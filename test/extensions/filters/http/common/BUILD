@@ -44,8 +44,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.jwt_authn"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
@@ -62,8 +65,11 @@ envoy_cc_test(
     name = "factory_base_test",
     srcs = ["factory_base_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/http:filter_interface",
@@ -82,7 +88,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "stream_rate_limiter_test",
     srcs = ["stream_rate_limiter_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",

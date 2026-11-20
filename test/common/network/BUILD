@@ -94,8 +94,11 @@ envoy_cc_test(
     name = "drain_close_util_test",
     srcs = ["drain_close_util_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/network:drain_close_util_lib",
@@ -110,8 +113,14 @@ envoy_cc_test(
     name = "connection_impl_test",
     srcs = ["connection_impl_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {"build": "default"},
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+        "tsan": {"build": "default"},
     },
     deps = [
         "//source/common/buffer:buffer_lib",
@@ -168,7 +177,10 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "multi_connection_base_impl_test",
     srcs = ["multi_connection_base_impl_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//envoy/network:socket_interface",
         "//source/common/network:multi_connection_base_impl_lib",
@@ -181,7 +193,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_manager_impl_test",
     srcs = ["filter_manager_impl_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
@@ -217,7 +232,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listen_socket_impl_test",
     srcs = ["listen_socket_impl_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:listen_socket_lib",
@@ -245,7 +263,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_impl_test",
     srcs = ["listener_impl_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
@@ -298,7 +319,10 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "udp_listener_impl_test",
     srcs = ["udp_listener_impl_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":udp_listener_impl_test_base_lib",
         "//source/common/event:dispatcher_lib",
@@ -322,7 +346,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "udp_listener_impl_batch_writer_test",
     srcs = envoy_select_enable_http3(["udp_listener_impl_batch_writer_test.cc"]),
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     # Skipping as quiche quic_gso_batch_writer.h does not exist on Windows
     tags = [
         "skip_on_windows",
@@ -354,7 +381,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "resolver_test",
     srcs = ["resolver_impl_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
@@ -384,7 +414,10 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "socket_option_impl_test",
     srcs = ["socket_option_impl_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":socket_option_test",
         "//envoy/network:address_interface",
@@ -396,7 +429,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "socket_option_factory_test",
     srcs = ["socket_option_factory_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//envoy/network:address_interface",
         "//source/common/network:address_lib",
@@ -416,7 +452,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "addr_family_aware_socket_option_impl_test",
     srcs = ["addr_family_aware_socket_option_impl_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":socket_option_test",
         "//source/common/network:addr_family_aware_socket_option_lib",
@@ -429,8 +468,8 @@ envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     rbe_pool = {
-        "asan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
     },
     deps = [
         "//envoy/common:base_includes",
@@ -461,7 +500,10 @@ envoy_cc_fuzz_test(
     name = "udp_fuzz_test",
     srcs = ["udp_fuzz.cc"],
     corpus = "udp_corpus",
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "udp_listener_impl_test_base_lib",
         "//source/common/event:dispatcher_lib",
@@ -614,7 +656,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "win32_redirect_records_option_test",
     srcs = ["win32_redirect_records_option_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":socket_option_test",
         "//source/common/network:address_lib",
@@ -625,7 +670,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_matcher_test",
     srcs = ["filter_matcher_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:filter_matcher_lib",
@@ -642,7 +690,10 @@ envoy_cc_fuzz_test(
     name = "listener_filter_buffer_fuzz_test",
     srcs = ["listener_filter_buffer_fuzz_test.cc"],
     corpus = "listener_filter_buffer_corpus",
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":listener_filter_buffer_fuzz_proto_cc_proto",
         "//source/common/network:listener_filter_buffer_lib",

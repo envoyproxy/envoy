@@ -12,8 +12,11 @@ envoy_cc_test(
     name = "filter_config_test",
     srcs = ["filter_config_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/common:hashable_interface",

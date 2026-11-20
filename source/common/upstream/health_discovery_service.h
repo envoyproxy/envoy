@@ -26,6 +26,7 @@
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -38,6 +39,9 @@ using HealthCheckerMap =
 
 // TODO(lilika): Add HdsClusters to the /clusters endpoint to get detailed stats about each HC host.
 
+class HdsCluster;
+using HdsClusterPtr = std::shared_ptr<HdsCluster>;
+
 /**
  * Implementation of Upstream::Cluster for hds clusters, clusters that are used
  * by HdsDelegates
@@ -45,11 +49,13 @@ using HealthCheckerMap =
 class HdsCluster : public Cluster, Logger::Loggable<Logger::Id::upstream> {
 public:
   static ClusterSharedPtr create();
-  HdsCluster(Server::Configuration::ServerFactoryContext& server_context,
-             envoy::config::cluster::v3::Cluster cluster,
-             const envoy::config::core::v3::BindConfig& bind_config, Stats::Store& stats,
-             Ssl::ContextManager& ssl_context_manager, bool added_via_api,
-             ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls);
+  // Creates an HdsCluster, resolving the endpoints in `cluster`.
+  static absl::StatusOr<HdsClusterPtr>
+  create(Server::Configuration::ServerFactoryContext& server_context,
+         envoy::config::cluster::v3::Cluster cluster,
+         const envoy::config::core::v3::BindConfig& bind_config, Stats::Store& stats,
+         Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+         ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -66,7 +72,7 @@ public:
                       const envoy::config::core::v3::BindConfig& bind_config,
                       ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls);
   // Creates healthcheckers and adds them to the list, then does initial start.
-  void initHealthchecks();
+  absl::Status initHealthchecks();
 
   std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
   std::vector<HostSharedPtr> hosts() { return *hosts_; };
@@ -81,6 +87,10 @@ protected:
   Outlier::DetectorSharedPtr outlier_detector_;
 
 private:
+  HdsCluster(Server::Configuration::ServerFactoryContext& server_context,
+             envoy::config::cluster::v3::Cluster cluster, Stats::Store& stats,
+             Ssl::ContextManager& ssl_context_manager, bool added_via_api);
+
   std::function<absl::Status()> initialization_complete_callback_;
 
   Server::Configuration::ServerFactoryContext& server_context_;
@@ -103,13 +113,11 @@ private:
 
   absl::Status updateHealthchecks(
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks);
-  void
+  absl::Status
   updateHosts(const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
                   locality_endpoints,
               bool update_socket_matches);
 };
-
-using HdsClusterPtr = std::shared_ptr<HdsCluster>;
 
 /**
  * All hds stats. @see stats_macros.h
@@ -167,8 +175,9 @@ private:
   absl::Status updateHdsCluster(HdsClusterPtr cluster,
                                 const envoy::config::cluster::v3::Cluster& cluster_health_check,
                                 const envoy::config::core::v3::BindConfig& bind_config);
-  HdsClusterPtr createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster_health_check,
-                                 const envoy::config::core::v3::BindConfig& bind_config);
+  absl::StatusOr<HdsClusterPtr>
+  createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster_health_check,
+                   const envoy::config::core::v3::BindConfig& bind_config);
   HdsDelegateStats stats_;
   const Protobuf::MethodDescriptor& service_method_;
 

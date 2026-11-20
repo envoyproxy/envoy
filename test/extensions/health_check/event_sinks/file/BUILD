@@ -16,8 +16,11 @@ envoy_extension_cc_test(
     srcs = ["file_sink_impl_test.cc"],
     extension_names = ["envoy.health_check.event_sinks.file"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/health_check/event_sinks/file:file_sink_lib",

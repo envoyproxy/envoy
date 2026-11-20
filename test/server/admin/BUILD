@@ -25,8 +25,11 @@ envoy_cc_test(
     name = "admin_factory_context_test",
     srcs = ["admin_factory_context_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/listener_manager:listener_info_lib",
@@ -55,8 +58,15 @@ envoy_cc_test(
     name = "admin_test",
     srcs = envoy_select_admin_functionality(["admin_test.cc"]),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":admin_instance_lib",
@@ -83,7 +93,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "admin_filter_test",
     srcs = envoy_select_admin_functionality(["admin_filter_test.cc"]),
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/server/admin:admin_lib",
@@ -98,8 +111,15 @@ envoy_cc_test(
     name = "admin_html_test",
     srcs = envoy_select_admin_html(["admin_html_test.cc"]),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":admin_instance_lib",
@@ -111,7 +131,12 @@ envoy_cc_test(
     name = "stats_handler_test",
     srcs = envoy_select_admin_functionality(["stats_handler_test.cc"]),
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
@@ -119,7 +144,6 @@ envoy_cc_test(
             "build": "linux_x64_small",
             "test": "linux_x64_large",
         },
-        "gcc": {"build": "linux_x64_large"},
     },
     deps = [
         ":admin_instance_lib",
@@ -132,6 +156,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:real_threads_test_helper_lib",
         "//test/test_common:stats_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -143,6 +168,7 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/server/admin:stats_params_lib",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -151,7 +177,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(["stats_render_test.cc"]) + envoy_select_admin_html([
         "stats_html_render_test.cc",
     ]),
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         ":stats_render_test_base",
         "//source/server/admin:admin_lib",
@@ -177,8 +203,11 @@ envoy_cc_test(
     name = "stats_request_test",
     srcs = envoy_select_admin_functionality(["stats_request_test.cc"]),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/stats:thread_local_store_lib",
@@ -220,8 +249,15 @@ envoy_cc_test(
     name = "runtime_handler_test",
     srcs = envoy_select_admin_functionality(["runtime_handler_test.cc"]),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [":admin_instance_lib"],
 )
@@ -230,8 +266,11 @@ envoy_cc_test(
     name = "prometheus_stats_test",
     srcs = envoy_select_admin_functionality(["prometheus_stats_test.cc"]),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/stats:tag_producer_lib",
@@ -241,6 +280,7 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:stats_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -249,8 +289,15 @@ envoy_cc_test(
     name = "logs_handler_test",
     srcs = envoy_select_admin_functionality(["logs_handler_test.cc"]),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":admin_instance_lib",
@@ -262,8 +309,15 @@ envoy_cc_test(
     name = "profiling_handler_test",
     srcs = envoy_select_admin_functionality(["profiling_handler_test.cc"]),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":admin_instance_lib",
@@ -278,8 +332,15 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":admin_instance_lib",
@@ -295,8 +356,15 @@ envoy_cc_test(
     name = "clusters_handler_test",
     srcs = envoy_select_admin_functionality(["clusters_handler_test.cc"]),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":admin_instance_lib",
@@ -316,8 +384,15 @@ envoy_cc_test(
         "//conditions:default": ["config_dump_handler_test.cc"],
     }),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":admin_instance_lib",
@@ -330,8 +405,15 @@ envoy_cc_test(
     name = "init_dump_handler_test",
     srcs = envoy_select_admin_functionality(["init_dump_handler_test.cc"]),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":admin_instance_lib",

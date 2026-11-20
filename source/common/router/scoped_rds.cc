@@ -654,9 +654,7 @@ ScopedRoutesConfigProviderManager::dumpConfigs(const Matchers::StringMatcher& na
   auto config_dump = std::make_unique<envoy::admin::v3::ScopedRoutesConfigDump>();
   for (const auto& element : configSubscriptions()) {
     auto subscription = element.second.lock();
-    ASSERT(subscription);
-
-    if (subscription->configInfo()) {
+    if (subscription && subscription->configInfo()) {
       auto* dynamic_config = config_dump->mutable_dynamic_scoped_route_configs()->Add();
       dynamic_config->set_version_info(subscription->configInfo().value().last_config_version_);
       const ScopedRdsConfigSubscription* typed_subscription =

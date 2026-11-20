@@ -39,8 +39,11 @@ envoy_extension_cc_test(
     srcs = ["header_forwarding_utils_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/mcp_router:header_forwarding_utils_lib",
@@ -54,8 +57,11 @@ envoy_extension_cc_test(
     srcs = ["mcp_router_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/http:async_client_interface",
@@ -76,7 +82,10 @@ envoy_extension_cc_test(
     name = "mcp_router_sse_test",
     srcs = ["mcp_router_sse_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http/sse:sse_parser_lib",
@@ -91,11 +100,10 @@ envoy_extension_cc_test(
     srcs = ["mcp_router_integration_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/clusters/mcp_multicluster:cluster",

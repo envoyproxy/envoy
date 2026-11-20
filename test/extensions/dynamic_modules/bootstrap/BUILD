@@ -39,8 +39,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/stats:isolated_store_lib",
@@ -60,8 +63,11 @@ envoy_extension_cc_test(
     srcs = ["cluster_writer_test.cc"],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/common:cleanup_lib",
@@ -86,6 +92,13 @@ envoy_extension_cc_test(
     name = "listener_writer_test",
     srcs = ["listener_writer_test.cc"],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/common:cleanup_lib",
         "//source/common/config:dependent_type_urls_lib",
@@ -115,11 +128,15 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/config:xds_manager_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/dynamic_modules:abi_impl",
         "//source/extensions/bootstrap/dynamic_modules:extension_config_lib",
@@ -130,9 +147,11 @@ envoy_extension_cc_dyn_module_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:admin_stream_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/server:listener_manager_mocks",
         "//test/mocks/server:listener_update_callbacks_handle_mocks",
         "//test/mocks/tracing:tracing_mocks",
@@ -157,8 +176,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/stats:isolated_store_lib",
@@ -183,8 +205,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/bootstrap/dynamic_modules:config",
@@ -216,6 +241,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_iterate_panic_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_listener_lifecycle_test",
+        "//test/extensions/dynamic_modules/test_data/rust:bootstrap_runtime_update_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_shared_data_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_stats_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_timer_test",
@@ -224,11 +250,10 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/common:base64_lib",

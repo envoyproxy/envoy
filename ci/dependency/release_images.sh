@@ -1,38 +1,34 @@
 #!/usr/bin/env bash
 
-# Update the base images pinned in the release Dockerfile to the current digest of their tag,
-# and describe the result as JSON (`output`, `title`, `summary`) for the workflow to name the
+# Update the base images pinned for the release container images to the current digest of their
+# tag, and describe the result as JSON (`output`, `title`, `summary`) for the workflow to name the
 # branch and PR.
 #
-# The pinned images are the `BUILD_OS:BUILD_TAG@sha256:BUILD_SHA` args, and any
-# `FROM image:tag@sha256:... AS envoy-<name>` stage.
+# The pinned images are the `oci.pull` entries of `MODULE.bazel` with a `# tag: <tag>` comment: the
+# images (`//distribution/docker`) are built with rules_oci from their digests.
 
 set -e -o pipefail
 
-DOCKERFILE="${DOCKERFILE:-distribution/docker/Dockerfile-envoy}"
+MODULE_BAZEL="${MODULE_BAZEL:-MODULE.bazel}"
 
 fail() {
     echo "::error::$*" >&2
     exit 1
 }
 
-dockerfile_arg() {
-    sed -n -E "s/^ARG ${1}=(.+)$/\1/p" "$DOCKERFILE"
-}
-
 # The pinned images as `name image:tag sha` lines.
 pinned_images() {
-    local build_os build_sha build_tag
-
-    build_os="$(dockerfile_arg BUILD_OS)"
-    build_tag="$(dockerfile_arg BUILD_TAG)"
-    build_sha="$(dockerfile_arg BUILD_SHA)"
-    if [[ -n "$build_os" && -n "$build_tag" && -n "$build_sha" ]]; then
-        echo "${build_os} ${build_os}:${build_tag} ${build_sha}"
-    fi
-    sed -n -E \
-        's/^FROM ([^@ ]+)@sha256:([0-9a-f]{64}) AS envoy-([^ ]+)$/\3 \1 \2/p' \
-        "$DOCKERFILE"
+    awk -F'"' '
+        /^oci\.pull\(/ { pull = 1; name = image = tag = sha = ""; next }
+        pull && /^\)/ {
+            if (tag != "") print name, image ":" tag, sha
+            pull = 0
+        }
+        pull && /^ +# tag: / { tag = $0; sub(/^ +# tag: +/, "", tag); sub(/ +$/, "", tag) }
+        pull && /^ +name = "/ { name = $2 }
+        pull && /^ +image = "/ { image = $2 }
+        pull && /^ +digest = "sha256:/ { sha = $2; sub(/^sha256:/, "", sha) }
+    ' "$MODULE_BAZEL"
 }
 
 # The current digest of an image tag (of the multi-arch index, where there is one).
@@ -45,12 +41,13 @@ pinned=()
 while read -r line; do
     [[ -n "$line" ]] && pinned+=("$line")
 done < <(pinned_images)
-(( ${#pinned[@]} > 0 )) || fail "No pinned images found in ${DOCKERFILE}"
+(( ${#pinned[@]} > 0 )) || fail "No pinned images found in ${MODULE_BAZEL}"
 
 changed=()
 summary=""
 for line in "${pinned[@]}"; do
     read -r name image current <<< "$line"
+    [[ "$current" =~ ^[0-9a-f]{64}$ ]] || fail "${name} (${image}) has no sha256 digest in ${MODULE_BAZEL}"
     latest="$(image_sha "$image")"
     [[ -n "$latest" ]] || fail "Unable to resolve the digest of ${image}"
     if [[ "$latest" == "$current" ]]; then
@@ -58,8 +55,9 @@ for line in "${pinned[@]}"; do
         continue
     fi
     echo "${image}: ${current:0:7} -> ${latest:0:7}" >&2
-    sed -i "s/${current}/${latest}/" "$DOCKERFILE"
-    changed+=("${name}-${latest:0:7}")
+    sed -i "s/${current}/${latest}/" "$MODULE_BAZEL"
+    # `ubuntu_base` -> `ubuntu`
+    changed+=("${name%%_*}-${latest:0:7}")
     summary+="- \`${image}\`: ${current:0:7} -> ${latest:0:7}"$'\n'
 done
 

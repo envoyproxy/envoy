@@ -17,11 +17,12 @@ envoy_extension_cc_test(
     srcs = envoy_select_enable_http3(["quic_lb_test.cc"]),
     extension_names = ["envoy.quic.connection_id_generator.quic_lb"],
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "gcc": {"build": "linux_x64_large"},
     },
     deps = envoy_select_enable_http3([
         "//test/test_common:logging_lib",
@@ -42,9 +43,22 @@ envoy_extension_cc_test(
     rbe_pool = {
         "default": {
             "build": "linux_x64_small",
-            "link": "linux_x64_large",
+            "test": "linux_x64_large",
         },
-        "gcc": {"build": "linux_x64_large"},
+        "gcc": {
+            "build": "linux_x64_large",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
     },
     deps = envoy_select_enable_http3([
         "//source/extensions/quic/connection_id_generator/quic_lb:quic_lb_config",

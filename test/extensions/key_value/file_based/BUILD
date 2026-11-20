@@ -16,8 +16,11 @@ envoy_extension_cc_test(
     srcs = ["alternate_protocols_cache_impl_test.cc"],
     extension_names = ["envoy.key_value.file_based"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/common:key_value_store_lib",

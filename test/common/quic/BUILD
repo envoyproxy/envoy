@@ -40,7 +40,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_writer_test",
     srcs = envoy_select_enable_http3(["envoy_quic_writer_test.cc"]),
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = envoy_select_enable_http3([
         "//source/common/network:io_socket_error_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
@@ -64,11 +64,16 @@ envoy_cc_test(
     name = "envoy_quic_proof_source_test",
     srcs = envoy_select_enable_http3(["envoy_quic_proof_source_test.cc"]),
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "gcc": {"build": "linux_x64_large"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = envoy_select_enable_http3([
         "//test/test_common:status_utility_lib",
@@ -91,7 +96,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_filter_manager_connection_impl_test",
     srcs = envoy_select_enable_http3(["quic_filter_manager_connection_impl_test.cc"]),
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = envoy_select_enable_http3([
         "//source/common/quic:quic_filter_manager_connection_lib",
         "//test/mocks/event:event_mocks",
@@ -130,11 +138,12 @@ envoy_cc_test(
     name = "envoy_quic_proof_verifier_test",
     srcs = envoy_select_enable_http3(["envoy_quic_proof_verifier_test.cc"]),
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "gcc": {"build": "linux_x64_large"},
     },
     deps = envoy_select_enable_http3([
         ":test_utils_lib",
@@ -158,8 +167,11 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = envoy_select_enable_http3([
         "//source/common/quic:envoy_quic_proof_verifier_lib",
@@ -180,8 +192,11 @@ envoy_cc_test(
     name = "envoy_quic_server_stream_test",
     srcs = envoy_select_enable_http3(["envoy_quic_server_stream_test.cc"]),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = envoy_select_enable_http3([
         ":test_utils_lib",
@@ -207,8 +222,11 @@ envoy_cc_test(
     name = "envoy_quic_client_stream_test",
     srcs = envoy_select_enable_http3(["envoy_quic_client_stream_test.cc"]),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = envoy_select_enable_http3([
         "//test/test_common:status_utility_lib",
@@ -236,11 +254,16 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "gcc": {"build": "linux_x64_large"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = envoy_select_enable_http3([
         ":test_proof_source_lib",
@@ -279,8 +302,11 @@ envoy_cc_test(
     name = "envoy_quic_client_session_test",
     srcs = envoy_select_enable_http3(["envoy_quic_client_session_test.cc"]),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = envoy_select_enable_http3([
         ":test_utils_lib",
@@ -311,11 +337,16 @@ envoy_cc_test(
     name = "active_quic_listener_test",
     srcs = envoy_select_enable_http3(["active_quic_listener_test.cc"]),
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "gcc": {"build": "linux_x64_large"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = envoy_select_enable_http3([
         ":fake_quic_packet_writer_lib",
@@ -350,8 +381,11 @@ envoy_cc_test(
     name = "envoy_quic_dispatcher_test",
     srcs = envoy_select_enable_http3(["envoy_quic_dispatcher_test.cc"]),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = envoy_select_enable_http3([
         ":test_proof_source_lib",
@@ -418,8 +452,11 @@ envoy_cc_test(
     name = "client_connection_factory_impl_test",
     srcs = envoy_select_enable_http3(["client_connection_factory_impl_test.cc"]),
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = envoy_select_enable_http3([
         "//source/common/event:dispatcher_lib",
@@ -444,7 +481,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_io_handle_wrapper_test",
     srcs = envoy_select_enable_http3(["quic_io_handle_wrapper_test.cc"]),
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = envoy_select_enable_http3([
         "//source/common/quic:quic_io_handle_wrapper_lib",
         "//test/mocks/api:api_mocks",
@@ -503,8 +543,11 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = envoy_select_enable_http3([
         "//test/test_common:status_utility_lib",
@@ -571,7 +614,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "envoy_deterministic_connection_id_generator_test",
     srcs = envoy_select_enable_http3(["envoy_deterministic_connection_id_generator_test.cc"]),
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = envoy_select_enable_http3([
         ":connection_id_matchers",
         "//source/common/quic:envoy_deterministic_connection_id_generator_lib",
@@ -601,8 +644,11 @@ envoy_cc_fuzz_test(
     srcs = ["envoy_quic_h3_fuzz_test.cc"],
     corpus = "envoy_quic_h3_fuzz_test_corpus",
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["nofips"],
     deps = [

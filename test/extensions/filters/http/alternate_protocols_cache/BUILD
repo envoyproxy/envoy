@@ -16,8 +16,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/alternate_protocols_cache:config",
@@ -33,8 +36,14 @@ envoy_extension_cc_test(
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {"build": "default"},
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+        "tsan": {"build": "default"},
     },
     deps = [
         "//source/extensions/filters/http/alternate_protocols_cache:config",
@@ -55,11 +64,23 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
     rbe_pool = {
-        "tsan": {
+        "default": {"test": "linux_x64_medium"},
+        "gcc": {
             "build": "linux_x64_small",
-            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
         },
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "coverage": {
+            "link": "linux_x64_large",
+            "test": "linux_x64_medium",
+        },
+        "tsan": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
     },
     shard_count = 2,
     tags = [

@@ -16,7 +16,10 @@ envoy_extension_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
     extension_names = ["envoy.formatter.dynamic_modules"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/formatter/dynamic_modules:formatter_lib",
         "//test/mocks/stream_info:stream_info_mocks",
@@ -39,8 +42,11 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.formatter.dynamic_modules"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/formatter:substitution_format_string_lib",
@@ -65,11 +71,10 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.formatter.dynamic_modules"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/formatter/dynamic_modules:config",

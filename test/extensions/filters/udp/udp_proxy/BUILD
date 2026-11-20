@@ -32,11 +32,16 @@ envoy_extension_cc_test(
     srcs = ["udp_proxy_filter_test.cc"],
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
     rbe_pool = {
-        "default": {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
             "build": "linux_x64_small",
             "link": "linux_x64_small",
         },
-        "gcc": {"build": "linux_x64_large"},
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":mocks",
@@ -91,8 +96,11 @@ envoy_extension_cc_test(
     srcs = ["router_impl_test.cc"],
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/network:address_lib",
@@ -111,11 +119,10 @@ envoy_extension_cc_test(
     srcs = ["udp_proxy_integration_test.cc"],
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//envoy/network:filter_interface",
@@ -145,11 +152,9 @@ envoy_extension_cc_test(
     srcs = ["udp_session_extension_discovery_integration_test.cc"],
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//envoy/network:filter_interface",

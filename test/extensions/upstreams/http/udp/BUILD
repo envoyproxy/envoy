@@ -16,8 +16,11 @@ envoy_extension_cc_test(
     srcs = ["upstream_request_test.cc"],
     extension_names = ["envoy.upstreams.http.udp"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/http:protocol_interface",
@@ -46,7 +49,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.upstreams.http.udp"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/upstreams/http/udp:config",
         "//source/extensions/upstreams/http/udp:upstream_request_lib",

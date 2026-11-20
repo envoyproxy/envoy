@@ -39,11 +39,11 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     rbe_pool = {
-        "default": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_large",
-        },
-        "msan": "linux_x64_small",
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+        "msan": {"test": "linux_x64_small"},
     },
     deps = [
         ":sni_to_header_filter_lib",
@@ -98,11 +98,10 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/event:dispatcher_includes",
