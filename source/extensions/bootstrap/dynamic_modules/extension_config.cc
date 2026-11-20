@@ -1,6 +1,8 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 
 #include <algorithm>
+#include <optional>
+#include <utility>
 #include <vector>
 
 #include "envoy/server/options.h"
@@ -139,6 +141,70 @@ void DynamicModuleBootstrapExtensionConfig::onListenerRemoval(const std::string&
   if (in_module_config_ != nullptr && on_bootstrap_extension_listener_removal_ != nullptr) {
     on_bootstrap_extension_listener_removal_(thisAsVoidPtr(), in_module_config_,
                                              {listener_name.data(), listener_name.size()});
+  }
+}
+
+bool DynamicModuleBootstrapExtensionConfig::enableRuntimeUpdate() {
+  if (runtime_update_enabled_) {
+    return false;
+  }
+  if (on_bootstrap_extension_runtime_update_ == nullptr) {
+    ENVOY_LOG(error, "cannot enable runtime update since the module does not implement "
+                     "envoy_dynamic_module_on_bootstrap_extension_runtime_update");
+    return false;
+  }
+  if (shutdown_started_) {
+    ENVOY_LOG(error, "cannot enable runtime update once shutdown started");
+    return false;
+  }
+  runtime_update_enabled_ = true;
+  Runtime::Loader& runtime = context_.runtime();
+  runtime_snapshot_ = runtime.threadsafeSnapshot();
+  runtime_values_ = runtimeValues(*runtime_snapshot_);
+  runtime_update_handle_ = runtime.addUpdateCallback([this]() { onRuntimeUpdate(); });
+  return true;
+}
+
+DynamicModuleBootstrapExtensionConfig::RuntimeValues
+DynamicModuleBootstrapExtensionConfig::runtimeValues(const Runtime::Snapshot& snapshot) {
+  RuntimeValues values;
+  // Layers are ordered from bottom to top, so a later layer overrides an earlier one.
+  for (const Runtime::Snapshot::OverrideLayerConstPtr& layer : snapshot.getLayers()) {
+    for (const auto& [key, entry] : layer->values()) {
+      values.insert_or_assign(key, entry.raw_string_value_);
+    }
+  }
+  return values;
+}
+
+void DynamicModuleBootstrapExtensionConfig::onRuntimeUpdate() {
+  Runtime::SnapshotConstSharedPtr snapshot = context_.runtime().threadsafeSnapshot();
+  RuntimeValues values = runtimeValues(*snapshot);
+  // A removed key has no value.
+  std::vector<std::pair<absl::string_view, std::optional<absl::string_view>>> changes;
+  for (const auto& [key, value] : values) {
+    const auto previous = runtime_values_.find(key);
+    if (previous == runtime_values_.end() || previous->second != value) {
+      changes.emplace_back(key, value);
+    }
+  }
+  for (const auto& [key, value] : runtime_values_) {
+    if (!values.contains(key)) {
+      changes.emplace_back(key, std::nullopt);
+    }
+  }
+  std::sort(changes.begin(), changes.end(),
+            [](const auto& a, const auto& b) { return a.first < b.first; });
+
+  // The removed keys view into the previous snapshot, so it must outlive the calls below.
+  const Runtime::SnapshotConstSharedPtr previous_snapshot =
+      std::exchange(runtime_snapshot_, std::move(snapshot));
+  runtime_values_ = std::move(values);
+  for (const auto& [key, value] : changes) {
+    const absl::string_view raw_value = value.value_or(absl::string_view());
+    on_bootstrap_extension_runtime_update_(
+        thisAsVoidPtr(), in_module_config_, {key.data(), key.size()},
+        {raw_value.data(), raw_value.size()}, !value.has_value());
   }
 }
 
@@ -323,6 +389,9 @@ void DynamicModuleBootstrapExtensionConfig::onPostInit() {
 
 void DynamicModuleBootstrapExtensionConfig::onShutdown() {
   shutdown_started_ = true;
+  runtime_update_handle_.reset();
+  runtime_values_.clear();
+  runtime_snapshot_.reset();
   if (cluster_writer_ != nullptr) {
     cluster_writer_->onShutdown();
   }
@@ -617,6 +686,11 @@ newDynamicModuleBootstrapExtensionConfig(
           "envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done");
   config->on_bootstrap_extension_listener_writer_update_done_ =
       on_listener_writer_update_done.ok() ? on_listener_writer_update_done.value() : nullptr;
+  auto on_runtime_update =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionRuntimeUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_runtime_update");
+  config->on_bootstrap_extension_runtime_update_ =
+      on_runtime_update.ok() ? on_runtime_update.value() : nullptr;
 
   // Always register an init target so that Envoy blocks traffic until the module signals readiness.
   // This must happen before calling the module constructor so the module can call

@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local_object.h"
@@ -221,6 +222,7 @@ public:
   virtual ~Loader() = default;
 
   using ReadyCallback = std::function<void()>;
+  using UpdateCallback = std::function<void()>;
 
   /**
    * Post-construction initialization. Runtime will be generally available after
@@ -276,6 +278,18 @@ public:
    * Updates deprecated feature use stats.
    */
   virtual void countDeprecatedFeatureUse() const PURE;
+
+  /**
+   * Add a callback that is invoked on the main thread every time a new snapshot is loaded, after
+   * the main thread and threadsafeSnapshot() observe it. A snapshot is loaded when any layer
+   * changes, including disk layer updates, RTDS updates and mergeValues(), and also when nothing
+   * changed, for example once the worker threads are registered. The callback must not modify the
+   * runtime. This must be called on the main thread.
+   * @param callback supplies the callback to invoke.
+   * @return Common::CallbackHandlePtr a handle that removes the callback when destroyed.
+   */
+  ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
+  addUpdateCallback(UpdateCallback callback) PURE;
 };
 
 using LoaderPtr = std::unique_ptr<Loader>;

@@ -13,6 +13,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/listener_manager.h"
@@ -84,9 +85,52 @@ protected:
     return optional_hooks_module_->getFunctionPointer<FunctionType>(name).value();
   }
 
+  // Makes the runtime report a snapshot whose layers set the given raw values, bottom to top.
+  void
+  setRuntimeLayers(const std::vector<absl::flat_hash_map<std::string, std::string>>& layer_values) {
+    auto snapshot = std::make_shared<TestRuntimeSnapshot>();
+    for (const auto& values : layer_values) {
+      snapshot->layers_.push_back(std::make_unique<TestRuntimeLayer>(values));
+    }
+    ON_CALL(context_.runtime_loader_, threadsafeSnapshot())
+        .WillByDefault(testing::Return(snapshot));
+  }
+
+  // Simulates the runtime loading a new snapshot.
+  void loadRuntimeSnapshot() { context_.runtime_loader_.update_callbacks_.runCallbacks(); }
+
+  std::string runtimeUpdates() {
+    return optionalHooksFunction<const char* (*)()>(
+        "bootstrap_optional_hooks_test_runtime_updates")();
+  }
+
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Extensions::DynamicModules::DynamicModulePtr optional_hooks_module_;
+
+private:
+  class TestRuntimeLayer : public Runtime::Snapshot::OverrideLayer {
+  public:
+    explicit TestRuntimeLayer(const absl::flat_hash_map<std::string, std::string>& values) {
+      for (const auto& [key, value] : values) {
+        values_[key].raw_string_value_ = value;
+      }
+    }
+    const std::string& name() const override { return name_; }
+    const Runtime::Snapshot::EntryMap& values() const override { return values_; }
+
+  private:
+    const std::string name_{"test"};
+    Runtime::Snapshot::EntryMap values_;
+  };
+
+  class TestRuntimeSnapshot : public testing::NiceMock<Runtime::MockSnapshot> {
+  public:
+    TestRuntimeSnapshot() {
+      ON_CALL(*this, getLayers()).WillByDefault(testing::ReturnRef(layers_));
+    }
+    std::vector<Runtime::Snapshot::OverrideLayerConstPtr> layers_;
+  };
 };
 
 // Test that the scheduler can be created, used, and deleted.
@@ -2062,6 +2106,97 @@ TEST_F(BootstrapAbiImplTest, LifecycleRefusedOnceShutdownStartedAndInInitOnlyMod
   }
 }
 
+// Test that the module is told about every runtime key that was added, changed or removed, in key
+// order, and only about the changes made after it enabled runtime updates.
+TEST_F(BootstrapAbiImplTest, RuntimeUpdateReportsChangedKeys) {
+  setRuntimeLayers({{{"a", "1"}, {"b", "2"}, {"c", "3"}}, {}});
+  auto config = newOptionalHooksConfig();
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+      config->thisAsVoidPtr()));
+  EXPECT_EQ(1, context_.runtime_loader_.update_callbacks_.size());
+  EXPECT_EQ("", runtimeUpdates());
+
+  // A key set by a higher layer reports the value of the highest layer.
+  setRuntimeLayers({{{"a", "1"}, {"b", "2"}}, {{"b", "20"}, {"d", "4"}}});
+  loadRuntimeSnapshot();
+  EXPECT_EQ("b=20;c!;d=4;", runtimeUpdates());
+
+  // A snapshot that changes nothing reports nothing.
+  setRuntimeLayers({{{"a", "1"}}, {{"b", "20"}, {"d", "4"}}});
+  loadRuntimeSnapshot();
+  EXPECT_EQ("b=20;c!;d=4;", runtimeUpdates());
+
+  // An empty value is reported as a value, not as a removal. Removing the override of a key that a
+  // lower layer sets reports the value of the lower layer.
+  setRuntimeLayers({{{"a", "1"}, {"b", "2"}}, {{"d", "4"}, {"e", ""}}});
+  loadRuntimeSnapshot();
+  EXPECT_EQ("b=20;c!;d=4;b=2;e=;", runtimeUpdates());
+}
+
+// Test that enabling runtime updates twice fails and keeps a single registration.
+TEST_F(BootstrapAbiImplTest, EnableRuntimeUpdateTwice) {
+  setRuntimeLayers({{}});
+  auto config = newOptionalHooksConfig();
+  EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_));
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+      config->thisAsVoidPtr()));
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+      config->thisAsVoidPtr()));
+  EXPECT_EQ(1, context_.runtime_loader_.update_callbacks_.size());
+}
+
+// Test that enabling runtime updates fails when the module does not implement the hook.
+TEST_F(BootstrapAbiImplTest, EnableRuntimeUpdateWithoutHook) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_)).Times(0);
+  EXPECT_LOG_CONTAINS("error",
+                      "cannot enable runtime update since the module does not implement "
+                      "envoy_dynamic_module_on_bootstrap_extension_runtime_update",
+                      {
+                        EXPECT_FALSE(
+                            envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+                                config.value()->thisAsVoidPtr()));
+                      });
+}
+
+// Test that runtime updates cannot be enabled once shutdown started, and stop once it starts.
+TEST_F(BootstrapAbiImplTest, RuntimeUpdateStopsOnceShutdownStarted) {
+  setRuntimeLayers({{{"a", "1"}}});
+  auto config = newOptionalHooksConfig();
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+      config->thisAsVoidPtr()));
+  config->onShutdown();
+  EXPECT_EQ(0, context_.runtime_loader_.update_callbacks_.size());
+  setRuntimeLayers({{{"a", "2"}}});
+  loadRuntimeSnapshot();
+  EXPECT_EQ("", runtimeUpdates());
+
+  auto shut_down_config = newOptionalHooksConfig();
+  shut_down_config->onShutdown();
+  EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_)).Times(0);
+  EXPECT_LOG_CONTAINS("error", "cannot enable runtime update once shutdown started", {
+    EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+        shut_down_config->thisAsVoidPtr()));
+  });
+}
+
+// Test that destroying the config removes its runtime update registration.
+TEST_F(BootstrapAbiImplTest, RuntimeUpdateRemovedWithTheConfig) {
+  setRuntimeLayers({{}});
+  auto config = newOptionalHooksConfig();
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+      config->thisAsVoidPtr()));
+  EXPECT_EQ(1, context_.runtime_loader_.update_callbacks_.size());
+  config.reset();
+  EXPECT_EQ(0, context_.runtime_loader_.update_callbacks_.size());
+}
+
 // Test that listener add/update events are forwarded to the module.
 TEST_F(BootstrapAbiImplTest, ListenerAddOrUpdateCallback) {
   auto dynamic_module =
@@ -2317,6 +2452,11 @@ TEST_F(BootstrapAbiImplTest, MainThreadCallbacksOffMainThreadFailClosed) {
        [] {
          EXPECT_FALSE(
              envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update",
+       [] {
+         EXPECT_FALSE(
+             envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(nullptr));
        }},
       {"envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers",
        [] {
@@ -2641,6 +2781,7 @@ TEST_F(BootstrapAbiImplTest, ServerCallbacksRefusedOnceTheExtensionIsDestroyed) 
   EXPECT_CALL(context_, clusterManager()).Times(0);
   EXPECT_CALL(context_, admin()).Times(0);
   EXPECT_CALL(context_, options()).Times(0);
+  EXPECT_CALL(context_, runtime()).Times(0);
   void* config_ptr = config->thisAsVoidPtr();
   std::vector<envoy_dynamic_module_type_module_http_header> headers = {
       {":method", 7, "GET", 3}, {":path", 5, "/", 1}, {"host", 4, "example.com", 11}};
@@ -2660,6 +2801,7 @@ TEST_F(BootstrapAbiImplTest, ServerCallbacksRefusedOnceTheExtensionIsDestroyed) 
       envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(config_ptr));
   EXPECT_FALSE(
       envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(config_ptr));
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(config_ptr));
 }
 
 // Test that the cluster writer callbacks are refused until the module enables the cluster writer.

@@ -315,6 +315,44 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ListenerLifecycleRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_listener_lifecycle_test"));
 }
 
+// This test verifies that a Rust bootstrap extension that enabled runtime updates is told about
+// every runtime key that changes, including a runtime feature flag, with the new value, and is not
+// told about the values present when it enabled the updates or about unchanged values.
+TEST_P(DynamicModulesBootstrapIntegrationTest, RuntimeUpdateRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  config_helper_.addRuntimeOverride("dynamic_modules_test.number", "1");
+  EXPECT_LOG_CONTAINS(
+      "info", "Runtime update enabled: true",
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_runtime_update_test"));
+
+  auto runtime_modify = [this](absl::string_view query) {
+    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+        lookupPort("admin"), "POST", absl::StrCat("/runtime_modify?", query), "",
+        Http::CodecType::HTTP1, version_);
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  };
+
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"info", "Runtime update: dynamic_modules_test.number=42, getter agrees: true"},
+           {"info", "Runtime update: envoy.reloadable_features.test_feature_true=false, getter "
+                    "agrees: true"}}),
+      runtime_modify(
+          "dynamic_modules_test.number=42&envoy.reloadable_features.test_feature_true=false"));
+
+  EXPECT_LOG_NOT_CONTAINS("info",
+                          "Runtime update:", runtime_modify("dynamic_modules_test.number=42"));
+
+  // Removing the admin override of a key falls back to the lower layer, and removing the only
+  // value of a key reports a removal.
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"info", "Runtime update: dynamic_modules_test.number=1, getter agrees: true"},
+           {"info", "Runtime update: envoy.reloadable_features.test_feature_true removed"}}),
+      runtime_modify("dynamic_modules_test.number=&envoy.reloadable_features.test_feature_true="));
+}
+
 // This test verifies that a bootstrap extension can register a function in the process-wide
 // function registry and an HTTP filter in the same module can resolve and call it during request
 // processing. The bootstrap extension asynchronously initializes a routing table and registers a

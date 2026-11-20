@@ -100,9 +100,11 @@ envoy_cc_library(
     deps = [
         ":cluster_writer_lib",
         ":listener_writer_lib",
+        "//envoy/common:callback",
         "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:async_client_interface",
+        "//envoy/runtime:runtime_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/server:listener_manager_interface",
         "//envoy/server:options_interface",

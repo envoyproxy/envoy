@@ -10519,6 +10519,62 @@ void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names
     envoy_dynamic_module_type_bootstrap_active_resource_kind kind,
     envoy_dynamic_module_type_bootstrap_active_resource_name_fn name_fn, void* user_data);
 
+// -------------------- Bootstrap Extension - Runtime Update --------------------
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_runtime_update is called on the main thread once for
+ * each runtime key whose value changed, after the module opted in with
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update.
+ *
+ * Envoy loads a new runtime snapshot whenever a layer of the `layered_runtime` bootstrap option
+ * changes, for example on an RTDS update, a disk layer update or a request to the admin
+ * `/runtime_modify` endpoint. Envoy compares the value of every key in the new snapshot, that is
+ * the value of the topmost layer that sets the key, with the previous snapshot, and calls this hook
+ * once for every key that was added, changed or removed, in lexicographic order of the keys. A
+ * snapshot that changes no value calls nothing. The first comparison is against the snapshot that
+ * was current when the module opted in, so the values present at that point are not reported.
+ * Nothing is reported once the server began to shut down.
+ *
+ * When this is called, the runtime getters such as envoy_dynamic_module_callback_get_runtime_bool
+ * already return the new values on the main thread. The worker threads observe the new snapshot
+ * shortly after.
+ *
+ * This hook is optional.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param key is the runtime key whose value changed. It is owned by Envoy and valid only for the
+ * duration of this call.
+ * @param value is the new value of the key as a raw string, as given by the layer that sets it, for
+ * example "true" or "42". It is empty when removed is true. It is owned by Envoy and valid only for
+ * the duration of this call.
+ * @param removed is true when no layer sets the key anymore.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_runtime_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_envoy_buffer value,
+    bool removed);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update is called by the module
+ * to opt in to envoy_dynamic_module_on_bootstrap_extension_runtime_update.
+ *
+ * This can be called during or after envoy_dynamic_module_on_bootstrap_extension_config_new, and
+ * must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @return true if the module now receives runtime updates. Returns false when it already opted in,
+ * when the module does not implement envoy_dynamic_module_on_bootstrap_extension_runtime_update,
+ * once the server began to shut down, or when called off the main thread. A call off the main
+ * thread also reports an Envoy bug.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
 // -------------------- Bootstrap Extension - Run On All Workers --------------------
 
 /**

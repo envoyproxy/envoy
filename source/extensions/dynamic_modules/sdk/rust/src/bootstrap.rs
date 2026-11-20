@@ -292,6 +292,18 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// `--mode init_only`.
   fn enable_listener_lifecycle(&self) -> bool;
 
+  /// Enable runtime update notifications. When enabled, the module receives
+  /// [`BootstrapExtensionConfig::on_runtime_update`] once for every runtime key whose value
+  /// changed in a newly loaded runtime snapshot, for example on an RTDS update, a disk layer
+  /// update or a request to the admin `/runtime_modify` endpoint. The values present when this is
+  /// called are not reported.
+  ///
+  /// This must be called on the main thread, and can be called from the config creation function.
+  ///
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`. This also
+  /// returns `false` once the server began to shut down.
+  fn enable_runtime_update(&self) -> bool;
+
   /// Returns the names of the currently active resources of the given kind, each at most once. See
   /// [`ActiveResourceKind`] for what each kind reports. This must be called on the main thread. It
   /// returns nothing before the server is initialized and once the extension is destroyed.
@@ -626,6 +638,26 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     &self,
     _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
     _listener_name: &str,
+  ) {
+  }
+
+  /// This is called on the main thread once for every runtime key whose value changed in a newly
+  /// loaded runtime snapshot, in lexicographic order of the keys.
+  ///
+  /// This is only called if the module has opted in via
+  /// [`EnvoyBootstrapExtensionConfig::enable_runtime_update`]. The runtime getters such as
+  /// [`crate::get_runtime_bool`] already return the new value on the main thread when this is
+  /// called.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `key` is the runtime key whose value changed.
+  /// * `value` is the new raw value of the key, for example `"true"` or `"42"`, or `None` when no
+  ///   runtime layer sets the key anymore.
+  fn on_runtime_update(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _key: &str,
+    _value: Option<&str>,
   ) {
   }
 
@@ -1452,6 +1484,12 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     }
   }
 
+  fn enable_runtime_update(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(self.raw)
+    }
+  }
+
   fn active_resource_names(&self, kind: ActiveResourceKind) -> Vec<String> {
     extern "C" fn name_trampoline(
       name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -2136,6 +2174,32 @@ ffi_export! {
     extension_config.on_listener_removal(
       &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
       listener_name_str.as_ref(),
+    );
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy for each runtime key whose value changed, once a bootstrap
+  /// extension enabled runtime updates.
+  fn envoy_dynamic_module_on_bootstrap_extension_runtime_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    key: abi::envoy_dynamic_module_type_envoy_buffer,
+    value: abi::envoy_dynamic_module_type_envoy_buffer,
+    removed: bool,
+  ) {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+
+    let key_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(key.ptr as *const u8, key.length) };
+    let value_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(value.ptr as *const u8, value.length) };
+
+    extension_config.on_runtime_update(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      key_str.as_ref(),
+      (!removed).then_some(value_str.as_ref()),
     );
   }
 }

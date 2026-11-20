@@ -31,6 +31,9 @@ static char g_last_listener_update_name[256];
 static char g_last_listener_update_error_details[1024];
 static size_t g_http_callout_done_count = 0;
 static int g_last_http_callout_result = -1;
+// Each runtime update is appended as "key=value;", or "key!;" when the key was removed.
+static char g_runtime_updates[4096];
+static size_t g_runtime_updates_length = 0;
 
 static void copyBuffer(char* destination, size_t destination_size,
                        envoy_dynamic_module_type_envoy_buffer buffer) {
@@ -79,6 +82,8 @@ envoy_dynamic_module_on_bootstrap_extension_config_new(
   g_last_listener_update_error_details[0] = '\0';
   g_http_callout_done_count = 0;
   g_last_http_callout_result = -1;
+  g_runtime_updates[0] = '\0';
+  g_runtime_updates_length = 0;
   if (!g_run_on_all_workers_at_startup) {
     envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
         extension_config_envoy_ptr);
@@ -294,6 +299,34 @@ void envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done(
              error_details);
 }
 
+static void appendRuntimeUpdate(const char* data, size_t length) {
+  if (g_runtime_updates_length + length >= sizeof(g_runtime_updates)) {
+    return;
+  }
+  if (length > 0) {
+    memcpy(g_runtime_updates + g_runtime_updates_length, data, length);
+  }
+  g_runtime_updates_length += length;
+  g_runtime_updates[g_runtime_updates_length] = '\0';
+}
+
+void envoy_dynamic_module_on_bootstrap_extension_runtime_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_envoy_buffer value,
+    bool removed) {
+  (void)extension_config_envoy_ptr;
+  (void)extension_config_module_ptr;
+  appendRuntimeUpdate(key.ptr, key.length);
+  if (removed) {
+    appendRuntimeUpdate("!", 1);
+  } else {
+    appendRuntimeUpdate("=", 1);
+    appendRuntimeUpdate(value.ptr, value.length);
+  }
+  appendRuntimeUpdate(";", 1);
+}
+
 size_t bootstrap_optional_hooks_test_worker_event_count(void) {
   return atomic_load(&g_worker_event_count);
 }
@@ -347,3 +380,5 @@ size_t bootstrap_optional_hooks_test_http_callout_done_count(void) {
 int bootstrap_optional_hooks_test_last_http_callout_result(void) {
   return g_last_http_callout_result;
 }
+
+const char* bootstrap_optional_hooks_test_runtime_updates(void) { return g_runtime_updates; }

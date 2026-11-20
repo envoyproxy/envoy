@@ -11,6 +11,7 @@ This can be used to implement:
 * Server initialization logic when Envoy starts.
 * Code that runs on every worker thread.
 * Clusters and listeners that the module adds, updates and removes.
+* Reactions to runtime value changes.
 * Singleton patterns for configuration loading from external services.
 * Global state management across filters.
 * Background tasks that run on the main thread.
@@ -71,6 +72,25 @@ The workers start only after Envoy finishes initializing, so a module must not w
 hook before it calls ``envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete``.
 That call can start the workers and wait until they ran the events posted before it, so a module
 must not hold a lock across it that its worker event hook takes.
+
+.. _config_bootstrap_extensions_dynamic_modules_runtime_update:
+
+Runtime Updates
+---------------
+
+Once the module calls ``envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update``,
+Envoy calls ``envoy_dynamic_module_on_bootstrap_extension_runtime_update`` on the main thread for
+every :ref:`runtime <config_runtime>` key whose value changed, with the key and its new raw value,
+or with ``removed`` set when no layer sets the key anymore. Envoy compares each newly loaded runtime
+snapshot with the previous one, so an RTDS update, a disk layer update or a request to the admin
+``/runtime_modify`` endpoint reports only the keys whose value it changed, in lexicographic order.
+The values present when the module enables runtime updates are not reported. When the hook runs,
+the runtime getters such as ``envoy_dynamic_module_callback_get_runtime_bool`` already return the
+new value on the main thread.
+
+The module can enable runtime updates from
+``envoy_dynamic_module_on_bootstrap_extension_config_new`` onwards. Enabling fails once the server
+began to shut down, and no update is reported after that.
 
 .. _config_bootstrap_extensions_dynamic_modules_cluster_writer:
 

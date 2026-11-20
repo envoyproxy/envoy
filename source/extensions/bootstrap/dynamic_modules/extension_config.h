@@ -3,10 +3,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/watcher.h"
 #include "envoy/http/async_client.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
@@ -74,6 +76,8 @@ using OnBootstrapExtensionClusterWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done);
 using OnBootstrapExtensionListenerWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done);
+using OnBootstrapExtensionRuntimeUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_update);
 
 class DynamicModuleBootstrapExtension;
 
@@ -195,6 +199,15 @@ public:
   void onListenerRemoval(const std::string& listener_name) override;
 
   /**
+   * Starts calling the module's runtime update hook once for every runtime key whose value changed
+   * in a newly loaded runtime snapshot, compared with the snapshot that was current at the previous
+   * update, or when this was called. Must be called on the main thread.
+   * @return false if already enabled, if the module does not implement the hook, or once shutdown
+   * began.
+   */
+  bool enableRuntimeUpdate();
+
+  /**
    * Enumerates the names of the currently active resources of a single kind: the active listeners'
    * filter chains (inline, default and routable FCDS chains), the clusters, the transport socket
    * match names present in every cluster that has matches, or the active dynamic secrets. `emit`
@@ -293,6 +306,7 @@ public:
       on_bootstrap_extension_cluster_writer_update_done_ = nullptr;
   OnBootstrapExtensionListenerWriterUpdateDoneType
       on_bootstrap_extension_listener_writer_update_done_ = nullptr;
+  OnBootstrapExtensionRuntimeUpdateType on_bootstrap_extension_runtime_update_ = nullptr;
 
   // The name of the extension.
   const std::string extension_name_;
@@ -408,6 +422,21 @@ private:
   // Handle for the shutdown lifecycle callback that cleans up listener_update_callbacks_handle_.
   Server::ServerLifecycleNotifier::HandlePtr listener_lifecycle_shutdown_handle_;
   bool listener_lifecycle_enabled_ = false;
+
+  // The effective value of every runtime key, viewing into the snapshot it was computed from.
+  using RuntimeValues = absl::flat_hash_map<absl::string_view, absl::string_view>;
+  static RuntimeValues runtimeValues(const Runtime::Snapshot& snapshot);
+
+  // Called by the runtime on the main thread once it loaded a new snapshot.
+  void onRuntimeUpdate();
+
+  // Set when the module enables runtime updates via enableRuntimeUpdate(). Reset once shutdown
+  // began.
+  Common::CallbackHandlePtr runtime_update_handle_;
+  // The snapshot the next runtime update is compared with, and its values.
+  Runtime::SnapshotConstSharedPtr runtime_snapshot_;
+  RuntimeValues runtime_values_;
+  bool runtime_update_enabled_ = false;
 
   // Thread-local slot that carries the worker events. Allocated on the first runOnAllWorkers().
   ThreadLocal::TypedSlotPtr<> worker_slot_;
