@@ -1802,6 +1802,8 @@ ztunnel
 UID
 UIDs
 configurability
+configurator
+configurators
 WDS
 OIDC
 Bredband
