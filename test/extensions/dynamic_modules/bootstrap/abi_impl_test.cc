@@ -4,6 +4,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 
+#include "source/common/config/ecds_subscription_registry.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -1995,6 +1996,107 @@ TEST_F(BootstrapAbiImplTest, ExtensionConfigSubscriptionValidatesLifecycleAndRel
   config->onShutdown();
   EXPECT_TRUE(destroyed);
   EXPECT_FALSE(subscribe());
+}
+
+TEST_F(BootstrapAbiImplTest, EcdsStartFailureReleasesSubscriptionAndName) {
+  auto config = newOptionalHooksConfig();
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{}));
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  config->on_bootstrap_extension_ecds_update_ = [](auto, auto, auto, auto, auto, auto, bool, auto) {
+    return true;
+  };
+  auto transport = std::make_unique<testing::StrictMock<Config::MockSubscription>>();
+  EXPECT_CALL(*transport, start(testing::ElementsAre("test-config")))
+      .WillOnce(testing::Throw(EnvoyException("ADS is not configured")));
+  EXPECT_CALL(
+      context_.xds_manager_,
+      subscribeToSingletonResource(_, _, _, _, testing::A<Config::SubscriptionCallbacks&>(), _, _))
+      .WillOnce(testing::Return(testing::ByMove(std::move(transport))));
+  EXPECT_FALSE(config->subscribeEcds(
+      "test-config",
+      R"({"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["test.Config"]})"));
+  EXPECT_OK(Config::EcdsSubscriptionRegistry::get(context_.singletonManager())
+                ->reserve("test-config", Config::EcdsSubscriptionRegistry::Sharing::Exclusive));
+  EXPECT_CALL(
+      context_.xds_manager_,
+      subscribeToSingletonResource(_, _, _, _, testing::A<Config::SubscriptionCallbacks&>(), _, _))
+      .WillOnce(testing::Return(absl::UnavailableError("subscription unavailable")));
+  EXPECT_FALSE(config->subscribeEcds(
+      "test-config",
+      R"({"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["test.Config"]})"));
+}
+
+TEST_F(BootstrapAbiImplTest, EcdsHookPreservesArgumentsAndRefusesSynchronousResubscribe) {
+  struct Update {
+    std::string name;
+    std::string version;
+    std::string type_url;
+    envoy_dynamic_module_type_bootstrap_ecds_config_encoding encoding;
+    bool has_config;
+    std::string config;
+  };
+  std::vector<Update> updates;
+  struct Hook {
+    std::vector<Update>& updates;
+  } hook{updates};
+  auto config = newOptionalHooksConfig();
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{}));
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  const auto original_module_config = config->in_module_config_;
+  Cleanup restore_config([&] { config->in_module_config_ = original_module_config; });
+  config->in_module_config_ = &hook;
+  config->on_bootstrap_extension_ecds_update_ = [](auto envoy, auto module, auto name, auto version,
+                                                   auto type_url, auto encoding, bool has_config,
+                                                   auto payload) {
+    auto& updates = static_cast<const Hook*>(module)->updates;
+    updates.push_back({std::string(name.ptr, name.length), std::string(version.ptr, version.length),
+                       std::string(type_url.ptr, type_url.length), encoding, has_config,
+                       payload.length == 0 ? "" : std::string(payload.ptr, payload.length)});
+    const std::string source =
+        R"({"config_source":{"path":"unused.yaml"},"type_urls":["google.protobuf.StringValue"]})";
+    EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+        envoy, {"test-config", 11}, {source.data(), source.size()}));
+    return true;
+  };
+  Config::SubscriptionCallbacks* callbacks = nullptr;
+  auto transport = std::make_unique<testing::StrictMock<Config::MockSubscription>>();
+  EXPECT_CALL(*transport, start(testing::ElementsAre("test-config"))).WillOnce([&] {
+    envoy::config::core::v3::TypedExtensionConfig resource;
+    resource.set_name("test-config");
+    Protobuf::StringValue payload;
+    payload.set_value("enabled");
+    MessageUtil::packFrom(*resource.mutable_typed_config(), payload);
+    auto decoded = TestUtility::decodeResources({resource});
+    EXPECT_OK(callbacks->onConfigUpdate(decoded.refvec_, "v1"));
+  });
+  EXPECT_CALL(
+      context_.xds_manager_,
+      subscribeToSingletonResource(_, _, _, _, testing::A<Config::SubscriptionCallbacks&>(), _, _))
+      .WillOnce(
+          [&](auto, auto, auto, auto&, auto& callback, auto, auto) -> Config::SubscriptionPtr {
+            callbacks = &callback;
+            return std::move(transport);
+          });
+  ASSERT_TRUE(config->subscribeEcds(
+      "test-config",
+      R"({"config_source":{"path":"unused.yaml"},"type_urls":["google.protobuf.StringValue"]})"));
+  Protobuf::RepeatedPtrField<std::string> removed;
+  removed.Add("test-config");
+  EXPECT_OK(callbacks->onConfigUpdate({}, removed, "v2"));
+  ASSERT_EQ(updates.size(), 2);
+  EXPECT_EQ(updates[0].name, "test-config");
+  EXPECT_EQ(updates[0].version, "v1");
+  EXPECT_EQ(updates[0].type_url, "type.googleapis.com/google.protobuf.StringValue");
+  EXPECT_EQ(updates[0].encoding, envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Bytes);
+  EXPECT_TRUE(updates[0].has_config);
+  EXPECT_EQ(updates[0].config, "enabled");
+  EXPECT_EQ(updates[1].name, "test-config");
+  EXPECT_TRUE(updates[1].version.empty());
+  EXPECT_TRUE(updates[1].type_url.empty());
+  EXPECT_FALSE(updates[1].has_config);
+  EXPECT_TRUE(updates[1].config.empty());
 }
 
 // Test that enabling cluster lifecycle registers callbacks with ClusterManager.

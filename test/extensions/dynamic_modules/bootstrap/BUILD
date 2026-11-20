@@ -131,6 +131,7 @@ envoy_extension_cc_dyn_module_test(
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {"build": "linux_x64_small"},
     deps = [
+        "//source/common/config:ecds_subscription_registry_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/dynamic_modules:abi_impl",
         "//source/extensions/bootstrap/dynamic_modules:extension_config_lib",

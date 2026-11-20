@@ -377,11 +377,18 @@ TEST_F(ExtensionConfigSubscriptionTest, DistinguishesJsonAndProtobufForTheSameTy
 }
 
 TEST_F(ExtensionConfigSubscriptionTest, RejectsEmptyAndWildcardNamesAndSubscriptionFailure) {
-  for (const auto* name :
-       {"", "*", "xdstp://authority/envoy.config.core.v3.TypedExtensionConfig/config/*"}) {
-    EXPECT_FALSE(
-        ExtensionConfigSubscription::create(name, source(), "test", context_, callback()).ok());
+  EXPECT_CALL(context_.xds_manager_,
+              subscribeToSingletonResource(_, _, _, _, A<Config::SubscriptionCallbacks&>(), _, _))
+      .Times(0);
+  for (const auto* name : {"", "*"}) {
+    auto result = ExtensionConfigSubscription::create(name, source(), "test", context_, callback());
+    EXPECT_THAT(result.status().message(), testing::HasSubstr("requires a single resource name"));
   }
+  auto wildcard = ExtensionConfigSubscription::create(
+      "xdstp://authority/envoy.config.core.v3.TypedExtensionConfig/config/*", source(), "test",
+      context_, callback());
+  EXPECT_THAT(wildcard.status().message(), testing::HasSubstr("does not support wildcard"));
+  testing::Mock::VerifyAndClearExpectations(&context_.xds_manager_);
   EXPECT_CALL(context_.xds_manager_,
               subscribeToSingletonResource("test-config", _, _, _,
                                            A<Config::SubscriptionCallbacks&>(), _, _))
@@ -434,13 +441,29 @@ TEST_F(ExtensionConfigSubscriptionTest, UnchangedResendsAndEmptySotwUpdatesAreNo
   EXPECT_THAT(dump(), ProtoEq(accepted));
 }
 
+TEST_F(ExtensionConfigSubscriptionTest, DeltaRemovalBeforeInitialConfigNotifiesModule) {
+  auto subscription = create();
+  Protobuf::RepeatedPtrField<std::string> removed;
+  removed.Add("test-config");
+  EXPECT_OK(subscription->onConfigUpdate({}, removed, "v1"));
+  ASSERT_EQ(updates_.size(), 1);
+  EXPECT_EQ(updates_[0].name, "test-config");
+  EXPECT_FALSE(updates_[0].config.has_value());
+}
+
 TEST_F(ExtensionConfigSubscriptionTest, DeltaUpdatesAndRemovalsPreservePresence) {
   auto subscription = create();
-  auto added = TestUtility::decodeResources({config(true)});
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
+  auto* resource = resources.Add();
+  resource->set_name("test-config");
+  resource->set_version("resource-version");
+  MessageUtil::packFrom(*resource->mutable_resource(), config(true));
+  auto added =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(resources);
   Protobuf::RepeatedPtrField<std::string> removed;
   EXPECT_OK(subscription->onConfigUpdate(added.refvec_, removed, "system-version"));
   ASSERT_EQ(updates_.size(), 1);
-  EXPECT_EQ(updates_[0].version, added.refvec_[0].get().version());
+  EXPECT_EQ(updates_[0].version, "resource-version");
   EXPECT_OK(subscription->onConfigUpdate({}, removed, "empty-delta"));
   EXPECT_EQ(updates_.size(), 1);
   removed.Add("other-config");

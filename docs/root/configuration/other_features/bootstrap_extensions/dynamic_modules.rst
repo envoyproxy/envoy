@@ -204,9 +204,11 @@ an accepted payload that Envoy cannot render fails the whole unfiltered config d
 resends and empty state-of-the-world updates do not invoke the hook.
 
 The hook must not block. Rejecting an update keeps the previous configuration and NACKs the
-response, which may contain other ECDS resources. Explicit removals and TTL expiry invoke the
-hook without a configuration. A rejected removal is only logged and keeps the previous
-configuration. A connection failure keeps the last configuration unless its TTL expires.
+response, which may contain other ECDS resources and may have been partly applied. Explicit
+removals and TTL expiry invoke the hook without a configuration. Delta can report a missing
+resource as a removal before any configuration arrives. A rejected removal is only logged and
+keeps the previous configuration. A connection failure keeps the last configuration unless its
+TTL expires.
 
 Filesystem sources can invoke the hook before the subscription call returns, so do not hold a
 lock across the call that the hook takes. Initial fetch failures do not invoke the hook. A module
@@ -219,6 +221,10 @@ and update time. Subscription statistics use the
 ``config_name`` set to the extension name, or ``default`` if it is empty, when explicit stats tags
 are enabled.
 
+A refused removal still increments ``update_success`` and updates the subscription version.
+On TTL expiry, ``version_text`` becomes empty. The module and config dump keep their previous
+configuration.
+
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
@@ -227,11 +233,11 @@ are enabled.
   update_attempt, Counter, Configuration fetch attempts
   update_failure, Counter, Configuration fetch failures
   update_rejected, Counter, Rejected configuration updates
-  update_success, Counter, Accepted updates including unchanged resends
-  update_time, Gauge, Time of the last accepted update in milliseconds since the epoch
+  update_success, Counter, Successful subscription updates including unchanged resends and refused removals
+  update_time, Gauge, Time of the last successful subscription update in milliseconds since the epoch
   update_duration, Histogram, Time spent processing updates in milliseconds
-  version, Gauge, Hash of the last accepted version
-  version_text, TextReadout, Last accepted version
+  version, Gauge, Hash of the last successful subscription version
+  version_text, TextReadout, Last successful subscription version
 
 Use Cases
 ---------
