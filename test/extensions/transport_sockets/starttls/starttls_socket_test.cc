@@ -30,8 +30,8 @@ TEST(StartTlsTest, SetTlsDataChunkSendLimit) {
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
   auto* raw_socket = new NiceMock<StartTlsTransportSocketMock>;
   auto* ssl_socket = new NiceMock<Network::MockTransportSocket>;
-  auto socket = std::make_unique<StartTlsSocket>(
-      Network::TransportSocketPtr(raw_socket), Network::TransportSocketPtr(ssl_socket), nullptr);
+  auto socket = std::make_unique<StartTlsSocket>(Network::TransportSocketPtr(raw_socket),
+                                                 Network::TransportSocketPtr(ssl_socket), nullptr);
   socket->setTransportSocketCallbacks(transport_callbacks);
 
   EXPECT_CALL(*raw_socket, setTlsDataChunkSendLimit(8192));

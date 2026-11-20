@@ -9032,21 +9032,6 @@ TEST_P(SslReadBufferLimitTest, TransportSocketDataChunkSendLimit) {
 
   client_connection_->setTransportSocketDataChunkSendLimit(chunk_send_limit);
 
-#ifndef ENVOY_SSL_OPENSSL
-  // Record the length of every application data record the client sends.
-  std::vector<uint16_t> record_lengths;
-  SSL* client_ssl = dynamic_cast<SslSocket*>(client_transport_socket_)->rawSslForTest();
-  SSL_set_msg_callback(client_ssl, [](int is_write, int, int content_type, const void* buf,
-                                      size_t len, SSL*, void* arg) {
-    const auto* header = static_cast<const uint8_t*>(buf);
-    if (is_write && content_type == SSL3_RT_HEADER && len == SSL3_RT_HEADER_LENGTH &&
-        header[0] == SSL3_RT_APPLICATION_DATA) {
-      static_cast<std::vector<uint16_t>*>(arg)->push_back((header[3] << 8) | header[4]);
-    }
-  });
-  SSL_set_msg_callback_arg(client_ssl, &record_lengths);
-#endif
-
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection_ = dispatcher_->createServerConnection(
@@ -9060,6 +9045,23 @@ TEST_P(SslReadBufferLimitTest, TransportSocketDataChunkSendLimit) {
   EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+#ifndef ENVOY_SSL_OPENSSL
+  // Record the length of every application data record the client sends from now on. This starts
+  // after the handshake because TLS 1.3 also sends the encrypted handshake flight, which the limit
+  // does not apply to, as application data records.
+  std::vector<uint16_t> record_lengths;
+  SSL* client_ssl = dynamic_cast<SslSocket*>(client_transport_socket_)->rawSslForTest();
+  SSL_set_msg_callback(client_ssl, [](int is_write, int, int content_type, const void* buf,
+                                      size_t len, SSL*, void* arg) {
+    const auto* header = static_cast<const uint8_t*>(buf);
+    if (is_write && content_type == SSL3_RT_HEADER && len == SSL3_RT_HEADER_LENGTH &&
+        header[0] == SSL3_RT_APPLICATION_DATA) {
+      static_cast<std::vector<uint16_t>*>(arg)->push_back((header[3] << 8) | header[4]);
+    }
+  });
+  SSL_set_msg_callback_arg(client_ssl, &record_lengths);
+#endif
 
   std::string received;
   EXPECT_CALL(*read_filter_, onNewConnection());
