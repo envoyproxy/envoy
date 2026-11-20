@@ -19,11 +19,16 @@ def get_bazel_build_options():
     ]
 
 
-def get_output_base():
+def get_output_base(args):
     bazel_startup_options = get_bazel_startup_options()
     bazel_options = get_bazel_build_options()
+    bazel_command = get_bazel_command(args)
     return subprocess.check_output(
-        ["bazel", *bazel_startup_options, "info", *bazel_options, "output_base"]).decode().strip()
+        [bazel_command, *bazel_startup_options, "info", *bazel_options, "output_base"]).decode().strip()
+
+
+def get_bazel_command(args):
+    return "bazelisk" if args.use_bazelisk else "bazel"
 
 
 # This method is equivalent to https://github.com/grailbio/bazel-compilation-database/blob/master/generate.py
@@ -32,18 +37,19 @@ def generate_compilation_database(args):
     # specified in bazelrc.
     bazel_startup_options = get_bazel_startup_options()
     bazel_options = get_bazel_build_options()
+    bazel_command = get_bazel_command(args)
 
     source_dir_targets = args.bazel_targets
     if args.exclude_contrib:
         source_dir_targets.remove("//contrib/...")
 
-    subprocess.check_call(["bazel", *bazel_startup_options, "build"] + bazel_options + [
+    subprocess.check_call([bazel_command, *bazel_startup_options, "build"] + bazel_options + [
         "--aspects=@bazel-compdb//:aspects.bzl%compilation_database_aspect",
         "--output_groups=compdb_files,header_files"
     ] + source_dir_targets)
 
     execroot = subprocess.check_output(
-        ["bazel", *bazel_startup_options, "info", *bazel_options,
+        [bazel_command, *bazel_startup_options, "info", *bazel_options,
          "execution_root"]).decode().strip()
 
     db_entries = []
@@ -124,7 +130,7 @@ def modify_compile_command(target, args, output_base):
 
 
 def fix_compilation_database(args, db):
-    output_base = get_output_base()
+    output_base = get_output_base(args)
 
     db = [
         modify_compile_command(target, args, output_base)
@@ -144,6 +150,7 @@ if __name__ == "__main__":
     parser.add_argument('--vscode', action='store_true')
     parser.add_argument('--include_all', action='store_true')
     parser.add_argument('--exclude_contrib', action='store_true')
+    parser.add_argument('--use_bazelisk', action='store_true')
     parser.add_argument(
         'bazel_targets', nargs='*', default=[
             "//source/...",
