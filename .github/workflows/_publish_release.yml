@@ -35,6 +35,10 @@ concurrency:
   cancel-in-progress: true
 
 
+env:
+  _TS_0: &ts-appauth envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+  _TS_1: &ts-dispatch envoyproxy/toolshed/actions/dispatch@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+
 jobs:
   docs-archive:
     # Untrusted release requests validate metadata only and never receive archive credentials.
@@ -120,12 +124,12 @@ jobs:
     - github-dev
     runs-on: ${{ fromJSON(inputs.request).config.ci.agent-ubuntu }}
     steps:
-    - uses: envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-appauth
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/actions/dispatch@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-dispatch
       with:
         ref: main
         repository: envoyproxy/envoy-website
