@@ -29,6 +29,12 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
     return;
   }
   connection_->addConnectionCallbacks(*this);
+  // If the socket could not be created (e.g. due to file descriptor exhaustion), the connection is
+  // already closed and raises a LocalClose event on the next dispatcher iteration, which fails this
+  // client. Do not set up or connect the closed connection.
+  if (connection_->state() == Network::Connection::State::Closed) {
+    return;
+  }
   read_filter_handle_ = std::make_shared<ConnReadFilter>(*this);
   connection_->addReadFilter(read_filter_handle_);
   Upstream::ClusterTrafficStats& cluster_traffic_stats = *host->cluster().trafficStats();
