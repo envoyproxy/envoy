@@ -34,13 +34,13 @@ message Metadata {
   // overwrite or merge with any existing values in that namespace. See
   // :ref:`the filter documentation <config_http_filters_set_metadata>` for
   // more information on how this value is merged with potentially existing
-  // ones if ``allow_overwrite`` is configured. Only one of ``value``,
-  // ``typed_value`` and ``filter_state`` may be set.
+  // ones if ``allow_overwrite`` is configured. Ignored if ``filter_state`` is
+  // set. Takes precedence over ``typed_value``.
   google.protobuf.Struct value = 3;
 
   // The value to place at the namespace. If ``allow_overwrite``, this will
-  // overwrite any existing values in that namespace. Only one of ``value``,
-  // ``typed_value`` and ``filter_state`` may be set.
+  // overwrite any existing values in that namespace. Ignored if
+  // ``filter_state`` or ``value`` is set.
   google.protobuf.Any typed_value = 4;
 
   // A filter state object whose contents should be copied into the typed
@@ -59,8 +59,8 @@ message Metadata {
   //
   // If no object exists under the key, nothing is written and the
   // ``filter_state_not_found`` counter is incremented. If ``allow_overwrite``,
-  // this will overwrite any existing typed value in that namespace. Only one
-  // of ``value``, ``typed_value`` and ``filter_state`` may be set.
+  // this will overwrite any existing typed value in that namespace. Takes
+  // precedence over ``value`` and ``typed_value``.
   FilterStateSource filter_state = 5;
 }
 

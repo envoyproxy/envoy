@@ -31,8 +31,7 @@ void setTypedMetadata(const Config& config, envoy::config::core::v3::Metadata& d
 
 // Serializes a filter state object into an Any for typed metadata. Returns false if the object
 // supports neither proto nor string serialization.
-bool serializeFilterStateObject(const StreamInfo::FilterState::Object& object,
-                                Protobuf::Any& out) {
+bool serializeFilterStateObject(const StreamInfo::FilterState::Object& object, Protobuf::Any& out) {
   if (ProtobufTypes::MessagePtr proto = object.serializeAsProto(); proto != nullptr) {
     if (proto->GetTypeName() == Protobuf::Any::descriptor()->full_name()) {
       // The object already serializes to an Any; use it directly rather than double-wrapping.
@@ -123,7 +122,12 @@ Config::Config(const envoy::extensions::filters::http::set_metadata::v3::Config&
   }
 
   for (const auto& metadata : proto_config.metadata()) {
-    if (metadata.has_value()) {
+    // `filter_state` takes precedence over `value`, which takes precedence over `typed_value`.
+    if (metadata.has_filter_state()) {
+      FilterStateMetadataEntry filter_state_entry{
+          metadata.allow_overwrite(), metadata.metadata_namespace(), metadata.filter_state().key()};
+      filter_state_.emplace_back(filter_state_entry);
+    } else if (metadata.has_value()) {
       UntypedMetadataEntry untyped_entry{metadata.allow_overwrite(), metadata.metadata_namespace(),
                                          metadata.value()};
       untyped_.emplace_back(untyped_entry);
@@ -131,10 +135,6 @@ Config::Config(const envoy::extensions::filters::http::set_metadata::v3::Config&
       TypedMetadataEntry typed_entry{metadata.allow_overwrite(), metadata.metadata_namespace(),
                                      metadata.typed_value()};
       typed_.emplace_back(typed_entry);
-    } else if (metadata.has_filter_state()) {
-      FilterStateMetadataEntry filter_state_entry{
-          metadata.allow_overwrite(), metadata.metadata_namespace(), metadata.filter_state().key()};
-      filter_state_.emplace_back(filter_state_entry);
     } else {
       ENVOY_LOG(warn, "set_metadata filter configuration contains metadata entries without value, "
                       "typed_value or filter_state");

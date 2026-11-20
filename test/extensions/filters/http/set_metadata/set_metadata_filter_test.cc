@@ -632,6 +632,62 @@ TEST_F(SetMetadataFilterTest, FilterStateStringObject) {
   EXPECT_EQ("hello", unpacked.value());
 }
 
+TEST_F(SetMetadataFilterTest, FilterStateTakesPrecedenceOverOtherValues) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      filter_state:
+        key: thekey
+      typed_value:
+        '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+        metadata_namespace: foo_namespace
+      value:
+        foo: bar
+  )EOF";
+
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state->setData("thekey", std::make_shared<TestStringFilterStateObject>("hello"));
+
+  envoy::config::core::v3::Metadata metadata;
+  runFilter(metadata, yaml_config, filter_state);
+
+  // Only the filter state object is written.
+  EXPECT_TRUE(metadata.filter_metadata().empty());
+  const auto& typed_metadata = metadata.typed_filter_metadata();
+  const auto it_namespace = typed_metadata.find("thenamespace");
+  ASSERT_NE(typed_metadata.end(), it_namespace);
+  const auto& any_val = it_namespace->second;
+  ASSERT_EQ("type.googleapis.com/google.protobuf.StringValue", any_val.type_url());
+  Protobuf::StringValue unpacked;
+  ASSERT_TRUE(any_val.UnpackTo(&unpacked));
+  EXPECT_EQ("hello", unpacked.value());
+}
+
+TEST_F(SetMetadataFilterTest, ValueTakesPrecedenceOverTypedValue) {
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      value:
+        foo: bar
+      typed_value:
+        '@type': type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+        metadata_namespace: foo_namespace
+  )EOF";
+
+  envoy::config::core::v3::Metadata metadata;
+  runFilter(metadata, yaml_config);
+
+  EXPECT_TRUE(metadata.typed_filter_metadata().empty());
+  const auto& untyped_metadata = metadata.filter_metadata();
+  const auto it_namespace = untyped_metadata.find("thenamespace");
+  ASSERT_NE(untyped_metadata.end(), it_namespace);
+  const auto& fields = it_namespace->second.fields();
+  const auto it_foo = fields.find("foo");
+  ASSERT_NE(fields.end(), it_foo);
+  EXPECT_EQ("bar", it_foo->second.string_value());
+}
+
 TEST_F(SetMetadataFilterTest, FilterStateNotFound) {
   const std::string yaml_config = R"EOF(
     metadata:
