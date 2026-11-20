@@ -782,6 +782,8 @@ bool envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize
     void* user_data) {
   auto json = static_cast<ConfigSnapshot*>(snapshot)->serialize();
   if (!json.ok()) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "dynamic modules: config snapshot encoding failed: {}", json.status());
     return false;
   }
   json_fn({json->data(), json->size()}, user_data);

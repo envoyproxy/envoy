@@ -10905,13 +10905,14 @@ unsafe extern "C" {
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
     /** Collects and redacts selected providers synchronously on the main thread. Missing providers are
- omitted; an empty selection collects nothing. Cost grows with the selected resources, so combine
- frequent notifications into one collection.
+ omitted, duplicates are collected once, and results are sorted by provider key. An empty
+ selection collects nothing. Endpoint dumps are not included. Cost grows with the selected
+ resources, so combine frequent notifications into one collection.
 
- Cluster and listener lifecycle hooks run inside manager updates, where providers can contain
- partial changes under the previous version. Collection is refused there; defer it with the
- bootstrap config scheduler. Callout failures during cluster removal are already reported from
- a posted callback.
+ Collection is refused in hooks Envoy runs inside an xDS update or a resource's destruction, where
+ providers can contain partial changes under the previous version. Defer collection with the
+ bootstrap config scheduler. Callout failures during cluster removal are already reported from a
+ posted callback.
 
  Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
  configuration may retain sensitive data. No admin listener is needed, and admin allow_paths does

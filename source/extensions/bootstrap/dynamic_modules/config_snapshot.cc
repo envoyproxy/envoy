@@ -52,12 +52,7 @@ absl::StatusOr<std::string> ConfigSnapshot::serialize() const {
       return absl::InternalError("could not pack config provider message");
     }
   }
-  // the MessageUtil JSON helper requires YAML support
-  Protobuf::util::JsonPrintOptions options;
-  options.preserve_proto_field_names = true;
-  std::string json;
-  RETURN_IF_NOT_OK(Protobuf::util::MessageToJsonString(dump, &json, options));
-  return json;
+  return MessageUtil::getJsonStringFromMessage(dump);
 }
 
 } // namespace DynamicModules

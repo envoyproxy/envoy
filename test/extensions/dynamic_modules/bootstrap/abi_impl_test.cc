@@ -2121,6 +2121,37 @@ TEST_F(BootstrapAbiImplTest, ConfigSnapshotNameRegexAndLengthAwareProviders) {
   EXPECT_EQ(snapshot, nullptr);
 }
 
+TEST_F(BootstrapAbiImplTest, ConfigSnapshotReportsJsonEncodingFailure) {
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  Server::ConfigTrackerImpl tracker;
+  auto provider = tracker.add("bootstrap", [](const Matchers::StringMatcher&) {
+    auto dump = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+    auto* extension = dump->mutable_bootstrap()->add_bootstrap_extensions();
+    extension->set_name("unknown");
+    extension->mutable_typed_config()->set_type_url("type.googleapis.com/unknown.Config");
+    return dump;
+  });
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{context_.admin_}));
+  EXPECT_CALL(context_.admin_, getConfigTracker()).WillOnce(testing::ReturnRef(tracker));
+  const envoy_dynamic_module_type_module_buffer providers[] = {{"bootstrap", 9}};
+  envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot = nullptr;
+  ASSERT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success,
+            envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                config->thisAsVoidPtr(), providers, 1, {nullptr, 0}, &snapshot));
+  ASSERT_NE(snapshot, nullptr);
+  EXPECT_LOG_CONTAINS("debug", "dynamic modules: config snapshot encoding failed:", {
+    EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+        snapshot,
+        [](envoy_dynamic_module_type_envoy_buffer, void*) {
+          ADD_FAILURE() << "JSON callback invoked after encoding failure";
+        },
+        nullptr));
+  });
+  envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(snapshot);
+}
+
 TEST_F(BootstrapAbiImplTest, ConfigSnapshotUsesRe2RegardlessOfServerRegexEngine) {
   class RegexContext : public Server::Configuration::MockServerFactoryContext {
   public:
@@ -2569,8 +2600,9 @@ TEST_F(BootstrapAbiImplTest, MainThreadCallbacksOffMainThreadFailClosed) {
        }},
       {"envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new",
        [] {
+         int sentinel = 0;
          envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot =
-             nullptr;
+             &sentinel;
          EXPECT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed,
                    envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
                        nullptr, nullptr, 0, {nullptr, 0}, &snapshot));

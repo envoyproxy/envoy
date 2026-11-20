@@ -145,15 +145,16 @@ impl Drop for EnvoyBootstrapExtensionConfigSnapshotImpl {
 /// A collection or encoding failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigSnapshotError {
-  /// Called off the main thread, before initialization, after shutdown began, inside a cluster or
-  /// listener lifecycle hook, or while another collection runs. A call off the main thread also
-  /// reports an Envoy bug.
+  /// Called off the main thread, before `on_server_initialized`, during shutdown, from a hook
+  /// Envoy runs inside an xDS update or a resource's destruction, or while another collection
+  /// runs. A call off the main thread also reports an Envoy bug.
   NotAllowed,
-  /// The name filter is invalid or exceeds the RE2 program size limit.
+  /// The name filter is invalid or its RE2 program size exceeds
+  /// `re2.max_program_size.error_level`.
   InvalidRegex,
   /// Admin support is unavailable.
   Unavailable,
-  /// A provider failed to collect or redact its configuration.
+  /// Collection failed for another reason, such as a provider throwing or returning no message.
   CollectionFailed,
   /// The collected messages could not be encoded as JSON.
   EncodingFailed,
@@ -432,13 +433,14 @@ pub trait EnvoyBootstrapExtensionConfig {
   fn enable_cluster_lifecycle(&self) -> bool;
 
   /// Collects and redacts selected providers synchronously on the main thread after initialization
-  /// and before shutdown. Missing providers are omitted; an empty selection collects nothing.
-  /// `name_regex` applies a full-match RE2 resource name filter where supported; `None` or an empty
-  /// expression selects all names. Cost grows with the selected resources, so combine frequent
-  /// notifications into one collection.
+  /// and before shutdown. Missing providers are omitted, duplicates are collected once, and results
+  /// are sorted by provider key. An empty selection collects nothing. Endpoint dumps are not
+  /// included. `name_regex` applies a full-match RE2 resource name filter where supported; `None`
+  /// or an empty expression selects all names. Cost grows with the selected resources, so combine
+  /// frequent notifications into one collection.
   ///
-  /// Collection is refused in cluster and listener lifecycle hooks, which run inside manager
-  /// updates where providers can contain partial changes under the previous version. Defer
+  /// Collection is refused in hooks Envoy runs inside an xDS update or a resource's destruction,
+  /// where providers can contain partial changes under the previous version. Defer
   /// collection with [`Self::new_scheduler`]. Callout failures during cluster removal are already
   /// reported from a posted callback.
   /// No admin listener is needed and admin `allow_paths` does not restrict access.
@@ -2563,8 +2565,6 @@ mod snapshot_tests {
 
   #[test]
   fn config_snapshot_collection_preserves_host_errors() {
-    let mut host = TestHost::default();
-    let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
     for (result, error) in [
       (
         ConfigSnapshotResult::NotAllowed,
@@ -2583,7 +2583,11 @@ mod snapshot_tests {
         ConfigSnapshotError::CollectionFailed,
       ),
     ] {
-      host.result = Some(result);
+      let mut host = TestHost {
+        result: Some(result),
+        ..TestHost::default()
+      };
+      let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
       assert!(matches!(envoy.get_config_snapshot(&[], None), Err(actual) if actual == error));
     }
   }

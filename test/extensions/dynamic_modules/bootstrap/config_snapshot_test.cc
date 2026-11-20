@@ -85,8 +85,10 @@ TEST(ConfigSnapshotTest, ReportsProviderFailure) {
 TEST(ConfigSnapshotTest, ProviderCanUnregisterDuringCollection) {
   Server::ConfigTrackerImpl tracker;
   Server::ConfigTracker::EntryOwnerPtr owner;
-  owner = tracker.add("bootstrap", [&owner](const Matchers::StringMatcher&) {
+  int calls = 0;
+  owner = tracker.add("bootstrap", [&owner, &calls](const Matchers::StringMatcher&) {
     owner.reset();
+    EXPECT_EQ(++calls, 1);
     return std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
   });
   const std::vector<absl::string_view> providers{"bootstrap"};

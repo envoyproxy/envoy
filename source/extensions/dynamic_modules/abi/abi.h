@@ -9476,14 +9476,15 @@ typedef void (*envoy_dynamic_module_type_bootstrap_extension_config_snapshot_jso
 typedef enum envoy_dynamic_module_type_bootstrap_config_snapshot_result {
   // the snapshot was collected and redacted
   envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success = 0,
-  // called off the main thread, before initialization, during shutdown, from a lifecycle hook,
-  // or while another collection runs
+  // called off the main thread, before
+  // envoy_dynamic_module_on_bootstrap_extension_server_initialized, during shutdown, from a hook
+  // Envoy runs inside an xDS update or a resource's destruction, or while another collection runs
   envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed = 1,
-  // the name regex is invalid or exceeds the RE2 program size limit
+  // the name regex is invalid or its RE2 program size exceeds re2.max_program_size.error_level
   envoy_dynamic_module_type_bootstrap_config_snapshot_result_InvalidRegex = 2,
   // admin support is unavailable
   envoy_dynamic_module_type_bootstrap_config_snapshot_result_Unavailable = 3,
-  // a provider failed to collect or redact its configuration
+  // collection failed for any other reason, such as a provider that throws or returns no message
   envoy_dynamic_module_type_bootstrap_config_snapshot_result_CollectionFailed = 4,
 } envoy_dynamic_module_type_bootstrap_config_snapshot_result;
 
@@ -10482,13 +10483,14 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
 
 /**
  * Collects and redacts selected providers synchronously on the main thread. Missing providers are
- * omitted; an empty selection collects nothing. Cost grows with the selected resources, so combine
- * frequent notifications into one collection.
+ * omitted, duplicates are collected once, and results are sorted by provider key. An empty
+ * selection collects nothing. Endpoint dumps are not included. Cost grows with the selected
+ * resources, so combine frequent notifications into one collection.
  *
- * Cluster and listener lifecycle hooks run inside manager updates, where providers can contain
- * partial changes under the previous version. Collection is refused there; defer it with the
- * bootstrap config scheduler. Callout failures during cluster removal are already reported from
- * a posted callback.
+ * Collection is refused in hooks Envoy runs inside an xDS update or a resource's destruction, where
+ * providers can contain partial changes under the previous version. Defer collection with the
+ * bootstrap config scheduler. Callout failures during cluster removal are already reported from a
+ * posted callback.
  *
  * Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
  * configuration may retain sensitive data. No admin listener is needed, and admin allow_paths does

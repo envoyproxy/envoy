@@ -22,7 +22,7 @@ namespace Bootstrap {
 namespace DynamicModules {
 namespace {
 
-// hooks invoked inside cluster or listener manager updates must set this flag to refuse snapshots
+// hooks run inside an xDS update or resource destruction must set this flag to refuse snapshots
 thread_local bool in_resource_lifecycle_callback = false;
 // both flags are shared across configs because callbacks can reenter another config on this thread
 thread_local bool collecting_config_snapshot = false;
