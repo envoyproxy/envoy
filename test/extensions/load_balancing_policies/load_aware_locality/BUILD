@@ -15,7 +15,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.load_aware_locality"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/load_balancing_policies/load_aware_locality:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
@@ -33,7 +39,13 @@ envoy_extension_cc_test(
     name = "load_aware_locality_lb_test",
     srcs = ["load_aware_locality_lb_test.cc"],
     extension_names = ["envoy.load_balancing_policies.load_aware_locality"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/upstream:host_utility_lib",
         "//source/extensions/load_balancing_policies/common:orca_weight_manager_lib",
@@ -66,8 +78,10 @@ envoy_extension_cc_test(
         "envoy.load_balancing_policies.round_robin",
     ],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/grpc:common_lib",

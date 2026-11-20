@@ -574,8 +574,8 @@ TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersResetOnServerMessage) {
 TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersGracefulClose) {
   scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "true"}});
   // Make remote close timeout long, so that test times out and fails if it is hit.
-  scoped_runtime_.mergeValues(
-      {{"envoy.filters.http.ext_proc.remote_close_timeout_milliseconds", "60000"}});
+  config_helper_.addRuntimeOverride("envoy.filters.http.ext_proc.remote_close_timeout_milliseconds",
+                                    "60000");
   // Skip the header processing on response path.
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig();
@@ -1958,8 +1958,8 @@ TEST_P(ExtProcIntegrationTestUpstream, RouterRetrySendTrailers) {
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyGracefulClose) {
   scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "true"}});
   // Make remote close timeout long, so that test times out and fails if it is hit.
-  scoped_runtime_.mergeValues(
-      {{"envoy.filters.http.ext_proc.remote_close_timeout_milliseconds", "60000"}});
+  config_helper_.addRuntimeOverride("envoy.filters.http.ext_proc.remote_close_timeout_milliseconds",
+                                    "60000");
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(std::nullopt);
@@ -1995,9 +1995,6 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyGracefulClose) {
 
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyGracefulCloseNoServerTrailers) {
   scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "true"}});
-  // Make remote close timeout short, so that test does not time out.
-  scoped_runtime_.mergeValues(
-      {{"envoy.filters.http.ext_proc.remote_close_timeout_milliseconds", "100"}});
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(std::nullopt);
@@ -5431,6 +5428,47 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoGRPCTimeout) {
   auto field_request_header_status = json_log->getString("field_request_header_status");
   // Should be 4:DEADLINE_EXCEEDED instead of 10:ABORTED
   EXPECT_EQ(*field_request_header_status, "4");
+}
+
+TEST_P(ExtProcIntegrationTest, RequestTimeoutWhileWaitingForGracefulClose) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Google gRPC does not have per try timeouts.";
+  }
+  // Enable per try timeout for side stream.
+  per_try_timeout_enabled_ = true;
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "true"}});
+  // Make remote close timeout long, so that test times out and fails if it is hit.
+  config_helper_.addRuntimeOverride("envoy.filters.http.ext_proc.remote_close_timeout_milliseconds",
+                                    "60000");
+  // Skip the header processing on response path.
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Accept the request headers message from ext_proc filter but do not send any response.
+  ProcessingRequest request;
+  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+  ASSERT_TRUE(request.has_request_headers());
+  protocolConfigEncoding(request);
+
+  // Reset the client stream. It will put the stream in waiting for graceful close state.
+  // TODO(yavlasov): add ability to detect that the stream
+  // was reset and reset the side stream in this case.
+  codec_client_->sendReset(*request_encoder_);
+
+  // Without any activity side stream should hit per try timeout and try to send error response,
+  // but since the stream is waiting for graceful close, it will get reset.
+  EXPECT_TRUE(processor_stream_->waitForReset());
 }
 
 // Test when ext_proc filter is nested inside a composite filter, the access_log filter

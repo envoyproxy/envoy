@@ -20,6 +20,7 @@ with the following statistics:
    downstream_cx_length_ms, Histogram, Connection length milliseconds
    downstream_cx_transport_socket_connect_timeout, Counter, Total connections that timed out during transport socket connection negotiation
    downstream_cx_overflow, Counter, Total connections rejected due to enforcement of listener connection limit
+   downstream_cx_overload_close_idle, Counter, Total idle HTTP connections closed due to configured overload actions
    downstream_cx_overload_reject, Counter, Total connections rejected due to configured overload actions
    downstream_global_cx_overflow, Counter, Total connections rejected due to enforcement of global connection limit
    connections_accepted_per_socket_event, Histogram, Number of connections accepted per listener socket event

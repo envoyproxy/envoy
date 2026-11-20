@@ -3091,6 +3091,160 @@ unsafe extern "C" {
         result: *mut bool,
     ) -> bool;
 }
+#[repr(u32)]
+/// The kind of selector used by a metadata path component.
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum envoy_dynamic_module_type_metadata_path_component_kind {
+    Key = 0,
+    Index = 1,
+    Sentinel = 2147483647,
+}
+/** A component of a metadata path. The kind selects either a literal struct key or a zero-based
+ list index. The other field is ignored. A key of length zero selects an empty key and may have a
+ null pointer. The callbacks reject unknown component kinds.*/
+#[repr(C)]
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct envoy_dynamic_module_type_module_metadata_path_component {
+    pub kind: envoy_dynamic_module_type_metadata_path_component_kind,
+    pub key: envoy_dynamic_module_type_module_buffer,
+    pub index: usize,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    [
+        "Size of envoy_dynamic_module_type_module_metadata_path_component",
+    ][::std::mem::size_of::<envoy_dynamic_module_type_module_metadata_path_component>()
+        - 32usize];
+    [
+        "Alignment of envoy_dynamic_module_type_module_metadata_path_component",
+    ][::std::mem::align_of::<envoy_dynamic_module_type_module_metadata_path_component>()
+        - 8usize];
+    [
+        "Offset of field: envoy_dynamic_module_type_module_metadata_path_component::kind",
+    ][::std::mem::offset_of!(
+        envoy_dynamic_module_type_module_metadata_path_component, kind
+    ) - 0usize];
+    [
+        "Offset of field: envoy_dynamic_module_type_module_metadata_path_component::key",
+    ][::std::mem::offset_of!(
+        envoy_dynamic_module_type_module_metadata_path_component, key
+    ) - 8usize];
+    [
+        "Offset of field: envoy_dynamic_module_type_module_metadata_path_component::index",
+    ][::std::mem::offset_of!(
+        envoy_dynamic_module_type_module_metadata_path_component, index
+    ) - 24usize];
+};
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_http_get_metadata_nested_string gets the
+ nested string metadata value.
+
+ The path contains struct keys and list indices relative to the namespace, starting with a key.
+ Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ returns false.
+
+ @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ @param metadata_source is the source of the metadata.
+ @param ns is the metadata namespace.
+ @param path is an array of path components, borrowed for this call. May be null only when
+ path_length is zero.
+ @param path_length is the number of path components.
+ @param result receives the value on success and is unchanged on failure.
+ The returned buffer is owned by Envoy and valid until the end of the current event hook
+ unless a metadata setter is called.
+ @return true on success, false otherwise.*/
+    pub fn envoy_dynamic_module_callback_http_get_metadata_nested_string(
+        filter_envoy_ptr: envoy_dynamic_module_type_http_filter_envoy_ptr,
+        metadata_source: envoy_dynamic_module_type_metadata_source,
+        ns: envoy_dynamic_module_type_module_buffer,
+        path: *const envoy_dynamic_module_type_module_metadata_path_component,
+        path_length: usize,
+        result: *mut envoy_dynamic_module_type_envoy_buffer,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_http_get_metadata_nested_number gets the
+ nested number metadata value.
+
+ The path contains struct keys and list indices relative to the namespace, starting with a key.
+ Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ returns false.
+
+ @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ @param metadata_source is the source of the metadata.
+ @param ns is the metadata namespace.
+ @param path is an array of path components, borrowed for this call. May be null only when
+ path_length is zero.
+ @param path_length is the number of path components.
+ @param result receives the value on success and is unchanged on failure.
+ @return true on success, false otherwise.*/
+    pub fn envoy_dynamic_module_callback_http_get_metadata_nested_number(
+        filter_envoy_ptr: envoy_dynamic_module_type_http_filter_envoy_ptr,
+        metadata_source: envoy_dynamic_module_type_metadata_source,
+        ns: envoy_dynamic_module_type_module_buffer,
+        path: *const envoy_dynamic_module_type_module_metadata_path_component,
+        path_length: usize,
+        result: *mut f64,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_http_get_metadata_nested_bool gets the
+ nested bool metadata value.
+
+ The path contains struct keys and list indices relative to the namespace, starting with a key.
+ Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ returns false.
+
+ @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ @param metadata_source is the source of the metadata.
+ @param ns is the metadata namespace.
+ @param path is an array of path components, borrowed for this call. May be null only when
+ path_length is zero.
+ @param path_length is the number of path components.
+ @param result receives the value on success and is unchanged on failure.
+ @return true on success, false otherwise.*/
+    pub fn envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+        filter_envoy_ptr: envoy_dynamic_module_type_http_filter_envoy_ptr,
+        metadata_source: envoy_dynamic_module_type_metadata_source,
+        ns: envoy_dynamic_module_type_module_buffer,
+        path: *const envoy_dynamic_module_type_module_metadata_path_component,
+        path_length: usize,
+        result: *mut bool,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_http_get_metadata_nested_list_size gets the
+ number of elements in a nested metadata list.
+
+ The path contains struct keys and list indices relative to the namespace, starting with a key.
+ Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ returns false.
+
+ @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ @param metadata_source is the source of the metadata.
+ @param ns is the metadata namespace.
+ @param path is an array of path components, borrowed for this call. May be null only when
+ path_length is zero.
+ @param path_length is the number of path components.
+ @param result receives the value on success and is unchanged on failure.
+ @return true on success, false otherwise.*/
+    pub fn envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+        filter_envoy_ptr: envoy_dynamic_module_type_http_filter_envoy_ptr,
+        metadata_source: envoy_dynamic_module_type_metadata_source,
+        ns: envoy_dynamic_module_type_module_buffer,
+        path: *const envoy_dynamic_module_type_module_metadata_path_component,
+        path_length: usize,
+        result: *mut usize,
+    ) -> bool;
+}
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
     /** envoy_dynamic_module_callback_http_set_filter_state_bytes is called by the module to set the
@@ -11012,6 +11166,67 @@ unsafe extern "C" {
         name_fn: envoy_dynamic_module_type_bootstrap_active_resource_name_fn,
         user_data: *mut ::std::os::raw::c_void,
     );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update is called when a watched runtime
+ key gets a new boolean value, or becomes unset after having one.*/
+    pub fn envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update(
+        extension_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+        extension_module_ptr: envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+        key: envoy_dynamic_module_type_envoy_buffer,
+        value: bool,
+        removed: bool,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_on_bootstrap_extension_runtime_int_update is called when a watched runtime
+ key gets a new non-negative integer value, or becomes unset after having one.*/
+    pub fn envoy_dynamic_module_on_bootstrap_extension_runtime_int_update(
+        extension_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+        extension_module_ptr: envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+        key: envoy_dynamic_module_type_envoy_buffer,
+        value: u64,
+        removed: bool,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_on_bootstrap_extension_runtime_number_update is called when a watched
+ runtime key gets a new number that is not a non-negative integer, or becomes unset after having
+ one.*/
+    pub fn envoy_dynamic_module_on_bootstrap_extension_runtime_number_update(
+        extension_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+        extension_module_ptr: envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+        key: envoy_dynamic_module_type_envoy_buffer,
+        value: f64,
+        removed: bool,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update is called by the module
+ to watch a runtime key, so that the runtime update hooks above are called on the bootstrap
+ extension when its value changes. Call it once for each key to watch. The key does not need to
+ have a value yet.
+
+ This can only be called during envoy_dynamic_module_on_bootstrap_extension_server_initialized.
+ RTDS may or may not have delivered its layers by then, so the module should read the current
+ value with the runtime getters such as envoy_dynamic_module_callback_get_runtime_bool when it
+ starts watching the key, and then rely on the hooks for the later changes.
+
+ @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ @param key is the runtime key to watch, for example "envoy.reloadable_features.some_flag". It is
+ only read during the call.
+ @return true if the module now watches the key. Returns false when the key is empty or already
+ watched, when the module implements none of the runtime update hooks, outside of
+ envoy_dynamic_module_on_bootstrap_extension_server_initialized, once the server began to shut
+ down, or when called off the main thread. A call off the main thread also reports an Envoy bug.*/
+    pub fn envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+        extension_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+        key: envoy_dynamic_module_type_module_buffer,
+    ) -> bool;
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {

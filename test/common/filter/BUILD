@@ -13,8 +13,18 @@ envoy_cc_test(
     srcs = ["config_discovery_impl_test.cc"],
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
-        "msan": "linux_x64_small",
-        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "msan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/config:ecds_subscription_registry_lib",

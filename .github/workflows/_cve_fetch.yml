@@ -35,7 +35,7 @@ jobs:
         else
             echo "weekly_run=false" >> $GITHUB_OUTPUT
         fi
-    - uses: envoyproxy/toolshed/actions/gcp/setup@c217ffacb627b52d81db650203403578bfca9c8c  # actions-v0.4.31
+    - uses: envoyproxy/toolshed/actions/gcp/setup@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       name: Setup GCP
       with:
         key: ${{ secrets.gcs-cve-key }}

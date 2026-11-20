@@ -508,6 +508,32 @@ pub trait EnvoyBootstrapExtension {
   /// The callback receives the gauge name and its current value.
   /// Return `true` to continue iteration, `false` to stop.
   fn iterate_gauges(&self, callback: &mut dyn FnMut(&str, u64) -> bool);
+
+  /// Watch a runtime key. The extension then receives [`BootstrapExtension::on_runtime_update`]
+  /// when the value of the key changes in a newly loaded runtime snapshot, for example on an RTDS
+  /// update, a disk layer update or a request to the admin `/runtime_modify` endpoint. Call this
+  /// once for each key to watch. The key does not need to have a value yet, and its value when this
+  /// is called is not reported.
+  ///
+  /// This can only be called from [`BootstrapExtension::on_server_initialized`]. RTDS may or may
+  /// not have delivered its layers by then, so read the current value with the runtime getters
+  /// such as [`crate::get_runtime_bool`] when starting to watch the key.
+  ///
+  /// Returns `false` if the key is empty or already watched, outside of
+  /// [`BootstrapExtension::on_server_initialized`], or once the server began to shut down.
+  fn enable_runtime_update(&self, key: &str) -> bool;
+}
+
+/// The value of a watched runtime key, as given to [`BootstrapExtension::on_runtime_update`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RuntimeValue {
+  /// A boolean, as read by [`crate::get_runtime_bool`].
+  Bool(bool),
+  /// A non-negative integer, as read exactly by [`crate::get_runtime_int`]. An integer is not
+  /// reported as [`RuntimeValue::Bool`], though [`crate::get_runtime_bool`] also reads it as one.
+  Int(u64),
+  /// Any other number, as read by [`crate::get_runtime_number`].
+  Number(f64),
 }
 
 /// BootstrapExtensionConfig is the module-side bootstrap extension configuration.
@@ -836,6 +862,27 @@ pub trait BootstrapExtension: Send + Sync {
   /// threads. To run code on every worker thread, call
   /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`] after the server is initialized.
   fn on_worker_thread_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
+
+  /// Called when the value of a runtime key watched via
+  /// [`EnvoyBootstrapExtension::enable_runtime_update`] changes. When several watched keys change
+  /// in the same runtime snapshot, this is called for each of them in lexicographic order of the
+  /// keys. The runtime getters such as [`crate::get_runtime_bool`] already return the new value on
+  /// the main thread when this is called.
+  ///
+  /// * `envoy_extension` can be used to interact with the underlying Envoy extension object.
+  /// * `key` is the watched runtime key whose value changed.
+  /// * `value` is the new value of the key, typed the way the runtime getters read it, or `None`
+  ///   when the key became unset. A value that is neither a boolean nor a number counts as unset.
+  ///   See [`RuntimeValue`]. When a runtime guard becomes unset, the guard returns to its value
+  ///   before any layer set it, normally its compiled default, while [`crate::get_runtime_bool`]
+  ///   returns the default given by the caller.
+  fn on_runtime_update(
+    &mut self,
+    _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    _key: &str,
+    _value: Option<RuntimeValue>,
+  ) {
+  }
 
   /// Called when Envoy begins draining.
   ///
@@ -1799,6 +1846,15 @@ impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
       );
     }
   }
+
+  fn enable_runtime_update(&self, key: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+        self.raw,
+        str_to_module_buffer(key),
+      )
+    }
+  }
 }
 
 // Bootstrap Extension Event Hook Implementations
@@ -2247,6 +2303,65 @@ ffi_export! {
       &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
       listener_name_str.as_ref(),
     );
+  }
+}
+
+fn on_runtime_update_impl(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+  key: abi::envoy_dynamic_module_type_envoy_buffer,
+  value: RuntimeValue,
+  removed: bool,
+) {
+  let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
+  let extension = unsafe { &mut *extension };
+  let key_str = unsafe { crate::ffi_helpers::str_lossy_from_raw(key.ptr as *const u8, key.length) };
+  extension.on_runtime_update(
+    &mut EnvoyBootstrapExtensionImpl::new(envoy_ptr),
+    key_str.as_ref(),
+    (!removed).then_some(value),
+  );
+}
+
+ffi_export! {
+  /// Event hook called by Envoy when a watched runtime key gets a new boolean value, or becomes
+  /// unset after having one.
+  fn envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+    key: abi::envoy_dynamic_module_type_envoy_buffer,
+    value: bool,
+    removed: bool,
+  ) {
+    on_runtime_update_impl(envoy_ptr, extension_ptr, key, RuntimeValue::Bool(value), removed);
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy when a watched runtime key gets a new non-negative integer value,
+  /// or becomes unset after having one.
+  fn envoy_dynamic_module_on_bootstrap_extension_runtime_int_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+    key: abi::envoy_dynamic_module_type_envoy_buffer,
+    value: u64,
+    removed: bool,
+  ) {
+    on_runtime_update_impl(envoy_ptr, extension_ptr, key, RuntimeValue::Int(value), removed);
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy when a watched runtime key gets any other new number, or becomes
+  /// unset after having one.
+  fn envoy_dynamic_module_on_bootstrap_extension_runtime_number_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+    key: abi::envoy_dynamic_module_type_envoy_buffer,
+    value: f64,
+    removed: bool,
+  ) {
+    on_runtime_update_impl(envoy_ptr, extension_ptr, key, RuntimeValue::Number(value), removed);
   }
 }
 

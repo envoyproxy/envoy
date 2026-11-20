@@ -132,6 +132,13 @@ void ValidationInstance::initialize(const Options& options,
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
   thread_local_.registerThread(*dispatcher_, true);
 
+  // The runtime is created before the bootstrap extensions, as in the main server, since they can
+  // use it while they are created.
+  runtime_ = component_factory.createRuntime(*this, initial_config);
+  ENVOY_BUG(runtime_ != nullptr,
+            "Component factory should not return nullptr from createRuntime()");
+  validation_context_.setRuntime(runtime());
+
   // Create bootstrap extensions to validate their configs and register any providers
   // or singletons needed by downstream config elements.
   // Note: Any lifecycle callbacks are intentionally not invoked as they are serving-time callbacks
@@ -146,11 +153,6 @@ void ValidationInstance::initialize(const Options& options,
     THROW_IF_NOT_OK_REF(extension_or_error.status());
     bootstrap_extensions_.push_back(std::move(extension_or_error.value()));
   }
-
-  runtime_ = component_factory.createRuntime(*this, initial_config);
-  ENVOY_BUG(runtime_ != nullptr,
-            "Component factory should not return nullptr from createRuntime()");
-  validation_context_.setRuntime(runtime());
 
   overload_manager_ = THROW_OR_RETURN_VALUE(
       OverloadManagerImpl::create(

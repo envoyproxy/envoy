@@ -163,12 +163,15 @@ envoy_cc_library(
     deps = [
         ":extension_config_lib",
         "//envoy/common:callback",
+        "//envoy/runtime:runtime_interface",
         "//envoy/server:bootstrap_extension_config_interface",
         "//envoy/server:lifecycle_notifier_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/types:variant",
     ],
 )
 

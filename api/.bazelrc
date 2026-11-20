@@ -1,6 +1,6 @@
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/174de772a0e9d571031cfdda38569c5f7ceedaf8
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/56e7f3556b6f00913c089fc914bdd81251ea0dd7
 
 # Build settings
 build --incompatible_strict_action_env
