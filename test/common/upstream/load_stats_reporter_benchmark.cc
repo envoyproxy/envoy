@@ -193,19 +193,13 @@ makeResponse(bool send_all_clusters, const std::vector<std::string>& cluster_nam
 // Measures the cost of starting a load report period, i.e. of (re)tracking the clusters selected
 // by the LRS server, which happens after every load report. The fixture setup (thousands of mock
 // clusters) dominates the wall time of this benchmark, not the measured code.
-void bmStartLoadReportPeriod(::benchmark::State& state, bool enable_optimized_lrs_bookkeeping,
-                             bool send_all_clusters) {
+void bmStartLoadReportPeriod(::benchmark::State& state, bool send_all_clusters) {
   const int num_clusters = state.range(0);
   if (benchmark::skipExpensiveBenchmarks() && num_clusters > 64) {
     state.SkipWithError("Skipping expensive benchmark in test mode");
     return;
   }
   // The reporter reads the flag when it is created, so it has to be set first.
-  TestScopedRuntime scoped_runtime;
-  if (enable_optimized_lrs_bookkeeping) {
-    scoped_runtime.mergeValues(
-        {{"envoy.restart_features.enable_optimized_lrs_bookkeeping", "true"}});
-  }
 
   BenchmarkFixture fixture;
   const std::vector<std::string> names = clusterNames(num_clusters);
@@ -229,18 +223,12 @@ void bmStartLoadReportPeriod(::benchmark::State& state, bool enable_optimized_lr
 
 // Measures the cost of a load report for all clusters when a share of the clusters had requests
 // since the last report.
-void bmSendLoadStatsRequest(::benchmark::State& state, bool enable_optimized_lrs_bookkeeping,
-                            double active_cluster_ratio) {
+void bmSendLoadStatsRequest(::benchmark::State& state, double active_cluster_ratio) {
   const int num_clusters = state.range(0);
   const int hosts_per_cluster = state.range(1);
   if (benchmark::skipExpensiveBenchmarks() && (num_clusters > 64 || hosts_per_cluster > 10)) {
     state.SkipWithError("Skipping expensive benchmark in test mode");
     return;
-  }
-  TestScopedRuntime scoped_runtime;
-  if (enable_optimized_lrs_bookkeeping) {
-    scoped_runtime.mergeValues(
-        {{"envoy.restart_features.enable_optimized_lrs_bookkeeping", "true"}});
   }
 
   BenchmarkFixture fixture;
@@ -272,28 +260,15 @@ void bmSendLoadStatsRequest(::benchmark::State& state, bool enable_optimized_lrs
 
 // The mock clusters are expensive to set up, so the number of clusters is kept moderate and the
 // number of hosts per cluster is the main knob for the total number of hosts.
-BENCHMARK_CAPTURE(bmStartLoadReportPeriod, SendAllClusters_NonOptimized, false, true)
-    ->Range(8, 512);
-BENCHMARK_CAPTURE(bmStartLoadReportPeriod, SendAllClusters_Optimized, true, true)->Range(8, 512);
-BENCHMARK_CAPTURE(bmStartLoadReportPeriod, ExplicitClusters_NonOptimized, false, false)
-    ->Range(8, 512);
-BENCHMARK_CAPTURE(bmStartLoadReportPeriod, ExplicitClusters_Optimized, true, false)->Range(8, 512);
+BENCHMARK_CAPTURE(bmStartLoadReportPeriod, SendAllClusters, true)->Range(8, 512);
+BENCHMARK_CAPTURE(bmStartLoadReportPeriod, ExplicitClusters, false)->Range(8, 512);
 
 // {clusters, hosts per cluster}
 #define SEND_LOAD_STATS_REQUEST_RANGES Ranges({{8, 512}, {8, 512}})
 
-BENCHMARK_CAPTURE(bmSendLoadStatsRequest, IdleClusters_NonOptimized, false, 0.0)
-    ->SEND_LOAD_STATS_REQUEST_RANGES;
-BENCHMARK_CAPTURE(bmSendLoadStatsRequest, IdleClusters_Optimized, true, 0.0)
-    ->SEND_LOAD_STATS_REQUEST_RANGES;
-BENCHMARK_CAPTURE(bmSendLoadStatsRequest, TenPercentActive_NonOptimized, false, 0.1)
-    ->SEND_LOAD_STATS_REQUEST_RANGES;
-BENCHMARK_CAPTURE(bmSendLoadStatsRequest, TenPercentActive_Optimized, true, 0.1)
-    ->SEND_LOAD_STATS_REQUEST_RANGES;
-BENCHMARK_CAPTURE(bmSendLoadStatsRequest, AllActive_NonOptimized, false, 1.0)
-    ->SEND_LOAD_STATS_REQUEST_RANGES;
-BENCHMARK_CAPTURE(bmSendLoadStatsRequest, AllActive_Optimized, true, 1.0)
-    ->SEND_LOAD_STATS_REQUEST_RANGES;
+BENCHMARK_CAPTURE(bmSendLoadStatsRequest, IdleClusters, 0.0)->SEND_LOAD_STATS_REQUEST_RANGES;
+BENCHMARK_CAPTURE(bmSendLoadStatsRequest, TenPercentActive, 0.1)->SEND_LOAD_STATS_REQUEST_RANGES;
+BENCHMARK_CAPTURE(bmSendLoadStatsRequest, AllActive, 1.0)->SEND_LOAD_STATS_REQUEST_RANGES;
 
 } // namespace
 } // namespace Upstream

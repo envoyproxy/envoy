@@ -31,16 +31,11 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-class LoadStatsReporterImplTest : public testing::TestWithParam<bool> {
+class LoadStatsReporterImplTest : public testing::Test {
 public:
   LoadStatsReporterImplTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
-        async_client_(new Grpc::MockAsyncClient()) {
-    scoped_runtime_.mergeValues({{"envoy.restart_features.enable_optimized_lrs_bookkeeping",
-                                  enableOptimizedLrsBookkeeping() ? "true" : "false"}});
-  }
-
-  bool enableOptimizedLrsBookkeeping() const { return GetParam(); }
+        async_client_(new Grpc::MockAsyncClient()) {}
 
   void TearDown() override {
     if (load_stats_reporter_ != nullptr) {
@@ -147,7 +142,7 @@ public:
 };
 
 // Validate that stream creation results in a timer based retry.
-TEST_P(LoadStatsReporterImplTest, StreamCreationFailure) {
+TEST_F(LoadStatsReporterImplTest, StreamCreationFailure) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
   EXPECT_CALL(*retry_timer_, enableTimer(_, _));
   createLoadStatsReporter();
@@ -156,7 +151,7 @@ TEST_P(LoadStatsReporterImplTest, StreamCreationFailure) {
   retry_timer_cb_();
 }
 
-TEST_P(LoadStatsReporterImplTest, TestPubSub) {
+TEST_F(LoadStatsReporterImplTest, TestPubSub) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createLoadStatsReporter();
@@ -174,7 +169,7 @@ TEST_P(LoadStatsReporterImplTest, TestPubSub) {
 }
 
 // Validate treatment of existing clusters across updates.
-TEST_P(LoadStatsReporterImplTest, ExistingClusters) {
+TEST_F(LoadStatsReporterImplTest, ExistingClusters) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // Initially, we have no clusters to report on.
   expectSendMessage({});
@@ -338,7 +333,7 @@ void addStatExpectation(envoy::config::endpoint::v3::UpstreamLocalityStats* stat
 // endpoint-level granularity load metrics when the feature is enabled. It sets
 // up a cluster with a host, simulates load metrics, and ensures that the
 // generated load report includes the expected endpoint-level statistics.
-TEST_P(LoadStatsReporterImplTest, EndpointLevelLoadStatsReporting) {
+TEST_F(LoadStatsReporterImplTest, EndpointLevelLoadStatsReporting) {
   // Enable endpoint granularity
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
@@ -406,7 +401,7 @@ TEST_P(LoadStatsReporterImplTest, EndpointLevelLoadStatsReporting) {
 
 // This test validates that endpoint stats are not reported if the endpoint has no load stat
 // updates.
-TEST_P(LoadStatsReporterImplTest, EndpointLevelLoadStatsReportingNoUpdate) {
+TEST_F(LoadStatsReporterImplTest, EndpointLevelLoadStatsReportingNoUpdate) {
   // Enable endpoint granularity
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
@@ -465,7 +460,7 @@ TEST_P(LoadStatsReporterImplTest, EndpointLevelLoadStatsReportingNoUpdate) {
 }
 
 // Validate that per-locality metrics are aggregated across hosts and included in the load report.
-TEST_P(LoadStatsReporterImplTest, UpstreamLocalityStats) {
+TEST_F(LoadStatsReporterImplTest, UpstreamLocalityStats) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
@@ -554,7 +549,7 @@ TEST_P(LoadStatsReporterImplTest, UpstreamLocalityStats) {
 }
 
 // Validate that the client can recover from a remote stream closure via retry.
-TEST_P(LoadStatsReporterImplTest, RemoteStreamClose) {
+TEST_F(LoadStatsReporterImplTest, RemoteStreamClose) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
@@ -569,7 +564,7 @@ TEST_P(LoadStatsReporterImplTest, RemoteStreamClose) {
 }
 
 // Validate that errors stat is not incremented for a graceful stream termination.
-TEST_P(LoadStatsReporterImplTest, RemoteStreamGracefulClose) {
+TEST_F(LoadStatsReporterImplTest, RemoteStreamGracefulClose) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
@@ -584,7 +579,7 @@ TEST_P(LoadStatsReporterImplTest, RemoteStreamGracefulClose) {
 }
 
 // Validate that when rq_active is non-zero, a load report is sent even if rq_issued is 0.
-TEST_P(LoadStatsReporterImplTest, ReportLoadWhenRqActiveIsNonZero) {
+TEST_F(LoadStatsReporterImplTest, ReportLoadWhenRqActiveIsNonZero) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.report_load_for_non_zero_stats", "false"}});
 
@@ -638,7 +633,7 @@ TEST_P(LoadStatsReporterImplTest, ReportLoadWhenRqActiveIsNonZero) {
 
 // Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is true, a load
 // report is sent if only rq_success is non-zero.
-TEST_P(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqSuccess) {
+TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqSuccess) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
 
@@ -691,7 +686,7 @@ TEST_P(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqSuccess) {
 
 // Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is true, a load
 // report is sent if only rq_error is non-zero.
-TEST_P(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqError) {
+TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqError) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
 
@@ -744,7 +739,7 @@ TEST_P(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqError) {
 
 // Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is true, a load
 // report is sent if only custom metrics are present.
-TEST_P(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsCustomMetric) {
+TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsCustomMetric) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
 
@@ -798,7 +793,7 @@ TEST_P(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsCustomMetric) {
 
 // Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is false, a load
 // report is NOT sent if only rq_success is non-zero.
-TEST_P(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsDisabled) {
+TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsDisabled) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.report_load_for_non_zero_stats", "false"}});
 
@@ -843,7 +838,7 @@ TEST_P(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsDisabled) {
 
 // Regression test: the load stats reporter must skip empty locality groups instead of
 // crashing with a null dereference on hosts[0].
-TEST_P(LoadStatsReporterImplTest, EmptyLocalityGroupDoesNotCrash) {
+TEST_F(LoadStatsReporterImplTest, EmptyLocalityGroupDoesNotCrash) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
@@ -917,7 +912,7 @@ TEST_P(LoadStatsReporterImplTest, EmptyLocalityGroupDoesNotCrash) {
 // discarded when tracking starts. The custom load metrics of its hosts are not discarded: with
 // envoy.reloadable_features.report_load_for_non_zero_stats they are sent on their own with the
 // first report.
-TEST_P(LoadStatsReporterImplTest, NewlyTrackedClusterStatsAreLatched) {
+TEST_F(LoadStatsReporterImplTest, NewlyTrackedClusterStatsAreLatched) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
 
@@ -994,7 +989,7 @@ TEST_P(LoadStatsReporterImplTest, NewlyTrackedClusterStatsAreLatched) {
 // metrics that the hosts of a newly tracked cluster accumulated before it was tracked are held
 // back until the hosts have requests to report, and are then sent together with them. The request
 // and drop stats from before the cluster was tracked are discarded just the same.
-TEST_P(LoadStatsReporterImplTest,
+TEST_F(LoadStatsReporterImplTest,
        NewlyTrackedClusterStatsAreLatchedReportLoadForNonZeroStatsDisabled) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.report_load_for_non_zero_stats", "false"}});
@@ -1068,7 +1063,7 @@ TEST_P(LoadStatsReporterImplTest,
 // Validate that with send_all_clusters, the request and drop stats that a cluster accumulated
 // before it was tracked are discarded when tracking starts, both for a cluster that is active
 // when the response arrives and for a cluster that becomes active later.
-TEST_P(LoadStatsReporterImplTest, NewlyTrackedClusterStatsAreLatchedSendAllClusters) {
+TEST_F(LoadStatsReporterImplTest, NewlyTrackedClusterStatsAreLatchedSendAllClusters) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();

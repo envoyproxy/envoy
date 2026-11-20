@@ -41,11 +41,6 @@ namespace Upstream {
  *     - Current `rq_active_` is non-zero.
  *     - Latched `rq_total_` is non-zero.
  *     - Any custom load metrics are non-zero in `LoadMetricStats`.
- *
- * - envoy.restart_features.enable_optimized_lrs_bookkeeping: If true uses the
- *   optimized codepath for keeping track of clusters for load reporting, which
- *   does not copy the cluster map on every report. The flag is read once, when
- *   the reporter is created.
  */
 class LoadStatsReporterImpl
     : public LoadStatsReporter,
@@ -90,8 +85,6 @@ private:
   void handleFailure();
   void startLoadReportPeriod();
 
-  void startLoadReportPeriodOptimized();
-  void sendLoadStatsRequestOptimized();
   // Appends the ClusterStats of a tracked cluster to request and starts its next measurement
   // interval.
   void addClusterStats(envoy::service::load_stats::v3::LoadStatsRequest& request,
@@ -117,9 +110,6 @@ private:
   Event::TimerPtr response_timer_;
   const envoy::service::load_stats::v3::LoadStatsRequest request_template_;
   Grpc::ResponsePtr<envoy::service::load_stats::v3::LoadStatsResponse> message_{nullptr};
-  // Whether envoy.restart_features.enable_optimized_lrs_bookkeeping was enabled when the reporter
-  // was created. The flag selects which of the two maps below is used, so it is read only once.
-  const bool optimized_lrs_bookkeeping_;
   // Map from cluster name to start of measurement interval.
   absl::node_hash_map<std::string, std::chrono::steady_clock::duration> clusters_;
   // Map from cluster name to the load reporting state of the cluster. Only holds clusters selected
