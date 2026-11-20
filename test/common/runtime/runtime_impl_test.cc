@@ -1358,6 +1358,29 @@ TEST_F(RtdsLoaderImplTest, BooleanToStringConversion) {
   EXPECT_EQ("true", loader_->snapshot().get("toggle").value().get());
 }
 
+TEST(NoRuntime, CachedFeatureEnabledDefaults) {
+  EXPECT_FALSE(ENVOY_RUNTIME_FEATURE_ENABLED("envoy.reloadable_features.test_feature_false"));
+  EXPECT_TRUE(ENVOY_RUNTIME_FEATURE_ENABLED("envoy.reloadable_features.test_feature_true"));
+}
+
+TEST(NoRuntime, CachedFeatureEnabledSeesOverrides) {
+  const auto enabled = []() {
+    return ENVOY_RUNTIME_FEATURE_ENABLED("envoy.reloadable_features.test_feature_false");
+  };
+  EXPECT_FALSE(enabled());
+  maybeSetRuntimeGuard("envoy.reloadable_features.test_feature_false", true);
+  // Same call site, so the cached flag is reused and the new value is read.
+  EXPECT_TRUE(enabled());
+  maybeSetRuntimeGuard("envoy.reloadable_features.test_feature_false", false);
+  EXPECT_FALSE(enabled());
+}
+
+TEST(NoRuntime, CachedFeatureEnabledUnknownFeature) {
+  EXPECT_ENVOY_BUG(
+      EXPECT_FALSE(ENVOY_RUNTIME_FEATURE_ENABLED("envoy.reloadable_features.not_a_feature")),
+      "Unable to find runtime feature envoy.reloadable_features.not_a_feature");
+}
+
 } // namespace
 } // namespace Runtime
 } // namespace Envoy
