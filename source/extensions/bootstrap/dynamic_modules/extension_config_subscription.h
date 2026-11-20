@@ -10,7 +10,6 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/subscription.h"
-#include "envoy/server/config_tracker.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/common/common/cleanup.h"
@@ -26,6 +25,8 @@ namespace Extensions {
 namespace Bootstrap {
 namespace DynamicModules {
 
+class ExtensionConfigSubscriptions;
+
 /**
  * An ECDS subscription for a bootstrap module.
  */
@@ -40,6 +41,7 @@ public:
   create(absl::string_view name, const envoy::config::core::v3::ExtensionConfigSource& source,
          absl::string_view extension_name, Server::Configuration::ServerFactoryContext& context,
          UpdateCallback callback);
+  ~ExtensionConfigSubscription() override;
 
   void start();
 
@@ -58,7 +60,8 @@ private:
                               Server::Configuration::ServerFactoryContext& context,
                               UpdateCallback callback);
   void removeConfig();
-  ProtobufTypes::MessagePtr dumpConfig(const Matchers::StringMatcher& name_matcher) const;
+  void dumpConfig(envoy::admin::v3::EcdsConfigDump& dump,
+                  const Matchers::StringMatcher& name_matcher) const;
 
   const std::string name_;
   const std::vector<std::string> type_urls_;
@@ -69,10 +72,12 @@ private:
   std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> last_config_;
   std::string last_version_;
   SystemTime last_updated_;
-  Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
+  std::shared_ptr<ExtensionConfigSubscriptions> subscriptions_;
   std::unique_ptr<Cleanup> name_reservation_;
   // destroy the subscription before its callbacks and stats
   Config::SubscriptionPtr subscription_;
+
+  friend class ExtensionConfigSubscriptions;
 };
 
 } // namespace DynamicModules

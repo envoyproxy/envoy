@@ -7,6 +7,9 @@
 #include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/config/xds_manager.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/config_tracker.h"
+#include "envoy/singleton/instance.h"
+#include "envoy/singleton/manager.h"
 
 #include "source/common/common/matchers.h"
 #include "source/common/config/ecds_subscription_registry.h"
@@ -14,23 +17,44 @@
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stats/utility.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace DynamicModules {
 
+class ExtensionConfigSubscriptions : public Singleton::Instance {
+public:
+  static std::shared_ptr<ExtensionConfigSubscriptions>
+  get(Server::Configuration::ServerFactoryContext& context);
+
+private:
+  absl::flat_hash_set<ExtensionConfigSubscription*> subscriptions_;
+  Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
+  friend class ExtensionConfigSubscription;
+};
+
 ExtensionConfigSubscription::ExtensionConfigSubscription(
     absl::string_view name, const envoy::config::core::v3::ExtensionConfigSource& source,
-    absl::string_view, Server::Configuration::ServerFactoryContext& context,
+    absl::string_view extension_name, Server::Configuration::ServerFactoryContext& context,
     UpdateCallback callback)
     : name_(name), type_urls_(source.type_urls().begin(), source.type_urls().end()),
       context_(context), callback_(std::move(callback)),
       resource_type_(context.messageValidationContext().dynamicValidationVisitor(), "name"),
-      scope_(context.scope().createScope(absl::StrCat("extension_config_discovery.", name, "."))) {}
+      scope_(context.scope().createScopeWithTaggedName(
+          absl::StrCat("extension_config_discovery.bootstrap.",
+                       Stats::Utility::sanitizeStatsName(name)),
+          {{"config_name", extension_name.empty() ? "default" : extension_name}},
+          absl::StrCat("extension_config_discovery.bootstrap.",
+                       Stats::Utility::sanitizeStatsName(name), ".",
+                       Stats::Utility::sanitizeStatsName(
+                           extension_name.empty() ? "default" : extension_name)))) {}
 
 absl::StatusOr<std::unique_ptr<ExtensionConfigSubscription>> ExtensionConfigSubscription::create(
     absl::string_view name, const envoy::config::core::v3::ExtensionConfigSource& source,
@@ -72,23 +96,15 @@ absl::StatusOr<std::unique_ptr<ExtensionConfigSubscription>> ExtensionConfigSubs
       result->resource_type_.resourceDecoder(), {});
   RETURN_IF_NOT_OK(subscription.status());
   result->subscription_ = std::move(*subscription);
-  if (auto admin = context.admin(); admin.has_value()) {
-    auto& tracker = admin->getConfigTracker();
-    const auto config_dump_key = absl::StrCat("ecds_bootstrap.", extension_name);
-    std::string key(config_dump_key);
-    for (uint64_t suffix = 1; tracker.getCallbacksMap().contains(key); ++suffix) {
-      key = absl::StrCat(config_dump_key, ".", suffix);
-    }
-    result->config_tracker_entry_ =
-        tracker.add(key, [self = result.get()](const Matchers::StringMatcher& matcher) {
-          return self->dumpConfig(matcher);
-        });
-    if (result->config_tracker_entry_ == nullptr) {
-      return absl::AlreadyExistsError(absl::StrCat("bootstrap ECDS config dump entry '",
-                                                   config_dump_key, "' is already registered"));
-    }
-  }
+  result->subscriptions_ = ExtensionConfigSubscriptions::get(context);
+  result->subscriptions_->subscriptions_.insert(result.get());
   return result;
+}
+
+ExtensionConfigSubscription::~ExtensionConfigSubscription() {
+  if (subscriptions_ != nullptr) {
+    subscriptions_->subscriptions_.erase(this);
+  }
 }
 
 void ExtensionConfigSubscription::start() { subscription_->start({name_}); }
@@ -109,14 +125,16 @@ absl::Status ExtensionConfigSubscription::onConfigUpdate(
     return absl::OkStatus();
   }
   if (resources.size() != 1 || !resources[0].get().hasResource()) {
-    return absl::InvalidArgumentError("bootstrap ECDS update must contain one configuration");
+    return absl::InvalidArgumentError(
+        absl::StrCat("bootstrap ECDS resource '", name_, "' requires one configuration"));
   }
   const auto& config = Protobuf::DynamicCastMessage<envoy::config::core::v3::TypedExtensionConfig>(
       resources[0].get().resource());
   auto normalized = Config::XdsResourceIdentifier::normalizeResourceName(config.name());
   if (!normalized.ok() || *normalized != name_ || !config.has_typed_config()) {
-    return absl::InvalidArgumentError(
-        "bootstrap ECDS resource has an unexpected name or no config");
+    return absl::InvalidArgumentError(absl::StrCat("bootstrap ECDS resource '", name_,
+                                                   "' received resource '", config.name(),
+                                                   "' with an unexpected name or no config"));
   }
   if (last_config_ != nullptr &&
       last_config_->typed_config().type_url() == config.typed_config().type_url() &&
@@ -128,13 +146,19 @@ absl::Status ExtensionConfigSubscription::onConfigUpdate(
         return TypeUtil::typeUrlToDescriptorFullName(type) == received_type;
       })) {
     return absl::InvalidArgumentError(
-        "bootstrap ECDS resource has an unexpected configuration type");
+        absl::StrCat("bootstrap ECDS resource '", name_, "' received type '", received_type,
+                     "', expected ", absl::StrJoin(type_urls_, ", ")));
   }
   auto bytes = MessageUtil::knownAnyToBytes(config.typed_config());
-  RETURN_IF_NOT_OK(bytes.status());
+  if (!bytes.ok()) {
+    return absl::InvalidArgumentError(absl::StrCat("bootstrap ECDS resource '", name_,
+                                                   "' could not decode type '", received_type,
+                                                   "': ", bytes.status().message()));
+  }
   if (!callback_(name_, version_info, absl::StrCat("type.googleapis.com/", received_type),
                  *bytes)) {
-    return absl::InvalidArgumentError("bootstrap module rejected extension config");
+    return absl::InvalidArgumentError(absl::StrCat("bootstrap module rejected ECDS resource '",
+                                                   name_, "' of type '", received_type, "'"));
   }
   last_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(config);
   last_version_ = version_info;
@@ -158,22 +182,44 @@ absl::Status ExtensionConfigSubscription::onConfigUpdate(
   return absl::OkStatus();
 }
 
-void ExtensionConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureReason,
-                                                       const EnvoyException* exception) {
-  ENVOY_LOG(warn, "bootstrap ECDS update for {} failed: {}", name_,
-            exception == nullptr ? "configuration unavailable" : exception->what());
+void ExtensionConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
+                                                       const EnvoyException*) {
+  ENVOY_LOG(debug, "bootstrap ECDS subscription {} failed due to {}", name_,
+            static_cast<int>(reason));
 }
 
-ProtobufTypes::MessagePtr
-ExtensionConfigSubscription::dumpConfig(const Matchers::StringMatcher& name_matcher) const {
-  auto dump = std::make_unique<envoy::admin::v3::EcdsConfigDump>();
+void ExtensionConfigSubscription::dumpConfig(envoy::admin::v3::EcdsConfigDump& dump,
+                                             const Matchers::StringMatcher& name_matcher) const {
   if (last_config_ != nullptr && name_matcher.match(name_)) {
-    auto* config = dump->add_ecds_filters();
+    auto* config = dump.add_ecds_filters();
     MessageUtil::packFrom(*config->mutable_ecds_filter(), *last_config_);
     config->set_version_info(last_version_);
     TimestampUtil::systemClockToTimestamp(last_updated_, *config->mutable_last_updated());
   }
-  return dump;
+}
+
+SINGLETON_MANAGER_REGISTRATION(dynamic_modules_bootstrap_ecds_subscriptions);
+
+std::shared_ptr<ExtensionConfigSubscriptions>
+ExtensionConfigSubscriptions::get(Server::Configuration::ServerFactoryContext& context) {
+  auto subscriptions = context.singletonManager().getTyped<ExtensionConfigSubscriptions>(
+      SINGLETON_MANAGER_REGISTERED_NAME(dynamic_modules_bootstrap_ecds_subscriptions),
+      [] { return std::make_shared<ExtensionConfigSubscriptions>(); });
+  if (subscriptions->config_tracker_entry_ == nullptr) {
+    if (auto admin = context.admin(); admin.has_value()) {
+      subscriptions->config_tracker_entry_ = admin->getConfigTracker().add(
+          "ecds_modules", [self = subscriptions.get()](const Matchers::StringMatcher& matcher) {
+            auto dump = std::make_unique<envoy::admin::v3::EcdsConfigDump>();
+            for (const auto* subscription : self->subscriptions_) {
+              subscription->dumpConfig(*dump, matcher);
+            }
+            return dump;
+          });
+      RELEASE_ASSERT(subscriptions->config_tracker_entry_ != nullptr,
+                     "duplicate bootstrap ECDS config dump key");
+    }
+  }
+  return subscriptions;
 }
 
 } // namespace DynamicModules

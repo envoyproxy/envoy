@@ -95,8 +95,20 @@ bool DynamicModuleBootstrapExtensionConfig::enableClusterLifecycle() {
 
 bool DynamicModuleBootstrapExtensionConfig::subscribeEcds(absl::string_view name,
                                                           absl::string_view source_json) {
-  if (!server_initialized_ || extension_destroyed_ || !shutdownNotificationExpected() ||
-      extension_config_subscription_ != nullptr || on_bootstrap_extension_ecds_update_ == nullptr) {
+  if (!server_initialized_) {
+    ENVOY_LOG(error, "cannot subscribe to bootstrap ECDS before server is initialized");
+    return false;
+  }
+  if (extension_destroyed_ || !shutdownNotificationExpected()) {
+    ENVOY_LOG(error, "cannot subscribe to bootstrap ECDS after shutdown or in init only mode");
+    return false;
+  }
+  if (extension_config_subscription_ != nullptr) {
+    ENVOY_LOG(error, "bootstrap extension {} is already subscribed to ECDS", extension_name_);
+    return false;
+  }
+  if (on_bootstrap_extension_ecds_update_ == nullptr) {
+    ENVOY_LOG(error, "bootstrap extension {} has no ECDS update hook", extension_name_);
     return false;
   }
   envoy::config::core::v3::ExtensionConfigSource source;

@@ -233,6 +233,7 @@ envoy_extension_cc_dyn_module_test(
     },
     deps = [
         "//source/common/common:base64_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/extensions/bootstrap/dynamic_modules:config",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//test/integration:http_integration_lib",

@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/common/base64.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
@@ -359,23 +360,23 @@ resources:
   };
 
   replace_config(response("2", "disabled"));
-  test_server_->waitForCounter("extension_config_discovery.test-config.update_success",
-                               testing::Ge(4));
+  test_server_->waitForCounter(
+      "extension_config_discovery.bootstrap.test-config.test.update_success", testing::Ge(4));
   expect_config("disabled");
 
   replace_config(response("3", "rejected"));
-  test_server_->waitForCounter("extension_config_discovery.test-config.update_rejected",
-                               testing::Ge(2));
+  test_server_->waitForCounter(
+      "extension_config_discovery.bootstrap.test-config.test.update_rejected", testing::Ge(2));
   expect_config("disabled");
 
   replace_config("version_info: '4'\nresources: []\n");
-  test_server_->waitForCounter("extension_config_discovery.test-config.update_success",
-                               testing::Ge(6));
+  test_server_->waitForCounter(
+      "extension_config_discovery.bootstrap.test-config.test.update_success", testing::Ge(6));
   expect_config("disabled");
 
   replace_config(response("5", ""));
-  test_server_->waitForCounter("extension_config_discovery.test-config.update_success",
-                               testing::Ge(8));
+  test_server_->waitForCounter(
+      "extension_config_discovery.bootstrap.test-config.test.update_success", testing::Ge(8));
   expect_config("");
 }
 
@@ -386,6 +387,8 @@ public:
     DISABLE_IF_ADMIN_DISABLED;
     config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
                                       unified_mux ? "true" : "false");
+    // the stats mode is selected before runtime overrides are loaded
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", true);
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ads = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
       ads->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -437,6 +440,13 @@ typed_config:
     ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
     EXPECT_FALSE(request.has_error_detail());
     EXPECT_EQ(writerModuleRequest("/ecds", "", ""), "keep-on-removal");
+    auto counter = test_server_->counter(
+        "extension_config_discovery.bootstrap.test-config.test.update_success");
+    ASSERT_NE(counter, nullptr);
+    EXPECT_EQ(counter->tagExtractedName(),
+              "extension_config_discovery.bootstrap.test-config.update_success");
+    EXPECT_THAT(counter->tags(), testing::Contains(Stats::Tag{"config_name", "test"}));
+
     auto duplicate =
         IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/ecds_second?subscribe",
                                            source, Http::CodecType::HTTP1, version_);

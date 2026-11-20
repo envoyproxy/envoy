@@ -207,6 +207,26 @@ lock across the call that the hook takes. Initial fetch failures do not invoke t
 that waits for its first configuration before signaling initialization complete must set its own
 startup timeout.
 
+The ``ecds_modules`` config dump key lists accepted bootstrap configurations with their version
+and update time. Subscription statistics use the
+``extension_config_discovery.bootstrap.<resource_name>.<extension_name>.`` prefix, tagged with
+``config_name`` set to the extension name, or ``default`` if it is empty, when explicit stats tags
+are enabled.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  init_fetch_timeout, Counter, Initial configuration fetches that timed out
+  update_attempt, Counter, Configuration fetch attempts
+  update_failure, Counter, Configuration fetch failures
+  update_rejected, Counter, Rejected configuration updates
+  update_success, Counter, Accepted updates including unchanged resends
+  update_time, Gauge, Time of the last accepted update in milliseconds since the epoch
+  update_duration, Histogram, Time spent processing updates in milliseconds
+  version, Gauge, Hash of the last accepted version
+  version_text, TextReadout, Last accepted version
+
 Use Cases
 ---------
 

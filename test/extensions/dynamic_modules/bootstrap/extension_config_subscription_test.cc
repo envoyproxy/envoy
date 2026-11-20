@@ -59,8 +59,9 @@ protected:
         .WillOnce([&](auto, auto, auto, Stats::Scope& scope, auto&, auto,
                       auto) -> Config::SubscriptionPtr {
           auto stats = Config::Utility::generateStats(scope);
-          EXPECT_EQ(stats.update_success_.name(),
-                    absl::StrCat("extension_config_discovery.", name, ".update_success"));
+          EXPECT_EQ(
+              stats.update_success_.name(),
+              absl::StrCat("extension_config_discovery.bootstrap.", name, ".test.update_success"));
           return std::move(transport);
         });
     auto result = ExtensionConfigSubscription::create(name, source(type_url, ads), "test", context_,
@@ -100,7 +101,7 @@ protected:
 
   envoy::admin::v3::EcdsConfigDump
   dump(const Matchers::StringMatcher& matcher = Matchers::UniversalStringMatcher()) {
-    auto message = tracker_.getCallbacksMap().at("ecds_bootstrap.test")(matcher);
+    auto message = tracker_.getCallbacksMap().at("ecds_modules")(matcher);
     return Protobuf::DynamicCastMessage<envoy::admin::v3::EcdsConfigDump>(*message);
   }
 
@@ -153,25 +154,29 @@ TEST_F(ExtensionConfigSubscriptionTest, AppliesConfigWithoutAdmin) {
   EXPECT_TRUE(tracker_.getCallbacksMap().empty());
 }
 
-TEST_F(ExtensionConfigSubscriptionTest, RepeatedInstancesHaveIndependentConfigDumps) {
-  auto subscription = create();
-  EXPECT_OK(update(*subscription, config(true)));
-  const auto accepted = dump();
-  auto duplicate = create();
-  EXPECT_OK(update(*duplicate, config(false), "v2"));
-  auto third = create();
-  EXPECT_EQ(tracker_.getCallbacksMap().size(), 3);
-  EXPECT_THAT(dump(), ProtoEq(accepted));
-  EXPECT_TRUE(tracker_.getCallbacksMap().contains("ecds_bootstrap.test.2"));
-  const auto duplicate_dump =
-      tracker_.getCallbacksMap().at("ecds_bootstrap.test.1")(Matchers::UniversalStringMatcher());
-  EXPECT_THAT(MessageUtil::getJsonStringFromMessageOrError(*duplicate_dump),
-              testing::HasSubstr("v2"));
-  duplicate.reset();
-  EXPECT_EQ(tracker_.getCallbacksMap().size(), 2);
-  EXPECT_THAT(dump(), ProtoEq(accepted));
-  duplicate = create();
-  EXPECT_TRUE(tracker_.getCallbacksMap().contains("ecds_bootstrap.test.1"));
+TEST_F(ExtensionConfigSubscriptionTest, SubscriptionsShareOneConfigDump) {
+  auto first = create();
+  EXPECT_OK(update(*first, config(true)));
+  auto second = create("type.googleapis.com/test.Config", "other-config");
+  auto other = config(false);
+  other.set_name("other-config");
+  EXPECT_OK(update(*second, other, "v2"));
+  auto pending = create("type.googleapis.com/test.Config", "pending-config");
+  ASSERT_EQ(tracker_.getCallbacksMap().size(), 1);
+  const auto actual = dump();
+  ASSERT_EQ(actual.ecds_filters_size(), 2);
+  EXPECT_THAT(actual.ecds_filters(),
+              testing::UnorderedElementsAre(
+                  testing::Property(
+                      &envoy::admin::v3::EcdsConfigDump::EcdsFilterConfig::version_info, "v1"),
+                  testing::Property(
+                      &envoy::admin::v3::EcdsConfigDump::EcdsFilterConfig::version_info, "v2")));
+  second.reset();
+  EXPECT_EQ(dump().ecds_filters_size(), 1);
+  first.reset();
+  EXPECT_EQ(dump().ecds_filters_size(), 0);
+  pending.reset();
+  EXPECT_TRUE(tracker_.getCallbacksMap().empty());
 }
 
 TEST_F(ExtensionConfigSubscriptionTest, RefusesRepeatedAdsNamesAndReleasesReservation) {
@@ -241,10 +246,15 @@ TEST_F(ExtensionConfigSubscriptionTest,
   auto subscription = create();
   auto invalid = config(true);
   invalid.set_name("other-config");
-  EXPECT_FALSE(update(*subscription, invalid).ok());
+  EXPECT_THAT(
+      update(*subscription, invalid).message(),
+      testing::AllOf(testing::HasSubstr("test-config"), testing::HasSubstr("other-config")));
   invalid = config(true);
   MessageUtil::packFrom(*invalid.mutable_typed_config(), Protobuf::StringValue());
-  EXPECT_FALSE(update(*subscription, invalid).ok());
+  EXPECT_THAT(update(*subscription, invalid).message(),
+              testing::AllOf(testing::HasSubstr("test-config"),
+                             testing::HasSubstr("google.protobuf.StringValue"),
+                             testing::HasSubstr("test.Config")));
   invalid.clear_typed_config();
   EXPECT_FALSE(update(*subscription, invalid).ok());
   auto duplicate = TestUtility::decodeResources({config(true), config(false)});
