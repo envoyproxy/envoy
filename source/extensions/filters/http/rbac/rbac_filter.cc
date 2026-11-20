@@ -7,6 +7,7 @@
 #include "source/common/network/matching/inputs.h"
 #include "source/common/ssl/matching/inputs.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "xds/type/matcher/v3/http_inputs.pb.h"
 
@@ -67,6 +68,32 @@ absl::Status ActionValidationVisitor::performDataInputValidation(
   return absl::InvalidArgumentError(fmt::format("RBAC HTTP filter cannot match on '{}'", type_url));
 }
 
+namespace {
+
+DynamicMetadataFieldNames fieldNamesFor(absl::string_view stat_prefix,
+                                        Filters::Common::RBAC::EnforcementMode mode) {
+  const auto& keys = Filters::Common::RBAC::DynamicMetadataKeysSingleton::get();
+  if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
+    return {absl::StrCat(stat_prefix, keys.ShadowEffectivePolicyIdField),
+            absl::StrCat(stat_prefix, keys.ShadowEngineResultField)};
+  }
+  return {absl::StrCat(stat_prefix, keys.EnforcedEffectivePolicyIdField),
+          absl::StrCat(stat_prefix, keys.EnforcedEngineResultField)};
+}
+
+// A route config with an empty stat prefix keeps the filter config's field names, so it builds
+// none of its own.
+std::optional<DynamicMetadataFieldNames>
+overridingFieldNamesFor(absl::string_view stat_prefix,
+                        Filters::Common::RBAC::EnforcementMode mode) {
+  if (stat_prefix.empty()) {
+    return std::nullopt;
+  }
+  return fieldNamesFor(stat_prefix, mode);
+}
+
+} // namespace
+
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope,
@@ -75,44 +102,34 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     : stats_(Filters::Common::RBAC::generateStats(stats_prefix, proto_config.rules_stat_prefix(),
                                                   proto_config.shadow_rules_stat_prefix(),
                                                   /*http_filter=*/true, scope)),
-      rules_stat_prefix_(proto_config.rules_stat_prefix()),
-      shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
+      enforced_field_names_(fieldNamesFor(proto_config.rules_stat_prefix(),
+                                          Filters::Common::RBAC::EnforcementMode::Enforced)),
+      shadow_field_names_(fieldNamesFor(proto_config.shadow_rules_stat_prefix(),
+                                        Filters::Common::RBAC::EnforcementMode::Shadow)),
       per_rule_stats_(proto_config.track_per_rule_stats()),
       engine_(Filters::Common::RBAC::createEngine(proto_config, context, validation_visitor,
                                                   action_validation_visitor_)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(
           proto_config, context, validation_visitor, action_validation_visitor_)) {}
 
-#define DEFINE_DYNAMIC_METADATA_STAT_KEY_GETTER(GETTER_NAME, PREFIX, ROUTE_LOCAL_PREFIX_OVERRIDE,  \
-                                                DYNAMIC_METADATA_KEY)                              \
-  std::string RoleBasedAccessControlFilterConfig::GETTER_NAME(                                     \
-      const Http::StreamFilterCallbacks* callbacks) const {                                        \
-    const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<                   \
-        RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);                               \
-    absl::string_view prefix = PREFIX;                                                             \
-    if (route_local && !route_local->ROUTE_LOCAL_PREFIX_OVERRIDE().empty()) {                      \
-      prefix = route_local->ROUTE_LOCAL_PREFIX_OVERRIDE();                                         \
-    }                                                                                              \
-    return absl::StrCat(                                                                           \
-        prefix, Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().DYNAMIC_METADATA_KEY);  \
+const DynamicMetadataFieldNames& RoleBasedAccessControlFilterConfig::fieldNames(
+    const RoleBasedAccessControlRouteSpecificFilterConfig* route_local,
+    const Filters::Common::RBAC::EnforcementMode mode) const {
+  if (route_local) {
+    const auto& route_names = route_local->fieldNames(mode);
+    if (route_names.has_value()) {
+      return *route_names;
+    }
   }
 
-DEFINE_DYNAMIC_METADATA_STAT_KEY_GETTER(shadowEffectivePolicyIdField, shadow_rules_stat_prefix_,
-                                        shadowRulesStatPrefix, ShadowEffectivePolicyIdField)
-DEFINE_DYNAMIC_METADATA_STAT_KEY_GETTER(shadowEngineResultField, shadow_rules_stat_prefix_,
-                                        shadowRulesStatPrefix, ShadowEngineResultField)
-DEFINE_DYNAMIC_METADATA_STAT_KEY_GETTER(enforcedEffectivePolicyIdField, rules_stat_prefix_,
-                                        rulesStatPrefix, EnforcedEffectivePolicyIdField)
-DEFINE_DYNAMIC_METADATA_STAT_KEY_GETTER(enforcedEngineResultField, rules_stat_prefix_,
-                                        rulesStatPrefix, EnforcedEngineResultField)
+  return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? enforced_field_names_
+                                                                  : shadow_field_names_;
+}
 
 const Filters::Common::RBAC::RoleBasedAccessControlEngine*
 RoleBasedAccessControlFilterConfig::engine(
-    const Http::StreamFilterCallbacks* callbacks,
+    const RoleBasedAccessControlRouteSpecificFilterConfig* route_local,
     const Filters::Common::RBAC::EnforcementMode mode) const {
-  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
-      RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);
-
   if (route_local) {
     return route_local->engine(mode);
   }
@@ -121,10 +138,7 @@ RoleBasedAccessControlFilterConfig::engine(
 }
 
 bool RoleBasedAccessControlFilterConfig::perRuleStatsEnabled(
-    const Http::StreamFilterCallbacks* callbacks) const {
-  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
-      RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);
-
+    const RoleBasedAccessControlRouteSpecificFilterConfig* route_local) const {
   if (route_local) {
     return route_local->perRuleStatsEnabled();
   }
@@ -136,8 +150,12 @@ RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpec
     const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& per_route_config,
     Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor)
-    : rules_stat_prefix_(per_route_config.rbac().rules_stat_prefix()),
-      shadow_rules_stat_prefix_(per_route_config.rbac().shadow_rules_stat_prefix()),
+    : enforced_field_names_(
+          overridingFieldNamesFor(per_route_config.rbac().rules_stat_prefix(),
+                                  Filters::Common::RBAC::EnforcementMode::Enforced)),
+      shadow_field_names_(
+          overridingFieldNamesFor(per_route_config.rbac().shadow_rules_stat_prefix(),
+                                  Filters::Common::RBAC::EnforcementMode::Shadow)),
       per_rule_stats_(per_route_config.rbac().track_per_rule_stats()) {
   // Moved from member initializer to ctor body to overcome clang false warning about memory
   // leak (clang-analyzer-cplusplus.NewDeleteLeaks,-warnings-as-errors).
@@ -148,21 +166,22 @@ RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpec
       per_route_config.rbac(), context, validation_visitor, action_validation_visitor_);
 }
 
-// Evaluates the shadow engine policy and updates metrics accordingly
-bool RoleBasedAccessControlFilter::evaluateShadowEngine(const Http::RequestHeaderMap& headers,
-                                                        Protobuf::Struct& metrics) const {
+// Evaluates the shadow engine policy and updates stats accordingly
+void RoleBasedAccessControlFilter::evaluateShadowEngine(
+    const Http::RequestHeaderMap& headers,
+    const RoleBasedAccessControlRouteSpecificFilterConfig* route_local,
+    EngineResult& shadow) const {
   const auto shadow_engine =
-      config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Shadow);
+      config_->engine(route_local, Filters::Common::RBAC::EnforcementMode::Shadow);
   if (shadow_engine == nullptr) {
-    return false;
+    return;
   }
 
-  auto& fields = *metrics.mutable_fields();
-  std::string effective_policy_id;
+  std::string& effective_policy_id = shadow.effective_policy_id_;
   absl::string_view shadow_response_code =
       Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
 
-  const bool per_rule_stats_enabled = config_->perRuleStatsEnabled(callbacks_);
+  const bool per_rule_stats_enabled = config_->perRuleStatsEnabled(route_local);
 
   if (shadow_engine->handleAction(*callbacks_->connection(), headers, callbacks_->streamInfo(),
                                   &effective_policy_id)) {
@@ -183,38 +202,28 @@ bool RoleBasedAccessControlFilter::evaluateShadowEngine(const Http::RequestHeade
         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
   }
 
-  if (!effective_policy_id.empty()) {
-    *fields[config_->shadowEffectivePolicyIdField(callbacks_)].mutable_string_value() =
-        effective_policy_id;
-  }
-
-  *fields[config_->shadowEngineResultField(callbacks_)].mutable_string_value() =
-      shadow_response_code;
-
-  return true;
+  shadow.result_ = shadow_response_code;
 }
 
 // Evaluates the enforced engine policy and returns the appropriate filter status
-Http::FilterHeadersStatus
-RoleBasedAccessControlFilter::evaluateEnforcedEngine(const Http::RequestHeaderMap& headers,
-                                                     Protobuf::Struct& metrics) const {
-  const auto engine = config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Enforced);
+Http::FilterHeadersStatus RoleBasedAccessControlFilter::evaluateEnforcedEngine(
+    const Http::RequestHeaderMap& headers,
+    const RoleBasedAccessControlRouteSpecificFilterConfig* route_local,
+    EngineResult& enforced) const {
+  const auto engine =
+      config_->engine(route_local, Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine == nullptr) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  auto& fields = *metrics.mutable_fields();
-  std::string effective_policy_id;
-  const bool per_rule_stats_enabled = config_->perRuleStatsEnabled(callbacks_);
+  std::string& effective_policy_id = enforced.effective_policy_id_;
+  const bool per_rule_stats_enabled = config_->perRuleStatsEnabled(route_local);
 
   const bool allowed = engine->handleAction(*callbacks_->connection(), headers,
                                             callbacks_->streamInfo(), &effective_policy_id);
 
   absl::string_view log_policy_id = effective_policy_id;
-  if (!effective_policy_id.empty()) {
-    *fields[config_->enforcedEffectivePolicyIdField(callbacks_)].mutable_string_value() =
-        effective_policy_id;
-  } else {
+  if (effective_policy_id.empty()) {
     log_policy_id = "none";
   }
 
@@ -225,7 +234,7 @@ RoleBasedAccessControlFilter::evaluateEnforcedEngine(const Http::RequestHeaderMa
       config_->stats().incPolicyAllowed(effective_policy_id);
     }
 
-    *fields[config_->enforcedEngineResultField(callbacks_)].mutable_string_value() =
+    enforced.result_ =
         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
 
     return Http::FilterHeadersStatus::Continue;
@@ -239,10 +248,52 @@ RoleBasedAccessControlFilter::evaluateEnforcedEngine(const Http::RequestHeaderMa
     config_->stats().incPolicyDenied(effective_policy_id);
   }
 
-  *fields[config_->enforcedEngineResultField(callbacks_)].mutable_string_value() =
-      Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
+  enforced.result_ = Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
 
   return Http::FilterHeadersStatus::StopIteration;
+}
+
+Http::FilterHeadersStatus
+RoleBasedAccessControlFilter::evaluateEngines(const Http::RequestHeaderMap& headers,
+                                              absl::string_view metadata_namespace) const {
+  // One lookup serves both engines and every field name. The connection manager keeps a cleared
+  // route until the stream ends, so this pointer outlives sendLocalReply(), and a denial writes the
+  // field names of the config whose engines ran.
+  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
+      RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks_);
+
+  EngineResult shadow;
+  evaluateShadowEngine(headers, route_local, shadow);
+  EngineResult enforced;
+  const Http::FilterHeadersStatus status = evaluateEnforcedEngine(headers, route_local, enforced);
+
+  // A config with neither engine writes no dynamic metadata.
+  if (shadow.result_.empty() && enforced.result_.empty()) {
+    return status;
+  }
+
+  // The fields are written after both engines ran and after any local reply returned, so nothing
+  // sendLocalReply() runs sees them, such as the onLocalReply() callbacks, the local reply mapper,
+  // the route's response header formatters and the encoder filters of a reply sent at once. One
+  // namespace lookup serves every field, and each field replaces the value an earlier filter wrote
+  // under the same name.
+  auto& fields =
+      *(*callbacks_->streamInfo().dynamicMetadata().mutable_filter_metadata())[metadata_namespace]
+           .mutable_fields();
+  const auto write = [&fields](EngineResult& result, const DynamicMetadataFieldNames& names) {
+    if (result.result_.empty()) {
+      return;
+    }
+    if (!result.effective_policy_id_.empty()) {
+      fields[names.effective_policy_id_].set_string_value(std::move(result.effective_policy_id_));
+    }
+    fields[names.engine_result_].set_string_value(result.result_);
+  };
+  write(shadow, config_->fieldNames(route_local, Filters::Common::RBAC::EnforcementMode::Shadow));
+  write(enforced,
+        config_->fieldNames(route_local, Filters::Common::RBAC::EnforcementMode::Enforced));
+
+  return status;
 }
 
 Http::FilterHeadersStatus
@@ -266,24 +317,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
           : "none",
       headers, callbacks_->streamInfo().dynamicMetadata().DebugString());
 
-  // Create metrics structure to hold results
-  Protobuf::Struct metrics;
-
-  // Evaluate shadow engine if it exists
-  const bool shadow_engine_evaluated = evaluateShadowEngine(headers, metrics);
-
-  // Evaluate enforced engine if it exists
-  const Http::FilterHeadersStatus status = evaluateEnforcedEngine(headers, metrics);
-
-  // Set dynamic metadata if either engine was evaluated
-  const bool enforced_engine_evaluated =
-      status == Http::FilterHeadersStatus::StopIteration ||
-      config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Enforced) != nullptr;
-
-  if (shadow_engine_evaluated || enforced_engine_evaluated) {
-    callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
-  }
-
+  const Http::FilterHeadersStatus status = evaluateEngines(headers, DynamicMetadataKey);
   if (status == Http::FilterHeadersStatus::StopIteration) {
     return status;
   }

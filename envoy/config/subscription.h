@@ -73,6 +73,15 @@ public:
    * @return optional ref<envoy::config::core::v3::Metadata> of a resource.
    */
   virtual const OptRef<const envoy::config::core::v3::Metadata> metadata() const PURE;
+
+  /**
+   * @return bool true if the resource was replayed from the xDS client's local cache to a watch
+   *         that joined an already-subscribed name, rather than received from the management
+   *         server. A replay is delivered on its own, never mixed with a server response. A
+   *         rejected replay is not NACKed, so the subscription keeps its initial fetch timeout
+   *         running until a replay is accepted.
+   */
+  virtual bool fromCache() const PURE;
 };
 
 using DecodedResourcePtr = std::unique_ptr<DecodedResource>;

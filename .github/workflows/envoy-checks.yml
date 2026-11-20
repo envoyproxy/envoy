@@ -73,10 +73,7 @@ jobs:
       pull-requests: read
     name: Check (${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).summary.title || 'SKIPPED' }})
     uses: ./.github/workflows/_check_build_openssl.yml
-    if: >-
-      fromJSON(needs.load.outputs.request).run.check-build-openssl
-      || fromJSON(needs.load.outputs.request).run.check-build-openssl-presubmit
-      || fromJSON(needs.load.outputs.request).run.check-build-openssl-asan
+    if: fromJSON(needs.load.outputs.request).config.ci.check-build-openssl[0] && true || false
     needs:
     - load
     with:
@@ -154,9 +151,7 @@ jobs:
       && github.event.workflow_run.repository.full_name == github.repository
       && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
       && (fromJSON(needs.load.outputs.request).run.check-build
-          || fromJSON(needs.load.outputs.request).run.check-build-openssl
-          || fromJSON(needs.load.outputs.request).run.check-build-openssl-presubmit
-          || fromJSON(needs.load.outputs.request).run.check-build-openssl-asan
+          || fromJSON(needs.load.outputs.request).config.ci.check-build-openssl[0]
           || fromJSON(needs.load.outputs.request).run.check-coverage
           || fromJSON(needs.load.outputs.request).run.check-san)
     needs:

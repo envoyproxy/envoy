@@ -6,6 +6,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -49,7 +50,8 @@ inline constexpr std::chrono::milliseconds WriterApplyPassBudget{5};
 // A queued write or removal of a resource.
 struct WriterOperation {
   std::string name;
-  // The sequence number of the latest submission for the resource.
+  // The sequence numbers of the first and of the latest submission for the resource.
+  uint64_t first_sequence;
   uint64_t sequence;
   // The ID of the write, or 0 for a removal.
   uint64_t update_id;
@@ -141,6 +143,10 @@ protected:
   virtual void applyUpdate(WriterOperation& operation) PURE;
   // Applies a removal.
   virtual void applyRemoval(const WriterOperation& operation) PURE;
+  // Called before a pass applies an operation. It must not queue or remove operations.
+  virtual void onApplyingOperation() {}
+  // Called once a pass applied its operations.
+  virtual void onPassApplied() {}
 
   /**
    * Queues a write.
@@ -161,9 +167,9 @@ protected:
     stats_.updates_pending_.inc();
     const uint64_t sequence = next_sequence_++;
     if (state.queued == queue_.end()) {
-      state.queued = queue_.insert(queue_.end(), WriterOperation{std::string(name), sequence,
-                                                                 update_id, std::string(resource),
-                                                                 std::string(version_info)});
+      state.queued = queue_.insert(
+          queue_.end(), WriterOperation{std::string(name), sequence, sequence, update_id,
+                                        std::string(resource), std::string(version_info)});
     } else {
       // The queued operation keeps its place in the queue and takes the latest write.
       WriterOperation& operation = *state.queued;
@@ -191,8 +197,9 @@ protected:
 
     State& state = it->second;
     if (state.queued == queue_.end()) {
-      state.queued = queue_.insert(queue_.end(),
-                                   WriterOperation{std::string(name), next_sequence_++, 0, {}, {}});
+      const uint64_t sequence = next_sequence_++;
+      state.queued = queue_.insert(
+          queue_.end(), WriterOperation{std::string(name), sequence, sequence, 0, {}, {}});
     } else {
       WriterOperation& operation = *state.queued;
       if (operation.update_id != 0) {
@@ -219,6 +226,15 @@ protected:
   void startApplying() {
     clusters_initialized_ = true;
     scheduleApplyPass();
+  }
+
+  bool clustersInitialized() const { return clusters_initialized_; }
+  // The sequence number of the next submission.
+  uint64_t nextSequence() const { return next_sequence_; }
+  // The first submission of the queued operation that waits the longest, if any.
+  std::optional<uint64_t> earliestQueuedSequence() const {
+    // The queue keeps the order of the first submissions.
+    return queue_.empty() ? std::nullopt : std::make_optional(queue_.front().first_sequence);
   }
 
   /**
@@ -399,6 +415,7 @@ private:
       if (it == queue_.end() || (applied_any && time_source.monotonicTime() >= deadline)) {
         break;
       }
+      onApplyingOperation();
       WriterOperation operation = std::move(*it);
       queue_.erase(it);
       states_.find(operation.name)->second.queued = queue_.end();
@@ -410,6 +427,7 @@ private:
       applied_any = true;
     }
     shared_state_->onApplyPassDone(this, queue_.empty(), time_source.monotonicTime());
+    onPassApplied();
     scheduleApplyPass();
   }
 

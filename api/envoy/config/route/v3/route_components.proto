@@ -199,7 +199,6 @@ message VirtualHost {
   // independently (e.g., values are not inherited).
   RetryPolicy retry_policy = 16;
 
-  // [#not-implemented-hide:]
   // Specifies the configuration for retry policy extension. Note that setting a route level entry
   // will take precedence over this config and it'll be treated independently (e.g., values are not
   // inherited). :ref:`Retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>` should not be
@@ -1493,7 +1492,6 @@ message RouteAction {
   // (e.g., policies are not merged, the most internal one becomes the enforced policy).
   RetryPolicy retry_policy = 9;
 
-  // [#not-implemented-hide:]
   // Specifies the configuration for retry policy extension. Note that if this is set, it'll take
   // precedence over the virtual host level retry policy entirely (e.g., policies are not merged,
   // the most internal one becomes the enforced policy). :ref:`Retry policy <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>`

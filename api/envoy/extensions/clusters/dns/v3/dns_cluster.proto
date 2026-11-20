@@ -6,6 +6,7 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/extensions/clusters/common/dns/v3/dns.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -21,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for DNS discovery clusters.
 // [#extension: envoy.clusters.dns]
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message DnsCluster {
   message RefreshRate {
     // Specifies the base interval between refreshes. This parameter is required and must be greater
@@ -97,4 +98,16 @@ message DnsCluster {
   // The value must be at least 1 second.
   google.protobuf.Duration dns_min_refresh_rate = 10
       [(validate.rules).duration = {gte {seconds: 1}}];
+
+  // Only takes effect when
+  // :ref:`all_addresses_in_single_endpoint <envoy_v3_api_field_extensions.clusters.dns.v3.DnsCluster.all_addresses_in_single_endpoint>`
+  // is true. If true, a DNS resolution that changes the resolved addresses updates the addresses
+  // of the existing logical host in place. The host is not replaced, so no cluster membership
+  // update is published and existing connection pools are not drained; new connections use the
+  // new addresses. This avoids connection churn for DNS servers that rotate their answers
+  // frequently, e.g. for load balancing. If false, the logical host is replaced by a new host
+  // whenever the resolved addresses change, which drains the connection pools of the old host,
+  // so that connections to addresses that are no longer resolved are drained as well.
+  // Defaults to true.
+  google.protobuf.BoolValue skip_draining_on_resolution = 11;
 }

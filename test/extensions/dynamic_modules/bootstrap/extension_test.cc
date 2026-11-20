@@ -226,6 +226,9 @@ TEST_F(ExtensionTest, ShutdownCallbackStopsTheConfiguration) {
                                testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
       .WillOnce(
           testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
+  EXPECT_CALL(context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::PostInit,
+                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()));
 
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
@@ -242,6 +245,44 @@ TEST_F(ExtensionTest, ShutdownCallbackStopsTheConfiguration) {
 
   captured_shutdown_cb();
   EXPECT_FALSE(config.value()->runOnAllWorkers(2));
+}
+
+// Test that the callback before the workers start reaches the listener writer.
+TEST_F(ExtensionTest, PostInitCallbackNotifiesTheListenerWriter) {
+  Server::ServerLifecycleNotifier::StageCallback captured_post_init_cb;
+  EXPECT_CALL(context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()));
+  EXPECT_CALL(context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::PostInit,
+                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
+      .WillOnce(
+          testing::DoAll(testing::SaveArg<1>(&captured_post_init_cb), testing::Return(nullptr)));
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so",
+                                                   /*do_not_close=*/false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+  NiceMock<Server::MockInstance> instance;
+  extension->onServerInitialized(instance);
+  // Nothing is notified before the module enables the listener writer.
+  captured_post_init_cb();
+
+  // The writer creates its apply callback first, and the newest expectation matches first.
+  new NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  auto* workers_started_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  ASSERT_TRUE(config.value()->enableListenerWriter());
+  EXPECT_CALL(*workers_started_callback, scheduleCallbackNextIteration());
+  captured_post_init_cb();
 }
 
 // Test that a server that shut down before it initialized its extensions stops the configuration.

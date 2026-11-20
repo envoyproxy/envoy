@@ -117,7 +117,7 @@ envoy_cc_fuzz_test(
     name = "base64_differential_fuzz_test",
     srcs = ["base64_differential_fuzz_test.cc"],
     corpus = "base64_differential_corpus",
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"fuzz_coverage": {"link": "linux_x64_small"}},
     # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
     tags = ["no_fuzz"],
     deps = [
@@ -216,7 +216,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "log_macros_test",
     srcs = ["log_macros_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//test/mocks/http:http_mocks",
@@ -240,7 +243,10 @@ envoy_cc_test(
     name = "fine_grain_log_macros_test",
     srcs = ["log_macros_test.cc"],
     args = ["--enable-fine-grain-logging"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//test/mocks/http:http_mocks",
@@ -267,7 +273,11 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "logger_test",
     srcs = ["logger_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+        "asan": {"build": "linux_x64_small"},
+    },
     deps = [
         "//envoy/common:logger",
         "//source/common/common:minimal_logger_lib",
@@ -290,7 +300,13 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "matchers_test",
     srcs = ["matchers_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/common:matchers_lib",
         "//source/common/config:metadata_lib",
@@ -620,6 +636,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "stderr_writer_test",
+    srcs = ["stderr_writer_test.cc"],
+    deps = [
+        "//source/common/common:stderr_writer_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "interval_value_test",
     srcs = ["interval_value_test.cc"],
     deps = ["//source/common/common:interval_value"],
@@ -640,7 +664,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "scope_tracked_object_stack_test",
     srcs = ["scope_tracked_object_stack_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/common:scope_tracked_object_stack",
         "//source/common/common:utility_lib",
@@ -703,7 +727,7 @@ envoy_benchmark_test(
 execution_context_dual_test(
     name = "execution_context_test",
     srcs = ["execution_context_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//envoy/common:execution_context",
         "//source/common/api:api_lib",

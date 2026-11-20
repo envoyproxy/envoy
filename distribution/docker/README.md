@@ -1,34 +1,24 @@
-# Envoy Docker Distribution
+# Envoy container images
 
-This directory contains the Docker build configuration for Envoy container images.
+The Envoy container images are built with Bazel (rules_oci), from the release binaries.
 
 ## Files
 
-- `Dockerfile-envoy` - Main Dockerfile for building Envoy container images
-- `buildd.sh` - Script for building Docker images in CI
-- `docker-entrypoint.sh` - Entrypoint script for Envoy containers
+- `BUILD` - The images: `envoy`, `envoy-debug`, `envoy-contrib`, `envoy-contrib-debug`,
+  `envoy-distroless`, `envoy-contrib-distroless` and `envoy-tools`
+- `ca_certificates.bzl` - The CA certificates configuration of the Ubuntu based images
+- `docker-entrypoint.sh` - Entrypoint script for the Ubuntu based images
+
+The base images are pinned by digest in `MODULE.bazel` (`oci.pull`), and updated by the
+`release-images` task of the dependency workflow (`ci/dependency/release_images.sh`).
 
 ## Usage
 
-The Docker build is typically invoked through the main CI script:
+Build the images, each as an OCI tarball, for the host's architecture:
 
 ```bash
-./ci/do_ci.sh docker
+./ci/do_ci.sh release.containers
 ```
 
-This will build Docker images for multiple platforms and variants including:
-- Standard Envoy image
-- Debug image
-- Contrib image (with additional extensions)
-- Distroless image
-- Tools image
-
-## Development
-
-For local development, you can build images directly using the build.sh script:
-
-```bash
-DOCKER_CI_DRYRUN=1 ./distribution/docker/build.sh
-```
-
-This will show what commands would be executed without actually building images.
+The release build (`./ci/do_ci.sh release.publish`, or `release.multiarch` for both architectures)
+builds them too, with the packages.

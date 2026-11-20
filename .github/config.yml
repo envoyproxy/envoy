@@ -8,10 +8,7 @@ build-image:
   sha-ci: 8fdf16ea0d40cb0e4726b13f97df8b73e80e331b206b62b224ceb2498149a1d5
   sha-devtools: 5914ff8694b377cbd137317acb4a0f91c9496e08a17e867743f942e15f4deb83
   sha-docker: 75bc814bc49ea2c4fe8807bd487fdb513b4b1ce9b6cce19bb1781ae9d28f80cf
-  sha-mobile: b4351554fbf60ecf5b69ae17434a1503802473118388361543a3c695040f8859
   sha-worker: 58abaea3f29aae5340f32dc99fc66c97a6c2fec0902345d03cf6d47684606a1d
-  # TODO: remove this dupe (currently used by ci request handler)
-  mobile-sha: b4351554fbf60ecf5b69ae17434a1503802473118388361543a3c695040f8859
   tag: v0.2.5
 
 config:
@@ -34,8 +31,8 @@ checks:
     on-run:
     - check-build
     - check-build-cto-asserts
-    - check-build-cto-base
     - check-build-cto-gperftools
+    - check-build-cto-jemalloc
     - check-build-cto-noadmin
     - check-build-cto-nolog
     - check-build-cto-wamr
@@ -43,9 +40,10 @@ checks:
     - check-build-execution-context
     - check-build-gcc-build
     - check-build-gcc-test
-    - check-build-openssl
-    - check-build-openssl-presubmit
     - check-build-openssl-asan
+    - check-build-openssl-build
+    - check-build-openssl-test
+    - check-build-openssl-test-affected
     - check-coverage
     - check-runtime
     - check-san
@@ -165,12 +163,16 @@ checks:
           ```
     # yamllint enable rule:line-length
   publish:
-    name: >-
-      Envoy/Publish and verify
+    name: Envoy/Publish
     on-run:
     - release
     - verify
     - docs
+    required: true
+  verify:
+    name: Envoy/Verify
+    on-run:
+    - verify
     required: true
 
 run:
@@ -215,7 +217,7 @@ run:
     - tools/api_versioning/**/*
     - tools/base/requirements.txt
     - tools/dev/requirements.txt
-  check-build-cto-base:
+  check-build-cto-gperftools:
     paths:
     - .bazelrc
     - .bazelversion
@@ -244,7 +246,7 @@ run:
     - tools/h3_request/**/*
     - tools/socket_passing/**/*
     - tools/type_whisperer/**/*
-  check-build-cto-gperftools:
+  check-build-cto-jemalloc:
     paths:
     - .bazelrc
     - .bazelversion
@@ -455,10 +457,14 @@ run:
     - tools/h3_request/**/*
     - tools/socket_passing/**/*
     - tools/type_whisperer/**/*
-  check-build-openssl:
+  check-build-openssl-asan:
     paths:
-    - "**/*"
-  check-build-openssl-presubmit:
+    - compat/openssl/**/*
+    - bazel/**/*
+    - .bazelrc
+    - ci/do_ci.sh
+    - ci/bazel_fun.sh
+  check-build-openssl-build:
     paths:
     - compat/openssl/**/*
     - source/common/tls/**/*
@@ -473,9 +479,20 @@ run:
     - .bazelrc
     - ci/do_ci.sh
     - ci/bazel_fun.sh
-  check-build-openssl-asan:
+  check-build-openssl-test:
+    paths:
+    - "**/*"
+  check-build-openssl-test-affected:
     paths:
     - compat/openssl/**/*
+    - source/common/tls/**/*
+    - source/common/crypto/**/*
+    - source/extensions/transport_sockets/tls/**/*
+    - test/common/tls/**/*
+    - test/common/crypto/**/*
+    - test/extensions/transport_sockets/tls/**/*
+    - envoy/ssl/**/*
+    - envoy/extensions/transport_sockets/tls/**/*
     - bazel/**/*
     - .bazelrc
     - ci/do_ci.sh
@@ -661,10 +678,15 @@ run:
     paths:
     - "**/*"
   release:
+    # Includes the publishing workflows (and so every path of `verify`, which needs the release's
+    # signed packages): a change to them runs the jobs they define.
     paths:
     - .bazelrc
     - .bazelversion
     - .github/config.yml
+    - .github/workflows/_publish_*.yml
+    - .github/workflows/envoy-publish.yml
+    - .github/workflows/envoy-verify.yml
     - api/**/*
     - bazel/**/*
     - ci/**/*

@@ -1045,9 +1045,11 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectEarlyDataWithEndStream) {
 TEST_P(TcpProxyTest, ReceiveBeforeConnectDownstreamClosesWithoutData) {
   setup(/*connections=*/1, /*set_redirect_records=*/false, /*receive_before_connect=*/true);
 
-  // Downstream closes without sending any data.
+  // Downstream closes without sending any data. The upstream connect is already in flight
+  // (IMMEDIATE), so the downstream must not be closed here; the FIN is buffered for the upstream.
   Buffer::OwnedImpl empty_buffer;
   EXPECT_CALL(*upstream_connections_.at(0), write(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
   filter_->onData(empty_buffer, /*end_stream=*/true);
 
   // When upstream connection is established, the end_stream signal should be sent even though
@@ -2485,6 +2487,82 @@ TEST_P(TcpProxyTest, OdcdsClusterMissingCauseConnectionClose) {
   ASSERT_FALSE(upstream_connection_establishment_latency.has_value());
 }
 
+// An empty FIN that arrives while an on demand cluster lookup is pending in IMMEDIATE mode must not
+// close the downstream. It is buffered as end_stream and flushed upstream once the connection is
+// established. The close is limited to ON_DOWNSTREAM_DATA, which is the only mode that never
+// connects upstream on its own.
+TEST_P(TcpProxyTest, ImmediateEmptyFinWhileOnDemandClusterPendingIsFlushedUpstream) {
+  auto config = onDemandConfig();
+  config.mutable_max_early_data_bytes()->set_value(1024);
+  mock_odcds_api_handle_ = Upstream::MockOdCdsApiHandle::create().release();
+
+  // The first lookup finds no cluster and triggers on demand discovery. The second lookup, after
+  // discovery completes, finds the cluster.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster"))
+      .WillOnce(Return(nullptr))
+      .WillOnce(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_))
+      .RetiresOnSaturation();
+
+  Upstream::ClusterDiscoveryCallbackPtr cluster_discovery_callback;
+  EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster", _, _))
+      .WillOnce([&](auto&&, auto&& cb, auto&&) {
+        cluster_discovery_callback = std::move(cb);
+        return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
+      });
+
+  // Use connections=0 so setup() does not call onNewConnection(). With ODCDS missing the cluster,
+  // onNewConnection returns StopIteration even though max_early_data_bytes enables
+  // receive_before_connect, so setup(1, ...) cannot reconcile those expectations.
+  setup(0, /*set_redirect_records=*/false, /*receive_before_connect=*/true, config);
+
+  upstream_connections_.push_back(std::make_unique<NiceMock<Network::MockClientConnection>>());
+  upstream_connection_data_.push_back(
+      std::make_unique<NiceMock<Tcp::ConnectionPool::MockConnectionData>>());
+  ON_CALL(*upstream_connection_data_.back(), connection())
+      .WillByDefault(ReturnRef(*upstream_connections_.back()));
+  upstream_hosts_.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
+  conn_pool_handles_.push_back(
+      std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>());
+  ON_CALL(*upstream_hosts_.at(0), address())
+      .WillByDefault(Return(*Network::Utility::resolveUrl("tcp://127.0.0.1:80")));
+  EXPECT_CALL(*upstream_connections_.at(0), dispatcher())
+      .WillRepeatedly(ReturnRef(filter_callbacks_.connection_.dispatcher_));
+
+  {
+    testing::InSequence sequence;
+    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+                tcpConnPool(_, _, _))
+        .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)))
+        .RetiresOnSaturation();
+    EXPECT_CALL(conn_pool_, newConnection(_))
+        .WillOnce(
+            [=, this](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+              conn_pool_callbacks_.push_back(&cb);
+              return onNewConnection(conn_pool_handles_.at(0).get());
+            })
+        .RetiresOnSaturation();
+    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+                tcpConnPool(_, _, _))
+        .WillRepeatedly(Return(std::nullopt));
+  }
+
+  // ODCDS is pending, so onNewConnection stops iteration even with receive_before_connect.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // The downstream half-closes while the lookup is still pending. Nothing may close it.
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+  Buffer::OwnedImpl empty_data;
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(empty_data, true));
+
+  // Discovery completes. The buffered end_stream must reach the upstream on connect.
+  std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Available);
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferString(""), /*end_stream*/ true));
+  // Empty FIN with max_early_data_bytes > 0 does not read-disable the downstream.
+  raiseEventUpstreamConnected(0, /*expect_read_enable=*/false);
+}
+
 // Test that upstream transport failure message is reflected in access logs.
 TEST_P(TcpProxyTest, UpstreamConnectFailureStreamInfoAccessLog) {
   setup(1, accessLogConfig("%UPSTREAM_TRANSPORT_FAILURE_REASON%"));
@@ -2871,7 +2949,8 @@ TEST_P(TcpProxyTest, SingleConnectionTriggerWithMultipleDataChunks) {
   EXPECT_EQ(connection_attempts, 1);
 }
 
-// Test empty data with end_stream doesn't trigger connection in ON_DOWNSTREAM_DATA mode.
+// Test empty data with end_stream doesn't trigger connection in ON_DOWNSTREAM_DATA mode, and
+// closes the downstream connection instead of leaving it open until idle_timeout.
 TEST_P(TcpProxyTest, EmptyDataWithEndStreamDoesNotTriggerConnection) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.set_upstream_connect_mode(
@@ -2884,12 +2963,40 @@ TEST_P(TcpProxyTest, EmptyDataWithEndStreamDoesNotTriggerConnection) {
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 
-  // Empty data with end_stream should NOT trigger connection.
+  // An empty FIN must not create an upstream connection or read-disable the downstream. It must
+  // close the downstream with the dedicated local close reason.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(_)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().TcpProxyDownstreamClosedWithoutData));
   Buffer::OwnedImpl empty_data;
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(empty_data, true));
+}
 
-  // No connection should be established.
-  EXPECT_TRUE(conn_pool_callbacks_.empty());
+// Same as above with max_early_data_bytes set to 0. The downstream is read-disabled on every
+// early-data read in this configuration, so the close must happen before that point.
+TEST_P(TcpProxyTest, EmptyDataWithEndStreamZeroEarlyDataBytesDoesNotReadDisable) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(0);
+
+  setupOnDownstreamDataMode(config, true);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(_)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().TcpProxyDownstreamClosedWithoutData));
+  Buffer::OwnedImpl empty_data;
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(empty_data, true));
 }
 
 // Test load shedding in onData() when receive_before_connect is enabled.
