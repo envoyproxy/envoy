@@ -3365,6 +3365,43 @@ TEST_F(FilterManagerTest,
   filter_manager_->destroyFilters();
 }
 
+TEST_F(FilterManagerTrailersTest, RequestStopAllFilterCanModifyDataParkedAtIt) {
+  initializeChain(true);
+  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
+
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+  // Filter 0 let the data through, so the filter it is parked at owns it.
+  filters_[1]->decoder_callbacks_->modifyDecodingBuffer([](Buffer::Instance& buffer) {
+    buffer.drain(buffer.length());
+    buffer.add("AAA");
+  });
+
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"AAA", true}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTrailersTest, ResponseStopAllFilterCanModifyDataParkedAtIt) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[1].encode_headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
+
+  encodeHeaders(false);
+  encodeData("aaa", true);
+  // Filter 2 let the data through, so the filter it is parked at owns it.
+  filters_[1]->encoder_callbacks_->modifyEncodingBuffer([](Buffer::Instance& buffer) {
+    buffer.drain(buffer.length());
+    buffer.add("AAA");
+  });
+
+  filters_[1]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ((Chunks{{"AAA", true}}), sent_data_);
+
+  filter_manager_->destroyFilters();
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy
