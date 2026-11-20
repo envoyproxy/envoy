@@ -501,6 +501,55 @@ TEST_F(HttpFilterTest, FullDuplexFailCloseWithDataInbound) {
   filter_->onDestroy();
 }
 
+TEST_F(HttpFilterTest, StandaloneModeOverrideOnResponseHeaders) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SEND"
+    response_body_mode: "STREAMED"
+    response_trailer_mode: "SEND"
+  allow_mode_override: true
+  )EOF");
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  ASSERT_TRUE(last_request_.has_response_headers());
+
+  // Ext_proc server sends back a standalone mode_override (no response_case set)
+  // while Envoy is waiting for response headers.
+  auto standalone_response = std::make_unique<ProcessingResponse>();
+  standalone_response->mutable_mode_override()->set_response_body_mode(
+      ProcessingMode::FULL_DUPLEX_STREAMED);
+  standalone_response->mutable_mode_override()->set_response_trailer_mode(
+      ProcessingMode::SEND);
+
+  stream_callbacks_->onReceiveMessage(std::move(standalone_response));
+
+  // Spurious message count should NOT be incremented.
+  EXPECT_EQ(0, config_->stats().spurious_msgs_received_.value());
+
+  // Ext_proc server sends back the response_headers response.
+  auto headers_response = std::make_unique<ProcessingResponse>();
+  headers_response->mutable_response_headers();
+  EXPECT_CALL(encoder_callbacks_, injectEncodedHeadersToFilterChain(false));
+  stream_callbacks_->onReceiveMessage(std::move(headers_response));
+
+  EXPECT_EQ(0, config_->stats().spurious_msgs_received_.value());
+  filter_->onDestroy();
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters
