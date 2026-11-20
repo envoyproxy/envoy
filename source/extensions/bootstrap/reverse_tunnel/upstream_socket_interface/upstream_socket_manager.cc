@@ -323,21 +323,33 @@ std::string UpstreamSocketManager::getNodeWithSocket(const std::string& key) {
   // Check if key exists as a cluster ID by looking at cluster_to_node_info_map_.
   auto cluster_it = cluster_to_node_info_map_.find(key);
   if (cluster_it != cluster_to_node_info_map_.end()) {
-    // Key is a cluster ID, use round-robin to select a node.
+    // Round-robin over nodes with a non-draining tunnel, preferring one with an idle socket.
+    // When no idle sockets remain, a non-draining upstream connection can still accept streams.
+    // Return no node when every node is draining.
     auto& cluster_info = cluster_it->second;
     const auto& nodes = cluster_info.nodes;
-
-    for (size_t attempts = 0; attempts < nodes.size(); ++attempts) {
-      const std::string& selected_node = nodes[cluster_info.round_robin_index % nodes.size()];
-      cluster_info.round_robin_index = (cluster_info.round_robin_index + 1) % nodes.size();
-      if (hasSelectableSocketsForNode(selected_node)) {
-        ENVOY_LOG(debug,
-                  "reverse_tunnel: key '{}' is a cluster ID; returning node {} via round-robin.",
-                  key, selected_node);
-        return selected_node;
+    size_t selected = nodes.size();
+    for (size_t i = 0; i < nodes.size(); ++i) {
+      const size_t candidate = (cluster_info.round_robin_index + i) % nodes.size();
+      if (!hasSelectableSocketsForNode(nodes[candidate])) {
+        continue;
+      }
+      if (selected == nodes.size()) {
+        selected = candidate;
+      }
+      const auto sockets_it = accepted_reverse_connections_.find(nodes[candidate]);
+      if (sockets_it != accepted_reverse_connections_.end() && !sockets_it->second.empty()) {
+        selected = candidate;
+        break;
       }
     }
-    return {};
+    if (selected == nodes.size()) {
+      return {};
+    }
+    cluster_info.round_robin_index = (selected + 1) % nodes.size();
+    ENVOY_LOG(debug, "reverse_tunnel: key '{}' is a cluster ID; returning node {} via round-robin.",
+              key, nodes[selected]);
+    return nodes[selected];
   }
 
   if (node_to_cluster_map_.contains(key) && !hasSelectableSocketsForNode(key)) {

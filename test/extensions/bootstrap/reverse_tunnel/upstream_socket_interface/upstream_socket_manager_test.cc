@@ -1170,6 +1170,34 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadClusterFallbackLogic) {
 }
 
 // getNodeWithSocket tests.
+TEST_F(TestUpstreamSocketManager, GetNodeWithSocketSkipsNodesWithoutIdleSockets) {
+  const std::string draining = "draining-node";
+  const std::string healthy = "healthy-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket(draining, cluster_id, createMockSocket(123), ping_interval);
+  socket_manager_->addConnectionSocket(healthy, cluster_id, createMockSocket(456), ping_interval);
+  socket_manager_->addConnectionSocket(healthy, cluster_id, createMockSocket(789), ping_interval);
+
+  // The draining node's only socket is in use: it stays in the cluster but has none idle.
+  auto in_use = socket_manager_->getConnectionSocket(draining);
+  ASSERT_NE(in_use, nullptr);
+  EXPECT_EQ(getClusterToNodeMapping(cluster_id).size(), 2);
+
+  // Every pick goes to the node with idle sockets.
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), healthy);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), healthy);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), healthy);
+
+  // With no idle socket anywhere, plain round-robin over all nodes.
+  ASSERT_NE(socket_manager_->getConnectionSocket(healthy), nullptr);
+  ASSERT_NE(socket_manager_->getConnectionSocket(healthy), nullptr);
+  const std::string first = socket_manager_->getNodeWithSocket(cluster_id);
+  const std::string second = socket_manager_->getNodeWithSocket(cluster_id);
+  EXPECT_NE(first, second);
+}
+
 TEST_F(TestUpstreamSocketManager, GetNodeWithSocketClusterRoundRobin) {
   const std::string node1 = "test-node-1";
   const std::string node2 = "test-node-2";

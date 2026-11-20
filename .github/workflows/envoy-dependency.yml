@@ -14,6 +14,7 @@ on:
         default: bazel
         type: choice
         options:
+        - actions
         - bazel
         - build-image
         - check
@@ -29,7 +30,8 @@ on:
       version:
         description: >-
           Version to set (optional). bazel = module version (single dependency only),
-          registry = bazel-registry commit (default: tip of main)
+          registry = bazel-registry commit (default: tip of main), actions = toolshed actions
+          release, eg `0.4.30` (default: latest), or with `wip` any commit on toolshed `main`
       pr:
         type: boolean
         default: true
@@ -40,7 +42,9 @@ on:
         default: false
         description: >-
           Open the PR as a draft with a `[WIP] ` title prefix. For the `registry` task this also
-          allows a non-ancestor/untagged bazel-registry commit (sets ENVOY_REGISTRY_ALLOW_UNSAFE).
+          allows a non-ancestor/untagged bazel-registry commit (sets ENVOY_REGISTRY_ALLOW_UNSAFE),
+          and for the `actions` task a toolshed commit that is not a release
+          (sets ENVOY_ACTIONS_ALLOW_UNSAFE).
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
@@ -55,26 +59,27 @@ jobs:
     if: >-
       ${{
           github.event_name == 'workflow_dispatch'
-          && contains(fromJSON('["bazel", "lockfiles", "registry"]'), inputs.task)
+          && contains(fromJSON('["actions", "bazel", "lockfiles", "registry"]'), inputs.task)
       }}
     name: >
       Update
       (${{ inputs.pr && 'PR/' || '' }}${{ inputs.task }}
       /${{ inputs.task == 'bazel' && inputs.dependency
            || inputs.task == 'registry' && 'bazel-registry'
+           || inputs.task == 'actions' && 'toolshed-actions'
            || 'lockfiles' }}
       /${{ inputs.version || 'latest' }}${{ inputs.task == 'registry' && inputs.dependency && format(' +{0}', inputs.dependency) || '' }})
     runs-on: ubuntu-24.04
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/actions/appauth@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+      uses: envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/actions/github/checkout@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+      uses: envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       with:
         token: ${{ steps.appauth.outputs.token }}
     - if: ${{ inputs.task == 'bazel' && ! inputs.dependency }}
@@ -82,7 +87,7 @@ jobs:
       run: |
         echo "::error::\`dependency\` is required for the \`bazel\` task"
         exit 1
-    - uses: envoyproxy/toolshed/actions/bson@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/bson@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       id: update
       name: Update (${{ inputs.task }})
       with:
@@ -98,6 +103,7 @@ jobs:
         ENVOY_DOCKER_CI: 1
         ENVOY_REGISTRY_HASH: ${{ inputs.task == 'registry' && inputs.version || '' }}
         ENVOY_REGISTRY_ALLOW_UNSAFE: ${{ inputs.task == 'registry' && inputs.wip && '1' || '' }}
+        ENVOY_ACTIONS_ALLOW_UNSAFE: ${{ inputs.task == 'actions' && inputs.wip && '1' || '' }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - id: result
       name: Update result
@@ -120,7 +126,7 @@ jobs:
         else
             echo "changes=false" > "$GITHUB_OUTPUT"
         fi
-    - uses: envoyproxy/toolshed/actions/upload/diff@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/upload/diff@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       name: Upload diff
       if: ${{ steps.changes.outputs.changes == 'true' }}
       with:
@@ -128,7 +134,7 @@ jobs:
     - id: pr
       name: Create a PR
       if: ${{ inputs.pr && steps.changes.outputs.changes == 'true' }}
-      uses: envoyproxy/toolshed/actions/github/pr@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+      uses: envoyproxy/toolshed/actions/github/pr@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       with:
         base: main
         body: |
@@ -210,11 +216,11 @@ jobs:
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/actions/appauth@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+      uses: envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
-    - uses: envoyproxy/toolshed/actions/bind-mounts@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/bind-mounts@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       if: ! github.event.repository.private
       with:
         mounts: |
@@ -226,12 +232,12 @@ jobs:
             chown: "runner:runner"
     - name: Free disk space
       if: github.event.repository.private
-      uses: envoyproxy/toolshed/actions/diskspace@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+      uses: envoyproxy/toolshed/actions/diskspace@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       with:
         to_remove: |
           /usr/local/.ghcup
           /usr/local/lib/android
-    - uses: envoyproxy/toolshed/actions/github/checkout@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -244,9 +250,7 @@ jobs:
             sha-ci
             sha-devtools
             sha-docker
-            sha-mobile
             sha-worker
-            mobile-sha
             tag)
         for sha in "${shas[@]}"; do
             current_sha=$(bazel run --config=ci //tools/dependency:build-image-sha "$sha")
@@ -286,13 +290,12 @@ jobs:
 
     - name: Check Docker SHAs
       id: build-images
-      uses: envoyproxy/toolshed/actions/docker/shas@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+      uses: envoyproxy/toolshed/actions/docker/shas@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       with:
         images: |
            sha-ci: docker.io/envoyproxy/envoy-build:ci-${{ steps.build-tools.outputs.tag }}
            sha-devtools: docker.io/envoyproxy/envoy-build:devtools-${{ steps.build-tools.outputs.tag }}
            sha-docker: docker.io/envoyproxy/envoy-build:docker-${{ steps.build-tools.outputs.tag }}
-           sha-mobile: docker.io/envoyproxy/envoy-build:mobile-${{ steps.build-tools.outputs.tag }}
            sha-worker: docker.io/envoyproxy/envoy-build:worker-${{ steps.build-tools.outputs.tag }}
 
     - run: |
@@ -301,7 +304,6 @@ jobs:
             "$CURRENT_ENVOY_SHA_CI:${{ fromJSON(steps.build-images.outputs.shas).sha-ci }}"
             "$CURRENT_ENVOY_SHA_DEVTOOLS:${{ fromJSON(steps.build-images.outputs.shas).sha-devtools }}"
             "$CURRENT_ENVOY_SHA_DOCKER:${{ fromJSON(steps.build-images.outputs.shas).sha-docker }}"
-            "$CURRENT_ENVOY_SHA_MOBILE:${{ fromJSON(steps.build-images.outputs.shas).sha-mobile }}"
             "$CURRENT_ENVOY_SHA_WORKER:${{ fromJSON(steps.build-images.outputs.shas).sha-worker }}")
         echo "replace=${SHA_REPLACE[*]}" >> "$GITHUB_OUTPUT"
       name: Find SHAs to replace
@@ -312,7 +314,6 @@ jobs:
         CURRENT_ENVOY_SHA_CI: ${{ steps.current.outputs.sha-ci }}
         CURRENT_ENVOY_SHA_DEVTOOLS: ${{ steps.current.outputs.sha-devtools }}
         CURRENT_ENVOY_SHA_DOCKER: ${{ steps.current.outputs.sha-docker }}
-        CURRENT_ENVOY_SHA_MOBILE: ${{ steps.current.outputs.sha-mobile }}
         CURRENT_ENVOY_SHA_WORKER: ${{ steps.current.outputs.sha-worker }}
     - run: |
         echo "${SHA_REPLACE}" | xargs bazel run --config=ci @envoy_toolshed//sha:replace "${PWD}"
@@ -321,7 +322,7 @@ jobs:
       name: Update SHAs
       working-directory: envoy
     - name: Create a PR
-      uses: envoyproxy/toolshed/actions/github/pr@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+      uses: envoyproxy/toolshed/actions/github/pr@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       with:
         base: main
         body: Created by Envoy dependency bot
@@ -347,13 +348,13 @@ jobs:
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/actions/appauth@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+      uses: envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/actions/github/checkout@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+      uses: envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       with:
         token: ${{ steps.appauth.outputs.token }}
     - id: update
@@ -375,14 +376,14 @@ jobs:
         else
             echo "changes=false" > "$GITHUB_OUTPUT"
         fi
-    - uses: envoyproxy/toolshed/actions/upload/diff@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/upload/diff@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       name: Upload diff
       if: ${{ steps.changes.outputs.changes == 'true' }}
       with:
         name: release-images-${{ steps.update.outputs.output }}
     - name: Create a PR
       if: ${{ inputs.pr && steps.changes.outputs.changes == 'true' }}
-      uses: envoyproxy/toolshed/actions/github/pr@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+      uses: envoyproxy/toolshed/actions/github/pr@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       with:
         base: main
         body: |

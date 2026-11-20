@@ -187,12 +187,9 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "substitution_formatter_test",
     srcs = ["substitution_formatter_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = ["envoy.access_loggers.open_telemetry"],
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
@@ -220,15 +217,9 @@ envoy_extension_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:utility_lib",
+        "@cel-cpp//parser",
         "@opentelemetry-proto//:logs_proto_cc",
-    ] + select(
-        {
-            "//bazel:windows_x86_64": [],
-            "//conditions:default": [
-                "@cel-cpp//parser",
-            ],
-        },
-    ),
+    ],
 )
 
 envoy_extension_cc_benchmark_binary(

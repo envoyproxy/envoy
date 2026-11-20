@@ -14,15 +14,13 @@ load(":ca_certificates.bzl", "ca_certificates_conf")
 licenses(["notice"])  # Apache 2
 
 exports_files([
-    "Dockerfile-envoy",
     "docker-entrypoint.sh",
-    "build.sh",
 ])
 
 # Container images.
 #
-# These match the stages of `Dockerfile-envoy`. Each image is built for the target platform with
-# the release binaries, as an OCI tarball (`<image>.tar`, eg `envoy-distroless.tar`).
+# Each image is built for the target platform with the release binaries, as an OCI tarball
+# (`<image>.tar`, eg `envoy-distroless.tar`).
 #
 # The `envoy`, `envoy-debug`, `envoy-contrib`, `envoy-contrib-debug` and `envoy-tools` images are
 # based on ubuntu (`@ubuntu_base`), with packages from an Ubuntu snapshot (`@ubuntu_jammy`). The
@@ -227,8 +225,8 @@ pkg_tar(
 
 # Ubuntu base layers.
 #
-# These replace the `RUN` steps of the `envoy-base` stage (`adduser --group --system envoy`, and
-# `apt-get install ca-certificates tzdata`), which can not run in bazel.
+# These do what `adduser --group --system envoy` and `apt-get install ca-certificates tzdata` would
+# in a Dockerfile, which can not run in bazel.
 
 # The `envoy` system user and group, as `adduser --group --system envoy` adds them, and the
 # packages, in the dpkg status of the base.
