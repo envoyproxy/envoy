@@ -2,7 +2,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
@@ -232,6 +234,30 @@ public:
   // budget before doing so.
   static constexpr int kMaxTrackedDepth = 17;
 
+  // Duplicate-key detection for one object. Public only so tests can reach
+  // kLinearScanLimit.
+  //
+  // Most objects are small, and a hash set costs tens of bytes per key. So keys
+  // are packed into one buffer and scanned linearly until the object grows past
+  // kLinearScanLimit, then moved to a hash set. Results are the same either way.
+  class SeenKeys {
+  public:
+    // Scan linearly up to this many keys. Keys are capped at kMaxKeyBytes, so
+    // the buffer stays small.
+    static constexpr size_t kLinearScanLimit = 32;
+
+    // Returns true if `key` was not already present.
+    bool insert(absl::string_view key);
+    void clear();
+
+  private:
+    // Small mode: all key bytes back to back, plus where each key ends.
+    std::string bytes_;
+    std::vector<uint32_t> ends_;
+    // Large mode, once non-null.
+    std::unique_ptr<absl::flat_hash_set<std::string>> large_;
+  };
+
 private:
   // feed() without the sticky-error check.
   absl::Status feedChunk(absl::string_view chunk, bool closed);
@@ -263,8 +289,9 @@ private:
   // key_stack_[d] — key of the item at depth d; forwarded as the `key` argument
   // to callbacks, and the sole label source for matchesPatternPath.
   std::string key_stack_[kMaxTrackedDepth]{};
-  // duplicate-key detection.
-  absl::flat_hash_set<std::string> seen_keys_[kMaxTrackedDepth]{};
+
+  // Duplicate-key detection, one per depth.
+  SeenKeys seen_keys_[kMaxTrackedDepth]{};
 
   bool in_string_chain_{false};
   // bytes rewound by Wuffs on short_read; prepended to next chunk.
