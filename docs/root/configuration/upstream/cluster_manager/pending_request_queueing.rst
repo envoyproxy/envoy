@@ -52,6 +52,112 @@ pending requests and return to FIFO mode when it has 60 or fewer pending request
         high_watermark: 80
         low_watermark: 60
 
+Fair queue
+~~~~~~~~~~
+
+The :ref:`fair queue policy
+<envoy_v3_api_msg_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig>` uses Stochastic Fair
+Queuing (SFQ) to isolate tenant or traffic classes waiting in a connection pool pending request
+queue.
+
+In a FIFO queue, a bursty tenant fills the queue and delays all subsequent requests, including
+requests from well-behaved tenants. Fair queue prevents head-of-line blocking by partitioning
+pending requests across multiple FIFO sub-queues (buckets) and serving active buckets in round-robin
+order.
+
+How it works
+^^^^^^^^^^^^
+
+1. **Classification**: Envoy extracts the class identifier from dynamic metadata using
+   :ref:`class_metadata_key
+   <envoy_v3_api_field_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig.class_metadata_key>`.
+   Supported value types include string, number, boolean, struct, and list.
+2. **Default class**: Envoy assigns requests that lack the specified metadata key to a dedicated
+   default class. Unclassified traffic shares a single bucket. This ensures unclassified bursts
+   cannot pollute buckets assigned to classified tenants.
+3. **Two-choice bucketing**: Envoy hashes the class identifier with 64-bit xxHash to select two
+   candidate buckets out of :ref:`num_buckets
+   <envoy_v3_api_field_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig.num_buckets>`
+   per-bucket FIFO queues (default 1024). Envoy enqueues the request into the shorter bucket (the
+   power of two choices). If a tenant's primary bucket collides with a noisy neighbor, this
+   two-choice selection directs requests to the secondary bucket immediately, avoiding delay
+   without waiting for hash perturbation.
+4. **Round-robin dequeue**: Non-empty buckets form a round-robin schedule. When an upstream
+   connection becomes available, Envoy dequeues one request from the current bucket and advances to
+   the next non-empty bucket. A burst from one tenant fills only that tenant's bucket, while other
+   tenants continue to receive service immediately.
+5. **Periodic perturbation**: Two distinct classes can occasionally share both candidate buckets.
+   Envoy updates the hash seed every
+   :ref:`perturbation_interval
+   <envoy_v3_api_field_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig.perturbation_interval>`
+   (default 1s) based on the request enqueue timestamp. Arriving requests use the updated seed.
+   Already-queued requests remain in their assigned buckets until dequeued. This periodic rotation
+   breaks persistent collisions between tenants over time. Setting the interval to ``0s`` disables
+   perturbation.
+6. **Memory and CPU efficiency**: Envoy allocates bucket vectors lazily on the first queued request.
+   Connection pools that never queue requests consume zero bucket memory. Configuring
+   :ref:`num_buckets
+   <envoy_v3_api_field_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig.num_buckets>` as a
+   power of two (such as the default 1024) enables bitmasking instead of hardware division.
+
+Configuration example
+^^^^^^^^^^^^^^^^^^^^^
+
+The following cluster fragment configures fair queuing across 1024 buckets with a 1-second
+perturbation interval. It reads the ``tenant_id`` key from the
+``envoy.filters.http.header_to_metadata`` metadata namespace:
+
+.. code-block:: yaml
+
+  queuing_policies:
+    pending_rq_policy:
+      name: envoy.queue_policy.fair_queue
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig
+        class_metadata_key:
+          key: envoy.filters.http.header_to_metadata
+          path:
+          - key: tenant_id
+        num_buckets: 1024
+        perturbation_interval: 1s
+
+To populate this metadata from incoming HTTP request headers, configure the
+:ref:`Header-To-Metadata filter <config_http_filters_header_to_metadata>` in the HTTP connection
+manager filter chain:
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.header_to_metadata
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
+      request_rules:
+      - header: x-tenant-id
+        on_header_present:
+          metadata_namespace: envoy.filters.http.header_to_metadata
+          key: tenant_id
+          type: STRING
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+Impact on tenant isolation
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In an unconfigured connection pool (default FIFO ordering), an aggressive or bursty tenant can
+fill the pending request queue when upstream connection capacity is constrained. Requests from
+well-behaved tenants wait behind the backlog, suffering head-of-line blocking and inflated tail
+latency:
+
+.. image:: images/queue_and_latency_timeseries_no_queue.png
+
+With the fair queue policy enabled, Envoy partitions pending requests into per-class buckets
+and services active buckets in round-robin order. A bursty tenant fills only its own bucket.
+Envoy continues to dequeue requests from other tenants promptly, preserving low tail latency
+without shedding traffic:
+
+.. image:: images/queue_and_latency_timeseries_fair_queue.png
+
 Observability
 -------------
 
