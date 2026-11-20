@@ -40,10 +40,9 @@ impl BootstrapExtensionConfig for EcdsConfig {
     body: &[u8],
   ) -> (u32, String) {
     if path.ends_with("?subscribe")
-      && !envoy.subscribe_extension_config(ExtensionConfigSource {
+      && !envoy.subscribe_ecds(EcdsSubscription {
         name: "test-config",
-        type_url: "type.googleapis.com/google.protobuf.StringValue",
-        config_source_json: std::str::from_utf8(body).expect("test source must be UTF-8"),
+        source_json: std::str::from_utf8(body).expect("test source must be UTF-8"),
       })
     {
       return (400, "subscription failed".into());
@@ -59,15 +58,32 @@ impl BootstrapExtensionConfig for EcdsConfig {
     )
   }
 
-  fn on_config_update(
+  fn on_ecds_update(
     &self,
     envoy: &mut dyn EnvoyBootstrapExtensionConfig,
-    config: Option<&[u8]>,
+    update: EcdsUpdate<'_>,
   ) -> bool {
     assert!(envoy
       .active_resource_names(ActiveResourceKind::Cluster)
       .iter()
       .any(|name| name == "cluster_0"));
+    let config = match update {
+      EcdsUpdate::Config {
+        name,
+        version,
+        type_url,
+        config,
+      } => {
+        assert_eq!(name, "test-config");
+        assert!(!version.is_empty());
+        assert_eq!(type_url, "type.googleapis.com/google.protobuf.StringValue");
+        Some(config)
+      },
+      EcdsUpdate::Removed { name } => {
+        assert_eq!(name, "test-config");
+        None
+      },
+    };
     if config.is_none() && self.config.lock().unwrap().as_deref() == Some("keep-on-removal") {
       return false;
     }

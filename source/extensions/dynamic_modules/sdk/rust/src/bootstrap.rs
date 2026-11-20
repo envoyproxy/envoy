@@ -23,13 +23,25 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 
 /// The source of a bootstrap extension's ECDS configuration.
 #[derive(Debug, Clone, Copy)]
-pub struct ExtensionConfigSource<'a> {
+pub struct EcdsSubscription<'a> {
   /// The name of the `envoy.config.core.v3.TypedExtensionConfig` resource.
   pub name: &'a str,
-  /// The required payload type URL, including the inner type of a `TypedStruct`.
-  pub type_url: &'a str,
-  /// A JSON-encoded `envoy.config.core.v3.ConfigSource`.
-  pub config_source_json: &'a str,
+  /// A JSON-encoded `envoy.config.core.v3.ExtensionConfigSource`.
+  pub source_json: &'a str,
+}
+
+/// A changed or removed ECDS resource. Buffers are borrowed for the hook invocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EcdsUpdate<'a> {
+  /// A configuration with its SotW response version or Delta resource version.
+  Config {
+    name: &'a str,
+    version: &'a str,
+    type_url: &'a str,
+    config: &'a [u8],
+  },
+  /// An explicit removal or TTL expiry.
+  Removed { name: &'a str },
 }
 
 /// The kind of active resource to enumerate with
@@ -291,11 +303,14 @@ pub trait EnvoyBootstrapExtensionConfig {
   fn enable_cluster_lifecycle(&self) -> bool;
 
   /// Subscribes to ECDS on the main thread after server initialization. Updates call
-  /// [`BootstrapExtensionConfig::on_config_update`]. The subscription lasts until shutdown.
-  /// Filesystem sources can deliver an update before this call returns.
-  /// Returns false if already subscribed, the source is invalid, server
-  /// state is unavailable, the update hook is missing, or the host was built without JSON support.
-  fn subscribe_extension_config<'a>(&self, source: ExtensionConfigSource<'a>) -> bool;
+  /// [`BootstrapExtensionConfig::on_ecds_update`] until shutdown. Filesystem sources can invoke
+  /// the hook before this call returns; do not hold a lock across it that the hook takes.
+  ///
+  /// Returns false before server initialization, after shutdown, in `--mode init_only`, if already
+  /// subscribed, or if the name or source is invalid or in use. ADS and xDS-TP names cannot be
+  /// shared with another bootstrap extension or filter. Default configurations are not supported.
+  /// Use `TypedStruct` for types Envoy does not link so config dumps can render them.
+  fn subscribe_ecds<'a>(&self, source: EcdsSubscription<'a>) -> bool;
 
   /// Enable listener lifecycle event notifications. When enabled, the module will receive
   /// [`BootstrapExtensionConfig::on_listener_add_or_update`] and
@@ -553,16 +568,19 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   ) {
   }
 
-  /// Validates and applies an ECDS configuration on the main thread. `Struct` and
-  /// `TypedStruct.value` become JSON, as with startup config. `None` means removal. Connection
-  /// failures retain the last accepted config without invoking this hook.
+  /// Applies ECDS updates on the main thread. Payloads use the startup config encoding;
+  /// `Struct` and `TypedStruct.value` become JSON. Removals include TTL expiry.
   ///
-  /// Return true to accept the update, or false to reject it and retain the previous settings.
-  /// The hook must not block or reenter xDS processing.
-  fn on_config_update(
+  /// Return true to accept, or false to retain the previous settings. Rejecting an update NACKs
+  /// the response, which may contain other ECDS resources. A rejected removal is only logged.
+  /// The default rejects updates. This hook must not block.
+  ///
+  /// Initial fetch failures do not invoke this hook. A module waiting for its first configuration
+  /// before completing initialization must set its own startup timeout.
+  fn on_ecds_update(
     &self,
     _envoy: &mut dyn EnvoyBootstrapExtensionConfig,
-    _config: Option<&[u8]>,
+    _update: EcdsUpdate<'_>,
   ) -> bool {
     false
   }
@@ -1478,18 +1496,13 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     }
   }
 
-  fn subscribe_extension_config<'a>(&self, source: ExtensionConfigSource<'a>) -> bool {
-    let ExtensionConfigSource {
-      name,
-      type_url,
-      config_source_json,
-    } = source;
+  fn subscribe_ecds<'a>(&self, source: EcdsSubscription<'a>) -> bool {
+    let EcdsSubscription { name, source_json } = source;
     unsafe {
-      abi::envoy_dynamic_module_callback_bootstrap_extension_subscribe_extension_config(
+      abi::envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
         self.raw,
         str_to_module_buffer(name),
-        str_to_module_buffer(type_url),
-        str_to_module_buffer(config_source_json),
+        str_to_module_buffer(source_json),
       )
     }
   }
@@ -2117,18 +2130,38 @@ ffi_export! {
   ///
   /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
   /// by the Envoy dynamic module ABI.
-  unsafe fn envoy_dynamic_module_on_bootstrap_extension_config_update(
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_ecds_update(
     envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
     config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    version: abi::envoy_dynamic_module_type_envoy_buffer,
+    type_url: abi::envoy_dynamic_module_type_envoy_buffer,
     has_config: bool,
     config: abi::envoy_dynamic_module_type_envoy_buffer,
   ) -> bool {
     let module = unsafe { &**(config_ptr as *const *const dyn BootstrapExtensionConfig) };
-    let config = has_config.then(|| unsafe {
-      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr.cast::<u8>(), config.length)
-    });
+    let text = |buffer: abi::envoy_dynamic_module_type_envoy_buffer| {
+      let bytes = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(buffer.ptr.cast::<u8>(), buffer.length)
+      };
+      std::str::from_utf8(bytes)
+    };
+    let Ok(name) = text(name) else {
+      return false;
+    };
+    let update = if has_config {
+      let (Ok(version), Ok(type_url)) = (text(version), text(type_url)) else {
+        return false;
+      };
+      let config = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(config.ptr.cast::<u8>(), config.length)
+      };
+      EcdsUpdate::Config { name, version, type_url, config }
+    } else {
+      EcdsUpdate::Removed { name }
+    };
     let mut envoy = EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr);
-    module.on_config_update(&mut envoy, config)
+    module.on_ecds_update(&mut envoy, update)
   }
   on_panic = false
 }
@@ -2299,5 +2332,150 @@ ffi_export! {
       status,
       error_details_str.as_ref(),
     );
+  }
+}
+
+#[cfg(test)]
+mod ecds_tests {
+  use super::*;
+  use std::sync::Mutex;
+
+  fn buffer(bytes: &[u8]) -> abi::envoy_dynamic_module_type_envoy_buffer {
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: if bytes.is_empty() {
+        std::ptr::null()
+      } else {
+        bytes.as_ptr().cast()
+      },
+      length: bytes.len(),
+    }
+  }
+
+  fn invoke(config: &dyn BootstrapExtensionConfig, payload: Option<&[u8]>) -> bool {
+    unsafe {
+      envoy_dynamic_module_on_bootstrap_extension_ecds_update(
+        std::ptr::null_mut(),
+        std::ptr::from_ref(&config).cast(),
+        buffer(b"test-config"),
+        buffer(b"v1"),
+        buffer(b"type.googleapis.com/test.Config"),
+        payload.is_some(),
+        buffer(payload.unwrap_or_default()),
+      )
+    }
+  }
+
+  #[derive(Default)]
+  struct Consumer {
+    updates: Mutex<Vec<Option<Vec<u8>>>>,
+    panic: bool,
+  }
+
+  impl BootstrapExtensionConfig for Consumer {
+    fn new_bootstrap_extension(
+      &self,
+      _: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      unreachable!()
+    }
+
+    fn on_ecds_update(
+      &self,
+      _: &mut dyn EnvoyBootstrapExtensionConfig,
+      update: EcdsUpdate<'_>,
+    ) -> bool {
+      assert!(!self.panic, "test ECDS panic");
+      let config = match update {
+        EcdsUpdate::Config {
+          name,
+          version,
+          type_url,
+          config,
+        } => {
+          assert_eq!(name, "test-config");
+          assert_eq!(version, "v1");
+          assert_eq!(type_url, "type.googleapis.com/test.Config");
+          Some(config)
+        },
+        EcdsUpdate::Removed { name } => {
+          assert_eq!(name, "test-config");
+          None
+        },
+      };
+      self
+        .updates
+        .lock()
+        .unwrap()
+        .push(config.map(<[u8]>::to_vec));
+      config != Some(b"rejected".as_slice())
+    }
+  }
+
+  #[test]
+  fn update_preserves_metadata_payload_presence_and_rejection() {
+    let module = Consumer::default();
+    for (payload, accepted) in [
+      (Some(b"{}".as_slice()), true),
+      (Some(b"".as_slice()), true),
+      (None, true),
+      (Some(b"rejected".as_slice()), false),
+    ] {
+      assert_eq!(invoke(&module, payload), accepted);
+    }
+    assert_eq!(
+      *module.updates.lock().unwrap(),
+      vec![
+        Some(b"{}".to_vec()),
+        Some(Vec::new()),
+        None,
+        Some(b"rejected".to_vec())
+      ]
+    );
+  }
+
+  #[test]
+  fn default_and_panicking_hooks_reject() {
+    struct DefaultConfig;
+    impl BootstrapExtensionConfig for DefaultConfig {
+      fn new_bootstrap_extension(
+        &self,
+        _: &mut dyn EnvoyBootstrapExtension,
+      ) -> Box<dyn BootstrapExtension> {
+        unreachable!()
+      }
+    }
+    assert!(!invoke(&DefaultConfig, Some(b"{}")));
+    let panicking = Consumer {
+      panic: true,
+      ..Consumer::default()
+    };
+    assert!(!invoke(&panicking, Some(b"{}")));
+  }
+
+  #[test]
+  fn invalid_metadata_is_rejected_before_calling_the_hook() {
+    let module = Consumer::default();
+    let config: &dyn BootstrapExtensionConfig = &module;
+    let valid = [
+      buffer(b"test-config"),
+      buffer(b"v1"),
+      buffer(b"type.googleapis.com/test.Config"),
+    ];
+    for index in 0 .. valid.len() {
+      let mut fields = valid;
+      fields[index] = buffer(b"\xff");
+      assert!(!unsafe {
+        envoy_dynamic_module_on_bootstrap_extension_ecds_update(
+          std::ptr::null_mut(),
+          std::ptr::from_ref(&config).cast(),
+          fields[0],
+          fields[1],
+          fields[2],
+          true,
+          buffer(b"{}"),
+        )
+      });
+    }
+    assert!(module.updates.lock().unwrap().is_empty());
   }
 }

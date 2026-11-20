@@ -6,8 +6,9 @@
 #include <string>
 #include <vector>
 
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
-#include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/config/subscription.h"
 #include "envoy/server/config_tracker.h"
 #include "envoy/server/factory_context.h"
@@ -31,12 +32,13 @@ namespace DynamicModules {
 class ExtensionConfigSubscription : public Config::SubscriptionCallbacks,
                                     public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
-  using UpdateCallback = std::function<bool(std::optional<absl::string_view>)>;
+  using UpdateCallback =
+      std::function<bool(absl::string_view name, absl::string_view version,
+                         absl::string_view type_url, std::optional<absl::string_view> config)>;
 
   static absl::StatusOr<std::unique_ptr<ExtensionConfigSubscription>>
-  create(absl::string_view name, absl::string_view type_url,
-         const envoy::config::core::v3::ConfigSource& config_source,
-         absl::string_view config_dump_key, Server::Configuration::ServerFactoryContext& context,
+  create(absl::string_view name, const envoy::config::core::v3::ExtensionConfigSource& source,
+         absl::string_view extension_name, Server::Configuration::ServerFactoryContext& context,
          UpdateCallback callback);
 
   void start();
@@ -50,14 +52,16 @@ public:
                             const EnvoyException* exception) override;
 
 private:
-  ExtensionConfigSubscription(absl::string_view name, absl::string_view type_url,
+  ExtensionConfigSubscription(absl::string_view name,
+                              const envoy::config::core::v3::ExtensionConfigSource& source,
+                              absl::string_view extension_name,
                               Server::Configuration::ServerFactoryContext& context,
                               UpdateCallback callback);
   void removeConfig();
   ProtobufTypes::MessagePtr dumpConfig(const Matchers::StringMatcher& name_matcher) const;
 
   const std::string name_;
-  const std::string type_url_;
+  const std::vector<std::string> type_urls_;
   Server::Configuration::ServerFactoryContext& context_;
   const UpdateCallback callback_;
   const Config::ResourceTypeHelper<envoy::config::core::v3::TypedExtensionConfig> resource_type_;

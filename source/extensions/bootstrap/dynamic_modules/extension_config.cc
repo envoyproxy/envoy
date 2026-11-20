@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <vector>
 
-#include "envoy/config/core/v3/config_source.pb.validate.h"
 #include "envoy/server/options.h"
 
 #include "source/common/common/assert.h"
@@ -94,28 +93,28 @@ bool DynamicModuleBootstrapExtensionConfig::enableClusterLifecycle() {
   return true;
 }
 
-bool DynamicModuleBootstrapExtensionConfig::subscribeExtensionConfig(
-    absl::string_view name, absl::string_view type_url, absl::string_view config_source_json) {
+bool DynamicModuleBootstrapExtensionConfig::subscribeEcds(absl::string_view name,
+                                                          absl::string_view source_json) {
   if (!server_initialized_ || extension_destroyed_ || !shutdownNotificationExpected() ||
-      extension_config_subscription_ != nullptr ||
-      on_bootstrap_extension_config_update_ == nullptr) {
+      extension_config_subscription_ != nullptr || on_bootstrap_extension_ecds_update_ == nullptr) {
     return false;
   }
-#ifdef ENVOY_ENABLE_YAML
-  envoy::config::core::v3::ConfigSource source;
+  envoy::config::core::v3::ExtensionConfigSource source;
   bool has_unknown_field = false;
-  auto status = MessageUtil::loadFromJsonNoThrow(config_source_json, source, has_unknown_field);
+  auto status = MessageUtil::loadFromJsonNoThrow(source_json, source, has_unknown_field);
   if (!status.ok()) {
     ENVOY_LOG(warn, "bootstrap ECDS config source for {} is invalid: {}", name, status.message());
     return false;
   }
   TRY_ASSERT_MAIN_THREAD {
-    MessageUtil::validate(source, context_.messageValidationContext().dynamicValidationVisitor());
     auto subscription = ExtensionConfigSubscription::create(
-        name, type_url, source, absl::StrCat("ecds_bootstrap.", extension_name_), context_,
-        [this](std::optional<absl::string_view> config) {
-          return on_bootstrap_extension_config_update_(
-              thisAsVoidPtr(), in_module_config_, config.has_value(),
+        name, source, extension_name_, context_,
+        [this](absl::string_view resource_name, absl::string_view version,
+               absl::string_view type_url, std::optional<absl::string_view> config) {
+          return on_bootstrap_extension_ecds_update_(
+              thisAsVoidPtr(), in_module_config_, {resource_name.data(), resource_name.size()},
+              {version.data(), version.size()}, {type_url.data(), type_url.size()},
+              config.has_value(),
               config.has_value()
                   ? envoy_dynamic_module_type_envoy_buffer{config->data(), config->size()}
                   : envoy_dynamic_module_type_envoy_buffer{nullptr, 0});
@@ -135,10 +134,6 @@ bool DynamicModuleBootstrapExtensionConfig::subscribeExtensionConfig(
     extension_config_subscription_.reset();
     return false;
   });
-#else
-  ENVOY_LOG(warn, "bootstrap ECDS subscription requires JSON support");
-  return false;
-#endif
 }
 
 void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(
@@ -648,11 +643,11 @@ newDynamicModuleBootstrapExtensionConfig(
 
   // The module constructor can enable the writers, which capture their done hooks, so the optional
   // hooks are resolved first.
-  auto on_config_update =
-      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionConfigUpdateType>(
-          "envoy_dynamic_module_on_bootstrap_extension_config_update");
-  config->on_bootstrap_extension_config_update_ =
-      on_config_update.ok() ? on_config_update.value() : nullptr;
+  auto on_ecds_update =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionEcdsUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_ecds_update");
+  config->on_bootstrap_extension_ecds_update_ =
+      on_ecds_update.ok() ? on_ecds_update.value() : nullptr;
   auto on_worker_event =
       config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionWorkerEventType>(
           "envoy_dynamic_module_on_bootstrap_extension_worker_event");

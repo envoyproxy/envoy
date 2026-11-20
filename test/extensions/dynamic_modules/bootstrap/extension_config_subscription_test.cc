@@ -35,15 +35,16 @@ protected:
     ON_CALL(context_.admin_, getConfigTracker()).WillByDefault(ReturnRef(tracker_));
   }
 
-  static envoy::config::core::v3::ConfigSource
-  source(absl::string_view = "type.googleapis.com/test.Config", bool ads = false) {
-    envoy::config::core::v3::ConfigSource source;
+  static envoy::config::core::v3::ExtensionConfigSource
+  source(absl::string_view type_url = "type.googleapis.com/test.Config", bool ads = false) {
+    envoy::config::core::v3::ExtensionConfigSource source;
     if (ads) {
-      source.mutable_ads();
+      source.mutable_config_source()->mutable_ads();
     } else {
-      source.mutable_path_config_source()->set_path("unused.yaml");
+      source.mutable_config_source()->mutable_path_config_source()->set_path("unused.yaml");
     }
-    source.set_resource_api_version(envoy::config::core::v3::V3);
+    source.mutable_config_source()->set_resource_api_version(envoy::config::core::v3::V3);
+    source.add_type_urls(type_url);
     return source;
   }
 
@@ -62,8 +63,8 @@ protected:
                     absl::StrCat("extension_config_discovery.", name, ".update_success"));
           return std::move(transport);
         });
-    auto result = ExtensionConfigSubscription::create(name, type_url, source(type_url, ads),
-                                                      "ecds_bootstrap.test", context_, callback());
+    auto result = ExtensionConfigSubscription::create(name, source(type_url, ads), "test", context_,
+                                                      callback());
     EXPECT_OK(result);
     auto subscription = std::move(result).value();
     subscription->start();
@@ -71,9 +72,11 @@ protected:
   }
 
   ExtensionConfigSubscription::UpdateCallback callback() {
-    return [this](std::optional<absl::string_view> config) {
+    return [this](absl::string_view name, absl::string_view version, absl::string_view type_url,
+                  std::optional<absl::string_view> config) {
       updates_.push_back(
-          {config.has_value() ? std::make_optional(std::string(*config)) : std::nullopt});
+          {std::string(name), std::string(version), std::string(type_url),
+           config.has_value() ? std::make_optional(std::string(*config)) : std::nullopt});
       return accept_;
     };
   }
@@ -102,6 +105,9 @@ protected:
   }
 
   struct Update {
+    std::string name;
+    std::string version;
+    std::string type_url;
     std::optional<std::string> config;
   };
   Event::SimulatedTimeSystem time_system_;
@@ -115,6 +121,9 @@ TEST_F(ExtensionConfigSubscriptionTest, AppliesTypedStructAndExposesAcceptedConf
   auto subscription = create();
   EXPECT_OK(update(*subscription, config(true)));
   ASSERT_EQ(updates_.size(), 1);
+  EXPECT_EQ(updates_[0].name, "test-config");
+  EXPECT_EQ(updates_[0].version, "v1");
+  EXPECT_EQ(updates_[0].type_url, "type.googleapis.com/test.Config");
   EXPECT_EQ(updates_[0].config.value(), R"({"enabled":true})");
   envoy::admin::v3::EcdsConfigDump expected;
   auto* entry = expected.add_ecds_filters();
@@ -171,9 +180,8 @@ TEST_F(ExtensionConfigSubscriptionTest, RefusesRepeatedAdsNamesAndReleasesReserv
   EXPECT_CALL(context_.xds_manager_,
               subscribeToSingletonResource(_, _, _, _, A<Config::SubscriptionCallbacks&>(), _, _))
       .Times(0);
-  EXPECT_FALSE(ExtensionConfigSubscription::create("test-config", "test.Config",
-                                                   source("test.Config", true),
-                                                   "ecds_bootstrap.other", context_, callback())
+  EXPECT_FALSE(ExtensionConfigSubscription::create("test-config", source("test.Config", true),
+                                                   "other", context_, callback())
                    .ok());
   auto registry = Config::EcdsSubscriptionRegistry::get(context_);
   EXPECT_FALSE(
@@ -193,14 +201,12 @@ TEST_F(ExtensionConfigSubscriptionTest, RefusesAnAdsNameAlreadyHeldByFilters) {
   EXPECT_CALL(context_.xds_manager_,
               subscribeToSingletonResource(_, _, _, _, A<Config::SubscriptionCallbacks&>(), _, _))
       .Times(0);
-  EXPECT_FALSE(ExtensionConfigSubscription::create("test-config", "test.Config",
-                                                   source("test.Config", true), "test", context_,
-                                                   callback())
+  EXPECT_FALSE(ExtensionConfigSubscription::create("test-config", source("test.Config", true),
+                                                   "test", context_, callback())
                    .ok());
   first_filter->reset();
-  EXPECT_FALSE(ExtensionConfigSubscription::create("test-config", "test.Config",
-                                                   source("test.Config", true), "test", context_,
-                                                   callback())
+  EXPECT_FALSE(ExtensionConfigSubscription::create("test-config", source("test.Config", true),
+                                                   "test", context_, callback())
                    .ok());
   second_filter->reset();
   EXPECT_OK(registry->reserve("test-config", Config::EcdsSubscriptionRegistry::Sharing::Exclusive));
@@ -215,15 +221,14 @@ TEST_F(ExtensionConfigSubscriptionTest, RefusesEquivalentXdsTpNamesAndReleasesRe
                                          name, _, _, _, A<Config::SubscriptionCallbacks&>(), _, _))
       .WillOnce(Return(
           testing::ByMove(std::make_unique<testing::StrictMock<Config::MockSubscription>>())));
-  auto subscription = ExtensionConfigSubscription::create(name, "test.Config", source(), "test",
-                                                          context_, callback());
+  auto subscription =
+      ExtensionConfigSubscription::create(name, source(), "test", context_, callback());
   ASSERT_OK(subscription);
   EXPECT_CALL(context_.xds_manager_,
               subscribeToSingletonResource(_, _, _, _, A<Config::SubscriptionCallbacks&>(), _, _))
       .Times(0);
-  EXPECT_FALSE(ExtensionConfigSubscription::create(reordered, "test.Config", source(),
-                                                   "ecds_bootstrap.other", context_, callback())
-                   .ok());
+  EXPECT_FALSE(
+      ExtensionConfigSubscription::create(reordered, source(), "other", context_, callback()).ok());
   auto registry = Config::EcdsSubscriptionRegistry::get(context_);
   EXPECT_FALSE(
       registry->reserve(reordered, Config::EcdsSubscriptionRegistry::Sharing::Shared).ok());
@@ -289,6 +294,28 @@ TEST_F(ExtensionConfigSubscriptionTest, AppliesStringAndBytesWrapperPayloads) {
   }
 }
 
+TEST_F(ExtensionConfigSubscriptionTest, AcceptsEachPermittedPayloadType) {
+  auto config_source = source("type.googleapis.com/test.Config");
+  config_source.add_type_urls("type.googleapis.com/google.protobuf.StringValue");
+  EXPECT_CALL(context_.xds_manager_,
+              subscribeToSingletonResource(_, _, _, _, A<Config::SubscriptionCallbacks&>(), _, _))
+      .WillOnce(Return(
+          testing::ByMove(std::make_unique<testing::StrictMock<Config::MockSubscription>>())));
+  auto subscription = ExtensionConfigSubscription::create("test-config", config_source, "test",
+                                                          context_, callback());
+  ASSERT_OK(subscription);
+  EXPECT_OK(update(**subscription, config(true)));
+  auto wrapper = config(true);
+  Protobuf::StringValue value;
+  value.set_value("enabled");
+  MessageUtil::packFrom(*wrapper.mutable_typed_config(), value);
+  EXPECT_OK(update(**subscription, wrapper, "v2"));
+  ASSERT_EQ(updates_.size(), 2);
+  EXPECT_EQ(updates_[0].type_url, "type.googleapis.com/test.Config");
+  EXPECT_EQ(updates_[1].type_url, "type.googleapis.com/google.protobuf.StringValue");
+  EXPECT_EQ(updates_[1].config.value(), "enabled");
+}
+
 TEST_F(ExtensionConfigSubscriptionTest, PreservesBinaryAndEmptyPayloads) {
   auto subscription = create();
   auto resource = config(true);
@@ -305,16 +332,31 @@ TEST_F(ExtensionConfigSubscriptionTest, PreservesBinaryAndEmptyPayloads) {
 TEST_F(ExtensionConfigSubscriptionTest, RejectsEmptyAndWildcardNamesAndSubscriptionFailure) {
   for (const auto* name :
        {"", "*", "xdstp://authority/envoy.config.core.v3.TypedExtensionConfig/config/*"}) {
-    EXPECT_FALSE(ExtensionConfigSubscription::create(name, "test.Config", source(), "test",
-                                                     context_, callback())
-                     .ok());
+    EXPECT_FALSE(
+        ExtensionConfigSubscription::create(name, source(), "test", context_, callback()).ok());
   }
   EXPECT_CALL(context_.xds_manager_,
               subscribeToSingletonResource("test-config", _, _, _,
                                            A<Config::SubscriptionCallbacks&>(), _, _))
       .WillOnce(Return(absl::UnavailableError("subscription unavailable")));
-  EXPECT_FALSE(ExtensionConfigSubscription::create("test-config", "test.Config", source(), "test",
-                                                   context_, callback())
+  EXPECT_FALSE(
+      ExtensionConfigSubscription::create("test-config", source(), "test", context_, callback())
+          .ok());
+}
+
+TEST_F(ExtensionConfigSubscriptionTest, RejectsUnsupportedDefaultsBeforeSubscribing) {
+  EXPECT_CALL(context_.xds_manager_,
+              subscribeToSingletonResource(_, _, _, _, A<Config::SubscriptionCallbacks&>(), _, _))
+      .Times(0);
+  auto config_source = source();
+  config_source.mutable_default_config()->set_type_url("type.googleapis.com/test.Config");
+  EXPECT_FALSE(ExtensionConfigSubscription::create("test-config", config_source, "test", context_,
+                                                   callback())
+                   .ok());
+  config_source.clear_default_config();
+  config_source.set_apply_default_config_without_warming(true);
+  EXPECT_FALSE(ExtensionConfigSubscription::create("test-config", config_source, "test", context_,
+                                                   callback())
                    .ok());
 }
 
@@ -351,6 +393,7 @@ TEST_F(ExtensionConfigSubscriptionTest, DeltaUpdatesAndRemovalsPreservePresence)
   Protobuf::RepeatedPtrField<std::string> removed;
   EXPECT_OK(subscription->onConfigUpdate(added.refvec_, removed, "system-version"));
   ASSERT_EQ(updates_.size(), 1);
+  EXPECT_EQ(updates_[0].version, added.refvec_[0].get().version());
   EXPECT_OK(subscription->onConfigUpdate({}, removed, "empty-delta"));
   EXPECT_EQ(updates_.size(), 1);
   removed.Add("other-config");
@@ -360,6 +403,8 @@ TEST_F(ExtensionConfigSubscriptionTest, DeltaUpdatesAndRemovalsPreservePresence)
   EXPECT_OK(subscription->onConfigUpdate({}, removed, "v2"));
   ASSERT_EQ(updates_.size(), 2);
   EXPECT_FALSE(updates_.back().config.has_value());
+  EXPECT_EQ(updates_.back().name, "test-config");
+  EXPECT_TRUE(updates_.back().version.empty());
   EXPECT_EQ(dump().ecds_filters_size(), 0);
   EXPECT_OK(update(*subscription, config(true)));
   EXPECT_EQ(updates_.size(), 3);

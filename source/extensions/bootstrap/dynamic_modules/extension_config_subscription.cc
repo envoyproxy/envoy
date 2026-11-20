@@ -1,9 +1,10 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension_config_subscription.h"
 
-#include <cstdint>
+#include <algorithm>
 #include <utility>
 
-#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/core/v3/config_source.pb.validate.h"
+#include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/config/xds_manager.h"
 #include "envoy/server/admin.h"
 
@@ -23,16 +24,18 @@ namespace Bootstrap {
 namespace DynamicModules {
 
 ExtensionConfigSubscription::ExtensionConfigSubscription(
-    absl::string_view name, absl::string_view type_url,
-    Server::Configuration::ServerFactoryContext& context, UpdateCallback callback)
-    : name_(name), type_url_(type_url), context_(context), callback_(std::move(callback)),
+    absl::string_view name, const envoy::config::core::v3::ExtensionConfigSource& source,
+    absl::string_view, Server::Configuration::ServerFactoryContext& context,
+    UpdateCallback callback)
+    : name_(name), type_urls_(source.type_urls().begin(), source.type_urls().end()),
+      context_(context), callback_(std::move(callback)),
       resource_type_(context.messageValidationContext().dynamicValidationVisitor(), "name"),
       scope_(context.scope().createScope(absl::StrCat("extension_config_discovery.", name, "."))) {}
 
 absl::StatusOr<std::unique_ptr<ExtensionConfigSubscription>> ExtensionConfigSubscription::create(
-    absl::string_view name, absl::string_view type_url,
-    const envoy::config::core::v3::ConfigSource& config_source, absl::string_view config_dump_key,
-    Server::Configuration::ServerFactoryContext& context, UpdateCallback callback) {
+    absl::string_view name, const envoy::config::core::v3::ExtensionConfigSource& source,
+    absl::string_view extension_name, Server::Configuration::ServerFactoryContext& context,
+    UpdateCallback callback) {
   if (name.empty() || name == "*") {
     return absl::InvalidArgumentError("bootstrap ECDS requires a single resource name");
   }
@@ -45,25 +48,33 @@ absl::StatusOr<std::unique_ptr<ExtensionConfigSubscription>> ExtensionConfigSubs
       return absl::InvalidArgumentError("bootstrap ECDS does not support wildcard resource names");
     }
   }
-  if (type_url.empty()) {
-    return absl::InvalidArgumentError("extension config type URL must be nonempty");
+  MessageUtil::validate(source, context.messageValidationContext().dynamicValidationVisitor());
+  MessageUtil::validate(source.config_source(),
+                        context.messageValidationContext().dynamicValidationVisitor());
+  if (std::any_of(source.type_urls().begin(), source.type_urls().end(),
+                  [](const auto& type) { return type.empty(); })) {
+    return absl::InvalidArgumentError("bootstrap ECDS payload type URLs must be nonempty");
   }
-  auto result = std::unique_ptr<ExtensionConfigSubscription>(
-      new ExtensionConfigSubscription(*normalized, type_url, context, std::move(callback)));
-  if (config_source.has_ads() || Config::XdsResourceIdentifier::hasXdsTpScheme(name)) {
+  if (source.has_default_config() || source.apply_default_config_without_warming()) {
+    return absl::InvalidArgumentError("bootstrap ECDS does not support default configurations");
+  }
+  auto result = std::unique_ptr<ExtensionConfigSubscription>(new ExtensionConfigSubscription(
+      *normalized, source, extension_name, context, std::move(callback)));
+  if (source.config_source().has_ads() || Config::XdsResourceIdentifier::hasXdsTpScheme(name)) {
     auto reservation = Config::EcdsSubscriptionRegistry::get(context)->reserve(
         *normalized, Config::EcdsSubscriptionRegistry::Sharing::Exclusive);
     RETURN_IF_NOT_OK(reservation.status());
     result->name_reservation_ = std::move(*reservation);
   }
   auto subscription = context.xdsManager().subscribeToSingletonResource(
-      *normalized, config_source,
+      *normalized, source.config_source(),
       Config::getTypeUrl<envoy::config::core::v3::TypedExtensionConfig>(), *result->scope_, *result,
       result->resource_type_.resourceDecoder(), {});
   RETURN_IF_NOT_OK(subscription.status());
-  result->subscription_ = std::move(subscription.value());
+  result->subscription_ = std::move(*subscription);
   if (auto admin = context.admin(); admin.has_value()) {
     auto& tracker = admin->getConfigTracker();
+    const auto config_dump_key = absl::StrCat("ecds_bootstrap.", extension_name);
     std::string key(config_dump_key);
     for (uint64_t suffix = 1; tracker.getCallbacksMap().contains(key); ++suffix) {
       key = absl::StrCat(config_dump_key, ".", suffix);
@@ -83,7 +94,7 @@ absl::StatusOr<std::unique_ptr<ExtensionConfigSubscription>> ExtensionConfigSubs
 void ExtensionConfigSubscription::start() { subscription_->start({name_}); }
 
 void ExtensionConfigSubscription::removeConfig() {
-  if (!callback_(std::nullopt)) {
+  if (!callback_(name_, "", "", std::nullopt)) {
     ENVOY_LOG(warn, "bootstrap module rejected ECDS removal for {}", name_);
     return;
   }
@@ -112,14 +123,17 @@ absl::Status ExtensionConfigSubscription::onConfigUpdate(
       last_config_->typed_config().value() == config.typed_config().value()) {
     return absl::OkStatus();
   }
-  if (Config::Utility::getFactoryType(config.typed_config()) !=
-      TypeUtil::typeUrlToDescriptorFullName(type_url_)) {
+  const auto received_type = Config::Utility::getFactoryType(config.typed_config());
+  if (std::none_of(type_urls_.begin(), type_urls_.end(), [&received_type](const auto& type) {
+        return TypeUtil::typeUrlToDescriptorFullName(type) == received_type;
+      })) {
     return absl::InvalidArgumentError(
         "bootstrap ECDS resource has an unexpected configuration type");
   }
   auto bytes = MessageUtil::knownAnyToBytes(config.typed_config());
   RETURN_IF_NOT_OK(bytes.status());
-  if (!callback_(*bytes)) {
+  if (!callback_(name_, version_info, absl::StrCat("type.googleapis.com/", received_type),
+                 *bytes)) {
     return absl::InvalidArgumentError("bootstrap module rejected extension config");
   }
   last_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(config);

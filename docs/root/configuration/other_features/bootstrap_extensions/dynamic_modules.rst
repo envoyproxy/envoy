@@ -178,6 +178,35 @@ prefix, tagged with ``config_name`` set to the extension name, or ``default`` if
   listeners_owned, Gauge, Listeners that the module owns
   updates_pending, Gauge, Writes that are queued or warming or that wait for the workers to start
 
+.. _config_bootstrap_extensions_dynamic_modules_ecds:
+
+ECDS Configuration
+------------------
+
+A module calls ``envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds`` after server
+initialization to subscribe to one named
+:ref:`TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>` resource. It
+passes a JSON-encoded :ref:`ExtensionConfigSource
+<envoy_v3_api_msg_config.core.v3.ExtensionConfigSource>` with its configuration source and allowed
+``type_urls``. Default configurations and wildcard names are not supported. On ADS and xDS-TP,
+the resource name must not be shared with another bootstrap extension or filter ECDS subscription.
+The subscription ends when shutdown begins.
+
+``envoy_dynamic_module_on_bootstrap_extension_ecds_update`` receives the resource name, version,
+payload type and configuration on the main thread. Payloads use the startup configuration
+encoding. For types that Envoy does not link, use ``TypedStruct`` so the config dump can render
+them. Identical resends and empty state-of-the-world updates do not invoke the hook.
+
+The hook must not block. Rejecting an update keeps the previous configuration and NACKs the
+response, which may contain other ECDS resources. Explicit removals and TTL expiry invoke the
+hook without a configuration. A rejected removal is only logged and keeps the previous
+configuration. A connection failure keeps the last configuration unless its TTL expires.
+
+Filesystem sources can invoke the hook before the subscription call returns, so do not hold a
+lock across the call that the hook takes. Initial fetch failures do not invoke the hook. A module
+that waits for its first configuration before signaling initialization complete must set its own
+startup timeout.
+
 Use Cases
 ---------
 

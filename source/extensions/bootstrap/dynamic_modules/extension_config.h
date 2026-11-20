@@ -75,8 +75,8 @@ using OnBootstrapExtensionClusterWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done);
 using OnBootstrapExtensionListenerWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done);
-using OnBootstrapExtensionConfigUpdateType =
-    decltype(&envoy_dynamic_module_on_bootstrap_extension_config_update);
+using OnBootstrapExtensionEcdsUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_ecds_update);
 
 class DynamicModuleBootstrapExtension;
 
@@ -162,8 +162,7 @@ public:
   /**
    * Subscribes once to a named ECDS configuration after server initialization.
    */
-  bool subscribeExtensionConfig(absl::string_view name, absl::string_view type_url,
-                                absl::string_view config_source_json);
+  bool subscribeEcds(absl::string_view name, absl::string_view source_json);
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
@@ -295,7 +294,7 @@ public:
   OnBootstrapExtensionListenerRemovalType on_bootstrap_extension_listener_removal_ = nullptr;
 
   // The following hooks are optional and stay nullptr when the module does not implement them.
-  OnBootstrapExtensionConfigUpdateType on_bootstrap_extension_config_update_ = nullptr;
+  OnBootstrapExtensionEcdsUpdateType on_bootstrap_extension_ecds_update_ = nullptr;
   OnBootstrapExtensionWorkerEventType on_bootstrap_extension_worker_event_ = nullptr;
   OnBootstrapExtensionRunOnAllWorkersDoneType on_bootstrap_extension_run_on_all_workers_done_ =
       nullptr;

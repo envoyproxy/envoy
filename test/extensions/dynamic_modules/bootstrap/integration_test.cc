@@ -340,9 +340,10 @@ resources:
   };
   const std::string config_path =
       TestEnvironment::writeStringToFileForTest("bootstrap_ecds.yaml", response("1", "enabled"));
-  envoy::config::core::v3::ConfigSource source;
-  source.mutable_path_config_source()->set_path(config_path);
-  source.set_resource_api_version(envoy::config::core::v3::V3);
+  envoy::config::core::v3::ExtensionConfigSource source;
+  source.mutable_config_source()->mutable_path_config_source()->set_path(config_path);
+  source.mutable_config_source()->set_resource_api_version(envoy::config::core::v3::V3);
+  source.add_type_urls("type.googleapis.com/google.protobuf.StringValue");
   const auto source_json = MessageUtil::getJsonStringFromMessageOrError(source);
   EXPECT_EQ(writerModuleRequest("/ecds_a", "subscribe", source_json), "enabled");
   EXPECT_EQ(writerModuleRequest("/ecds_b", "subscribe", source_json), "enabled");
@@ -405,7 +406,8 @@ typed_config:
 )EOF");
     initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_ecds_test", "test", "/ecds");
 
-    const std::string source = R"({"ads":{},"resource_api_version":"V3"})";
+    const std::string source =
+        R"({"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["type.googleapis.com/google.protobuf.StringValue"]})";
     EXPECT_EQ(writerModuleRequest("/ecds", "subscribe", source), "removed");
     FakeHttpConnectionPtr connection;
     FakeStreamPtr stream;

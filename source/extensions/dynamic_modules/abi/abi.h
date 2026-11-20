@@ -9454,35 +9454,6 @@ typedef enum {
 } envoy_dynamic_module_type_bootstrap_active_resource_kind;
 
 /**
- * Subscribes to one ECDS resource. Call on the main thread after server initialization.
- * Filesystem sources can deliver an update before this call returns.
- *
- * @param config_envoy_ptr is the pointer to the bootstrap extension configuration.
- * @param name is the ECDS resource name.
- * @param type_url is the expected payload type URL, or the inner type URL for TypedStruct.
- * @param config_source_json is a JSON-encoded envoy.config.core.v3.ConfigSource.
- * @return true if the subscription started, false otherwise.
- */
-bool envoy_dynamic_module_callback_bootstrap_extension_subscribe_extension_config(
-    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer name, envoy_dynamic_module_type_module_buffer type_url,
-    envoy_dynamic_module_type_module_buffer config_source_json);
-
-/**
- * Called on the main thread when an ECDS configuration is updated or removed.
- *
- * @param config_envoy_ptr is the pointer to the bootstrap extension configuration.
- * @param config_module_ptr is the pointer to the in-module bootstrap extension configuration.
- * @param has_config is false when the resource was removed.
- * @param config uses the startup extension_config encoding and is valid only during this call.
- * @return true if accepted, false if rejected without changing the module's current settings.
- */
-bool envoy_dynamic_module_on_bootstrap_extension_config_update(
-    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
-    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr config_module_ptr,
-    bool has_config, envoy_dynamic_module_type_envoy_buffer config);
-
-/**
  * The callback type invoked once per active resource name during enumeration.
  *
  * @param name is the name of the resource. The buffer is owned by Envoy and is valid only for the
@@ -9601,6 +9572,32 @@ typedef enum envoy_dynamic_module_type_bootstrap_listener_writer_update_status {
 // =============================================================================
 // Bootstrap Extension Event Hooks
 // =============================================================================
+
+/**
+ * Called on the main thread when an ECDS resource changes or is removed, including TTL expiry.
+ * This hook must not block. Rejecting an update NACKs the response, which may contain other ECDS
+ * resources. A rejected removal is only logged and retains the previous configuration.
+ *
+ * A module that waits for its first configuration before completing initialization must set its
+ * own startup timeout. Initial fetch failures do not invoke this hook.
+ *
+ * @param config_envoy_ptr is the pointer to the bootstrap extension configuration.
+ * @param config_module_ptr is the pointer to the in-module bootstrap extension configuration.
+ * @param name is the resource name.
+ * @param version is the SotW response version or Delta resource version, empty for removals.
+ * @param type_url is the payload type URL, using the inner type for TypedStruct, empty for
+ * removals.
+ * @param has_config is false when the resource was removed.
+ * @param config uses the startup extension_config encoding. All buffers are owned by Envoy and
+ * valid only during this call.
+ * @return true if accepted, false if rejected without changing the module's current settings.
+ */
+bool envoy_dynamic_module_on_bootstrap_extension_ecds_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer version,
+    envoy_dynamic_module_type_envoy_buffer type_url, bool has_config,
+    envoy_dynamic_module_type_envoy_buffer config);
 
 /**
  * envoy_dynamic_module_on_bootstrap_extension_config_new is called by the main thread when the
@@ -10472,6 +10469,29 @@ bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
 bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer path_prefix);
+
+// -------------------- Bootstrap Extension Callbacks - ECDS --------------------
+
+/**
+ * Subscribes to one named ECDS resource until shutdown. Filesystem sources can invoke
+ * envoy_dynamic_module_on_bootstrap_extension_ecds_update before this call returns; do not hold
+ * a lock across this call that the hook takes.
+ *
+ * @param config_envoy_ptr is the pointer to the bootstrap extension configuration.
+ * @param name is the resource name. Wildcards are not supported. On ADS and xDS-TP, this name must
+ * not be used by another bootstrap extension or filter ECDS subscription.
+ * @param source_json is a JSON-encoded envoy.config.core.v3.ExtensionConfigSource. Its type_urls
+ * lists permitted payload types, using the inner type for TypedStruct. Default configurations
+ * are not supported. For types not linked into Envoy, use TypedStruct so config dumps can render
+ * the payload. Both input buffers are owned by the module and only need to last this call.
+ * @return true if started; false before server initialization, after shutdown, in init_only mode,
+ * without the ECDS update hook, if already subscribed, or if the name or source is invalid or in
+ * use.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer source_json);
 
 // -------------------- Bootstrap Extension Callbacks - Cluster Lifecycle --------------------
 

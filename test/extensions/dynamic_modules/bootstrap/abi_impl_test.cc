@@ -1934,24 +1934,34 @@ TEST_F(BootstrapAbiImplTest, TimerReEnable) {
 
 TEST_F(BootstrapAbiImplTest, ExtensionConfigSubscriptionValidatesLifecycleAndReleasesOnShutdown) {
   auto config = newOptionalHooksConfig();
-  const std::string type_url = "type.googleapis.com/test.Config";
-  const std::string source = R"({"ads":{},"resource_api_version":"V3"})";
+  const std::string source =
+      R"({"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["type.googleapis.com/test.Config"]})";
+  const auto hook = [](auto, auto, auto, auto, auto, bool, auto) { return true; };
+  config->on_bootstrap_extension_ecds_update_ = hook;
   auto subscribe = [&]() {
-    return envoy_dynamic_module_callback_bootstrap_extension_subscribe_extension_config(
-        config->thisAsVoidPtr(), {"test-config", 11}, {type_url.data(), type_url.size()},
-        {source.data(), source.size()});
+    return envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+        config->thisAsVoidPtr(), {"test-config", 11}, {source.data(), source.size()});
   };
+  EXPECT_CALL(
+      context_.xds_manager_,
+      subscribeToSingletonResource(_, _, _, _, testing::A<Config::SubscriptionCallbacks&>(), _, _))
+      .Times(0);
   EXPECT_FALSE(subscribe());
   testing::NiceMock<Server::MockListenerManager> listener_manager;
   config->setListenerManager(listener_manager);
+  config->on_bootstrap_extension_ecds_update_ = nullptr;
   EXPECT_FALSE(subscribe());
-  config->on_bootstrap_extension_config_update_ = [](auto, auto, bool, auto) { return true; };
-  EXPECT_FALSE(config->subscribeExtensionConfig("test-config", "test.Config", "invalid-json"));
-  EXPECT_FALSE(
-      config->subscribeExtensionConfig("test-config", "test.Config", R"({"unknown":true})"));
-  EXPECT_FALSE(config->subscribeExtensionConfig("test-config", "test.Config", "{}"));
-  EXPECT_FALSE(config->subscribeExtensionConfig("test-config", "test.Config",
-                                                R"({"ads":{},"resource_api_version":99})"));
+  config->on_bootstrap_extension_ecds_update_ = hook;
+  ON_CALL(context_.options_, mode()).WillByDefault(testing::Return(Server::Mode::InitOnly));
+  EXPECT_FALSE(subscribe());
+  ON_CALL(context_.options_, mode()).WillByDefault(testing::Return(Server::Mode::Serve));
+  EXPECT_FALSE(config->subscribeEcds("test-config", "invalid-json"));
+  EXPECT_FALSE(config->subscribeEcds("test-config", R"({"unknown":true})"));
+  EXPECT_FALSE(config->subscribeEcds("test-config", "{}"));
+  EXPECT_FALSE(config->subscribeEcds(
+      "test-config",
+      R"({"config_source":{"ads":{},"resource_api_version":99},"type_urls":["test.Config"]})"));
+  testing::Mock::VerifyAndClearExpectations(&context_.xds_manager_);
   EXPECT_CALL(context_.xds_manager_,
               subscribeToSingletonResource("test-config", _, _, _,
                                            testing::A<Config::SubscriptionCallbacks&>(), _, _))
@@ -1975,6 +1985,11 @@ TEST_F(BootstrapAbiImplTest, ExtensionConfigSubscriptionValidatesLifecycleAndRel
       });
   EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{}));
   EXPECT_TRUE(subscribe());
+  testing::Mock::VerifyAndClearExpectations(&context_.xds_manager_);
+  EXPECT_CALL(
+      context_.xds_manager_,
+      subscribeToSingletonResource(_, _, _, _, testing::A<Config::SubscriptionCallbacks&>(), _, _))
+      .Times(0);
   EXPECT_FALSE(subscribe());
   EXPECT_FALSE(destroyed);
   config->onShutdown();
@@ -2368,10 +2383,10 @@ TEST_F(BootstrapAbiImplTest, MainThreadCallbacksOffMainThreadFailClosed) {
          EXPECT_FALSE(
              envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr));
        }},
-      {"envoy_dynamic_module_callback_bootstrap_extension_subscribe_extension_config",
+      {"envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds",
        [] {
-         EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_subscribe_extension_config(
-             nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}));
+         EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+             nullptr, {nullptr, 0}, {nullptr, 0}));
        }},
       {"envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers",
        [] {

@@ -15708,18 +15708,16 @@ fn noop_scheduler_as_boxed_trait_object() {
 mod ecds_tests {
   use crate::abi;
   use crate::bootstrap::*;
-  use std::sync::Arc;
 
   #[derive(Default)]
   struct TestHost {
-    subscription: Option<(String, String, String)>,
+    subscription: Option<(String, String)>,
   }
 
   #[no_mangle]
-  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_subscribe_extension_config(
+  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
     host: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
     name: abi::envoy_dynamic_module_type_module_buffer,
-    type_url: abi::envoy_dynamic_module_type_module_buffer,
     source: abi::envoy_dynamic_module_type_module_buffer,
   ) -> bool {
     let host = unsafe { &mut *host.cast::<TestHost>() };
@@ -15729,71 +15727,22 @@ mod ecds_tests {
       };
       std::str::from_utf8(bytes).unwrap().to_owned()
     };
-    host.subscription = Some((read(name), read(type_url), read(source)));
+    host.subscription = Some((read(name), read(source)));
     true
   }
 
   #[test]
-  fn subscribes_with_borrowed_config_source_and_preserves_payload_presence() {
+  fn subscribes_with_borrowed_config_source() {
     let mut host = TestHost::default();
     let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
-    assert!(envoy.subscribe_extension_config(ExtensionConfigSource {
+    let source = r#"{"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["type.googleapis.com/test.Config"]}"#;
+    assert!(envoy.subscribe_ecds(EcdsSubscription {
       name: "test-config",
-      type_url: "type.googleapis.com/test.Config",
-      config_source_json: r#"{"ads":{},"resource_api_version":"V3"}"#,
+      source_json: source,
     }));
-    let (name, type_url, source) = host.subscription.as_ref().unwrap();
-    assert_eq!(name, "test-config");
-    assert_eq!(type_url, "type.googleapis.com/test.Config");
-    assert_eq!(source, r#"{"ads":{},"resource_api_version":"V3"}"#);
-
-    struct Consumer(Arc<std::sync::Mutex<Vec<Option<Vec<u8>>>>>);
-    impl BootstrapExtensionConfig for Consumer {
-      fn new_bootstrap_extension(
-        &self,
-        _: &mut dyn EnvoyBootstrapExtension,
-      ) -> Box<dyn BootstrapExtension> {
-        unreachable!()
-      }
-      fn on_config_update(
-        &self,
-        _: &mut dyn EnvoyBootstrapExtensionConfig,
-        config: Option<&[u8]>,
-      ) -> bool {
-        self.0.lock().unwrap().push(config.map(<[u8]>::to_vec));
-        config != Some(b"rejected".as_slice())
-      }
-    }
-    let observed = Arc::new(std::sync::Mutex::new(Vec::new()));
-    let config: Box<dyn BootstrapExtensionConfig> = Box::new(Consumer(Arc::clone(&observed)));
-    for (payload, accepted) in [
-      (Some(b"{}".as_slice()), true),
-      (Some(b"".as_slice()), true),
-      (None, true),
-      (Some(b"rejected".as_slice()), false),
-    ] {
-      let bytes = payload.unwrap_or_default();
-      let result = unsafe {
-        envoy_dynamic_module_on_bootstrap_extension_config_update(
-          std::ptr::null_mut(),
-          std::ptr::from_ref(&config).cast(),
-          payload.is_some(),
-          abi::envoy_dynamic_module_type_envoy_buffer {
-            ptr: bytes.as_ptr().cast(),
-            length: bytes.len(),
-          },
-        )
-      };
-      assert_eq!(result, accepted);
-    }
     assert_eq!(
-      *observed.lock().unwrap(),
-      [
-        Some(b"{}".to_vec()),
-        Some(Vec::new()),
-        None,
-        Some(b"rejected".to_vec())
-      ]
+      host.subscription,
+      Some(("test-config".to_owned(), source.to_owned()))
     );
   }
 }
