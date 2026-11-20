@@ -171,6 +171,7 @@ go_library(
     srcs = [
         "sdk/go/abi/common.go",
         "sdk/go/abi/early_header_mutation.go",
+        "sdk/go/abi/envoy_pointer.go",
         "sdk/go/abi/header_formatter.go",
         "sdk/go/abi/internal.go",
         "sdk/go/abi/listener.go",
@@ -194,4 +195,20 @@ go_library(
         "//source/extensions/dynamic_modules:go_sdk_internal_recovery",
         "//source/extensions/dynamic_modules:go_sdk_shared",
     ],
+)
+
+# The abi package refers to symbols that Envoy provides. The test never calls them, so the linker
+# only has to accept them unresolved.
+go_test(
+    name = "go_sdk_abi_test",
+    srcs = ["sdk/go/abi/envoy_pointer_test.go"],
+    clinkopts = select({
+        "//bazel:darwin_any": [
+            "-Wl,-undefined,dynamic_lookup",
+        ],
+        "//conditions:default": [
+            "-Wl,--unresolved-symbols=ignore-all",
+        ],
+    }),
+    embed = [":go_sdk_abi"],
 )
