@@ -651,7 +651,14 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
   /// * `key` is the watched runtime key whose value changed.
   /// * `value` is the new raw value of the key, for example `"true"` or `"42"`, or `None` when no
-  ///   runtime layer sets the key anymore.
+  ///   runtime layer sets the key anymore. The raw value of a number from a static or RTDS layer is
+  ///   rounded to six significant digits, for example `1000001` is `"1e+06"`, but a change of the
+  ///   number is reported even when its raw value does not change. For a runtime guard, removal
+  ///   puts the guard back to its value before any layer set it, normally its compiled default,
+  ///   while the runtime getters return the default given by the caller.
+  ///
+  /// This can be called before [`BootstrapExtension::on_server_initialized`], for example with a
+  /// filesystem RTDS layer and only static clusters without health checks.
   fn on_runtime_update(
     &self,
     _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,

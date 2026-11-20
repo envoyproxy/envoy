@@ -1,6 +1,7 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 
 #include <algorithm>
+#include <cmath>
 #include <optional>
 #include <string>
 #include <utility>
@@ -171,7 +172,16 @@ bool DynamicModuleBootstrapExtensionConfig::enableRuntimeUpdate(absl::string_vie
   return true;
 }
 
-std::optional<std::string>
+bool DynamicModuleBootstrapExtensionConfig::RuntimeValue::operator==(
+    const RuntimeValue& other) const {
+  // NaN is equal to itself, so that a key that stays NaN is not reported on every update.
+  const bool same_double = double_.has_value() == other.double_.has_value() &&
+                           (!double_.has_value() || *double_ == *other.double_ ||
+                            (std::isnan(*double_) && std::isnan(*other.double_)));
+  return raw_ == other.raw_ && uint_ == other.uint_ && same_double;
+}
+
+std::optional<DynamicModuleBootstrapExtensionConfig::RuntimeValue>
 DynamicModuleBootstrapExtensionConfig::runtimeValue(const Runtime::Snapshot& snapshot,
                                                     absl::string_view key) {
   // Snapshot::get() asserts against runtime feature keys, so the layers are searched instead.
@@ -179,7 +189,8 @@ DynamicModuleBootstrapExtensionConfig::runtimeValue(const Runtime::Snapshot& sna
   for (auto layer = layers.rbegin(); layer != layers.rend(); ++layer) {
     const auto entry = (*layer)->values().find(key);
     if (entry != (*layer)->values().end()) {
-      return entry->second.raw_string_value_;
+      return RuntimeValue{entry->second.raw_string_value_, entry->second.uint_value_,
+                          entry->second.double_value_};
     }
   }
   return std::nullopt;
@@ -188,12 +199,12 @@ DynamicModuleBootstrapExtensionConfig::runtimeValue(const Runtime::Snapshot& sna
 void DynamicModuleBootstrapExtensionConfig::onRuntimeUpdate() {
   const Runtime::SnapshotConstSharedPtr snapshot = context_.runtime().threadsafeSnapshot();
   for (auto& [key, value] : watched_runtime_values_) {
-    std::optional<std::string> new_value = runtimeValue(*snapshot, key);
+    std::optional<RuntimeValue> new_value = runtimeValue(*snapshot, key);
     if (new_value == value) {
       continue;
     }
     value = std::move(new_value);
-    const absl::string_view raw_value = value.has_value() ? *value : absl::string_view();
+    const absl::string_view raw_value = value.has_value() ? value->raw_ : absl::string_view();
     on_bootstrap_extension_runtime_update_(
         thisAsVoidPtr(), in_module_config_, {key.data(), key.size()},
         {raw_value.data(), raw_value.size()}, !value.has_value());

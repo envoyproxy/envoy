@@ -1,4 +1,5 @@
 #include <atomic>
+#include <cmath>
 #include <thread>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -96,6 +97,23 @@ protected:
         .WillByDefault(testing::Return(snapshot));
   }
 
+  // Like setRuntimeLayers(), with entries that can also set the numbers.
+  void setRuntimeEntries(const std::vector<Runtime::Snapshot::EntryMap>& layer_entries) {
+    auto snapshot = std::make_shared<TestRuntimeSnapshot>();
+    for (const auto& entries : layer_entries) {
+      snapshot->layers_.push_back(std::make_unique<TestRuntimeLayer>(entries));
+    }
+    ON_CALL(context_.runtime_loader_, threadsafeSnapshot())
+        .WillByDefault(testing::Return(snapshot));
+  }
+
+  static Runtime::Snapshot::Entry numberEntry(const std::string& raw, double value) {
+    Runtime::Snapshot::Entry entry;
+    entry.raw_string_value_ = raw;
+    entry.double_value_ = value;
+    return entry;
+  }
+
   // Simulates the runtime loading a new snapshot.
   void loadRuntimeSnapshot() { context_.runtime_loader_.update_callbacks_.runCallbacks(); }
 
@@ -131,6 +149,7 @@ private:
         values_[key].raw_string_value_ = value;
       }
     }
+    explicit TestRuntimeLayer(Runtime::Snapshot::EntryMap values) : values_(std::move(values)) {}
     const std::string& name() const override { return name_; }
     const Runtime::Snapshot::EntryMap& values() const override { return values_; }
 
@@ -2148,6 +2167,28 @@ TEST_F(BootstrapAbiImplTest, RuntimeUpdateReportsWatchedKeys) {
   setRuntimeLayers({{{"a", "1"}, {"b", "2"}}, {{"d", "4"}, {"e", ""}}});
   loadRuntimeSnapshot();
   EXPECT_EQ("b=20;c!;d=4;b=2;e=;", runtimeUpdates());
+}
+
+// Test that a change of a number is reported even when its rounded raw string does not change, and
+// that a NaN that stays NaN is not reported.
+TEST_F(BootstrapAbiImplTest, RuntimeUpdateComparesNumbers) {
+  setRuntimeEntries({{{"n", numberEntry("1e+06", 1000000)}, {"nan", numberEntry("nan", NAN)}}});
+  auto config = newOptionalHooksConfig();
+  EXPECT_TRUE(watchRuntimeKey(*config, "n"));
+  EXPECT_TRUE(watchRuntimeKey(*config, "nan"));
+
+  setRuntimeEntries({{{"n", numberEntry("1e+06", 1000001)}, {"nan", numberEntry("nan", NAN)}}});
+  loadRuntimeSnapshot();
+  EXPECT_EQ("n=1e+06;", runtimeUpdates());
+
+  setRuntimeEntries({{{"n", numberEntry("1e+06", 1000001)}, {"nan", numberEntry("nan", NAN)}}});
+  loadRuntimeSnapshot();
+  EXPECT_EQ("n=1e+06;", runtimeUpdates());
+
+  // A number that appears or disappears with the same raw string is a change too.
+  setRuntimeLayers({{{"n", "1e+06"}, {"nan", "nan"}}});
+  loadRuntimeSnapshot();
+  EXPECT_EQ("n=1e+06;n=1e+06;nan=nan;", runtimeUpdates());
 }
 
 // Test that the module can watch a key during on_bootstrap_extension_config_new.

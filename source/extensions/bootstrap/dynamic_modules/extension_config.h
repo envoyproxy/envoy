@@ -428,9 +428,19 @@ private:
   Server::ServerLifecycleNotifier::HandlePtr listener_lifecycle_shutdown_handle_;
   bool listener_lifecycle_enabled_ = false;
 
-  // Returns the raw value of the key from the topmost layer of the snapshot that sets it.
-  static std::optional<std::string> runtimeValue(const Runtime::Snapshot& snapshot,
-                                                 absl::string_view key);
+  // The value of a watched runtime key. The numbers are compared as well as the raw string, since
+  // the raw string of a number can be rounded and then hide a change of the number.
+  struct RuntimeValue {
+    bool operator==(const RuntimeValue& other) const;
+
+    std::string raw_;
+    std::optional<uint64_t> uint_;
+    std::optional<double> double_;
+  };
+
+  // Returns the value of the key from the topmost layer of the snapshot that sets it.
+  static std::optional<RuntimeValue> runtimeValue(const Runtime::Snapshot& snapshot,
+                                                  absl::string_view key);
 
   // Called by the runtime on the main thread once it loaded a new snapshot.
   void onRuntimeUpdate();
@@ -439,7 +449,7 @@ private:
   // shutdown began.
   Common::CallbackHandlePtr runtime_update_handle_;
   // The watched runtime keys and their values at the previous update, ordered by key.
-  absl::btree_map<std::string, std::optional<std::string>> watched_runtime_values_;
+  absl::btree_map<std::string, std::optional<RuntimeValue>> watched_runtime_values_;
 
   // Thread-local slot that carries the worker events. Allocated on the first runOnAllWorkers().
   ThreadLocal::TypedSlotPtr<> worker_slot_;

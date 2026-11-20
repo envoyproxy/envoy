@@ -10969,6 +10969,14 @@ unsafe extern "C" {
  already return the new values on the main thread. The worker threads observe the new snapshot
  shortly after. The module cannot watch more keys from this hook.
 
+ This can be called before envoy_dynamic_module_on_bootstrap_extension_server_initialized. For
+ example, with a filesystem RTDS layer and only static clusters without health checks, the first
+ update can arrive first, while the callouts and the worker events are still refused.
+
+ Envoy also compares the numbers that a layer gives to the key, so a change of a number is
+ reported even when its raw string does not change. The raw string of a number from a static or
+ RTDS layer is rounded to six significant digits, for example 1000001 is given as "1e+06".
+
  This hook is optional.
 
  @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
@@ -10980,7 +10988,10 @@ unsafe extern "C" {
  @param value is the new value of the key as a raw string, as given by the layer that sets it, for
  example "true" or "42". It is empty when removed is true. It is owned by Envoy and valid only for
  the duration of this call.
- @param removed is true when no layer sets the key anymore.*/
+ @param removed is true when no layer sets the key anymore. For a runtime guard such as
+ "envoy.reloadable_features.some_flag", the guard then returns to its value before any layer set
+ it, normally its compiled default, while the runtime getters return the default given by the
+ caller.*/
     pub fn envoy_dynamic_module_on_bootstrap_extension_runtime_update(
         extension_config_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
         extension_config_module_ptr: envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,

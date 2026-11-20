@@ -89,8 +89,16 @@ changed, in lexicographic order. The value of a key when the module starts watch
 reported. When the hook runs, the runtime getters such as
 ``envoy_dynamic_module_callback_get_runtime_bool`` already return the new value on the main thread.
 
+The raw value of a number from a static or RTDS layer is rounded to six significant digits, for
+example ``1000001`` is given as ``1e+06``, but a change of the number is reported even when its
+raw value does not change. When the key is removed, a runtime guard such as
+``envoy.reloadable_features.some_flag`` returns to its value before any layer set it, normally its
+compiled default, while the runtime getters return the default given by the caller.
+
 The module can only watch keys during ``envoy_dynamic_module_on_bootstrap_extension_config_new``.
-No update is reported once the server began to shut down.
+No update is reported once the server began to shut down. The first update can arrive before
+``envoy_dynamic_module_on_bootstrap_extension_server_initialized``, for example with a filesystem
+RTDS layer and only static clusters without health checks.
 
 .. _config_bootstrap_extensions_dynamic_modules_cluster_writer:
 
