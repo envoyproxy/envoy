@@ -10259,10 +10259,11 @@ unsafe extern "C" {
 
  Accepted is reported after successful response processing, before ACK; resources may still be
  warming. Rejected is reported before NACK and may follow partial application.
- Unsubscribed is posted to the main dispatcher when a watch drops interest. Disabling
- notifications discards pending unsubscriptions, even if re-enabled before delivery.
+ Unsubscribed is posted to the main dispatcher once no watch on the stream still names the
+ resource. It can arrive after later outcomes, such as the CDS Accepted that removed a cluster.
+ Disabling notifications discards pending unsubscriptions, even if re-enabled before delivery.
 
- Implementations must not block or reenter xDS processing. Resource payloads are not included.
+ Implementations must not block. Resource payloads are not included.
  All buffers are borrowed for this call.
 
  @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.

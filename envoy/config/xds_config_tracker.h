@@ -35,7 +35,8 @@ public:
   virtual ~XdsConfigTracker() = default;
 
   /**
-   * Returns whether xDS notifications are needed. May change between updates.
+   * Returns whether xDS notifications are needed. May change between updates. While false, Envoy
+   * skips every callback, including unsubscriptions, and does not replay them.
    */
   virtual bool enabled() const { return true; }
 

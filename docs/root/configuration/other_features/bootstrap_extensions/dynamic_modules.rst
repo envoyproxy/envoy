@@ -191,9 +191,9 @@ Accepted follows successful processing, before ACK; resources may still be warmi
 Rejected precedes NACK and may follow partial application. Its error details are the NACK
 message and may quote rejected configuration. They are empty for other outcomes.
 
-The hook runs on the main thread and must not block or reenter xDS processing.
-Envoy posts unsubscription notifications to the dispatcher to avoid calling the hook during
-cluster destruction.
+The hook runs on the main thread and must not block. Unsubscribed is posted to the dispatcher once
+no watch on the stream still names the resource, avoiding a call during cluster destruction. It
+can arrive after later outcomes, such as the CDS Accepted that removed a cluster.
 
 Disabling notifications discards queued unsubscriptions. Re-enabling does not replay them.
 Delivery stops when shutdown begins.

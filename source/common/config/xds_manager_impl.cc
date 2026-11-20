@@ -625,6 +625,7 @@ public:
     trackers_->entries_.push_back(this);
   }
   ~Registration() override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     auto& entries = trackers_->entries_;
     const auto it = std::find(entries.begin(), entries.end(), this);
     ASSERT(it != entries.end());
@@ -644,6 +645,7 @@ private:
 };
 
 Common::CallbackHandlePtr XdsConfigTrackers::add(XdsConfigTracker& tracker) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   return std::make_unique<Registration>(trackers_, tracker);
 }
 

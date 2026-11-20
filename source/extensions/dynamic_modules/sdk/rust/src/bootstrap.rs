@@ -53,7 +53,7 @@ pub enum XdsUpdate<'a> {
     nonce: &'a str,
     error_details: &'a str,
   },
-  /// A watch dropped interest in this resource.
+  /// The last watch on the stream dropped interest in this resource.
   Unsubscribed { resource_name: &'a str },
 }
 
@@ -656,12 +656,13 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   ) {
   }
 
-  /// Reports gRPC xDS outcomes on the main thread. Must not block or reenter xDS processing.
+  /// Reports gRPC xDS outcomes on the main thread. Must not block.
   ///
   /// Accepted follows successful response processing, before ACK; resources may still be warming.
   /// Rejected precedes NACK and may follow partial application.
-  /// Unsubscribed is posted when a watch drops interest. Disabling notifications discards pending
-  /// unsubscriptions, even if re-enabled before delivery.
+  /// Unsubscribed is posted once no watch on the stream still names the resource. It can arrive
+  /// after later outcomes, such as the CDS Accepted that removed a cluster. Disabling notifications
+  /// discards pending unsubscriptions, even if re-enabled before delivery.
   ///
   /// Resource payloads are not included. Update metadata is borrowed for this call.
   fn on_xds_update(
