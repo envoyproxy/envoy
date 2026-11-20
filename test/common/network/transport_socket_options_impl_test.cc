@@ -123,7 +123,31 @@ TEST_F(TransportSocketOptionsImplTest, FilterStateHashable) {
   TestTransportSocketFactory factory;
   std::vector<uint8_t> keys;
   factory.hashKey(keys, transport_socket_options);
-  EXPECT_GT(keys.size(), 0);
+  // The default Hashable::hashKey() appends the 64-bit hash in host byte order.
+  const uint64_t expected_hash = 12345;
+  const auto* expected_bytes = reinterpret_cast<const uint8_t*>(&expected_hash);
+  EXPECT_EQ(std::vector<uint8_t>(expected_bytes, expected_bytes + sizeof(expected_hash)), keys);
+}
+
+class WideHashableObj : public StreamInfo::FilterState::Object, public Hashable {
+  std::optional<uint64_t> hash() const override { return 12345; };
+  void hashKey(std::vector<uint8_t>& key) const override {
+    for (uint8_t i = 0; i < 16; i++) {
+      key.push_back(i);
+    }
+  }
+};
+
+TEST_F(TransportSocketOptionsImplTest, FilterStateWideHashable) {
+  filter_state_.setData("hashable", std::make_shared<WideHashableObj>(),
+                        StreamInfo::FilterState::LifeSpan::FilterChain,
+                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  TestTransportSocketFactory factory;
+  std::vector<uint8_t> keys;
+  factory.hashKey(keys, transport_socket_options);
+  const std::vector<uint8_t> expected{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  EXPECT_EQ(expected, keys);
 }
 
 TEST_F(TransportSocketOptionsImplTest, FilterStateNonHashable) {
