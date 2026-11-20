@@ -212,6 +212,15 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  _TS_0: &ts-appauth envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_1: &ts-bind-mounts envoyproxy/toolshed/actions/bind-mounts@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_2: &ts-bson envoyproxy/toolshed/actions/bson@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_3: &ts-checkout envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_4: &ts-diskspace envoyproxy/toolshed/actions/diskspace@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_5: &ts-gpg-write envoyproxy/toolshed/actions/gpg/write@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_6: &ts-jq envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_7: &ts-remnt envoyproxy/toolshed/actions/github/remnt@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_8: &ts-run envoyproxy/toolshed/actions/github/run@e8ab1b7c39d474eadc1b9340055df55407d2c77e
   CI_DEBUG: ${{ vars.CI_DEBUG }}
 
 
@@ -226,7 +235,7 @@ jobs:
     name: ${{ inputs.target-suffix && format('[{0}] ', inputs.target-suffix) || '' }}${{ inputs.command }} ${{ inputs.target }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-jq
       id: started
       name: Create timestamp
       with:
@@ -234,7 +243,7 @@ jobs:
         filter: |
           now
     # This controls which input vars are exposed to the run action (and related steps)
-    - uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-jq
       name: Context
       id: context
       with:
@@ -267,14 +276,14 @@ jobs:
         fi
         echo "mnt-available=$MNT_AVAILABLE" >> "$GITHUB_OUTPUT"
       id: disk
-    - uses: envoyproxy/toolshed/actions/github/remnt@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-remnt
       if: steps.disk.outputs.should-remnt == 'true'
-    - uses: envoyproxy/toolshed/actions/bind-mounts@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-bind-mounts
       if: inputs.bind-mount && steps.disk.outputs.mnt-available == 'true'
       with:
         mounts: ${{ inputs.bind-mounts }}
     - name: Free diskspace
-      uses: envoyproxy/toolshed/actions/diskspace@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-diskspace
       if: inputs.diskspace-hack || steps.disk.outputs.mnt-available != 'true'
       with:
         to_remove: ${{ inputs.diskspace-hack-paths }}
@@ -282,7 +291,7 @@ jobs:
         mount
         df -h
 
-    - uses: envoyproxy/toolshed/actions/bson@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-bson
       name: Configure Docker
       if: runner.os == 'Linux'
       with:
@@ -297,7 +306,7 @@ jobs:
             else . end
           | "${{ inputs.template-docker-configure }}"
 
-    - uses: envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-appauth
       id: appauth
       name: Appauth
       if: ${{ inputs.trusted }}
@@ -308,7 +317,7 @@ jobs:
         # - the workaround is to allow the token to be passed through.
         token: ${{ github.token }}
         token-ok: true
-    - uses: envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-checkout
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -351,7 +360,7 @@ jobs:
               || 'origin' }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
-    - uses: envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-checkout
       id: checkout-extra
       name: Checkout extra repository (for publishing)
       if: ${{ inputs.checkout-extra }}
@@ -362,7 +371,7 @@ jobs:
     - name: Stage signing key material
       id: signing
       if: ${{ inputs.signing }}
-      uses: envoyproxy/toolshed/actions/gpg/write@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-gpg-write
       with:
         key: ${{ secrets.gpg-key }}
         passphrase: ${{ secrets.gpg-key-password }}
@@ -398,7 +407,7 @@ jobs:
 
     # NOTE: This is where untrusted code can be run!!!
     #  It MUST be the last step in the workflow
-    - uses: envoyproxy/toolshed/actions/github/run@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-run
       id: ci-run
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:

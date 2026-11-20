@@ -13,6 +13,10 @@ on:
         required: false
         type: string
 
+env:
+  _TS_0: &ts-bind-mounts envoyproxy/toolshed/actions/bind-mounts@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_1: &ts-diskspace envoyproxy/toolshed/actions/diskspace@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+
 jobs:
   CodeQL-Build:
     if: github.repository == 'envoyproxy/envoy'
@@ -23,7 +27,7 @@ jobs:
       pull-requests: read
     runs-on: ubuntu-22.04
     steps:
-    - uses: envoyproxy/toolshed/actions/bind-mounts@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-bind-mounts
       if: |
         ! github.event.repository.private
       with:
@@ -37,7 +41,7 @@ jobs:
 
     - name: Free disk space
       if: github.event.repository.private
-      uses: envoyproxy/toolshed/actions/diskspace@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-diskspace
       with:
         to_remove: |
           /usr/local/.ghcup

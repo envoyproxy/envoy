@@ -45,6 +45,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  _TS_0: &ts-checkout envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_1: &ts-env-summary envoyproxy/toolshed/actions/github/env/summary@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_2: &ts-envoy-ci-env envoyproxy/toolshed/actions/envoy/ci/env@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_3: &ts-jq envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e
   CI_DEBUG: ${{ vars.CI_DEBUG && true || false }}
 
 
@@ -56,18 +60,18 @@ jobs:
       request: ${{ steps.env.outputs.data }}
       trusted: true
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-jq
       id: started
       name: Create timestamp
       with:
         options: -r
         filter: |
           now
-    - uses: envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-checkout
       id: checkout
       name: Checkout Envoy repository
     - name: Generate environment variables
-      uses: envoyproxy/toolshed/actions/envoy/ci/env@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-envoy-ci-env
       id: env
       with:
         branch-name: ${{ inputs.branch-name }}
@@ -79,7 +83,7 @@ jobs:
 
     - name: Request summary
       id: summary
-      uses: envoyproxy/toolshed/actions/github/env/summary@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-env-summary
       with:
         actor: ${{ toJSON(fromJSON(steps.env.outputs.data).request.actor) }}
         base-sha: ${{ fromJSON(steps.env.outputs.data).request.base-sha }}

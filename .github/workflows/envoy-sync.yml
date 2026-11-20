@@ -13,6 +13,10 @@ concurrency:
   group: ${{ github.workflow }}
 
 
+env:
+  _TS_0: &ts-appauth envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_1: &ts-dispatch envoyproxy/toolshed/actions/dispatch@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+
 jobs:
   sync:
     runs-on: ubuntu-24.04
@@ -42,13 +46,13 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
         fi
     - if: steps.tip.outputs.skip != 'true'
-      uses: envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-appauth
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
     - if: steps.tip.outputs.skip != 'true'
-      uses: envoyproxy/toolshed/actions/dispatch@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-dispatch
       with:
         repository: "envoyproxy/${{ matrix.downstream }}"
         ref: main

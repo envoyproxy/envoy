@@ -21,6 +21,9 @@ on:
         required: true
 
 
+env:
+  _TS_0: &ts-checkout envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+
 jobs:
   # Reopen the released branch and create a synced release PR on the next
   # younger stable branch, skipping ENVOY_RELEASE_SKIP_VERSIONS.
@@ -32,7 +35,7 @@ jobs:
       next-branch: ${{ steps.plan.outputs.next-branch }}
     steps:
     - name: Checkout repository
-      uses: envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-checkout
       with:
         branch: main
         config: |

@@ -54,6 +54,8 @@ on:
           (closes any open bot PR and deletes the bot branch before recreating it)
 
 env:
+  _TS_0: &ts-appauth envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_1: &ts-checkout envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e
   COMMITTER_NAME: publish-envoy[bot]
   COMMITTER_EMAIL: 140627008+publish-envoy[bot]@users.noreply.github.com
 
@@ -146,13 +148,13 @@ jobs:
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-checkout
       with:
         config: |
           fetch-depth: 0
@@ -182,13 +184,13 @@ jobs:
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
 
     - name: Checkout repository
-      uses: envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-checkout
       with:
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
