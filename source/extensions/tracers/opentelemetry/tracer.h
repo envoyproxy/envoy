@@ -66,7 +66,7 @@ public:
                              const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
                              const SpanContext& previous_span_context,
                              OptRef<const Tracing::TraceContext> trace_context,
-                             OTelSpanKind span_kind);
+                             OTelSpanKind span_kind, bool preserve_headers = false);
 
 private:
   /**
@@ -182,6 +182,11 @@ public:
    * populate the is_remote bits of the exported span's flags field.
    */
   void setParentContextIsRemote(bool is_remote) { parent_context_is_remote_ = is_remote; }
+
+  /**
+   * Sets whether injectContext() should preserve existing trace headers on upstream requests.
+   */
+  void setPreserveHeaders(bool preserve_headers) { preserve_headers_ = preserve_headers; }
 
   absl::string_view tracestate() const { return span_.trace_state(); }
 
