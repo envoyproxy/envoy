@@ -516,9 +516,12 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
   injectDecodedHeadersToFilterChain(false);
   // The end-of-stream marker originates (or is retracted) at this filter's position.
   observed_end_stream_ = end_stream;
-  // With per-filter observed end stream, the stream-level flag is left untouched: it records
-  // what the downstream client actually sent and drives lifecycle decisions.
-  if (!parent_.per_filter_buffer_ && parent_.inject_data_with_state_update_) {
+  // With per-filter buffer, the stream-level flag is left untouched: it records what the
+  // downstream client actually sent. Pending injection is tracked separately, so the lifecycle
+  // checks can still tell that the request body is not fully through.
+  if (parent_.per_filter_buffer_) {
+    parent_.state().decoder_injection_pending_ = !end_stream;
+  } else if (parent_.inject_data_with_state_update_) {
     parent_.state().observed_decode_end_stream_ = end_stream;
   }
   ENVOY_STREAM_LOG(trace, "injectDecodedDataToFilterChain with end_stream: {}", parent_,
@@ -824,8 +827,9 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     state_.filter_added_data_in_data_callback_ = false;
     const bool data_nonempty_before_callback = data.length() > 0;
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.requestTrailers();
-    // |= as the marker latches: when trailers are parked at this filter, its own buffered data
-    // is replayed to it with end_stream false, and that delivery must not retract the marker.
+    // |= as the marker latches. This is defensive: every current read of the marker also
+    // requires no trailers, so a delivery with end_stream false after the marker is set (e.g.
+    // buffered data replayed while trailers are parked at this filter) changes nothing today.
     (*entry)->observed_end_stream_ |= (*entry)->end_stream_;
     FilterDataStatus status = (*entry)->handle_->decodeData(data, (*entry)->end_stream_);
     if ((*entry)->end_stream_) {
@@ -938,7 +942,9 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
   for (; entry != decoder_filters_.end(); entry++) {
     ENVOY_EXECUTION_SCOPE(trackedStream(), &(*entry)->filter_context_);
     // Trailers carry the end-of-stream marker: it reaches this filter's position whether the
-    // trailers are delivered to it below or parked here because it has stopped.
+    // trailers are delivered to it below or parked here because it has stopped. Every current
+    // read of the marker also requires no trailers, so this is not read today; it is kept so a
+    // future reader that does not (e.g. a stream recreation check) sees the marker.
     (*entry)->observed_end_stream_ = true;
     request_trailers_state_ = {entry->get(), false};
     // If the filter pointed by entry has stopped for all frame type, return now.
@@ -1661,8 +1667,9 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
     state_.filter_added_data_in_data_callback_ = false;
     const bool data_nonempty_before_callback = data.length() > 0;
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.responseTrailers();
-    // |= as the marker latches: when trailers are parked at this filter, its own buffered data
-    // is replayed to it with end_stream false, and that delivery must not retract the marker.
+    // |= as the marker latches. This is defensive: every current read of the marker also
+    // requires no trailers, so a delivery with end_stream false after the marker is set (e.g.
+    // buffered data replayed while trailers are parked at this filter) changes nothing today.
     (*entry)->observed_end_stream_ |= (*entry)->end_stream_;
     FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
     if (state_.encoder_filter_chain_aborted_) {
@@ -1722,7 +1729,9 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTr
   for (; entry != encoder_filters_.end(); entry++) {
     ENVOY_EXECUTION_SCOPE(trackedStream(), &(*entry)->filter_context_);
     // Trailers carry the end-of-stream marker: it reaches this filter's position whether the
-    // trailers are delivered to it below or parked here because it has stopped.
+    // trailers are delivered to it below or parked here because it has stopped. Every current
+    // read of the marker also requires no trailers, so this is not read today; it is kept so a
+    // future reader that does not (e.g. a stream recreation check) sees the marker.
     (*entry)->observed_end_stream_ = true;
     response_trailers_state_ = {entry->get(), false};
     // If the filter pointed by entry has stopped for all frame type, return now.
@@ -1823,7 +1832,9 @@ void FilterManager::checkAndCloseStreamIfFullyClosed() {
   // TODO(yanavlasov): to support this case the codec needs to notify HCM that it has closed its low
   // level stream
   //                   to avoid use-after-free when HCM cleans-up its ActiveStream
-  const bool downstream_client_sent_end_stream = decoderObservedEndStream();
+  // A decoder filter still injecting the request body means the request is not finished yet.
+  const bool downstream_client_sent_end_stream =
+      decoderObservedEndStream() && !decoderInjectionPending();
   const bool decoder_filter_chain_paused =
       !state_.decoder_filter_chain_complete_ && !state_.decoder_filter_chain_aborted_;
   if (state_.encoder_filter_chain_complete_ && downstream_client_sent_end_stream &&
@@ -2060,8 +2071,9 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
   // the stream is complete may differ, re-check bytesReceived() to make sure
   // there was no body from the HCM's point of view. This deliberately checks the stream-level
   // flag rather than this filter's positional marker: recreation requires the whole request to
-  // have been received, wherever it is currently buffered.
-  if (!parent_.decoderObservedEndStream()) {
+  // have been received, wherever it is currently buffered. A filter still injecting the request
+  // body holds bytes the recreated stream would not replay.
+  if (!parent_.decoderObservedEndStream() || parent_.decoderInjectionPending()) {
     return false;
   }
 
@@ -2185,8 +2197,8 @@ void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance&
   injectEncodedHeadersToFilterChain(false);
   // The end-of-stream marker originates (or is retracted) at this filter's position.
   observed_end_stream_ = end_stream;
-  // With per-filter observed end stream, the stream-level flag is left untouched: it records
-  // what the upstream actually sent and drives lifecycle decisions.
+  // With per-filter buffer, the stream-level flag is left untouched: it records what the
+  // upstream actually sent.
   if (!parent_.per_filter_buffer_ && parent_.inject_data_with_state_update_) {
     parent_.state_.observed_encode_end_stream_ = end_stream;
   }

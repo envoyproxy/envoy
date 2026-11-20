@@ -109,8 +109,10 @@ RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_added_data_on_con
 RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_held_trailers);
 // When resuming filter chain iteration, compute end_stream from whether the end of the stream has
 // reached the resuming filter, instead of from the stream-level flag. When enabled,
-// envoy.reloadable_features.ext_proc_inject_data_with_state_update is ignored. Per-filter body
-// buffering will be added behind this flag before it is enabled by default.
+// envoy.reloadable_features.ext_proc_inject_data_with_state_update is ignored.
+// TODO(wbpcode): flip to true once per-filter body buffering lands behind this flag. This is the
+// first part of that change (https://github.com/envoyproxy/envoy/pull/48660), so the flag is
+// incomplete until then.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_filter_manager_per_filter_buffer);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
 RUNTIME_GUARD(envoy_reloadable_features_geoip_sanitize_geo_headers);

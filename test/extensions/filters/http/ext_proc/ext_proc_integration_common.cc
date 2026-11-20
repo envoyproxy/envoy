@@ -71,6 +71,11 @@ void ExtProcIntegrationTest::addDownstreamExtProcFilter(
     envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config,
     const std::string& ext_proc_filter_name) {
   setGrpcService(*proto_config.mutable_grpc_service(), cluster_name, grpc_upstream->localAddress());
+  // Same default message timeout as initializeConfig() gives the single filter, see the comment
+  // there.
+  if (!proto_config.has_message_timeout()) {
+    proto_config.mutable_message_timeout()->set_seconds(5);
+  }
   envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
   ext_proc_filter.set_name(ext_proc_filter_name);
   std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(proto_config);

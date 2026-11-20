@@ -900,6 +900,24 @@ public:
   virtual bool decoderObservedEndStream() const { return state_.observed_decode_end_stream_; }
 
   /**
+   * Whether the last request data injection was made without end_stream, i.e. a decoder filter
+   * is expected to inject more. Three cases are not handled:
+   * - More than one filter injecting: an earlier filter injecting end_stream clears this while a
+   *   later injecting filter may still hold the body.
+   * - A filter that stops injecting without ever injecting end_stream (e.g. it gives up and
+   *   continues decoding instead). This stays true for the rest of the stream.
+   * - A request with trailers. Its body never carries end_stream, so every injection is made
+   *   without it, and the request ends with the trailers passing the filter instead (e.g.
+   *   ext_proc in STREAMED mode forwards held trailers once the last chunk is injected). This
+   *   stays true for the rest of the stream.
+   * TODO(wbpcode): handle these cases. They are not introduced by
+   * envoy.reloadable_features.filter_manager_per_filter_buffer: with it disabled and
+   * envoy.reloadable_features.ext_proc_inject_data_with_state_update enabled, the last injection
+   * leaves the stream-level end-of-stream flag in the same state.
+   */
+  bool decoderInjectionPending() const { return state_.decoder_injection_pending_; }
+
+  /**
    * Instructs the FilterManager to not create a filter chain. This makes it possible to issue
    * a local reply without the overhead of creating and traversing the filters.
    */
@@ -996,6 +1014,9 @@ protected:
     // client) before iteration of the decoder filter chain begins. This flag is used for setting
     // end_stream value when resuming decoder filter chain iteration.
     bool observed_decode_end_stream_{};
+    // Set to the inverse of end_stream by the last request data injection. Only maintained with
+    // per-filter buffer, where injection leaves observed_decode_end_stream_ untouched.
+    bool decoder_injection_pending_{};
     // Set `true` when the filter manager observes end stream on the encoder path (from upstream
     // server or Envoy's local reply) before iteration of the encoder filter chain begins. This flag
     // is used for setting end_stream value when resuming encoder filter chain iteration.
