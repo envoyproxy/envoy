@@ -30,9 +30,6 @@ public:
                                                 const std::string& listener_filter_name)
       : HttpIntegrationTest(downstream_type, ipVersion(), config),
         filter_name_(listener_filter_name), port_name_("http") {
-    // extension_config_discovery.*.grpc.<stat_prefix>.* is now covered by the
-    // extension_config_discovery.**.grpc.$.** rule, so the tag-extraction check can be enabled
-    // here. Toward #21595.
     skip_tag_extraction_rule_check_ = false;
   }
 

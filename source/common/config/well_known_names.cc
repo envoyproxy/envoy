@@ -23,6 +23,10 @@ std::string expandRegex(const std::string& regex) {
               {"<TLS_VERSION>", R"(TLSv\d\.\d)"},
               // A generic name can contain any character except dots.
               {"<TAG_VALUE>", TAG_VALUE_REGEX},
+              {"<GRPC_STREAM_STAT>", R"(streams_(?:total|closed_[0-9]+))"},
+              // Both the resource and client names may contain ".grpc.". If a second delimiter
+              // could also introduce a client, the first alternative leaves the capture empty.
+              {"<RESOURCE_GRPC_CLIENT>", R"(.+?\.grpc\.(?:(?:.*\.)?grpc\..+\.|((.+)\.)))"},
               // Route names may contain dots and slashes in addition to
               // alphanumerics, underscores, and dashes.
               {"<ROUTE_CONFIG_NAME>", R"([\w-\./]+)"},
@@ -257,12 +261,13 @@ TagNameValues::TagNameValues() {
 
   // grpc.(<stat_prefix>).**
   addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "grpc.$.**");
-  // listener_manager.lds.grpc.(<stat_prefix>).**
-  addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "listener_manager.lds.grpc.$.**");
-  // sds.[<resource_name>.]grpc.(<stat_prefix>).**
-  addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "sds.**.grpc.$.**");
-  // extension_config_discovery.[<config_name>.]grpc.(<stat_prefix>).**
-  addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "extension_config_discovery.**.grpc.$.**");
+  // Capture the full client prefix up to the stream counter in a subscription scope.
+  addRe2(GOOGLE_GRPC_CLIENT_PREFIX, R"(^listener_manager\.lds\.grpc\.((.+)\.)<GRPC_STREAM_STAT>$)",
+         ".grpc.");
+  addRe2(GOOGLE_GRPC_CLIENT_PREFIX, R"(^sds\.<RESOURCE_GRPC_CLIENT><GRPC_STREAM_STAT>$)", ".grpc.");
+  addRe2(GOOGLE_GRPC_CLIENT_PREFIX,
+         R"(^extension_config_discovery\.<TAG_VALUE>\.<RESOURCE_GRPC_CLIENT><GRPC_STREAM_STAT>$)",
+         ".grpc.");
 
   // listener.[<address>.]ssl.certificate.(<cert_name>).<metric_name> or
   // cluster.[<cluster_name>.]ssl.certificate.(<cert_name>).<metric_name>

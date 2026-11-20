@@ -40,9 +40,6 @@ public:
 
   ListenerIntegrationTestBase(Network::Address::IpVersion version, const std::string& config)
       : HttpIntegrationTest(Http::CodecType::HTTP1, version, config) {
-    // listener_manager.lds.grpc.<stat_prefix>.* is now covered by the
-    // listener_manager.lds.grpc.$.** rule, so the tag-extraction check can be enabled here.
-    // Toward #21595.
     skip_tag_extraction_rule_check_ = false;
   }
 
@@ -1618,9 +1615,6 @@ public:
           stat_prefix: tcp_stats
           cluster: cluster_0
 )EOF") {
-    // listener_manager.lds.grpc.<stat_prefix>.* is now covered by the
-    // listener_manager.lds.grpc.$.** rule, so the tag-extraction check can be enabled here.
-    // Toward #21595.
     skip_tag_extraction_rule_check_ = false;
   }
 

@@ -14,6 +14,8 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
@@ -96,8 +98,6 @@ public:
   SdsDynamicIntegrationBaseTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().ip_version),
         test_quic_(GetParam().test_quic) {
-    // sds.*.grpc.<stat_prefix>.* is now covered by the sds.**.grpc.$.** rule, so the
-    // tag-extraction check can be enabled here. Toward #21595.
     skip_tag_extraction_rule_check_ = false;
   }
 
@@ -105,8 +105,6 @@ public:
                                 Network::Address::IpVersion version, const std::string& config)
       : HttpIntegrationTest(downstream_protocol, version, config),
         test_quic_(GetParam().test_quic) {
-    // sds.*.grpc.<stat_prefix>.* is now covered by the sds.**.grpc.$.** rule, so the
-    // tag-extraction check can be enabled here. Toward #21595.
     skip_tag_extraction_rule_check_ = false;
   }
 
@@ -752,6 +750,9 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, RotatedCertificateReleasedByLastConn
 // A test that SDS server send a good server secret for a static listener.
 // The first ssl request should be OK.
 TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
+  // The mode is selected at startup. Exercise both paths using the existing IP-version matrix.
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                useExplicitStatsTags());
   on_server_init_function_ = [this]() {
     createSdsStream(*sdsUpstream());
     sendSdsResponse(getServerSecretRsa());
@@ -762,6 +763,16 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
     return makeSslClientConnection();
   };
   testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
+
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+    ASSERT_NE(nullptr, store);
+    EXPECT_EQ(useExplicitStatsTags(), store->useExplicitTags());
+    expectStatTags("sds.server_cert_rsa.grpc.sds_cluster.lyft.com.streams_total",
+                   "sds.grpc.streams_total",
+                   {{"envoy.xds_resource_name", server_cert_rsa_},
+                    {"envoy.google_grpc_client_prefix", "sds_cluster.lyft.com"}});
+  }
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
