@@ -1,3 +1,4 @@
+#include <string>
 #include <string_view>
 
 #include "source/extensions/dynamic_modules/sdk/cpp/sdk.h"
@@ -32,6 +33,22 @@ TEST(HeaderValidityTest, Values) {
         std::string_view("bell\a"), std::string_view("del\x7f"),
         std::string_view("value\r\nx-injected: 1")}) {
     EXPECT_FALSE(isValidHeaderValue(value)) << value;
+  }
+}
+
+TEST(HeaderValidityTest, EveryByte) {
+  for (int c = 0; c < 256; ++c) {
+    const bool token =
+        (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+        std::string_view("!#$%&'*+-.^_`|~").find(static_cast<char>(c)) != std::string_view::npos;
+    EXPECT_EQ(isValidHeaderName(std::string(1, static_cast<char>(c))), token) << c;
+    // In the middle and at the end of a value long enough for the compiler to vectorize.
+    const bool allowed = c == '\t' || (c >= ' ' && c != 0x7f);
+    for (const size_t position : {40, 66}) {
+      std::string value(67, 'v');
+      value[position] = static_cast<char>(c);
+      EXPECT_EQ(isValidHeaderValue(value), allowed) << c << " at " << position;
+    }
   }
 }
 

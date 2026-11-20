@@ -1,6 +1,9 @@
 package shared
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestIsValidHeaderName(t *testing.T) {
 	t.Parallel()
@@ -30,6 +33,22 @@ func TestIsValidHeaderValue(t *testing.T) {
 	} {
 		if IsValidHeaderValue(value) {
 			t.Errorf("IsValidHeaderValue(%q) = true, want false", value)
+		}
+	}
+}
+
+func TestHeaderChecksEveryByte(t *testing.T) {
+	t.Parallel()
+	for c := range 256 {
+		b := byte(c)
+		token := 'a' <= b && b <= 'z' || 'A' <= b && b <= 'Z' || '0' <= b && b <= '9' ||
+			strings.IndexByte("!#$%&'*+-.^_`|~", b) >= 0
+		if got := IsValidHeaderName(string([]byte{b})); got != token {
+			t.Errorf("IsValidHeaderName(%q) = %v, want %v", b, got, token)
+		}
+		allowed := b == '\t' || b >= ' ' && b != 0x7f
+		if got := IsValidHeaderValue(string([]byte{'v', b, 'v'})); got != allowed {
+			t.Errorf("IsValidHeaderValue(%q) = %v, want %v", b, got, allowed)
 		}
 	}
 }

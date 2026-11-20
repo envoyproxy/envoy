@@ -1,5 +1,7 @@
 #include "sdk.h"
 
+#include <algorithm>
+#include <array>
 #include <format>
 #include <iostream>
 #include <string_view>
@@ -67,32 +69,32 @@ std::string readWholeResponseBody(HttpFilterHandle& handle) {
                         handle.receivedBufferedResponseBody());
 }
 
+// The bytes of an HTTP token (RFC 9110), which is what a header name is.
+constexpr std::array<bool, 256> TokenChars = [] {
+  std::array<bool, 256> table{};
+  for (int c = 0; c < 256; ++c) {
+    table[c] =
+        (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+        std::string_view("!#$%&'*+-.^_`|~").find(static_cast<char>(c)) != std::string_view::npos;
+  }
+  return table;
+}();
+
 bool isValidHeaderName(std::string_view name) {
-  if (!name.empty() && name.front() == ':') {
+  if (name.starts_with(':')) {
     name.remove_prefix(1);
   }
-  if (name.empty()) {
-    return false;
-  }
-  constexpr std::string_view token_symbols = "!#$%&'*+-.^_`|~";
-  for (const char c : name) {
-    const bool alphanumeric =
-        (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
-    if (!alphanumeric && token_symbols.find(c) == std::string_view::npos) {
-      return false;
-    }
-  }
-  return true;
+  return !name.empty() &&
+         std::all_of(name.begin(), name.end(), [](unsigned char c) { return TokenChars[c]; });
 }
 
 bool isValidHeaderValue(std::string_view value) {
-  for (const char c : value) {
-    const auto byte = static_cast<unsigned char>(c);
-    if (byte != '\t' && (byte < ' ' || byte == 0x7f)) {
-      return false;
-    }
+  // No early exit, so that the compiler can vectorize the loop.
+  bool valid = true;
+  for (const unsigned char c : value) {
+    valid &= (c >= ' ' && c != 0x7f) || c == '\t';
   }
-  return true;
+  return valid;
 }
 } // namespace Utility
 

@@ -12,8 +12,8 @@ func IsValidHeaderName(name string) bool {
 	if name == "" {
 		return false
 	}
-	for i := 0; i < len(name); i++ {
-		if !isTokenChar(name[i]) {
+	for i := range len(name) {
+		if !tokenChars[name[i]] {
 			return false
 		}
 	}
@@ -27,17 +27,22 @@ func IsValidHeaderName(name string) bool {
 // header and start another on an HTTP/1 connection, so a module that copies request data or
 // other untrusted input into a header should check it with this first.
 func IsValidHeaderValue(value string) bool {
-	for i := 0; i < len(value); i++ {
-		if c := value[i]; c != '\t' && (c < ' ' || c == 0x7f) {
+	for i := range len(value) {
+		if !valueChars[value[i]] {
 			return false
 		}
 	}
 	return true
 }
 
-func isTokenChar(c byte) bool {
-	if ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9') {
-		return true
+// tokenChars holds the bytes of an HTTP token (RFC 9110), which is what a header name is, and
+// valueChars the bytes allowed in a header value.
+var tokenChars, valueChars = func() (token, value [256]bool) {
+	for c := range 256 {
+		b := byte(c)
+		token[c] = 'a' <= b && b <= 'z' || 'A' <= b && b <= 'Z' || '0' <= b && b <= '9' ||
+			strings.IndexByte("!#$%&'*+-.^_`|~", b) >= 0
+		value[c] = b == '\t' || b >= ' ' && b != 0x7f
 	}
-	return strings.IndexByte("!#$%&'*+-.^_`|~", c) >= 0
-}
+	return token, value
+}()
