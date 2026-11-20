@@ -8,7 +8,8 @@ debugging failures that involve) those areas:
 | Guide | Covers |
 |-------|--------|
 | `compat/openssl/AGENTS.md` | The OpenSSL compatibility layer (`bssl-compat`) and `--config=openssl` build failures |
-| `.github/copilot-instructions.md` | GitHub Copilot cloud agent environment setup |
+| `api/AGENTS.md` | Changing the xDS API protos, with links to the API style guide and review checklist |
+| `.github/instructions/cloud-agent.instructions.md` | GitHub Copilot cloud agent environment setup |
 
 ## Critical rules
 
@@ -171,8 +172,8 @@ or with `bazel` and the same `--config` on the failing targets:
 | Prechecks: deps | `deps` | |
 | Prechecks: publish | `release.test_only`, `config` | |
 | Prechecks: external | `external` | downstream bzlmod build in `bazel/tests/external` |
-| Checks: build | `api`, `compile_time_options`, `execution_context`, `gcc` | `--config=gcc`, `--config=compile-time-options` |
-| Checks: openssl | `openssl.presubmit` (PRs), `openssl` (post-submit) | `--config=openssl`; allowed to fail |
+| Checks: build | `api`, `cto.*` (one job per option), `execution_context`, `gcc.build`, `gcc.test` | `--config=gcc`, `--config=compile-time-options` |
+| Checks: openssl | `openssl.build`, `openssl.test_affected` (PRs), `openssl.asan`, `openssl.test` (post-submit) | `--config=openssl`; allowed to fail |
 | Checks: coverage | `coverage`, `fuzz_coverage` | `--config=coverage`; limits in `test/coverage.yaml` |
 | Checks: runtime | `cpu-detection` | |
 | Checks: san | `asan`, `msan`, `tsan` | `--config=asan`/`msan`/`tsan`; only run when asked |

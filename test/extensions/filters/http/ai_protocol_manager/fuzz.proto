@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.ai_protocol_manager;
+
+import "envoy/type/ai/v3/llm_binding.proto";
+import "envoy/type/ai/v3/llm_protocol.proto";
+
+// Input for encode_sse_fuzz_test (SSE response transcoding and token usage extraction).
+message EncodeSseFuzzInput {
+  string body = 1;
+  uint64 fragmentation_seed = 2;
+  envoy.type.ai.v3.LLMProtocol request_protocol = 3;
+  envoy.type.ai.v3.LLMProtocol response_protocol = 4;
+  uint32 max_sse_event_size = 5;
+  uint32 max_parsed_sse_events = 6;
+}
+
+// Input for encode_unary_fuzz_test (unary JSON response transcoding and token usage extraction).
+message EncodeUnaryFuzzInput {
+  string body = 1;
+  uint64 fragmentation_seed = 2;
+  envoy.type.ai.v3.LLMProtocol request_protocol = 3;
+  envoy.type.ai.v3.LLMProtocol response_protocol = 4;
+  uint32 max_json_body_size = 5;
+}
+
+// Input for decode_fuzz_test (request JSON parsing, transcoding, bindings, and request_info).
+message DecodeFuzzInput {
+  string path = 1;
+  string body = 2;
+  uint64 fragmentation_seed = 3;
+  envoy.type.ai.v3.LLMProtocol request_protocol = 4;
+  envoy.type.ai.v3.LLMProtocol response_protocol = 5;
+  envoy.type.ai.v3.LLMBinding request_binding = 6;
+  envoy.type.ai.v3.LLMBinding response_binding = 7;
+  uint32 inline_string_threshold_bytes = 8;
+  uint32 decoder_buffer_limit = 9;
+}

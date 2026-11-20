@@ -295,6 +295,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
       allowed_override_modes_(config.allowed_override_modes()),
       grpc_service_(getFilterGrpcService(config)),
+      grpc_service_config_with_hash_key_(config.grpc_service()),
       mutation_checker_(config.mutation_rules(), context.regexEngine()),
       filter_metadata_(config.filter_metadata()),
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
@@ -818,13 +819,13 @@ Filter::StreamOpenState Filter::openStream() {
     auto options = Http::AsyncClient::StreamOptions()
                        .setParentSpan(decoder_callbacks_->activeSpan())
                        .setParentContext(grpc_context)
-                       .setBufferBodyForRetry(grpc_service_.has_retry_policy())
+                       .setBufferBodyForRetry(grpcServiceConfig().has_retry_policy())
                        .setSampled(emit_client_span_ ? std::nullopt : std::make_optional(false))
                        .setRemoteCloseTimeout(config_->remoteCloseTimeout());
 
     ExternalProcessorClient* grpc_client = dynamic_cast<ExternalProcessorClient*>(client_.get());
     ExternalProcessorStreamPtr stream_object =
-        grpc_client->start(*this, config_with_hash_key_, options, watermark_callbacks_);
+        grpc_client->start(*this, grpcServiceConfigWithHashKey(), options, watermark_callbacks_);
 
     if (processing_complete_ || stream_object == nullptr) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called.
@@ -1563,10 +1564,10 @@ void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info)
   }
 
   absl::string_view destination = "";
-  if (config_with_hash_key_.config().has_envoy_grpc()) {
-    destination = config_with_hash_key_.config().envoy_grpc().cluster_name();
-  } else if (config_with_hash_key_.config().has_google_grpc()) {
-    destination = config_with_hash_key_.config().google_grpc().target_uri();
+  if (grpcServiceConfig().has_envoy_grpc()) {
+    destination = grpcServiceConfig().envoy_grpc().cluster_name();
+  } else if (grpcServiceConfig().has_google_grpc()) {
+    destination = grpcServiceConfig().google_grpc().target_uri();
   }
   logging_info_->setDestination(destination);
 }
@@ -1578,7 +1579,7 @@ void Filter::logStreamInfo() {
     return;
   }
 
-  if (grpc_service_.has_envoy_grpc()) {
+  if (grpcServiceConfig().has_envoy_grpc()) {
     // Envoy gRPC service
     logStreamInfoBase(stream_ != nullptr ? &stream_->streamInfo() : nullptr);
   } else {
@@ -2274,23 +2275,28 @@ void Filter::mergePerRouteConfig() {
     decoding_state_.setProcessingMode(*(merged_config->processingMode()));
     encoding_state_.setProcessingMode(*(merged_config->processingMode()));
   }
+  std::optional<envoy::config::core::v3::GrpcService> grpc_service;
   if (merged_config->grpcService().has_value()) {
     ENVOY_STREAM_LOG(trace, "Setting new GrpcService from per-route configuration",
                      *decoder_callbacks_);
-    grpc_service_ = *merged_config->grpcService();
-    config_with_hash_key_.setConfig(*merged_config->grpcService());
+    grpc_service = *merged_config->grpcService();
   }
   if (!merged_config->grpcInitialMetadata().empty()) {
     ENVOY_STREAM_LOG(trace, "Overriding grpc initial metadata from per-route configuration",
                      *decoder_callbacks_);
-    envoy::config::core::v3::GrpcService config = config_with_hash_key_.config();
-    auto ptr = config.mutable_initial_metadata();
+    if (!grpc_service.has_value()) {
+      grpc_service = grpcServiceConfig();
+    }
+    auto ptr = grpc_service->mutable_initial_metadata();
     for (const auto& header : merged_config->grpcInitialMetadata()) {
       ENVOY_STREAM_LOG(trace, "Setting grpc initial metadata {} = {}", *decoder_callbacks_,
                        header.key(), header.value());
       mergeHeaderValuesField(*ptr, header);
     }
-    config_with_hash_key_.setConfig(config);
+  }
+  if (grpc_service.has_value()) {
+    route_config_with_hash_key_ =
+        std::make_unique<Grpc::GrpcServiceConfigWithHashKey>(std::move(*grpc_service));
   }
 
   // For metadata namespaces, we only override the existing value if we have a

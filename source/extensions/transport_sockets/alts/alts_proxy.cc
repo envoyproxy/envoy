@@ -1,5 +1,6 @@
 #include "source/extensions/transport_sockets/alts/alts_proxy.h"
 
+#include <cstdint>
 #include <memory>
 #include <utility>
 
@@ -25,9 +26,6 @@ using ::grpc::gcp::ServerHandshakeParameters;
 using ::grpc::gcp::StartClientHandshakeReq;
 using ::grpc::gcp::StartServerHandshakeReq;
 
-// TODO(matthewstevenson88): Make this deadline configurable.
-constexpr absl::Duration AltsClientContextDeadline = absl::Seconds(30);
-
 void AltsProxy::setRpcProtocolVersions(grpc::gcp::RpcProtocolVersions* rpc_protocol_versions) {
   rpc_protocol_versions->mutable_max_rpc_version()->set_major(MaxMajorRpcVersion);
   rpc_protocol_versions->mutable_max_rpc_version()->set_minor(MaxMinorRpcVersion);
@@ -43,7 +41,6 @@ AltsProxy::create(std::shared_ptr<grpc::Channel> handshaker_service_channel,
   }
   auto client_context = std::make_unique<grpc::ClientContext>();
   client_context->set_deadline(absl::ToChronoTime(absl::Now() + AltsClientContextDeadline));
-  // TODO(matthewstevenson88): Investigate using Envoy's async gRPC client.
   auto stub = HandshakerService::NewStub(handshaker_service_channel);
   if (stub == nullptr) {
     return absl::InvalidArgumentError("Handshaker service stub is null.");
@@ -70,7 +67,7 @@ AltsProxy::~AltsProxy() {
   }
 }
 
-absl::StatusOr<HandshakerResp> AltsProxy::sendStartClientHandshakeReq() {
+HandshakerReq AltsProxy::makeStartClientHandshakeReq(absl::string_view target_name) {
   // Prepare the StartClientHandshakeReq message. Ignore the target name field,
   // it should never be populated for Envoy's use of ALTS.
   HandshakerReq request;
@@ -80,9 +77,44 @@ absl::StatusOr<HandshakerResp> AltsProxy::sendStartClientHandshakeReq() {
   client_start->add_record_protocols(RecordProtocol);
   setRpcProtocolVersions(client_start->mutable_rpc_versions());
   client_start->set_max_frame_size(MaxFrameSize);
-  if (!target_name_.empty()) {
-    client_start->set_target_name(target_name_);
+  if (!target_name.empty()) {
+    client_start->set_target_name(target_name);
   }
+  return request;
+}
+
+HandshakerReq AltsProxy::makeStartServerHandshakeReq(absl::Span<const uint8_t> in_bytes) {
+  // Prepare the StartServerHandshakeReq message.
+  ServerHandshakeParameters server_parameters;
+  server_parameters.add_record_protocols(RecordProtocol);
+  HandshakerReq request;
+  StartServerHandshakeReq* server_start = request.mutable_server_start();
+  server_start->add_application_protocols(ApplicationProtocol);
+  (*server_start->mutable_handshake_parameters())[HandshakeProtocol::ALTS] = server_parameters;
+  setRpcProtocolVersions(server_start->mutable_rpc_versions());
+  server_start->set_in_bytes(in_bytes.data(), in_bytes.size());
+  server_start->set_max_frame_size(MaxFrameSize);
+  return request;
+}
+
+HandshakerReq AltsProxy::makeNextHandshakeReq(absl::Span<const uint8_t> in_bytes) {
+  // Prepare the NextHandshakeMessageReq message.
+  HandshakerReq request;
+  NextHandshakeMessageReq* next = request.mutable_next();
+  next->set_in_bytes(in_bytes.data(), in_bytes.size());
+  return request;
+}
+
+absl::StatusOr<HandshakerResp> AltsProxy::checkResponse(HandshakerResp response) {
+  if (response.has_status() && response.status().code() != 0) {
+    return absl::Status(static_cast<absl::StatusCode>(response.status().code()),
+                        response.status().details());
+  }
+  return response;
+}
+
+absl::StatusOr<HandshakerResp> AltsProxy::sendStartClientHandshakeReq() {
+  HandshakerReq request = makeStartClientHandshakeReq(target_name_);
 
   // Send the StartClientHandshakeReq message to the handshaker service and wait
   // for the response.
@@ -95,25 +127,12 @@ absl::StatusOr<HandshakerResp> AltsProxy::sendStartClientHandshakeReq() {
   if (!stream_->Read(&response)) {
     return absl::InternalError("Failed to read client start response from handshaker service.");
   }
-  if (response.has_status() && response.status().code() != 0) {
-    return absl::Status(static_cast<absl::StatusCode>(response.status().code()),
-                        response.status().details());
-  }
-  return response;
+  return checkResponse(std::move(response));
 }
 
 absl::StatusOr<HandshakerResp>
 AltsProxy::sendStartServerHandshakeReq(absl::Span<const uint8_t> in_bytes) {
-  // Prepare the StartServerHandshakeReq message.
-  ServerHandshakeParameters server_parameters;
-  server_parameters.add_record_protocols(RecordProtocol);
-  HandshakerReq request;
-  StartServerHandshakeReq* server_start = request.mutable_server_start();
-  server_start->add_application_protocols(ApplicationProtocol);
-  (*server_start->mutable_handshake_parameters())[HandshakeProtocol::ALTS] = server_parameters;
-  setRpcProtocolVersions(server_start->mutable_rpc_versions());
-  server_start->set_in_bytes(in_bytes.data(), in_bytes.size());
-  server_start->set_max_frame_size(MaxFrameSize);
+  HandshakerReq request = makeStartServerHandshakeReq(in_bytes);
 
   // Send the StartServerHandshakeReq message to the handshaker service and wait
   // for the response.
@@ -126,19 +145,12 @@ AltsProxy::sendStartServerHandshakeReq(absl::Span<const uint8_t> in_bytes) {
   if (!stream_->Read(&response)) {
     return absl::InternalError("Failed to read server start response from handshaker service.");
   }
-  if (response.has_status() && response.status().code() != 0) {
-    return absl::Status(static_cast<absl::StatusCode>(response.status().code()),
-                        response.status().details());
-  }
-  return response;
+  return checkResponse(std::move(response));
 }
 
 absl::StatusOr<grpc::gcp::HandshakerResp>
 AltsProxy::sendNextHandshakeReq(absl::Span<const uint8_t> in_bytes) {
-  // Prepare the NextHandshakeMessageReq message.
-  HandshakerReq request;
-  NextHandshakeMessageReq* next = request.mutable_next();
-  next->set_in_bytes(in_bytes.data(), in_bytes.size());
+  HandshakerReq request = makeNextHandshakeReq(in_bytes);
 
   // Send the NextHandshakeMessageReq message to the handshaker service and wait
   // for the response.
@@ -151,11 +163,7 @@ AltsProxy::sendNextHandshakeReq(absl::Span<const uint8_t> in_bytes) {
   if (!stream_->Read(&response)) {
     return absl::InternalError("Failed to read next response from handshaker service.");
   }
-  if (response.has_status() && response.status().code() != 0) {
-    return absl::Status(static_cast<absl::StatusCode>(response.status().code()),
-                        response.status().details());
-  }
-  return response;
+  return checkResponse(std::move(response));
 }
 
 } // namespace Alts

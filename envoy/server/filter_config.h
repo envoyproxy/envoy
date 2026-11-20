@@ -276,9 +276,14 @@ struct ExtraFactoryContext {
   // ('listener.<address>.') and has nothing to do with the stat prefix of a filter; the names are
   // kept apart on purpose.
   //
-  // NOTE: declared last so that the aggregate initialization of the members that were here before
-  // it keeps working unchanged.
+  // NOTE: declared after the members above so that their aggregate initialization keeps working
+  // unchanged.
   OptRef<Stats::Scope> stats_prefix_scope = std::nullopt;
+  // Whether the factory context of the filter chain bypasses the overload manager, as
+  // FactoryContext::shouldBypassOverloadManager() reports. It is always false for upstream filter
+  // chains and for contexts that are not tied to a listener, such as route specific filter
+  // configurations.
+  bool bypass_overload_manager = false;
 
   /**
    * @return the scope to use for stats: this context's own scope if it has one, otherwise the scope
@@ -336,6 +341,7 @@ struct ExtraFactoryContext {
     ExtraFactoryContext extra_context{context.messageValidationVisitor(), stats_prefix};
     extra_context.init_manager = context.initManager();
     extra_context.scope = context.scope();
+    extra_context.bypass_overload_manager = context.shouldBypassOverloadManager();
     // The HTTP connection manager is the only context that has a scope named after the stats
     // prefix of its filters, hence the type check rather than a method on FactoryContext. The scope
     // stands in for one prefix only, so it is not handed to a filter that is created with a

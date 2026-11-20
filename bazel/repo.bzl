@@ -5,13 +5,8 @@ CONTAINERS = """
 REPO = "{repo}"
 REPO_GCR = "{repo_gcr}"
 SHA = "{sha}"
-SHA_MOBILE = "{sha_mobile}"
 SHA_WORKER = "{sha_worker}"
 TAG = "{tag}"
-
-def image_mobile():
-    return "%s@sha256:%s" % (
-        REPO, SHA_MOBILE)
 
 def image_worker():
     return "%s@sha256:%s" % (
@@ -80,7 +75,6 @@ def _envoy_repo_impl(repository_ctx):
         repo = build_image["repo"],
         repo_gcr = build_image["repo-gcr"],
         sha = build_image["sha"],
-        sha_mobile = build_image["sha-mobile"],
         sha_worker = build_image["sha-worker"],
         tag = build_image["tag"],
     ))
@@ -258,17 +252,6 @@ py_console_script_binary(
     name = "publish",
     args = [
         "publish",
-        PATH,
-    ],
-    pkg = "@base_pip3//envoy_base_utils",
-    script = "envoy.project",
-    data = [":envoy_repo.py"],
-)
-
-py_console_script_binary(
-    name = "trigger",
-    args = [
-        "trigger",
         PATH,
     ],
     pkg = "@base_pip3//envoy_base_utils",

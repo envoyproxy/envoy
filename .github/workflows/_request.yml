@@ -43,17 +43,16 @@ jobs:
       pull-requests: read
     outputs:
       env: ${{ steps.data.outputs.value }}
-      caches: ${{ steps.caches.outputs.value }}
       config: ${{ steps.config.outputs.config }}
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       id: started
       name: Create timestamp
       with:
         options: -r
         filter: |
           now
-    - uses: envoyproxy/toolshed/actions/github/checkout@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       id: checkout
       name: Checkout Envoy repository (requested)
       with:
@@ -71,7 +70,7 @@ jobs:
     # *ALL* variables collected should be treated as untrusted and should be sanitized before
     # use
     - name: Generate environment variables from commit
-      uses: envoyproxy/toolshed/actions/envoy/ci/request@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      uses: envoyproxy/toolshed/actions/envoy/ci/request@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       id: env
       with:
         branch-name: ${{ steps.checkout.outputs.branch-name }}
@@ -84,7 +83,7 @@ jobs:
 
     - name: Request summary
       id: summary
-      uses: envoyproxy/toolshed/actions/github/env/summary@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      uses: envoyproxy/toolshed/actions/github/env/summary@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       with:
         actor: ${{ toJSON(fromJSON(steps.env.outputs.data).request.actor) }}
         base-sha: ${{ fromJSON(steps.env.outputs.data).request.base-sha }}
@@ -100,7 +99,7 @@ jobs:
         target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
 
     - name: Environment data
-      uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       id: data
       with:
         input: |
@@ -108,62 +107,87 @@ jobs:
           title: ${{ steps.summary.outputs.title }}
           link: ${{ format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}
           summary: ${{ steps.summary.outputs.summary }}
+          publish-fast: ${{ vars.ENVOY_PUBLISH_FAST && true || false }}
+          publish-vm: ${{ vars.ENVOY_PUBLISH_VM || 'ubuntu-latest-16-cores' }}
+          publish-jobs: ${{ vars.ENVOY_PUBLISH_JOBS || 500 }}
+          # The highest remote execution priority (the cluster's `--priority_range` is 0,1).
+          # Quoted, so a priority of 0 survives the callers' `|| ''` (`'0'` is truthy, `0` is not).
+          publish-priority: "${{ vars.ENVOY_PUBLISH_PRIORITY || 1 }}"
+          # Set by GitHub (not the pull request): whether its author is a member of the repo, and
+          # whether its branch is in the repo (only members and the repo's apps can push one).
+          publish-author: ${{ github.event.pull_request.author_association || '' }}
+          publish-same-repo: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          # Only those who can triage the repo can label a pull request.
+          publish-labelled: ${{ contains(github.event.pull_request.labels.*.name, 'ci:fastpublish') }}
         input-format: yaml
         filter: |
+          # The jobs of a check, from the `check-build-<check>-<option>` run flags that are set in
+          # the branch's config: the `<check>.<option>` target of each.
+          def check_build_jobs($run; $check; $name):
+            [$run
+             | to_entries[]
+             | select(.key | test("^check-build-\($check)-[a-z0-9-]+$"))
+             | select(.value)
+             | (.key | ltrimstr("check-build-\($check)-")) as $option
+             | {target: "\($check).\($option | gsub("-"; "_"))",
+                name: "\($name) (\($option | gsub("-"; " ")))"}]
+            | sort_by(.target);
           .title as $title
+          | .["publish-fast"] as $publishFast
+          | .["publish-vm"] as $publishVM
+          | .["publish-jobs"] as $publishJobs
+          | .["publish-priority"] as $publishPriority
+          | ((.["publish-author"] // "" | IN("OWNER", "MEMBER", "COLLABORATOR"))
+             or .["publish-same-repo"] == true) as $publishMember
+          | (.["publish-labelled"] == true) as $publishLabelled
           | .env.config.envoy.icon as $icon
           | .link as $link
           | "\($icon) Request ([\($title)](\($link)))" as $linkedTitle
           | .summary as $summary
           | .env
+          # The Check/build jobs a branch sets with run flags in its config: one per
+          # `check-build-<check>-<option>` flag that is set, as the `<check>.<option>` target.
+          | .config.ci["check-build"] = (
+              check_build_jobs(.run; "cto"; "Compile time options")
+              + check_build_jobs(.run; "gcc"; "GCC"))
+          # Check/build (OpenSSL) is set the same way with `check-build-openssl-*` flags (a branch
+          # with none has no OpenSSL jobs). Some of its targets are only for pull requests, and some
+          # only for anything else (pushes, schedules).
+          | ((.request.pr // "" | tostring) != "") as $pr
+          | .config.ci["check-build-openssl"] = (
+              check_build_jobs(.run; "openssl"; "OpenSSL")
+              | map(select(
+                  .target as $target
+                  | if $pr then
+                      ["openssl.asan", "openssl.test"]
+                    else
+                      ["openssl.test_affected"]
+                    end
+                  | any(.[]; . == $target)
+                  | not)))
+          # A release (a non-dev version: its PR, and its push), or any request with
+          # `vars.ENVOY_PUBLISH_FAST` set (eg to test it), publishes as fast as it can: every
+          # publishing job (build, docs, signing, images, publish, verify) on a larger runner
+          # (`vars.ENVOY_PUBLISH_VM`), and its remote builds with more jobs (`vars.ENVOY_PUBLISH_JOBS`)
+          # at the highest remote execution priority (`vars.ENVOY_PUBLISH_PRIORITY`). The version is
+          # the requested commit's, so only for a trusted request, or a pull request by a member of
+          # the repo, or from a branch in it (eg the publishing app's release PRs). Such a pull request
+          # labelled `ci:fastpublish` (by a maintainer) also publishes as fast as it can; on anyone
+          # else's, the label (which stays on for every later push) does nothing.
+          | ((.request.trusted or $publishMember)
+             and ((.request.version.dev | not) or $publishFast or $publishLabelled)) as $publishRelease
+          | .config.ci["agent-publish"] = (
+              if $publishRelease then $publishVM else .config.ci["agent-ubuntu"] end)
+          | .config.ci["publish-jobs"] = (
+              if $publishRelease then ($publishJobs | tonumber) else null end)
+          | .config.ci["publish-priority"] = (
+              if $publishRelease then ($publishPriority | tostring) else null end)
           | .summary = {
               $summary,
               $title,
               $link,
               "linked-title": $linkedTitle}
           | del(.config.tables)
-
-    # TODO(phlax): shift this to ci/request action above
-    - name: Check Docker cache (x64)
-      id: cache-exists-docker-x64
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-      with:
-        lookup-only: true
-        path: /tmp/cache
-        key: ${{ fromJSON(steps.data.outputs.value).request.build-image.default }}
-    - name: Check Docker cache (arm64)
-      id: cache-exists-docker-arm64
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-      with:
-        lookup-only: true
-        path: /tmp/cache
-        key: ${{ fromJSON(steps.data.outputs.value).request.build-image.default }}-arm64
-    - name: Caches
-      uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
-      id: caches
-      with:
-        input-format: yaml
-        input: |
-          docker:
-            x64: ${{ steps.cache-exists-docker-x64.outputs.cache-hit || 'false' }}
-            arm64: ${{ steps.cache-exists-docker-arm64.outputs.cache-hit || 'false' }}
-        filter: |
-          .
-
-  cache:
-    permissions:
-      actions: write
-      contents: read
-      packages: read
-    if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}
-    needs: incoming
-    uses: ./.github/workflows/_request_cache.yml
-    secrets:
-      app-id: ${{ secrets.lock-app-id }}
-      app-key: ${{ secrets.lock-app-key }}
-    with:
-      caches: ${{ needs.incoming.outputs.caches }}
-      env: ${{ needs.incoming.outputs.env }}
 
   checks:
     if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}

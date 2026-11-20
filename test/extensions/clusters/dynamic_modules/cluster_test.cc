@@ -4865,6 +4865,33 @@ TEST_F(DynamicModuleClusterTest, AddHostsWithLocality) {
   EXPECT_EQ(2, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 }
 
+// Hosts in the same locality share one Locality object, within and across addHosts calls.
+TEST_F(DynamicModuleClusterTest, AddHostsSharesLocalityObject) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  std::vector<std::vector<std::tuple<std::string, std::string, std::string>>> metadata;
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(cluster->addHosts({"127.0.0.1:10001", "127.0.0.1:10002", "127.0.0.1:10003"},
+                                {1, 1, 1}, {"us-east-1", "us-east-1", "us-east-1"},
+                                {"us-east-1a", "us-east-1a", "us-east-1b"}, {"", "", ""}, metadata,
+                                hosts));
+  ASSERT_EQ(3, hosts.size());
+  EXPECT_EQ(&hosts[0]->locality(), &hosts[1]->locality());
+  EXPECT_NE(&hosts[0]->locality(), &hosts[2]->locality());
+  EXPECT_EQ("us-east-1a", hosts[1]->locality().zone());
+  EXPECT_EQ("us-east-1b", hosts[2]->locality().zone());
+
+  std::vector<Upstream::HostSharedPtr> more_hosts;
+  ASSERT_TRUE(cluster->addHosts({"127.0.0.1:10004"}, {1}, {"us-east-1"}, {"us-east-1a"}, {""},
+                                metadata, more_hosts));
+  ASSERT_EQ(1, more_hosts.size());
+  EXPECT_EQ(&hosts[0]->locality(), &more_hosts[0]->locality());
+}
+
 // Test adding hosts with locality and metadata.
 TEST_F(DynamicModuleClusterTest, AddHostsWithLocalityAndMetadata) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));

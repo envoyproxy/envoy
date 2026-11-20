@@ -46,7 +46,7 @@ jobs:
     uses: ./.github/workflows/_mobile_container_ci.yml
     with:
       args: ${{ matrix.args }}
-      container: ${{ fromJSON(needs.env.outputs.build-image).mobile }}
+      container: ${{ fromJSON(needs.env.outputs.build-image).default }}
       container-output: |
         "bazel-bin/library/kotlin/io/envoyproxy/envoymobile/${{ matrix.output }}.aar": build/
         "bazel-bin/library/kotlin/io/envoyproxy/envoymobile/${{ matrix.output }}-pom.xml": build/
@@ -74,7 +74,7 @@ jobs:
           shell: bash
       target: ${{ matrix.target }}
       uploads: |
-        ${{ matrix.output }}_android_aar_sources: /tmp/output/${{ matrix.output }}_android_aar_sources.tar.gz
+        ${{ matrix.output }}_android_aar_sources: {path: /tmp/output/${{ matrix.output }}_android_aar_sources.tar.gz, compression-level: 0}
     strategy:
       fail-fast: false
       matrix:
@@ -202,7 +202,7 @@ jobs:
           shell: bash
       target: ${{ matrix.target }}
       uploads: |
-        python-wheel: /tmp/dist/*.whl
+        python-wheel: {path: /tmp/dist/*.whl, compression-level: 0}
     strategy:
       fail-fast: false
       matrix:
