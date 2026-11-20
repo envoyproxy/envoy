@@ -674,7 +674,37 @@ absl::Status LoaderImpl::loadNewSnapshot() {
     absl::MutexLock lock(snapshot_mutex_);
     thread_safe_snapshot_ = ptr;
   }
+  for (auto it = update_callbacks_->begin(); it != update_callbacks_->end();) {
+    (*it++)();
+  }
   return absl::OkStatus();
+}
+
+namespace {
+
+class UpdateCallbackHandle : public Common::CallbackHandle {
+public:
+  UpdateCallbackHandle(std::weak_ptr<std::list<Loader::UpdateCallback>> callbacks,
+                       std::list<Loader::UpdateCallback>::iterator it)
+      : callbacks_(std::move(callbacks)), it_(it) {}
+  ~UpdateCallbackHandle() override {
+    if (auto callbacks = callbacks_.lock(); callbacks != nullptr) {
+      callbacks->erase(it_);
+    }
+  }
+
+private:
+  const std::weak_ptr<std::list<Loader::UpdateCallback>> callbacks_;
+  const std::list<Loader::UpdateCallback>::iterator it_;
+};
+
+} // namespace
+
+Common::CallbackHandlePtr LoaderImpl::addUpdateCallback(UpdateCallback callback) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  update_callbacks_->push_back(std::move(callback));
+  return std::make_unique<UpdateCallbackHandle>(update_callbacks_,
+                                                std::prev(update_callbacks_->end()));
 }
 
 const Snapshot& LoaderImpl::snapshot() const {

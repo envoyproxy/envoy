@@ -525,6 +525,10 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_cluster
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle, false,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update, false,
+          envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers, false,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr, uint64_t)
 

@@ -11106,6 +11106,67 @@ unsafe extern "C" {
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
+    /** envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update is called when a watched runtime
+ key gets a new boolean value, or becomes unset after having one.*/
+    pub fn envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update(
+        extension_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+        extension_module_ptr: envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+        key: envoy_dynamic_module_type_envoy_buffer,
+        value: bool,
+        removed: bool,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_on_bootstrap_extension_runtime_int_update is called when a watched runtime
+ key gets a new non-negative integer value, or becomes unset after having one.*/
+    pub fn envoy_dynamic_module_on_bootstrap_extension_runtime_int_update(
+        extension_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+        extension_module_ptr: envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+        key: envoy_dynamic_module_type_envoy_buffer,
+        value: u64,
+        removed: bool,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_on_bootstrap_extension_runtime_number_update is called when a watched
+ runtime key gets a new number that is not a non-negative integer, or becomes unset after having
+ one.*/
+    pub fn envoy_dynamic_module_on_bootstrap_extension_runtime_number_update(
+        extension_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+        extension_module_ptr: envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+        key: envoy_dynamic_module_type_envoy_buffer,
+        value: f64,
+        removed: bool,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update is called by the module
+ to watch a runtime key, so that the runtime update hooks above are called on the bootstrap
+ extension when its value changes. Call it once for each key to watch. The key does not need to
+ have a value yet.
+
+ This can only be called during envoy_dynamic_module_on_bootstrap_extension_server_initialized.
+ RTDS may or may not have delivered its layers by then, so the module should read the current
+ value with the runtime getters such as envoy_dynamic_module_callback_get_runtime_bool when it
+ starts watching the key, and then rely on the hooks for the later changes.
+
+ @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ @param key is the runtime key to watch, for example "envoy.reloadable_features.some_flag". It is
+ only read during the call.
+ @return true if the module now watches the key. Returns false when the key is empty or already
+ watched, when the module implements none of the runtime update hooks, outside of
+ envoy_dynamic_module_on_bootstrap_extension_server_initialized, once the server began to shut
+ down, or when called off the main thread. A call off the main thread also reports an Envoy bug.*/
+    pub fn envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+        extension_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+        key: envoy_dynamic_module_type_module_buffer,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
     /** envoy_dynamic_module_on_bootstrap_extension_worker_event is called on every worker thread for an
  event posted by envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers. The worker
  threads call it concurrently.

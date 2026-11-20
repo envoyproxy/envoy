@@ -11,6 +11,7 @@ This can be used to implement:
 * Server initialization logic when Envoy starts.
 * Code that runs on every worker thread.
 * Clusters and listeners that the module adds, updates and removes.
+* Reactions to runtime value changes.
 * Singleton patterns for configuration loading from external services.
 * Global state management across filters.
 * Background tasks that run on the main thread.
@@ -71,6 +72,42 @@ The workers start only after Envoy finishes initializing, so a module must not w
 hook before it calls ``envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete``.
 That call can start the workers and wait until they ran the events posted before it, so a module
 must not hold a lock across it that its worker event hook takes.
+
+.. _config_bootstrap_extensions_dynamic_modules_runtime_update:
+
+Runtime Updates
+---------------
+
+A bootstrap extension watches a :ref:`runtime <config_runtime>` key by passing it to
+``envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update``, once for each key to
+watch. Envoy then calls a runtime update hook on that extension on the main thread whenever the
+value of a watched key changes. The hook is chosen by the type of the value, the way the runtime
+getters read it:
+
+* ``envoy_dynamic_module_on_bootstrap_extension_runtime_int_update`` for a non-negative integer,
+  as read by ``envoy_dynamic_module_callback_get_runtime_int``.
+* ``envoy_dynamic_module_on_bootstrap_extension_runtime_number_update`` for any other number, as
+  read by ``envoy_dynamic_module_callback_get_runtime_number``.
+* ``envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update`` for a boolean, as read by
+  ``envoy_dynamic_module_callback_get_runtime_bool``.
+
+A value of any other type, such as a string, counts as unset. When a key becomes unset, Envoy calls
+the hook of its previous type with the previous value and ``removed`` set. Envoy compares each
+newly loaded runtime snapshot with the previous values of the watched keys, so an RTDS update, a
+disk layer update or a request to the admin ``/runtime_modify`` endpoint reports only the watched
+keys whose type or value it changed, in lexicographic order. The value of a key when the extension
+starts watching it is not reported. When a hook runs, the runtime getters already return the new
+value on the main thread. When a runtime guard such as ``envoy.reloadable_features.some_flag`` is
+removed, the guard returns to its value before any layer set it, normally its compiled default,
+while ``envoy_dynamic_module_callback_get_runtime_bool`` returns the default given by the caller.
+
+The extension can only watch keys during
+``envoy_dynamic_module_on_bootstrap_extension_server_initialized``. RTDS may or may not have
+delivered its layers by then, so the extension should read the current value with the runtime
+getters when it starts watching a key, and then rely on the hooks for the later changes. No update
+is reported once the server began to shut down. In the Rust SDK, the three hooks call
+``on_runtime_update`` of ``BootstrapExtension`` with a ``RuntimeValue``, or with ``None`` when the
+key became unset.
 
 .. _config_bootstrap_extensions_dynamic_modules_cluster_writer:
 

@@ -617,6 +617,21 @@ newDynamicModuleBootstrapExtensionConfig(
           "envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done");
   config->on_bootstrap_extension_listener_writer_update_done_ =
       on_listener_writer_update_done.ok() ? on_listener_writer_update_done.value() : nullptr;
+  auto on_runtime_bool_update =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionRuntimeBoolUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update");
+  config->on_bootstrap_extension_runtime_bool_update_ =
+      on_runtime_bool_update.ok() ? on_runtime_bool_update.value() : nullptr;
+  auto on_runtime_int_update =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionRuntimeIntUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_runtime_int_update");
+  config->on_bootstrap_extension_runtime_int_update_ =
+      on_runtime_int_update.ok() ? on_runtime_int_update.value() : nullptr;
+  auto on_runtime_number_update =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionRuntimeNumberUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_runtime_number_update");
+  config->on_bootstrap_extension_runtime_number_update_ =
+      on_runtime_number_update.ok() ? on_runtime_number_update.value() : nullptr;
 
   // Always register an init target so that Envoy blocks traffic until the module signals readiness.
   // This must happen before calling the module constructor so the module can call
