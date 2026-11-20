@@ -539,6 +539,22 @@ TEST_F(DiskLoaderImplTest, LayersOverride) {
   EXPECT_EQ("Happy cake", loader_->snapshot().get("file15").value().get());
 }
 
+TEST_F(DiskLoaderImplTest, FrozenRestartFeatureLayerLoadError) {
+  const std::string dir = "test/common/runtime/test_data/current/envoy";
+  setup();
+  write(dir + "/envoy.restart_features.test_feature", "true");
+  run("test/common/runtime/test_data/current", "envoy_override");
+  loader_->freezeRestartFeatures();
+
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath(dir),
+                                 TestEnvironment::temporaryPath(dir + "/loop"));
+  EXPECT_LOG_CONTAINS("error", "ignoring removal of envoy.restart_features.test_feature",
+                      updateDiskLayer(0));
+  EXPECT_EQ(1, store_.counter("runtime.load_error").value());
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.restart_features.test_feature"));
+  EXPECT_EQ(1, store_.counter("runtime.restart_feature_ignored").value());
+}
+
 // Validate that multiple admin layers leads to a configuration load failure.
 TEST_F(DiskLoaderImplTest, MultipleAdminLayersFail) {
   setup();
@@ -558,6 +574,18 @@ TEST_F(DiskLoaderImplTest, MultipleAdminLayersFail) {
                                   generator_, validation_visitor_, *api_);
   EXPECT_EQ(loader.status().message(),
             "Too many admin layers specified in LayeredRuntime, at most one may be specified");
+}
+
+TEST_F(DiskLoaderImplTest, ReservedLayerNameFails) {
+  setup();
+  envoy::config::bootstrap::v3::LayeredRuntime layered_runtime;
+  auto* layer = layered_runtime.add_layers();
+  layer->set_name("frozen_restart_features");
+  layer->mutable_admin_layer();
+  absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
+      Runtime::LoaderImpl::create(dispatcher_, tls_, layered_runtime, local_info_, store_,
+                                  generator_, validation_visitor_, *api_);
+  EXPECT_EQ(loader.status().message(), "Reserved layer name: frozen_restart_features");
 }
 
 class StaticLoaderImplTest : public LoaderImplTest {
@@ -630,6 +658,24 @@ TEST_F(StaticLoaderImplTest, RemovedFlags) {
     envoy.reloadable_features.removed_foo: true
   )EOF");
   EXPECT_ENVOY_BUG(setup(), "envoy.reloadable_features.removed_foo");
+}
+
+TEST_F(StaticLoaderImplTest, FrozenRestartFeaturesRejectAdminChanges) {
+  base_ = TestUtility::parseYaml<Protobuf::Struct>(R"EOF(
+    envoy.restart_features.test_feature: true
+  )EOF");
+  setup();
+  loader_->freezeRestartFeatures();
+
+  EXPECT_THAT(loader_->mergeValues({{"envoy.restart_features.test_feature", "false"}}),
+              StatusHelpers::HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  EXPECT_THAT(loader_->mergeValues({{"envoy.restart_features.test_feature", ""}}),
+              StatusHelpers::HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  EXPECT_THAT(
+      loader_->mergeValues({{"foo", "bar"}, {"envoy.restart_features.test_feature", "false"}}),
+      StatusHelpers::HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  EXPECT_FALSE(loader_->snapshot().get("foo").has_value());
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.restart_features.test_feature"));
 }
 
 TEST_F(StaticLoaderImplTest, ProtoParsingInvalidField) {
@@ -1097,6 +1143,106 @@ TEST_F(RtdsLoaderImplTest, WrongResourceName) {
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
   EXPECT_EQ(2, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+TEST_F(RtdsLoaderImplTest, FrozenRestartFeaturesIgnoreRtds) {
+  setup();
+  loader_->freezeRestartFeatures();
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      envoy.restart_features.test_feature: true
+  )EOF");
+  EXPECT_CALL(rtds_init_callback_, Call());
+  EXPECT_LOG_CONTAINS("error",
+                      "ignoring envoy.restart_features.test_feature=true in layer some_resource",
+                      doOnConfigUpdateVerifyNoThrow(runtime));
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.restart_features.test_feature"));
+  EXPECT_FALSE(loader_->snapshot().runtimeFeatureEnabled("envoy.restart_features.test_feature"));
+  EXPECT_EQ("true", loader_->snapshot()
+                        .getLayers()[1]
+                        ->values()
+                        .at("envoy.restart_features.test_feature")
+                        .raw_string_value_);
+  EXPECT_EQ("frozen_restart_features", loader_->snapshot().getLayers().back()->name());
+  EXPECT_EQ("false", loader_->snapshot()
+                         .getLayers()
+                         .back()
+                         ->values()
+                         .at("envoy.restart_features.test_feature")
+                         .raw_string_value_);
+  EXPECT_EQ(1, store_.counter("runtime.restart_feature_ignored").value());
+
+  // The same ignored value is only logged and counted once.
+  EXPECT_LOG_NOT_CONTAINS("error", "ignoring", doOnConfigUpdateVerifyNoThrow(runtime));
+  EXPECT_EQ(1, store_.counter("runtime.restart_feature_ignored").value());
+}
+
+TEST_F(RtdsLoaderImplTest, FrozenRestartFeatureTopLayerWins) {
+  layers_ = {"some_resource", "another_resource"};
+  setup();
+  loader_->freezeRestartFeatures();
+
+  const auto lower = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      envoy.restart_features.test_feature: true
+  )EOF");
+  auto upper = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: another_resource
+    layer:
+      envoy.restart_features.test_feature: false
+  )EOF");
+  EXPECT_CALL(rtds_init_callback_, Call());
+  doOnConfigUpdateVerifyNoThrow(lower, 0);
+  EXPECT_EQ(1, store_.counter("runtime.restart_feature_ignored").value());
+  EXPECT_LOG_NOT_CONTAINS("error", "ignoring", doOnConfigUpdateVerifyNoThrow(upper, 1));
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.restart_features.test_feature"));
+
+  // The upper layer no longer hides the ignored lower value.
+  upper = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: another_resource
+    layer: {}
+  )EOF");
+  EXPECT_LOG_CONTAINS("error",
+                      "ignoring envoy.restart_features.test_feature=true in layer some_resource",
+                      doOnConfigUpdateVerifyNoThrow(upper, 1));
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.restart_features.test_feature"));
+  EXPECT_EQ(2, store_.counter("runtime.restart_feature_ignored").value());
+}
+
+class RtdsLoaderImplFrozenRestartFeatureTest
+    : public RtdsLoaderImplTest,
+      public testing::WithParamInterface<std::pair<std::string, std::string>> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    RemovedOrNonBool, RtdsLoaderImplFrozenRestartFeatureTest,
+    testing::Values(std::make_pair("{}", "ignoring removal of envoy.restart_features.test_feature"),
+                    std::make_pair("{envoy.restart_features.test_feature: foo}",
+                                   "ignoring envoy.restart_features.test_feature=foo")));
+
+TEST_P(RtdsLoaderImplFrozenRestartFeatureTest, KeepsValue) {
+  setup();
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      envoy.restart_features.test_feature: true
+  )EOF");
+  EXPECT_CALL(rtds_init_callback_, Call());
+  doOnConfigUpdateVerifyNoThrow(runtime);
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.restart_features.test_feature"));
+
+  loader_->freezeRestartFeatures();
+  runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(
+      absl::StrCat("name: some_resource\nlayer: ", GetParam().first));
+  EXPECT_LOG_CONTAINS("error", GetParam().second, doOnConfigUpdateVerifyNoThrow(runtime));
+
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.restart_features.test_feature"));
+  EXPECT_TRUE(loader_->snapshot().runtimeFeatureEnabled("envoy.restart_features.test_feature"));
+  EXPECT_EQ("frozen_restart_features", loader_->snapshot().getLayers().back()->name());
+  EXPECT_EQ(1, store_.counter("runtime.restart_feature_ignored").value());
 }
 
 // Successful update.

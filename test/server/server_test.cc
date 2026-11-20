@@ -1368,6 +1368,31 @@ TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
   EXPECT_EQ("No admin layer specified", response_body);
 }
 
+TEST_P(ServerInstanceImplTest, RuntimeModifyRestartFeatureRejected) {
+  options_.config_yaml_ = "layered_runtime: {layers: [{name: admin, admin_layer: {}}]}";
+  initialize("test/server/test_data/server/empty_bootstrap.yaml");
+  Http::TestResponseHeaderMapImpl response_headers;
+  std::string response_body;
+  EXPECT_EQ(Http::Code::BadRequest,
+            server_->admin()->request("/runtime_modify?envoy.restart_features.test_feature=true",
+                                      "POST", response_headers, response_body));
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.restart_features.test_feature"));
+}
+
+TEST_P(ServerInstanceImplTest, RuntimeModifyRestartFeatureWithoutFreeze) {
+  options_.config_yaml_ = "layered_runtime: {layers: ["
+                          "{name: static_layer, static_layer: "
+                          "{envoy.restart_features.freeze_restart_features: false}}, "
+                          "{name: admin, admin_layer: {}}]}";
+  initialize("test/server/test_data/server/empty_bootstrap.yaml");
+  Http::TestResponseHeaderMapImpl response_headers;
+  std::string response_body;
+  EXPECT_EQ(Http::Code::OK,
+            server_->admin()->request("/runtime_modify?envoy.restart_features.test_feature=true",
+                                      "POST", response_headers, response_body));
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.restart_features.test_feature"));
+}
+
 // Verify that bootstrap fails if RTDS is configured through an EDS cluster
 TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughEdsFails) {
   options_.service_cluster_name_ = "some_service";

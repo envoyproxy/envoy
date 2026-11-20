@@ -254,7 +254,8 @@ public:
 
   /**
    * Merge the given map of key-value pairs into the runtime's state. To remove a previous merge for
-   * a key, use an empty string as the value.
+   * a key, use an empty string as the value. If any of the values may not be modified, none of them
+   * are merged and FailedPrecondition is returned, which admin clients receive as a bad request.
    * @param values the values to merge
    * @return a status indicating success or failure.
    */
