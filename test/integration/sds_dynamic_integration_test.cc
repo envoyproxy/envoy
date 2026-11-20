@@ -1814,6 +1814,9 @@ TEST_P(SdsDynamicClusterIntegrationTest, ClusterRefersNonExistentSdsCluster) {
 // Validate that Envoy starts fine with a cyclic dependency between CDS and SDS clusters
 // i.e. CDS cluster refers to dynamic SDS cluster and SDS cluster refers to the same CDS cluster.
 TEST_P(SdsDynamicClusterIntegrationTest, CdsSdsCyclicDependency) {
+  // Google gRPC also uses this name as a stat prefix. Distinguish it from
+  // server.dynamic_unknown_fields.
+  sds_cluster_name_ = "cyclic_sds_cluster";
   on_server_init_function_ = [this]() {
     {
       // CDS.
@@ -1822,10 +1825,10 @@ TEST_P(SdsDynamicClusterIntegrationTest, CdsSdsCyclicDependency) {
       result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
       RELEASE_ASSERT(result, result.message());
       xds_stream_->startGrpcStream();
+      dynamic_cluster_.set_name(sds_cluster_name_);
       sendCdsResponse(true);
     }
   };
-  sds_cluster_name_ = "dynamic";
   valid_sds_cluster_ = false;
   // The secret can never be fetched: the dynamic cluster warms once the SDS initial fetch times
   // out, which is what lets the server start. Keep that short.
