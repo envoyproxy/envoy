@@ -86,11 +86,13 @@ FaultFilterConfig::FaultFilterConfig(
     : settings_(fault, context), runtime_(context.runtime()),
       stats_(generateStats(stats_prefix, scope)), scope_(scope), time_source_(context.timeSource()),
       stat_name_set_(scope.symbolTable().makeSet("Fault")),
+      aborts_dry_run_(stat_name_set_->add("aborts_dry_run")),
       aborts_injected_(stat_name_set_->add("aborts_injected")),
       delays_injected_(stat_name_set_->add("delays_injected")),
       stats_prefix_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault"))),
       downstream_cluster_tag_(
           stat_name_set_->add(Envoy::Config::TagNames::get().FAULT_DOWNSTREAM_CLUSTER)),
+      aborts_dry_run_base_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault.aborts_dry_run"))),
       aborts_injected_base_(
           stat_name_set_->add(absl::StrCat(stats_prefix, "fault.aborts_injected"))),
       delays_injected_base_(
@@ -183,9 +185,7 @@ bool FaultFilter::maybeSetupDelay(const Http::RequestHeaderMap& request_headers)
     delay_timer_->enableTimer(duration.value(), &decoder_callbacks_->scope());
     recordDelaysInjectedStats();
     decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected);
-    auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
-    (*dynamic_metadata.mutable_filter_metadata())[decoder_callbacks_->filterConfigName()] =
-        fault_settings_->filterMetadata();
+    setFilterMetadata();
     return true;
   }
   return false;
@@ -196,9 +196,15 @@ bool FaultFilter::maybeDoAbort(const Http::RequestHeaderMap& request_headers) {
   std::optional<Grpc::Status::GrpcStatus> grpc_status;
   std::tie(http_status, grpc_status) = abortStatus(request_headers);
 
-  if (http_status.has_value() && tryIncActiveFaults()) {
-    abortWithStatus(http_status.value(), grpc_status);
-    return true;
+  if (http_status.has_value()) {
+    if (isAbortDryRun()) {
+      onAbortDryRun(http_status.value(), grpc_status);
+      return false;
+    }
+    if (tryIncActiveFaults()) {
+      abortWithStatus(http_status.value(), grpc_status);
+      return true;
+    }
   }
 
   return false;
@@ -263,6 +269,10 @@ bool FaultFilter::isDelayEnabled(const Http::RequestHeaderMap& request_headers) 
   }
   return config_->runtime().snapshot().featureEnabled(fault_settings_->delayPercentRuntime(),
                                                       request_delay->percentage(&request_headers));
+}
+
+bool FaultFilter::isAbortDryRun() const {
+  return fault_settings_->requestAbort() != nullptr && fault_settings_->requestAbort()->dryRun();
 }
 
 bool FaultFilter::isAbortEnabled(const Http::RequestHeaderMap& request_headers) {
@@ -390,6 +400,15 @@ void FaultFilter::recordDelaysInjectedStats() {
   config_->stats().delays_injected_.inc();
 }
 
+void FaultFilter::recordAbortsDryRunStats() {
+  // Downstream specific stats.
+  if (!downstream_cluster_.empty() && !fault_settings_->disableDownstreamClusterStats()) {
+    config_->incAbortsDryRun(downstream_cluster_storage_->statName());
+  }
+
+  config_->stats().aborts_dry_run_.inc();
+}
+
 void FaultFilter::recordAbortsInjectedStats() {
   // Downstream specific stats.
   if (!downstream_cluster_.empty() && !fault_settings_->disableDownstreamClusterStats()) {
@@ -464,30 +483,32 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
   std::tie(http_status, grpc_status) = abortStatus(request_headers);
 
   if (http_status.has_value()) {
-    abortWithStatus(http_status.value(), grpc_status);
-  } else {
-    // Should not continue to count as an active fault after the delay has elapsed if no other type
-    // of fault is active. As the delay timer is always done at this point and followed abort faults
-    // have been checked earlier, here we just check if there's a response rate limit configured.
-    ASSERT(fault_active_);
-    ASSERT(delay_timer_ == nullptr);
-    if (!isResponseRateLimitConfigured()) {
-      config_->stats().active_faults_.dec();
-      fault_active_ = false;
+    if (!isAbortDryRun()) {
+      abortWithStatus(http_status.value(), grpc_status);
+      return;
     }
-
-    // Continue request processing.
-    decoder_callbacks_->continueDecoding();
+    onAbortDryRun(http_status.value(), grpc_status);
   }
+
+  // Should not continue to count as an active fault after the delay has elapsed if no other type
+  // of fault is active. As the delay timer is always done at this point and followed abort faults
+  // have been checked earlier, here we just check if there's a response rate limit configured.
+  ASSERT(fault_active_);
+  ASSERT(delay_timer_ == nullptr);
+  if (!isResponseRateLimitConfigured()) {
+    config_->stats().active_faults_.dec();
+    fault_active_ = false;
+  }
+
+  // Continue request processing.
+  decoder_callbacks_->continueDecoding();
 }
 
 void FaultFilter::abortWithStatus(Http::Code http_status_code,
                                   std::optional<Grpc::Status::GrpcStatus> grpc_status) {
   recordAbortsInjectedStats();
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected);
-  auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
-  (*dynamic_metadata.mutable_filter_metadata())[decoder_callbacks_->filterConfigName()] =
-      fault_settings_->filterMetadata();
+  setFilterMetadata();
   absl::string_view body = "fault filter abort";
   if (fault_settings_->requestAbort() != nullptr &&
       !fault_settings_->requestAbort()->responseBody().empty()) {
@@ -495,6 +516,29 @@ void FaultFilter::abortWithStatus(Http::Code http_status_code,
   }
   decoder_callbacks_->sendLocalReply(http_status_code, body, nullptr, grpc_status,
                                      RcDetails::get().FaultAbort);
+}
+
+void FaultFilter::onAbortDryRun(Http::Code http_status_code,
+                                std::optional<Grpc::Status::GrpcStatus> grpc_status) {
+  recordAbortsDryRunStats();
+  auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
+  auto& filter_metadata =
+      (*dynamic_metadata.mutable_filter_metadata())[decoder_callbacks_->filterConfigName()];
+  auto& dry_run_abort = *(*filter_metadata.mutable_fields())["dry_run_abort"]
+                             .mutable_struct_value()
+                             ->mutable_fields();
+  dry_run_abort.clear();
+  if (grpc_status.has_value()) {
+    dry_run_abort["grpc_status"].set_number_value(static_cast<uint64_t>(grpc_status.value()));
+  } else {
+    dry_run_abort["http_status"].set_number_value(static_cast<uint64_t>(http_status_code));
+  }
+}
+
+void FaultFilter::setFilterMetadata() {
+  auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
+  (*dynamic_metadata.mutable_filter_metadata())[decoder_callbacks_->filterConfigName()] =
+      fault_settings_->filterMetadata();
 }
 
 bool FaultFilter::matchesTargetUpstreamCluster() {

@@ -121,3 +121,11 @@ This approach does not always work, for example:
 For this purpose, we have [client
 features](https://www.envoyproxy.io/docs/envoy/latest/api/client_features).
 
+A control plane should generally not vary the contents of a resource based on the client features
+of the requesting client. Clients with different features would then see different contents for
+the same resource name, which breaks cacheability of the resource (for example by xDS proxies or
+by a control plane serving many clients from one snapshot). This may be acceptable for a resource
+that the control plane already marks as uncacheable via `Resource.cache_control.do_not_cache`, as
+is often the case for EDS, but is generally not desirable for other resource types. When designing
+an API, prefer approaches that let a client ignore what it does not support over relying on the
+control plane to tailor resources by client feature.

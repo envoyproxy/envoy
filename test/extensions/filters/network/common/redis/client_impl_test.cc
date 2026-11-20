@@ -446,7 +446,7 @@ TEST_F(RedisClientImplTest, CommandStatsDisabledSingleRequest) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     InSequence s;
 
-    simTime().setMonotonicTime(std::chrono::microseconds(10));
+    simTime().advanceTimeWait(std::chrono::microseconds(10));
 
     EXPECT_CALL(stats_,
                 deliverHistogramToSinks(
@@ -510,7 +510,7 @@ TEST_F(RedisClientImplTest, CommandStatsEnabledTwoRequests) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     InSequence s;
 
-    simTime().setMonotonicTime(std::chrono::microseconds(10));
+    simTime().advanceTimeWait(std::chrono::microseconds(10));
 
     EXPECT_CALL(stats_, deliverHistogramToSinks(
                             Property(&Stats::Metric::name, "upstream_commands.get.latency"), 10));

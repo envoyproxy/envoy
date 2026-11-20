@@ -8,6 +8,8 @@ on:
     secrets:
       dockerhub-token:
       gcp-key:
+      gpg-key:
+      gpg-key-password:
     inputs:
       docs:
         type: boolean
@@ -37,20 +39,15 @@ jobs:
     if: inputs.server
     secrets:
       dockerhub-token: ${{ secrets.dockerhub-token }}
+      gpg-key: ${{ secrets.gpg-key }}
+      gpg-key-password: ${{ secrets.gpg-key-password }}
     permissions:
       actions: read
       contents: read
       packages: read
-    name: Server
+    name: Server (multiarch)
     uses: ./.github/workflows/_publish_build_server.yml
-    strategy:
-      fail-fast: false
-      matrix:
-        arch:
-        - x64
-        - arm64
     with:
-      arch: ${{ matrix.arch }}
       request: ${{ inputs.request }}
       trusted: ${{ inputs.trusted }}
 

@@ -59,7 +59,7 @@ public:
   void addDescriptor(const RateLimit::LocalDescriptor& descriptor,
                      DynamicDescriptorSharedPtr dynamic_descriptor);
   // pass request_descriptors to the dynamic descriptor set to get the token bucket.
-  RateLimitTokenBucketSharedPtr getBucket(const RateLimit::Descriptor);
+  RateLimitTokenBucketSharedPtr getBucket(const RateLimit::Descriptor&);
 
 private:
   bool matchDescriptorEntries(const std::vector<RateLimit::DescriptorEntry>& request_entries,
@@ -111,7 +111,10 @@ public:
                        bool shadow_mode);
 
   // RateLimitTokenBucket
-  bool consume(double factor = 1.0, uint64_t tokens = 1);
+  // With overdraft, the cost is consumed even when the bucket is short, and the bucket can go
+  // below zero by at most max_tokens. Later requests wait until the refill repays the debt.
+  // Returns false only when the bucket is already at the debt cap.
+  bool consume(double factor = 1.0, uint64_t tokens = 1, bool overdraft = false);
   // Refill tokens back to the bucket, capped at max_tokens.
   void refill(uint64_t tokens);
   double fillRate() const { return token_bucket_.fillRate(); }
@@ -151,7 +154,12 @@ public:
   LocalRateLimiter::Result
   requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) override;
 
+  // Account for completed descriptor usage without enforcement. Usage beyond the remaining budget
+  // overdraws the bucket. The default bucket is consumed only on the request path.
+  void consumeDescriptors(absl::Span<const RateLimit::Descriptor> request_descriptors);
+
 private:
+  RateLimitTokenBucketSharedPtr getBucket(const RateLimit::Descriptor& descriptor);
   RateLimitTokenBucketSharedPtr default_token_bucket_;
 
   TimeSource& time_source_;

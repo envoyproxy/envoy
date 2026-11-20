@@ -220,6 +220,8 @@ public:
 
   bool headersAsBytes() const { return encode_raw_headers_; }
 
+  bool readRawHeaderValue() const { return read_raw_header_value_; }
+
   Filters::Common::MutationRules::CheckResult
   checkDecoderHeaderMutation(const Filters::Common::MutationRules::CheckOperation& operation,
                              const Http::LowerCaseString& key, absl::string_view value) const {
@@ -357,6 +359,7 @@ private:
   const uint32_t max_denied_response_body_bytes_;
   const bool pack_as_bytes_;
   const bool encode_raw_headers_;
+  const bool read_raw_header_value_;
   const Http::Code status_on_error_;
   const bool validate_mutations_;
   Stats::Scope& scope_;
@@ -421,7 +424,8 @@ public:
                             : envoy::extensions::filters::http::ext_authz::v3::CheckSettings()),
         disabled_(config.disabled()),
         grpc_service_(config.has_check_settings() && config.check_settings().has_grpc_service()
-                          ? std::make_optional(config.check_settings().grpc_service())
+                          ? std::make_optional<const Grpc::GrpcServiceConfigWithHashKey>(
+                                config.check_settings().grpc_service())
                           : std::nullopt),
         http_service_(config.has_check_settings() && config.check_settings().has_http_service()
                           ? std::make_optional(config.check_settings().http_service())
@@ -451,8 +455,6 @@ public:
    * @return Context extensions to add to the CheckRequest.
    */
   const ContextExtensionsMap& contextExtensions() const { return context_extensions_; }
-  // Allow moving the context extensions out of this object.
-  ContextExtensionsMap&& takeContextExtensions() { return std::move(context_extensions_); }
 
   bool disabled() const { return disabled_; }
 
@@ -461,9 +463,9 @@ public:
   }
 
   /**
-   * @return The gRPC service override for this route, if any.
+   * @return The gRPC service override for this route with its client cache key, if any.
    */
-  const std::optional<const envoy::config::core::v3::GrpcService>& grpcService() const {
+  const std::optional<const Grpc::GrpcServiceConfigWithHashKey>& grpcService() const {
     return grpc_service_;
   }
 
@@ -481,12 +483,10 @@ public:
   const std::optional<bool>& emitClientSpan() const { return emit_client_span_; }
 
 private:
-  // We save the context extensions as a protobuf map instead of a std::map as this allows us to
-  // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
   envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings_;
   const bool disabled_;
-  const std::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
+  const std::optional<const Grpc::GrpcServiceConfigWithHashKey> grpc_service_;
   const std::optional<const envoy::extensions::filters::http::ext_authz::v3::HttpService>
       http_service_;
   std::optional<bool> emit_client_span_;
@@ -564,7 +564,7 @@ private:
 
   // Create a new gRPC client for per-route gRPC service configuration.
   Filters::Common::ExtAuthz::ClientPtr
-  createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service);
+  createPerRouteGrpcClient(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key);
 
   // Create a new HTTP client for per-route HTTP service configuration.
   Filters::Common::ExtAuthz::ClientPtr createPerRouteHttpClient(
