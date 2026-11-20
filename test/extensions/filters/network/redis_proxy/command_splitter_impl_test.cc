@@ -4546,28 +4546,29 @@ TEST_F(ClusterScopeInfoTest, InfoBytesToHumanAllSizes) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.info.success").value());
 }
 
-// The splitter and per-command stats carry the stat prefix as an explicit tag.
 TEST_F(RedisCommandSplitterImplTest, StatsAreTagged) {
-  auto expect_tags = [&](const std::string& name, const std::string& tag_extracted_name) {
-    const Stats::CounterSharedPtr counter = TestUtility::findCounter(store_, name);
-    ASSERT_NE(counter, nullptr) << "no counter named '" << name << "'";
-    EXPECT_EQ(tag_extracted_name, counter->tagExtractedName()) << " for stat '" << name << "'";
-    ASSERT_EQ(1U, counter->tags().size()) << " for stat '" << name << "'";
-    EXPECT_EQ("envoy.redis_prefix", counter->tags()[0].name_) << " for stat '" << name << "'";
-    EXPECT_EQ("foo", counter->tags()[0].value_) << " for stat '" << name << "'";
+  getSplitter({"JSON.SET"});
+  const Stats::Tag prefix{"envoy.redis_prefix", "foo"};
+  auto expect_counter = [&](const std::string& name, const std::string& extracted,
+                            const Stats::TagVector& tags) {
+    const auto counter = TestUtility::findCounter(store_, name);
+    ASSERT_NE(nullptr, counter) << name;
+    EXPECT_EQ(extracted, counter->tagExtractedName()) << name;
+    EXPECT_THAT(counter->tags(), testing::UnorderedElementsAreArray(tags)) << name;
   };
 
-  expect_tags("redis.foo.splitter.invalid_request", "redis.splitter.invalid_request");
-  expect_tags("redis.foo.command.get.total", "redis.command.get.total");
-  expect_tags("redis.foo.command.hello.total", "redis.command.hello.total");
+  expect_counter("redis.foo.splitter.invalid_request", "redis.splitter.invalid_request", {prefix});
+  for (const std::string command : {"get", "hello", "json.set"}) {
+    expect_counter("redis.foo.command." + command + ".total", "redis.command.total",
+                   {prefix, {"envoy.redis_command", command}});
+  }
 
   const Stats::Histogram& latency = store_.rootScope()->histogramFromString(
       "redis.foo.command.get.latency", latency_in_micros_ ? Stats::Histogram::Unit::Microseconds
                                                           : Stats::Histogram::Unit::Milliseconds);
-  EXPECT_EQ("redis.command.get.latency", latency.tagExtractedName());
-  ASSERT_EQ(1U, latency.tags().size());
-  EXPECT_EQ("envoy.redis_prefix", latency.tags()[0].name_);
-  EXPECT_EQ("foo", latency.tags()[0].value_);
+  EXPECT_EQ("redis.command.latency", latency.tagExtractedName());
+  EXPECT_THAT(latency.tags(),
+              testing::UnorderedElementsAre(prefix, Stats::Tag{"envoy.redis_command", "get"}));
 }
 
 } // namespace CommandSplitter

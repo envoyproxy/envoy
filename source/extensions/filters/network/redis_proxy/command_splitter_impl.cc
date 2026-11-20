@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 #include "source/extensions/filters/network/redis_proxy/cluster_response_handler.h"
@@ -1127,11 +1128,10 @@ InstanceStats InstanceImpl::generateStats(Stats::Scope& scope, absl::string_view
 
 CommandStats InstanceImpl::makeCommandStats(Stats::Scope& scope, absl::string_view stat_prefix,
                                             absl::string_view command, bool latency_in_micros) {
-  // The stat prefix is the flat prefix, "redis.(<stat_prefix>.)*": the stat prefix is the tag of
-  // every stat; the command stays part of the tag-extracted name.
   const Stats::TaggedStatName tagged_prefix =
-      Stats::mergeStatPrefix(scope.symbolTable(), stat_prefix, absl::StrCat("command.", command),
-                             {}, {}, /*sanitize=*/false);
+      Stats::mergeStatPrefix(scope.symbolTable(), stat_prefix, "command",
+                             {{Envoy::Config::TagNames::get().REDIS_COMMAND, command}},
+                             absl::StrCat("command.", command), /*sanitize=*/false);
   Stats::LiteScopeHelper helper(scope, tagged_prefix.baseName(), tagged_prefix.tags(),
                                 tagged_prefix.name());
   Stats::StatNameManagedStorage storage{"latency", scope.symbolTable()};

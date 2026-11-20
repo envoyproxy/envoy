@@ -613,6 +613,20 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          {test_cluster, from_zone, to_zone});
 }
 
+TEST(TagExtractorTest, RedisCommandTagExtractor) {
+  DefaultTagRegexTester tester;
+  const auto& names = Config::TagNames::get();
+  const Tag prefix{names.REDIS_PREFIX, "cache"};
+  tester.testRegex("redis.cache.command.get.total", "redis.command.total",
+                   {prefix, {names.REDIS_COMMAND, "get"}});
+  tester.testRegex("redis.cache.command.json.set.latency", "redis.command.latency",
+                   {prefix, {names.REDIS_COMMAND, "json.set"}});
+  tester.testRegex("redis.cache.splitter.invalid_request", "redis.splitter.invalid_request",
+                   {prefix});
+  tester.testRegex("redis.cache.command.foo.command.bar.total",
+                   "redis.command.foo.command.bar.total", {prefix});
+}
+
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {
   const auto& tag_names = Config::TagNames::get();
 

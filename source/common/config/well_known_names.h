@@ -181,6 +181,8 @@ public:
   const std::string THRIFT_PREFIX = "envoy.thrift_prefix";
   // Stats prefix for the Redis Proxy network filter
   const std::string REDIS_PREFIX = "envoy.redis_prefix";
+  // Command handled by the Redis proxy's downstream command splitter.
+  const std::string REDIS_COMMAND = "envoy.redis_command";
   // Proxy Protocol version for a connection (Proxy Protocol listener filter).
   const std::string PROXY_PROTOCOL_VERSION = "envoy.proxy_protocol_version";
   // Stats prefix for the proxy protocol listener filter.
