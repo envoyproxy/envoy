@@ -327,6 +327,17 @@ public:
    *         the route configuration.
    */
   virtual const ShadowPolicyStatsSharedPtr& stats() const PURE;
+
+  /**
+   * @return the retry policy of the mirrored requests, or nullptr if they are not retried.
+   */
+  virtual const RetryPolicyConstSharedPtr& retryPolicy() const PURE;
+
+  /**
+   * @return the timeout of the mirrored requests, or nullopt to use the timeout of the primary
+   *         request.
+   */
+  virtual std::optional<std::chrono::milliseconds> timeout() const PURE;
 };
 
 using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;

@@ -961,9 +961,15 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
       shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*original_shadow_headers);
     }
     applyShadowPolicyHeaders(shadow_policy, *shadow_headers);
+    if (shadow_policy.timeout().has_value()) {
+      // With respect_expected_rq_timeout, the mirror's router would take its timeout from the
+      // headers of the primary request instead of the mirror timeout.
+      shadow_headers->removeEnvoyExpectedRequestTimeoutMs();
+      shadow_headers->removeEnvoyUpstreamRequestTimeoutMs();
+    }
     auto options =
         Http::AsyncClient::RequestOptions()
-            .setTimeout(timeout_.global_timeout_)
+            .setTimeout(shadow_policy.timeout().value_or(timeout_.global_timeout_))
             .setParentSpan(callbacks_->activeSpan())
             .setChildSpanName("mirror")
             .setSampled(shadow_policy.traceSampled())
@@ -980,6 +986,11 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
             .setDiscardResponseBody(true)
             .setFilterConfig(config_)
             .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
+    if (shadow_policy.retryPolicy() != nullptr) {
+      // TODO(wdauchy): share the body with the primary's buffer, e.g. via ref-counted read-only
+      // slices, instead of a copy per mirror.
+      options.setRetryPolicy(shadow_policy.retryPolicy()).setBufferBodyForRetry(true);
+    }
 
     // The last policy can move the metadata since no later policy needs it.
     if (shadow_metadata.has_value()) {
@@ -1231,7 +1242,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
       upstream_requests_.front()->acceptDataFromRouter(copy, end_stream);
     }
 
-    // If we are potentially going to retry or buffer shadow this request we need to buffer.
+    // If we are potentially going to retry or redirect this request we need to buffer.
     // This will not cause the connection manager to 413 because before we hit the
     // buffer limit we give up on retries and buffering. We must buffer using addDecodedData()
     // so that all buffered data is available by the time we do request complete processing and
