@@ -1,5 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/clusters/original_dst/v3/original_dst.pb.h"
 #include "envoy/extensions/filters/listener/original_dst/v3/original_dst.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/header_map.h"
@@ -24,9 +25,12 @@ ConfigHelper::ConfigModifierFunction setOriginalDstCluster(int port) {
     auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
     cluster.clear_load_balancing_policy();
 
-    cluster.set_type(envoy::config::cluster::v3::Cluster::ORIGINAL_DST);
+    envoy::extensions::clusters::original_dst::v3::OriginalDstCluster original_dst_config;
+    original_dst_config.mutable_upstream_port_override()->set_value(port);
+    cluster.mutable_cluster_type()->set_name("envoy.cluster.original_dst");
+    std::ignore =
+        cluster.mutable_cluster_type()->mutable_typed_config()->PackFrom(original_dst_config);
     cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
-    cluster.mutable_original_dst_lb_config()->mutable_upstream_port_override()->set_value(port);
     cluster.clear_load_assignment();
 
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -92,9 +96,12 @@ TEST_P(OriginalDstIntegrationTest, ScopedIpv6OriginalDstCrash) {
     auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
     cluster.clear_load_balancing_policy();
 
-    cluster.set_type(envoy::config::cluster::v3::Cluster::ORIGINAL_DST);
+    envoy::extensions::clusters::original_dst::v3::OriginalDstCluster original_dst_config;
+    original_dst_config.set_use_http_header(true);
+    cluster.mutable_cluster_type()->set_name("envoy.cluster.original_dst");
+    std::ignore =
+        cluster.mutable_cluster_type()->mutable_typed_config()->PackFrom(original_dst_config);
     cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
-    cluster.mutable_original_dst_lb_config()->set_use_http_header(true);
     cluster.clear_load_assignment();
   });
 

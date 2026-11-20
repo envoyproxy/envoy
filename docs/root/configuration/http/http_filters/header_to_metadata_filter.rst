@@ -93,7 +93,7 @@ A corresponding upstream cluster configuration could be:
 
 .. literalinclude:: _include/header-to-metadata-filter.yaml
     :language: yaml
-    :lines: 45-55
+    :lines: 45-65
     :lineno-start: 45
     :linenos:
     :caption: :download:`header-to-metadata-filter.yaml <_include/header-to-metadata-filter.yaml>`

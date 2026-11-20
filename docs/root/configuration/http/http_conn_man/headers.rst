@@ -153,7 +153,7 @@ The header used to override destination address when using the
 load balancing policy.
 
 It is ignored, unless the use of it is enabled via
-:ref:`use_http_header <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.use_http_header>`.
+:ref:`use_http_header <envoy_v3_api_field_extensions.clusters.original_dst.v3.OriginalDstCluster.use_http_header>`.
 
 .. _config_http_conn_man_headers_x-forwarded-client-cert:
 
