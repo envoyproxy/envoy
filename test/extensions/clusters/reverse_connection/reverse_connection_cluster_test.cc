@@ -350,6 +350,25 @@ TEST_F(ReverseConnectionClusterTest, BadConfigWithWrongLbPolicy) {
                             "with cluster type 'REVERSE_CONNECTION'");
 }
 
+TEST_F(ReverseConnectionClusterTest, BadConfigFromBaseClusterInitialization) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    eds_cluster_config:
+      service_name: service_foo
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(setupFromYaml(yaml, false), EnvoyException,
+                            "eds_cluster_config set in a non-EDS cluster");
+}
+
 TEST_F(ReverseConnectionClusterTest, BasicSetup) {
   const std::string yaml = R"EOF(
     name: name
@@ -820,17 +839,30 @@ TEST_F(ReverseConnectionClusterTest, DrainingNodeCannotReuseCachedHost) {
   TestLoadBalancerContext lb_context(&connection, "x-remote-node-id", "test-cluster");
   auto original_host = lb.chooseHost(&lb_context).host;
   ASSERT_NE(original_host, nullptr);
+  auto& all_tunnels_draining =
+      cluster_->info()->statsScope().counterFromString("upstream_rq_all_tunnels_draining");
+  EXPECT_EQ(all_tunnels_draining.value(), 0);
 
   socket_manager->markSocketDraining(123);
   EXPECT_EQ(lb.chooseHost(&lb_context).host, nullptr);
+  EXPECT_EQ(all_tunnels_draining.value(), 1);
   lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
       new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "test-node"}}};
   EXPECT_EQ(lb.chooseHost(&lb_context).host, nullptr);
+  EXPECT_EQ(all_tunnels_draining.value(), 2);
   EXPECT_NE(socket_manager->getLifecycleInfo(123), nullptr);
 
   // A healthy replacement may reuse the host while the original tunnel is still draining.
   addTestSocket("test-node", "test-cluster", 124);
   EXPECT_EQ(lb.chooseHost(&lb_context).host, original_host);
+  EXPECT_EQ(all_tunnels_draining.value(), 2);
+
+  // Unknown keys still create a fallback host and must not count as an all-draining miss.
+  EXPECT_CALL(server_context_.dispatcher_, post(_));
+  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "unknown-node"}}};
+  EXPECT_NE(lb.chooseHost(&lb_context).host, nullptr);
+  EXPECT_EQ(all_tunnels_draining.value(), 2);
 }
 
 // Test different hosts for different UUIDs.

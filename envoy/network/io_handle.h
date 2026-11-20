@@ -365,9 +365,11 @@ public:
   virtual void resetFileEvents() PURE;
 
   /**
-   * Notify a listening handle on its worker thread that the listener's drain has started.
-   * This allows handles that initiate connections to stop creating new ones while leaving
-   * previously accepted connections available to complete their own drain.
+   * Notify a running stream listener's handle on its worker thread that the whole listener started
+   * draining, before accepted connections are notified. Handles can stop initiating connections
+   * while accepted connections complete their drain. Other listener types and listeners already
+   * stopped use resetFileEvents() instead; temporary disabling and individual filter-chain drains
+   * do not invoke this hook.
    */
   virtual void onListenerDrain() {}
 

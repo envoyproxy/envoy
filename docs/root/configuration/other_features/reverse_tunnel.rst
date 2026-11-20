@@ -491,6 +491,26 @@ The header priority order is:
       be inferred from the request (e.g., the ``x-tenant-id`` header is missing or the formatter
       evaluates to empty), host selection will fail and the request will not be routed.
 
+Listener draining
+-----------------
+
+When a reverse listener begins draining, the initiator stops pending handshakes and replacement dials
+before notifying accepted tunnels. This stop is independent of ``enable_drain_with_goaway`` and is
+permanent for that listener. An admin drain with ``skip_exit`` keeps the listener running but does not
+resume tunnel initiation; a full listener replacement is required to initiate tunnels again.
+
+With the drain-aware HCM's ``enable_drain_with_goaway`` enabled, unused reverse tunnels close when
+selected to drain. In-place filter-chain updates schedule replacement tunnels before closing unused
+ones, while whole-listener drains suppress replacements. A first request that arrives before the idle
+close is handled by the HTTP codec and follows its normal GOAWAY sequence.
+
+Responder exclusion requires ``enable_drain_with_goaway`` in the reverse connection cluster's
+``ReverseTunnelUpstreamCodecOptions``. After GOAWAY, a tunnel remains available to existing streams but
+is no longer eligible for new streams. An initiator with no eligible tunnels is skipped during node
+selection. If the requested node or cluster has only draining tunnels, requests fail with HTTP 503
+(no healthy upstream), and ``cluster.<name>.upstream_rq_all_tunnels_draining`` is incremented. Early drain
+METADATA only notifies the reporter and does not exclude the tunnel.
+
 .. _config_reverse_tunnel_access_logging:
 
 Access logging

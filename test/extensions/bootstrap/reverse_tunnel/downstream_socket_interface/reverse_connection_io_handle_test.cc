@@ -3750,6 +3750,7 @@ TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsPendingWorkWithoutAccept
       std::make_shared<Network::Address::Ipv4Instance>(host, 12345));
   EXPECT_CALL(*connection, connectionInfoProvider())
       .WillOnce(ReturnRef(*connection->stream_info_.downstream_connection_info_provider_));
+  EXPECT_CALL(*connection, id()).WillOnce(Return(42));
   addHostConnectionInfo(host, "remote-cluster", 1);
   getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
   io_handle_->updateConnectionState(host, "remote-cluster", connection_key,
@@ -3763,11 +3764,17 @@ TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsPendingWorkWithoutAccept
   auto closed_connection = std::make_unique<StrictMock<Network::MockClientConnection>>();
   EXPECT_CALL(*closed_connection, connectionInfoProvider())
       .WillOnce(ReturnRef(*closed_connection->stream_info_.downstream_connection_info_provider_));
+  EXPECT_CALL(*closed_connection, id()).WillOnce(Return(44));
   EXPECT_CALL(*closed_connection, state()).WillOnce(Return(Network::Connection::State::Closed));
   addConnectionToEstablishedQueue(std::move(closed_connection));
   addConnectionToEstablishedQueue(nullptr);
 
   auto pending = setupMockConnection();
+  const std::string pending_key = "192.168.1.1:12346";
+  pending->stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>(host, 12346));
+  io_handle_->updateConnectionState(host, "remote-cluster", pending_key,
+                                    ReverseConnectionState::Connecting);
   EXPECT_CALL(*pending, state()).WillRepeatedly(Return(Network::Connection::State::Open));
   EXPECT_CALL(*pending, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*pending, id()).WillRepeatedly(Return(43));
@@ -3776,6 +3783,30 @@ TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsPendingWorkWithoutAccept
                                                        host_description, "remote-cluster");
   addWrapperToHostMap(wrapper.get(), host);
   pushConnectionWrapper(std::move(wrapper));
+
+  EXPECT_EQ(getHostConnectionInfo(host).connecting_count, 1);
+  auto stats = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(stats["test_scope.reverse_connections.host.192.168.1.1.connecting"], 1);
+  EXPECT_EQ(stats["test_scope.reverse_connections.cluster.remote-cluster.connecting"], 1);
+
+  auto access_log = std::make_shared<StrictMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce([&](const Formatter::Context&, const StreamInfo::StreamInfo& info) {
+        const auto& metadata =
+            info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
+        EXPECT_EQ(metadata.fields().at("event").string_value(), "connection_closed");
+        EXPECT_EQ(metadata.fields().at("host_address").string_value(), host);
+        EXPECT_EQ(metadata.fields().at("upstream_cluster").string_value(), "remote-cluster");
+        EXPECT_EQ(metadata.fields().at("connection_key").string_value(), connection_key);
+        EXPECT_EQ(metadata.fields().at("connection_id").string_value(), "42");
+      })
+      .WillOnce([](const Formatter::Context&, const StreamInfo::StreamInfo& info) {
+        const auto& metadata =
+            info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
+        EXPECT_EQ(metadata.fields().at("event").string_value(), "connection_closed");
+        EXPECT_EQ(metadata.fields().at("connection_id").string_value(), "44");
+      });
 
   const size_t deferred_before = dispatcher_.to_delete_.size();
   // No downstream child or HCM exists. The listener hook must still cancel the retry timer,
@@ -3789,6 +3820,11 @@ TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsPendingWorkWithoutAccept
   EXPECT_TRUE(getConnWrapperToHostMap().empty());
   EXPECT_TRUE(getHostConnectionInfo(host).connection_keys.empty());
   EXPECT_TRUE(getHostConnectionInfo(host).connection_states.empty());
+  EXPECT_EQ(getHostConnectionInfo(host).connecting_count, 0);
+  stats = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(stats["test_scope.reverse_connections.host.192.168.1.1.connecting"], 0);
+  EXPECT_EQ(stats["test_scope.reverse_connections.cluster.remote-cluster.connecting"], 0);
+  EXPECT_EQ(stats["test_scope.reverse_connections.host.192.168.1.1.connected"], 0);
   EXPECT_EQ(dispatcher_.to_delete_.size(), deferred_before + 4);
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
   maintainReverseConnections();

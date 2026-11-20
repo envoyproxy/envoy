@@ -323,6 +323,10 @@ void ReverseConnectionIOHandle::resetFileEvents() {
 
 void ReverseConnectionIOHandle::stopInitiatingConnections() {
   ASSERT(worker_dispatcher_ != nullptr && worker_dispatcher_->isThreadSafe());
+  if (connections_stopped_) {
+    return;
+  }
+  ENVOY_LOG(info, "reverse_tunnel: listener draining; stopping pending and replacement dials");
   // Disable replacement dials before shutting down sockets, whose callbacks can request one.
   connections_stopped_ = true;
   rev_conn_retry_timer_.reset();
@@ -337,6 +341,19 @@ void ReverseConnectionIOHandle::stopInitiatingConnections() {
     }
   }
 
+  for (auto& [host, host_info] : host_to_conn_info_map_) {
+    for (auto state = host_info.connection_states.begin();
+         state != host_info.connection_states.end();) {
+      if (state->second == ReverseConnectionState::Connecting) {
+        updateStateGauge(host, host_info.cluster_name, state->second, false);
+        host_info.connection_states.erase(state++);
+      } else {
+        ++state;
+      }
+    }
+    host_info.connecting_count = 0;
+  }
+
   // These handshakes completed but the synthetic listener has not accepted their sockets yet.
   // They have no active downstream streams and must not become usable after drain starts.
   while (!established_connections_.empty()) {
@@ -346,7 +363,8 @@ void ReverseConnectionIOHandle::stopInitiatingConnections() {
     if (connection == nullptr) {
       continue;
     }
-    dropTunnelFromTracking(connection->connectionInfoProvider().localAddress()->asString());
+    onDownstreamConnectionClosed(connection->connectionInfoProvider().localAddress()->asString(),
+                                 connection->id());
     if (connection->state() == Network::Connection::State::Open) {
       connection->close(Network::ConnectionCloseType::NoFlush);
     }
@@ -840,10 +858,6 @@ void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& 
 
 void ReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement(
     const std::string& connection_key, uint64_t connection_id) {
-  ENVOY_LOG(info,
-            "reverse_tunnel: tunnel {} draining; dropping from tracking and dialing replacement",
-            connection_key);
-
   // Drop the key so the maintenance loop sees a deficit and dials a replacement. The underlying
   // TCP socket is left alone: in-flight HTTP/2 streams keep running on it and it closes naturally
   // on the next FIN; onDownstreamConnectionClosed() then no-ops.
@@ -866,6 +880,7 @@ void ReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement(
     return;
   }
 
+  ENVOY_LOG(info, "reverse_tunnel: tunnel {} draining; scheduling replacement", connection_key);
   // Dial the replacement on the next dispatcher pass instead of waiting for the periodic tick.
   rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(0));
 }

@@ -1096,6 +1096,71 @@ TEST_P(ReverseTunnelDrainIntegrationTest, HealthCheckFailureAndRecoveryKeepIdleT
   ASSERT_TRUE(second_tunnel->waitForDisconnect());
 }
 
+TEST_P(ReverseTunnelDrainIntegrationTest, InPlaceUpdateReplacesIdleTunnelsBeforeMaintenance) {
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(600);
+  // Events are delivered even when HCM uses the legacy drain decision. Cover that path too.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_connection_event_drain",
+                                    "false");
+  // The periodic maintenance interval is 10s plus up to 1.5s jitter. With this fixed RNG
+  // value the next tick is 11.499s away; replacement must not rely on that tick.
+  setDeterministicValue(1499);
+  addDrainingAwareReverseConnectionHcmListener(/*reverse_connection_count=*/2);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* filter = bootstrap.mutable_static_resources()
+                       ->mutable_listeners(0)
+                       ->mutable_filter_chains(0)
+                       ->mutable_filters(0);
+    envoy::extensions::filters::network::reverse_tunnel::v3::DrainAwareHttpConnectionManager config;
+    ASSERT_TRUE(filter->typed_config().UnpackTo(&config));
+    config.set_enable_drain_with_goaway(true);
+    ASSERT_TRUE(filter->mutable_typed_config()->PackFrom(config));
+  });
+  initialize();
+
+  FakeRawConnectionPtr first_tunnel;
+  FakeRawConnectionPtr second_tunnel;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(first_tunnel));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(second_tunnel));
+  completeReverseTunnelHandshake(*first_tunnel);
+  completeReverseTunnelHandshake(*second_tunnel);
+  test_server_->waitForGauge("http.reverse_connection_hcm.downstream_cx_active", Eq(2));
+
+  const MonotonicTime update_start = timeSystem().monotonicTime();
+  const auto original_listener = config_helper_.bootstrap().static_resources().listeners(0);
+  ConfigHelper updated_config(GetParam(), config_helper_.bootstrap());
+  updated_config.addConfigModifier([original_listener](
+                                       envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // ConfigHelper resets socket addresses to loopback. Restore the original listener so only
+    // its filter chain changes and the rc:// address remains valid for an in-place update.
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    *listener = original_listener;
+    auto* filter = listener->mutable_filter_chains(0)->mutable_filters(0);
+    envoy::extensions::filters::network::reverse_tunnel::v3::DrainAwareHttpConnectionManager config;
+    ASSERT_TRUE(filter->typed_config().UnpackTo(&config));
+    config.mutable_hcm_config()->set_stat_prefix("replacement_hcm");
+    ASSERT_TRUE(filter->mutable_typed_config()->PackFrom(config));
+  });
+  updated_config.setLds("2");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
+  ASSERT_TRUE(first_tunnel->waitForDisconnect());
+  ASSERT_TRUE(second_tunnel->waitForDisconnect());
+
+  FakeRawConnectionPtr first_replacement;
+  FakeRawConnectionPtr second_replacement;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(first_replacement, std::chrono::seconds(1)));
+  ASSERT_TRUE(
+      fake_upstreams_[0]->waitForRawConnection(second_replacement, std::chrono::seconds(1)));
+  EXPECT_LT(timeSystem().monotonicTime() - update_start, std::chrono::seconds(10));
+  completeReverseTunnelHandshake(*first_replacement);
+  completeReverseTunnelHandshake(*second_replacement);
+  test_server_->waitForGauge("http.replacement_hcm.downstream_cx_active", Eq(2));
+  EXPECT_EQ(0, test_server_->counter("listener_manager.listener_stopped")->value());
+  test_server_.reset();
+  ASSERT_TRUE(first_replacement->waitForDisconnect());
+  ASSERT_TRUE(second_replacement->waitForDisconnect());
+}
+
 TEST_P(ReverseTunnelDrainIntegrationTest, DrainClosesIdleTunnelsAndPreservesActiveConnectStreams) {
   using Http2Frame = Http::Http2::Http2Frame;
   DISABLE_IF_ADMIN_DISABLED;
@@ -1156,9 +1221,9 @@ TEST_P(ReverseTunnelDrainIntegrationTest, DrainClosesIdleTunnelsAndPreservesActi
       std::string(Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack))));
   active_tunnel->clearData();
 
-  auto admin_response =
-      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners?graceful",
-                                         "", Http::CodecType::HTTP1, GetParam());
+  auto admin_response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
+                                                           "/drain_listeners?graceful&skip_exit",
+                                                           "", Http::CodecType::HTTP1, GetParam());
   ASSERT_TRUE(admin_response->complete());
   ASSERT_EQ("200", admin_response->headers().getStatusValue());
   timeSystem().advanceTimeWait(std::chrono::milliseconds(200));
@@ -1195,6 +1260,7 @@ TEST_P(ReverseTunnelDrainIntegrationTest, DrainClosesIdleTunnelsAndPreservesActi
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_cx_total")->value());
 
   // Neither closing an idle tunnel nor sending GOAWAY may replenish a draining listener's pool.
+  EXPECT_EQ(0, test_server_->counter("listener_manager.listener_stopped")->value());
   FakeRawConnectionPtr unexpected_tunnel;
   EXPECT_FALSE(
       fake_upstreams_[0]->waitForRawConnection(unexpected_tunnel, std::chrono::milliseconds(10)));

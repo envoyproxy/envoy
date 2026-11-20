@@ -360,7 +360,8 @@ public:
   /**
    * Stop creating tunnels when the listener begins draining. Must run on the worker dispatcher.
    * Cancels pending handshakes and queued accepts while preserving accepted tunnel sockets.
-   * Repeated calls are harmless.
+   * This is permanent for this listener, including an admin drain with skip_exit. Repeated calls
+   * are harmless; restarting tunnel initiation requires replacing the listener.
    */
   void stopInitiatingConnections();
 

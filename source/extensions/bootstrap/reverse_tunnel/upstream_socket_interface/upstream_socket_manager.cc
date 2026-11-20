@@ -352,7 +352,7 @@ std::string UpstreamSocketManager::getNodeWithSocket(const std::string& key) {
     return nodes[selected];
   }
 
-  if (node_to_cluster_map_.contains(key) && !hasSelectableSocketsForNode(key)) {
+  if (!hasSelectableSocketsForNode(key) && node_to_cluster_map_.contains(key)) {
     return {};
   }
 

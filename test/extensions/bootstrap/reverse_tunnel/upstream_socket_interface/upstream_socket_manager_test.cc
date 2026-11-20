@@ -1190,12 +1190,39 @@ TEST_F(TestUpstreamSocketManager, GetNodeWithSocketSkipsNodesWithoutIdleSockets)
   EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), healthy);
   EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), healthy);
 
-  // With no idle socket anywhere, plain round-robin over all nodes.
+  // With no idle socket anywhere, round-robin over nodes with non-draining sockets in use.
   ASSERT_NE(socket_manager_->getConnectionSocket(healthy), nullptr);
   ASSERT_NE(socket_manager_->getConnectionSocket(healthy), nullptr);
   const std::string first = socket_manager_->getNodeWithSocket(cluster_id);
   const std::string second = socket_manager_->getNodeWithSocket(cluster_id);
   EXPECT_NE(first, second);
+}
+
+TEST_F(TestUpstreamSocketManager, IdlePreferenceAndFallbackExcludeDrainingNodes) {
+  const std::string cluster_id = "test-cluster";
+  auto draining_socket = addActiveSocket("draining-node", cluster_id, 123);
+  auto busy_socket = addActiveSocket("busy-node", cluster_id, 456);
+  socket_manager_->addConnectionSocket("idle-node", cluster_id, createMockSocket(789),
+                                       std::chrono::seconds(30));
+  socket_manager_->markSocketDraining(123);
+
+  // Skip the draining node and prefer an idle socket over a connection already in use.
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "idle-node");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "idle-node");
+  auto idle_socket = socket_manager_->getConnectionSocket("idle-node");
+  ASSERT_NE(idle_socket, nullptr);
+
+  // Once all sockets are in use, the fallback may reuse either healthy node, but never the one
+  // whose only tunnel received GOAWAY.
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "busy-node");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "idle-node");
+  socket_manager_->markSocketDraining(456);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "idle-node");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "idle-node");
+
+  socket_manager_->markSocketDraining(789);
+  EXPECT_TRUE(socket_manager_->getNodeWithSocket(cluster_id).empty());
+  EXPECT_EQ(getClusterToNodeMapping(cluster_id).size(), 3);
 }
 
 TEST_F(TestUpstreamSocketManager, GetNodeWithSocketClusterRoundRobin) {

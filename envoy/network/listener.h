@@ -515,9 +515,10 @@ public:
   virtual void enable() PURE;
 
   /**
-   * Notify the listener on its worker thread that its drain has started. Called once before
-   * accepted connections are notified. This does not apply to temporary disabling or draining
-   * individual filter chains, which may continue to use the listener.
+   * Notify a running stream listener on its worker thread that the whole listener started draining.
+   * Called once, before accepted connections are notified, and not once the listener has stopped.
+   * Other listener types do not receive this notification. It does not apply to temporary disabling
+   * or draining individual filter chains, which may continue to use the listener.
    */
   virtual void onDrain() {}
 

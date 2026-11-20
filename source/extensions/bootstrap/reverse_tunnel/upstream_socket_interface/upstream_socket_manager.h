@@ -172,8 +172,9 @@ public:
   /**
    * Get a node that has a non-draining socket (idle or used) for the given key.
    * If the key is found in the cluster_to_node_info_map_, assume it is the cluster ID and return an
-   * eligible node in that cluster in a round-robin manner. Otherwise, treat the key as a node ID
-   * and check its eligibility if it is known to this worker.
+   * eligible node in that cluster in a round-robin manner, preferring nodes with an idle socket.
+   * If none have idle sockets, return the next eligible node with a socket already in use.
+   * Otherwise, treat the key as a node ID and check its eligibility if it is known to this worker.
    * @param key the cluster ID or node ID to lookup.
    * @return the node ID, empty if the known node or cluster has no non-draining sockets, or the key
    * itself if it cannot be resolved.

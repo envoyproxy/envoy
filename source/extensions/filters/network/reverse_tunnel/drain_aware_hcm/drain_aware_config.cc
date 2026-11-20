@@ -171,11 +171,7 @@ DrainAwareHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto
              Network::FilterManager& filter_manager) -> void {
     auto& server_context = context.serverFactoryContext();
     if (enable_drain_with_goaway) {
-      filter_manager.addReadFilter(std::make_shared<DrainAwareReadFilter>(
-          context.drainDecision(), server_context,
-          context.direction() == envoy::config::core::v3::TrafficDirection::INBOUND
-              ? Network::DrainDirection::InboundOnly
-              : Network::DrainDirection::All));
+      filter_manager.addReadFilter(std::make_shared<DrainAwareReadFilter>(server_context));
     }
     Server::OverloadManager& overload_manager = context.shouldBypassOverloadManager()
                                                     ? server_context.nullOverloadManager()
