@@ -8,9 +8,15 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/grpc/async_client.h"
+
+#include "source/common/common/assert.h"
+#include "source/extensions/transport_sockets/alts/alts_async_proxy.h"
+
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "src/core/lib/iomgr/exec_ctx.h"
 #include "src/core/tsi/alts/zero_copy_frame_protector/alts_zero_copy_grpc_protector.h"
@@ -37,10 +43,31 @@ AltsTsiHandshaker::createForServer(std::shared_ptr<grpc::Channel> handshaker_ser
       new AltsTsiHandshaker(/*is_client=*/false, handshaker_service_channel, /*target_name=*/""));
 }
 
+std::unique_ptr<AltsTsiHandshaker>
+AltsTsiHandshaker::createAsyncForClient(Grpc::RawAsyncClientSharedPtr handshaker_client,
+                                        absl::string_view target_name) {
+  ASSERT(handshaker_client != nullptr);
+  return absl::WrapUnique(
+      new AltsTsiHandshaker(/*is_client=*/true, std::move(handshaker_client), target_name));
+}
+
+std::unique_ptr<AltsTsiHandshaker>
+AltsTsiHandshaker::createAsyncForServer(Grpc::RawAsyncClientSharedPtr handshaker_client) {
+  ASSERT(handshaker_client != nullptr);
+  return absl::WrapUnique(new AltsTsiHandshaker(/*is_client=*/false, std::move(handshaker_client),
+                                                /*target_name=*/""));
+}
+
 AltsTsiHandshaker::AltsTsiHandshaker(bool is_client,
                                      std::shared_ptr<grpc::Channel> handshaker_service_channel,
                                      absl::string_view target_name)
     : is_client_(is_client), handshaker_service_channel_(handshaker_service_channel),
+      target_name_(target_name) {}
+
+AltsTsiHandshaker::AltsTsiHandshaker(bool is_client,
+                                     Grpc::RawAsyncClientSharedPtr handshaker_client,
+                                     absl::string_view target_name)
+    : is_client_(is_client), handshaker_client_(std::move(handshaker_client)),
       target_name_(target_name) {}
 
 absl::Status AltsTsiHandshaker::next(void* handshaker, const unsigned char* received_bytes,
@@ -54,8 +81,12 @@ absl::Status AltsTsiHandshaker::next(void* handshaker, const unsigned char* rece
     return absl::InternalError("Handshake is already complete.");
   }
 
-  // Get a handshake message from the handshaker service.
   absl::Span<const uint8_t> in_bytes = absl::MakeConstSpan(received_bytes, received_bytes_size);
+  if (handshaker_client_ != nullptr) {
+    return nextAsync(handshaker, in_bytes, std::move(on_next_done));
+  }
+
+  // Get a handshake message from the handshaker service.
   HandshakerResp response;
   if (!has_sent_initial_handshake_message_) {
     has_sent_initial_handshake_message_ = true;
@@ -84,12 +115,67 @@ absl::Status AltsTsiHandshaker::next(void* handshaker, const unsigned char* rece
     }
     response = *std::move(next);
   }
+  return processResponse(response, in_bytes, handshaker, on_next_done);
+}
 
+absl::Status AltsTsiHandshaker::nextAsync(void* handshaker,
+                                          absl::Span<const uint8_t> received_bytes,
+                                          OnNextDone on_next_done) {
+  if (next_in_progress_) {
+    return absl::FailedPreconditionError("A call to AltsTsiHandshaker::Next is in progress.");
+  }
+  // Keep a copy of the received bytes: the caller may release them as soon as
+  // this returns, and they are needed again once the response arrives.
+  received_bytes_.assign(received_bytes.begin(), received_bytes.end());
+  AltsAsyncProxy::OnResponse on_response =
+      [this, handshaker,
+       on_next_done = std::move(on_next_done)](absl::StatusOr<HandshakerResp> response) {
+        next_in_progress_ = false;
+        absl::Status status = response.status();
+        if (status.ok()) {
+          status = processResponse(*response, received_bytes_, handshaker, on_next_done);
+        }
+        if (!status.ok()) {
+          on_next_done(status, handshaker, /*bytes_to_send=*/nullptr,
+                       /*bytes_to_send_size=*/0, /*handshake_result=*/nullptr);
+        }
+      };
+
+  absl::Status status;
+  next_in_progress_ = true;
+  if (alts_async_proxy_ == nullptr) {
+    auto alts_async_proxy = AltsAsyncProxy::create(handshaker_client_, target_name_);
+    if (!alts_async_proxy.ok()) {
+      next_in_progress_ = false;
+      return alts_async_proxy.status();
+    }
+    alts_async_proxy_ = *std::move(alts_async_proxy);
+    status = is_client_ ? alts_async_proxy_->sendStartClientHandshakeReq(std::move(on_response))
+                        : alts_async_proxy_->sendStartServerHandshakeReq(received_bytes_,
+                                                                         std::move(on_response));
+  } else {
+    status = alts_async_proxy_->sendNextHandshakeReq(received_bytes_, std::move(on_response));
+  }
+  if (!status.ok()) {
+    next_in_progress_ = false;
+  }
+  return status;
+}
+
+void AltsTsiHandshaker::cancel() {
+  next_in_progress_ = false;
+  // Destroying the proxy ends its stream; it invokes no further callbacks.
+  alts_async_proxy_.reset();
+}
+
+absl::Status AltsTsiHandshaker::processResponse(const HandshakerResp& response,
+                                                absl::Span<const uint8_t> received_bytes,
+                                                void* handshaker, const OnNextDone& on_next_done) {
   // Maybe prepare the handshake result.
   std::unique_ptr<AltsHandshakeResult> handshake_result = nullptr;
   if (response.has_result()) {
     is_handshake_complete_ = true;
-    auto result = getHandshakeResult(response.result(), in_bytes, response.bytes_consumed());
+    auto result = getHandshakeResult(response.result(), received_bytes, response.bytes_consumed());
     if (!result.ok()) {
       return result.status();
     }

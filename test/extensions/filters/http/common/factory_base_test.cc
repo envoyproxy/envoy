@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.validate.h"
 #include "envoy/http/filter.h"
@@ -90,6 +92,22 @@ public:
 class TestEmptyUnifiedFactoryBase : public UnifiedFactoryBase<RouterProto> {
 public:
   TestEmptyUnifiedFactoryBase() : UnifiedFactoryBase("test.empty_unified_factory_base") {}
+};
+
+// A concrete filter factory that records whether its extra context bypasses the overload manager.
+class TestOverloadManagerUnifiedFactoryBase : public UnifiedFactoryBase<RouterProto> {
+public:
+  TestOverloadManagerUnifiedFactoryBase()
+      : UnifiedFactoryBase("test.overload_manager_unified_factory_base") {}
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const RouterProto&, Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override {
+    bypass_overload_manager_ = extra_context.bypass_overload_manager;
+    return [](Envoy::Http::FilterChainFactoryCallbacks&) {};
+  }
+
+  std::optional<bool> bypass_overload_manager_;
 };
 
 // A concrete filter factory used to test the default behavior of DualFactoryBase.
@@ -271,6 +289,31 @@ TEST(FactoryBaseTest, UnifiedGenericContextFromFactoryContext) {
   ASSERT_THAT(cb, IsOkAndHolds(::testing::NotNull()));
   EXPECT_EQ(&context.scope(), factory.scope_);
   EXPECT_EQ(&context.scope(), factory.stats_scope_);
+}
+
+TEST(FactoryBaseTest, ExtraContextCopiesBypassOverloadManagerFromFactoryContext) {
+  for (const bool bypass_overload_manager : {false, true}) {
+    SCOPED_TRACE(bypass_overload_manager);
+    TestOverloadManagerUnifiedFactoryBase factory;
+    testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+    EXPECT_CALL(context, shouldBypassOverloadManager())
+        .WillOnce(testing::Return(bypass_overload_manager));
+    RouterProto proto_config;
+
+    ASSERT_THAT(factory.createFilterFactoryFromProto(proto_config, "stats.", context),
+                IsOkAndHolds(::testing::NotNull()));
+    EXPECT_EQ(bypass_overload_manager, factory.bypass_overload_manager_);
+  }
+}
+
+TEST(FactoryBaseTest, UpstreamExtraContextDoesNotBypassOverloadManager) {
+  TestOverloadManagerUnifiedFactoryBase factory;
+  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_context;
+  RouterProto proto_config;
+
+  ASSERT_THAT(factory.createFilterFactoryFromProto(proto_config, "stats.", upstream_context),
+              IsOkAndHolds(::testing::NotNull()));
+  EXPECT_EQ(false, factory.bypass_overload_manager_);
 }
 
 TEST(FactoryBaseTest, UnifiedNoEntryPointImplemented) {

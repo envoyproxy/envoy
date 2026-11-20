@@ -87,6 +87,28 @@ const Protobuf::Value& dynamicMetadataValue(const StreamInfo::StreamInfo& stream
   return Envoy::Config::Metadata::metadataValue(&metadata, filter_name_str, path_parts);
 }
 
+// Whether key is held at a level of the filter state chain other than the one a write at life_span
+// stores to: the first level whose life span is at least life_span.
+bool heldAtOtherLifeSpan(const StreamInfo::FilterStateSharedPtr& filter_state,
+                         absl::string_view key, StreamInfo::FilterState::LifeSpan life_span) {
+  if (!filter_state->hasDataWithName(key)) {
+    return false;
+  }
+  StreamInfo::FilterStateSharedPtr target = filter_state;
+  while (target != nullptr && target->lifeSpan() < life_span) {
+    target = target->parent();
+  }
+  if (target == nullptr || !target->hasDataWithName(key)) {
+    return true;
+  }
+  const StreamInfo::FilterStateSharedPtr above = target->parent();
+  if (above != nullptr && above->hasDataWithName(key)) {
+    return true;
+  }
+  // The target holds key. A lower level holds it too if the leaf's lookup finds another object.
+  return filter_state->getDataReadOnlyGeneric(key) != target->getDataReadOnlyGeneric(key);
+}
+
 } // namespace
 
 HeadersMapOptConstRef
@@ -922,6 +944,17 @@ bool ContextAccessor::getFilterStateBytes(const StreamInfo::StreamInfo& stream_i
   return true;
 }
 
+bool ContextAccessor::canSetFilterState(const StreamInfo::FilterStateSharedPtr& filter_state,
+                                        absl::string_view key,
+                                        StreamInfo::FilterState::LifeSpan life_span) {
+  if (heldAtOtherLifeSpan(filter_state, key, life_span)) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "filter state key '{}' is already set at a different life span", key);
+    return false;
+  }
+  return true;
+}
+
 bool ContextAccessor::setFilterStateBytes(
     StreamInfo::StreamInfo& stream_info, absl::string_view key, absl::string_view value,
     std::optional<StreamInfo::FilterState::LifeSpan> life_span,
@@ -930,14 +963,14 @@ bool ContextAccessor::setFilterStateBytes(
   if (!filter_state) {
     return false;
   }
-  auto accessor = std::make_shared<Router::StringAccessorImpl>(value);
-  if (life_span.has_value() && stream_sharing.has_value()) {
-    filter_state->setData(key, std::move(accessor), life_span.value(), stream_sharing.value());
-  } else if (life_span.has_value()) {
-    filter_state->setData(key, std::move(accessor), life_span.value());
-  } else {
-    filter_state->setData(key, std::move(accessor));
+  const auto effective_life_span =
+      life_span.value_or(StreamInfo::FilterState::LifeSpan::FilterChain);
+  if (!canSetFilterState(filter_state, key, effective_life_span)) {
+    return false;
   }
+  filter_state->setData(key, std::make_shared<Router::StringAccessorImpl>(value),
+                        effective_life_span,
+                        stream_sharing.value_or(StreamInfo::StreamSharingMayImpactPooling::None));
   return true;
 }
 
@@ -959,11 +992,13 @@ bool ContextAccessor::setFilterStateTyped(
     return false;
   }
 
-  if (life_span.has_value()) {
-    stream_info.filterState()->setData(key, std::move(object), life_span.value());
-  } else {
-    stream_info.filterState()->setData(key, std::move(object));
+  const auto& filter_state = stream_info.filterState();
+  const auto effective_life_span =
+      life_span.value_or(StreamInfo::FilterState::LifeSpan::FilterChain);
+  if (!canSetFilterState(filter_state, key, effective_life_span)) {
+    return false;
   }
+  filter_state->setData(key, std::move(object), effective_life_span);
   return true;
 }
 

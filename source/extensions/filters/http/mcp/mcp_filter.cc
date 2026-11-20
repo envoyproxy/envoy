@@ -553,7 +553,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
 
       // Set the buffer limit.
       const uint32_t max_size = getMaxRequestBodySize();
-      if (max_size > 0) {
+      if (max_size > decoder_callbacks_->bufferLimit()) {
         decoder_callbacks_->setBufferLimit(max_size);
         ENVOY_LOG(debug, "set decoder buffer limit to {} bytes", max_size);
       }
