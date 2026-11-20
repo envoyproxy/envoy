@@ -230,6 +230,8 @@ public:
     return allow_failed_header_matchers_;
   }
   const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
+  const HttpUri& parEndpoint() const { return par_endpoint_; }
+  bool usePar() const { return use_par_; }
   const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
   const std::string& endSessionEndpoint() const { return end_session_endpoint_; }
   const Formatter::Formatter* postLogoutRedirectUri() const {
@@ -336,6 +338,8 @@ private:
                                    const std::string& filter_stats_prefix, Stats::Scope& scope);
 
   const HttpUri oauth_token_endpoint_;
+  const HttpUri par_endpoint_;
+  bool use_par_{false};
   // Owns the data exposed by authorization_endpoint_url_.
   const std::string authorization_endpoint_;
   Http::Utility::Url authorization_endpoint_url_;
@@ -483,6 +487,8 @@ public:
                                    std::chrono::seconds expires_in) override;
 
   Http::FilterHeadersStatus onRefreshAccessTokenFailure() override;
+  void onPushAuthorizationRequestSuccess() override;
+  void onPushAuthorizationRequestFailure() override;
 
   // Handles unauthorized requests by checking allow_failed_matcher and either continuing
   // the request as unauthorized (if matcher matches) or sending an unauthorized response.
@@ -534,6 +540,8 @@ private:
   // Declared after the configs on purpose: the client holds a reference to the token endpoint URI
   // owned by the FilterConfig, so it must be destroyed before default_config_ is released.
   std::shared_ptr<OAuth2Client> oauth_client_;
+  // Response headers (cookies) for the browser redirect, held while the PAR request is in flight.
+  Http::ResponseHeaderMapPtr pending_par_response_headers_;
   OAuth2ClientFactory oauth_client_factory_;
   ValidatorFactory validator_factory_;
   TimeSource& time_source_;

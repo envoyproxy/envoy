@@ -12,6 +12,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/oauth2/oauth_response.pb.h"
@@ -25,6 +26,8 @@ namespace Oauth2 {
 
 namespace {
 constexpr absl::string_view WwwFormUrlEncodedReservedCharacters = ":/=&?+";
+// Upper bound on a PAR request_uri from the authorization server before it is used in a redirect.
+constexpr size_t kMaxRequestUriLength = 1024;
 
 constexpr const char* UrlBodyTemplateWithCredentialsForAuthCode =
     "grant_type=authorization_code&code={0}&client_id={1}&client_secret={2}&redirect_uri={3}&code_"
@@ -66,7 +69,7 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
 
   const auto encoded_cb_url =
       Http::Utility::PercentEncoding::encode(cb_url, WwwFormUrlEncodedReservedCharacters);
-  Http::RequestMessagePtr request = createPostRequest();
+  Http::RequestMessagePtr request = createPostRequest(uri_);
   std::string body;
 
   switch (auth_type) {
@@ -109,7 +112,7 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   request->headers().setContentLength(body.length());
   ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
                           "Dispatching OAuth request for access token.");
-  dispatchRequest(std::move(request));
+  dispatchRequest(std::move(request), uri_);
 }
 
 void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
@@ -118,7 +121,7 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
   ASSERT(state_ == OAuthState::Idle);
   state_ = OAuthState::PendingAccessTokenByRefreshToken;
 
-  Http::RequestMessagePtr request = createPostRequest();
+  Http::RequestMessagePtr request = createPostRequest(uri_);
   std::string body;
 
   switch (auth_type) {
@@ -162,7 +165,7 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
   request->headers().setContentLength(body.length());
   ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
                           "Dispatching OAuth request for update access token by refresh token.");
-  dispatchRequest(std::move(request));
+  dispatchRequest(std::move(request), uri_);
 }
 
 void OAuth2ClientImpl::cancel() {
@@ -176,19 +179,115 @@ void OAuth2ClientImpl::cancel() {
   state_ = OAuthState::Idle;
 }
 
-void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
-  const auto thread_local_cluster = cm_.getThreadLocalCluster(uri_.cluster());
+namespace {
+// Percent-encodes each key and value, then joins them into a form body.
+std::string encodeFormParams(const OAuth2Client::FormParams& params) {
+  std::string body;
+  for (const auto& [key, value] : params) {
+    if (!body.empty()) {
+      body += "&";
+    }
+    body += Http::Utility::PercentEncoding::encode(key, WwwFormUrlEncodedReservedCharacters);
+    body += "=";
+    body += Http::Utility::PercentEncoding::encode(value, WwwFormUrlEncodedReservedCharacters);
+  }
+  return body;
+}
+} // namespace
+
+void OAuth2ClientImpl::asyncPushAuthorizationRequest(const FormParams& params,
+                                                     const std::string& client_id,
+                                                     const std::string& secret,
+                                                     AuthType auth_type) {
+  ASSERT(state_ == OAuthState::Idle);
+  if (par_endpoint_ == nullptr) {
+    parent_->onPushAuthorizationRequestFailure();
+    return;
+  }
+  state_ = OAuthState::PendingPushedAuthorizationRequest;
+
+  const std::string auth_params = encodeFormParams(params);
+  Http::RequestMessagePtr request = createPostRequest(*par_endpoint_);
+  std::string body;
+
+  switch (auth_type) {
+  case AuthType::UrlEncodedBody:
+    body = fmt::format(
+        "{}&client_id={}&client_secret={}", auth_params,
+        Http::Utility::PercentEncoding::encode(client_id, WwwFormUrlEncodedReservedCharacters),
+        Http::Utility::PercentEncoding::encode(secret, WwwFormUrlEncodedReservedCharacters));
+    break;
+  case AuthType::BasicAuth: {
+    const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
+    const auto encoded_token = Base64::encode(basic_auth_token.data(), basic_auth_token.size());
+    request->headers().appendCopy(Http::CustomHeaders::get().Authorization,
+                                  absl::StrCat("Basic ", encoded_token));
+    body = auth_params;
+    break;
+  }
+  case AuthType::TlsClientAuth:
+    body = fmt::format(
+        "{}&client_id={}", auth_params,
+        Http::Utility::PercentEncoding::encode(client_id, WwwFormUrlEncodedReservedCharacters));
+    break;
+  case AuthType::PrivateKeyJwt:
+    // For private_key_jwt, the secret parameter contains the pre-built JWT assertion.
+    body = fmt::format(
+        "{}&client_id={}&client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-assertion-type%3Ajwt-bearer&client_assertion={}",
+        auth_params,
+        Http::Utility::PercentEncoding::encode(client_id, WwwFormUrlEncodedReservedCharacters),
+        Http::Utility::PercentEncoding::encode(secret, WwwFormUrlEncodedReservedCharacters));
+    break;
+  }
+
+  request->body().add(body);
+  request->headers().setContentLength(body.length());
+  ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                          "Dispatching OAuth pushed authorization request.");
+  dispatchRequest(std::move(request), *par_endpoint_);
+}
+
+bool OAuth2ClientImpl::parsePushedAuthorizationResponse(const std::string& response_body) {
+  request_uri_.clear();
+  auto json_or_error = Json::Factory::loadFromString(response_body);
+  if (!json_or_error.ok()) {
+    return false;
+  }
+  auto request_uri_or_error = json_or_error.value()->getString("request_uri");
+  if (!request_uri_or_error.ok()) {
+    return false;
+  }
+  const std::string& request_uri = request_uri_or_error.value();
+  if (request_uri.empty() || request_uri.size() > kMaxRequestUriLength) {
+    return false;
+  }
+  for (const char c : request_uri) {
+    if (static_cast<unsigned char>(c) < 0x20 || static_cast<unsigned char>(c) == 0x7f) {
+      return false;
+    }
+  }
+  request_uri_ = request_uri;
+  return true;
+}
+
+void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg, const HttpUri& uri) {
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(uri.cluster());
   if (thread_local_cluster != nullptr) {
     auto options = Http::AsyncClient::RequestOptions().setTimeout(
-        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout)));
+        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri, timeout)));
 
-    if (retry_policy_ != nullptr) {
+    // PAR POSTs are not retried: a replayed single-use client assertion or a retried POST can
+    // leave orphan request_uri values.
+    if (retry_policy_ != nullptr && state_ != OAuthState::PendingPushedAuthorizationRequest) {
       options.setRetryPolicy(retry_policy_);
       options.setBufferBodyForRetry(true);
     }
 
     in_flight_request_ =
         thread_local_cluster->httpAsyncClient().send(std::move(msg), *this, options);
+  } else if (state_ == OAuthState::PendingPushedAuthorizationRequest) {
+    state_ = OAuthState::Idle;
+    parent_->onPushAuthorizationRequestFailure();
   } else {
     handleOAuthFailure(false, "Token endpoint cluster not found");
   }
@@ -232,14 +331,18 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   }
 
   ASSERT(state_ == OAuthState::PendingAccessToken ||
-         state_ == OAuthState::PendingAccessTokenByRefreshToken);
+         state_ == OAuthState::PendingAccessTokenByRefreshToken ||
+         state_ == OAuthState::PendingPushedAuthorizationRequest);
   const OAuthState oldState = state_;
   state_ = OAuthState::Idle;
 
   // Check that the auth cluster returned a happy response.
   const absl::string_view response_code = message->headers().getStatusValue();
 
-  if (response_code != "200") {
+  // RFC 9126 section 2.2: a successful PAR response is 201 Created.
+  const bool is_par_success =
+      oldState == OAuthState::PendingPushedAuthorizationRequest && response_code == "201";
+  if (response_code != "200" && !is_par_success) {
     const std::string response_body = message->bodyAsString();
     ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
                             "Oauth response code: {}", response_code);
@@ -254,6 +357,11 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     case OAuthState::PendingAccessTokenByRefreshToken:
       handleRefreshTokenFailure(is_request_dispatched);
       break;
+    case OAuthState::PendingPushedAuthorizationRequest:
+      ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                              "PAR request failed with response code: {}", response_code);
+      parent_->onPushAuthorizationRequestFailure();
+      break;
     default:
       PANIC("Malformed oauth client state");
     }
@@ -261,6 +369,15 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   }
 
   const std::string response_body = message->bodyAsString();
+
+  if (oldState == OAuthState::PendingPushedAuthorizationRequest) {
+    if (parsePushedAuthorizationResponse(response_body)) {
+      parent_->onPushAuthorizationRequestSuccess();
+    } else {
+      parent_->onPushAuthorizationRequestFailure();
+    }
+    return;
+  }
 
   envoy::extensions::http_filters::oauth2::OAuthResponse response;
   TRY_NEEDS_AUDIT {
@@ -333,6 +450,9 @@ void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
     break;
   case OAuthState::PendingAccessTokenByRefreshToken:
     handleRefreshTokenFailure(is_request_dispatched);
+    break;
+  case OAuthState::PendingPushedAuthorizationRequest:
+    parent_->onPushAuthorizationRequestFailure();
     break;
   default:
     PANIC("Malformed oauth client state");
