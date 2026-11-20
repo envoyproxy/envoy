@@ -51,6 +51,10 @@ void PassthroughSocket::configureInitialCongestionWindow(uint64_t bandwidth_bits
   return transport_socket_->configureInitialCongestionWindow(bandwidth_bits_per_sec, rtt);
 }
 
+void PassthroughSocket::setTlsDataChunkSendLimit(uint64_t data_chunk_size) {
+  transport_socket_->setTlsDataChunkSendLimit(data_chunk_size);
+}
+
 } // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy

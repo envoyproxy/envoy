@@ -1174,6 +1174,29 @@ TEST_F(MultiConnectionBaseImplTest, StartSecureTransportAfterConnect) {
   impl_->startSecureTransport();
 }
 
+TEST_F(MultiConnectionBaseImplTest, SetTransportSocketDataChunkSendLimit) {
+  setupMultiConnectionImpl(3);
+
+  EXPECT_CALL(*createdConnections()[0], setTransportSocketDataChunkSendLimit(8192));
+  impl_->setTransportSocketDataChunkSendLimit(8192);
+
+  startConnect();
+
+  // The limit should be applied to the newly created connection.
+  EXPECT_CALL(*nextConnection(), setTransportSocketDataChunkSendLimit(8192));
+  timeOutAndStartNextAttempt();
+
+  EXPECT_CALL(*createdConnections()[0], setTransportSocketDataChunkSendLimit(4096));
+  EXPECT_CALL(*createdConnections()[1], setTransportSocketDataChunkSendLimit(4096));
+  impl_->setTransportSocketDataChunkSendLimit(4096);
+
+  connectSecondAttempt();
+
+  // After connecting, the limit is only passed to the remaining connection.
+  EXPECT_CALL(*createdConnections()[1], setTransportSocketDataChunkSendLimit(2048));
+  impl_->setTransportSocketDataChunkSendLimit(2048);
+}
+
 // Tests for MultiConnectionBaseImpl methods which simply delegate to the first connection.
 
 TEST_F(MultiConnectionBaseImplTest, Dispatcher) {

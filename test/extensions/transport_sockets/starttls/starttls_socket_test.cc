@@ -24,6 +24,27 @@ public:
   ~StartTlsTransportSocketMock() override { Die(); }
 };
 
+// The TLS data chunk send limit reaches the TLS socket whether it is set before or after the switch
+// to TLS, so a limit set while the connection is still clear-text is not lost.
+TEST(StartTlsTest, SetTlsDataChunkSendLimit) {
+  NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
+  auto* raw_socket = new NiceMock<StartTlsTransportSocketMock>;
+  auto* ssl_socket = new NiceMock<Network::MockTransportSocket>;
+  auto socket = std::make_unique<StartTlsSocket>(
+      Network::TransportSocketPtr(raw_socket), Network::TransportSocketPtr(ssl_socket), nullptr);
+  socket->setTransportSocketCallbacks(transport_callbacks);
+
+  EXPECT_CALL(*raw_socket, setTlsDataChunkSendLimit(8192));
+  EXPECT_CALL(*ssl_socket, setTlsDataChunkSendLimit(8192));
+  socket->setTlsDataChunkSendLimit(8192);
+
+  EXPECT_CALL(*raw_socket, Die);
+  socket->startSecureTransport();
+
+  EXPECT_CALL(*ssl_socket, setTlsDataChunkSendLimit(4096));
+  socket->setTlsDataChunkSendLimit(4096);
+}
+
 TEST(StartTlsTest, BasicSwitch) {
   Network::TransportSocketOptionsConstSharedPtr options =
       std::make_shared<Network::TransportSocketOptionsImpl>();

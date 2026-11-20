@@ -191,6 +191,7 @@ protected:
       std::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; }
       void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
       std::optional<uint64_t> congestionWindowInBytes() const override { return {}; }
+      void setTransportSocketDataChunkSendLimit(uint64_t) override {}
       // ScopeTrackedObject
       void dumpState(std::ostream& os, int) const override { os << "SyntheticConnection"; }
 

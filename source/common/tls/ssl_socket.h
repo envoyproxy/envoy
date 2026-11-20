@@ -43,6 +43,9 @@ struct SslSocketFactoryStats {
 
 enum class InitialState { Client, Server };
 
+// The largest plaintext a TLS record can carry, and the default per-write limit of SslSocket.
+inline constexpr uint64_t MaxTlsDataChunkSendLimit = 16384;
+
 class SslSocket : public Network::TransportSocket,
                   public Envoy::Ssl::PrivateKeyConnectionCallbacks,
                   public Ssl::HandshakeCallbacks,
@@ -66,6 +69,7 @@ public:
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   bool startSecureTransport() override { return false; }
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
+  void setTlsDataChunkSendLimit(uint64_t data_chunk_size) override;
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
   // Ssl::HandshakeCallbacks
@@ -105,6 +109,7 @@ private:
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
   uint64_t bytes_to_retry_{};
+  uint64_t data_chunk_send_limit_{MaxTlsDataChunkSendLimit};
   std::string failure_reason_;
   std::optional<Api::IoError::IoErrorCode> detected_io_error_;
   bool read_disabled_{false};
@@ -129,6 +134,7 @@ public:
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
   bool startSecureTransport() override { return false; }
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
+  void setTlsDataChunkSendLimit(uint64_t) override {}
 };
 
 // This SslSocket will be used when SSL secret is not fetched from SDS server.

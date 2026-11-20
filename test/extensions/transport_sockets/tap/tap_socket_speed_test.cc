@@ -38,6 +38,7 @@ public:
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
   bool startSecureTransport() override { return true; }
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
+  void setTlsDataChunkSendLimit(uint64_t) override {}
 };
 
 // Tapper that consumes the snapshot without doing any trace work, isolating the cost the socket

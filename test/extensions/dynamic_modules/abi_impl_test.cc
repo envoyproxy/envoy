@@ -1144,6 +1144,10 @@ WEAK_STUB(NetworkFilterEnableHalfClose,
           envoy_dynamic_module_callback_network_filter_enable_half_close(nullptr, false))
 WEAK_STUB(NetworkFilterSetBufferLimits,
           envoy_dynamic_module_callback_network_filter_set_buffer_limits(nullptr, 0))
+WEAK_STUB(
+    NetworkFilterSetTransportSocketDataChunkSendLimit,
+    envoy_dynamic_module_callback_network_filter_set_transport_socket_data_chunk_send_limit(nullptr,
+                                                                                             0))
 WEAK_STUB(NetworkFilterSchedulerCommit,
           envoy_dynamic_module_callback_network_filter_scheduler_commit(nullptr, 0))
 WEAK_STUB(NetworkFilterSchedulerDelete,

@@ -3404,6 +3404,25 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetBufferLimits) {
   envoy_dynamic_module_callback_network_filter_set_buffer_limits(filterPtr(), 32768);
 }
 
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetTransportSocketDataChunkSendLimit) {
+  for (const uint32_t limit : {1u, 8192u, 16384u}) {
+    EXPECT_CALL(connection_, setTransportSocketDataChunkSendLimit(limit));
+    EXPECT_TRUE(
+        envoy_dynamic_module_callback_network_filter_set_transport_socket_data_chunk_send_limit(
+            filterPtr(), limit));
+  }
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
+       SetTransportSocketDataChunkSendLimitRejectsInvalid) {
+  EXPECT_CALL(connection_, setTransportSocketDataChunkSendLimit(testing::_)).Times(0);
+  for (const uint32_t limit : {0u, 16385u, UINT32_MAX}) {
+    EXPECT_FALSE(
+        envoy_dynamic_module_callback_network_filter_set_transport_socket_data_chunk_send_limit(
+            filterPtr(), limit));
+  }
+}
+
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, AboveHighWatermark) {
   EXPECT_CALL(connection_, aboveHighWatermark())
       .WillOnce(testing::Return(true))

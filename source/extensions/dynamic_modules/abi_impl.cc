@@ -1475,6 +1475,10 @@ WEAK_STUB(uint32_t, envoy_dynamic_module_callback_network_filter_get_buffer_limi
 WEAK_STUB_VOID(envoy_dynamic_module_callback_network_filter_set_buffer_limits,
                envoy_dynamic_module_type_network_filter_envoy_ptr, uint32_t)
 
+WEAK_STUB(bool,
+          envoy_dynamic_module_callback_network_filter_set_transport_socket_data_chunk_send_limit,
+          false, envoy_dynamic_module_type_network_filter_envoy_ptr, uint32_t)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_above_high_watermark, false,
           envoy_dynamic_module_type_network_filter_envoy_ptr)
 

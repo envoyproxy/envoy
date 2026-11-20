@@ -8570,6 +8570,7 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   auto transport_socket = server_ssl_socket_factory->createDownstreamTransportSocket();
   EXPECT_FALSE(transport_socket->startSecureTransport());                                  // Noop
   transport_socket->configureInitialCongestionWindow(200, std::chrono::microseconds(223)); // Noop
+  transport_socket->setTlsDataChunkSendLimit(8192);                                        // Noop
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
   EXPECT_EQ(nullptr, transport_socket->ssl());
   EXPECT_EQ(true, transport_socket->canFlushClose());
@@ -9011,6 +9012,89 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
   }
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// A TLS data chunk send limit caps the plaintext of each TLS record the connection sends, and the
+// peer still receives all of the data.
+TEST_P(SslReadBufferLimitTest, TransportSocketDataChunkSendLimit) {
+  constexpr uint64_t chunk_send_limit = 1000;
+  constexpr uint32_t write_size = 3 * 16384;
+
+  initialize();
+
+  // Out of range limits are rejected.
+  Network::TransportSocketPtr unused_socket =
+      client_ssl_socket_factory_->createTransportSocket(nullptr, nullptr);
+  EXPECT_ENVOY_BUG(unused_socket->setTlsDataChunkSendLimit(0),
+                   "invalid TLS data chunk send limit 0");
+  EXPECT_ENVOY_BUG(unused_socket->setTlsDataChunkSendLimit(16385),
+                   "invalid TLS data chunk send limit 16385");
+
+  client_connection_->setTransportSocketDataChunkSendLimit(chunk_send_limit);
+
+#ifndef ENVOY_SSL_OPENSSL
+  // Record the length of every application data record the client sends.
+  std::vector<uint16_t> record_lengths;
+  SSL* client_ssl = dynamic_cast<SslSocket*>(client_transport_socket_)->rawSslForTest();
+  SSL_set_msg_callback(client_ssl, [](int is_write, int, int content_type, const void* buf,
+                                      size_t len, SSL*, void* arg) {
+    const auto* header = static_cast<const uint8_t*>(buf);
+    if (is_write && content_type == SSL3_RT_HEADER && len == SSL3_RT_HEADER_LENGTH &&
+        header[0] == SSL3_RT_APPLICATION_DATA) {
+      static_cast<std::vector<uint16_t>*>(arg)->push_back((header[3] << 8) | header[4]);
+    }
+  });
+  SSL_set_msg_callback_arg(client_ssl, &record_lengths);
+#endif
+
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection_ = dispatcher_->createServerConnection(
+            std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket(),
+            stream_info_);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+      });
+  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
+
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  std::string received;
+  EXPECT_CALL(*read_filter_, onNewConnection());
+  EXPECT_CALL(*read_filter_, onData(_, _))
+      .WillRepeatedly([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
+        received.append(data.toString());
+        data.drain(data.length());
+        if (received.size() == write_size) {
+          server_connection_->close(Network::ConnectionCloseType::FlushWrite);
+        }
+        return Network::FilterStatus::StopIteration;
+      });
+
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+
+  std::string payload;
+  for (uint32_t i = 0; i < write_size; i++) {
+    payload.push_back('a' + i % 26);
+  }
+  Buffer::OwnedImpl data(payload);
+  client_connection_->write(data, false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(payload, received);
+#ifndef ENVOY_SSL_OPENSSL
+  // A record carries at most the limit in plaintext plus at most 256 bytes of TLS overhead.
+  // Without the limit, each 16384-byte write would be sent as a larger record.
+  EXPECT_GE(record_lengths.size(), write_size / chunk_send_limit);
+  for (const uint16_t length : record_lengths) {
+    EXPECT_LE(length, chunk_send_limit + 256);
+  }
+#endif
+  EXPECT_EQ(0UL, server_stats_store_.counter("ssl.connection_error").value());
+  EXPECT_EQ(0UL, client_stats_store_.counter("ssl.connection_error").value());
 }
 
 // Test asynchronous signing (ECDHE) using a private key provider.

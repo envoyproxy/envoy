@@ -56,6 +56,8 @@ public:
     return active_socket_->configureInitialCongestionWindow(bandwidth_bits_per_sec, rtt);
   }
 
+  void setTlsDataChunkSendLimit(uint64_t data_chunk_size) override;
+
 private:
   // This is a proxy for wrapping the transport callback object passed from the consumer.
   // Its primary purpose is to filter Connected events to ensure they only happen once per open.

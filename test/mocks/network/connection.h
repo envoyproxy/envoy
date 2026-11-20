@@ -106,6 +106,7 @@ public:
   MOCK_METHOD(void, configureInitialCongestionWindow,                                              \
               (uint64_t bandwidth_bits_per_sec, std::chrono::microseconds rtt), ());               \
   MOCK_METHOD(std::optional<uint64_t>, congestionWindowInBytes, (), (const));                      \
+  MOCK_METHOD(void, setTransportSocketDataChunkSendLimit, (uint64_t data_chunk_size));             \
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));                                     \
   MOCK_METHOD(bool, setSocketOption, (Network::SocketOptionName, absl::Span<uint8_t>), ());        \
   MOCK_METHOD(OptRef<const StreamInfo::StreamInfo>, trackedStream, (), (const));

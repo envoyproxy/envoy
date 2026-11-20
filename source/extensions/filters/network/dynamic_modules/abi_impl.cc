@@ -1613,6 +1613,18 @@ void envoy_dynamic_module_callback_network_filter_set_buffer_limits(
   filter->connection().setBufferLimits(limit);
 }
 
+bool envoy_dynamic_module_callback_network_filter_set_transport_socket_data_chunk_send_limit(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint32_t limit) {
+  // Zero would stop the TLS write loop from making progress, and a value above the 16384-byte TLS
+  // record plaintext maximum cannot cap the record size.
+  if (limit == 0 || limit > 16384) {
+    return false;
+  }
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  filter->connection().setTransportSocketDataChunkSendLimit(limit);
+  return true;
+}
+
 bool envoy_dynamic_module_callback_network_filter_above_high_watermark(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);

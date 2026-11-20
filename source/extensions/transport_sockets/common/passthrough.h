@@ -81,6 +81,7 @@ public:
   bool startSecureTransport() override { return false; }
   void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                         std::chrono::microseconds rtt) override;
+  void setTlsDataChunkSendLimit(uint64_t data_chunk_size) override;
 
 protected:
   Network::TransportSocketPtr transport_socket_;

@@ -286,6 +286,12 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for BufferLimitsFilter {
     envoy_filter.set_buffer_limits(32768);
     assert_eq!(envoy_filter.get_buffer_limit(), 32768);
 
+    // The TLS data chunk send limit is validated before it reaches the transport socket, which
+    // ignores it on this plaintext connection.
+    assert!(envoy_filter.set_transport_socket_data_chunk_send_limit(8192));
+    assert!(!envoy_filter.set_transport_socket_data_chunk_send_limit(0));
+    assert!(!envoy_filter.set_transport_socket_data_chunk_send_limit(16385));
+
     abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
   }
 
