@@ -985,6 +985,19 @@ parseRouteConfigurationFromV3Yaml(const std::string& yaml) {
   return route_config;
 }
 
+TEST_F(RouteConfigProviderManagerImplTest, ConfigDumpDuringProviderDestruction) {
+  setup();
+  outer_init_manager_.initialize(init_watcher_);
+
+  init_watcher_.expectReady().WillOnce([this]() {
+    UniversalStringMatcher name_matcher;
+    const auto config_dump = route_config_provider_manager_->dumpRouteConfigs(name_matcher);
+    EXPECT_TRUE(config_dump->dynamic_route_configs().empty());
+  });
+
+  provider_.reset();
+}
+
 TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
   UniversalStringMatcher universal_name_matcher;
   auto message_ptr =

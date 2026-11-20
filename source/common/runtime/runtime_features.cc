@@ -35,6 +35,11 @@
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
+
+// When enabled, which is the default, the ALTS transport socket's server-side handshakes talk to
+// the ALTS handshaker service through Envoy's async gRPC client, so a worker thread never waits for
+// the handshaker service. Disable to restore the previous blocking gRPC calls.
+RUNTIME_GUARD(envoy_reloadable_features_alts_async_handshaker);
 // When enabled, the admin filter returns to the event loop between the chunks of a response.
 RUNTIME_GUARD(envoy_reloadable_features_admin_filter_yield_between_chunks);
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
@@ -165,6 +170,7 @@ RUNTIME_GUARD(envoy_reloadable_features_orca_accept_unpadded_base64);
 RUNTIME_GUARD(envoy_reloadable_features_orca_weight_manager_use_named_metrics_first);
 RUNTIME_GUARD(envoy_reloadable_features_pqc_default_ecdh_curves);
 RUNTIME_GUARD(envoy_reloadable_features_preserve_downstream_keepalive);
+RUNTIME_GUARD(envoy_reloadable_features_prometheus_stats_unsorted);
 RUNTIME_GUARD(envoy_reloadable_features_propagate_downstream_rst_to_upstream);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_protocol_added_tlvs_format_string);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_protocol_remove_too_long_tlvs);
@@ -229,6 +235,10 @@ RUNTIME_GUARD(envoy_reloadable_features_use_stats_prefix_scope_for_http_filter);
 RUNTIME_GUARD(envoy_reloadable_features_vhds_answered_alias_cache);
 RUNTIME_GUARD(envoy_reloadable_features_vhds_overrides_rds_virtual_hosts_with_same_name);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
+// When a never-notified SDS watch is added for a secret name that another watch on the same mux
+// already subscribes to, replay the last delivered secret to the new watch instead of waiting for
+// the server to resend it.
+RUNTIME_GUARD(envoy_reloadable_features_xds_replay_cached_resources);
 // This is only needed if sharing c-ares query cache across dns clusters.
 // Disabled by default for now to prevent behavior changes.
 FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);

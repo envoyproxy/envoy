@@ -152,6 +152,7 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//envoy/http:codes_interface",
         "//envoy/server:admin_interface",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:histogram_lib",
     ],
 )
