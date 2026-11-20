@@ -99,10 +99,19 @@ protected:
   // Simulates the runtime loading a new snapshot.
   void loadRuntimeSnapshot() { context_.runtime_loader_.update_callbacks_.runCallbacks(); }
 
-  static bool watchRuntimeKey(DynamicModuleBootstrapExtensionConfig& config,
-                              absl::string_view key) {
+  static bool enableRuntimeUpdate(DynamicModuleBootstrapExtensionConfig& config,
+                                  absl::string_view key) {
     return envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
         config.thisAsVoidPtr(), {key.data(), key.size()});
+  }
+
+  // Watches the key as if the module did it during on_bootstrap_extension_config_new.
+  static bool watchRuntimeKey(DynamicModuleBootstrapExtensionConfig& config,
+                              absl::string_view key) {
+    config.runtime_watch_frozen_ = false;
+    const bool watched = enableRuntimeUpdate(config, key);
+    config.runtime_watch_frozen_ = true;
+    return watched;
   }
 
   std::string runtimeUpdates() {
@@ -2141,21 +2150,45 @@ TEST_F(BootstrapAbiImplTest, RuntimeUpdateReportsWatchedKeys) {
   EXPECT_EQ("b=20;c!;d=4;b=2;e=;", runtimeUpdates());
 }
 
-// Test that the module can watch a key from the runtime update hook, and that the value of the key
-// at that point is not reported.
-TEST_F(BootstrapAbiImplTest, RuntimeUpdateWatchesKeysFromTheHook) {
+// Test that the module can watch a key during on_bootstrap_extension_config_new.
+TEST_F(BootstrapAbiImplTest, WatchRuntimeKeyDuringConfigNew) {
+  setRuntimeLayers({{}});
+  auto config = newOptionalHooksConfig("watch_runtime_key");
+  EXPECT_TRUE(config->runtime_watch_frozen_);
+  EXPECT_EQ(1, context_.runtime_loader_.update_callbacks_.size());
+
+  setRuntimeLayers({{{"a", "1"}}});
+  loadRuntimeSnapshot();
+  EXPECT_EQ("a=1;", runtimeUpdates());
+}
+
+// Test that the module cannot watch a key once on_bootstrap_extension_config_new returned.
+TEST_F(BootstrapAbiImplTest, WatchRuntimeKeyAfterConfigNew) {
+  setRuntimeLayers({{}});
+  auto config = newOptionalHooksConfig();
+  EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_)).Times(0);
+  EXPECT_LOG_CONTAINS("error",
+                      "cannot enable runtime update after "
+                      "envoy_dynamic_module_on_bootstrap_extension_config_new returned",
+                      { EXPECT_FALSE(enableRuntimeUpdate(*config, "a")); });
+}
+
+// Test that the module cannot watch a key from the runtime update hook.
+TEST_F(BootstrapAbiImplTest, WatchRuntimeKeyFromTheHook) {
   setRuntimeLayers({{}});
   auto config = newOptionalHooksConfig();
   EXPECT_TRUE(watchRuntimeKey(*config, "watch_more"));
 
   setRuntimeLayers({{{"more", "1"}, {"watch_more", "1"}}});
-  loadRuntimeSnapshot();
+  EXPECT_LOG_CONTAINS("error",
+                      "cannot enable runtime update after "
+                      "envoy_dynamic_module_on_bootstrap_extension_config_new returned",
+                      { loadRuntimeSnapshot(); });
   EXPECT_EQ("watch_more=1;", runtimeUpdates());
-  EXPECT_FALSE(watchRuntimeKey(*config, "more"));
 
   setRuntimeLayers({{{"more", "2"}, {"watch_more", "1"}}});
   loadRuntimeSnapshot();
-  EXPECT_EQ("watch_more=1;more=2;", runtimeUpdates());
+  EXPECT_EQ("watch_more=1;", runtimeUpdates());
 }
 
 // Test that watching a key twice fails, and that every watched key shares a single registration.
@@ -2194,7 +2227,7 @@ TEST_F(BootstrapAbiImplTest, EnableRuntimeUpdateWithoutHook) {
                       { EXPECT_FALSE(watchRuntimeKey(*config.value(), "a")); });
 }
 
-// Test that runtime updates cannot be enabled once shutdown started, and stop once it starts.
+// Test that runtime updates stop once shutdown started.
 TEST_F(BootstrapAbiImplTest, RuntimeUpdateStopsOnceShutdownStarted) {
   setRuntimeLayers({{{"a", "1"}}});
   auto config = newOptionalHooksConfig();
@@ -2204,12 +2237,6 @@ TEST_F(BootstrapAbiImplTest, RuntimeUpdateStopsOnceShutdownStarted) {
   setRuntimeLayers({{{"a", "2"}}});
   loadRuntimeSnapshot();
   EXPECT_EQ("", runtimeUpdates());
-
-  auto shut_down_config = newOptionalHooksConfig();
-  shut_down_config->onShutdown();
-  EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_)).Times(0);
-  EXPECT_LOG_CONTAINS("error", "cannot enable runtime update once shutdown started",
-                      { EXPECT_FALSE(watchRuntimeKey(*shut_down_config, "a")); });
 }
 
 // Test that destroying the config removes its runtime update registration.

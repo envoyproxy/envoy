@@ -151,8 +151,9 @@ bool DynamicModuleBootstrapExtensionConfig::enableRuntimeUpdate(absl::string_vie
                      "envoy_dynamic_module_on_bootstrap_extension_runtime_update");
     return false;
   }
-  if (shutdown_started_) {
-    ENVOY_LOG(error, "cannot enable runtime update once shutdown started");
+  if (runtime_watch_frozen_) {
+    ENVOY_LOG(error, "cannot enable runtime update after "
+                     "envoy_dynamic_module_on_bootstrap_extension_config_new returned");
     return false;
   }
   if (key.empty()) {
@@ -186,16 +187,12 @@ DynamicModuleBootstrapExtensionConfig::runtimeValue(const Runtime::Snapshot& sna
 
 void DynamicModuleBootstrapExtensionConfig::onRuntimeUpdate() {
   const Runtime::SnapshotConstSharedPtr snapshot = context_.runtime().threadsafeSnapshot();
-  // The changes are collected first, since the hook can watch more keys.
-  std::vector<std::pair<std::string, std::optional<std::string>>> changes;
-  for (auto& [key, previous_value] : watched_runtime_values_) {
-    std::optional<std::string> value = runtimeValue(*snapshot, key);
-    if (value != previous_value) {
-      previous_value = value;
-      changes.emplace_back(key, std::move(value));
+  for (auto& [key, value] : watched_runtime_values_) {
+    std::optional<std::string> new_value = runtimeValue(*snapshot, key);
+    if (new_value == value) {
+      continue;
     }
-  }
-  for (const auto& [key, value] : changes) {
+    value = std::move(new_value);
     const absl::string_view raw_value = value.has_value() ? *value : absl::string_view();
     on_bootstrap_extension_runtime_update_(
         thisAsVoidPtr(), in_module_config_, {key.data(), key.size()},
@@ -718,6 +715,7 @@ newDynamicModuleBootstrapExtensionConfig(
   config->on_bootstrap_extension_listener_removal_ = on_listener_removal.value();
 
   config->stat_creation_frozen_ = true;
+  config->runtime_watch_frozen_ = true;
 
   return config;
 }

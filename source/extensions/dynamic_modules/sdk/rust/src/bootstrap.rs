@@ -299,10 +299,10 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// need to have a value yet, and its value when this is called is not reported. Read it with the
   /// runtime getters such as [`crate::get_runtime_bool`].
   ///
-  /// This must be called on the main thread, and can be called from the config creation function.
+  /// This can only be called from the config creation function.
   ///
-  /// Returns `false` if the key is empty or already watched, or once the server began to shut
-  /// down.
+  /// Returns `false` if the key is empty or already watched, or once the config creation function
+  /// returned.
   fn enable_runtime_update(&self, key: &str) -> bool;
 
   /// Returns the names of the currently active resources of the given kind, each at most once. See

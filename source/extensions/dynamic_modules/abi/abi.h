@@ -10537,7 +10537,7 @@ void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names
  *
  * When this is called, the runtime getters such as envoy_dynamic_module_callback_get_runtime_bool
  * already return the new values on the main thread. The worker threads observe the new snapshot
- * shortly after. The module can watch more keys from this hook.
+ * shortly after. The module cannot watch more keys from this hook.
  *
  * This hook is optional.
  *
@@ -10565,8 +10565,8 @@ void envoy_dynamic_module_on_bootstrap_extension_runtime_update(
  * a value yet. The module can read the current value with the runtime getters such as
  * envoy_dynamic_module_callback_get_runtime_bool.
  *
- * This can be called during or after envoy_dynamic_module_on_bootstrap_extension_config_new, and
- * must be called on the main thread.
+ * This can only be called during envoy_dynamic_module_on_bootstrap_extension_config_new, on the
+ * main thread.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
@@ -10574,8 +10574,9 @@ void envoy_dynamic_module_on_bootstrap_extension_runtime_update(
  * only read during the call.
  * @return true if the module now watches the key. Returns false when the key is empty or already
  * watched, when the module does not implement
- * envoy_dynamic_module_on_bootstrap_extension_runtime_update, once the server began to shut down,
- * or when called off the main thread. A call off the main thread also reports an Envoy bug.
+ * envoy_dynamic_module_on_bootstrap_extension_runtime_update, once
+ * envoy_dynamic_module_on_bootstrap_extension_config_new returned, or when called off the main
+ * thread. A call off the main thread also reports an Envoy bug.
  */
 bool envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,

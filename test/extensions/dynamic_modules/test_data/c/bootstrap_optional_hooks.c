@@ -9,7 +9,8 @@
 // reads the records through the accessors at the end of this file. With the config
 // "run_on_all_workers_at_startup", it posts a worker event from on_server_initialized, signals
 // that its initialization is complete from a later scheduler event, and counts the worker events
-// in the worker_events_total counter.
+// in the worker_events_total counter. With the config "watch_runtime_key", it watches the runtime
+// key "a" from on_bootstrap_extension_config_new.
 
 static envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr g_config_envoy_ptr = NULL;
 static envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr g_scheduler = NULL;
@@ -84,6 +85,12 @@ envoy_dynamic_module_on_bootstrap_extension_config_new(
   g_last_http_callout_result = -1;
   g_runtime_updates[0] = '\0';
   g_runtime_updates_length = 0;
+  static const char kWatchRuntimeKey[] = "watch_runtime_key";
+  if (config.length == sizeof(kWatchRuntimeKey) - 1 &&
+      memcmp(config.ptr, kWatchRuntimeKey, config.length) == 0) {
+    envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+        extension_config_envoy_ptr, (envoy_dynamic_module_type_module_buffer){"a", 1});
+  }
   if (!g_run_on_all_workers_at_startup) {
     envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
         extension_config_envoy_ptr);
@@ -324,7 +331,7 @@ void envoy_dynamic_module_on_bootstrap_extension_runtime_update(
     appendRuntimeUpdate(value.ptr, value.length);
   }
   appendRuntimeUpdate(";", 1);
-  // A change of "watch_more" starts watching "more" from the hook.
+  // A change of "watch_more" tries to watch "more" from the hook, which Envoy refuses.
   static const char kWatchMore[] = "watch_more";
   if (key.length == sizeof(kWatchMore) - 1 && memcmp(key.ptr, kWatchMore, key.length) == 0) {
     envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(

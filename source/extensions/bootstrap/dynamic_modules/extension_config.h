@@ -202,10 +202,10 @@ public:
   /**
    * Starts calling the module's runtime update hook when the value of the given runtime key changes
    * in a newly loaded runtime snapshot, compared with its value at the previous update, or when
-   * this was called. Must be called on the main thread.
+   * this was called. Must be called on the main thread during on_bootstrap_extension_config_new.
    * @param key the runtime key to watch.
    * @return false if the key is empty or already watched, if the module does not implement the
-   * hook, or once shutdown began.
+   * hook, or once on_bootstrap_extension_config_new returned.
    */
   bool enableRuntimeUpdate(absl::string_view key);
 
@@ -349,6 +349,9 @@ public:
   // Per-request label values use a stack-local Stats::StatNameDynamicPool in the increment
   // callbacks (see abi_impl.cc).
   bool stat_creation_frozen_ = false;
+  // The module can only watch runtime keys during on_bootstrap_extension_config_new, so that the
+  // runtime update hook cannot change the watched keys while Envoy iterates over them.
+  bool runtime_watch_frozen_ = false;
 
   // Temporary storage for the admin response body. Set by the
   // envoy_dynamic_module_callback_bootstrap_extension_admin_set_response callback during

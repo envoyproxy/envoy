@@ -89,9 +89,8 @@ changed, in lexicographic order. The value of a key when the module starts watch
 reported. When the hook runs, the runtime getters such as
 ``envoy_dynamic_module_callback_get_runtime_bool`` already return the new value on the main thread.
 
-The module can watch keys from ``envoy_dynamic_module_on_bootstrap_extension_config_new`` onwards,
-including from the runtime update hook. Watching fails once the server began to shut down, and no
-update is reported after that.
+The module can only watch keys during ``envoy_dynamic_module_on_bootstrap_extension_config_new``.
+No update is reported once the server began to shut down.
 
 .. _config_bootstrap_extensions_dynamic_modules_cluster_writer:
 
