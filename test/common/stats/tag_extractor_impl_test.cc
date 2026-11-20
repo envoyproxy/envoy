@@ -652,6 +652,9 @@ TEST(TagExtractorTest, GoogleGrpcClientPrefixTagExtractors) {
       "extension_config_discovery.http_filter.payments.v1.grpc.control.example.streams_total",
       "extension_config_discovery.http_filter.payments.v1.grpc.streams_total", {client});
 
+  tester.testRegex("listener_manager.lds.grpc.control.example.google_grpc_client_creation",
+                   "listener_manager.lds.grpc.google_grpc_client_creation", {client});
+
   // A resource can contain ".grpc." even when the metric is unrelated to the gRPC client.
   tester.testRegex("sds.cert.grpc.prod.key_rotation_failed", "sds.grpc.prod.key_rotation_failed",
                    {secret});

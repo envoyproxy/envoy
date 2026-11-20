@@ -9,6 +9,10 @@ namespace {
 
 const absl::string_view TAG_VALUE_REGEX = R"([^\.]+)";
 
+// Counters created by Grpc::GoogleAsyncClientImpl in the client scope.
+constexpr absl::string_view GOOGLE_GRPC_STAT_REGEX =
+    R"((?:google_grpc_client_creation|streams_(?:total|closed_[0-9]+)))";
+
 // To allow for more readable regular expressions to be declared below, and to
 // reduce duplication, define a few common pattern substitutions for regex
 // segments.
@@ -23,7 +27,7 @@ std::string expandRegex(const std::string& regex) {
               {"<TLS_VERSION>", R"(TLSv\d\.\d)"},
               // A generic name can contain any character except dots.
               {"<TAG_VALUE>", TAG_VALUE_REGEX},
-              {"<GRPC_STREAM_STAT>", R"(streams_(?:total|closed_[0-9]+))"},
+              {"<GOOGLE_GRPC_STAT>", GOOGLE_GRPC_STAT_REGEX},
               // Both the resource and client names may contain ".grpc.". If a second delimiter
               // could also introduce a client, the first alternative leaves the capture empty.
               {"<RESOURCE_GRPC_CLIENT>", R"(.+?\.grpc\.(?:(?:.*\.)?grpc\..+\.|((.+)\.)))"},
@@ -261,12 +265,12 @@ TagNameValues::TagNameValues() {
 
   // grpc.(<stat_prefix>).**
   addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "grpc.$.**");
-  // Capture the full client prefix up to the stream counter in a subscription scope.
-  addRe2(GOOGLE_GRPC_CLIENT_PREFIX, R"(^listener_manager\.lds\.grpc\.((.+)\.)<GRPC_STREAM_STAT>$)",
+  // Capture the full client prefix before the counter in a subscription scope.
+  addRe2(GOOGLE_GRPC_CLIENT_PREFIX, R"(^listener_manager\.lds\.grpc\.((.+)\.)<GOOGLE_GRPC_STAT>$)",
          ".grpc.");
-  addRe2(GOOGLE_GRPC_CLIENT_PREFIX, R"(^sds\.<RESOURCE_GRPC_CLIENT><GRPC_STREAM_STAT>$)", ".grpc.");
+  addRe2(GOOGLE_GRPC_CLIENT_PREFIX, R"(^sds\.<RESOURCE_GRPC_CLIENT><GOOGLE_GRPC_STAT>$)", ".grpc.");
   addRe2(GOOGLE_GRPC_CLIENT_PREFIX,
-         R"(^extension_config_discovery\.<TAG_VALUE>\.<RESOURCE_GRPC_CLIENT><GRPC_STREAM_STAT>$)",
+         R"(^extension_config_discovery\.<TAG_VALUE>\.<RESOURCE_GRPC_CLIENT><GOOGLE_GRPC_STAT>$)",
          ".grpc.");
 
   // listener.[<address>.]ssl.certificate.(<cert_name>).<metric_name> or

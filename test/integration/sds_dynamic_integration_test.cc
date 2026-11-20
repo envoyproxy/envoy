@@ -768,10 +768,13 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
     auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
     ASSERT_NE(nullptr, store);
     EXPECT_EQ(useExplicitStatsTags(), store->useExplicitTags());
-    expectStatTags("sds.server_cert_rsa.grpc.sds_cluster.lyft.com.streams_total",
-                   "sds.grpc.streams_total",
-                   {{"envoy.xds_resource_name", server_cert_rsa_},
-                    {"envoy.google_grpc_client_prefix", "sds_cluster.lyft.com"}});
+    for (const auto* counter :
+         {"google_grpc_client_creation", "streams_total", "streams_closed_12"}) {
+      expectStatTags(fmt::format("sds.server_cert_rsa.grpc.sds_cluster.lyft.com.{}", counter),
+                     fmt::format("sds.grpc.{}", counter),
+                     {{"envoy.xds_resource_name", server_cert_rsa_},
+                      {"envoy.google_grpc_client_prefix", "sds_cluster.lyft.com"}});
+    }
   }
 
   // Success
