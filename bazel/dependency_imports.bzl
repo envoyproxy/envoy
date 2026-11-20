@@ -67,7 +67,7 @@ def _container_images():
     )
 
 # go version for rules_go
-GO_VERSION = "1.27.3"
+GO_VERSION = "1.27.4"
 
 RUST_VERSION = "1.96.1"
 
