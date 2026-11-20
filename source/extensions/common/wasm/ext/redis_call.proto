@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package envoy.source.extensions.common.wasm;
+
+message RedisCallArguments {
+  // Must resolve, directly or via an envoy_internal address, to something speaking RESP2.
+  string cluster = 1;
+  repeated bytes command_args = 2;
+  // Mandatory, non-zero, and bounded (see kMaxRedisCallTimeoutMillis in context.cc).
+  uint32 timeout_millis = 3;
+};
+
+message RedisCallStartResult {
+  // Stable per plugin instance, so a module only needs to register on_queue_ready interest once.
+  uint32 queue_token = 1;
+  // Identifies this call's eventual RedisCallResult among others interleaved on the same queue.
+  uint32 call_id = 2;
+};
+
+// Delivered by enqueueing onto the queue identified by RedisCallStartResult.queue_token.
+// proxy-wasm only invokes onQueueReady on the queue owner's RootContext, so a module must use
+// origin_context_id, not the running Context, to route the result to the right caller.
+message RedisCallResult {
+  enum Status {
+    Unknown = 0; // Proto3's zero value, deliberately not a success state.
+    Ok = 1;
+    Failure = 2;
+  };
+  Status status = 1;
+  bytes response = 2;
+  uint32 call_id = 3;
+  uint32 origin_context_id = 4; // id() of the Context that issued the redis_call.
+};

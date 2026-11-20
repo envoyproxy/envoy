@@ -4,6 +4,7 @@
 #include <chrono>
 #include <map>
 #include <memory>
+#include <utility>
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.h"
@@ -26,6 +27,7 @@
 #include "source/extensions/common/wasm/stats_handler.h"
 #include "source/extensions/common/wasm/wasm_vm.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "include/proxy-wasm/exports.h"
 #include "include/proxy-wasm/wasm.h"
 
@@ -51,6 +53,12 @@ public:
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   Event::Dispatcher& dispatcher() { return dispatcher_; }
   Api::Api& api() { return api_; }
+
+  // Test-only stand-in for a loaded module's exported proxy_on_queue_ready, letting a test
+  // exercise the real enqueueSharedQueue -> onQueueReady dispatch path without a wasm binary.
+  void setOnQueueReadyForTesting(proxy_wasm::WasmCallVoid<2> on_queue_ready) {
+    on_queue_ready_ = std::move(on_queue_ready);
+  }
   Context* getRootContext(const std::shared_ptr<PluginBase>& plugin, bool allow_closed) override {
     return static_cast<Context*>(WasmBase::getRootContext(plugin, allow_closed));
   }
@@ -83,6 +91,32 @@ public:
       dns_token_++;
     } while (!dns_token_);
     return dns_token_;
+  }
+
+  // Unique per worker clone (vm_id() alone is copied verbatim across clones), used to keep each
+  // worker's redis_call shared queue distinct; see Context::redisCall().
+  uint64_t wasmInstanceId() const { return wasm_instance_id_; }
+
+  // Admission/correlation state for Context::redisCall(), stored on the Wasm VM rather than the
+  // RootContext because reconfiguration replaces the RootContext but the proxy-wasm shared-queue
+  // registry preserves queued-but-undrained results across that same re-registration. Keyed by
+  // (root_id(), plugin()->key()) rather than root_id() alone, since two PluginConfigs can share a
+  // root_id, and plugin()->key() additionally distinguishes concurrently-alive configuration
+  // generations during reconfiguration.
+  struct RedisCallState {
+    uint32_t queue_token = 0;
+    // Real serialized bytes of completed-but-undrained results only; an outstanding (not yet
+    // completed) call is not charged anything -- see Context::redisCall()'s comment.
+    uint64_t queued_bytes = 0;
+    uint32_t next_call_id = 1; // 0 is never issued as a call_id; see Context::redisCall().
+    // Every call_id currently sitting on the shared queue, undrained, with the bytes reserved
+    // for it. Shared queues are guest-writable, so dequeueSharedQueue() can't assume every
+    // dequeue is one of ours draining -- this map is checked against instead, using the
+    // (non-forgeable) size recorded here.
+    absl::flat_hash_map<uint32_t, size_t> queued_results;
+  };
+  RedisCallState& redisCallState(std::string_view root_id, std::string_view plugin_key) {
+    return redis_call_state_[std::make_pair(std::string(root_id), std::string(plugin_key))];
   }
 
   void setCreateContextForTesting(CreateContextFn create_context,
@@ -120,8 +154,17 @@ protected:
 
   CreateContextFn create_context_for_testing_;
   CreateContextFn create_root_context_for_testing_;
+  // Keyed by (root_id, plugin key); see redisCallState()'s comment.
+  absl::flat_hash_map<std::pair<std::string, std::string>, RedisCallState> redis_call_state_;
   Network::DnsResolverSharedPtr dns_resolver_;
   uint32_t dns_token_ = 1;
+  const uint64_t wasm_instance_id_ = nextWasmInstanceId();
+
+private:
+  static uint64_t nextWasmInstanceId() {
+    static std::atomic<uint64_t> next_id{1};
+    return next_id.fetch_add(1, std::memory_order_relaxed);
+  }
 };
 using WasmSharedPtr = std::shared_ptr<Wasm>;
 

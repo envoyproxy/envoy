@@ -1,5 +1,8 @@
+#include <utility>
+
 #include "source/common/common/logger.h"
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
+#include "source/extensions/common/wasm/ext/redis_call.pb.h"
 #include "source/extensions/common/wasm/ext/set_envoy_filter_state.pb.h"
 #include "source/extensions/common/wasm/ext/sign.pb.h"
 #include "source/extensions/common/wasm/ext/verify_signature.pb.h"
@@ -222,6 +225,32 @@ RegisterForeignFunction registerClearRouteCacheForeignFunction(
     [](WasmBase&, std::string_view, const std::function<void*(size_t size)>&) -> WasmResult {
       auto context = static_cast<Context*>(proxy_wasm::contextOrEffectiveContext());
       context->clearRouteCache();
+      return WasmResult::Ok;
+    });
+
+RegisterForeignFunction registerRedisCallForeignFunction(
+    "redis_call",
+    [](WasmBase&, std::string_view arguments,
+       const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
+      envoy::source::extensions::common::wasm::RedisCallArguments args;
+      if (!args.ParseFromString(arguments)) {
+        return WasmResult::BadArgument;
+      }
+      auto context = static_cast<Context*>(proxy_wasm::contextOrEffectiveContext());
+      std::vector<std::string> command_args(args.command_args().begin(), args.command_args().end());
+      uint32_t queue_token;
+      uint32_t call_id;
+      auto result = context->redisCall(args.cluster(), std::move(command_args),
+                                       args.timeout_millis(), &queue_token, &call_id);
+      if (result != WasmResult::Ok) {
+        return result;
+      }
+      envoy::source::extensions::common::wasm::RedisCallStartResult start_result;
+      start_result.set_queue_token(queue_token);
+      start_result.set_call_id(call_id);
+      auto size = start_result.ByteSizeLong();
+      auto output = alloc_result(size);
+      std::ignore = start_result.SerializeToArray(output, static_cast<int>(size));
       return WasmResult::Ok;
     });
 
