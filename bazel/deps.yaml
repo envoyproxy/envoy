@@ -1166,6 +1166,7 @@ rules_rust:
   project_url: "https://github.com/bazelbuild/rules_rust"
   release_date: "2026-08-28"
   use_category:
+  - build
   - controlplane
   - dataplane_core
   - dataplane_ext

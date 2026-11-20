@@ -4,6 +4,7 @@ load("@envoy_repo//:path.bzl", "PATH")
 load("@envoy_toolshed//:utils.bzl", "json_merge")
 load("@envoy_toolshed//dependency:macros.bzl", "release_date_updater")
 load("@envoy_toolshed//dependency:reachability.bzl", "dependency_reachability")
+load("@envoy_toolshed//dependency:sbom.bzl", "cyclonedx_sbom")
 load("@envoy_toolshed//dependency/cve:macros.bzl", "cve_scan")
 load("@rules_python//python:defs.bzl", "py_test")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
@@ -170,6 +171,25 @@ envoy_dependency_reachability(
         "v8_python_*",
     ],
     roots = ["//source/exe:main_common_with_all_extensions_lib"],
+)
+
+# A CycloneDX SBOM of the dependencies that are built into Envoy (with all of its extensions):
+# those that `:dep-reachability` reaches in production, with what `deps.yaml` and the module
+# graph say of them.
+cyclonedx_sbom(
+    name = "sbom",
+    # Rule sets and tools are used to build Envoy, and are not part of it.
+    build_categories = [
+        "build",
+        "test_only",
+    ],
+    dependencies = "//bazel:all_repository_locations",
+    description = "Cloud-native high-performance edge/middle/service proxy",
+    purl = "pkg:github/envoyproxy/envoy@v{version}",
+    reachability = ":dep-reachability",
+    subject = "envoy",
+    version_file = "//:VERSION.txt",
+    visibility = ["//visibility:public"],
 )
 
 py_test(
