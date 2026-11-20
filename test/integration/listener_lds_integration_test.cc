@@ -376,6 +376,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerMultiAddressesIntegrati
 
 // Tests that an update with an unknown filter config proto is rejected.
 TEST_P(ListenerIntegrationTest, CleanlyRejectsUnknownFilterConfigProto) {
+  // The rejected listener contains an unknown Any. The fixture's tag check reads /config_dump,
+  // which cannot serialize that Any to JSON.
+  skip_tag_extraction_rule_check_ = true;
   on_server_init_function_ = [&]() {
     createLdsStream();
     envoy::config::listener::v3::Listener listener =
