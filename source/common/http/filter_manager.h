@@ -28,6 +28,8 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
+#include "absl/container/inlined_vector.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -841,8 +843,9 @@ public:
    */
   bool aboveHighWatermark() { return high_watermark_count_ != 0; }
 
-  // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
-  // events for this stream and the downstream connection to the router filter.
+  // Pass on downstream watermark callbacks to watermark subscribers (e.g. the router filter on the
+  // downstream filter manager, or UpstreamCodecFilter and subscribed upstream filters on an
+  // UpstreamFilterManager).
   void callHighWatermarkCallbacks();
   void callLowWatermarkCallbacks();
 
@@ -852,6 +855,7 @@ public:
   // own pause/resume in step with the upstream.
   void callUpstreamHighWatermarkCallbacks();
   void callUpstreamLowWatermarkCallbacks();
+  uint32_t upstreamHighWatermarkCount() const { return upstream_high_watermark_count_; }
 
   void requestHeadersInitialized() {
     if (Http::Headers::get().MethodValues.Head ==
@@ -1222,12 +1226,58 @@ private:
   Buffer::InstancePtr buffered_response_data_;
   Buffer::InstancePtr buffered_request_data_;
   uint64_t buffer_limit_{0};
+  // Reentrancy-safe watermark callback list: removals during fanout tombstone the slot instead of
+  // invalidating iteration, and compaction runs once the outermost fanout finishes.
+  template <typename Callback> struct WatermarkCallbackList {
+    void add(Callback& cb, uint32_t current_high_count) {
+      ASSERT(std::find(callbacks_.begin(), callbacks_.end(), &cb) == callbacks_.end());
+      callbacks_.push_back(&cb);
+      for (uint32_t i = 0; i < current_high_count; ++i) {
+        if (i > 0 && std::find(callbacks_.begin(), callbacks_.end(), &cb) == callbacks_.end()) {
+          break;
+        }
+        cb.onAboveWriteBufferHighWatermark();
+      }
+    }
+
+    void remove(Callback& cb, bool allow_empty) {
+      auto it = std::find(callbacks_.begin(), callbacks_.end(), &cb);
+      if (it != callbacks_.end()) {
+        if (iterating_depth_ > 0) {
+          *it = nullptr;
+        } else {
+          callbacks_.erase(it);
+        }
+      } else {
+        ASSERT(allow_empty && std::all_of(callbacks_.begin(), callbacks_.end(),
+                                          [](const Callback* p) { return p == nullptr; }));
+      }
+    }
+
+    template <typename Fn> void forEach(Fn&& fn) {
+      ++iterating_depth_;
+      const size_t size = callbacks_.size();
+      for (size_t i = 0; i < size; ++i) {
+        if (Callback* cb = callbacks_[i]; cb != nullptr) {
+          fn(*cb);
+        }
+      }
+      if (--iterating_depth_ == 0) {
+        callbacks_.erase(std::remove(callbacks_.begin(), callbacks_.end(), nullptr),
+                         callbacks_.end());
+      }
+    }
+
+    absl::InlinedVector<Callback*, 4> callbacks_;
+    uint32_t iterating_depth_{0};
+  };
+
   uint32_t high_watermark_count_{0};
-  std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
+  WatermarkCallbackList<DownstreamWatermarkCallbacks> watermark_callbacks_;
   // Upstream-request watermark subscribers and the count of outstanding high watermarks, so a
   // filter subscribing mid-stream is brought up to the current back-pressure state.
   uint32_t upstream_high_watermark_count_{0};
-  std::list<UpstreamWatermarkCallbacks*> upstream_watermark_callbacks_;
+  WatermarkCallbackList<UpstreamWatermarkCallbacks> upstream_watermark_callbacks_;
   Network::Socket::OptionsSharedPtr upstream_options_;
   Upstream::LoadBalancerContext::OverrideHost upstream_override_host_;
 

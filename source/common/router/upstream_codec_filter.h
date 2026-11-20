@@ -116,6 +116,11 @@ private:
   }
   bool maybeHandleDeferredReset();
   std::string deferredResetDetails() const;
+  // Number of readDisable(true) calls applied to the upstream stream by this filter.
+  uint32_t upstream_read_disable_count_{0};
+  // High watermarks observed while no upstream stream existed (pre-onPoolReady or post-clear), so
+  // their matching low watermarks do not prematurely undo active readDisable(true) calls.
+  uint32_t unapplied_high_watermarks_{0};
 };
 
 class UpstreamCodecFilterFactory

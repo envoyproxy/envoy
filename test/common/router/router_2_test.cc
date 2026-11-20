@@ -118,6 +118,7 @@ class WatermarkTest : public RouterTestBase {
 public:
   WatermarkTest()
       : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
+    callbacks_.cluster_info_ = cm_.thread_local_cluster_.cluster_.info_;
     EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
     // Add default mock for requestBodyBufferLimit which is called during router initialization.
     EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
@@ -317,6 +318,24 @@ TEST_F(WatermarkTest, DelayUpstreamReadDisableBeforeResponse2) {
   response_decoder_->decodeData(data, true);
   // router filter no longer resets the stream due to upstream half closing first
   router_->onDestroy();
+}
+
+// Tests that if a deferred readDisable callback resets the upstream request during
+// onUpstreamHeaders(), Router::Filter does not forward response headers downstream.
+TEST_F(WatermarkTest, DeferredReadDisableResetSkipsEncodeHeaders) {
+  sendRequest(false);
+
+  ASSERT(callbacks_.callbacks_.begin() != callbacks_.callbacks_.end());
+  Envoy::Http::DownstreamWatermarkCallbacks* watermark_callbacks = *callbacks_.callbacks_.begin();
+  EXPECT_CALL(encoder_, getStream()).WillRepeatedly(ReturnRef(stream_));
+
+  EXPECT_CALL(stream_, readDisable(_)).Times(0u);
+  watermark_callbacks->onAboveWriteBufferHighWatermark();
+
+  EXPECT_CALL(stream_, readDisable(true)).WillOnce([this](bool) { router_->onDestroy(); });
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0u);
+  response_decoder_->decodeHeaders(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}, false);
 }
 
 TEST_F(WatermarkTest, FilterWatermarks) {
