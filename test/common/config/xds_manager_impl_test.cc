@@ -318,6 +318,54 @@ TEST_P(XdsManagerImplTest, ConfigTrackersReachXdstpAuthorityMux) {
   EXPECT_FALSE(authority_tracker->enabled());
 }
 
+class MockResponseAwareXdsConfigTracker : public MockXdsConfigTracker {
+public:
+  MOCK_METHOD(void, onConfigAcceptedWithResponse,
+              (const envoy::service::discovery::v3::DiscoveryResponse& message,
+               const std::vector<DecodedResourcePtr>& resources),
+              (override));
+  MOCK_METHOD(void, onConfigAcceptedWithResponse,
+              (const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+               absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+               const Protobuf::RepeatedPtrField<std::string>& removed_resources),
+              (override));
+};
+
+TEST(XdsConfigTrackersTest, AcceptedResponsesReachExistingAndResponseAwareTrackersOnce) {
+  testing::StrictMock<MockXdsConfigTracker> existing;
+  testing::StrictMock<MockResponseAwareXdsConfigTracker> response_aware;
+  XdsConfigTrackers trackers;
+  auto existing_handle = trackers.add(existing);
+  auto response_aware_handle = trackers.add(response_aware);
+
+  const std::vector<DecodedResourcePtr> resources;
+  envoy::service::discovery::v3::DiscoveryResponse sotw;
+  sotw.set_type_url("test-type");
+  sotw.set_version_info("sotw-version");
+  sotw.set_nonce("sotw-nonce");
+  EXPECT_CALL(existing, onConfigAccepted("test-type", testing::Ref(resources)));
+  EXPECT_CALL(response_aware, onConfigAccepted(_, _)).Times(0);
+  EXPECT_CALL(response_aware,
+              onConfigAcceptedWithResponse(testing::Ref(sotw), testing::Ref(resources)));
+  trackers.onConfigAcceptedWithResponse(sotw, resources);
+
+  envoy::service::discovery::v3::DeltaDiscoveryResponse delta;
+  delta.set_type_url("test-type");
+  delta.set_system_version_info("delta-version");
+  delta.set_nonce("delta-nonce");
+  envoy::service::discovery::v3::Resource added_resource;
+  std::vector<const envoy::service::discovery::v3::Resource*> added_resources{&added_resource};
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  removed_resources.Add("removed");
+  EXPECT_CALL(existing, onConfigAccepted("test-type", testing::ElementsAre(&added_resource),
+                                         testing::Ref(removed_resources)));
+  EXPECT_CALL(response_aware, onConfigAccepted(_, _, _)).Times(0);
+  EXPECT_CALL(response_aware, onConfigAcceptedWithResponse(testing::Ref(delta),
+                                                           testing::ElementsAre(&added_resource),
+                                                           testing::Ref(removed_resources)));
+  trackers.onConfigAcceptedWithResponse(delta, added_resources, removed_resources);
+}
+
 TEST(XdsConfigTrackersTest, RegistrationMayOutliveManager) {
   testing::StrictMock<MockXdsConfigTracker> tracker;
   Common::CallbackHandlePtr handle;

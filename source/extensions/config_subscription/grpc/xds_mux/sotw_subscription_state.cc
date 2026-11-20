@@ -80,7 +80,7 @@ void SotwSubscriptionState::handleGoodResponse(
 
   // Processing point when resources are successfully ingested.
   if (xds_config_tracker_.has_value() && xds_config_tracker_->enabled()) {
-    xds_config_tracker_->onConfigAccepted(message.type_url(), non_heartbeat_resources);
+    xds_config_tracker_->onConfigAcceptedWithResponse(message, non_heartbeat_resources);
   }
 
   // Send the resources to the xDS delegate, if configured.

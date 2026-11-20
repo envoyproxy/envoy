@@ -2097,18 +2097,31 @@ TEST_F(BootstrapAbiImplTest, XdsNotificationsRequireOptInAndReleaseOnDisableAndS
   Config::XdsConfigTrackers trackers;
   struct ObservedUpdates {
     mutable std::vector<envoy_dynamic_module_type_bootstrap_xds_update_status> values;
+    mutable std::vector<std::string> versions;
   };
   ObservedUpdates outcomes;
   config->in_module_config_ = &outcomes;
   config->on_bootstrap_extension_xds_update_ =
       [](auto, auto module, envoy_dynamic_module_type_envoy_buffer type_url, auto status,
-         envoy_dynamic_module_type_envoy_buffer error_details) {
+         envoy_dynamic_module_type_envoy_buffer error_details,
+         envoy_dynamic_module_type_envoy_buffer version,
+         envoy_dynamic_module_type_envoy_buffer nonce,
+         envoy_dynamic_module_type_envoy_buffer resource_name) {
         EXPECT_EQ(absl::string_view(type_url.ptr, type_url.length), "test-type");
         EXPECT_EQ(absl::string_view(error_details.ptr, error_details.length),
                   status == envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected
                       ? "rejected"
                       : "");
-        static_cast<const ObservedUpdates*>(module)->values.push_back(status);
+        const auto version_view = absl::string_view(version.ptr, version.length);
+        const bool unsubscribed =
+            status == envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed;
+        EXPECT_EQ(absl::string_view(nonce.ptr, nonce.length),
+                  version_view.empty() ? "" : absl::StrCat(version_view, "-nonce"));
+        EXPECT_EQ(absl::string_view(resource_name.ptr, resource_name.length),
+                  unsubscribed ? "resource" : "");
+        const auto* outcomes = static_cast<const ObservedUpdates*>(module);
+        outcomes->values.push_back(status);
+        outcomes->versions.emplace_back(version_view);
       };
   EXPECT_CALL(context_.xds_manager_, addXdsConfigTracker(_))
       .Times(2)
@@ -2122,33 +2135,43 @@ TEST_F(BootstrapAbiImplTest, XdsNotificationsRequireOptInAndReleaseOnDisableAndS
           config->thisAsVoidPtr(), true)));
   testing::NiceMock<Server::MockListenerManager> listener_manager;
   config->setListenerManager(listener_manager);
-  trackers.onConfigAccepted("test-type", std::vector<Config::DecodedResourcePtr>{});
+  envoy::service::discovery::v3::DiscoveryResponse sotw;
+  sotw.set_type_url("test-type");
+  sotw.set_version_info("sotw-version");
+  sotw.set_nonce("sotw-version-nonce");
+  envoy::service::discovery::v3::DeltaDiscoveryResponse delta;
+  delta.set_type_url("test-type");
+  delta.set_system_version_info("delta-version");
+  delta.set_nonce("delta-version-nonce");
+  trackers.onConfigAcceptedWithResponse(sotw, {});
   EXPECT_TRUE(outcomes.values.empty());
   EXPECT_TRUE(config->setXdsNotifications(true));
   EXPECT_TRUE(config->setXdsNotifications(true));
-  trackers.onConfigAccepted("test-type", std::vector<Config::DecodedResourcePtr>{});
-  trackers.onConfigAccepted("test-type", {}, {});
-  envoy::service::discovery::v3::DiscoveryResponse sotw;
-  sotw.set_type_url("test-type");
+  trackers.onConfigAcceptedWithResponse(sotw, {});
+  trackers.onConfigAcceptedWithResponse(delta, {}, {});
   trackers.onConfigRejected(sotw, "rejected");
-  envoy::service::discovery::v3::DeltaDiscoveryResponse delta;
-  delta.set_type_url("test-type");
   trackers.onConfigRejected(delta, "rejected");
   trackers.onResourceUnsubscribed("test-type", "resource");
+  trackers.onConfigAccepted("test-type", {});
+  trackers.onConfigAccepted("test-type", {}, {});
   EXPECT_THAT(
       outcomes.values,
       testing::ElementsAre(envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted,
                            envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted,
                            envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected,
                            envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected,
-                           envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed));
+                           envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed,
+                           envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted,
+                           envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted));
+  EXPECT_THAT(outcomes.versions, testing::ElementsAre("sotw-version", "delta-version",
+                                                      "sotw-version", "delta-version", "", "", ""));
   EXPECT_TRUE(config->setXdsNotifications(false));
-  trackers.onConfigAccepted("test-type", std::vector<Config::DecodedResourcePtr>{});
-  EXPECT_EQ(outcomes.values.size(), 5);
+  trackers.onConfigAcceptedWithResponse(sotw, {});
+  EXPECT_EQ(outcomes.values.size(), 7);
   EXPECT_TRUE(config->setXdsNotifications(true));
   config->onShutdown();
-  trackers.onConfigAccepted("test-type", std::vector<Config::DecodedResourcePtr>{});
-  EXPECT_EQ(outcomes.values.size(), 5);
+  trackers.onConfigAcceptedWithResponse(sotw, {});
+  EXPECT_EQ(outcomes.values.size(), 7);
   EXPECT_LOG_CONTAINS("error",
                       "cannot enable xDS notifications once shutdown started or in init only mode",
                       EXPECT_FALSE(config->setXdsNotifications(true)));
@@ -2159,7 +2182,8 @@ TEST_F(BootstrapAbiImplTest, XdsNotificationsRefusedWithoutHookOrInInitOnlyMode)
   testing::NiceMock<Server::MockListenerManager> listener_manager;
   config->setListenerManager(listener_manager);
   EXPECT_CALL(context_.xds_manager_, addXdsConfigTracker(_)).Times(0);
-  config->on_bootstrap_extension_xds_update_ = [](auto, auto, auto, auto, auto) {};
+  config->on_bootstrap_extension_xds_update_ = [](auto, auto, auto, auto, auto, auto, auto, auto) {
+  };
   ON_CALL(context_.options_, mode()).WillByDefault(testing::Return(Server::Mode::InitOnly));
   EXPECT_LOG_CONTAINS("error",
                       "cannot enable xDS notifications once shutdown started or in init only mode",
@@ -2184,11 +2208,17 @@ TEST_F(BootstrapAbiImplTest, XdsUnsubscriptionsArePostedAndCancelledWhenDisabled
   config->in_module_config_ = &outcomes;
   config->on_bootstrap_extension_xds_update_ =
       [](auto envoy, auto module, envoy_dynamic_module_type_envoy_buffer type_url, auto status,
-         envoy_dynamic_module_type_envoy_buffer error_details) {
+         envoy_dynamic_module_type_envoy_buffer error_details,
+         envoy_dynamic_module_type_envoy_buffer version,
+         envoy_dynamic_module_type_envoy_buffer nonce,
+         envoy_dynamic_module_type_envoy_buffer resource_name) {
         EXPECT_NE(envoy, nullptr);
         EXPECT_EQ(absl::string_view(type_url.ptr, type_url.length), "test-type");
         EXPECT_EQ(status, envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed);
         EXPECT_EQ(error_details.length, 0);
+        EXPECT_EQ(version.length, 0);
+        EXPECT_EQ(nonce.length, 0);
+        EXPECT_EQ(absl::string_view(resource_name.ptr, resource_name.length), "resource");
         ++static_cast<const ObservedUpdates*>(module)->count;
       };
   EXPECT_CALL(context_.xds_manager_, addXdsConfigTracker(_))
@@ -2199,7 +2229,8 @@ TEST_F(BootstrapAbiImplTest, XdsUnsubscriptionsArePostedAndCancelledWhenDisabled
   ASSERT_TRUE(config->setXdsNotifications(true));
   {
     const std::string type_url = "test-type";
-    trackers.onResourceUnsubscribed(type_url, "resource");
+    const std::string resource_name = "resource";
+    trackers.onResourceUnsubscribed(type_url, resource_name);
   }
   EXPECT_EQ(outcomes.count, 0);
   ASSERT_EQ(posts.size(), 1);
@@ -2234,7 +2265,7 @@ TEST_F(BootstrapAbiImplTest, XdsUnsubscriptionsAreDroppedAfterConfigDestruction)
   EXPECT_CALL(dispatcher_, post(_)).WillOnce([&](Event::PostCb callback) {
     post = std::move(callback);
   });
-  config->on_bootstrap_extension_xds_update_ = [](auto, auto, auto, auto, auto) {
+  config->on_bootstrap_extension_xds_update_ = [](auto, auto, auto, auto, auto, auto, auto, auto) {
     ADD_FAILURE() << "xDS callback invoked after module config destruction";
   };
   EXPECT_CALL(context_.xds_manager_, addXdsConfigTracker(_))
@@ -2252,7 +2283,7 @@ TEST_F(BootstrapAbiImplTest, XdsNotificationsReleaseBeforeModuleConfigDestructio
   Config::XdsConfigTrackers trackers;
   auto config = newOptionalHooksConfig();
   config->in_module_config_ = &trackers;
-  config->on_bootstrap_extension_xds_update_ = [](auto, auto, auto, auto, auto) {
+  config->on_bootstrap_extension_xds_update_ = [](auto, auto, auto, auto, auto, auto, auto, auto) {
     ADD_FAILURE() << "xDS callback invoked during module config destruction";
   };
   config->on_bootstrap_extension_config_destroy_ = [](auto module) {

@@ -9849,22 +9849,29 @@ void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
  * Unsubscribed is posted to the main dispatcher when a watch drops interest. Disabling
  * notifications discards pending unsubscriptions, even if re-enabled before delivery.
  *
- * Implementations must not block or reenter xDS processing. Events omit resource names,
- * response versions, nonces and payloads.
+ * Implementations must not block or reenter xDS processing. Resource payloads are not included.
+ * All buffers are borrowed for this call.
  *
  * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.
  * @param config_module_ptr is the pointer to the in-module bootstrap extension configuration.
- * @param type_url is the resource type URL, borrowed for this call.
+ * @param type_url is the resource type URL.
  * @param status is the processing outcome or client-initiated unsubscription.
  * @param error_details is the NACK message for Rejected, or empty otherwise. It may quote rejected
- * configuration and is borrowed for this call.
+ * configuration.
+ * @param version is version_info for SotW or system_version_info for Delta, or empty for
+ * Unsubscribed. A Delta system version is not a per-resource version.
+ * @param nonce is the response nonce for Accepted and Rejected, or empty for Unsubscribed.
+ * Nonces are scoped to an xDS stream and resource type.
+ * @param resource_name is the resource name for Unsubscribed, or empty otherwise.
  */
 void envoy_dynamic_module_on_bootstrap_extension_xds_update(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr config_module_ptr,
     envoy_dynamic_module_type_envoy_buffer type_url,
     envoy_dynamic_module_type_bootstrap_xds_update_status status,
-    envoy_dynamic_module_type_envoy_buffer error_details);
+    envoy_dynamic_module_type_envoy_buffer error_details,
+    envoy_dynamic_module_type_envoy_buffer version, envoy_dynamic_module_type_envoy_buffer nonce,
+    envoy_dynamic_module_type_envoy_buffer resource_name);
 
 // =============================================================================
 // Bootstrap Extension Callbacks

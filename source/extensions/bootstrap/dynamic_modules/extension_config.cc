@@ -171,49 +171,74 @@ bool DynamicModuleBootstrapExtensionConfig::setXdsNotifications(bool enabled) {
 
 void DynamicModuleBootstrapExtensionConfig::onConfigAccepted(
     absl::string_view type_url, const std::vector<Config::DecodedResourcePtr>&) {
-  notifyXdsUpdate(type_url, envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted);
+  notifyXdsUpdate(type_url, envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted, {}, {},
+                  {}, {});
 }
 
 void DynamicModuleBootstrapExtensionConfig::onConfigAccepted(
     absl::string_view type_url, absl::Span<const envoy::service::discovery::v3::Resource* const>,
     const Protobuf::RepeatedPtrField<std::string>&) {
-  notifyXdsUpdate(type_url, envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted);
+  notifyXdsUpdate(type_url, envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted, {}, {},
+                  {}, {});
+}
+
+void DynamicModuleBootstrapExtensionConfig::onConfigAcceptedWithResponse(
+    const envoy::service::discovery::v3::DiscoveryResponse& message,
+    const std::vector<Config::DecodedResourcePtr>&) {
+  notifyXdsUpdate(message.type_url(),
+                  envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted, {},
+                  message.version_info(), message.nonce(), {});
+}
+
+void DynamicModuleBootstrapExtensionConfig::onConfigAcceptedWithResponse(
+    const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+    absl::Span<const envoy::service::discovery::v3::Resource* const>,
+    const Protobuf::RepeatedPtrField<std::string>&) {
+  notifyXdsUpdate(message.type_url(),
+                  envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted, {},
+                  message.system_version_info(), message.nonce(), {});
 }
 
 void DynamicModuleBootstrapExtensionConfig::onConfigRejected(
     const envoy::service::discovery::v3::DiscoveryResponse& message,
     absl::string_view error_detail) {
   notifyXdsUpdate(message.type_url(),
-                  envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected, error_detail);
+                  envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected, error_detail,
+                  message.version_info(), message.nonce(), {});
 }
 
 void DynamicModuleBootstrapExtensionConfig::onConfigRejected(
     const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
     absl::string_view error_detail) {
   notifyXdsUpdate(message.type_url(),
-                  envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected, error_detail);
+                  envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected, error_detail,
+                  message.system_version_info(), message.nonce(), {});
 }
 
 void DynamicModuleBootstrapExtensionConfig::onResourceUnsubscribed(absl::string_view type_url,
-                                                                   absl::string_view) {
+                                                                   absl::string_view resource) {
   // unsubscription can happen while the cluster manager is destroying a cluster
   main_thread_dispatcher_.post([weak_config = weak_from_this(), type_url = std::string(type_url),
+                                resource_name = std::string(resource),
                                 generation = xds_notifications_generation_]() {
     auto config = weak_config.lock();
     if (config != nullptr && config->xds_update_handle_ != nullptr &&
         config->xds_notifications_generation_ == generation) {
       config->notifyXdsUpdate(type_url,
-                              envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed);
+                              envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed,
+                              {}, {}, {}, resource_name);
     }
   });
 }
 
 void DynamicModuleBootstrapExtensionConfig::notifyXdsUpdate(
     absl::string_view type_url, envoy_dynamic_module_type_bootstrap_xds_update_status status,
-    absl::string_view error_detail) {
-  on_bootstrap_extension_xds_update_(thisAsVoidPtr(), in_module_config_,
-                                     {type_url.data(), type_url.size()}, status,
-                                     {error_detail.data(), error_detail.size()});
+    absl::string_view error_detail, absl::string_view version, absl::string_view nonce,
+    absl::string_view resource_name) {
+  on_bootstrap_extension_xds_update_(
+      thisAsVoidPtr(), in_module_config_, {type_url.data(), type_url.size()}, status,
+      {error_detail.data(), error_detail.size()}, {version.data(), version.size()},
+      {nonce.data(), nonce.size()}, {resource_name.data(), resource_name.size()});
 }
 
 void DynamicModuleBootstrapExtensionConfig::getActiveResourceNames(

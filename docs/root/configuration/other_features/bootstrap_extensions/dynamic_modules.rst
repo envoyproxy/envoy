@@ -183,8 +183,9 @@ xDS Notifications
 
 After server initialization, enable gRPC xDS notifications with
 ``envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications``. The optional
-``envoy_dynamic_module_on_bootstrap_extension_xds_update`` hook receives the resource type URL,
-outcome and rejection error details. Enabling fails in ``--mode init_only``.
+``envoy_dynamic_module_on_bootstrap_extension_xds_update`` hook receives the resource type URL
+and outcome. Accepted and rejected responses include their version and nonce; unsubscriptions
+include the resource name. Enabling fails in ``--mode init_only``.
 
 Accepted follows successful processing, before ACK; resources may still be warming.
 Rejected precedes NACK and may follow partial application. Its error details are the NACK
@@ -197,8 +198,9 @@ cluster destruction.
 Disabling notifications discards queued unsubscriptions. Re-enabling does not replay them.
 Delivery stops when shutdown begins.
 
-Events support per-type metrics and scheduling config collection. They omit resource names,
-response versions, nonces and payloads. Strings are valid only during the callback.
+The version is ``version_info`` for SotW and ``system_version_info`` for Delta. A Delta system
+version is not a per-resource version, and nonces are scoped to an xDS stream and resource type.
+Resource payloads are not included. Strings are valid only during the callback.
 
 Use Cases
 ---------

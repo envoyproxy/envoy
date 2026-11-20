@@ -210,6 +210,13 @@ public:
   onConfigAccepted(absl::string_view type_url,
                    absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
                    const Protobuf::RepeatedPtrField<std::string>& removed_resources) override;
+  void
+  onConfigAcceptedWithResponse(const envoy::service::discovery::v3::DiscoveryResponse& message,
+                               const std::vector<Config::DecodedResourcePtr>& resources) override;
+  void onConfigAcceptedWithResponse(
+      const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+      absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources) override;
   void onConfigRejected(const envoy::service::discovery::v3::DiscoveryResponse& message,
                         absl::string_view error_detail) override;
   void onConfigRejected(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
@@ -370,7 +377,8 @@ public:
 private:
   void notifyXdsUpdate(absl::string_view type_url,
                        envoy_dynamic_module_type_bootstrap_xds_update_status status,
-                       absl::string_view error_detail = {});
+                       absl::string_view error_detail, absl::string_view version,
+                       absl::string_view nonce, absl::string_view resource_name);
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP

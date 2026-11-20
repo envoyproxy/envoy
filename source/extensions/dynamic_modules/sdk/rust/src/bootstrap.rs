@@ -1,4 +1,3 @@
-pub use crate::abi::envoy_dynamic_module_type_bootstrap_xds_update_status as XdsUpdateStatus;
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::EnvoyBuffer;
 use crate::{
@@ -37,6 +36,25 @@ pub enum ActiveResourceKind {
   /// The names of the delivered dynamic (SDS) secrets: TLS certificates, certificate validation
   /// contexts, session ticket keys and generic secrets.
   Secret,
+}
+
+/// An xDS processing outcome or client-initiated unsubscription.
+///
+/// Versions are `version_info` for SotW or `system_version_info` for Delta, rather than
+/// per-resource versions. Nonces are scoped to the xDS stream and resource type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum XdsUpdate<'a> {
+  /// A response was accepted.
+  Accepted { version: &'a str, nonce: &'a str },
+  /// A response was rejected. The version and nonce identify the rejected response;
+  /// `error_details` is the NACK message and may quote rejected configuration.
+  Rejected {
+    version: &'a str,
+    nonce: &'a str,
+    error_details: &'a str,
+  },
+  /// A watch dropped interest in this resource.
+  Unsubscribed { resource_name: &'a str },
 }
 
 /// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
@@ -641,18 +659,16 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   /// Reports gRPC xDS outcomes on the main thread. Must not block or reenter xDS processing.
   ///
   /// Accepted follows successful response processing, before ACK; resources may still be warming.
-  /// Rejected precedes NACK and may follow partial application. `error_details` is the NACK
-  /// message, which may quote rejected configuration, and is empty for other outcomes.
+  /// Rejected precedes NACK and may follow partial application.
   /// Unsubscribed is posted when a watch drops interest. Disabling notifications discards pending
   /// unsubscriptions, even if re-enabled before delivery.
   ///
-  /// Events omit resource names, response versions, nonces and payloads.
+  /// Resource payloads are not included. Update metadata is borrowed for this call.
   fn on_xds_update(
     &self,
     _envoy: &mut dyn EnvoyBootstrapExtensionConfig,
     _type_url: &str,
-    _status: XdsUpdateStatus,
-    _error_details: &str,
+    _update: XdsUpdate<'_>,
   ) {
   }
 
@@ -2179,26 +2195,44 @@ ffi_export! {
   /// Forwards an xDS outcome to the bootstrap config.
   ///
   /// # Safety
-  /// All pointers and the status must satisfy the Envoy dynamic module ABI. The URL and error
-  /// details are valid only during this call; the module config remains live until it returns.
+  /// All pointers and the status must satisfy the Envoy dynamic module ABI. Buffers and the
+  /// module config remain valid until this call returns.
   unsafe fn envoy_dynamic_module_on_bootstrap_extension_xds_update(
     envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
     config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
     type_url: abi::envoy_dynamic_module_type_envoy_buffer,
-    status: XdsUpdateStatus,
+    status: abi::envoy_dynamic_module_type_bootstrap_xds_update_status,
     error_details: abi::envoy_dynamic_module_type_envoy_buffer,
+    version: abi::envoy_dynamic_module_type_envoy_buffer,
+    nonce: abi::envoy_dynamic_module_type_envoy_buffer,
+    resource_name: abi::envoy_dynamic_module_type_envoy_buffer,
   ) {
+    use abi::envoy_dynamic_module_type_bootstrap_xds_update_status as Status;
+
     let config = unsafe { &**(config_ptr as *const *const dyn BootstrapExtensionConfig) };
-    let bytes = unsafe {
-      crate::ffi_helpers::slice_from_raw_or_empty(type_url.ptr.cast::<u8>(), type_url.length)
+    let [Ok(type_url), Ok(version), Ok(nonce), Ok(resource_name)] =
+      [type_url, version, nonce, resource_name].map(|buffer| {
+        std::str::from_utf8(unsafe {
+          crate::ffi_helpers::slice_from_raw_or_empty(buffer.ptr.cast::<u8>(), buffer.length)
+        })
+      })
+    else {
+      return;
     };
-    if let Ok(type_url) = std::str::from_utf8(bytes) {
-      let error_details = unsafe {
-        crate::ffi_helpers::str_lossy_from_raw(error_details.ptr.cast::<u8>(), error_details.length)
-      };
-      let mut envoy = EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr);
-      config.on_xds_update(&mut envoy, type_url, status, error_details.as_ref());
-    }
+    let error_details = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(error_details.ptr.cast::<u8>(), error_details.length)
+    };
+    let update = match status {
+      Status::Accepted => XdsUpdate::Accepted { version, nonce },
+      Status::Rejected => XdsUpdate::Rejected {
+        version,
+        nonce,
+        error_details: error_details.as_ref(),
+      },
+      Status::Unsubscribed => XdsUpdate::Unsubscribed { resource_name },
+    };
+    let mut envoy = EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr);
+    config.on_xds_update(&mut envoy, type_url, update);
   }
 }
 

@@ -56,6 +56,15 @@ public:
                                 const std::vector<DecodedResourcePtr>& resources) PURE;
 
   /**
+   * Includes the accepted SotW response. Forwards to onConfigAccepted by default.
+   */
+  virtual void
+  onConfigAcceptedWithResponse(const envoy::service::discovery::v3::DiscoveryResponse& message,
+                               const std::vector<DecodedResourcePtr>& resources) {
+    onConfigAccepted(message.type_url(), resources);
+  }
+
+  /**
    * Invoked when Delta xDS configuration updates have been successfully accepted, applied on
    * the Envoy instance, and are about to be ACK'ed.
    *
@@ -72,6 +81,16 @@ public:
   onConfigAccepted(const absl::string_view type_url,
                    absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
                    const Protobuf::RepeatedPtrField<std::string>& removed_resources) PURE;
+
+  /**
+   * Includes the accepted Delta response. Forwards to onConfigAccepted by default.
+   */
+  virtual void onConfigAcceptedWithResponse(
+      const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+      absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
+    onConfigAccepted(message.type_url(), added_resources, removed_resources);
+  }
 
   /**
    * Invoked when xds configs are rejected during xDS ingestion.

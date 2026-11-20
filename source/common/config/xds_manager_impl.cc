@@ -686,6 +686,22 @@ void XdsConfigTrackers::onConfigAccepted(
   });
 }
 
+void XdsConfigTrackers::onConfigAcceptedWithResponse(
+    const envoy::service::discovery::v3::DiscoveryResponse& message,
+    const std::vector<DecodedResourcePtr>& resources) {
+  forEach(
+      [&](XdsConfigTracker& tracker) { tracker.onConfigAcceptedWithResponse(message, resources); });
+}
+
+void XdsConfigTrackers::onConfigAcceptedWithResponse(
+    const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+    absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
+  forEach([&](XdsConfigTracker& tracker) {
+    tracker.onConfigAcceptedWithResponse(message, added_resources, removed_resources);
+  });
+}
+
 void XdsConfigTrackers::onConfigRejected(
     const envoy::service::discovery::v3::DiscoveryResponse& message,
     absl::string_view error_detail) {

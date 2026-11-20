@@ -105,14 +105,21 @@ public:
     ASSERT_TRUE(compareDiscoveryRequest(cluster_type, "1", {}, {}, {}, true));
     ASSERT_TRUE(compareDiscoveryRequest(endpoint_type, "1", {"eds_cluster"}, {}, {}, true));
     test_server_->waitUntilListenersReady();
+    const auto updates = writerModuleRequest("/xds", "", "");
+    const auto response_version = delta ? "system_version_info_this_is_a_test" : "1";
+    EXPECT_THAT(updates, testing::HasSubstr(absl::StrCat("Accepted: ", cluster_type, ": ",
+                                                         response_version, ": nonce")));
+    EXPECT_THAT(updates, testing::HasSubstr(absl::StrCat("Accepted: ", endpoint_type, ": ",
+                                                         response_version, ": nonce")));
 
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cluster_type, {}, {},
                                                                {"eds_cluster"}, "2");
     ASSERT_TRUE(compareDiscoveryRequest(endpoint_type, "1", {}, {}, {"eds_cluster"}, true));
     ASSERT_TRUE(compareDiscoveryRequest(cluster_type, "2", {}, {}, {}, true));
     test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Eq(1));
-    EXPECT_THAT(writerModuleRequest("/xds", "", ""),
-                testing::HasSubstr(absl::StrCat("Unsubscribed: ", endpoint_type, ": \n")));
+    EXPECT_THAT(
+        writerModuleRequest("/xds", "", ""),
+        testing::HasSubstr(absl::StrCat("Unsubscribed: ", endpoint_type, ": eds_cluster\n")));
   }
 
   // Starts Envoy with a Rust writer test module, which gets the serialized startup resource as its
@@ -401,9 +408,13 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, XdsOutcomesRust) {
   const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
   ASSERT_TRUE(compareSotwDiscoveryRequest(type_url, "", {}, true));
   sendSotwDiscoveryResponse<envoy::config::cluster::v3::Cluster>(type_url, {}, "1");
-  ASSERT_TRUE(compareSotwDiscoveryRequest(type_url, "1", {}));
+  envoy::service::discovery::v3::DiscoveryRequest ack;
+  ASSERT_TRUE(xds_stream_->waitForGrpcMessage(*dispatcher_, ack));
+  EXPECT_EQ(ack.type_url(), type_url);
+  EXPECT_EQ(ack.version_info(), "1");
+  EXPECT_EQ(ack.error_detail().code(), Grpc::Status::WellKnownGrpcStatus::Ok);
   test_server_->waitUntilListenersReady();
-  const auto accepted = fmt::format("Accepted: {}: \n", type_url);
+  const auto accepted = fmt::format("Accepted: {}: 1: {}\n", type_url, ack.response_nonce());
   EXPECT_EQ(writerModuleRequest("/xds", "", ""), accepted);
 
   sendSotwDiscoveryResponse<envoy::config::listener::v3::Listener>(
@@ -414,7 +425,8 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, XdsOutcomesRust) {
   EXPECT_EQ(nack.version_info(), "1");
   ASSERT_FALSE(nack.error_detail().message().empty());
   const auto rejected =
-      absl::StrCat(accepted, "Rejected: ", type_url, ": ", nack.error_detail().message(), "\n");
+      absl::StrCat(accepted, "Rejected: ", type_url, ": 2: ", nack.response_nonce(), ": ",
+                   nack.error_detail().message(), "\n");
   EXPECT_EQ(writerModuleRequest("/xds", "", ""), rejected);
 
   sendSotwDiscoveryResponse<envoy::config::cluster::v3::Cluster>(type_url, {}, "3");

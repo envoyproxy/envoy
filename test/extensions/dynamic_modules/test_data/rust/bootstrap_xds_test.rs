@@ -51,23 +51,40 @@ impl BootstrapExtensionConfig for XdsConfig {
     &self,
     envoy: &mut dyn EnvoyBootstrapExtensionConfig,
     type_url: &str,
-    status: XdsUpdateStatus,
-    error_details: &str,
+    update: XdsUpdate<'_>,
   ) {
-    if status == XdsUpdateStatus::Rejected {
-      assert!(envoy.set_xds_notifications(false));
+    match update {
+      XdsUpdate::Accepted { version, nonce } => {
+        writeln!(
+          self.updates.lock().unwrap(),
+          "Accepted: {type_url}: {version}: {nonce}"
+        )
+        .unwrap();
+      },
+      XdsUpdate::Rejected {
+        version,
+        nonce,
+        error_details,
+      } => {
+        assert!(envoy.set_xds_notifications(false));
+        writeln!(
+          self.updates.lock().unwrap(),
+          "Rejected: {type_url}: {version}: {nonce}: {error_details}"
+        )
+        .unwrap();
+      },
+      XdsUpdate::Unsubscribed { resource_name } => {
+        assert!(!envoy
+          .active_resource_names(ActiveResourceKind::Cluster)
+          .iter()
+          .any(|name| name == "eds_cluster"));
+        writeln!(
+          self.updates.lock().unwrap(),
+          "Unsubscribed: {type_url}: {resource_name}"
+        )
+        .unwrap();
+      },
     }
-    if status == XdsUpdateStatus::Unsubscribed {
-      assert!(!envoy
-        .active_resource_names(ActiveResourceKind::Cluster)
-        .iter()
-        .any(|name| name == "eds_cluster"));
-    }
-    writeln!(
-      self.updates.lock().unwrap(),
-      "{status:?}: {type_url}: {error_details}"
-    )
-    .unwrap();
   }
 }
 

@@ -444,7 +444,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
 
     // Processing point when resources are successfully ingested.
     if (xds_config_tracker_.has_value() && xds_config_tracker_->enabled()) {
-      xds_config_tracker_->onConfigAccepted(type_url, resources);
+      xds_config_tracker_->onConfigAcceptedWithResponse(*message, resources);
     }
   }
   END_TRY
