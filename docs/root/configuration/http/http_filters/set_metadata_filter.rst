@@ -27,7 +27,8 @@ Configuration
 The filter can be configured with multiple metadata entries, each targeting a specific namespace.
 Each entry can contain static values, copy a filter state object via
 ``filter_state``, or use the deprecated legacy configuration format. If an entry sets more than one
-of ``filter_state``, ``value`` and ``typed_value``, ``filter_state`` takes precedence, then ``value``.
+of ``filter_state``, ``value`` and ``typed_value``, ``filter_state`` takes precedence, then ``value``,
+then ``typed_value``.
 
 Metadata Merge Rules
 --------------------
