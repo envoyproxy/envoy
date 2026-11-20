@@ -2789,17 +2789,7 @@ message RateLimit {
   //   This is not supported if the rate limit action is configured in the ``typed_per_filter_config`` like
   //   :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or
   //   :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`, etc.
-  //
-  // .. attention::
-  //
-  //   This field is deprecated along with the route level :ref:`RouteAction.rate_limits
-  //   <envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` and virtual host level
-  //   :ref:`VirtualHost.rate_limits <envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>`.
-  google.protobuf.UInt32Value stage = 1 [
-    deprecated = true,
-    (validate.rules).uint32 = {lte: 10},
-    (envoy.annotations.deprecated_at_minor_version) = "3.0"
-  ];
+  google.protobuf.UInt32Value stage = 1 [(validate.rules).uint32 = {lte: 10}];
 
   // The key to be set in runtime to disable this rate limit configuration.
   //
@@ -2807,14 +2797,7 @@ message RateLimit {
   //   This is not supported if the rate limit action is configured in the ``typed_per_filter_config`` like
   //   :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or
   //   :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`, etc.
-  //
-  // .. attention::
-  //
-  //   This field is deprecated along with the route level :ref:`RouteAction.rate_limits
-  //   <envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` and virtual host level
-  //   :ref:`VirtualHost.rate_limits <envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>`.
-  string disable_key = 2
-      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+  string disable_key = 2;
 
   // A list of actions that are to be applied for this rate limit configuration.
   // Order matters as the actions are processed sequentially and the descriptor

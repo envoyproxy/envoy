@@ -7,9 +7,7 @@ fields. Use :ref:`RateLimitPerRoute.rate_limits
 filter instead, or :ref:`rate_limits
 <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limits>` of the
 local rate limit filter.
-The fields that only apply to these deprecated fields are deprecated as well: the
-:ref:`stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>` and :ref:`disable_key
-<envoy_v3_api_field_config.route.v3.RateLimit.disable_key>` of the rate limit config, ``stage`` of the
+The fields that only apply to these deprecated fields are deprecated as well: ``stage`` of the
 :ref:`rate limit filter <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.stage>`
 and the :ref:`local rate limit filter
 <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.stage>`,
