@@ -74,6 +74,12 @@ using OnBootstrapExtensionClusterWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done);
 using OnBootstrapExtensionListenerWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done);
+using OnBootstrapExtensionRuntimeBoolUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update);
+using OnBootstrapExtensionRuntimeIntUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_int_update);
+using OnBootstrapExtensionRuntimeNumberUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_number_update);
 
 class DynamicModuleBootstrapExtension;
 
@@ -255,6 +261,11 @@ public:
   void onExtensionDestroyed();
 
   /**
+   * Whether the server began to shut down or the extension was destroyed.
+   */
+  bool shutdownStarted() const { return shutdown_started_; }
+
+  /**
    * Returns the admin server, or nothing once the extension is destroyed.
    */
   OptRef<Server::Admin> admin();
@@ -293,6 +304,10 @@ public:
       on_bootstrap_extension_cluster_writer_update_done_ = nullptr;
   OnBootstrapExtensionListenerWriterUpdateDoneType
       on_bootstrap_extension_listener_writer_update_done_ = nullptr;
+  OnBootstrapExtensionRuntimeBoolUpdateType on_bootstrap_extension_runtime_bool_update_ = nullptr;
+  OnBootstrapExtensionRuntimeIntUpdateType on_bootstrap_extension_runtime_int_update_ = nullptr;
+  OnBootstrapExtensionRuntimeNumberUpdateType on_bootstrap_extension_runtime_number_update_ =
+      nullptr;
 
   // The name of the extension.
   const std::string extension_name_;

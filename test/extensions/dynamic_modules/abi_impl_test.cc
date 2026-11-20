@@ -669,6 +669,9 @@ WEAK_STUB(BootstrapExtensionEnableClusterLifecycle,
           envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(nullptr))
 WEAK_STUB(BootstrapExtensionEnableListenerLifecycle,
           envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr))
+WEAK_STUB(BootstrapExtensionEnableRuntimeUpdate,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(nullptr,
+                                                                                  {nullptr, 0}))
 WEAK_STUB(BootstrapExtensionRunOnAllWorkers,
           envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(nullptr, 1))
 WEAK_STUB(BootstrapExtensionEnableClusterWriter,
