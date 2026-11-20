@@ -105,6 +105,30 @@ request, the latter is recorded when the headers end the stream. Envoy records
 records ``last_downstream_ack_received_ns`` when it tracks the final ACK, currently for QUIC. The
 markers do not by themselves measure body buffering or processing.
 
+Nested HTTP metadata in Rust
+----------------------------
+
+The Rust SDK's nested metadata getters take a path of literal field names and zero-based list
+indices, starting with a field name. Use ``metadata_path!`` to build the path from borrowed
+strings and ``usize`` indices.
+
+Inside an HTTP filter hook, this example reads the first role from JWT claims stored under
+``claims`` by the JWT authentication filter's ``payload_in_metadata`` setting.
+
+.. code-block:: rust
+
+   use envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_module_type_metadata_source::Dynamic;
+   use envoy_proxy_dynamic_modules_rust_sdk::metadata_path;
+
+   let role = envoy_filter.get_metadata_nested_string(
+       Dynamic,
+       "envoy.filters.http.jwt_authn",
+       &metadata_path!["claims", "roles", 0],
+   );
+
+The getter returns ``None`` if the path cannot be resolved or the selected value has a different
+type.
+
 Compatibility
 --------------------------
 
