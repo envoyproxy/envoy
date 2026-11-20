@@ -112,6 +112,8 @@ yarn-error.log*
 /contrib/golang/**/test_data/*/go.sum
 /devcontainer/devcontainer.env
 /docs/landing_source/.bundle
+# Sandbox screenshots come from each example's `_static/` in envoyproxy/examples: do not commit them
+/docs/root/start/sandboxes/_static
 /linux
 examples/single-page-app/xds/lds.yml
 examples/websocket/certs
