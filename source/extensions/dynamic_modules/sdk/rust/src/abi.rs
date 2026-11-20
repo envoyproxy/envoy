@@ -11063,10 +11063,10 @@ unsafe extern "C" {
  selection collects nothing. Endpoint dumps are not included. Cost grows with the selected
  resources, so combine frequent notifications into one collection.
 
- Collection is refused in hooks Envoy runs inside an xDS update or a resource's destruction, where
- providers can contain partial changes under the previous version. Defer collection with the
- bootstrap config scheduler. Callout failures during cluster removal are already reported from a
- posted callback.
+ Collection is refused in cluster or listener lifecycle hooks, whatever triggered them, and in
+ other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction. Providers can
+ contain partial changes under the previous version. Defer collection with the bootstrap config
+ scheduler. Callout failures during cluster removal are already reported from a posted callback.
 
  Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
  configuration may retain sensitive data. No admin listener is needed, and admin allow_paths does

@@ -9601,8 +9601,9 @@ typedef enum envoy_dynamic_module_type_bootstrap_config_snapshot_result {
   // the snapshot was collected and redacted
   envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success = 0,
   // called off the main thread, before
-  // envoy_dynamic_module_on_bootstrap_extension_server_initialized, during shutdown, from a hook
-  // Envoy runs inside an xDS update or a resource's destruction, or while another collection runs
+  // envoy_dynamic_module_on_bootstrap_extension_server_initialized, during shutdown, from a
+  // cluster or listener lifecycle hook, whatever triggered it, from another bootstrap hook Envoy
+  // runs inside an xDS update or a resource's destruction, or while another collection runs
   envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed = 1,
   // the name regex is invalid or its RE2 program size exceeds re2.max_program_size.error_level
   envoy_dynamic_module_type_bootstrap_config_snapshot_result_InvalidRegex = 2,
@@ -10611,10 +10612,10 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
  * selection collects nothing. Endpoint dumps are not included. Cost grows with the selected
  * resources, so combine frequent notifications into one collection.
  *
- * Collection is refused in hooks Envoy runs inside an xDS update or a resource's destruction, where
- * providers can contain partial changes under the previous version. Defer collection with the
- * bootstrap config scheduler. Callout failures during cluster removal are already reported from a
- * posted callback.
+ * Collection is refused in cluster or listener lifecycle hooks, whatever triggered them, and in
+ * other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction. Providers can
+ * contain partial changes under the previous version. Defer collection with the bootstrap config
+ * scheduler. Callout failures during cluster removal are already reported from a posted callback.
  *
  * Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
  * configuration may retain sensitive data. No admin listener is needed, and admin allow_paths does
