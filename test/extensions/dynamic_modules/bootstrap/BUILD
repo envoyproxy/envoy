@@ -28,6 +28,7 @@ envoy_extension_cc_test(
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@xds//udpa/type/v1:pkg_cc_proto",
         "@xds//xds/type/v3:pkg_cc_proto",
     ],
 )

@@ -194,9 +194,14 @@ The first subscriber keeps the name until its subscription ends. The bootstrap s
 when shutdown begins.
 
 ``envoy_dynamic_module_on_bootstrap_extension_ecds_update`` receives the resource name, version,
-payload type and configuration on the main thread. Payloads use the startup configuration
-encoding. For types that Envoy does not link, use ``TypedStruct`` so the config dump can render
-them. Identical resends and empty state-of-the-world updates do not invoke the hook.
+payload type, encoding and configuration on the main thread. ``Struct`` and ``TypedStruct.value``
+arrive as JSON, ``StringValue`` and ``BytesValue`` as unwrapped bytes, and other messages as
+protobuf bytes. xDS-TP names have sorted context parameters. Filesystem updates without
+``version_info`` have an empty version.
+
+For types that Envoy does not link, use ``TypedStruct``, or send binary payloads as ``BytesValue``;
+an accepted payload that Envoy cannot render fails the whole unfiltered config dump. Identical
+resends and empty state-of-the-world updates do not invoke the hook.
 
 The hook must not block. Rejecting an update keeps the previous configuration and NACKs the
 response, which may contain other ECDS resources. Explicit removals and TTL expiry invoke the

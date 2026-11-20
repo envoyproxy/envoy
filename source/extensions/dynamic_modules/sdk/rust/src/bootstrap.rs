@@ -1,3 +1,4 @@
+pub use crate::abi::envoy_dynamic_module_type_bootstrap_ecds_config_encoding as EcdsConfigEncoding;
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::EnvoyBuffer;
 use crate::{
@@ -33,14 +34,16 @@ pub struct EcdsSubscription<'a> {
 /// A changed or removed ECDS resource. Buffers are borrowed for the hook invocation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EcdsUpdate<'a> {
-  /// A configuration with its SotW response version or Delta resource version.
+  /// A configuration with its SotW response version or Delta resource version. Filesystem
+  /// updates may have an empty version. xDS-TP names have sorted context parameters.
   Config {
     name: &'a str,
     version: &'a str,
     type_url: &'a str,
+    encoding: EcdsConfigEncoding,
     config: &'a [u8],
   },
-  /// An explicit removal or TTL expiry.
+  /// An explicit removal or TTL expiry. Delta may report a missing resource before any config.
   Removed { name: &'a str },
 }
 
@@ -307,9 +310,10 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// the hook before this call returns; do not hold a lock across it that the hook takes.
   ///
   /// Returns false before server initialization, after shutdown, in `--mode init_only`, if already
-  /// subscribed, or if the name or source is invalid or in use. ADS and xDS-TP names cannot be
-  /// shared with another bootstrap extension or filter. Default configurations are not supported.
-  /// Use `TypedStruct` for types Envoy does not link so config dumps can render them.
+  /// subscribed, or if the name or source is invalid or in use. Another bootstrap extension cannot
+  /// use the same ADS or xDS-TP name. Filters conflict only on ADS. Default configs are
+  /// unsupported. For types Envoy does not link, use `TypedStruct`, or `BytesValue` for binary
+  /// payloads. An accepted payload that Envoy cannot render fails the whole unfiltered config dump.
   fn subscribe_ecds<'a>(&self, source: EcdsSubscription<'a>) -> bool;
 
   /// Enable listener lifecycle event notifications. When enabled, the module will receive
@@ -568,11 +572,12 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   ) {
   }
 
-  /// Applies ECDS updates on the main thread. Payloads use the startup config encoding;
-  /// `Struct` and `TypedStruct.value` become JSON. Removals include TTL expiry.
+  /// Applies ECDS updates on the main thread with their payload encoding. Removals include TTL
+  /// expiry and can arrive before any configuration.
   ///
   /// Return true to accept, or false to retain the previous settings. Rejecting an update NACKs
-  /// the response, which may contain other ECDS resources. A rejected removal is only logged.
+  /// the response, which may contain other ECDS resources and may have been partly applied.
+  /// A rejected removal is only logged.
   /// The default rejects updates. This hook must not block.
   ///
   /// Initial fetch failures do not invoke this hook. A module waiting for its first configuration
@@ -2136,6 +2141,7 @@ ffi_export! {
     name: abi::envoy_dynamic_module_type_envoy_buffer,
     version: abi::envoy_dynamic_module_type_envoy_buffer,
     type_url: abi::envoy_dynamic_module_type_envoy_buffer,
+    encoding: EcdsConfigEncoding,
     has_config: bool,
     config: abi::envoy_dynamic_module_type_envoy_buffer,
   ) -> bool {
@@ -2156,7 +2162,7 @@ ffi_export! {
       let config = unsafe {
         crate::ffi_helpers::slice_from_raw_or_empty(config.ptr.cast::<u8>(), config.length)
       };
-      EcdsUpdate::Config { name, version, type_url, config }
+      EcdsUpdate::Config { name, version, type_url, encoding, config }
     } else {
       EcdsUpdate::Removed { name }
     };
@@ -2351,7 +2357,11 @@ mod ecds_tests {
     }
   }
 
-  fn invoke(config: &dyn BootstrapExtensionConfig, payload: Option<&[u8]>) -> bool {
+  fn invoke(
+    config: &dyn BootstrapExtensionConfig,
+    payload: Option<&[u8]>,
+    encoding: EcdsConfigEncoding,
+  ) -> bool {
     unsafe {
       envoy_dynamic_module_on_bootstrap_extension_ecds_update(
         std::ptr::null_mut(),
@@ -2359,6 +2369,7 @@ mod ecds_tests {
         buffer(b"test-config"),
         buffer(b"v1"),
         buffer(b"type.googleapis.com/test.Config"),
+        encoding,
         payload.is_some(),
         buffer(payload.unwrap_or_default()),
       )
@@ -2368,6 +2379,7 @@ mod ecds_tests {
   #[derive(Default)]
   struct Consumer {
     updates: Mutex<Vec<Option<Vec<u8>>>>,
+    encodings: Mutex<Vec<EcdsConfigEncoding>>,
     panic: bool,
   }
 
@@ -2390,11 +2402,13 @@ mod ecds_tests {
           name,
           version,
           type_url,
+          encoding,
           config,
         } => {
           assert_eq!(name, "test-config");
           assert_eq!(version, "v1");
           assert_eq!(type_url, "type.googleapis.com/test.Config");
+          self.encodings.lock().unwrap().push(encoding);
           Some(config)
         },
         EcdsUpdate::Removed { name } => {
@@ -2420,7 +2434,7 @@ mod ecds_tests {
       (None, true),
       (Some(b"rejected".as_slice()), false),
     ] {
-      assert_eq!(invoke(&module, payload), accepted);
+      assert_eq!(invoke(&module, payload, EcdsConfigEncoding::Json), accepted);
     }
     assert_eq!(
       *module.updates.lock().unwrap(),
@@ -2434,6 +2448,20 @@ mod ecds_tests {
   }
 
   #[test]
+  fn payload_encoding_is_forwarded() {
+    let module = Consumer::default();
+    let encodings = [
+      EcdsConfigEncoding::Protobuf,
+      EcdsConfigEncoding::Json,
+      EcdsConfigEncoding::Bytes,
+    ];
+    for encoding in encodings {
+      assert!(invoke(&module, Some(b"{}"), encoding));
+    }
+    assert_eq!(*module.encodings.lock().unwrap(), encodings);
+  }
+
+  #[test]
   fn default_and_panicking_hooks_reject() {
     struct DefaultConfig;
     impl BootstrapExtensionConfig for DefaultConfig {
@@ -2444,12 +2472,16 @@ mod ecds_tests {
         unreachable!()
       }
     }
-    assert!(!invoke(&DefaultConfig, Some(b"{}")));
+    assert!(!invoke(
+      &DefaultConfig,
+      Some(b"{}"),
+      EcdsConfigEncoding::Json
+    ));
     let panicking = Consumer {
       panic: true,
       ..Consumer::default()
     };
-    assert!(!invoke(&panicking, Some(b"{}")));
+    assert!(!invoke(&panicking, Some(b"{}"), EcdsConfigEncoding::Json));
   }
 
   #[test]
@@ -2471,6 +2503,7 @@ mod ecds_tests {
           fields[0],
           fields[1],
           fields[2],
+          EcdsConfigEncoding::Json,
           true,
           buffer(b"{}"),
         )

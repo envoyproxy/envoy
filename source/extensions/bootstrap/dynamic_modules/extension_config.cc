@@ -122,10 +122,12 @@ bool DynamicModuleBootstrapExtensionConfig::subscribeEcds(absl::string_view name
     auto subscription = ExtensionConfigSubscription::create(
         name, source, extension_name_, context_,
         [this](absl::string_view resource_name, absl::string_view version,
-               absl::string_view type_url, std::optional<absl::string_view> config) {
+               absl::string_view type_url,
+               envoy_dynamic_module_type_bootstrap_ecds_config_encoding encoding,
+               std::optional<absl::string_view> config) {
           return on_bootstrap_extension_ecds_update_(
               thisAsVoidPtr(), in_module_config_, {resource_name.data(), resource_name.size()},
-              {version.data(), version.size()}, {type_url.data(), type_url.size()},
+              {version.data(), version.size()}, {type_url.data(), type_url.size()}, encoding,
               config.has_value(),
               config.has_value()
                   ? envoy_dynamic_module_type_envoy_buffer{config->data(), config->size()}

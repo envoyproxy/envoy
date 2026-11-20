@@ -115,12 +115,15 @@ envoy_cc_library(
         "//source/common/config:xds_resource_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:utility_lib",
+        "//source/extensions/dynamic_modules/abi",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@xds//udpa/type/v1:pkg_cc_proto",
+        "@xds//xds/type/v3:pkg_cc_proto",
     ],
 )
 

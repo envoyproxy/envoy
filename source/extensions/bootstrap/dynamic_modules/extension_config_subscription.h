@@ -15,6 +15,7 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/resource_type_helper.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -33,9 +34,10 @@ class ExtensionConfigSubscriptions;
 class ExtensionConfigSubscription : public Config::SubscriptionCallbacks,
                                     public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
-  using UpdateCallback =
-      std::function<bool(absl::string_view name, absl::string_view version,
-                         absl::string_view type_url, std::optional<absl::string_view> config)>;
+  using UpdateCallback = std::function<bool(
+      absl::string_view name, absl::string_view version, absl::string_view type_url,
+      envoy_dynamic_module_type_bootstrap_ecds_config_encoding encoding,
+      std::optional<absl::string_view> config)>;
 
   static absl::StatusOr<std::unique_ptr<ExtensionConfigSubscription>>
   create(absl::string_view name, const envoy::config::core::v3::ExtensionConfigSource& source,

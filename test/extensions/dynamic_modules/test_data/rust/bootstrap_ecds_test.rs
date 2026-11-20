@@ -21,7 +21,12 @@ fn new_config(
 }
 
 struct EcdsConfig {
-  config: Mutex<Option<String>>,
+  config: Mutex<Option<AppliedConfig>>,
+}
+
+struct AppliedConfig {
+  value: String,
+  version: String,
 }
 
 impl BootstrapExtensionConfig for EcdsConfig {
@@ -47,15 +52,15 @@ impl BootstrapExtensionConfig for EcdsConfig {
     {
       return (400, "subscription failed".into());
     }
-    (
-      200,
-      self
-        .config
-        .lock()
-        .unwrap()
-        .clone()
-        .unwrap_or_else(|| "removed".into()),
-    )
+    let config = self.config.lock().unwrap();
+    let value = config.as_ref().map(|config| {
+      if path.ends_with("?version") {
+        config.version.as_str()
+      } else {
+        config.value.as_str()
+      }
+    });
+    (200, value.unwrap_or("removed").to_owned())
   }
 
   fn on_ecds_update(
@@ -67,34 +72,41 @@ impl BootstrapExtensionConfig for EcdsConfig {
       .active_resource_names(ActiveResourceKind::Cluster)
       .iter()
       .any(|name| name == "cluster_0"));
-    let config = match update {
+    let next = match update {
       EcdsUpdate::Config {
         name,
         version,
         type_url,
+        encoding,
         config,
       } => {
         assert_eq!(name, "test-config");
-        assert!(!version.is_empty());
         assert_eq!(type_url, "type.googleapis.com/google.protobuf.StringValue");
-        Some(config)
+        assert_eq!(encoding, EcdsConfigEncoding::Bytes);
+        if config == b"rejected" {
+          return false;
+        }
+        Some(AppliedConfig {
+          value: std::str::from_utf8(config)
+            .expect("test payload must be UTF-8")
+            .to_owned(),
+          version: version.to_owned(),
+        })
       },
       EcdsUpdate::Removed { name } => {
         assert_eq!(name, "test-config");
         None
       },
     };
-    if config.is_none() && self.config.lock().unwrap().as_deref() == Some("keep-on-removal") {
+    let mut config = self.config.lock().unwrap();
+    if next.is_none()
+      && config
+        .as_ref()
+        .is_some_and(|config| config.value == "keep-on-removal")
+    {
       return false;
     }
-    if config == Some(b"rejected".as_slice()) {
-      return false;
-    }
-    *self.config.lock().unwrap() = config.map(|bytes| {
-      std::str::from_utf8(bytes)
-        .expect("test payload must be UTF-8")
-        .to_owned()
-    });
+    *config = next;
     true
   }
 }

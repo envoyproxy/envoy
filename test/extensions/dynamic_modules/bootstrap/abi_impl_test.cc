@@ -1936,7 +1936,7 @@ TEST_F(BootstrapAbiImplTest, ExtensionConfigSubscriptionValidatesLifecycleAndRel
   auto config = newOptionalHooksConfig();
   const std::string source =
       R"({"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["type.googleapis.com/test.Config"]})";
-  const auto hook = [](auto, auto, auto, auto, auto, bool, auto) { return true; };
+  const auto hook = [](auto, auto, auto, auto, auto, auto, bool, auto) { return true; };
   config->on_bootstrap_extension_ecds_update_ = hook;
   auto subscribe = [&]() {
     return envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(

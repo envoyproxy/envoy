@@ -23,6 +23,8 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
+#include "udpa/type/v1/typed_struct.pb.h"
+#include "xds/type/v3/typed_struct.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -111,7 +113,8 @@ ExtensionConfigSubscription::~ExtensionConfigSubscription() {
 void ExtensionConfigSubscription::start() { subscription_->start({name_}); }
 
 void ExtensionConfigSubscription::removeConfig() {
-  if (!callback_(name_, "", "", std::nullopt)) {
+  if (!callback_(name_, "", "", envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Protobuf,
+                 std::nullopt)) {
     ENVOY_LOG(warn, "bootstrap module rejected ECDS removal for {}", name_);
     return;
   }
@@ -156,7 +159,15 @@ absl::Status ExtensionConfigSubscription::onConfigUpdate(
                                                    "' could not decode type '", received_type,
                                                    "': ", bytes.status().message()));
   }
-  if (!callback_(name_, version_info, absl::StrCat("type.googleapis.com/", received_type),
+  const auto& payload = config.typed_config();
+  auto encoding = envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Protobuf;
+  if (payload.Is<Protobuf::Struct>() || payload.Is<xds::type::v3::TypedStruct>() ||
+      payload.Is<udpa::type::v1::TypedStruct>()) {
+    encoding = envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Json;
+  } else if (payload.Is<Protobuf::StringValue>() || payload.Is<Protobuf::BytesValue>()) {
+    encoding = envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Bytes;
+  }
+  if (!callback_(name_, version_info, absl::StrCat("type.googleapis.com/", received_type), encoding,
                  *bytes)) {
     return absl::InvalidArgumentError(absl::StrCat("bootstrap module rejected ECDS resource '",
                                                    name_, "' of type '", received_type, "'"));

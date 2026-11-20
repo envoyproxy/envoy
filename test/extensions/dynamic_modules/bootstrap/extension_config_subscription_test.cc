@@ -15,6 +15,7 @@
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
 namespace Envoy {
@@ -74,9 +75,10 @@ protected:
 
   ExtensionConfigSubscription::UpdateCallback callback() {
     return [this](absl::string_view name, absl::string_view version, absl::string_view type_url,
+                  envoy_dynamic_module_type_bootstrap_ecds_config_encoding encoding,
                   std::optional<absl::string_view> config) {
       updates_.push_back(
-          {std::string(name), std::string(version), std::string(type_url),
+          {std::string(name), std::string(version), std::string(type_url), encoding,
            config.has_value() ? std::make_optional(std::string(*config)) : std::nullopt});
       return accept_;
     };
@@ -109,6 +111,7 @@ protected:
     std::string name;
     std::string version;
     std::string type_url;
+    envoy_dynamic_module_type_bootstrap_ecds_config_encoding encoding;
     std::optional<std::string> config;
   };
   Event::SimulatedTimeSystem time_system_;
@@ -125,6 +128,7 @@ TEST_F(ExtensionConfigSubscriptionTest, AppliesTypedStructAndExposesAcceptedConf
   EXPECT_EQ(updates_[0].name, "test-config");
   EXPECT_EQ(updates_[0].version, "v1");
   EXPECT_EQ(updates_[0].type_url, "type.googleapis.com/test.Config");
+  EXPECT_EQ(updates_[0].encoding, envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Json);
   EXPECT_EQ(updates_[0].config.value(), R"({"enabled":true})");
   envoy::admin::v3::EcdsConfigDump expected;
   auto* entry = expected.add_ecds_filters();
@@ -273,6 +277,20 @@ TEST_F(ExtensionConfigSubscriptionTest, MissingTypedStructValueIsAnEmptyObject) 
   EXPECT_EQ(updates_[0].config.value(), "{}");
 }
 
+TEST_F(ExtensionConfigSubscriptionTest, AppliesUdpaTypedStructPayload) {
+  auto subscription = create();
+  udpa::type::v1::TypedStruct typed;
+  typed.set_type_url("type.googleapis.com/test.Config");
+  (*typed.mutable_value()->mutable_fields())["enabled"].set_bool_value(true);
+  auto resource = config(true);
+  MessageUtil::packFrom(*resource.mutable_typed_config(), typed);
+  EXPECT_OK(update(*subscription, resource));
+  ASSERT_EQ(updates_.size(), 1);
+  EXPECT_EQ(updates_[0].type_url, "type.googleapis.com/test.Config");
+  EXPECT_EQ(updates_[0].encoding, envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Json);
+  EXPECT_EQ(updates_[0].config.value(), R"({"enabled":true})");
+}
+
 TEST_F(ExtensionConfigSubscriptionTest, AppliesStructPayload) {
   auto subscription = create("type.googleapis.com/google.protobuf.Struct");
   Protobuf::Struct payload;
@@ -282,6 +300,7 @@ TEST_F(ExtensionConfigSubscriptionTest, AppliesStructPayload) {
   EXPECT_OK(update(*subscription, resource));
   ASSERT_EQ(updates_.size(), 1);
   EXPECT_EQ(updates_[0].config.value(), R"({"enabled":true})");
+  EXPECT_EQ(updates_[0].encoding, envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Json);
 }
 
 TEST_F(ExtensionConfigSubscriptionTest, AppliesStringAndBytesWrapperPayloads) {
@@ -301,6 +320,8 @@ TEST_F(ExtensionConfigSubscriptionTest, AppliesStringAndBytesWrapperPayloads) {
     EXPECT_OK(update(*subscription, resource));
     ASSERT_EQ(updates_.size(), previous_updates + 1);
     EXPECT_EQ(updates_.back().config, std::make_optional(value));
+    EXPECT_EQ(updates_.back().encoding,
+              envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Bytes);
   }
 }
 
@@ -336,7 +357,23 @@ TEST_F(ExtensionConfigSubscriptionTest, PreservesBinaryAndEmptyPayloads) {
   EXPECT_OK(update(*subscription, resource));
   ASSERT_EQ(updates_.size(), 2);
   EXPECT_EQ(updates_[0].config.value(), std::string("\x08\x00", 2));
+  EXPECT_EQ(updates_[0].encoding,
+            envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Protobuf);
   EXPECT_EQ(updates_[1].config.value(), "");
+}
+
+TEST_F(ExtensionConfigSubscriptionTest, DistinguishesJsonAndProtobufForTheSameType) {
+  auto subscription = create();
+  EXPECT_OK(update(*subscription, config(true)));
+  auto binary = config(true);
+  binary.mutable_typed_config()->set_type_url("type.googleapis.com/test.Config");
+  binary.mutable_typed_config()->set_value(std::string("\x08\x01", 2));
+  EXPECT_OK(update(*subscription, binary, "v2"));
+  ASSERT_EQ(updates_.size(), 2);
+  EXPECT_EQ(updates_[0].type_url, updates_[1].type_url);
+  EXPECT_EQ(updates_[0].encoding, envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Json);
+  EXPECT_EQ(updates_[1].encoding,
+            envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Protobuf);
 }
 
 TEST_F(ExtensionConfigSubscriptionTest, RejectsEmptyAndWildcardNamesAndSubscriptionFailure) {
