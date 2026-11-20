@@ -43,8 +43,7 @@ void FilterChainBridge::updateIngestBackpressure() {
     // Expect at most one synchronous self-echo while pauseSource() is on the stack, then clear any
     // unconsumed expectation on return (e.g. for non-echoing mocks, AsyncStream, or teardown) so a
     // later genuine watermark is never swallowed.
-    const uint32_t prev_expected_echoes = expected_high_watermark_echoes_;
-    ++expected_high_watermark_echoes_;
+    const uint32_t prev_expected_echoes = expected_high_watermark_echoes_++;
     pauseSource();
     expected_high_watermark_echoes_ =
         std::min(expected_high_watermark_echoes_, prev_expected_echoes);
@@ -62,8 +61,7 @@ void FilterChainBridge::updateIngestBackpressure() {
   if (source_paused_ && unacked_ <= low_watermark_) {
     source_paused_ = false;
     ENVOY_LOG(debug, "ai_protocol_manager: ingest low watermark ({} bytes not durable)", unacked_);
-    const uint32_t prev_expected_echoes = expected_low_watermark_echoes_;
-    ++expected_low_watermark_echoes_;
+    const uint32_t prev_expected_echoes = expected_low_watermark_echoes_++;
     resumeSource();
     expected_low_watermark_echoes_ = std::min(expected_low_watermark_echoes_, prev_expected_echoes);
   }
