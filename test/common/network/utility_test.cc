@@ -925,6 +925,42 @@ TEST(PacketLoss, LossTest) {
   EXPECT_EQ(2, packets_dropped);
   EXPECT_EQ(0, packets_read);
 }
+
+TEST(PacketLoss, TruncatedAndKernelDropsAreAdded) {
+  class ZeroTimeSource : public TimeSource {
+  public:
+    SystemTime systemTime() override { return SystemTime(std::chrono::seconds(0)); }
+    MonotonicTime monotonicTime() override { return MonotonicTime(std::chrono::seconds(0)); }
+  };
+
+  NiceMock<MockIoHandle> io_handle;
+  NiceMock<MockUdpPacketProcessor> processor;
+  const Address::Ipv4Instance local_address("127.0.0.1", 1234);
+  IoHandle::UdpSaveCmsgConfig save_cmsg_config;
+
+  ON_CALL(io_handle, supportsUdpGro()).WillByDefault(Return(false));
+  ON_CALL(io_handle, supportsMmsg()).WillByDefault(Return(false));
+  ON_CALL(processor, maxDatagramSize()).WillByDefault(Return(1500));
+  ON_CALL(processor, numPacketsExpectedPerEventLoop()).WillByDefault(Return(1));
+  ON_CALL(processor, saveCmsgConfig()).WillByDefault(ReturnRef(save_cmsg_config));
+
+  EXPECT_CALL(processor, onDatagramsDropped(5));
+  EXPECT_CALL(io_handle, recvmsg(_, _, _, _, _))
+      .WillOnce([](Buffer::RawSlice*, const uint64_t, uint32_t,
+                   const IoHandle::UdpSaveCmsgConfig&, IoHandle::RecvMsgOutput& output) {
+        *output.dropped_packets_ = 3;
+        *output.truncated_packets_ = 2;
+        output.msg_[0].truncated_and_dropped_ = true;
+        return Api::ioCallUint64ResultNoError();
+      });
+
+  ZeroTimeSource time_source;
+  uint32_t packets_dropped = 0;
+  EXPECT_TRUE(Utility::readPacketsFromSocket(io_handle, local_address, processor, time_source,
+                                             false, false, packets_dropped)
+                  .ok());
+  EXPECT_EQ(packets_dropped, 3);
+}
 #endif
 
 #if defined(__linux__)
