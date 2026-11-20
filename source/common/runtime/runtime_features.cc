@@ -40,8 +40,6 @@
 // the ALTS handshaker service through Envoy's async gRPC client, so a worker thread never waits for
 // the handshaker service. Disable to restore the previous blocking gRPC calls.
 RUNTIME_GUARD(envoy_reloadable_features_alts_async_handshaker);
-// When enabled, the admin filter returns to the event loop between the chunks of a response.
-RUNTIME_GUARD(envoy_reloadable_features_admin_filter_yield_between_chunks);
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_cache_parsed_tls_certificates);
 RUNTIME_GUARD(envoy_reloadable_features_cares_dual_resolution_preserve_failure);
@@ -325,6 +323,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_async_client_downstream_flow_contr
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_rx_queue_overflow_socket_options);
 // TODO(abeyad): Flip to true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_ip_packet_info_socket_options);
+// When enabled, the admin filter returns to the event loop between the chunks of a response.
+// TODO(wbpcode): flip to true after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_admin_filter_yield_between_chunks);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
