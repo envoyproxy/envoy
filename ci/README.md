@@ -39,7 +39,7 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 # Build image base and compiler versions
 
 * `envoyproxy/envoy-build:ci-<tag>` &mdash; based on Debian (trixie-slim); the compilers (Clang and GCC) and other toolchains are
-  fetched by Bazel rather than installed in the image. Variants `devtools`, `docker`, `mobile` and `worker` add tooling for
+  fetched by Bazel rather than installed in the image. Variants `devtools`, `docker` and `worker` add tooling for
   specific CI jobs.
 
 `./ci/run_envoy_docker.sh` picks the variant itself: `devtools` by default, `ci` under GitHub Actions or with
