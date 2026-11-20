@@ -144,6 +144,10 @@ message OAuth2Credentials {
   //
   // The multi-entry form is only read when ``auth_type`` is ``PRIVATE_KEY_JWT``. The other auth
   // types read the single-value form only.
+  //
+  // When ``auth_type`` is ``CLIENT_ASSERTION``, this field must contain an externally issued JWT,
+  // such as a Kubernetes service account token. The JWT is sent as the client assertion without
+  // being signed by Envoy. Use dynamic SDS secrets to update the JWT before it expires.
   transport_sockets.tls.v3.SdsSecretConfig token_secret = 2;
 
   // Configures how the secret token should be created.
@@ -288,6 +292,13 @@ message OAuth2Config {
     // The JWT assertion is sent as ``client_assertion`` in the token request body along with
     // ``client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer``.
     PRIVATE_KEY_JWT = 3;
+
+    // The client authenticates using an externally issued JWT assertion (RFC 7523).
+    // The ``token_secret`` in credentials must contain the JWT, not a private key or shared secret.
+    // The JWT is sent as ``client_assertion`` in both authorization code and refresh token requests,
+    // with ``client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer``.
+    // Envoy does not obtain or sign the JWT; it must be supplied and rotated through SDS.
+    CLIENT_ASSERTION = 4;
   }
 
   // Endpoint on the authorization server to retrieve the access token from.
