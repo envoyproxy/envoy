@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ratelimit.v3;
 
+import "envoy/annotations/deprecation.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/ratelimit/v3/rls.proto";
 import "envoy/config/route/v3/route_components.proto";
@@ -49,7 +50,19 @@ message RateLimit {
   // .. note::
   //
   //  The filter supports a range of 0 - 10 inclusively for stage numbers.
-  uint32 stage = 2 [(validate.rules).uint32 = {lte: 10}];
+  //
+  // .. attention::
+  //
+  //   This field is deprecated. It only selects the deprecated
+  //   :ref:`VirtualHost.rate_limits <envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` and
+  //   :ref:`RouteAction.rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>`
+  //   with the same :ref:`stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>` and has no
+  //   effect on the ``rate_limits`` configured in the filter config.
+  uint32 stage = 2 [
+    deprecated = true,
+    (validate.rules).uint32 = {lte: 10},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
 
   // The type of requests the filter should apply to. The supported
   // types are ``internal``, ``external`` or ``both``. A request is considered internal if
@@ -171,7 +184,7 @@ message RateLimit {
 
   // Rate limit configuration that is used to generate a list of descriptor entries based on
   // the request context. The generated entries will be sent to the rate limit service.
-  // If this is set, then
+  // If this is set, then the deprecated
   // :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
   // :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
   // will be ignored. However, :ref:`RateLimitPerRoute.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
@@ -215,6 +228,11 @@ message RateLimit {
 
 // [#next-free-field: 6]
 message RateLimitPerRoute {
+  // .. attention::
+  //
+  //   This enum is deprecated. It is only used by the deprecated :ref:`vh_rate_limits
+  //   <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`.
+  //
   // [#next-major-version: unify with local ratelimit, should use common.ratelimit.v3.VhRateLimitsOptions instead.]
   enum VhRateLimitsOptions {
     // Use the virtual host rate limits unless the route has a rate limit policy.
@@ -228,6 +246,11 @@ message RateLimitPerRoute {
   }
 
   // The override option determines how the filter handles the cases where there is an override config at a more specific level than this one (from least to most specific: virtual host, route, cluster weight).
+  //
+  // .. attention::
+  //
+  //   This enum is deprecated. It is only used by the deprecated ``override_option``.
+  //
   // [#not-implemented-hide:]
   enum OverrideOptions {
     // Client-defined default, typically OVERRIDE_POLICY. If VhRateLimitsOptions is set, that will be used instead.
@@ -244,17 +267,37 @@ message RateLimitPerRoute {
   }
 
   // Specifies if the rate limit filter should include the virtual host rate limits.
-  // [#next-major-version: unify with local ratelimit, should use common.ratelimit.v3.VhRateLimitsOptions instead.]
-  VhRateLimitsOptions vh_rate_limits = 1 [(validate.rules).enum = {defined_only: true}];
+  //
+  // .. attention::
+  //
+  //   This field is deprecated. It only applies to the deprecated
+  //   :ref:`VirtualHost.rate_limits <envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` and
+  //   :ref:`RouteAction.rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>`.
+  //   Use ``rate_limits_override_option`` to control how the ``rate_limits`` of different levels
+  //   are applied instead.
+  VhRateLimitsOptions vh_rate_limits = 1 [
+    deprecated = true,
+    (validate.rules).enum = {defined_only: true},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
 
   // Specifies if the rate limit filter should include the lower levels (route level, virtual host level or cluster weight level) rate limits override options.
+  //
+  // .. attention::
+  //
+  //   This field is deprecated. Use ``rate_limits_override_option`` instead.
+  //
   // [#not-implemented-hide:]
-  OverrideOptions override_option = 2 [(validate.rules).enum = {defined_only: true}];
+  OverrideOptions override_option = 2 [
+    deprecated = true,
+    (validate.rules).enum = {defined_only: true},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
 
   // Rate limit configuration that is used to generate a list of descriptor entries based on
   // the request context. The generated entries will be used to find one or multiple matched rate
   // limit rule from the ``descriptors``.
-  // If this is set, then
+  // If this is set, then the deprecated
   // :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>`,
   // :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` and
   // :ref:`RateLimit.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits>` fields
