@@ -758,6 +758,9 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
 
   for (; entry != decoder_filters_.end(); entry++) {
     ENVOY_EXECUTION_SCOPE(trackedStream(), &(*entry)->filter_context_);
+    // Recorded before the stop-all check: data parked at a stop-all filter has passed every
+    // earlier filter, so the filter holding it is the one allowed to modify it.
+    recordLatestDataFilter(entry, state_.latest_data_decoding_filter_, decoder_filters_);
     // If the filter pointed by entry has stopped for all frame types, return now.
     if (handleDataIfStopAll(**entry, data, state_.decoder_filters_streaming_)) {
       return;
@@ -803,8 +806,6 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
-
-    recordLatestDataFilter(entry, state_.latest_data_decoding_filter_, decoder_filters_);
 
     state_.filter_call_state_ |= FilterCallState::DecodeData;
     state_.filter_added_data_in_data_callback_ = false;
@@ -1615,6 +1616,8 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
   const bool trailers_exists_at_start = filter_manager_callbacks_.responseTrailers().has_value();
   for (; entry != encoder_filters_.end(); entry++) {
     ENVOY_EXECUTION_SCOPE(trackedStream(), &(*entry)->filter_context_);
+    // See the comment in decodeData().
+    recordLatestDataFilter(entry, state_.latest_data_encoding_filter_, encoder_filters_);
     // If the filter pointed by entry has stopped for all frame type, return now.
     if (handleDataIfStopAll(**entry, data, state_.encoder_filters_streaming_)) {
       return;
@@ -1633,8 +1636,6 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
-
-    recordLatestDataFilter(entry, state_.latest_data_encoding_filter_, encoder_filters_);
 
     state_.filter_added_data_in_data_callback_ = false;
     const bool data_nonempty_before_callback = data.length() > 0;

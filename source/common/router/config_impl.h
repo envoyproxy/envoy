@@ -350,7 +350,6 @@ private:
 };
 using CorsPolicyImpl = CorsPolicyImplBase<envoy::config::route::v3::CorsPolicy>;
 
-using RetryPolicyConstOptRef = const OptRef<const envoy::config::route::v3::RetryPolicy>;
 using HedgePolicyConstOptRef = const OptRef<const envoy::config::route::v3::HedgePolicy>;
 
 class ConfigImpl;

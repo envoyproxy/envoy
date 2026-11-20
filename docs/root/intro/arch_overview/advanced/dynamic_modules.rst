@@ -82,29 +82,6 @@ instead of ``#[no_mangle]``. Rust handles platform-specific symbol decoration, i
 leading underscore on macOS. Shared modules and ordinary Cargo SDK builds keep unprefixed hook
 names by default.
 
-HTTP stream timing
-------------------
-
-HTTP filters can read stream timing through ``TimingInfo`` in the C++, Go, and Rust SDKs. The
-:repo:`ABI header <source/extensions/dynamic_modules/abi/abi.h>` lists the markers in
-``envoy_dynamic_module_type_timing_info_v2``. Access loggers can read these markers with
-``envoy_dynamic_module_callback_access_logger_get_timing_info_v2``. The original
-``envoy_dynamic_module_callback_access_logger_get_timing_info`` remains available without the new
-markers.
-
-``start_time_unix_ns`` is a Unix timestamp in nanoseconds. The other numeric timing fields are
-nanosecond offsets from the request's monotonic start time. Check the ``has_*`` fields in the C ABI
-or ``Has*`` fields in Go to distinguish recorded values from unavailable markers. When a flag is
-false, its numeric field contains ``-1``. C++ and Rust use optional values instead. Zero and
-negative offsets are valid.
-
-``last_downstream_header_rx_byte_received_ns`` marks receipt of all request headers, while
-``last_downstream_rx_byte_received_ns`` marks receipt of the full request. For a header-only
-request, the latter is recorded when the headers end the stream. Envoy records
-``downstream_connection_end_ns`` only if the request is active when the connection closes. It
-records ``last_downstream_ack_received_ns`` when it tracks the final ACK, currently for QUIC. The
-markers do not by themselves measure body buffering or processing.
-
 Compatibility
 --------------------------
 

@@ -1,5 +1,7 @@
+#include <chrono>
 #include <cstddef>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -7,6 +9,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
+#include "envoy/network/connection.h"
 
 #include "source/common/common/thread.h"
 #include "source/common/network/transport_socket_options_impl.h"
@@ -29,15 +32,18 @@
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/base/thread_annotations.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/synchronization/mutex.h"
 #include "gmock/gmock.h"
 #include "grpcpp/grpcpp.h"
-#include "grpcpp/impl/codegen/service_type.h"
+#include "grpcpp/impl/service_type.h"
 #include "grpcpp/security/server_credentials.h"
 #include "grpcpp/server_builder.h"
 #include "grpcpp/server_context.h"
@@ -107,6 +113,43 @@ public:
   std::string client_target_name;
 };
 
+// Holds the fake handshaker service's handling of StartServerHandshakeReq
+// messages while closed, as if the handshaker service were slow to respond to
+// the server side of ALTS handshakes, i.e. to Envoy's side. It is thread-safe.
+class ServerStartGate {
+public:
+  void close() {
+    absl::MutexLock lock(mu_);
+    open_ = false;
+  }
+
+  void open() {
+    absl::MutexLock lock(mu_);
+    open_ = true;
+  }
+
+  // Called by the handshaker service for each StartServerHandshakeReq. Blocks
+  // while the gate is closed.
+  void pass() {
+    absl::MutexLock lock(mu_);
+    if (!open_) {
+      ++held_;
+    }
+    mu_.Await(absl::Condition(&open_));
+  }
+
+  // Returns the number of StartServerHandshakeReq messages held so far.
+  int held() {
+    absl::MutexLock lock(mu_);
+    return held_;
+  }
+
+private:
+  absl::Mutex mu_;
+  bool open_ ABSL_GUARDED_BY(mu_) = true;
+  int held_ ABSL_GUARDED_BY(mu_) = 0;
+};
+
 // FakeHandshakeService implements a fake handshaker service using a fake key
 // exchange protocol. The fake key exchange protocol is a 3-message protocol:
 // - Client first sends ClientInit message to Server.
@@ -117,8 +160,8 @@ public:
 // It is thread-safe.
 class FakeHandshakerService : public HandshakerService::Service {
 public:
-  explicit FakeHandshakerService(const std::string& peer_identity)
-      : peer_identity_(peer_identity) {}
+  FakeHandshakerService(const std::string& peer_identity, ServerStartGate* server_start_gate)
+      : peer_identity_(peer_identity), server_start_gate_(server_start_gate) {}
 
   grpc::Status
   DoHandshake(grpc::ServerContext* /*server_context*/,
@@ -129,6 +172,9 @@ public:
     grpc::gcp::HandshakerReq request;
     grpc::gcp::HandshakerResp response;
     while (stream->Read(&request)) {
+      if (request.has_server_start() && server_start_gate_ != nullptr) {
+        server_start_gate_->pass();
+      }
       status = processRequest(&context, request, &response);
       if (!status.ok()) {
         return writeErrorResponse(stream, status);
@@ -298,10 +344,12 @@ private:
   }
 
   const std::string peer_identity_;
+  ServerStartGate* const server_start_gate_;
 };
 
-std::unique_ptr<Service> createFakeHandshakerService(const std::string& peer_identity) {
-  return std::unique_ptr<Service>{new FakeHandshakerService(peer_identity)};
+std::unique_ptr<Service> createFakeHandshakerService(const std::string& peer_identity,
+                                                     ServerStartGate* server_start_gate) {
+  return std::unique_ptr<Service>{new FakeHandshakerService(peer_identity, server_start_gate)};
 }
 
 class AltsIntegrationTestBase : public Event::TestUsingSimulatedTime,
@@ -350,7 +398,7 @@ public:
         service = std::unique_ptr<grpc::Service>{capturing_handshaker_service_};
       } else {
         capturing_handshaker_service_ = nullptr;
-        service = createFakeHandshakerService("peer_identity");
+        service = createFakeHandshakerService("peer_identity", &server_start_gate_);
       }
 
       std::string server_address = Network::Test::getLoopbackAddressUrlString(version_) + ":0";
@@ -398,6 +446,8 @@ public:
   }
 
   void TearDown() override {
+    // Release any handshake that a test left waiting at the handshaker service.
+    server_start_gate_.open();
     HttpIntegrationTest::cleanupUpstreamAndDownstream();
     dispatcher_->clearDeferredDeleteList();
     if (fake_handshaker_server_ != nullptr) {
@@ -466,6 +516,7 @@ public:
   TsiSocket* client_tsi_socket_{nullptr};
   bool capturing_handshaker_;
   CapturingHandshakerService* capturing_handshaker_service_;
+  ServerStartGate server_start_gate_;
 };
 
 class AltsIntegrationTestValidPeer : public AltsIntegrationTestBase {
@@ -646,6 +697,94 @@ TEST_P(AltsIntegrationTestCapturingHandshaker, CheckTargetNameOverride) {
   codec_client_ = makeRawHttpConnection(makeAltsConnection(options), std::nullopt);
   EXPECT_FALSE(codec_client_->connected());
   EXPECT_EQ("custom.alts.target.googleapis.com", capturing_handshaker_service_->client_target_name);
+}
+
+// Runs Envoy's handshakes with the previous, blocking calls to the handshaker
+// service, which the runtime guard restores.
+class AltsIntegrationTestBlockingHandshaker : public AltsIntegrationTestBase {
+public:
+  AltsIntegrationTestBlockingHandshaker()
+      : AltsIntegrationTestBase("peer_identity", "",
+                                /* server_connect_handshaker */ true,
+                                /* client_connect_handshaker */ true) {}
+
+  void initialize() override {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.alts_async_handshaker", "false");
+    AltsIntegrationTestBase::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestBlockingHandshaker,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(AltsIntegrationTestBlockingHandshaker, RouterRequestAndResponseWithBodyNoBuffer) {
+  ConnectionCreationFunction creator = [this]() -> Network::ClientConnectionPtr {
+    return makeAltsConnection();
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  EXPECT_TRUE(tsiPeerIdentitySet());
+}
+
+class AltsIntegrationTestSlowHandshaker : public AltsIntegrationTestBase {
+public:
+  AltsIntegrationTestSlowHandshaker()
+      : AltsIntegrationTestBase("peer_identity", "",
+                                /* server_connect_handshaker */ true,
+                                /* client_connect_handshaker */ true) {}
+
+  // Runs the test's dispatcher until condition holds. The fake handshaker
+  // service runs on its own gRPC threads, so this has to wait in real time.
+  testing::AssertionResult runUntil(const std::function<bool()>& condition) {
+    for (std::chrono::milliseconds waited{0}; !condition();
+         waited += std::chrono::milliseconds(1)) {
+      if (waited > TestUtility::DefaultTimeout) {
+        return testing::AssertionFailure() << "condition not reached";
+      }
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+      timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(1));
+    }
+    return testing::AssertionSuccess();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestSlowHandshaker,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that while one connection's handshake waits for the handshaker
+// service, the worker thread that runs it keeps serving its other connections.
+TEST_P(AltsIntegrationTestSlowHandshaker, WaitingHandshakeDoesNotBlockWorker) {
+  // Envoy runs a single worker thread, so both connections below share it.
+  ASSERT_EQ(concurrency_, 1);
+  initialize();
+  codec_client_ = makeHttpConnection(makeAltsConnection());
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Start a second connection, whose handshake waits for the handshaker
+  // service on Envoy's side.
+  server_start_gate_.close();
+  ConnectionStatusCallbacks waiting_connection_callbacks;
+  Network::ClientConnectionPtr waiting_connection = makeAltsConnection();
+  waiting_connection->addConnectionCallbacks(waiting_connection_callbacks);
+  waiting_connection->connect();
+  ASSERT_TRUE(runUntil([this]() { return server_start_gate_.held() == 1; }));
+
+  // The first connection is still served.
+  response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_FALSE(waiting_connection_callbacks.connected());
+
+  // Once the handshaker service responds, the second handshake completes.
+  server_start_gate_.open();
+  ASSERT_TRUE(runUntil([&waiting_connection_callbacks]() {
+    return waiting_connection_callbacks.connected() || waiting_connection_callbacks.closed();
+  }));
+  EXPECT_TRUE(waiting_connection_callbacks.connected());
+  waiting_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
 } // namespace
