@@ -47,8 +47,6 @@ on:
     outputs:
       build-image:
         value: ${{ jobs.request.outputs.build-image }}
-      build-image-mobile:
-        value: ${{ jobs.request.outputs.build-image-mobile }}
       check-id:
         value: ${{ jobs.request.outputs.check-id }}
       check-name:
@@ -82,7 +80,6 @@ jobs:
       pull-requests: read
     outputs:
       build-image: ${{ toJSON(fromJSON(steps.request-output.outputs.value).request.build-image) }}
-      build-image-mobile: ${{ fromJSON(steps.request-output.outputs.value).request.build-image-mobile }}
       check-id: ${{ fromJSON(steps.request-output.outputs.value).check.check-id }}
       request: ${{ steps.request-output.outputs.value }}
       trusted: ${{ fromJSON(steps.request-output.outputs.value).request.trusted }}
