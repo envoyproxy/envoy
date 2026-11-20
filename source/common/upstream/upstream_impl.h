@@ -885,6 +885,7 @@ public:
                    std::optional<bool> weighted_priority_health = std::nullopt,
                    std::optional<uint32_t> overprovisioning_factor = std::nullopt,
                    HostLookupMapConstSharedPtr cross_priority_host_map = nullptr) override;
+  void batchHostUpdate(BatchUpdateCb& callback) override;
   HostLookupMapConstSharedPtr crossPriorityHostMap() const override;
 
   /**
@@ -907,6 +908,10 @@ private:
   // Persistent backing of the cross priority host map, used after
   // usePersistentCrossPriorityHostMap() is called. A snapshot is published on every update.
   PersistentHostMap persistent_cross_priority_host_map_;
+  // Hosts added during an active batch update whose address was still owned by another priority at
+  // the time of the add. Promoted into the map if that priority removes its host later in the
+  // batch.
+  HostMap pending_cross_priority_hosts_added_;
   bool use_persistent_cross_priority_host_map_{false};
 };
 
