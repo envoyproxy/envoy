@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -63,6 +64,12 @@ private:
                               PriorityStateManager& priority_state_manager,
                               const HostLookupMap& all_hosts,
                               const absl::flat_hash_set<std::string>& all_new_hosts);
+  // Updates the priorities when graceful_host_removal is enabled. Returns whether any priority was
+  // rebuilt.
+  bool updatePrioritiesWithGracefulHostRemoval(
+      bool weighted_priority_health, uint32_t overprovisioning_factor,
+      PriorityStateManager& priority_state_manager, const HostLookupMap& all_hosts,
+      const absl::flat_hash_set<std::string>& all_new_hosts);
   bool validateUpdateSize(int num_resources);
   const std::string& edsServiceName() const {
     const std::string& name = info_->edsServiceName();
@@ -79,6 +86,18 @@ private:
   void reloadHealthyHostsHelper(const HostSharedPtr& host) override;
   void startPreInit() override;
   void onAssignmentTimeout();
+  // Reloads the healthy hosts when graceful_host_removal is enabled. The hosts retained with
+  // PENDING_DYNAMIC_REMOVAL that are not needed anymore are only removed if remove_hosts is true,
+  // and otherwise on a later event loop iteration (see scheduleGracefulHostRemoval()). If
+  // changed_host is not null, the healthy hosts are reloaded because its health changed.
+  void reloadHealthyHostsWithGracefulHostRemoval(bool remove_hosts,
+                                                 const HostSharedPtr& changed_host = nullptr);
+  // Schedules a reload of the healthy hosts that removes the hosts retained with
+  // PENDING_DYNAMIC_REMOVAL that are not needed anymore on a later event loop iteration.
+  void scheduleGracefulHostRemoval();
+  // Returns the effective healthy panic threshold percentage in [0, 100], honoring runtime
+  // overrides of upstream.healthy_panic_threshold.
+  uint64_t healthyPanicThresholdPercent() const;
 
   // Returns true iff all the LEDS based localities were updated.
   bool validateAllLedsUpdated() const;
@@ -110,6 +129,13 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
   Event::TimerPtr assignment_timeout_;
+  Event::Dispatcher& main_thread_dispatcher_;
+  // Created on first use by scheduleGracefulHostRemoval().
+  Event::TimerPtr graceful_host_removal_timer_;
+  // Whether a reload of the healthy hosts was deferred to graceful_host_removal_timer_ because it
+  // was requested during a batch update.
+  bool graceful_host_removal_reload_pending_{};
+  uint32_t default_healthy_panic_percent_{50};
   InitializePhase initialize_phase_;
   using LedsConfigSet = absl::flat_hash_set<envoy::config::endpoint::v3::LedsClusterLocalityConfig,
                                             MessageUtil, MessageUtil>;

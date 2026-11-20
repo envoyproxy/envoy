@@ -1458,11 +1458,18 @@ ClusterInfoImpl::ClusterInfoImpl(
             return runtime_val;
           }())),
       type_(config.type()),
-      drain_connections_on_host_removal_(config.ignore_health_on_host_removal()),
+      drain_connections_on_host_removal_(config.ignore_health_on_host_removal() ||
+                                         config.eds_cluster_config().graceful_host_removal()),
+      graceful_host_removal_(config.eds_cluster_config().graceful_host_removal()),
       connection_pool_per_downstream_connection_(
           config.connection_pool_per_downstream_connection()),
+      // With graceful host removal, when active health checking is configured, newly added hosts
+      // are excluded until their first active health check completes, so that hosts awaiting their
+      // first active health check do not count towards the panic threshold, priority and locality
+      // availability while the removed hosts they replace are retained.
       warm_hosts_(!config.health_checks().empty() &&
-                  common_lb_config_->ignore_new_hosts_until_first_hc()),
+                  (common_lb_config_->ignore_new_hosts_until_first_hc() ||
+                   config.eds_cluster_config().graceful_host_removal())),
       wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, wait_for_warm_on_init, true)),
       set_local_interface_name_on_upstream_connections_(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
