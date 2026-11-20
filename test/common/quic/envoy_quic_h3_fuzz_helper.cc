@@ -387,7 +387,7 @@ QuicPacketizer::serializeStreamFrame(const test::common::quic::QuicStreamFrame& 
     }
   } else if (frame.has_junk()) {
     auto junk = frame.junk();
-    size_t len = std::min(junk.size(), 1024UL);
+    size_t len = std::min<size_t>(junk.size(), 1024);
     return serialize(quic::QuicFrame(quic::QuicStreamFrame(id, fin, offset, junk.data(), len)));
   }
   return nullptr;

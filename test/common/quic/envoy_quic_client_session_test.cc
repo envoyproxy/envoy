@@ -613,6 +613,11 @@ TEST_P(EnvoyQuicClientSessionTest, EcnReportingIsEnabled) {
 }
 
 TEST_P(EnvoyQuicClientSessionTest, EcnReporting) {
+#ifdef WIN32
+  // Windows does not let a socket set ECN marks for its outgoing packets with IP_TOS or
+  // IPV6_TCLASS, so the peer cannot send the marked packets this test needs.
+  GTEST_SKIP() << "Setting ECN marks with IP_TOS/IPV6_TCLASS is not supported on Windows.";
+#endif
   std::optional<Network::Address::IpVersion> version = peer_socket_->ipVersion();
   EXPECT_TRUE(version.has_value());
   // Make the peer socket send ECN marks
@@ -781,7 +786,8 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
   int sock_opt;
   socklen_t sock_len = sizeof(int);
   EXPECT_EQ(0, quic_connection_->connectionSocket()
-                   ->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len)
+                   ->getSocketOption(ENVOY_SOCKET_UDP_GRO.level(), ENVOY_SOCKET_UDP_GRO.option(),
+                                     &sock_opt, &sock_len)
                    .return_value_);
   EXPECT_EQ(1, sock_opt);
 
@@ -853,7 +859,8 @@ TEST_P(EnvoyQuicClientSessionDisallowMmsgTest, UsesRecvMsgWhenNoGro) {
     int sock_opt;
     socklen_t sock_len = sizeof(int);
     EXPECT_EQ(0, quic_connection_->connectionSocket()
-                     ->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len)
+                     ->getSocketOption(ENVOY_SOCKET_UDP_GRO.level(), ENVOY_SOCKET_UDP_GRO.option(),
+                                       &sock_opt, &sock_len)
                      .return_value_);
     EXPECT_EQ(0, sock_opt);
   }
