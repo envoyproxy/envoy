@@ -2,6 +2,7 @@
 
 #include "envoy/http/codec_runtime_overrides.h"
 
+#include "source/common/runtime/breaking_changes_flags.h"
 #include "source/common/singleton/const_singleton.h"
 
 #include "absl/flags/commandlineflag.h"
@@ -34,6 +35,11 @@
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
+
+// When enabled, which is the default, the ALTS transport socket's server-side handshakes talk to
+// the ALTS handshaker service through Envoy's async gRPC client, so a worker thread never waits for
+// the handshaker service. Disable to restore the previous blocking gRPC calls.
+RUNTIME_GUARD(envoy_reloadable_features_alts_async_handshaker);
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_cache_parsed_tls_certificates);
 RUNTIME_GUARD(envoy_reloadable_features_cares_dual_resolution_preserve_failure);
@@ -93,6 +99,11 @@ RUNTIME_GUARD(envoy_reloadable_features_filter_chain_drain_uses_configured_strat
 // forward that buffered data down the chain instead of the now-empty frame, so the frame is not
 // lost. See https://github.com/envoyproxy/envoy/issues/46841
 RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_added_data_on_continue);
+// Forward trailers from the filter holding them (the filter that added them, or a filter that
+// stopped all iteration when they arrived) exactly once, once that filter iterates, so they reach
+// every later filter, instead of dispatching them from the adding filter at the end of the data
+// pass.
+RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_held_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
 RUNTIME_GUARD(envoy_reloadable_features_geoip_sanitize_geo_headers);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
@@ -157,6 +168,7 @@ RUNTIME_GUARD(envoy_reloadable_features_orca_accept_unpadded_base64);
 RUNTIME_GUARD(envoy_reloadable_features_orca_weight_manager_use_named_metrics_first);
 RUNTIME_GUARD(envoy_reloadable_features_pqc_default_ecdh_curves);
 RUNTIME_GUARD(envoy_reloadable_features_preserve_downstream_keepalive);
+RUNTIME_GUARD(envoy_reloadable_features_prometheus_stats_unsorted);
 RUNTIME_GUARD(envoy_reloadable_features_propagate_downstream_rst_to_upstream);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_protocol_added_tlvs_format_string);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_protocol_remove_too_long_tlvs);
@@ -191,6 +203,7 @@ RUNTIME_GUARD(envoy_reloadable_features_strip_path_parameters_per_segment);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_strip_upgrade_header_on_failed_websocket_upgrades);
 RUNTIME_GUARD(envoy_reloadable_features_tap_honor_tap_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_tunnel_allow_upstream_half_close);
+RUNTIME_GUARD(envoy_reloadable_features_tcp_upstream_no_error_reset_after_end_stream);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_tls_ecdsa_selection_check_supported_versions);
 RUNTIME_GUARD(envoy_reloadable_features_tls_inspector_enforce_client_tls_version);
@@ -220,6 +233,10 @@ RUNTIME_GUARD(envoy_reloadable_features_use_stats_prefix_scope_for_http_filter);
 RUNTIME_GUARD(envoy_reloadable_features_vhds_answered_alias_cache);
 RUNTIME_GUARD(envoy_reloadable_features_vhds_overrides_rds_virtual_hosts_with_same_name);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
+// When a never-notified SDS watch is added for a secret name that another watch on the same mux
+// already subscribes to, replay the last delivered secret to the new watch instead of waiting for
+// the server to resend it.
+RUNTIME_GUARD(envoy_reloadable_features_xds_replay_cached_resources);
 // This is only needed if sharing c-ares query cache across dns clusters.
 // Disabled by default for now to prevent behavior changes.
 FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
@@ -372,6 +389,12 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_odcds_missing_cluster_cache);
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
           std::numeric_limits<uint32_t>::max(), "");            // NOLINT
+
+// Define all breaking changes flags as Envoy reloadable features.
+#define ENABLED_BREAKING_CHANGE_TO_RUNTIME(name) RUNTIME_GUARD(envoy_reloadable_features_##name)
+#define DISABLED_BREAKING_CHANGE_TO_RUNTIME(name)                                                  \
+  FALSE_RUNTIME_GUARD(envoy_reloadable_features_##name)
+ALL_BREAKING_CHANGES(ENABLED_BREAKING_CHANGE_TO_RUNTIME, DISABLED_BREAKING_CHANGE_TO_RUNTIME);
 
 namespace Envoy {
 namespace Runtime {

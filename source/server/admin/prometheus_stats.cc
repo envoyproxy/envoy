@@ -765,8 +765,10 @@ uint64_t outputStatType(Buffer::Instance& response, const StatsParams& params,
   for (const auto& [group, _] : groups) {
     sorted_stat_names.push_back(group);
   }
-  Stats::StatNameLessThan comp(global_symbol_table);
-  std::sort(sorted_stat_names.begin(), sorted_stat_names.end(), comp);
+  if (!params.unordered_) {
+    Stats::StatNameLessThan comp(global_symbol_table);
+    std::sort(sorted_stat_names.begin(), sorted_stat_names.end(), comp);
+  }
 
   auto result = groups.size();
   for (auto& group_name : sorted_stat_names) {
@@ -782,7 +784,9 @@ uint64_t outputStatType(Buffer::Instance& response, const StatsParams& params,
     // Sort before producing the final output to satisfy the "preferred" ordering from the
     // prometheus spec: metrics will be sorted by their tags' textual representation, which will
     // be consistent across calls.
-    std::sort(group.begin(), group.end(), MetricLessThan());
+    if (!params.unordered_) {
+      std::sort(group.begin(), group.end(), MetricLessThan());
+    }
 
     output_format.generateOutput(response, group, prefixed_tag_extracted_name.value());
   }
@@ -832,7 +836,9 @@ uint64_t outputPrimitiveStatType(Buffer::Instance& response, const StatsParams& 
   for (const auto& [group, _] : groups) {
     sorted_group_names.push_back(group);
   }
-  std::sort(sorted_group_names.begin(), sorted_group_names.end());
+  if (!params.unordered_) {
+    std::sort(sorted_group_names.begin(), sorted_group_names.end());
+  }
 
   auto result = groups.size();
   for (auto& group_name : sorted_group_names) {
@@ -847,7 +853,9 @@ uint64_t outputPrimitiveStatType(Buffer::Instance& response, const StatsParams& 
     // Sort before producing the final output to satisfy the "preferred" ordering from the
     // prometheus spec: metrics will be sorted by their tags' textual representation, which will
     // be consistent across calls.
-    std::sort(group.begin(), group.end(), PrimitiveMetricSnapshotLessThan());
+    if (!params.unordered_) {
+      std::sort(group.begin(), group.end(), PrimitiveMetricSnapshotLessThan());
+    }
 
     output_format.generateOutput(response, std::move(group), prefixed_tag_extracted_name.value());
   }

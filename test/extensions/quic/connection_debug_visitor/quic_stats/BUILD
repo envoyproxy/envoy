@@ -28,8 +28,19 @@ envoy_extension_cc_test(
     srcs = envoy_select_enable_http3(["integration_test.cc"]),
     extension_names = ["envoy.quic.connection_debug_visitor.quic_stats"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_small"},
+        "default": {"test": "linux_x64_medium"},
+        "gcc": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "coverage": {
+            "link": "linux_x64_large",
+            "test": "linux_x64_medium",
+        },
+        "tsan": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
     },
     deps = envoy_select_enable_http3([
         "//source/extensions/quic/connection_debug_visitor/quic_stats:config",

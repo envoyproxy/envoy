@@ -819,6 +819,19 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle
   return config->enableListenerLifecycle();
 }
 
+// -------------------- Runtime Update Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  auto* extension = static_cast<DynamicModuleBootstrapExtension*>(extension_envoy_ptr);
+  return extension->enableRuntimeUpdate(absl::string_view(key.ptr, key.length));
+}
+
 // -------------------- Run On All Workers Callbacks --------------------
 
 bool envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(

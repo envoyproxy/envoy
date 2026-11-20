@@ -267,8 +267,10 @@ protected:
 
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
                                      const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                                     const Envoy::Http::AsyncClient::StreamOptions&,
+                                     const Envoy::Http::AsyncClient::StreamOptions& options,
                                      Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&) {
+    buffer_body_for_retry_ = options.buffer_body_for_retry;
+    started_config_with_hash_key_ = &config_with_hash_key;
     if (do_start_option_ == OnGrpcError) {
       callbacks.onGrpcError(Grpc::Status::Internal, "foo");
       return nullptr;
@@ -737,6 +739,8 @@ protected:
   TestScopedRuntime scoped_runtime_;
 
   std::optional<envoy::config::core::v3::GrpcService> final_expected_grpc_service_;
+  bool buffer_body_for_retry_ = false;
+  const Grpc::GrpcServiceConfigWithHashKey* started_config_with_hash_key_ = nullptr;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   std::unique_ptr<MockClient> client_;
   MockClient* client_ptr_ = nullptr;
@@ -5919,6 +5923,114 @@ TEST_F(HttpFilterTest, GrpcServiceMetadataOverride) {
   EXPECT_EQ(meta[0].value(), "a"); // a = a inherited
   EXPECT_EQ(meta[1].value(), "c"); // b = c overridden
   EXPECT_EQ(meta[2].value(), "c"); // c = c added
+
+  filter_->onDestroy();
+}
+
+// Without a per-route override, the filter uses the gRPC service of the filter config.
+TEST_F(HttpFilterTest, GrpcServiceFromFilterConfig) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  final_expected_grpc_service_.emplace(config_->grpcService().value());
+  EXPECT_EQ(&config_->grpcServiceConfigWithHashKey().config(), &filter_->grpcServiceConfig());
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, std::nullopt);
+  EXPECT_EQ(&config_->grpcServiceConfigWithHashKey().config(), &filter_->grpcServiceConfig());
+  EXPECT_EQ(&config_->grpcServiceConfigWithHashKey(), started_config_with_hash_key_);
+
+  filter_->onDestroy();
+}
+
+// A per-route config that overrides only the processing mode keeps the filter config's service.
+TEST_F(HttpFilterTest, ProcessingModeOverrideKeepsGrpcService) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  ExtProcPerRoute route_proto;
+  route_proto.mutable_overrides()->mutable_processing_mode()->set_response_header_mode(
+      ProcessingMode::SKIP);
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillOnce([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; });
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, std::nullopt);
+  EXPECT_EQ(&config_->grpcServiceConfigWithHashKey(), started_config_with_hash_key_);
+
+  filter_->onDestroy();
+}
+
+// The per-route initial metadata extends the per-route gRPC service, whose retry policy and
+// cluster the stream uses.
+TEST_F(HttpFilterTest, GrpcServiceAndMetadataOverride) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+    initial_metadata:
+      - key: "a"
+        value: "a"
+  )EOF");
+
+  ExtProcPerRoute route_proto;
+  auto* route_grpc_service = route_proto.mutable_overrides()->mutable_grpc_service();
+  route_grpc_service->mutable_envoy_grpc()->set_cluster_name("cluster_1");
+  route_grpc_service->mutable_retry_policy()->mutable_num_retries()->set_value(1);
+  *route_proto.mutable_overrides()->mutable_grpc_initial_metadata()->Add() =
+      makeHeaderValue("b", "b");
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillOnce([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; });
+
+  envoy::config::core::v3::GrpcService expected_grpc_service = *route_grpc_service;
+  *expected_grpc_service.add_initial_metadata() = makeHeaderValue("b", "b");
+  final_expected_grpc_service_.emplace(expected_grpc_service);
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, std::nullopt);
+
+  EXPECT_THAT(filter_->grpcServiceConfig(), ProtoEq(expected_grpc_service));
+  EXPECT_TRUE(buffer_body_for_retry_);
+  filter_->logStreamInfo();
+  EXPECT_EQ("cluster_1", stream_info_.filterState()
+                             ->getDataReadOnly<ExtProcLoggingInfo>(filter_config_name)
+                             ->destination());
+
+  filter_->onDestroy();
+}
+
+// A per-route Google gRPC service logs no Envoy gRPC stream info for the stream.
+TEST_F(HttpFilterTest, GoogleGrpcServiceOverride) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  ExtProcPerRoute route_proto;
+  auto* google_grpc =
+      route_proto.mutable_overrides()->mutable_grpc_service()->mutable_google_grpc();
+  google_grpc->set_target_uri("ext_proc_server_uri");
+  google_grpc->set_stat_prefix("ext_proc");
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillOnce([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; });
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  filter_->logStreamInfo();
+
+  auto logging_info =
+      stream_info_.filterState()->getDataReadOnly<ExtProcLoggingInfo>(filter_config_name);
+  EXPECT_EQ(logging_info->upstreamHost(), nullptr);
+  EXPECT_EQ(logging_info->destination(), "ext_proc_server_uri");
 
   filter_->onDestroy();
 }

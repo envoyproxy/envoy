@@ -27,6 +27,11 @@ public:
   create(const envoy::config::route::v3::RetryPolicy& retry_policy,
          ProtobufMessage::ValidationVisitor& validation_visitor,
          Server::Configuration::CommonFactoryContext& common_context);
+
+  static absl::StatusOr<RetryPolicyConstSharedPtr>
+  createFromTypedConfig(const Protobuf::Any& typed_config,
+                        ProtobufMessage::ValidationVisitor& validation_visitor,
+                        Server::Configuration::CommonFactoryContext& common_context);
   RetryPolicyImpl() = default;
 
   // Router::RetryPolicy
