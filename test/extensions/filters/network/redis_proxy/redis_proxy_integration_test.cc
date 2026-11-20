@@ -3047,7 +3047,7 @@ void expectRedisStatsTagsAndNames(IntegrationTestServer& server) {
 // The tags mode is latched from the process-global runtime flag during server initialization, so
 // it must be set before initialize(); the global TestListener restores the flag after each test.
 TEST_P(RedisProxyIntegrationTest, StatsTagsAndNamesLegacyTagsMode) {
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", false);
+  Runtime::maybeSetRuntimeGuard("envoy.restart_features.enable_stats_explicit_tags", false);
   initialize();
 
   auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
@@ -3059,7 +3059,7 @@ TEST_P(RedisProxyIntegrationTest, StatsTagsAndNamesLegacyTagsMode) {
 }
 
 TEST_P(RedisProxyIntegrationTest, StatsTagsAndNamesExplicitTagsMode) {
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", true);
+  Runtime::maybeSetRuntimeGuard("envoy.restart_features.enable_stats_explicit_tags", true);
   initialize();
 
   auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());

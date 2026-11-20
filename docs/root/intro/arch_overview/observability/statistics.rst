@@ -26,6 +26,29 @@ Within Envoy and throughout the documentation, statistics are identified by a ca
 representation. The dynamic portions of these strings are stripped to become tags. Users can
 configure this behavior via :ref:`the Tag Specifier configuration <envoy_v3_api_msg_config.metrics.v3.TagSpecifier>`.
 
+.. note::
+
+  When no custom tag extraction rules are configured, that is when
+  :ref:`stats_tags <envoy_v3_api_field_config.metrics.v3.StatsConfig.stats_tags>` is empty and
+  :ref:`use_all_default_tags
+  <envoy_v3_api_field_config.metrics.v3.StatsConfig.use_all_default_tags>` is left at its default
+  of ``true``, Envoy takes the tags of a statistic from the code that creates it instead of
+  extracting them from the canonical string. The resulting names and tags are the same.
+  This is controlled by the ``envoy.restart_features.enable_stats_explicit_tags`` runtime guard,
+  which is read once at startup, before the runtime is loaded. It can **only** be overridden in a
+  :ref:`static layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.static_layer>` of the
+  :ref:`layered runtime <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.layered_runtime>`; values
+  set in disk, admin or RTDS layers have no effect. For example, to fall back to extracting tags
+  from the canonical string:
+
+  .. code-block:: yaml
+
+    layered_runtime:
+      layers:
+      - name: static_layer
+        static_layer:
+          envoy.restart_features.enable_stats_explicit_tags: false
+
 Envoy emits three types of values as statistics:
 
 * **Counters**: Unsigned integers that only increase and never decrease. E.g., total requests.

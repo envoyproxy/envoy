@@ -1,5 +1,6 @@
 #include "source/common/stats/thread_local_store.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <list>
@@ -34,7 +35,8 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
       histogram_settings_(std::make_unique<HistogramSettingsImpl>()),
       null_counter_(alloc.symbolTable()), null_gauge_(alloc.symbolTable()),
       null_histogram_(alloc.symbolTable()), null_text_readout_(alloc.symbolTable()),
-      well_known_tags_(alloc.symbolTable().makeSet("well_known_tags")) {
+      well_known_tags_(alloc.symbolTable().makeSet("well_known_tags")),
+      fixed_tags_pool_(alloc.symbolTable()) {
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     well_known_tags_->rememberBuiltin(desc.name_);
   }
@@ -51,6 +53,16 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
   auto new_scope = std::make_shared<ScopeImpl>(empty, StatNameTagSpan{}, empty, *this, false);
   addScope(new_scope);
   default_scope_ = new_scope;
+}
+
+void ThreadLocalStoreImpl::setTagProducer(TagProducerPtr&& tag_producer) {
+  tag_producer_ = std::move(tag_producer);
+  fixed_stat_name_tags_.clear();
+  fixed_tags_pool_.clear();
+  for (const Tag& tag : tag_producer_->fixedTags()) {
+    fixed_stat_name_tags_.emplace_back(fixed_tags_pool_.add(tag.name_),
+                                       fixed_tags_pool_.add(tag.value_));
+  }
 }
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
@@ -566,6 +578,20 @@ public:
       }
     } else {
       tag_extracted_name_ = name;
+      if (tls.useExplicitTags()) {
+        // The fixed tags (e.g. from --stats-tag) are normally added by the tag producer, which is
+        // skipped when the tags are supplied, so add them here. Skip a fixed tag whose name is
+        // already present, e.g. on stats merged from a hot restart parent.
+        // TODO(wbpcode): the fixed tags are the same for every stat, so copying them into each
+        // stat is unnecessary. Keep them as a shared option of the store and apply them only when
+        // the stats are output, e.g. by /stats/prometheus or the stats sinks.
+        for (const auto& fixed_tag : tls.fixedStatNameTags()) {
+          if (std::ranges::find(stat_name_tags_, fixed_tag.first, &StatNameTag::first) ==
+              stat_name_tags_.end()) {
+            stat_name_tags_.push_back(fixed_tag);
+          }
+        }
+      }
     }
   }
 

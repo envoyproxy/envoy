@@ -227,7 +227,7 @@ headers:
         });
     // The two IP versions run the server in the two stats modes, which it reads before the runtime
     // loader exists.
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+    Runtime::maybeSetRuntimeGuard("envoy.restart_features.enable_stats_explicit_tags",
                                   useExplicitStatsTags());
     setupTest(absl::StrCat(R"EOF(
 virtual_cluster_override:

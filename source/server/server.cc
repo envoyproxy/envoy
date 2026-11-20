@@ -9,6 +9,7 @@
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
@@ -63,6 +64,7 @@
 #include "source/server/utils.h"
 
 #include "absl/flags/flag.h"
+#include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Server {
@@ -384,6 +386,46 @@ registerCustomInlineHeadersFromBootstrap(const envoy::config::bootstrap::v3::Boo
   return absl::OkStatus();
 }
 
+// Finds the value of a runtime key in a runtime static layer, where the key may be spelled flat or
+// split into nested structs, the same as the runtime loader accepts.
+OptRef<const Protobuf::Value> findStaticLayerValue(const Protobuf::Struct& layer,
+                                                   absl::string_view key) {
+  for (const auto& [name, value] : layer.fields()) {
+    if (name == key) {
+      return value;
+    }
+    if (!value.has_struct_value() || key.size() <= name.size() || !absl::StartsWith(key, name) ||
+        key[name.size()] != '.') {
+      continue;
+    }
+    if (auto nested = findStaticLayerValue(value.struct_value(), key.substr(name.size() + 1));
+        nested.has_value()) {
+      return nested;
+    }
+  }
+  return {};
+}
+
+// The runtime guard enabling the explicit stats tags is needed before the runtime loader is
+// created, so it can ONLY be overridden by the static layers of the bootstrap, which are checked
+// directly here; disk, admin and RTDS layers have no effect on it. As in the runtime loader, a
+// later layer overrides an earlier one, values are parsed the same way (e.g. 0 is false) and a
+// value that is not a boolean leaves the guard at its default.
+bool statsExplicitTagsEnabled(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  constexpr absl::string_view key = "envoy.restart_features.enable_stats_explicit_tags";
+  const bool default_value = Runtime::runtimeFeatureEnabled(key);
+  bool enabled = default_value;
+  for (const auto& layer : bootstrap.layered_runtime().layers()) {
+    if (!layer.has_static_layer()) {
+      continue;
+    }
+    if (auto value = findStaticLayerValue(layer.static_layer(), key); value.has_value()) {
+      enabled = Runtime::SnapshotImpl::createEntry(*value, "").bool_value_.value_or(default_value);
+    }
+  }
+  return enabled;
+}
+
 } // namespace
 
 absl::Status InstanceUtil::loadBootstrapConfig(
@@ -505,7 +547,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     const bool use_all_default_tags =
         !stats_config.has_use_all_default_tags() || stats_config.use_all_default_tags().value();
     if (stats_config.stats_tags().empty() && use_all_default_tags &&
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_stats_explicit_tags")) {
+        statsExplicitTagsEnabled(bootstrap_)) {
       stats_store_.setUseExplicitTags(true);
       http_context_.setUseExplicitTags(true);
     }

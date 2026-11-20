@@ -125,10 +125,11 @@ IntegrationTestServerPtr IntegrationTestServer::create(
     Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_real_stats,
     bool use_bootstrap_node_metadata,
     std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto, bool use_admin_server,
-    Server::HotRestart* hot_restart) {
+    Server::HotRestart* hot_restart, const Stats::TagVector& cli_stats_tags) {
   IntegrationTestServerPtr server{std::make_unique<IntegrationTestServerImpl>(
       time_system, api, config_path, use_real_stats, std::move(config_proto))};
   server->hot_restart_ = hot_restart;
+  server->cli_stats_tags_ = cli_stats_tags;
   if (server_ready_function != nullptr) {
     server->setOnServerReadyCb(server_ready_function);
   }
@@ -287,6 +288,7 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   OptionsImplBase options(Server::createTestOptionsImpl(
       config_path_, "", version, validation_config, concurrency, drain_time, drain_strategy,
       use_bootstrap_node_metadata, std::move(config_proto_)));
+  options.setStatsTags(cli_stats_tags_);
   Thread::MutexBasicLockable lock;
 
   Random::RandomGeneratorPtr random_generator;

@@ -1,0 +1,9 @@
+layered_runtime:
+  layers:
+  - name: first_static_layer
+    static_layer:
+      envoy.restart_features.enable_stats_explicit_tags: false
+  - name: second_static_layer
+    static_layer:
+      envoy.restart_features.enable_stats_explicit_tags: "false"
+static_resources:

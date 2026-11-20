@@ -45,7 +45,7 @@ public:
   void initialize() override {
     // The mode is read during server initialization, before the runtime loader exists, so it has
     // to be set directly rather than with addRuntimeOverride().
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+    Runtime::maybeSetRuntimeGuard("envoy.restart_features.enable_stats_explicit_tags",
                                   explicitTags());
     BaseIntegrationTest::initialize();
     auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());

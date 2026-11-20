@@ -24,6 +24,7 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
+using testing::ContainsRegex;
 using testing::Eq;
 using testing::HasSubstr;
 using testing::Not;
@@ -175,7 +176,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", request("admin", "GET", "/stats/recentlookups", response));
   EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
   EXPECT_TRUE(absl::StartsWith(response->body(), "   Count Lookup\n")) << response->body();
-  EXPECT_LT(28, response->body().size());
+  EXPECT_THAT(response->body(), ContainsRegex("total: [1-9][0-9]*\n"));
 
   // Now disable recent-lookups tracking and check that we get the error again.
   EXPECT_EQ("200", request("admin", "POST", "/stats/recentlookups/disable", response));
@@ -232,15 +233,13 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_THAT(response->body(), Eq("{\"stats\":[]}"));
 
   EXPECT_EQ("200", request("admin", "GET", "/stats?format=prometheus", response));
-  EXPECT_THAT(
-      response->body(),
-      HasSubstr("envoy_http_downstream_rq_xx{envoy_response_code_class=\"4\",envoy_http_conn_"
-                "manager_prefix=\"admin\"} 2\n"));
+  EXPECT_THAT(response->body(),
+              HasSubstr("envoy_http_downstream_rq_xx{envoy_http_conn_manager_prefix=\"admin\","
+                        "envoy_response_code_class=\"4\"} 2\n"));
   EXPECT_THAT(response->body(), HasSubstr("# TYPE envoy_http_downstream_rq_xx counter\n"));
-  EXPECT_THAT(
-      response->body(),
-      HasSubstr("envoy_listener_admin_http_downstream_rq_xx{envoy_response_code_class=\"4\","
-                "envoy_http_conn_manager_prefix=\"admin\"} 2\n"));
+  EXPECT_THAT(response->body(),
+              HasSubstr("envoy_listener_admin_http_downstream_rq_xx{envoy_http_conn_manager_prefix="
+                        "\"admin\",envoy_response_code_class=\"4\"} 2\n"));
   EXPECT_THAT(response->body(), HasSubstr("# TYPE envoy_cluster_upstream_cx_active gauge\n"));
   EXPECT_THAT(response->body(),
               HasSubstr("envoy_cluster_upstream_cx_active{envoy_cluster_name=\"cluster_0\"} 0\n"));
@@ -264,15 +263,13 @@ TEST_P(IntegrationAdminTest, Admin) {
   }
 
   EXPECT_EQ("200", request("admin", "GET", "/stats/prometheus", response));
-  EXPECT_THAT(
-      response->body(),
-      HasSubstr("envoy_http_downstream_rq_xx{envoy_response_code_class=\"4\",envoy_http_conn_"
-                "manager_prefix=\"admin\"} 2\n"));
+  EXPECT_THAT(response->body(),
+              HasSubstr("envoy_http_downstream_rq_xx{envoy_http_conn_manager_prefix=\"admin\","
+                        "envoy_response_code_class=\"4\"} 2\n"));
   EXPECT_THAT(response->body(), HasSubstr("# TYPE envoy_http_downstream_rq_xx counter\n"));
-  EXPECT_THAT(
-      response->body(),
-      HasSubstr("envoy_listener_admin_http_downstream_rq_xx{envoy_response_code_class=\"4\","
-                "envoy_http_conn_manager_prefix=\"admin\"} 2\n"));
+  EXPECT_THAT(response->body(),
+              HasSubstr("envoy_listener_admin_http_downstream_rq_xx{envoy_http_conn_manager_prefix="
+                        "\"admin\",envoy_response_code_class=\"4\"} 2\n"));
   EXPECT_THAT(response->body(), HasSubstr("# TYPE envoy_cluster_upstream_cx_active gauge\n"));
   EXPECT_THAT(response->body(),
               HasSubstr("envoy_cluster_upstream_cx_active{envoy_cluster_name=\"cluster_0\"} 0\n"));
