@@ -110,11 +110,9 @@ private:
   Event::TimerPtr response_timer_;
   const envoy::service::load_stats::v3::LoadStatsRequest request_template_;
   Grpc::ResponsePtr<envoy::service::load_stats::v3::LoadStatsResponse> message_{nullptr};
-  // Map from cluster name to start of measurement interval.
-  absl::node_hash_map<std::string, std::chrono::steady_clock::duration> clusters_;
   // Map from cluster name to the load reporting state of the cluster. Only holds clusters selected
   // by the latest LoadStatsResponse.
-  absl::flat_hash_map<std::string, ClusterLoadReportState> clusters_with_state_;
+  absl::flat_hash_map<std::string, ClusterLoadReportState> clusters_;
   // Generation of the latest startLoadReportPeriod() call, see ClusterLoadReportState::generation.
   uint64_t generation_{0};
   TimeSource& time_source_;

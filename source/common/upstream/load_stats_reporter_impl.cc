@@ -130,14 +130,14 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
     // Walk the cluster manager's active clusters instead of looking every tracked cluster up by
     // name. Active clusters that are not tracked yet are picked up by startLoadReportPeriod().
     cm_.forEachActiveCluster([&](const Cluster& cluster) {
-      const auto it = clusters_with_state_.find(cluster.info()->name());
-      if (it == clusters_with_state_.end()) {
+      const auto it = clusters_.find(cluster.info()->name());
+      if (it == clusters_.end()) {
         return;
       }
       addClusterStats(*request, it->first, cluster, it->second, report_load_for_non_zero_stats);
     });
   } else {
-    for (auto& [cluster_name, state] : clusters_with_state_) {
+    for (auto& [cluster_name, state] : clusters_) {
       OptRef<const Upstream::Cluster> active_cluster = cm_.getActiveCluster(cluster_name);
       if (!active_cluster.has_value()) {
         ENVOY_LOG(debug, "Cluster {} does not exist", cluster_name);
@@ -337,7 +337,7 @@ void LoadStatsReporterImpl::onReceiveMessage(
 
 bool LoadStatsReporterImpl::trackCluster(absl::string_view cluster_name,
                                          std::chrono::steady_clock::duration now) {
-  const auto [it, inserted] = clusters_with_state_.try_emplace(cluster_name, now);
+  const auto [it, inserted] = clusters_.try_emplace(cluster_name, now);
   it->second.generation = generation_;
   return inserted;
 }
@@ -368,7 +368,7 @@ void LoadStatsReporterImpl::startLoadReportPeriod() {
   }
   // Stop tracking clusters that are no longer selected by the LRS server. With send_all_clusters
   // this also drops clusters that no longer exist.
-  absl::erase_if(clusters_with_state_,
+  absl::erase_if(clusters_,
                  [this](const auto& entry) { return entry.second.generation != generation_; });
   response_timer_->enableTimer(std::chrono::milliseconds(
       DurationUtil::durationToMilliseconds(message_->load_reporting_interval())));
