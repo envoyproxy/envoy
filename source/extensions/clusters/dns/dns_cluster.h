@@ -19,7 +19,8 @@ class LogicalDnsClusterTest;
  */
 
 class DnsClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
-                              envoy::extensions::clusters::dns::v3::DnsCluster> {
+                              envoy::extensions::clusters::dns::v3::DnsCluster>,
+                          Logger::Loggable<Logger::Id::upstream> {
 public:
   DnsClusterFactory() : ConfigurableClusterFactoryBase("envoy.cluster.dns") {}
 
