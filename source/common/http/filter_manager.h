@@ -723,7 +723,7 @@ public:
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
         proxy_100_continue_(proxy_100_continue),
-        per_filter_observed_end_stream_(Runtime::runtimeFeatureEnabled(
+        per_filter_buffer_(Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.filter_manager_per_filter_buffer")),
         inject_data_with_state_update_(Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.ext_proc_inject_data_with_state_update")),
@@ -1212,7 +1212,7 @@ private:
   const bool proxy_100_continue_;
   // Runtime flags latched when the filter manager is created, so the end_stream handling stays
   // consistent for the lifetime of the stream.
-  const bool per_filter_observed_end_stream_;
+  const bool per_filter_buffer_;
   const bool inject_data_with_state_update_;
   // Runtime flag latched when the filter manager is created, so the trailers handling stays
   // consistent for the lifetime of the stream.

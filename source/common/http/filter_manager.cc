@@ -59,7 +59,7 @@ void finalizeHeaders(FilterManagerCallbacks& callbacks, StreamInfo::StreamInfo& 
 } // namespace
 
 bool ActiveStreamFilterBase::observedEndStream() const {
-  return parent_.per_filter_observed_end_stream_ ? observed_end_stream_ : streamObservedEndStream();
+  return parent_.per_filter_buffer_ ? observed_end_stream_ : streamObservedEndStream();
 }
 
 void ActiveStreamFilterBase::commonContinue() {
@@ -518,7 +518,7 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
   observed_end_stream_ = end_stream;
   // With per-filter observed end stream, the stream-level flag is left untouched: it records
   // what the downstream client actually sent and drives lifecycle decisions.
-  if (!parent_.per_filter_observed_end_stream_ && parent_.inject_data_with_state_update_) {
+  if (!parent_.per_filter_buffer_ && parent_.inject_data_with_state_update_) {
     parent_.state().observed_decode_end_stream_ = end_stream;
   }
   ENVOY_STREAM_LOG(trace, "injectDecodedDataToFilterChain with end_stream: {}", parent_,
@@ -2187,7 +2187,7 @@ void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance&
   observed_end_stream_ = end_stream;
   // With per-filter observed end stream, the stream-level flag is left untouched: it records
   // what the upstream actually sent and drives lifecycle decisions.
-  if (!parent_.per_filter_observed_end_stream_ && parent_.inject_data_with_state_update_) {
+  if (!parent_.per_filter_buffer_ && parent_.inject_data_with_state_update_) {
     parent_.state_.observed_encode_end_stream_ = end_stream;
   }
   ENVOY_STREAM_LOG(trace, "injectEncodedDataToFilterChain with end_stream: {}", parent_,

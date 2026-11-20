@@ -3406,9 +3406,9 @@ class FilterManagerObservedEndStreamTest : public FilterManagerTest {
 public:
   using Chunks = std::vector<std::pair<std::string, bool>>;
 
-  void initializeChain(bool per_filter_observed_end_stream) {
+  void initializeChain(bool per_filter_buffer) {
     scoped_runtime_.mergeValues({{"envoy.reloadable_features.filter_manager_per_filter_buffer",
-                                  per_filter_observed_end_stream ? "true" : "false"}});
+                                  per_filter_buffer ? "true" : "false"}});
     initialize();
 
     for (size_t i = 0; i < filters_.size(); i++) {
