@@ -111,13 +111,13 @@ matcher_tree:
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, ExtensionInput) {
   envoy::extensions::filters::http::rbac::v3::RBAC config{};
-  *config.mutable_matcher() = Filters::Common::RBAC::extensionInputMatcher();
+  *config.mutable_matcher() = Filters::Common::RBAC::extensionInputMatcher("foo");
 
   Stats::IsolatedStoreImpl store;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   {
     Filters::Common::RBAC::TestExtensionInputFactory input_factory(
-        Envoy::Matcher::DataInputStage::RequestTrailers);
+        Envoy::Matcher::DataInputStage::Unknown);
     EXPECT_THROW_WITH_REGEX(std::ignore = std::make_shared<RoleBasedAccessControlFilterConfig>(
                                 config, "test", *store.rootScope(), context,
                                 ProtobufMessage::getStrictValidationVisitor()),
@@ -125,9 +125,9 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ExtensionInput) {
                             "RBAC HTTP filter cannot match on "
                             "'type.googleapis.com/google.protobuf.StringValue'");
   }
-  {
-    Filters::Common::RBAC::TestExtensionInputFactory input_factory(
-        Envoy::Matcher::DataInputStage::RequestHeaders);
+  for (const auto stage : {Envoy::Matcher::DataInputStage::Connection,
+                           Envoy::Matcher::DataInputStage::RequestHeaders}) {
+    Filters::Common::RBAC::TestExtensionInputFactory input_factory(stage);
     EXPECT_NO_THROW(std::ignore = std::make_shared<RoleBasedAccessControlFilterConfig>(
                         config, "test", *store.rootScope(), context,
                         ProtobufMessage::getStrictValidationVisitor()));

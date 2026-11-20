@@ -56,6 +56,7 @@ envoy_extension_cc_test(
         "//source/extensions/matching/input_matchers/ip:config",
         "//source/extensions/matching/network/common:inputs_lib",
         "//test/extensions/filters/common/rbac:engine_mocks",
+        "//test/extensions/filters/common/rbac:extension_input_lib",
         "//test/extensions/filters/http/rbac:route_config_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",

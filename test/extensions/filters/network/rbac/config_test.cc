@@ -232,7 +232,7 @@ matcher_tree:
 TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, ExtensionInput) {
   envoy::extensions::filters::network::rbac::v3::RBAC config{};
   config.set_stat_prefix("test");
-  *config.mutable_matcher() = Filters::Common::RBAC::extensionInputMatcher();
+  *config.mutable_matcher() = Filters::Common::RBAC::extensionInputMatcher("foo");
 
   Stats::IsolatedStoreImpl store;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;

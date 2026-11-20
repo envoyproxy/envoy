@@ -102,9 +102,11 @@ envoy_cc_test_library(
     deps = [
         "//envoy/http:filter_interface",
         "//envoy/matcher:matcher_interface",
+        "//source/common/common:fmt_lib",
         "//source/common/protobuf",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
         "@xds//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )
