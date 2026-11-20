@@ -1149,11 +1149,6 @@ TEST_F(LoadStatsReporterImplTest, NewlyTrackedClusterStatsAreLatchedSendAllClust
   response_timer_cb_();
 }
 
-INSTANTIATE_TEST_SUITE_P(LoadStatsReporterImplTest, LoadStatsReporterImplTest, testing::Bool(),
-                         [](const testing::TestParamInfo<bool>& info) {
-                           return info.param ? "EnableOptimizedLRSBookkeeping"
-                                             : "DisableOptimizedLRSBookkeeping";
-                         });
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
