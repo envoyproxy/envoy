@@ -1,5 +1,6 @@
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/common/thread_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/event/dispatcher_impl.h"
@@ -88,17 +89,24 @@ void UberFilterFuzzer::fuzz(
     cb_(filter_callback_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "Controlled exception {}", e.what());
+    // The factory may have added a filter before it threw.
+    reset();
     return;
   }
 
+  // The fuzzer is reused for every input, so destroy the filters however this returns: a filter
+  // left behind is dropped, without `onDestroy()`, when the next input adds its own.
+  Cleanup cleanup([this]() { reset(); });
+
   // Data path should not throw exceptions.
   if (decoder_filter_ != nullptr) {
-    Http::TestRequestHeaderMapImpl headers;
+    // These are what the decoder callbacks return for as long as the filter lives: it may ask for
+    // them while encoding, or from work that it completes in the loop below.
     for (const auto& header : downstream_data.headers().headers()) {
-      headers.addCopy(header.key(), header.value());
+      callbacks_request_headers_.addCopy(header.key(), header.value());
     }
     ON_CALL(decoder_callbacks_, requestHeaders())
-        .WillByDefault(Return(makeOptRef<Http::RequestHeaderMap>(headers)));
+        .WillByDefault(Return(makeOptRef<Http::RequestHeaderMap>(callbacks_request_headers_)));
     HttpFilterFuzzer::runData(decoder_filter_.get(), downstream_data);
   } else {
     decoding_finished_ = true;
@@ -131,12 +139,12 @@ void UberFilterFuzzer::fuzz(
   if (!isFilterFinished()) {
     throw EnvoyException("filter did not finish processing");
   }
-
-  reset();
 }
 
 void UberFilterFuzzer::reset() {
   destroy_filters_();
+  // Run what the filters have posted while they still exist, rather than in the next input.
+  worker_thread_dispatcher_->run(Event::DispatcherImpl::RunType::NonBlock);
   // The fuzzer is reused across inputs, and the next one may add no filter at all.
   destroy_filters_ = []() {};
   decoder_filter_.reset();
@@ -145,6 +153,7 @@ void UberFilterFuzzer::reset() {
   access_logger_.reset();
   custom_stat_namespaces_ = Stats::CustomStatNamespacesImpl();
   decoding_buffer_.reset();
+  callbacks_request_headers_.clear();
   HttpFilterFuzzer::reset();
 }
 
