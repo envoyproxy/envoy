@@ -87,7 +87,7 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_send_rst_on_user_space_socket);
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
 // Ignore the automated "remove this flag" issue: do not remove this before
-// envoy.reloadable_features.filter_manager_per_filter_observed_end_stream is removed, since it is
+// envoy.reloadable_features.filter_manager_per_filter_buffer is removed, since it is
 // still used when that flag is disabled.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_not_send_empty_data_with_false_eos);
@@ -109,8 +109,9 @@ RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_added_data_on_con
 RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_held_trailers);
 // When resuming filter chain iteration, compute end_stream from whether the end of the stream has
 // reached the resuming filter, instead of from the stream-level flag. When enabled,
-// envoy.reloadable_features.ext_proc_inject_data_with_state_update is ignored.
-RUNTIME_GUARD(envoy_reloadable_features_filter_manager_per_filter_observed_end_stream);
+// envoy.reloadable_features.ext_proc_inject_data_with_state_update is ignored. Per-filter body
+// buffering will be added behind this flag before it is enabled by default.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_filter_manager_per_filter_buffer);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
 RUNTIME_GUARD(envoy_reloadable_features_geoip_sanitize_geo_headers);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);

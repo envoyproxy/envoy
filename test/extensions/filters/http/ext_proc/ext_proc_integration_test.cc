@@ -6326,6 +6326,8 @@ TEST_P(ExtProcIntegrationTest, StreamedBodyCompleteBeforeHeadersUnsetChunkSizePa
 }
 
 TEST_P(ExtProcIntegrationTest, ThreeExtProcFiltersInRequestProcessingStreamed) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.filter_manager_per_filter_buffer", "true"}});
   two_ext_proc_filters_ = true;
   grpc_upstream_count_ = 3;
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {

@@ -3407,9 +3407,8 @@ public:
   using Chunks = std::vector<std::pair<std::string, bool>>;
 
   void initializeChain(bool per_filter_observed_end_stream) {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.filter_manager_per_filter_observed_end_stream",
-          per_filter_observed_end_stream ? "true" : "false"}});
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.filter_manager_per_filter_buffer",
+                                  per_filter_observed_end_stream ? "true" : "false"}});
     initialize();
 
     for (size_t i = 0; i < filters_.size(); i++) {

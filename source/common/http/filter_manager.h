@@ -724,7 +724,7 @@ public:
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
         proxy_100_continue_(proxy_100_continue),
         per_filter_observed_end_stream_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.filter_manager_per_filter_observed_end_stream")),
+            "envoy.reloadable_features.filter_manager_per_filter_buffer")),
         inject_data_with_state_update_(Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.ext_proc_inject_data_with_state_update")),
         forward_held_trailers_(Runtime::runtimeFeatureEnabled(
