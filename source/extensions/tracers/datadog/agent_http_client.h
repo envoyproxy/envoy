@@ -64,15 +64,18 @@ public:
 
   /**
    * Send an HTTP POST request to the cluster, where the requested resource is
-   * \p url.path. Invoke \p set_headers immediately to obtain the HTTP request
-   * headers. Send \p body as the request body. Return a
+   * \p url.path. If this client is shut down, \p deadline has passed, or the
+   * cluster does not exist, return without sending anything or invoking any
+   * callback. Otherwise, invoke \p set_headers immediately to obtain the HTTP
+   * request headers, and send \p body as the request body. Return a
    * \c datadog::tracing::Error if one occurs, otherwise return
    * \c datadog::tracing::nullopt. When a complete response is received,
    * invoke \p on_response with the response status, response headers, and
    * response body. If an error occurs before a complete response is received,
    * invoke \p on_error with a \c datadog::tracing::Error.
    * @param url URL from which the request path is taken
-   * @param set_headers callback invoked immediately to obtain request headers
+   * @param set_headers callback invoked immediately to obtain request headers,
+   * if a request is sent
    * @param body data to send as POST request body
    * @param on_response callback to invoke when a complete response is received
    * @param on_error callback to invoke when an error occurs before a complete

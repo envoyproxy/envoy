@@ -57,8 +57,10 @@ AsyncClientImpl::AsyncClientImpl(const envoy::config::core::v3::GrpcService& con
                                  absl::Status& creation_status)
     : max_recv_message_length_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), max_receive_message_length, 0)),
-      skip_envoy_headers_(config.envoy_grpc().skip_envoy_headers()), cm_(context.clusterManager()),
-      remote_cluster_name_(config.envoy_grpc().cluster_name()),
+      skip_envoy_headers_(config.envoy_grpc().skip_envoy_headers()),
+      per_stream_buffer_limit_bytes_(
+          PROTOBUF_GET_OPTIONAL_WRAPPED(config.envoy_grpc(), per_stream_buffer_limit_bytes)),
+      cm_(context.clusterManager()), remote_cluster_name_(config.envoy_grpc().cluster_name()),
       host_name_(config.envoy_grpc().authority()), time_source_(context.timeSource()) {
   auto parser_or_error = Router::HeaderParser::configure(
       config.initial_metadata(),
@@ -128,6 +130,11 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
   if (!options.retry_policy.has_value() && options.parsed_retry_policy == nullptr &&
       parent_.retryPolicy() != nullptr) {
     options_.setRetryPolicy(parent_.retryPolicy());
+  }
+
+  // Apply parent per-stream buffer limit from configuration, if the caller did not set one.
+  if (!options.buffer_limit_.has_value() && parent_.per_stream_buffer_limit_bytes_.has_value()) {
+    options_.setBufferLimit(*parent_.per_stream_buffer_limit_bytes_);
   }
 
   // Apply parent `skip_envoy_headers_` setting from configuration, if no per-stream
@@ -225,11 +232,27 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   stream_->sendHeaders(headers_message_->headers(), false);
 }
 
+bool AsyncStreamImpl::checkWaitingToDeletedOnRemoteClose() {
+  // It is expected that the server only sends trailers or closed the stream
+  // when the client is waiting for a half-close. If we got headers or data,
+  // then reset the stream.
+  if (waiting_to_delete_on_remote_close_) {
+    waiting_to_delete_on_remote_close_ = false;
+    resetStream();
+    return true;
+  }
+  return false;
+}
+
 // TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
 // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
 // Pending on https://github.com/envoyproxy/envoy/issues/39054, we are not doing "-bin" decoding
 // right now.
 void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
+  if (checkWaitingToDeletedOnRemoteClose()) {
+    return;
+  }
+
   const auto http_response_status = Http::Utility::getResponseStatus(*headers);
   const auto grpc_status = Common::getGrpcStatus(*headers);
 
@@ -272,6 +295,10 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
 }
 
 void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
+  if (checkWaitingToDeletedOnRemoteClose()) {
+    return;
+  }
+
   decoded_frames_.clear();
   auto status = decoder_.decode(data, decoded_frames_);
 
@@ -393,9 +420,7 @@ void AsyncStreamImpl::cleanup() {
     options_.sidestream_watermark_callbacks = nullptr;
   }
 
-  // Do not reset if the stream is being cleaning up after server has half-closed. The stream may
-  // also be null if it was never successfully started.
-  if (!http_reset_ && !waiting_to_delete_on_remote_close_) {
+  if (!http_reset_) {
     http_reset_ = true;
     if (stream_ != nullptr) {
       stream_->reset();

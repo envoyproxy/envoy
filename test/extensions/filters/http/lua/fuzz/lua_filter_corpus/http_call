@@ -1,0 +1,17 @@
+script: HTTP_CALL
+request {
+  headers {
+    headers { key: "x-fuzz-path" value: "/check" }
+    headers { key: "x-fuzz-name" value: "x-call" }
+    headers { key: "x-fuzz-value" value: "1" }
+    headers { key: "x-fuzz-timeout" value: "20" }
+    headers { key: "x-fuzz-relay" value: "1" }
+  }
+}
+http_call_responses {
+  headers {
+    headers { key: ":status" value: "403" }
+    headers { key: "x-reason" value: "deny" }
+  }
+  body: "denied"
+}

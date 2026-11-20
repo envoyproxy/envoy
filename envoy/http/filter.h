@@ -434,6 +434,14 @@ public:
    */
   virtual void
   requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+
+  /**
+   * Enables independent half close for the current stream: the stream is not reset when the
+   * response completes before the request. Used by the router filter for TCP upstreams.
+   *
+   * NOTE: this must be called before the response is encoded and cannot be undone.
+   */
+  virtual void enableHalfClose() PURE;
 };
 
 /**
@@ -1196,6 +1204,9 @@ public:
    *
    * When called in encodeData, the trailers map will be initialized to an empty map and returned by
    * reference. Calling this function more than once is invalid.
+   *
+   * Filters after the caller observe end_stream == false on the current data frame and then receive
+   * the new trailers via encodeTrailers(), including when one of them stops data iteration.
    *
    * @return a reference to the newly created trailers map.
    */

@@ -33,6 +33,7 @@ public:
   MOCK_METHOD(std::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(void, iterateContexts, (std::function<void(const Context&)> callback));
   MOCK_METHOD(Ssl::PrivateKeyMethodManager&, privateKeyMethodManager, ());
+  MOCK_METHOD(void, addContext, (const Envoy::Ssl::ContextSharedPtr& context));
   MOCK_METHOD(void, removeContext, (const Envoy::Ssl::ContextSharedPtr& old_context));
 };
 

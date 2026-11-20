@@ -74,8 +74,8 @@ impl RouteSpecifierConfig for ShadowExampleConfig {
   fn on_route(&self, ctx: &mut RouteSpecifierContext) -> OnRouteStatus {
     if !self.dry_run {
       // A wet run records only the cluster override, which the default Unspecified decision
-      // applies, so the request routes to the module's cluster. A cluster the route cannot accept is reported as an error rather
-      // than as a silent no-op.
+      // applies, so the request routes to the module's cluster. A cluster the route cannot accept
+      // is reported as an error rather than as a silent no-op.
       if !ctx.set_cluster_name(&self.cluster) {
         ctx.set_decision(RouteDecision::Error);
       }

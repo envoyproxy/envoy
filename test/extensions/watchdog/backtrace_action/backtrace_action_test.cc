@@ -332,11 +332,11 @@ TEST(BacktraceActionWritingTest, TimerReArmsWhileSlotIsBeingWritten) {
   Event::MockDispatcher dispatcher;
   std::vector<testing::NiceMock<Event::MockTimer>*> timers;
   EXPECT_CALL(dispatcher, createTimer_(testing::_))
-      .WillRepeatedly(testing::Invoke([&](Event::TimerCb) -> Event::Timer* {
+      .WillRepeatedly([&](Event::TimerCb) -> Event::Timer* {
         auto* timer = new testing::NiceMock<Event::MockTimer>();
         timers.push_back(timer);
         return timer;
-      }));
+      });
   Api::ApiPtr api = Api::createApiForTest(stats);
   Server::Configuration::GuardDogActionFactoryContext context{*api, dispatcher, *stats.rootScope(),
                                                               "test"};

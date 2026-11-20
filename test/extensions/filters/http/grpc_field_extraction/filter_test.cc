@@ -334,6 +334,60 @@ extractions_by_method: {
   checkSerializedData<CreateApiKeyRequest>(*request_data4, {request4});
 }
 
+TEST_F(FilterTestExtractOk, StreamingPipelinedMessageHeadForwarded) {
+  setUp(R"pb(
+extractions_by_method: {
+  key: "apikeys.ApiKeys.CreateApiKeyInStream"
+  value: {
+    request_field_extractions: {
+      key: "parent"
+      value: {
+      }
+    }
+  }
+}
+    )pb");
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKeyInStream"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request1 = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data1 = Envoy::Grpc::Common::serializeToGrpcFrame(request1);
+  CreateApiKeyRequest request2 = makeCreateApiKeyRequest(
+      R"pb(
+      parent: "from-req2"
+)pb");
+  Envoy::Buffer::InstancePtr request_data2 = Envoy::Grpc::Common::serializeToGrpcFrame(request2);
+
+  // First chunk: all of message 1 plus the head of pipelined message 2 (its
+  // 5-byte gRPC delimiter and the first few payload bytes).
+  constexpr uint64_t kMessage2HeadSize = 12;
+  Envoy::Buffer::OwnedImpl chunk1;
+  chunk1.move(*request_data1);
+  Envoy::Buffer::OwnedImpl message2_head;
+  message2_head.move(*request_data2, kMessage2HeadSize);
+  chunk1.move(message2_head);
+
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_,
+              setDynamicMetadata("envoy.filters.http.grpc_field_extraction",
+                                 HasStructFields(UnorderedElementsAre(IsStructList(
+                                     "parent", ElementsAre(IsStructValueString("project-id")))))));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(chunk1, false));
+
+  // Second chunk: the remainder of message 2, delivered after extraction is
+  // done, passes through untouched.
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data2, true));
+
+  // The forwarded bytes, in order, must reassemble into both messages.
+  Envoy::Buffer::OwnedImpl downstream;
+  downstream.move(chunk1);
+  downstream.move(*request_data2);
+  checkSerializedData<CreateApiKeyRequest>(downstream, {request1, request2});
+}
+
 using FilterTestFieldTypes = FilterTestBase;
 TEST_F(FilterTestFieldTypes, SingularType) {
   setUp(R"pb(

@@ -96,8 +96,8 @@ impl<ETS: EnvoyTransportSocket> TransportSocket<ETS> for XorTransportSocket {
           if n == 0 {
             return IoResult::keep_open(total, true);
           }
-          apply_xor(&mut buffer[..n], self.key);
-          envoy.read_buffer_add(&buffer[..n]);
+          apply_xor(&mut buffer[.. n], self.key);
+          envoy.read_buffer_add(&buffer[.. n]);
           total += n;
           if envoy.should_drain_read_buffer() {
             envoy.set_is_readable();
@@ -130,7 +130,7 @@ impl<ETS: EnvoyTransportSocket> TransportSocket<ETS> for XorTransportSocket {
         }
         break PostIoAction::KeepOpen;
       }
-      let (status, n) = envoy.io_write(&self.write_scratch[written..]);
+      let (status, n) = envoy.io_write(&self.write_scratch[written ..]);
       match status {
         IoStatus::Success => {
           if n == 0 {

@@ -91,6 +91,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl X509_VERIFY_PARAM_set_flags \
   --uncomment-func-decl X509_VERIFY_PARAM_clear_flags \
   --uncomment-func-decl X509_VERIFY_PARAM_set_depth \
+  --uncomment-func-decl X509_VERIFY_PARAM_set_time \
   --uncomment-func-decl X509_VERIFY_PARAM_set_time_posix \
   --uncomment-func-decl X509_NAME_ENTRY_get_object \
   --uncomment-func-decl X509_NAME_oneline \

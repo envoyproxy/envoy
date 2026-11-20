@@ -15,9 +15,6 @@ on:
       branch-name:
         type: string
         default: main
-      cache-docker:
-        type: boolean
-        default: true
       config-file:
         type: string
         default: ./.github/config.yml
@@ -34,8 +31,6 @@ on:
     outputs:
       build-image:
         value: ${{ jobs.request.outputs.build-image }}
-      build-image-mobile:
-        value: ${{ jobs.request.outputs.build-image-mobile }}
       request:
         value: ${{ jobs.request.outputs.request }}
       trusted:
@@ -58,22 +53,21 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       build-image: ${{ toJSON(fromJSON(steps.env.outputs.data).request.build-image) }}
-      build-image-mobile: ${{ fromJSON(steps.env.outputs.data).request.build-image-mobile }}
       request: ${{ steps.env.outputs.data }}
       trusted: true
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       id: started
       name: Create timestamp
       with:
         options: -r
         filter: |
           now
-    - uses: envoyproxy/toolshed/actions/github/checkout@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       id: checkout
       name: Checkout Envoy repository
     - name: Generate environment variables
-      uses: envoyproxy/toolshed/actions/envoy/ci/env@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      uses: envoyproxy/toolshed/actions/envoy/ci/env@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       id: env
       with:
         branch-name: ${{ inputs.branch-name }}
@@ -85,7 +79,7 @@ jobs:
 
     - name: Request summary
       id: summary
-      uses: envoyproxy/toolshed/actions/github/env/summary@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      uses: envoyproxy/toolshed/actions/github/env/summary@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       with:
         actor: ${{ toJSON(fromJSON(steps.env.outputs.data).request.actor) }}
         base-sha: ${{ fromJSON(steps.env.outputs.data).request.base-sha }}
@@ -100,14 +94,3 @@ jobs:
         ref: ${{ fromJSON(steps.env.outputs.data).request.ref }}
         sha: ${{ fromJSON(steps.env.outputs.data).request.sha }}
         target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
-
-  cache:
-    secrets:
-      app-id: ${{ secrets.lock-app-id }}
-      app-key: ${{ secrets.lock-app-key }}
-    uses: ./.github/workflows/_request_cache_docker.yml
-    needs: request
-    if: ${{ inputs.cache-docker }}
-    with:
-      caches: ${{ needs.request.outputs.caches }}
-      image-tag: ${{ fromJSON(needs.request.outputs.build-image).default }}

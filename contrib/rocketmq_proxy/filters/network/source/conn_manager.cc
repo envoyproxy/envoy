@@ -223,8 +223,12 @@ void ConnectionManager::addOrUpdateGroupMember(absl::string_view group,
 
 void ConnectionManager::onUnregisterClient(RemotingCommandPtr request) {
   auto header = request->typedCustomHeader<UnregisterClientRequestHeader>();
-  ASSERT(header != nullptr);
-  ASSERT(!header->clientId().empty());
+  if (header == nullptr || header->clientId().empty()) {
+    ENVOY_CONN_LOG(error, "rocketmq_proxy: unregister client request without a valid header",
+                   read_callbacks_->connection());
+    onError(request, "Malformed unregister client request");
+    return;
+  }
   ENVOY_LOG(trace, "Unregister client ID: {}, producer group: {}, consumer group: {}",
             header->clientId(), header->producerGroup(), header->consumerGroup());
 
@@ -269,6 +273,12 @@ void ConnectionManager::onSendMessage(RemotingCommandPtr request) {
   ENVOY_CONN_LOG(trace, "#onSendMessage, opaque: {}", read_callbacks_->connection(),
                  request->opaque());
   auto header = request->typedCustomHeader<SendMessageRequestHeader>();
+  if (header == nullptr) {
+    ENVOY_CONN_LOG(error, "rocketmq_proxy: send message request without a valid header",
+                   read_callbacks_->connection());
+    onError(request, "Malformed send message request");
+    return;
+  }
   header->queueId(-1);
   createActiveMessage(request).sendRequestToUpstream();
 }
@@ -276,8 +286,12 @@ void ConnectionManager::onSendMessage(RemotingCommandPtr request) {
 void ConnectionManager::onGetConsumerListByGroup(RemotingCommandPtr request) {
   auto requestExtHeader = request->typedCustomHeader<GetConsumerListByGroupRequestHeader>();
 
-  ASSERT(requestExtHeader != nullptr);
-  ASSERT(!requestExtHeader->consumerGroup().empty());
+  if (requestExtHeader == nullptr || requestExtHeader->consumerGroup().empty()) {
+    ENVOY_CONN_LOG(error, "rocketmq_proxy: get consumer list request without a valid header",
+                   read_callbacks_->connection());
+    onError(request, "Malformed get consumer list request");
+    return;
+  }
 
   ENVOY_LOG(trace, "#onGetConsumerListByGroup, consumer group: {}",
             requestExtHeader->consumerGroup());
@@ -311,7 +325,12 @@ void ConnectionManager::onGetConsumerListByGroup(RemotingCommandPtr request) {
 
 void ConnectionManager::onPopMessage(RemotingCommandPtr request) {
   auto header = request->typedCustomHeader<PopMessageRequestHeader>();
-  ASSERT(header != nullptr);
+  if (header == nullptr) {
+    ENVOY_CONN_LOG(error, "rocketmq_proxy: pop message request without a valid header",
+                   read_callbacks_->connection());
+    onError(request, "Malformed pop message request");
+    return;
+  }
   ENVOY_LOG(trace, "#onPopMessage. Consumer group: {}, topic: {}", header->consumerGroup(),
             header->topic());
   createActiveMessage(request).sendRequestToUpstream();
@@ -319,7 +338,12 @@ void ConnectionManager::onPopMessage(RemotingCommandPtr request) {
 
 void ConnectionManager::onAckMessage(RemotingCommandPtr request) {
   auto header = request->typedCustomHeader<AckMessageRequestHeader>();
-  ASSERT(header != nullptr);
+  if (header == nullptr) {
+    ENVOY_CONN_LOG(error, "rocketmq_proxy: ack message request without a valid header",
+                   read_callbacks_->connection());
+    onError(request, "Malformed ack message request");
+    return;
+  }
   ENVOY_LOG(
       trace,
       "#onAckMessage. Consumer group: {}, topic: {}, queue Id: {}, offset: {}, extra-info: {}",
@@ -343,13 +367,12 @@ ActiveMessage& ConnectionManager::createActiveMessage(RemotingCommandPtr& reques
   ENVOY_CONN_LOG(trace, "ConnectionManager#createActiveMessage. Code: {}, opaque: {}",
                  read_callbacks_->connection(), request->code(), request->opaque());
   ActiveMessagePtr active_message = std::make_unique<ActiveMessage>(*this, std::move(request));
-  LinkedList::moveIntoList(std::move(active_message), active_message_list_);
-  return **active_message_list_.begin();
+  active_message_list_.push(std::move(active_message));
+  return *active_message_list_.front();
 }
 
 void ConnectionManager::deferredDelete(ActiveMessage& active_message) {
-  read_callbacks_->connection().dispatcher().deferredDelete(
-      active_message.removeFromList(active_message_list_));
+  read_callbacks_->connection().dispatcher().deferredDelete(active_message.removeFromList());
 }
 
 void ConnectionManager::resetAllActiveMessages(absl::string_view error_msg) {

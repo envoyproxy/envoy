@@ -2,11 +2,14 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.dynamic_modules.v3;
 
+import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.dynamic_modules.v3";
 option java_outer_classname = "DynamicModulesProto";
@@ -29,7 +32,21 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * Inspect, modify, or inject data into the downstream connection.
 // * Access connection-level information such as addresses and TLS status.
 // * Control connection lifecycle (e.g., close the connection).
+// [#next-free-field: 7]
 message DynamicModuleNetworkFilter {
+  message AccessLogOptions {
+    // The interval at which the filter flushes access logs of type ``TcpPeriodic``. If not
+    // specified, the filter does not flush them periodically. The interval must be at least 1ms.
+    google.protobuf.Duration access_log_flush_interval = 1
+        [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+    // If set to ``true``, the filter flushes an access log of type ``TcpConnectionStart`` when it
+    // receives a new connection, before the module's new connection hook runs.
+    //
+    // Defaults to ``false``.
+    bool flush_access_log_on_start = 2;
+  }
+
   // Specifies the shared-object level configuration.
   envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1;
 
@@ -77,4 +94,21 @@ message DynamicModuleNetworkFilter {
   //
   // Defaults to ``false``.
   bool terminal_filter = 4;
+
+  // Configuration for :ref:`access logs <arch_overview_access_logs>` emitted by this filter. The
+  // filter flushes them with the access log type ``TcpConnectionEnd`` when the connection is
+  // closed, and the module can flush them with the types ``TcpUpstreamConnected`` and
+  // ``TcpPeriodic`` at its own events, such as once it has connected to its upstream. The filter
+  // records the time the connection ends, and gives the connection a stream ID if it has none. A
+  // TCP proxy later in the chain replaces that stream ID when it sees the connection. If empty, the
+  // filter does none of this, and ``access_log_options`` has no effect. Access logs are not
+  // supported on QUIC listeners.
+  //
+  // A terminal module that reaches its upstream itself can report the upstream, the timing, the
+  // bytes and the outcome of the connection through the dynamic module ABI, so that access logs
+  // show them as they do for the TCP proxy.
+  repeated config.accesslog.v3.AccessLog access_log = 5;
+
+  // Additional options for the access logs in ``access_log``.
+  AccessLogOptions access_log_options = 6;
 }

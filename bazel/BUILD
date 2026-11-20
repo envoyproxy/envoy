@@ -129,6 +129,9 @@ genrule(
     # Undocumented attr to depend on workspace status files.
     # https://github.com/bazelbuild/bazel/issues/4942
     stamp = 1,
+    # A one-line file from the stamp, so new with every commit: locally, rather than queued for
+    # remote execution on the critical path of every stamped link.
+    tags = ["no-remote-exec"],
 )
 
 # For macOS, which doesn't have GNU ld's `--build-id` flag.
@@ -144,6 +147,9 @@ genrule(
     # Undocumented attr to depend on workspace status files.
     # https://github.com/bazelbuild/bazel/issues/4942
     stamp = 1,
+    # A one-line file from the stamp, so new with every commit: locally, rather than queued for
+    # remote execution on the critical path of every stamped link.
+    tags = ["no-remote-exec"],
 )
 
 # For Windows, which must list each exported symbol individually.
@@ -155,10 +161,48 @@ genrule(
     tools = ["//tools/windows:gen_dynamic_modules_exports"],
 )
 
+bool_flag(
+    name = "shared_unwind",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "shared_unwind_enabled",
+    flag_values = {":shared_unwind": "True"},
+)
+
+selects.config_setting_group(
+    name = "linux_x86_64_shared_unwind",
+    match_all = [
+        ":shared_unwind_enabled",
+        ":linux_x86_64",
+    ],
+)
+
+# By default, Linux builds use the toolchain's libunwind.a, selected by -unwindlib=libunwind
+# in MODULE.bazel's extra_link_flags. Clang reuses -static-libgcc to link the unwinder
+# statically even when it is LLVM libunwind, not libgcc; the misleading name is intentional.
+# --//bazel:shared_unwind=true (set by build:asan in .bazelrc) disables that unwinder with
+# -unwindlib=none and uses @unwind_libs//:libunwind from envoy_toolshed's unwind_extension
+# instead, on Linux x86_64 only because unwind_libs only ships x86_64.
+# ASAN's dlsym(RTLD_NEXT) lookup cannot see a static unwinder, risking mixed LLVM/libgcc_s
+# unwinders and broken Rust dynamic-module panics.
+# The toolshed build supports our sysroot's older glibc; LLVM's shipped .so requires newer glibc.
+# See https://github.com/envoyproxy/toolshed/blob/bazel-v0.5.6/bazel/compile/README.md#L88-L99
+# With -unwindlib=none clang has nothing to apply the toolchain's -static-libgcc to and warns
+# "argument unused during compilation" on every link, so that warning is silenced here.
 cc_library(
     name = "static_stdlib",
     linkopts = select({
-        "//bazel:linux": ["-static-libgcc"],
+        ":linux_x86_64_shared_unwind": [
+            "-unwindlib=none",
+            "-Wno-unused-command-line-argument",
+        ],
+        ":linux": ["-static-libgcc"],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        ":linux_x86_64_shared_unwind": ["@unwind_libs//:libunwind"],
         "//conditions:default": [],
     }),
 )
@@ -173,40 +217,47 @@ config_setting(
 
 config_setting(
     name = "windows_opt_build",
-    values = {
-        "cpu": "x64_windows",
-        "compilation_mode": "opt",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"compilation_mode": "opt"},
 )
 
 config_setting(
     name = "windows_dbg_build",
-    values = {
-        "cpu": "x64_windows",
-        "compilation_mode": "dbg",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"compilation_mode": "dbg"},
 )
 
 config_setting(
     name = "windows_fastbuild_build",
-    values = {
-        "cpu": "x64_windows",
-        "compilation_mode": "fastbuild",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"compilation_mode": "fastbuild"},
 )
 
 config_setting(
     name = "clang_cl_build",
-    values = {
-        "cpu": "x64_windows",
-        "define": "clang_cl=1",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"define": "clang_cl=1"},
 )
 
 config_setting(
     name = "clang_cl_opt_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
         "compilation_mode": "opt",
     },
@@ -214,8 +265,11 @@ config_setting(
 
 config_setting(
     name = "clang_cl_dbg_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
         "compilation_mode": "dbg",
     },
@@ -223,8 +277,11 @@ config_setting(
 
 config_setting(
     name = "clang_cl_fastbuild_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
         "compilation_mode": "fastbuild",
     },
@@ -271,6 +328,21 @@ config_setting(
 )
 
 config_setting(
+    name = "compile_time_options_build",
+    values = {"define": "ENVOY_CONFIG_COMPILE_TIME_OPTIONS=1"},
+)
+
+config_setting(
+    name = "fuzz_coverage_build",
+    values = {"define": "ENVOY_CONFIG_FUZZ_COVERAGE=1"},
+)
+
+config_setting(
+    name = "openssl_build",
+    flag_values = {":openssl": "True"},
+)
+
+config_setting(
     name = "clang_build",
     flag_values = {
         "@bazel_tools//tools/cpp:compiler": "clang",
@@ -280,6 +352,16 @@ config_setting(
 config_setting(
     name = "clang_pch_build",
     values = {"define": "ENVOY_CLANG_PCH=1"},
+)
+
+config_setting(
+    name = "gcc_requested",
+    flag_values = {":use_gcc": "true"},
+)
+
+bool_flag(
+    name = "use_gcc",
+    build_setting_default = False,
 )
 
 config_setting(
@@ -638,15 +720,37 @@ label_flag(
     visibility = ["//visibility:public"],
 )
 
-# wee8 engine: envoy_toolshed prebuilt by default, source for configs the
-# prebuilt is incompatible with (gcc libstdc++ ABI; sanitizers need instrumented deps).
+# Use prebuilt artifacts for dependencies that offer them (currently wee8). Set to False to
+# build every such dependency from source, e.g. in environments that disallow prebuilt
+# artifacts: --//bazel:use_prebuilt_libs=False
+# Toolchain components (compiler, sysroot, libc++/libunwind runtimes) are not covered.
+bool_flag(
+    name = "use_prebuilt_libs",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "prebuilt_libs_disabled",
+    flag_values = {":use_prebuilt_libs": "False"},
+)
+
+selects.config_setting_group(
+    name = "wee8_source_build",
+    match_any = [
+        ":prebuilt_libs_disabled",
+        ":asan_build",
+        ":msan_build",
+        ":tsan_build",
+    ],
+)
+
+# wee8 engine: envoy_toolshed prebuilt by default, source when :use_prebuilt_libs is False
+# or for configs the prebuilt is incompatible with (sanitizers need instrumented deps).
+# envoy_toolshed itself falls back to source on unsupported platforms.
 alias(
     name = "wee8_engine",
     actual = select({
-        ":gcc_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
-        ":asan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
-        ":msan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
-        ":tsan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":wee8_source_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
         "//conditions:default": "@envoy_toolshed//v8:wee8",
     }),
     visibility = ["//visibility:public"],
@@ -797,14 +901,19 @@ config_setting(
 
 config_setting(
     name = "windows_x86_64",
-    values = {"cpu": "x64_windows"},
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
 )
 
 # Configuration settings to make doing selects for Apple vs non-Apple platforms
 # easier. More details: https://docs.bazel.build/versions/master/configurable-attributes.html#config_settingaliasing
 config_setting(
     name = "darwin",
-    values = {"cpu": "darwin"},
+    constraint_values = [
+        "@platforms//os:macos",
+    ],
 )
 
 config_setting(
@@ -825,37 +934,65 @@ config_setting(
 
 config_setting(
     name = "ios_i386",
-    values = {"cpu": "ios_i386"},
+    constraint_values = [
+        "@platforms//cpu:x86_32",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_x86_64",
-    values = {"cpu": "ios_x86_64"},
+    constraint_values = [
+        "@apple_support//constraints:simulator",
+        "@platforms//cpu:x86_64",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_armv7",
-    values = {"cpu": "ios_armv7"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:armv7",
+        "@platforms//os:ios",
+    ],
 )
 
+# armv7s has no platforms constraint, so this matches the same platforms as `ios_armv7`.
 config_setting(
     name = "ios_armv7s",
-    values = {"cpu": "ios_armv7s"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:armv7",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_arm64",
-    values = {"cpu": "ios_arm64"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:arm64",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_sim_arm64",
-    values = {"cpu": "ios_sim_arm64"},
+    constraint_values = [
+        "@apple_support//constraints:simulator",
+        "@platforms//cpu:arm64",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_arm64e",
-    values = {"cpu": "ios_arm64e"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:arm64e",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
@@ -920,11 +1057,106 @@ config_setting(
     define_values = {"engflow_rbe": "true"},
 )
 
+# Set by `ci/do_ci.sh release.multiarch`, which builds both arches from an x64 host: on EngFlow,
+# their actions run on x86_64 workers, whichever arch they target.
+bool_flag(
+    name = "multiarch",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "multiarch_build",
+    flag_values = {":multiarch": "true"},
+)
+
 selects.config_setting_group(
-    name = "engflow_rbe_x86_64",
+    name = "engflow_rbe_linux_x86_64",
     match_all = [
         ":engflow_rbe",
         ":linux_x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_multiarch",
+    match_all = [
+        ":engflow_rbe",
+        ":multiarch_build",
+    ],
+)
+
+# EngFlow builds whose actions run on x86_64 workers, which is what the `linux_x64_*` pools are
+# pinned for (`envoy_exec_properties`): x64 builds, and both arches of a multiarch one. A native
+# arm64 build keeps its platform's arm pool.
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64",
+    match_any = [
+        ":engflow_rbe_linux_x86_64",
+        ":engflow_rbe_multiarch",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_asan",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":asan_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_compile_time_options",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":compile_time_options_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_coverage",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":coverage_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_fuzz_coverage",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":fuzz_coverage_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_gcc",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":gcc_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_msan",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":msan_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_openssl",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":openssl_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_x86_64_tsan",
+    match_all = [
+        ":engflow_rbe_x86_64",
+        ":tsan_build",
     ],
 )
 

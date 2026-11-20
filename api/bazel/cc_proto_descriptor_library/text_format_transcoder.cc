@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "absl/log/absl_log.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_format.h"
@@ -62,9 +63,20 @@ void TextFormatTranscoder::loadFileDescriptors(
 
   google::protobuf::FileDescriptorProto file_descriptor_proto;
   std::string file_descriptor_bytes;
-  absl::Base64Unescape(file_descriptor_info.file_descriptor_bytes_base64, &file_descriptor_bytes);
-  file_descriptor_proto.ParseFromString(file_descriptor_bytes);
-  internals_->descriptor_pool.BuildFile(file_descriptor_proto);
+  if (!absl::Base64Unescape(file_descriptor_info.file_descriptor_bytes_base64,
+                            &file_descriptor_bytes) ||
+      !file_descriptor_proto.ParseFromString(file_descriptor_bytes)) {
+    // Embedded descriptors are generated at build time, so a failure here is a build bug, not a
+    // runtime condition. Fail loudly in debug builds, and skip rather than register garbage in
+    // release builds.
+    ABSL_LOG(DFATAL) << "Failed to parse embedded file descriptor for: "
+                     << file_descriptor_info.file_name;
+    return;
+  }
+  if (internals_->descriptor_pool.BuildFile(file_descriptor_proto) == nullptr) {
+    ABSL_LOG(DFATAL) << "Failed to build embedded file descriptor for: "
+                     << file_descriptor_info.file_name;
+  }
 }
 
 bool TextFormatTranscoder::toBinarySerializationInternal(

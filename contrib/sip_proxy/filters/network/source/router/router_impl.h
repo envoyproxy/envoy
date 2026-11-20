@@ -101,15 +101,12 @@ public:
   std::shared_ptr<UpstreamRequest> upstreamRequest() const { return upstream_request_; }
 
   SystemTime timestamp() const { return this->active_trans_->streamInfo().startTime(); }
-  void toDelete() { deleted_ = true; }
-  bool deleted() { return deleted_; }
 
 private:
   std::list<std::shared_ptr<MessageMetadata>> messages_;
   SipFilters::DecoderFilterCallbacks* active_trans_;
   std::shared_ptr<UpstreamRequest> upstream_request_;
   std::chrono::system_clock::time_point timestamp_;
-  bool deleted_{false};
 };
 
 struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
@@ -130,27 +127,16 @@ struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
 
   void auditTimerAction() {
     const auto p1 = dispatcher_.timeSource().systemTime();
-    for (auto it = transaction_info_map_.cbegin(); it != transaction_info_map_.cend();) {
-      if (it->second->deleted()) {
-        transaction_info_map_.erase(it++);
-        continue;
-      }
-
-      auto diff =
-          std::chrono::duration_cast<std::chrono::milliseconds>(p1 - it->second->timestamp());
+    // Collect first, so that the map is never iterated while a reset changes it.
+    std::vector<std::shared_ptr<TransactionInfoItem>> expired;
+    for (const auto& [transaction_id, item] : transaction_info_map_) {
+      auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(p1 - item->timestamp());
       if (diff.count() >= transaction_timeout_.count()) {
-        it->second->resetTrans();
-        // transaction_info_map_.erase(it++);
+        expired.push_back(item);
       }
-
-      ++it;
-      // In single thread, this condition should be cover in line 160
-      // And Envoy should be single thread
-      // if (it->second->deleted()) {
-      //   transaction_info_map_.erase(it++);
-      // } else {
-      //   ++it;
-      // }
+    }
+    for (const auto& item : expired) {
+      item->resetTrans();
     }
     audit_timer_->enableTimer(std::chrono::seconds(2));
   }
@@ -185,30 +171,27 @@ public:
   void insertTransaction(std::string&& transaction_id,
                          SipFilters::DecoderFilterCallbacks* active_trans,
                          std::shared_ptr<UpstreamRequest> upstream_request) {
-    if (hasTransaction(transaction_id)) {
-      return;
-    }
-
     tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.emplace(std::make_pair(
         transaction_id, std::make_shared<TransactionInfoItem>(active_trans, upstream_request)));
   }
 
-  void deleteTransaction(std::string&& transaction_id) {
-    if (hasTransaction(transaction_id)) {
-      tls_->getTyped<ThreadLocalTransactionInfo>()
-          .transaction_info_map_.at(transaction_id)
-          ->toDelete();
+  // Removes the entry of a transaction that is ending, so that it can never be returned by
+  // getTransaction() after it is destroyed. An entry inserted by another transaction with the same
+  // id is left alone.
+  void deleteTransaction(const std::string& transaction_id,
+                         const SipFilters::DecoderFilterCallbacks& active_trans) {
+    auto& map = tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_;
+    auto it = map.find(transaction_id);
+    if (it != map.end() && it->second->activeTrans() == &active_trans) {
+      map.erase(it);
     }
   }
 
-  bool hasTransaction(std::string& transaction_id) {
-    return tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.find(
-               transaction_id) !=
-           tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.end();
-  }
-
-  TransactionInfoItem& getTransaction(std::string&& transaction_id) {
-    return *(tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.at(transaction_id));
+  // Returns the live transaction with this id, or nullptr.
+  SipFilters::DecoderFilterCallbacks* getTransaction(const std::string& transaction_id) {
+    auto& map = tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_;
+    auto it = map.find(transaction_id);
+    return it == map.end() ? nullptr : it->second->activeTrans();
   }
 
   void insertUpstreamRequest(const std::string& host,
@@ -280,6 +263,7 @@ private:
 
   QueryStatus handleCustomizedAffinity(const std::string& header, const std::string& type,
                                        const std::string& key, MessageMetadataSharedPtr metadata);
+  void useUpstreamRequest(std::shared_ptr<UpstreamRequest> upstream_request);
 
   Upstream::ClusterManager& cluster_manager_;
   RouterStats& stats_;
@@ -338,7 +322,7 @@ public:
   void resetStream();
   void releaseConnection(bool close);
 
-  SipFilters::DecoderFilterCallbacks* getTransaction(std::string&& transaction_id);
+  SipFilters::DecoderFilterCallbacks* getTransaction(const std::string& transaction_id);
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -358,7 +342,6 @@ public:
 
   void setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
   void delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
-  SipFilters::DecoderFilterCallbacks& decoderFilterCallbacks() { return *callbacks_; }
 
   ConnectionState connectionState() { return conn_state_; }
   void setConnectionState(ConnectionState state) { conn_state_ = state; }
@@ -370,7 +353,8 @@ public:
   void setMetadata(MessageMetadataSharedPtr metadata) { metadata_ = metadata; }
   MessageMetadataSharedPtr metadata() { return metadata_; }
 
-  std::shared_ptr<SipSettings> settings() { return callbacks_->settings(); }
+  // Kept from the last transaction, so that responses can still be decoded after it ends.
+  std::shared_ptr<SipSettings> settings() { return settings_; }
 
 private:
   std::shared_ptr<Upstream::TcpPoolData> conn_pool_;
@@ -382,6 +366,7 @@ private:
 
   std::shared_ptr<TransactionInfo> transaction_info_;
   SipFilters::DecoderFilterCallbacks* callbacks_{};
+  std::shared_ptr<SipSettings> settings_;
   MessageMetadataSharedPtr metadata_;
   Buffer::OwnedImpl upstream_buffer_;
 };

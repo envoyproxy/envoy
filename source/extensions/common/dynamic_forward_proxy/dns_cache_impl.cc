@@ -283,8 +283,7 @@ DnsCacheImpl::PrimaryHostInfo* DnsCacheImpl::createHost(const std::string& host,
         // try_emplace() is used here for direct argument forwarding.
         .try_emplace(host,
                      std::make_unique<PrimaryHostInfo>(
-                         *this, std::string(host_attributes.host_),
-                         host_attributes.port_.value_or(default_port),
+                         *this, host_attributes.host_, host_attributes.port_.value_or(default_port),
                          host_attributes.is_ip_address_, [this, host]() { onReResolveAlarm(host); },
                          [this, host]() { onResolveTimeout(host); }))
         .first->second.get();

@@ -10,7 +10,9 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/ssl/ssl.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
@@ -85,8 +87,17 @@ BORINGSSL_TEST_P(SslIntegrationTest, UnknownSslAlert) {
   connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
-// Test that stats produced by the tls transport socket have correct tag extraction.
+// Test that stats produced by the tls transport socket have the same flat names, tag-extracted
+// names and tags whether the tags are derived by the legacy tag-extraction rules (IPv4) or
+// supplied explicitly (IPv6).
 TEST_P(SslIntegrationTest, StatsTagExtraction) {
+  // Exercise both stats modes without doubling the test matrix: the two IP versions run the
+  // server in different modes. The mode is read during server initialization, before the runtime
+  // loader exists, so it has to be set directly rather than with addRuntimeOverride().
+  const bool explicit_tags = version_ == Network::Address::IpVersion::v6;
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                explicit_tags);
+
   // Configure TLS to use specific parameters so the exact metrics the test expects are created.
   // TLSv1.3 doesn't allow specifying the cipher suites, so use TLSv1.2 to force a specific cipher
   // suite to simplify the test.
@@ -121,6 +132,12 @@ TEST_P(SslIntegrationTest, StatsTagExtraction) {
 
   testRouterRequestAndResponseWithBody(1024, 1024, false, false, &creator);
   checkStats();
+
+  // Sanity check that the parameterized mode really took effect; otherwise both IP versions
+  // would silently be exercising the same thing.
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), explicit_tags);
 
   using ExpectedResultsMap =
       absl::node_hash_map<std::string, std::pair<std::string, Stats::TagVector>>;
@@ -488,11 +505,6 @@ typed_config:
   "@type": type.googleapis.com/test.common.config.DummyConfig
   )EOF"),
                             *custom_validator_config);
-  auto* cert_validator_factory =
-      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
-          getFactory("envoy.tls.cert_validator.timed_cert_validator");
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->resetForTest();
   initialize();
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
@@ -542,18 +554,19 @@ typed_config:
   "@type": type.googleapis.com/test.common.config.DummyConfig
   )EOF"),
                             *custom_validator_config);
-  auto* cert_validator_factory =
-      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
-          getFactory("envoy.tls.cert_validator.timed_cert_validator");
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->resetForTest();
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
   initialize();
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
       ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config.get()),
       *context_manager_, *api_, &server_factory_context_.serverScope());
+  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
+      static_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory&>(
+          *client_transport_socket_factory_ptr)
+          .sslCtx();
+  auto& cert_validator = static_cast<Extensions::TransportSockets::Tls::TimedCertValidator&>(
+      ContextImplPeer::getMutableCertValidator(
+          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  cert_validator.updateValidationTimeOutMs(TestUtility::DefaultTimeout);
   Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
       client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
@@ -566,17 +579,12 @@ typed_config:
   while (socket->state() == Ssl::SocketState::HandshakeWaitingForConnectionData) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
-      static_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory&>(
-          *client_transport_socket_factory_ptr)
-          .sslCtx();
-  auto& cert_validator = static_cast<const Extensions::TransportSockets::Tls::TimedCertValidator&>(
-      ContextImplPeer::getCertValidator(
-          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  ASSERT_TRUE(cert_validator.validationStarted());
   EXPECT_TRUE(cert_validator.validationPending());
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
   connection->close(Network::ConnectionCloseType::NoFlush);
   connection.reset();
+  cert_validator.updateValidationTimeOutMs(std::chrono::milliseconds(0));
   while (cert_validator.validationPending()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -592,18 +600,19 @@ typed_config:
   "@type": type.googleapis.com/test.common.config.DummyConfig
   )EOF"),
                             *custom_validator_config);
-  auto* cert_validator_factory =
-      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
-          getFactory("envoy.tls.cert_validator.timed_cert_validator");
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->resetForTest();
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
   initialize();
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
       ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config.get()),
       *context_manager_, *api_, &server_factory_context_.serverScope());
+  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
+      static_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory&>(
+          *client_transport_socket_factory_ptr)
+          .sslCtx();
+  auto& cert_validator = static_cast<Extensions::TransportSockets::Tls::TimedCertValidator&>(
+      ContextImplPeer::getMutableCertValidator(
+          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  cert_validator.updateValidationTimeOutMs(TestUtility::DefaultTimeout);
   Network::ClientConnectionPtr connection = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
       client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
@@ -616,16 +625,11 @@ typed_config:
   while (socket->state() == Ssl::SocketState::HandshakeWaitingForConnectionData) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
-      static_cast<Extensions::TransportSockets::Tls::ClientSslSocketFactory&>(
-          *client_transport_socket_factory_ptr)
-          .sslCtx();
-  auto& cert_validator = static_cast<const Extensions::TransportSockets::Tls::TimedCertValidator&>(
-      ContextImplPeer::getCertValidator(
-          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  ASSERT_TRUE(cert_validator.validationStarted());
   EXPECT_TRUE(cert_validator.validationPending());
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
   connection->close(Network::ConnectionCloseType::NoFlush);
+  cert_validator.updateValidationTimeOutMs(std::chrono::milliseconds(0));
   while (cert_validator.validationPending()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }

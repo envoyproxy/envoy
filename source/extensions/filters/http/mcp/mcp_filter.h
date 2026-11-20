@@ -218,6 +218,7 @@ private:
   enum class ProtocolVersionValidationResult {
     Ok,
     Missing,
+    Invalid,
     Mismatch,
   };
   ProtocolVersionValidationResult validateProtocolVersion() const;

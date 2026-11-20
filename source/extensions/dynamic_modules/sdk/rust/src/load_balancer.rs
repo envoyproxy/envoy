@@ -1,7 +1,18 @@
 use crate::{
-  abi, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer, strs_to_module_buffers,
-  wrap_into_c_void_ptr, EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId,
-  EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId, NEW_LOAD_BALANCER_CONFIG_FUNCTION,
+  abi,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  str_to_module_buffer,
+  strs_to_module_buffers,
+  wrap_into_c_void_ptr,
+  EnvoyBuffer,
+  EnvoyCounterId,
+  EnvoyCounterVecId,
+  EnvoyGaugeId,
+  EnvoyGaugeVecId,
+  EnvoyHistogramId,
+  EnvoyHistogramVecId,
+  NEW_LOAD_BALANCER_CONFIG_FUNCTION,
 };
 #[cfg(any(test, feature = "mock"))]
 use mockall::*;

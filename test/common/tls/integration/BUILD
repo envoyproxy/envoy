@@ -21,7 +21,7 @@ envoy_cc_test_library(
         "ssl_integration_test_base.cc",
     ],
     hdrs = ["ssl_integration_test_base.h"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/integration:http_integration_lib",
@@ -38,7 +38,13 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+        "msan": {"test": "linux_x64_small"},
+    },
     deps = [
         ":sni_to_header_filter_lib",
         ":ssl_integration_test_lib",
@@ -46,7 +52,9 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/ssl:ssl_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:ssl_handshaker_lib",
@@ -89,7 +97,12 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",

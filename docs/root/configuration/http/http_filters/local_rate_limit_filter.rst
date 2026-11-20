@@ -56,6 +56,28 @@ enforced, or when a custom status other than 429 is configured. The option is di
       denominator: HUNDRED
   enable_retry_after_header: true
 
+Sharing across a local cluster
+------------------------------
+
+When
+:ref:`local_cluster_rate_limit <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.local_cluster_rate_limit>`
+is configured, Envoy divides each token bucket evenly across the current local cluster membership
+by scaling each request's token cost by the membership. For example, with 8 members, a request that
+costs 1 token without sharing costs 8 tokens.
+
+If the scaled cost is larger than ``max_tokens``, the bucket can never hold enough tokens for the
+request. In this case, Envoy admits the request when the bucket holds ``max_tokens`` tokens and
+still consumes the full scaled cost. The bucket goes below zero, and the next request waits until
+the bucket refills to ``max_tokens``. The aggregate rate across the local cluster stays at the
+configured rate, but the aggregate burst can be one request for each member, which can be larger
+than ``max_tokens``.
+
+This behavior applies only to a request that costs ``max_tokens`` or fewer tokens without sharing.
+A request that costs more than ``max_tokens`` without sharing remains rejected, and a bucket with
+``max_tokens: 0`` rejects every request. This behavior can be temporarily reverted by setting
+runtime guard ``envoy.reloadable_features.local_ratelimit_local_cluster_preserve_one_request`` to
+``false``.
+
 Example configuration
 ---------------------
 
@@ -128,6 +150,67 @@ If requests come from a downstream service cluster "foo" for "/foo/bar"
 path, then 10 req/min are allowed. But if they come from a downstream service
 cluster "foo" for "/foo/bar2" path, then 100 req/min are allowed. Otherwise,
 1000 req/min are allowed.
+
+Accounting for usage when a stream completes
+--------------------------------------------
+
+Set :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>`
+on an embedded ``rate_limits`` action to update local descriptor token buckets when the stream completes.
+This allows :ref:`hits_addend <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` in the
+filter's ``rate_limits`` to use response headers or final stream information, such as
+``%RESP(x-usage)%`` or ``%BYTES_SENT%``.
+
+This works in both the filter-level configuration and the per-route configuration in
+:ref:`typed_per_filter_config <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`.
+The local rate limit filter ignores ``apply_on_stream_done`` on route and virtual-host
+``rate_limits``; those entries continue to apply on the request path.
+
+Example using embedded ``rate_limits``:
+
+.. code-block:: yaml
+
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_key: usage
+        descriptor_value: service
+  - actions:
+    - generic_key:
+        descriptor_key: usage
+        descriptor_value: service
+    apply_on_stream_done: true
+    hits_addend:
+      format: "%RESP(x-usage)%"
+
+The first action enforces the budget and consumes one token on the request path. The second
+charges additional usage reported in the ``x-usage`` response header when the stream completes.
+Both actions must match a configured local descriptor. Completion actions update every matching
+descriptor bucket without blocking the completed request. Usage exceeding the remaining budget
+overdraws the bucket: it borrows future tokens, and later requests are rejected until the refill
+repays the debt. The debt is capped at the bucket's ``max_tokens``, and usage beyond the cap is
+dropped. The default token bucket is consumed only on the request path.
+Missing, empty or invalid formatted usage does not generate a descriptor and logs a warning.
+Negative hits addends refund tokens using the existing local descriptor behavior.
+
+With ``local_cluster_rate_limit``, positive charges are divided by the local cluster's token share
+factor, while refunds add the specified token count without scaling. This matches request-path
+refund behavior. A charge and refund with the same addend do not cancel when the share factor is
+less than one.
+
+Request and completion actions share the same bounded cache for wildcard descriptors. A value
+first seen at completion creates a bucket and can evict another bucket, including one used for
+request enforcement. Revisiting an evicted value creates a fresh bucket with its initial budget.
+Size ``max_dynamic_descriptors`` for the combined cardinality of request and completion values.
+
+Completion accounting works with process-wide and per-connection buckets. Request counters and
+rate limit response headers reflect the request-path decision; completion accounting does not
+change the response or increment request counters again.
+
+As with the global rate limit filter, completion actions also run when the request was rejected
+by the rate limit filter. Stream information such as ``%BYTES_SENT%`` includes usage from a local
+rate limit response. To account for upstream-reported usage, use a response header such as
+``%RESP(x-usage)%`` that is present only when the upstream reports a cost. A missing header
+drops the descriptor and logs a warning.
 
 Statistics
 ----------

@@ -62,8 +62,8 @@ message IoUringOptions {
   // The timeout in milliseconds to wait for pending write operations to complete when closing
   // a socket. ``io_uring`` writes are asynchronous. If the remote peer stops reading, a write
   // may never complete. After this timeout, pending writes are canceled and the socket is
-  // closed. If not specified, defaults to 1000.
-  google.protobuf.UInt32Value write_timeout_ms = 4;
+  // closed. If not specified, defaults to 1000. When set, the value must be greater than zero.
+  google.protobuf.UInt32Value write_timeout_ms = 4 [(validate.rules).uint32 = {gt: 0}];
 
   // The high watermark in bytes for the write buffer. When the amount of pending write data
   // exceeds this threshold, the socket stops accepting new writes from the connection so that

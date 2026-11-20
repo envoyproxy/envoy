@@ -1,16 +1,23 @@
 use crate::{
-  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer,
-  wrap_into_c_void_ptr, EnvoyBuffer, NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION,
+  abi,
+  bytes_to_module_buffer,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  str_to_module_buffer,
+  wrap_into_c_void_ptr,
+  EnvoyBuffer,
+  NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION,
 };
 #[cfg(any(test, feature = "mock"))]
 use mockall::*;
+use std::cell::RefCell;
 
 thread_local! {
   // Scratch for the ABI slice descriptors read by `read_buffer_slices`. Reused across body reads on
   // the same worker thread to avoid a per-call allocation. It is only borrowed within a single call
   // and is never held across a re-entrant call.
-  static SLICE_DESCRIPTOR_SCRATCH: std::cell::RefCell<Vec<abi::envoy_dynamic_module_type_envoy_buffer>> =
-    const { std::cell::RefCell::new(Vec::new()) };
+  static SLICE_DESCRIPTOR_SCRATCH: RefCell<Vec<abi::envoy_dynamic_module_type_envoy_buffer>> =
+    const { RefCell::new(Vec::new()) };
 }
 
 /// The module-side bridge configuration.
@@ -488,7 +495,7 @@ mod tests {
     result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
     result_buffer_length: *mut usize,
   ) {
-    for i in 0..OVERFLOW_SLICE_COUNT {
+    for i in 0 .. OVERFLOW_SLICE_COUNT {
       *result_buffer.add(i) = abi::envoy_dynamic_module_type_envoy_buffer {
         ptr: &SLICE_BYTE as *const u8 as _,
         length: 1,

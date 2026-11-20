@@ -1,3 +1,4 @@
+//go:generate mockgen -source=stats_sink_api.go -destination=mocks/mock_stats_sink_api.go -package=mocks
 package shared
 
 // StatSink is the per-config stats sink instance. A single StatSink lives for

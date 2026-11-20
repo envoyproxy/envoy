@@ -115,6 +115,7 @@ resolvePendingRqQueuePolicy(
   RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(queue_policy_config.typed_config(),
                                                           server_context.messageValidationVisitor(),
                                                           *factory_config));
+  // This instance is only used to run factory-specific validation.
   auto queue = factory->createQueuePolicy(*factory_config, stat_prefix,
                                           server_context.messageValidationVisitor());
   RETURN_IF_NOT_OK(queue.status());
@@ -944,14 +945,17 @@ void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_para
     ASSERT(overprovisioning_factor.value() > 0);
     overprovisioning_factor_ = overprovisioning_factor.value();
   }
-  hosts_ = std::move(update_hosts_params.hosts);
-  healthy_hosts_ = std::move(update_hosts_params.healthy_hosts);
-  degraded_hosts_ = std::move(update_hosts_params.degraded_hosts);
-  excluded_hosts_ = std::move(update_hosts_params.excluded_hosts);
-  hosts_per_locality_ = std::move(update_hosts_params.hosts_per_locality);
-  healthy_hosts_per_locality_ = std::move(update_hosts_params.healthy_hosts_per_locality);
-  degraded_hosts_per_locality_ = std::move(update_hosts_params.degraded_hosts_per_locality);
-  excluded_hosts_per_locality_ = std::move(update_hosts_params.excluded_hosts_per_locality);
+  // A snapshot leaves the flat views null; the subclass that adopts it serves them.
+  if (update_hosts_params.snapshot == nullptr) {
+    hosts_ = std::move(update_hosts_params.hosts);
+    healthy_hosts_ = std::move(update_hosts_params.healthy_hosts);
+    degraded_hosts_ = std::move(update_hosts_params.degraded_hosts);
+    excluded_hosts_ = std::move(update_hosts_params.excluded_hosts);
+    hosts_per_locality_ = std::move(update_hosts_params.hosts_per_locality);
+    healthy_hosts_per_locality_ = std::move(update_hosts_params.healthy_hosts_per_locality);
+    degraded_hosts_per_locality_ = std::move(update_hosts_params.degraded_hosts_per_locality);
+    excluded_hosts_per_locality_ = std::move(update_hosts_params.excluded_hosts_per_locality);
+  }
   locality_weights_ = std::move(locality_weights);
 
   runUpdateCallbacks(hosts_added, hosts_removed);
@@ -973,7 +977,8 @@ HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
                                         std::move(hosts_per_locality),
                                         std::move(healthy_hosts_per_locality),
                                         std::move(degraded_hosts_per_locality),
-                                        std::move(excluded_hosts_per_locality)};
+                                        std::move(excluded_hosts_per_locality),
+                                        nullptr};
 }
 
 PrioritySet::UpdateHostsParams HostSetImpl::updateHostsParams(const HostSet& host_set) {
@@ -1049,6 +1054,23 @@ void PrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {
   HostVector net_hosts_removed = filterHosts(scope.all_hosts_removed_, scope.all_hosts_added_);
 
   runUpdateCallbacks(net_hosts_added, net_hosts_removed);
+}
+
+HostSetImplPtr PrioritySetImpl::createHostSet(uint32_t priority,
+                                              std::optional<bool> weighted_priority_health,
+                                              std::optional<uint32_t> overprovisioning_factor) {
+  if (host_set_factory_ != nullptr) {
+    return host_set_factory_(priority, weighted_priority_health, overprovisioning_factor);
+  }
+  return std::make_unique<HostSetImpl>(priority, weighted_priority_health, overprovisioning_factor);
+}
+
+void PrioritySetImpl::setHostSetFactory(HostSetFactory factory) {
+  if (!host_sets_.empty()) {
+    IS_ENVOY_BUG("host set factory set after host sets were created");
+    return;
+  }
+  host_set_factory_ = factory;
 }
 
 void PrioritySetImpl::BatchUpdateScope::updateHosts(
@@ -1441,6 +1463,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.connection_pool_per_downstream_connection()),
       warm_hosts_(!config.health_checks().empty() &&
                   common_lb_config_->ignore_new_hosts_until_first_hc()),
+      wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, wait_for_warm_on_init, true)),
       set_local_interface_name_on_upstream_connections_(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
       added_via_api_(added_via_api),
@@ -1794,11 +1817,10 @@ absl::StatusOr<bool> validateTransportSocketSupportsQuic(
 
 ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
                                  ClusterFactoryContext& cluster_context,
-                                 absl::Status& creation_status)
+                                 absl::Status& creation_status, HostSetFactory host_set_factory)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
       init_watcher_("ClusterImplBase", [this]() { onInitDone(); }),
       runtime_(cluster_context.serverFactoryContext().runtime()),
-      wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)),
       random_(cluster_context.serverFactoryContext().api().randomGenerator()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
           cluster_context.serverFactoryContext().singletonManager(),
@@ -1878,6 +1900,9 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
 #endif
   }
 
+  if (host_set_factory != nullptr) {
+    priority_set_.setHostSetFactory(host_set_factory);
+  }
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);
@@ -1892,10 +1917,11 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
         uint32_t excluded_hosts = 0;
         uint32_t hosts = 0;
         for (const auto& host_set : prioritySet().hostSetsPerPriority()) {
-          hosts += host_set->hosts().size();
-          healthy_hosts += host_set->healthyHosts().size();
-          degraded_hosts += host_set->degradedHosts().size();
-          excluded_hosts += host_set->excludedHosts().size();
+          const HostCounts counts = host_set->hostCounts();
+          hosts += counts.hosts;
+          healthy_hosts += counts.healthy;
+          degraded_hosts += counts.degraded;
+          excluded_hosts += counts.excluded;
         }
         info_->endpointStats().membership_total_.set(hosts);
         info_->endpointStats().membership_healthy_.set(healthy_hosts);
@@ -1950,6 +1976,15 @@ ClusterImplBase::partitionHostsPerLocality(const HostsPerLocality& hosts) {
                          std::move(filtered_clones[2]));
 }
 
+PrioritySet::UpdateHostsParams
+HostSetImpl::snapshotUpdateHostsParams(HostSetSnapshotConstSharedPtr snapshot) {
+  PrioritySet::UpdateHostsParams params;
+  params.snapshot = std::move(snapshot);
+  return params;
+}
+
+bool HostSetImpl::excludedByHealthFlags(const Host& host) { return excludeBasedOnHealthFlag(host); }
+
 bool ClusterInfoImpl::maintenanceMode() const {
   return runtime_.snapshot().featureEnabled(maintenance_mode_runtime_key_, 0);
 }
@@ -1992,10 +2027,7 @@ void ClusterImplBase::onPreInitComplete() {
 void ClusterImplBase::onInitDone() {
   info()->configUpdateStats().warming_state_.set(0);
   if (health_checker_ && pending_initialize_health_checks_ == 0) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.health_check_after_cluster_warming")) {
-      health_checker_->start();
-    }
+    health_checker_->start();
     for (auto& host_set : prioritySet().hostSetsPerPriority()) {
       for (auto& host : host_set->hosts()) {
         if (host->disableActiveHealthCheck()) {
@@ -2103,10 +2135,6 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
 void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_checker) {
   ASSERT(!health_checker_);
   health_checker_ = health_checker;
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.health_check_after_cluster_warming")) {
-    health_checker_->start();
-  }
   health_checker_->addHostCheckCompleteCb(
       [this](const HostSharedPtr& host, HealthTransition changed_state, HealthState) -> void {
         // If we get a health check completion that resulted in a state change, signal to
@@ -2140,8 +2168,26 @@ void ClusterImplBase::reloadHealthyHosts(const HostSharedPtr& host) {
   reloadHealthyHostsHelper(host);
 }
 
-void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
+void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr& host) {
   const auto& host_sets = prioritySet().hostSetsPerPriority();
+
+  // A health change re-partitions only the host's priority. A null host comes from
+  // finishInitialization() and re-partitions every priority.
+  if (host != nullptr &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.incremental_health_transition")) {
+    const uint32_t priority = host->priority();
+    if (priority < host_sets.size()) {
+      const auto& host_set = host_sets[priority];
+      prioritySet().updateHosts(
+          priority,
+          HostSetImpl::partitionHosts(host_set->hostsPtr(), host_set->hostsPerLocalityPtr()),
+          host_set->localityWeights(), {}, {}, std::nullopt, std::nullopt);
+      return;
+    }
+    IS_ENVOY_BUG(fmt::format("health change for host at priority {} beyond {} host sets", priority,
+                             host_sets.size()));
+  }
+
   for (size_t priority = 0; priority < host_sets.size(); ++priority) {
     const auto& host_set = host_sets[priority];
     // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?

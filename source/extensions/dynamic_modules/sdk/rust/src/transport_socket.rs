@@ -5,7 +5,11 @@
 //! connections in Envoy.
 
 use crate::{
-  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, wrap_into_c_void_ptr,
+  abi,
+  bytes_to_module_buffer,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  wrap_into_c_void_ptr,
 };
 #[cfg(any(test, feature = "mock"))]
 use mockall::*;
@@ -19,9 +23,10 @@ thread_local! {
 }
 
 // Copies the write buffer slices into `out`. The `get_slices` closure wraps the ABI slice getter so
-// this logic stays unit-testable. It is called first with a null buffer to learn the slice count and
-// then with the scratch buffer to fill it. The descriptor scratch is reused across calls and the
-// output is pre-sized from the summed slice lengths so a large write does not repeatedly reallocate.
+// this logic stays unit-testable. It is called first with a null buffer to learn the slice count
+// and then with the scratch buffer to fill it. The descriptor scratch is reused across calls and
+// the output is pre-sized from the summed slice lengths so a large write does not repeatedly
+// reallocate.
 fn copy_write_buffer_slices(
   out: &mut Vec<u8>,
   get_slices: impl Fn(*mut abi::envoy_dynamic_module_type_envoy_buffer, *mut usize),
@@ -44,9 +49,9 @@ fn copy_write_buffer_slices(
     let mut filled = count;
     get_slices(slices.as_mut_ptr(), &mut filled);
     let filled = filled.min(count);
-    let total: usize = slices[..filled].iter().map(|slice| slice.length).sum();
+    let total: usize = slices[.. filled].iter().map(|slice| slice.length).sum();
     out.reserve(total);
-    for slice in &slices[..filled] {
+    for slice in &slices[.. filled] {
       if slice.ptr.is_null() || slice.length == 0 {
         continue;
       }

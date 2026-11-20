@@ -390,6 +390,8 @@ TEST_F(ClientContextConfigImplTest, MultipleTlsCertificatesWhenCustomTlsCertSele
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  // Deliberately uses its own symbol table, distinct from the factory context's: regression
+  // test for the context stats crashing when the scope does not share the server's table.
   Stats::IsolatedStoreImpl store;
   auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
   EXPECT_OK(context_or);

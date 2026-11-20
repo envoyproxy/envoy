@@ -1,3 +1,4 @@
+//go:generate mockgen -source=header_formatter_api.go -destination=mocks/mock_header_formatter_api.go -package=mocks
 package shared
 
 // HeaderFormatter decides the casing of the header keys of a single HTTP/1

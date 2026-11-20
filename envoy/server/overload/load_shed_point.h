@@ -34,6 +34,11 @@ public:
   const std::string H2ServerGoAwayAndCloseOnDispatch =
       "envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch";
 
+  // Envoy will reject new HTTP2 streams at the codec level on OnBeginHeaders by sending a
+  // RST_STREAM(REFUSED_STREAM) before allocating stream or header objects.
+  const std::string H2ServerResetStreamOnBeginHeaders =
+      "envoy.load_shed_points.http2_server_reset_stream_on_begin_headers";
+
   // Envoy will close the connections before creating codec if Envoy is under pressure,
   // typically memory. This happens once getting data from the connection.
   const std::string HcmCodecCreation = "envoy.load_shed_points.hcm_ondata_creating_codec";
