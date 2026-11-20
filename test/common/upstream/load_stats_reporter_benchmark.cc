@@ -199,7 +199,6 @@ void bmStartLoadReportPeriod(::benchmark::State& state, bool send_all_clusters) 
     state.SkipWithError("Skipping expensive benchmark in test mode");
     return;
   }
-  // The reporter reads the flag when it is created, so it has to be set first.
 
   BenchmarkFixture fixture;
   const std::vector<std::string> names = clusterNames(num_clusters);

@@ -88,7 +88,7 @@ private:
   // Appends the ClusterStats of a tracked cluster to request and starts its next measurement
   // interval.
   void addClusterStats(envoy::service::load_stats::v3::LoadStatsRequest& request,
-                       const std::string& cluster_name, const Cluster& cluster,
+                       absl::string_view cluster_name, const Cluster& cluster,
                        ClusterLoadReportState& state, bool report_load_for_non_zero_stats);
   // Latches the load stats of all hosts of cluster and appends the resulting locality (and
   // optionally endpoint) stats to cluster_stats.

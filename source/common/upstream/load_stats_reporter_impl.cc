@@ -159,7 +159,7 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
 }
 
 void LoadStatsReporterImpl::addClusterStats(
-    envoy::service::load_stats::v3::LoadStatsRequest& request, const std::string& cluster_name,
+    envoy::service::load_stats::v3::LoadStatsRequest& request, absl::string_view cluster_name,
     const Cluster& cluster, ClusterLoadReportState& state, bool report_load_for_non_zero_stats) {
   auto* cluster_stats = request.add_cluster_stats();
   cluster_stats->set_cluster_name(cluster_name);

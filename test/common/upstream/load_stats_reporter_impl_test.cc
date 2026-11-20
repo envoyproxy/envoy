@@ -106,6 +106,19 @@ public:
     dropped_request->set_dropped_count(count);
   }
 
+  // Returns the ClusterStats that are expected to be reported for a cluster without hosts that
+  // dropped the given number of requests during the given measurement interval.
+  envoy::config::endpoint::v3::ClusterStats
+  makeClusterStats(const std::string& cluster_name, uint64_t total_dropped_requests,
+                   std::chrono::microseconds load_report_interval) {
+    envoy::config::endpoint::v3::ClusterStats cluster_stats;
+    cluster_stats.set_cluster_name(cluster_name);
+    cluster_stats.set_total_dropped_requests(total_dropped_requests);
+    cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(load_report_interval.count()));
+    return cluster_stats;
+  }
+
   // Adds cluster to the active clusters of cm_ under the given name. Unlike stubbing
   // getActiveCluster() on its own, this keeps clusters(), forEachActiveCluster(),
   // getActiveCluster() and the name of the cluster consistent with each other, as they are for a
@@ -122,6 +135,11 @@ public:
           }
           return it->second.get();
         });
+  }
+
+  // Removes a cluster that was added with addActiveCluster() from the active clusters of cm_.
+  void removeActiveCluster(const std::string& name) {
+    cluster_info_maps_.active_clusters_.erase(name);
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -1145,6 +1163,128 @@ TEST_F(LoadStatsReporterImplTest, NewlyTrackedClusterStatsAreLatchedSendAllClust
 
     expectSendMessage({foo_cluster_stats, bar_cluster_stats});
   }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+}
+
+// Validate that with send_all_clusters, a cluster that is removed from the cluster manager is no
+// longer reported or tracked, and that it is tracked as a new cluster when it is added again: it
+// is missing from the first report after that, and the load from before it was tracked again is
+// discarded. A cluster that is replaced under the same name between two reports, as happens when
+// a cluster is updated, stays tracked instead.
+TEST_F(LoadStatsReporterImplTest, ClusterRemovedAndReAddedSendAllClusters) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter();
+
+  // foo and bar are active when the response arrives. The load of foo so far is discarded.
+  auto foo_cluster = std::make_unique<NiceMock<MockClusterMockPrioritySet>>();
+  NiceMock<MockClusterMockPrioritySet> bar_cluster;
+  foo_cluster->info_->load_report_stats_.upstream_rq_dropped_.add(2);
+  addActiveCluster("foo", *foo_cluster);
+  addActiveCluster("bar", bar_cluster);
+  deliverLoadStatsResponse({}, /*report_endpoint_granularity=*/false, /*send_all_clusters=*/true);
+
+  // Both clusters are reported.
+  foo_cluster->info_->load_report_stats_.upstream_rq_dropped_.add(3);
+  bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
+  time_system_.advanceTimeWait(std::chrono::microseconds(1));
+  expectSendMessage({makeClusterStats("foo", 3, std::chrono::microseconds(1)),
+                     makeClusterStats("bar", 1, std::chrono::microseconds(1))});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // foo is removed and destroyed. Its load since the previous report is lost with it, and the
+  // next report does not have it. The load report period that starts after that report stops
+  // tracking it.
+  foo_cluster->info_->load_report_stats_.upstream_rq_dropped_.add(4);
+  removeActiveCluster("foo");
+  foo_cluster.reset();
+  bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
+  time_system_.advanceTimeWait(std::chrono::microseconds(2));
+  expectSendMessage({makeClusterStats("bar", 1, std::chrono::microseconds(2))});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // foo is added again, as a new cluster. It is not tracked until the next load report period
+  // starts, which is right after the next report, so that report does not have it either. Its
+  // load so far is discarded when it is tracked.
+  NiceMock<MockClusterMockPrioritySet> readded_foo_cluster;
+  readded_foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
+  addActiveCluster("foo", readded_foo_cluster);
+  bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
+  time_system_.advanceTimeWait(std::chrono::microseconds(3));
+  expectSendMessage({makeClusterStats("bar", 1, std::chrono::microseconds(3))});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // foo is reported again, for a measurement interval that started when it was tracked again.
+  readded_foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(6);
+  bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
+  time_system_.advanceTimeWait(std::chrono::microseconds(4));
+  expectSendMessage({makeClusterStats("foo", 6, std::chrono::microseconds(4)),
+                     makeClusterStats("bar", 1, std::chrono::microseconds(4))});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // foo is replaced by another cluster with the same name between two reports, which is what
+  // happens when a cluster is updated. foo was never found to be missing, so it stays tracked:
+  // the load of its replacement is reported in full, and its measurement interval continues.
+  NiceMock<MockClusterMockPrioritySet> replaced_foo_cluster;
+  replaced_foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(7);
+  removeActiveCluster("foo");
+  addActiveCluster("foo", replaced_foo_cluster);
+  bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
+  time_system_.advanceTimeWait(std::chrono::microseconds(5));
+  expectSendMessage({makeClusterStats("foo", 7, std::chrono::microseconds(5)),
+                     makeClusterStats("bar", 1, std::chrono::microseconds(5))});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+}
+
+// Validate that with an explicit list of clusters, a cluster stays tracked while it does not
+// exist: nothing is reported for it then, and once it is added, or removed and added again, its
+// load is reported in full for a measurement interval that includes the time during which it did
+// not exist.
+TEST_F(LoadStatsReporterImplTest, ClusterRemovedAndReAddedExplicitList) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter();
+
+  // foo is selected before it exists. Nothing is reported for it.
+  deliverLoadStatsResponse({"foo"});
+  time_system_.advanceTimeWait(std::chrono::microseconds(1));
+  expectSendMessage({});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // foo is added. All of its load is reported, for a measurement interval that started when foo
+  // was selected.
+  auto foo_cluster = std::make_unique<NiceMock<MockClusterMockPrioritySet>>();
+  foo_cluster->info_->load_report_stats_.upstream_rq_dropped_.add(2);
+  addActiveCluster("foo", *foo_cluster);
+  time_system_.advanceTimeWait(std::chrono::microseconds(2));
+  expectSendMessage({makeClusterStats("foo", 2, std::chrono::microseconds(3))});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // foo is removed and destroyed. Its load since the previous report is lost with it, and nothing
+  // is reported for it, but it stays tracked.
+  foo_cluster->info_->load_report_stats_.upstream_rq_dropped_.add(3);
+  removeActiveCluster("foo");
+  foo_cluster.reset();
+  time_system_.advanceTimeWait(std::chrono::microseconds(4));
+  expectSendMessage({});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // foo is added again, as a new cluster. All of its load is reported, for a measurement interval
+  // that started with the last report that had foo.
+  NiceMock<MockClusterMockPrioritySet> readded_foo_cluster;
+  readded_foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
+  addActiveCluster("foo", readded_foo_cluster);
+  time_system_.advanceTimeWait(std::chrono::microseconds(8));
+  expectSendMessage({makeClusterStats("foo", 5, std::chrono::microseconds(12))});
   EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
   response_timer_cb_();
 }

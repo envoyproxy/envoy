@@ -385,10 +385,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli
 // change.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_odcds_missing_cluster_cache);
 
-// TODO(pradeepcrao): Flip to true after testing in production.
-// Use optimized codepath for book keeping for Load Stats Reporting.
-FALSE_RUNTIME_GUARD(envoy_restart_features_enable_optimized_lrs_bookkeeping);
-
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
