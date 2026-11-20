@@ -3,11 +3,15 @@
 #include "envoy/admin/v3/config_dump.pb.h"
 
 #include "source/common/common/matchers.h"
+#include "source/common/config/ecds_subscription_registry.h"
+#include "source/common/config/utility.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension_config_subscription.h"
 #include "source/server/admin/config_tracker_impl.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -26,32 +30,52 @@ using testing::ReturnRef;
 
 class ExtensionConfigSubscriptionTest : public testing::Test {
 protected:
-  std::unique_ptr<ExtensionConfigSubscription>
-  create(absl::string_view type_url = "type.googleapis.com/test.Config") {
-    auto transport = std::make_unique<testing::StrictMock<Config::MockSubscription>>();
-    EXPECT_CALL(*transport, start(testing::ElementsAre("test-config")));
-    EXPECT_CALL(context_.xds_manager_,
-                subscribeToSingletonResource("test-config", _, _, _,
-                                             A<Config::SubscriptionCallbacks&>(), _, _))
-        .WillOnce([&](auto, auto, auto, auto&, auto&, auto, auto) -> Config::SubscriptionPtr {
-          return std::move(transport);
-        });
+  ExtensionConfigSubscriptionTest() {
     ON_CALL(context_, admin()).WillByDefault(Return(OptRef<Server::Admin>{context_.admin_}));
     ON_CALL(context_.admin_, getConfigTracker()).WillByDefault(ReturnRef(tracker_));
+  }
+
+  static envoy::config::core::v3::ConfigSource
+  source(absl::string_view = "type.googleapis.com/test.Config", bool ads = false) {
     envoy::config::core::v3::ConfigSource source;
-    source.mutable_ads();
+    if (ads) {
+      source.mutable_ads();
+    } else {
+      source.mutable_path_config_source()->set_path("unused.yaml");
+    }
     source.set_resource_api_version(envoy::config::core::v3::V3);
-    auto result = ExtensionConfigSubscription::create(
-        "test-config", type_url, source, "ecds_bootstrap.test", context_,
-        [this](std::optional<absl::string_view> config) {
-          updates_.push_back(config.has_value() ? std::make_optional(std::string(*config))
-                                                : std::nullopt);
-          return accept_;
+    return source;
+  }
+
+  std::unique_ptr<ExtensionConfigSubscription>
+  create(absl::string_view type_url = "type.googleapis.com/test.Config",
+         absl::string_view name = "test-config", bool ads = false) {
+    auto transport = std::make_unique<testing::StrictMock<Config::MockSubscription>>();
+    EXPECT_CALL(*transport, start(testing::ElementsAre(name)));
+    EXPECT_CALL(
+        context_.xds_manager_,
+        subscribeToSingletonResource(name, _, _, _, A<Config::SubscriptionCallbacks&>(), _, _))
+        .WillOnce([&](auto, auto, auto, Stats::Scope& scope, auto&, auto,
+                      auto) -> Config::SubscriptionPtr {
+          auto stats = Config::Utility::generateStats(scope);
+          EXPECT_EQ(stats.update_success_.name(),
+                    absl::StrCat("extension_config_discovery.", name, ".update_success"));
+          return std::move(transport);
         });
+    auto result = ExtensionConfigSubscription::create(name, type_url, source(type_url, ads),
+                                                      "ecds_bootstrap.test", context_, callback());
     EXPECT_OK(result);
     auto subscription = std::move(result).value();
     subscription->start();
     return subscription;
+  }
+
+  ExtensionConfigSubscription::UpdateCallback callback() {
+    return [this](std::optional<absl::string_view> config) {
+      updates_.push_back(
+          {config.has_value() ? std::make_optional(std::string(*config)) : std::nullopt});
+      return accept_;
+    };
   }
 
   envoy::config::core::v3::TypedExtensionConfig config(bool enabled) {
@@ -71,28 +95,44 @@ protected:
     return subscription.onConfigUpdate(resources.refvec_, version);
   }
 
-  std::string dump() {
-    auto config =
-        tracker_.getCallbacksMap().at("ecds_bootstrap.test")(Matchers::UniversalStringMatcher());
-    return MessageUtil::getJsonStringFromMessageOrError(*config);
+  envoy::admin::v3::EcdsConfigDump
+  dump(const Matchers::StringMatcher& matcher = Matchers::UniversalStringMatcher()) {
+    auto message = tracker_.getCallbacksMap().at("ecds_bootstrap.test")(matcher);
+    return Protobuf::DynamicCastMessage<envoy::admin::v3::EcdsConfigDump>(*message);
   }
 
+  struct Update {
+    std::optional<std::string> config;
+  };
+  Event::SimulatedTimeSystem time_system_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Server::ConfigTrackerImpl tracker_;
   bool accept_ = true;
-  std::vector<std::optional<std::string>> updates_;
+  std::vector<Update> updates_;
 };
 
 TEST_F(ExtensionConfigSubscriptionTest, AppliesTypedStructAndExposesAcceptedConfig) {
   auto subscription = create();
   EXPECT_OK(update(*subscription, config(true)));
   ASSERT_EQ(updates_.size(), 1);
-  EXPECT_THAT(updates_[0].value(), testing::HasSubstr("true"));
-  EXPECT_THAT(dump(), testing::HasSubstr("v1"));
-  EXPECT_THAT(dump(), testing::HasSubstr("test.Config"));
-  EXPECT_THAT(dump(), testing::HasSubstr("true"));
+  EXPECT_EQ(updates_[0].config.value(), R"({"enabled":true})");
+  envoy::admin::v3::EcdsConfigDump expected;
+  auto* entry = expected.add_ecds_filters();
+  MessageUtil::packFrom(*entry->mutable_ecds_filter(), config(true));
+  entry->set_version_info("v1");
+  TimestampUtil::systemClockToTimestamp(context_.timeSource().systemTime(),
+                                        *entry->mutable_last_updated());
+  EXPECT_THAT(dump(), ProtoEq(expected));
   subscription.reset();
   EXPECT_TRUE(tracker_.getCallbacksMap().empty());
+}
+
+TEST_F(ExtensionConfigSubscriptionTest, DumpHonorsNameFilter) {
+  auto subscription = create();
+  EXPECT_OK(update(*subscription, config(true)));
+  EXPECT_EQ(
+      dump(Matchers::StringMatcherImpl::createExactMatcher("another-config")).ecds_filters_size(),
+      0);
 }
 
 TEST_F(ExtensionConfigSubscriptionTest, AppliesConfigWithoutAdmin) {
@@ -100,7 +140,7 @@ TEST_F(ExtensionConfigSubscriptionTest, AppliesConfigWithoutAdmin) {
   auto subscription = create();
   EXPECT_OK(update(*subscription, config(true)));
   ASSERT_EQ(updates_.size(), 1);
-  EXPECT_THAT(updates_[0].value(), testing::HasSubstr("true"));
+  EXPECT_EQ(updates_[0].config.value(), R"({"enabled":true})");
   EXPECT_TRUE(tracker_.getCallbacksMap().empty());
 }
 
@@ -112,7 +152,7 @@ TEST_F(ExtensionConfigSubscriptionTest, RepeatedInstancesHaveIndependentConfigDu
   EXPECT_OK(update(*duplicate, config(false), "v2"));
   auto third = create();
   EXPECT_EQ(tracker_.getCallbacksMap().size(), 3);
-  EXPECT_EQ(dump(), accepted);
+  EXPECT_THAT(dump(), ProtoEq(accepted));
   EXPECT_TRUE(tracker_.getCallbacksMap().contains("ecds_bootstrap.test.2"));
   const auto duplicate_dump =
       tracker_.getCallbacksMap().at("ecds_bootstrap.test.1")(Matchers::UniversalStringMatcher());
@@ -120,9 +160,75 @@ TEST_F(ExtensionConfigSubscriptionTest, RepeatedInstancesHaveIndependentConfigDu
               testing::HasSubstr("v2"));
   duplicate.reset();
   EXPECT_EQ(tracker_.getCallbacksMap().size(), 2);
-  EXPECT_EQ(dump(), accepted);
+  EXPECT_THAT(dump(), ProtoEq(accepted));
   duplicate = create();
   EXPECT_TRUE(tracker_.getCallbacksMap().contains("ecds_bootstrap.test.1"));
+}
+
+TEST_F(ExtensionConfigSubscriptionTest, RefusesRepeatedAdsNamesAndReleasesReservation) {
+  auto first = create("type.googleapis.com/test.Config", "test-config", true);
+  EXPECT_OK(update(*first, config(true)));
+  EXPECT_CALL(context_.xds_manager_,
+              subscribeToSingletonResource(_, _, _, _, A<Config::SubscriptionCallbacks&>(), _, _))
+      .Times(0);
+  EXPECT_FALSE(ExtensionConfigSubscription::create("test-config", "test.Config",
+                                                   source("test.Config", true),
+                                                   "ecds_bootstrap.other", context_, callback())
+                   .ok());
+  auto registry = Config::EcdsSubscriptionRegistry::get(context_);
+  EXPECT_FALSE(
+      registry->reserve("test-config", Config::EcdsSubscriptionRegistry::Sharing::Shared).ok());
+  first.reset();
+  EXPECT_OK(registry->reserve("test-config", Config::EcdsSubscriptionRegistry::Sharing::Shared));
+}
+
+TEST_F(ExtensionConfigSubscriptionTest, RefusesAnAdsNameAlreadyHeldByFilters) {
+  auto registry = Config::EcdsSubscriptionRegistry::get(context_);
+  auto first_filter =
+      registry->reserve("test-config", Config::EcdsSubscriptionRegistry::Sharing::Shared);
+  auto second_filter =
+      registry->reserve("test-config", Config::EcdsSubscriptionRegistry::Sharing::Shared);
+  ASSERT_OK(first_filter);
+  ASSERT_OK(second_filter);
+  EXPECT_CALL(context_.xds_manager_,
+              subscribeToSingletonResource(_, _, _, _, A<Config::SubscriptionCallbacks&>(), _, _))
+      .Times(0);
+  EXPECT_FALSE(ExtensionConfigSubscription::create("test-config", "test.Config",
+                                                   source("test.Config", true), "test", context_,
+                                                   callback())
+                   .ok());
+  first_filter->reset();
+  EXPECT_FALSE(ExtensionConfigSubscription::create("test-config", "test.Config",
+                                                   source("test.Config", true), "test", context_,
+                                                   callback())
+                   .ok());
+  second_filter->reset();
+  EXPECT_OK(registry->reserve("test-config", Config::EcdsSubscriptionRegistry::Sharing::Exclusive));
+}
+
+TEST_F(ExtensionConfigSubscriptionTest, RefusesEquivalentXdsTpNamesAndReleasesReservation) {
+  const std::string name =
+      "xdstp://authority/envoy.config.core.v3.TypedExtensionConfig/test-config?a=1&b=2";
+  const std::string reordered =
+      "xdstp://authority/envoy.config.core.v3.TypedExtensionConfig/test-config?b=2&a=1";
+  EXPECT_CALL(context_.xds_manager_, subscribeToSingletonResource(
+                                         name, _, _, _, A<Config::SubscriptionCallbacks&>(), _, _))
+      .WillOnce(Return(
+          testing::ByMove(std::make_unique<testing::StrictMock<Config::MockSubscription>>())));
+  auto subscription = ExtensionConfigSubscription::create(name, "test.Config", source(), "test",
+                                                          context_, callback());
+  ASSERT_OK(subscription);
+  EXPECT_CALL(context_.xds_manager_,
+              subscribeToSingletonResource(_, _, _, _, A<Config::SubscriptionCallbacks&>(), _, _))
+      .Times(0);
+  EXPECT_FALSE(ExtensionConfigSubscription::create(reordered, "test.Config", source(),
+                                                   "ecds_bootstrap.other", context_, callback())
+                   .ok());
+  auto registry = Config::EcdsSubscriptionRegistry::get(context_);
+  EXPECT_FALSE(
+      registry->reserve(reordered, Config::EcdsSubscriptionRegistry::Sharing::Shared).ok());
+  subscription->reset();
+  EXPECT_OK(registry->reserve(reordered, Config::EcdsSubscriptionRegistry::Sharing::Shared));
 }
 
 TEST_F(ExtensionConfigSubscriptionTest,
@@ -149,7 +255,7 @@ TEST_F(ExtensionConfigSubscriptionTest, MissingTypedStructValueIsAnEmptyObject) 
   MessageUtil::packFrom(*empty.mutable_typed_config(), typed);
   EXPECT_OK(update(*subscription, empty));
   ASSERT_EQ(updates_.size(), 1);
-  EXPECT_EQ(updates_[0].value(), "{}");
+  EXPECT_EQ(updates_[0].config.value(), "{}");
 }
 
 TEST_F(ExtensionConfigSubscriptionTest, AppliesStructPayload) {
@@ -160,7 +266,7 @@ TEST_F(ExtensionConfigSubscriptionTest, AppliesStructPayload) {
   MessageUtil::packFrom(*resource.mutable_typed_config(), payload);
   EXPECT_OK(update(*subscription, resource));
   ASSERT_EQ(updates_.size(), 1);
-  EXPECT_EQ(updates_[0].value(), R"({"enabled":true})");
+  EXPECT_EQ(updates_[0].config.value(), R"({"enabled":true})");
 }
 
 TEST_F(ExtensionConfigSubscriptionTest, AppliesStringAndBytesWrapperPayloads) {
@@ -179,7 +285,7 @@ TEST_F(ExtensionConfigSubscriptionTest, AppliesStringAndBytesWrapperPayloads) {
     const auto previous_updates = updates_.size();
     EXPECT_OK(update(*subscription, resource));
     ASSERT_EQ(updates_.size(), previous_updates + 1);
-    EXPECT_EQ(updates_.back(), std::make_optional(value));
+    EXPECT_EQ(updates_.back().config, std::make_optional(value));
   }
 }
 
@@ -192,25 +298,24 @@ TEST_F(ExtensionConfigSubscriptionTest, PreservesBinaryAndEmptyPayloads) {
   resource.mutable_typed_config()->clear_value();
   EXPECT_OK(update(*subscription, resource));
   ASSERT_EQ(updates_.size(), 2);
-  EXPECT_EQ(updates_[0].value(), std::string("\x08\x00", 2));
-  EXPECT_EQ(updates_[1].value(), "");
+  EXPECT_EQ(updates_[0].config.value(), std::string("\x08\x00", 2));
+  EXPECT_EQ(updates_[1].config.value(), "");
 }
 
-TEST_F(ExtensionConfigSubscriptionTest, RejectsEmptyNamesAndSubscriptionFailure) {
-  envoy::config::core::v3::ConfigSource source;
-  auto callback = [](std::optional<absl::string_view>) { return true; };
-  EXPECT_FALSE(
-      ExtensionConfigSubscription::create("", "test.Config", source, "test", context_, callback)
-          .ok());
-  EXPECT_FALSE(
-      ExtensionConfigSubscription::create("test", "", source, "test", context_, callback).ok());
-  EXPECT_CALL(
-      context_.xds_manager_,
-      subscribeToSingletonResource("test", _, _, _, A<Config::SubscriptionCallbacks&>(), _, _))
+TEST_F(ExtensionConfigSubscriptionTest, RejectsEmptyAndWildcardNamesAndSubscriptionFailure) {
+  for (const auto* name :
+       {"", "*", "xdstp://authority/envoy.config.core.v3.TypedExtensionConfig/config/*"}) {
+    EXPECT_FALSE(ExtensionConfigSubscription::create(name, "test.Config", source(), "test",
+                                                     context_, callback())
+                     .ok());
+  }
+  EXPECT_CALL(context_.xds_manager_,
+              subscribeToSingletonResource("test-config", _, _, _,
+                                           A<Config::SubscriptionCallbacks&>(), _, _))
       .WillOnce(Return(absl::UnavailableError("subscription unavailable")));
-  EXPECT_FALSE(
-      ExtensionConfigSubscription::create("test", "test.Config", source, "test", context_, callback)
-          .ok());
+  EXPECT_FALSE(ExtensionConfigSubscription::create("test-config", "test.Config", source(), "test",
+                                                   context_, callback())
+                   .ok());
 }
 
 TEST_F(ExtensionConfigSubscriptionTest, RejectionAndConnectionFailureRetainAcceptedConfig) {
@@ -219,32 +324,57 @@ TEST_F(ExtensionConfigSubscriptionTest, RejectionAndConnectionFailureRetainAccep
   const auto accepted = dump();
   accept_ = false;
   EXPECT_FALSE(update(*subscription, config(false), "v2").ok());
-  EXPECT_EQ(dump(), accepted);
-  subscription->onConfigUpdateFailed(Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
-  EXPECT_EQ(dump(), accepted);
+  EXPECT_THAT(dump(), ProtoEq(accepted));
+  for (auto reason : {Config::ConfigUpdateFailureReason::ConnectionFailure,
+                      Config::ConfigUpdateFailureReason::FetchTimedout,
+                      Config::ConfigUpdateFailureReason::UpdateRejected}) {
+    subscription->onConfigUpdateFailed(reason, nullptr);
+    EXPECT_THAT(dump(), ProtoEq(accepted));
+  }
   EXPECT_EQ(updates_.size(), 2);
-  EXPECT_FALSE(subscription->onConfigUpdate({}, "removed").ok());
-  EXPECT_EQ(dump(), accepted);
 }
 
-TEST_F(ExtensionConfigSubscriptionTest, DeltaUpdatesAndRemovalPreservePresence) {
+TEST_F(ExtensionConfigSubscriptionTest, UnchangedResendsAndEmptySotwUpdatesAreNoOps) {
+  auto subscription = create();
+  EXPECT_OK(update(*subscription, config(true)));
+  const auto accepted = dump();
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
+  EXPECT_OK(update(*subscription, config(true), "v2"));
+  EXPECT_OK(subscription->onConfigUpdate({}, "heartbeat"));
+  EXPECT_EQ(updates_.size(), 1);
+  EXPECT_THAT(dump(), ProtoEq(accepted));
+}
+
+TEST_F(ExtensionConfigSubscriptionTest, DeltaUpdatesAndRemovalsPreservePresence) {
   auto subscription = create();
   auto added = TestUtility::decodeResources({config(true)});
   Protobuf::RepeatedPtrField<std::string> removed;
-  EXPECT_OK(subscription->onConfigUpdate(added.refvec_, removed, "v1"));
+  EXPECT_OK(subscription->onConfigUpdate(added.refvec_, removed, "system-version"));
+  ASSERT_EQ(updates_.size(), 1);
   EXPECT_OK(subscription->onConfigUpdate({}, removed, "empty-delta"));
   EXPECT_EQ(updates_.size(), 1);
   removed.Add("other-config");
-  EXPECT_FALSE(subscription->onConfigUpdate({}, removed, "v2").ok());
-  removed.Mutable(0)->assign("test-config");
-  EXPECT_FALSE(subscription->onConfigUpdate(added.refvec_, removed, "v2").ok());
+  EXPECT_OK(subscription->onConfigUpdate({}, removed, "v2"));
+  EXPECT_EQ(updates_.size(), 1);
+  removed.Add("test-config");
   EXPECT_OK(subscription->onConfigUpdate({}, removed, "v2"));
   ASSERT_EQ(updates_.size(), 2);
-  EXPECT_FALSE(updates_.back().has_value());
-  EXPECT_THAT(dump(), testing::Not(testing::HasSubstr("test-config")));
-  EXPECT_OK(update(*subscription, config(false)));
-  EXPECT_OK(subscription->onConfigUpdate({}, "sotw-removal"));
-  EXPECT_FALSE(updates_.back().has_value());
+  EXPECT_FALSE(updates_.back().config.has_value());
+  EXPECT_EQ(dump().ecds_filters_size(), 0);
+  EXPECT_OK(update(*subscription, config(true)));
+  EXPECT_EQ(updates_.size(), 3);
+}
+
+TEST_F(ExtensionConfigSubscriptionTest, RejectedRemovalsAreLoggedAndDoNotFail) {
+  auto subscription = create();
+  EXPECT_OK(update(*subscription, config(true)));
+  const auto accepted = dump();
+  accept_ = false;
+  Protobuf::RepeatedPtrField<std::string> removed;
+  removed.Add("test-config");
+  EXPECT_LOG_CONTAINS("warn", "rejected ECDS removal for test-config",
+                      { EXPECT_OK(subscription->onConfigUpdate({}, removed, "v2")); });
+  EXPECT_THAT(dump(), ProtoEq(accepted));
 }
 
 } // namespace

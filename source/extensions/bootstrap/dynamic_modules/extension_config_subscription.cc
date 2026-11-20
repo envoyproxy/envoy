@@ -8,10 +8,13 @@
 #include "envoy/server/admin.h"
 
 #include "source/common/common/matchers.h"
+#include "source/common/config/ecds_subscription_registry.h"
 #include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_resource.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -30,14 +33,33 @@ absl::StatusOr<std::unique_ptr<ExtensionConfigSubscription>> ExtensionConfigSubs
     absl::string_view name, absl::string_view type_url,
     const envoy::config::core::v3::ConfigSource& config_source, absl::string_view config_dump_key,
     Server::Configuration::ServerFactoryContext& context, UpdateCallback callback) {
-  if (name.empty() || type_url.empty()) {
-    return absl::InvalidArgumentError("extension config name and type URL must be nonempty");
+  if (name.empty() || name == "*") {
+    return absl::InvalidArgumentError("bootstrap ECDS requires a single resource name");
+  }
+  auto normalized = Config::XdsResourceIdentifier::normalizeResourceName(name);
+  RETURN_IF_NOT_OK(normalized.status());
+  if (Config::XdsResourceIdentifier::hasXdsTpScheme(name)) {
+    auto urn = Config::XdsResourceIdentifier::decodeUrn(name);
+    RETURN_IF_NOT_OK(urn.status());
+    if (absl::EndsWith(urn->id(), "*")) {
+      return absl::InvalidArgumentError("bootstrap ECDS does not support wildcard resource names");
+    }
+  }
+  if (type_url.empty()) {
+    return absl::InvalidArgumentError("extension config type URL must be nonempty");
   }
   auto result = std::unique_ptr<ExtensionConfigSubscription>(
-      new ExtensionConfigSubscription(name, type_url, context, std::move(callback)));
+      new ExtensionConfigSubscription(*normalized, type_url, context, std::move(callback)));
+  if (config_source.has_ads() || Config::XdsResourceIdentifier::hasXdsTpScheme(name)) {
+    auto reservation = Config::EcdsSubscriptionRegistry::get(context)->reserve(
+        *normalized, Config::EcdsSubscriptionRegistry::Sharing::Exclusive);
+    RETURN_IF_NOT_OK(reservation.status());
+    result->name_reservation_ = std::move(*reservation);
+  }
   auto subscription = context.xdsManager().subscribeToSingletonResource(
-      name, config_source, Config::getTypeUrl<envoy::config::core::v3::TypedExtensionConfig>(),
-      *result->scope_, *result, result->resource_type_.resourceDecoder(), {});
+      *normalized, config_source,
+      Config::getTypeUrl<envoy::config::core::v3::TypedExtensionConfig>(), *result->scope_, *result,
+      result->resource_type_.resourceDecoder(), {});
   RETURN_IF_NOT_OK(subscription.status());
   result->subscription_ = std::move(subscription.value());
   if (auto admin = context.admin(); admin.has_value()) {
@@ -60,28 +82,35 @@ absl::StatusOr<std::unique_ptr<ExtensionConfigSubscription>> ExtensionConfigSubs
 
 void ExtensionConfigSubscription::start() { subscription_->start({name_}); }
 
-absl::Status ExtensionConfigSubscription::removeConfig() {
+void ExtensionConfigSubscription::removeConfig() {
   if (!callback_(std::nullopt)) {
-    return absl::InvalidArgumentError("bootstrap module rejected extension config removal");
+    ENVOY_LOG(warn, "bootstrap module rejected ECDS removal for {}", name_);
+    return;
   }
   last_config_.reset();
   last_version_.clear();
-  return absl::OkStatus();
 }
 
 absl::Status ExtensionConfigSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& resources, const std::string& version_info) {
+  // an omitted ECDS resource or TTL heartbeat does not remove its configuration
   if (resources.empty()) {
-    return removeConfig();
+    return absl::OkStatus();
   }
   if (resources.size() != 1 || !resources[0].get().hasResource()) {
     return absl::InvalidArgumentError("bootstrap ECDS update must contain one configuration");
   }
   const auto& config = Protobuf::DynamicCastMessage<envoy::config::core::v3::TypedExtensionConfig>(
       resources[0].get().resource());
-  if (config.name() != name_ || !config.has_typed_config()) {
+  auto normalized = Config::XdsResourceIdentifier::normalizeResourceName(config.name());
+  if (!normalized.ok() || *normalized != name_ || !config.has_typed_config()) {
     return absl::InvalidArgumentError(
         "bootstrap ECDS resource has an unexpected name or no config");
+  }
+  if (last_config_ != nullptr &&
+      last_config_->typed_config().type_url() == config.typed_config().type_url() &&
+      last_config_->typed_config().value() == config.typed_config().value()) {
+    return absl::OkStatus();
   }
   if (Config::Utility::getFactoryType(config.typed_config()) !=
       TypeUtil::typeUrlToDescriptorFullName(type_url_)) {
@@ -102,17 +131,17 @@ absl::Status ExtensionConfigSubscription::onConfigUpdate(
 absl::Status ExtensionConfigSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
-  if (!removed_resources.empty()) {
-    if (removed_resources.size() != 1 || removed_resources[0] != name_ ||
-        !added_resources.empty()) {
-      return absl::InvalidArgumentError("bootstrap ECDS removal must name only its subscription");
+  if (!added_resources.empty()) {
+    return onConfigUpdate(added_resources, added_resources[0].get().version());
+  }
+  for (const auto& name : removed_resources) {
+    auto normalized = Config::XdsResourceIdentifier::normalizeResourceName(name);
+    if (normalized.ok() && *normalized == name_) {
+      removeConfig();
+      break;
     }
-    return removeConfig();
   }
-  if (added_resources.empty()) {
-    return absl::OkStatus();
-  }
-  return onConfigUpdate(added_resources, added_resources[0].get().version());
+  return absl::OkStatus();
 }
 
 void ExtensionConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureReason,

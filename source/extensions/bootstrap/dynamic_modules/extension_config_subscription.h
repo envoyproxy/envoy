@@ -12,6 +12,7 @@
 #include "envoy/server/config_tracker.h"
 #include "envoy/server/factory_context.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/resource_type_helper.h"
 
@@ -52,7 +53,7 @@ private:
   ExtensionConfigSubscription(absl::string_view name, absl::string_view type_url,
                               Server::Configuration::ServerFactoryContext& context,
                               UpdateCallback callback);
-  absl::Status removeConfig();
+  void removeConfig();
   ProtobufTypes::MessagePtr dumpConfig(const Matchers::StringMatcher& name_matcher) const;
 
   const std::string name_;
@@ -65,6 +66,7 @@ private:
   std::string last_version_;
   SystemTime last_updated_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
+  std::unique_ptr<Cleanup> name_reservation_;
   // destroy the subscription before its callbacks and stats
   Config::SubscriptionPtr subscription_;
 };

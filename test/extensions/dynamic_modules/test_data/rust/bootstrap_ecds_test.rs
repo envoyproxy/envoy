@@ -61,9 +61,16 @@ impl BootstrapExtensionConfig for EcdsConfig {
 
   fn on_config_update(
     &self,
-    _envoy: &mut dyn EnvoyBootstrapExtensionConfig,
+    envoy: &mut dyn EnvoyBootstrapExtensionConfig,
     config: Option<&[u8]>,
   ) -> bool {
+    assert!(envoy
+      .active_resource_names(ActiveResourceKind::Cluster)
+      .iter()
+      .any(|name| name == "cluster_0"));
+    if config.is_none() && self.config.lock().unwrap().as_deref() == Some("keep-on-removal") {
+      return false;
+    }
     if config == Some(b"rejected".as_slice()) {
       return false;
     }
