@@ -112,6 +112,7 @@ go_library(
         "sdk/go/shared/early_header_mutation_api.go",
         "sdk/go/shared/header_formatter.go",
         "sdk/go/shared/header_formatter_api.go",
+        "sdk/go/shared/headers.go",
         "sdk/go/shared/http.go",
         "sdk/go/shared/http_api.go",
         "sdk/go/shared/listener_api.go",
@@ -131,7 +132,10 @@ go_library(
 
 go_test(
     name = "go_sdk_shared_test",
-    srcs = ["sdk/go/shared/types_test.go"],
+    srcs = [
+        "sdk/go/shared/headers_test.go",
+        "sdk/go/shared/types_test.go",
+    ],
     embed = [":go_sdk_shared"],
 )
 

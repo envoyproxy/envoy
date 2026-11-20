@@ -66,6 +66,34 @@ std::string readWholeResponseBody(HttpFilterHandle& handle) {
   return getBodyContent(handle.bufferedResponseBody(), handle.receivedResponseBody(),
                         handle.receivedBufferedResponseBody());
 }
+
+bool isValidHeaderName(std::string_view name) {
+  if (!name.empty() && name.front() == ':') {
+    name.remove_prefix(1);
+  }
+  if (name.empty()) {
+    return false;
+  }
+  constexpr std::string_view token_symbols = "!#$%&'*+-.^_`|~";
+  for (const char c : name) {
+    const bool alphanumeric =
+        (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+    if (!alphanumeric && token_symbols.find(c) == std::string_view::npos) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool isValidHeaderValue(std::string_view value) {
+  for (const char c : value) {
+    const auto byte = static_cast<unsigned char>(c);
+    if (byte != '\t' && (byte < ' ' || byte == 0x7f)) {
+      return false;
+    }
+  }
+  return true;
+}
 } // namespace Utility
 
 HttpFilterConfigFactoryRegister::HttpFilterConfigFactoryRegister(std::string_view name,
