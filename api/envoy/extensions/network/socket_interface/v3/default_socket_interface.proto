@@ -40,7 +40,7 @@ message DefaultSocketInterface {
 //   ``io_uring`` support is experimental and its performance characteristics depend heavily on
 //   the kernel version.
 //
-// [#next-free-field: 8]
+// [#next-free-field: 11]
 message IoUringOptions {
   // The number of entries in the ``io_uring`` submission queue (SQ). Each in-flight I/O
   // operation requires one SQE. The completion queue (CQ) is sized at ``2x`` this value
@@ -87,9 +87,28 @@ message IoUringOptions {
   // Enables ``multishot`` reads backed by a kernel-provided buffer ring. A single ``recv`` is armed
   // per socket and the kernel keeps delivering data as it arrives without a new submission per
   // read, which reduces event loop wakeups and read submissions for read-heavy workloads. The ring
-  // holds ``io_uring_size`` buffers rounded up to a power of two and capped at 4096, each
+  // holds ``provided_buffer_count`` buffers, or ``io_uring_size`` rounded up to a power
+  // of two and capped at 4096 when that option is omitted, each
   // ``read_buffer_size`` bytes, so each worker thread uses up to that buffer count times
   // ``read_buffer_size`` bytes for the pool. Requires Linux kernel 6.0 or later. On older kernels,
   // Envoy falls back to ``readv``-based reads. If not specified, defaults to false.
   bool enable_multishot_receive = 7;
+
+  // Number of kernel-provided receive buffers per ring, independent of SQ capacity.
+  // Must be a power of two between 128 and 4096. Only affects ``multishot`` reads.
+  // If omitted, uses ``io_uring_size`` rounded up to a power of two and capped at 4096.
+  google.protobuf.UInt32Value provided_buffer_count = 8
+      [(validate.rules).uint32 = {gte: 128, lte: 4096}];
+
+  // Defer kernel task work until the worker explicitly reaps completions. This may
+  // improve batching for read-heavy workloads. Requires Linux 6.1 or later and cannot
+  // be combined with ``enable_submission_queue_polling``. Unsupported kernels reject
+  // ring initialization. If omitted, defaults to false.
+  bool enable_deferred_taskrun = 9;
+
+  // Accumulate positive completions for the same persistent receive into one connection
+  // read callback, including interleaved receives. Batches end at the current CQ snapshot
+  // and at error, EOF, or non-read completions; no wait for additional traffic is added.
+  // Requires ``enable_multishot_receive``. If omitted, defaults to false.
+  bool enable_receive_batching = 10;
 }
