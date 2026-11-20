@@ -85,33 +85,28 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
   SpanContext span_context(kDefaultVersion, getTraceId(), spanId(), sampled(),
                            std::string(tracestate()), /*is_remote=*/false);
   return parent_tracer_.startSpan(name, stream_info_, start_time, span_context, {},
-                                  ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+                                  ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT,
+                                  preserve_headers_);
 }
 
 void Span::updateParent(const Tracing::TraceContext& trace_context, bool preserve_headers) {
-  preserve_headers_ = preserve_headers;
-
   SpanContextExtractor extractor(trace_context);
   absl::StatusOr<SpanContext> context = extractor.extractSpanContext();
   if (!context.ok()) {
+    ENVOY_LOG(debug, "Unable to extract span context in updateParent: {}", context.status());
     return;
   }
+  preserve_headers_ = preserve_headers;
+
   setParentContextIsRemote(context->isRemote());
   setTraceId(context->traceId());
   setParentId(context->spanId());
 
-  // Merge tracestates, with new components added on the left.
-  // https://www.w3.org/TR/trace-context/#mutating-the-tracestate-field
-  absl::InlinedVector<absl::string_view, 2> tracestate_pieces;
+  // Replace the span's tracestate with the incoming context's tracestate, if
+  // it's non-empty. This might clobber the sampler-selected tracestate.
   if (!context->tracestate().empty()) {
-    tracestate_pieces.push_back(context->tracestate());
+    setTracestate(context->tracestate());
   }
-  const std::string tracestate = getTracestate();
-  if (!tracestate.empty() &&
-      absl::c_find(tracestate_pieces, tracestate) == tracestate_pieces.end()) {
-    tracestate_pieces.push_back(tracestate);
-  }
-  setTracestate(absl::StrJoin(tracestate_pieces, ","));
 }
 
 void Span::finishSpan() {
@@ -144,7 +139,11 @@ void Span::finishSpan() {
 
 void Span::setOperation(absl::string_view operation) { span_.set_name(operation); };
 
-void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
+void Span::injectContext(Tracing::TraceContext& trace_context,
+                         const Tracing::UpstreamContext& upstream) {
+  if (preserve_headers_ && !upstream.async_client_span_) {
+    return;
+  }
   std::string trace_id_hex = absl::BytesToHexString(span_.trace_id());
   std::string span_id_hex = absl::BytesToHexString(span_.span_id());
   for (const TraceContextFormat format : parent_tracer_.outgoingTraceContext()) {
@@ -442,13 +441,14 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
                                    const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
                                    const SpanContext& parent_context,
                                    OptRef<const Tracing::TraceContext> trace_context,
-                                   OTelSpanKind span_kind) {
+                                   OTelSpanKind span_kind, bool preserve_headers) {
   // If reached here, then this is main span for request with a parent context or this is
   // subsequent spans. Ignore the Envoy tracing decision anyway.
 
   // Create a new span and populate details from the span context.
   auto new_span = std::make_unique<Span>(operation_name, stream_info, start_time, time_source_,
                                          *this, span_kind, false);
+  new_span->setPreserveHeaders(preserve_headers);
   new_span->setParentContextIsRemote(parent_context.isRemote());
   new_span->setTraceId(parent_context.traceId());
   if (!parent_context.spanId().empty()) {

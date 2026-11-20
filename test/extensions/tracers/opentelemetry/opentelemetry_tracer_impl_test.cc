@@ -719,7 +719,7 @@ TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
   EXPECT_EQ(sampled_entry.value(), "00-00000000000000010000000000000002-0000000000000003-01");
 }
 
-TEST_F(OpenTelemetryDriverTest, UpdateParentMergesTracestate) {
+TEST_F(OpenTelemetryDriverTest, UpdateParentDoesNotMergeTracestate) {
   setupValidDriver();
   Tracing::TestTraceContextImpl request_headers{
       {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
@@ -731,10 +731,52 @@ TEST_F(OpenTelemetryDriverTest, UpdateParentMergesTracestate) {
                                              operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_EQ(span->getTracestate(), "foobar=123");
 
-  request_headers.remove(OpenTelemetryConstants::get().TRACE_STATE.key());
   request_headers.set(OpenTelemetryConstants::get().TRACE_STATE.key(), "baz=456");
   span->updateParent(request_headers, /*preserve_headers=*/false);
-  EXPECT_EQ(span->getTracestate(), "baz=456,foobar=123");
+  EXPECT_EQ(span->getTracestate(), "baz=456");
+}
+
+TEST_F(OpenTelemetryDriverTest, UpdateParentPreserveHeadersPropagatesToChildSpan) {
+  setupValidDriver();
+  NiceMock<Random::MockRandomGenerator>& mock_random =
+      context_.server_factory_context_.api_.random_;
+  ON_CALL(mock_random, random()).WillByDefault(Return(4));
+
+  // Use HttpTraceContext because TestTraceContextImpl::set() ignores existing keys.
+  Http::TestRequestHeaderMapImpl request_header_map{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "POST"}};
+  Tracing::HttpTraceContext request_headers(request_header_map);
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+
+  constexpr absl::string_view kPreservedTraceparent =
+      "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01";
+  request_headers.set(OpenTelemetryConstants::get().TRACE_PARENT.key(), kPreservedTraceparent);
+  request_headers.set(OpenTelemetryConstants::get().TRACE_STATE.key(), "foobar=123");
+  span->updateParent(request_headers, /*preserve_headers=*/true);
+
+  Tracing::SpanPtr child_span =
+      span->spawnChild(mock_tracing_config_, "router cluster egress", time_system_.systemTime());
+
+  // Router upstream span (async_client_span = false) preserves the downstream headers.
+  child_span->injectContext(request_headers, Tracing::UpstreamContext());
+  EXPECT_EQ(request_headers.get(OpenTelemetryConstants::get().TRACE_PARENT.key()),
+            kPreservedTraceparent);
+  EXPECT_EQ(request_headers.get(OpenTelemetryConstants::get().TRACE_STATE.key()), "foobar=123");
+
+  // Async client span (async_client_span = true) still injects trace context into its own request
+  // headers.
+  Http::TestRequestHeaderMapImpl async_header_map{
+      {":authority", "authz"}, {":path", "/check"}, {":method", "POST"}};
+  Tracing::HttpTraceContext async_request_headers(async_header_map);
+  const Tracing::UpstreamContext async_upstream_context(/*host=*/nullptr, /*cluster=*/nullptr,
+                                                        Tracing::ServiceType::Http,
+                                                        /*async_client_span=*/true);
+  child_span->injectContext(async_request_headers, async_upstream_context);
+  EXPECT_EQ(async_request_headers.get(OpenTelemetryConstants::get().TRACE_PARENT.key()),
+            "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-0000000000000004-01");
+  EXPECT_EQ(async_request_headers.get(OpenTelemetryConstants::get().TRACE_STATE.key()),
+            "foobar=123");
 }
 
 // Verifies a span it not created when an invalid traceparent header is received
