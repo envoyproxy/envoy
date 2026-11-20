@@ -1273,9 +1273,6 @@ TEST_F(EnvoyQuicServerSessionTest, GetRttAndCwnd) {
   envoy_quic_session_.configureInitialCongestionWindow(8000000, std::chrono::microseconds(1000000));
   EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(),
             quic::kInitialCongestionWindow * quic::kDefaultTCPMSS);
-
-  // QUIC does not send TLS records, so the TLS data chunk send limit is a no-op.
-  envoy_quic_session_.setTransportSocketDataChunkSendLimit(8192);
 }
 
 TEST_F(EnvoyQuicServerSessionTest, SslConnectionInfoDumbImplmention) {

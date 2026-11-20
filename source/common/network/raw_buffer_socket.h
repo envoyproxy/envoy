@@ -24,7 +24,6 @@ public:
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
   bool startSecureTransport() override { return false; }
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
-  void setTlsDataChunkSendLimit(uint64_t) override {}
 
 protected:
   TransportSocketCallbacks* transportSocketCallbacks() const { return callbacks_; };

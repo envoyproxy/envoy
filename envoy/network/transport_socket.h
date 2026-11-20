@@ -210,16 +210,6 @@ public:
    */
   virtual void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                                 std::chrono::microseconds rtt) PURE;
-
-  /**
-   * Set the maximum number of plaintext bytes passed to each TLS write, which caps the plaintext
-   * size of each TLS record the transport socket sends. The default is 16384, the TLS record
-   * plaintext maximum. The limit applies from the next write; a write that is being retried keeps
-   * its original size. Transport sockets that do not send TLS records ignore the limit, and
-   * transport sockets that wrap others pass it on to them.
-   * @param data_chunk_size the maximum plaintext bytes per TLS write, from 1 through 16384.
-   */
-  virtual void setTlsDataChunkSendLimit(uint64_t data_chunk_size) PURE;
 };
 
 using TransportSocketPtr = std::unique_ptr<TransportSocket>;

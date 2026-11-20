@@ -23,15 +23,6 @@ bool StartTlsSocket::startSecureTransport() {
   return true;
 }
 
-void StartTlsSocket::setTlsDataChunkSendLimit(uint64_t data_chunk_size) {
-  active_socket_->setTlsDataChunkSendLimit(data_chunk_size);
-  // Until startSecureTransport() is called the TLS socket is not active, so give it the limit too.
-  // Otherwise a limit set while the connection is still clear-text would be lost.
-  if (!using_tls_) {
-    tls_socket_->setTlsDataChunkSendLimit(data_chunk_size);
-  }
-}
-
 Network::TransportSocketPtr StartTlsSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     Upstream::HostDescriptionConstSharedPtr host) const {

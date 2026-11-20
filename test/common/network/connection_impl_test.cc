@@ -3380,13 +3380,6 @@ TEST_F(MockTransportConnectionImplTest, ObjectDestructOrder) {
   EXPECT_OK(file_ready_cb_(Event::FileReadyType::Read));
 }
 
-// The TLS data chunk send limit is passed to the transport socket.
-TEST_F(MockTransportConnectionImplTest, SetTransportSocketDataChunkSendLimit) {
-  initializeConnection();
-  EXPECT_CALL(*transport_socket_, setTlsDataChunkSendLimit(8192));
-  connection_->setTransportSocketDataChunkSendLimit(8192);
-}
-
 // Verify that read resumptions requested via setTransportSocketIsReadable() are scheduled once read
 // is re-enabled.
 TEST_F(MockTransportConnectionImplTest, ReadBufferReadyResumeAfterReadDisable) {

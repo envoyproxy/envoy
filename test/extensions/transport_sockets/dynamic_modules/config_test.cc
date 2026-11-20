@@ -438,7 +438,6 @@ TEST_F(DynamicModuleTransportSocketTest, ProtocolAndFlushClose) {
   EXPECT_EQ(nullptr, socket->ssl());
   EXPECT_FALSE(socket->startSecureTransport());
   socket->configureInitialCongestionWindow(100, std::chrono::microseconds(1));
-  socket->setTlsDataChunkSendLimit(8192);
 }
 
 TEST_F(DynamicModuleTransportSocketTest, OnConnectedRaisesConnectedEvent) {

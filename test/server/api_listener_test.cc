@@ -185,7 +185,6 @@ api_listener:
   connection.addConnectionCallbacks(network_connection_callbacks);
   EXPECT_FALSE(connection.lastRoundTripTime().has_value());
   connection.configureInitialCongestionWindow(100, std::chrono::microseconds(123));
-  connection.setTransportSocketDataChunkSendLimit(8192);
 
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
   // Shutting down the ApiListener should raise an event on all connection callback targets.

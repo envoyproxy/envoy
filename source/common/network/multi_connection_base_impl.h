@@ -100,7 +100,6 @@ public:
   std::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
   std::optional<uint64_t> congestionWindowInBytes() const override;
-  void setTransportSocketDataChunkSendLimit(uint64_t data_chunk_size) override;
 
   // Simple getters which always delegate to the first connection in connections_.
   bool isHalfCloseEnabled() const override;
@@ -207,7 +206,6 @@ private:
     std::optional<uint32_t> buffer_limits_;
     std::optional<std::chrono::milliseconds> buffer_high_watermark_timeout_;
     std::optional<bool> start_secure_transport_;
-    std::optional<uint64_t> transport_socket_data_chunk_send_limit_;
     std::optional<std::chrono::milliseconds> delayed_close_timeout_;
   };
 

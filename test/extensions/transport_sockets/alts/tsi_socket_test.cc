@@ -462,11 +462,6 @@ TEST_P(TsiSocketTest, ConfigureInitialCongestionWindowIsNoOp) {
   client_.tsi_socket_->configureInitialCongestionWindow(0, std::chrono::milliseconds(0));
 }
 
-TEST_P(TsiSocketTest, SetTlsDataChunkSendLimitIsNoOp) {
-  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
-  client_.tsi_socket_->setTlsDataChunkSendLimit(8192);
-}
-
 TEST_P(TsiSocketTest, DoesNotStartSecureTransport) {
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
   EXPECT_FALSE(client_.tsi_socket_->startSecureTransport());

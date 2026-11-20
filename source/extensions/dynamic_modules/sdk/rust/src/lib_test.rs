@@ -3296,39 +3296,6 @@ fn test_buffer_limits() {
   assert_eq!(filter.get_buffer_limit(), 32768);
 }
 
-struct TransportSocketDataChunkSendLimitState {
-  last_limit: u32,
-  result: bool,
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_callback_network_filter_set_transport_socket_data_chunk_send_limit(
-  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
-  limit: u32,
-) -> bool {
-  let state = &mut *(filter_envoy_ptr as *mut TransportSocketDataChunkSendLimitState);
-  state.last_limit = limit;
-  state.result
-}
-
-#[test]
-fn test_set_transport_socket_data_chunk_send_limit() {
-  let mut state = TransportSocketDataChunkSendLimitState {
-    last_limit: 0,
-    result: true,
-  };
-  let mut filter = EnvoyNetworkFilterImpl {
-    raw: &mut state as *mut _ as *mut _,
-  };
-
-  assert!(filter.set_transport_socket_data_chunk_send_limit(8192));
-  assert_eq!(state.last_limit, 8192);
-
-  state.result = false;
-  assert!(!filter.set_transport_socket_data_chunk_send_limit(0));
-  assert_eq!(state.last_limit, 0);
-}
-
 #[test]
 fn test_above_high_watermark() {
   reset_mock_connection_state();

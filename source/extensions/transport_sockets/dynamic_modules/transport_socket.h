@@ -115,7 +115,6 @@ public:
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
   bool startSecureTransport() override;
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
-  void setTlsDataChunkSendLimit(uint64_t) override {}
 
   // Accessors for the ABI callbacks. These are only valid on the connection's worker thread.
   Network::TransportSocketCallbacks* callbacks() const { return callbacks_; }

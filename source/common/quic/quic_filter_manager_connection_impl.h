@@ -148,8 +148,6 @@ public:
   void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                         std::chrono::microseconds rtt) override;
   std::optional<uint64_t> congestionWindowInBytes() const override;
-  // QUIC does not send TLS records, so there is no TLS write to limit.
-  void setTransportSocketDataChunkSendLimit(uint64_t) override {}
   const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
 
   // Network::FilterManagerConnection

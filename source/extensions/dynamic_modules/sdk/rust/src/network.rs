@@ -720,19 +720,6 @@ pub trait EnvoyNetworkFilter {
   /// drained, [`NetworkFilter::on_below_write_buffer_low_watermark`] is called.
   fn set_buffer_limits(&mut self, limit: u32);
 
-  /// Set the maximum plaintext bytes the downstream transport socket passes to each TLS write,
-  /// which caps the plaintext size of each TLS record sent to the downstream peer. The default is
-  /// 16384, the TLS record plaintext maximum, and `limit` must be from 1 through 16384.
-  ///
-  /// Call this from [`NetworkFilter::on_new_connection`], before writing any data. The limit
-  /// applies from the next write; a write that is being retried keeps its original size. With the
-  /// StartTLS transport socket the limit also applies after
-  /// [`EnvoyNetworkFilter::start_downstream_secure_transport`]. Transport sockets that do not send
-  /// TLS records ignore the limit.
-  ///
-  /// Returns false if `limit` is out of range, in which case the current limit is unchanged.
-  fn set_transport_socket_data_chunk_send_limit(&mut self, limit: u32) -> bool;
-
   /// Check if the connection is currently above the high watermark.
   fn above_high_watermark(&self) -> bool;
 
@@ -2137,14 +2124,6 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
 
   fn set_buffer_limits(&mut self, limit: u32) {
     unsafe { abi::envoy_dynamic_module_callback_network_filter_set_buffer_limits(self.raw, limit) }
-  }
-
-  fn set_transport_socket_data_chunk_send_limit(&mut self, limit: u32) -> bool {
-    unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_set_transport_socket_data_chunk_send_limit(
-        self.raw, limit,
-      )
-    }
   }
 
   fn above_high_watermark(&self) -> bool {

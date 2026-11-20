@@ -5874,26 +5874,6 @@ void envoy_dynamic_module_callback_network_filter_set_buffer_limits(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint32_t limit);
 
 /**
- * envoy_dynamic_module_callback_network_filter_set_transport_socket_data_chunk_send_limit is
- * called by the module to set the maximum number of plaintext bytes the downstream transport
- * socket passes to each TLS write, which caps the plaintext size of each TLS record Envoy sends to
- * the downstream peer. The default is 16384, the TLS record plaintext maximum.
- *
- * Call this from envoy_dynamic_module_on_network_filter_new_connection, before any data is written
- * to the connection. The limit applies from the next write; a write that is being retried keeps
- * its original size. With the StartTLS transport socket the limit also applies after
- * envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport switches the
- * connection to TLS. Transport sockets that do not send TLS records ignore the limit.
- *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
- * @param limit is the maximum plaintext bytes per TLS write, from 1 through 16384 inclusive.
- * @return true if the limit is valid and was passed to the transport socket. false if it is out of
- * range, in which case the current limit is unchanged.
- */
-bool envoy_dynamic_module_callback_network_filter_set_transport_socket_data_chunk_send_limit(
-    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint32_t limit);
-
-/**
  * envoy_dynamic_module_callback_network_filter_above_high_watermark is called by the module to
  * check if the connection is currently above the high watermark.
  *

@@ -463,13 +463,6 @@ public:
    * return value is cwnd(in packets) times the connection's MSS.
    */
   virtual std::optional<uint64_t> congestionWindowInBytes() const PURE;
-
-  /**
-   * Set the maximum number of plaintext bytes the connection's transport socket passes to each TLS
-   * write. See Network::TransportSocket::setTlsDataChunkSendLimit().
-   * @param data_chunk_size the maximum plaintext bytes per TLS write, from 1 through 16384.
-   */
-  virtual void setTransportSocketDataChunkSendLimit(uint64_t data_chunk_size) PURE;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;

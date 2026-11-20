@@ -324,15 +324,6 @@ bool MultiConnectionBaseImpl::startSecureTransport() {
   return ret;
 }
 
-void MultiConnectionBaseImpl::setTransportSocketDataChunkSendLimit(uint64_t data_chunk_size) {
-  if (!connect_finished_) {
-    per_connection_state_.transport_socket_data_chunk_send_limit_ = data_chunk_size;
-  }
-  for (auto& connection : connections_) {
-    connection->setTransportSocketDataChunkSendLimit(data_chunk_size);
-  }
-}
-
 std::optional<std::chrono::milliseconds> MultiConnectionBaseImpl::lastRoundTripTime() const {
   // Note, this might change before connect finishes.
   return connections_[0]->lastRoundTripTime();
@@ -491,10 +482,6 @@ ClientConnectionPtr MultiConnectionBaseImpl::createNextConnection() {
   if (per_connection_state_.start_secure_transport_.has_value()) {
     ASSERT(per_connection_state_.start_secure_transport_);
     connection->startSecureTransport();
-  }
-  if (per_connection_state_.transport_socket_data_chunk_send_limit_.has_value()) {
-    connection->setTransportSocketDataChunkSendLimit(
-        per_connection_state_.transport_socket_data_chunk_send_limit_.value());
   }
 
   return connection;

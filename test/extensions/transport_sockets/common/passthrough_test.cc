@@ -107,12 +107,6 @@ TEST_F(PassthroughTest, ConfigureInitialCongestionWindowDefersToInnerSocket) {
   passthrough_socket_->configureInitialCongestionWindow(100, std::chrono::microseconds(123));
 }
 
-// Test setTlsDataChunkSendLimit method defers to inner socket
-TEST_F(PassthroughTest, SetTlsDataChunkSendLimitDefersToInnerSocket) {
-  EXPECT_CALL(*inner_socket_, setTlsDataChunkSendLimit(8192));
-  passthrough_socket_->setTlsDataChunkSendLimit(8192);
-}
-
 class UpstreamTestFactory : public PassthroughFactory {
 public:
   UpstreamTestFactory(Network::UpstreamTransportSocketFactoryPtr&& transport_socket_factory)

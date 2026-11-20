@@ -79,6 +79,12 @@ public:
   virtual unsigned maxProtocolVersion() const PURE;
 
   /**
+   * @return the maximum number of plaintext bytes in each TLS record sent, or nullopt to use the
+   * TLS library default of 16384.
+   */
+  virtual std::optional<uint32_t> maxSendFragment() const PURE;
+
+  /**
    * @return true if the ContextConfig is able to provide secrets to create SSL context,
    * and false if dynamic secrets are expected but are not downloaded from SDS server yet.
    */
