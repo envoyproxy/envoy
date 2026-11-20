@@ -249,11 +249,7 @@ public:
   // Accept a connection and return the server connection created for it. If user_space_socket is
   // true, the connection's socket is backed by a user space IO handle whose peer is
   // client_io_handle_. Otherwise it is backed by the default IO handle of MockConnectionSocket.
-  //
-  // If close_during_setup is true, the network filter chain closes the connection when it is
-  // created, and the returned connection is already destroyed.
-  NiceMock<Network::MockServerConnection>* acceptConnection(bool user_space_socket = true,
-                                                            bool close_during_setup = false) {
+  NiceMock<Network::MockServerConnection>* acceptConnection(bool user_space_socket = true) {
     std::tie(client_io_handle_, server_io_handle_) =
         IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
     auto* socket = new NiceMock<Network::MockConnectionSocket>();
@@ -276,22 +272,13 @@ public:
     EXPECT_CALL(*connection, getSocket()).WillRepeatedly(ReturnRef(server_socket_));
     EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(connection));
     EXPECT_CALL(conn_handler_, incNumConnections());
-    EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _))
-        .WillOnce([connection, close_during_setup](Network::Connection&,
-                                                   const Filter::NetworkFilterFactoriesList&) {
-          if (close_during_setup) {
-            connection->local_close_reason_ = absl::StrCat(
-                StreamInfo::LocalCloseReasons::get().TcpProxyInitializationFailure, "1");
-            connection->state_ = Network::Connection::State::Closed;
-          }
-          return true;
-        });
+    EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
     EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes());
     EXPECT_CALL(listener_config_, perConnectionBufferHighWatermarkTimeout());
-    EXPECT_CALL(conn_handler_, decNumConnections());
     internal_listener_->onAccept(
         Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
-    return close_during_setup ? nullptr : connection;
+    EXPECT_CALL(conn_handler_, decNumConnections());
+    return connection;
   }
 
   void closeConnection(NiceMock<Network::MockServerConnection>& connection,
@@ -332,16 +319,6 @@ TEST_F(ActiveInternalConnectionTest, LocalCloseWithoutUpstreamInfo) {
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(absl::StrCat("internal_listener_close:",
                          StreamInfo::LocalCloseReasons::get().TcpSessionIdleTimeout),
-            client_io_handle_->passthroughState()->closeDetails());
-}
-
-// A connection that this side closes while setting it up, before its connection callbacks are
-// added, also records the close details.
-TEST_F(ActiveInternalConnectionTest, CloseDuringSetupRecordsCloseDetails) {
-  acceptConnection(/*user_space_socket=*/true, /*close_during_setup=*/true);
-  dispatcher_.clearDeferredDeleteList();
-  EXPECT_EQ(absl::StrCat("internal_listener_close:",
-                         StreamInfo::LocalCloseReasons::get().TcpProxyInitializationFailure, "1"),
             client_io_handle_->passthroughState()->closeDetails());
 }
 

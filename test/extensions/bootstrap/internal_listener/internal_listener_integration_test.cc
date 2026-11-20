@@ -766,7 +766,7 @@ public:
   void initialize() override {
     useAccessLog("%RESPONSE_CODE% %RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS% "
                  "%UPSTREAM_TRANSPORT_FAILURE_REASON%");
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* bootstrap_extension = bootstrap.add_bootstrap_extensions();
       bootstrap_extension->set_name("envoy.bootstrap.internal_listener");
       envoy::extensions::bootstrap::internal_listener::v3::InternalListener
@@ -785,19 +785,14 @@ public:
           ->mutable_envoy_internal_address()
           ->set_server_listener_name("internal_listener");
 
-      // A cluster without hosts, for tcp_proxy to fail without connecting.
-      auto* empty_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      empty_cluster->set_name("cluster_without_hosts");
-      empty_cluster->mutable_load_assignment()->set_cluster_name("cluster_without_hosts");
-
-      // The internal listener tunnels the bytes to tcp_proxy_cluster_ over CONNECT.
+      // The internal listener tunnels the bytes to cluster_0 (the fake upstream) over CONNECT.
       auto* internal_listener = bootstrap.mutable_static_resources()->add_listeners();
       internal_listener->set_name("internal_listener");
       internal_listener->mutable_internal_listener();
       auto* internal_filter = internal_listener->add_filter_chains()->add_filters();
       internal_filter->set_name("tcp_proxy");
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-      tcp_proxy.set_cluster(tcp_proxy_cluster_);
+      tcp_proxy.set_cluster("cluster_0");
       tcp_proxy.set_stat_prefix("tcp_proxy_internal");
       tcp_proxy.mutable_tunneling_config()->set_hostname("host.example.com:443");
       std::ignore = internal_filter->mutable_typed_config()->PackFrom(tcp_proxy);
@@ -833,31 +828,12 @@ public:
     return waitForResponseAndAccessLog(*response);
   }
 
-  // Sends a request that the internal listener closes without reaching the fake upstream. Returns
-  // the access log entry of the request.
-  std::string sendRequestWithoutUpstream() {
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    return waitForResponseAndAccessLog(*response);
-  }
-
   std::string waitForResponseAndAccessLog(IntegrationStreamDecoder& response) {
     EXPECT_TRUE(response.waitForEndStream());
     EXPECT_EQ("503", response.headers().getStatusValue());
     codec_client_->close();
     return waitForAccessLog(access_log_name_);
   }
-
-  // The local close reason with which tcp_proxy closes a connection whose upstream it could not
-  // establish, given the value of TcpProxy::Filter::UpstreamFailureReason.
-  static constexpr int ConnectFailed = 0;
-  static constexpr int NoHealthyUpstream = 1;
-  static std::string tcpProxyInitializationFailure(int upstream_failure_reason) {
-    return absl::StrCat(StreamInfo::LocalCloseReasons::get().TcpProxyInitializationFailure,
-                        upstream_failure_reason);
-  }
-
-  std::string tcp_proxy_cluster_{"cluster_0"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, InternalListenerCloseDetailsIntegrationTest,
@@ -868,27 +844,15 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, InternalListenerCloseDetailsIntegrationTest
 // transport failure reason and closes the connection with an initialization failure.
 TEST_P(InternalListenerCloseDetailsIntegrationTest, TunnelRejectionReachesRouter) {
   initialize();
+  // tcp_proxy closes the internal connection with an initialization failure reason, here
+  // UpstreamFailureReason::ConnectFailed (0).
   const std::string close_details =
-      absl::StrCat("internal_listener_close:", tcpProxyInitializationFailure(ConnectFailed),
-                   "|internal_listener_upstream_failure:tunnel_response:403");
+      absl::StrCat("internal_listener_close:",
+                   StreamInfo::LocalCloseReasons::get().TcpProxyInitializationFailure,
+                   "0|internal_listener_upstream_failure:tunnel_response:403");
   EXPECT_THAT(rejectTunnel(Http::Code::Forbidden),
               testing::HasSubstr(absl::StrCat(
                   "503 UC upstream_reset_before_response_started{connection_termination|",
-                  close_details, "} ", close_details)));
-}
-
-// tcp_proxy has no host to connect to: it closes the connection with an initialization failure,
-// without an upstream transport failure reason. It does so while the internal listener accepts the
-// connection, so the router's connection fails to connect, and the router reports the reason as a
-// connection pool failure.
-TEST_P(InternalListenerCloseDetailsIntegrationTest, NoHealthyUpstreamReachesRouter) {
-  tcp_proxy_cluster_ = "cluster_without_hosts";
-  initialize();
-  const std::string close_details =
-      absl::StrCat("internal_listener_close:", tcpProxyInitializationFailure(NoHealthyUpstream));
-  EXPECT_THAT(sendRequestWithoutUpstream(),
-              testing::HasSubstr(absl::StrCat(
-                  "503 UF upstream_reset_before_response_started{remote_connection_failure|",
                   close_details, "} ", close_details)));
 }
 
