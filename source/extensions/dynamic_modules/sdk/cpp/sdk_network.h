@@ -328,6 +328,16 @@ public:
    */
   virtual std::shared_ptr<Scheduler> getScheduler() = 0;
 
+  /**
+   * Returns a load shed point of the overload manager by name, to shed load at the module's own
+   * point of the connection processing.
+   * @param name The name of the load shed point.
+   * @return The load shed point, or nullptr if the overload manager has no load shed point with the
+   * name or the listener of the filter bypasses the overload manager. Filters of a filter chain
+   * that FCDS delivers do not see the bypass and get the load shed point.
+   */
+  virtual std::unique_ptr<LoadShedPoint> getLoadShedPoint(std::string_view name) = 0;
+
   /** Returns whether Envoy logging is enabled for the supplied level. */
   virtual bool logEnabled(LogLevel level) = 0;
 

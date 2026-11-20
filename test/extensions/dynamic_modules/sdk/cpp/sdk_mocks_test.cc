@@ -8,6 +8,7 @@ namespace DynamicModules {
 static_assert(std::is_base_of_v<BodyBuffer, MockBodyBuffer>);
 static_assert(std::is_base_of_v<HeaderMap, MockHeaderMap>);
 static_assert(std::is_base_of_v<Scheduler, MockScheduler>);
+static_assert(std::is_base_of_v<LoadShedPoint, MockLoadShedPoint>);
 static_assert(std::is_base_of_v<HttpCalloutCallback, MockHttpCalloutCallback>);
 static_assert(std::is_base_of_v<HttpStreamCallback, MockHttpStreamCallback>);
 static_assert(std::is_base_of_v<DownstreamWatermarkCallbacks, MockDownstreamWatermarkCallbacks>);
@@ -21,6 +22,7 @@ TEST(SdkMocksTest, MocksAreInstantiable) {
   MockBodyBuffer body_buffer;
   MockHeaderMap header_map;
   MockScheduler scheduler;
+  MockLoadShedPoint load_shed_point;
   MockHttpCalloutCallback callout_cb;
   MockHttpStreamCallback stream_cb;
   MockDownstreamWatermarkCallbacks watermark_cb;
@@ -39,6 +41,16 @@ TEST(SdkMocksTest, DrainConnectionUponCompletionIsMockable) {
   MockHttpFilterHandle handle;
   EXPECT_CALL(handle, drainConnectionUponCompletion()).Times(1);
   handle.drainConnectionUponCompletion();
+}
+
+TEST(SdkMocksTest, GetLoadShedPointIsMockable) {
+  testing::StrictMock<MockHttpFilterConfigHandle> handle;
+  EXPECT_CALL(handle, getLoadShedPoint(std::string_view("shedding"))).WillOnce([] {
+    auto load_shed_point = std::make_unique<testing::StrictMock<MockLoadShedPoint>>();
+    EXPECT_CALL(*load_shed_point, shouldShedLoad()).WillOnce(testing::Return(true));
+    return load_shed_point;
+  });
+  EXPECT_TRUE(handle.getLoadShedPoint("shedding")->shouldShedLoad());
 }
 
 TEST(SdkMocksTest, HasFilterStateIsMockable) {

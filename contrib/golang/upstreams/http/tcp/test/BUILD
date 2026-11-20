@@ -17,7 +17,7 @@ envoy_cc_dyn_module_test(
     data = [
         "//contrib/golang/upstreams/http/tcp/test/test_data:bridges.so",
     ],
-    rbe_pool = "linux_x64_medium",
+    rbe_pool = {"test": "linux_x64_medium"},
     shard_count = 30,
     tags = [
         "cpu:3",

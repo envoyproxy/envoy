@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//envoy/secret:secret_manager_interface",
         "//envoy/secret:secret_provider_interface",
+        "//envoy/server/overload:load_shed_point_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/protobuf:utility_lib",
@@ -48,6 +49,7 @@ envoy_cc_library(
         ":abi_impl",
         ":filter_config_lib",
         ":filter_lib",
+        "//envoy/server/overload:load_shed_point_interface",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@abseil-cpp//absl/strings",

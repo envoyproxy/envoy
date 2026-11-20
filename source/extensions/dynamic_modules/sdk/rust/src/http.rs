@@ -5,6 +5,7 @@ use crate::{
   abi,
   bytes_to_module_buffer,
   ffi_export,
+  new_load_shed_point,
   str_to_module_buffer,
   strs_to_module_buffers,
   ClusterHostCount,
@@ -15,6 +16,7 @@ use crate::{
   EnvoyGenericSecretId,
   EnvoyHistogramId,
   EnvoyHistogramVecId,
+  EnvoyLoadShedPoint,
   NewHttpFilterConfigFunction,
   NewHttpFilterPerRouteConfigFunction,
   TimingInfo,
@@ -28,6 +30,71 @@ use std::ffi::c_void;
 use std::num::NonZero;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::rc::Rc;
+
+/// A literal struct key or zero-based list index in a metadata path.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MetadataPathComponent<'a> {
+  /// Select a struct field, including an empty key.
+  Key(&'a str),
+  /// Select a list element.
+  Index(usize),
+}
+
+impl<'a, T: AsRef<str> + ?Sized> From<&'a T> for MetadataPathComponent<'a> {
+  fn from(key: &'a T) -> Self {
+    Self::Key(key.as_ref())
+  }
+}
+
+impl From<usize> for MetadataPathComponent<'_> {
+  fn from(index: usize) -> Self {
+    Self::Index(index)
+  }
+}
+
+/// Builds an array of metadata path components from borrowed strings and `usize` indices.
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::{metadata_path, MetadataPathComponent};
+///
+/// let path = metadata_path!["claims", "roles", 0];
+/// assert_eq!(path[2], MetadataPathComponent::Index(0));
+/// ```
+#[macro_export]
+macro_rules! metadata_path {
+  ($($component:expr),* $(,)?) => {
+    [$(<$crate::MetadataPathComponent<'_> as ::core::convert::From<_>>::from($component)),*]
+  };
+}
+
+/// Converts a path to ABI components, storing up to eight components inline.
+///
+/// Take `as_ptr` on the bound result and keep it in place for the ABI call. Moving an inline
+/// `SmallVec` after taking its pointer invalidates the pointer.
+fn metadata_path_to_abi(
+  path: &[MetadataPathComponent<'_>],
+) -> smallvec::SmallVec<[abi::envoy_dynamic_module_type_module_metadata_path_component; 8]> {
+  use abi::envoy_dynamic_module_type_metadata_path_component_kind::{Index, Key};
+  use abi::envoy_dynamic_module_type_module_metadata_path_component as AbiPathComponent;
+  path
+    .iter()
+    .map(|component| match component {
+      MetadataPathComponent::Key(key) => AbiPathComponent {
+        kind: Key,
+        key: str_to_module_buffer(key),
+        index: 0,
+      },
+      MetadataPathComponent::Index(index) => AbiPathComponent {
+        kind: Index,
+        key: abi::envoy_dynamic_module_type_module_buffer {
+          ptr: std::ptr::null(),
+          length: 0,
+        },
+        index: *index,
+      },
+    })
+    .collect()
+}
 
 /// The trait that represents the configuration for an Envoy Http filter configuration.
 /// This has one to one mapping with the [`EnvoyHttpFilterConfig`] object.
@@ -455,6 +522,15 @@ pub trait EnvoyHttpFilterConfig {
   /// the secret has been subscribed to but not yet delivered by the SDS server.
   fn get_generic_secret(&self, id: EnvoyGenericSecretId) -> Option<EnvoyBuffer<'_>>;
 
+  /// Get a load shed point of the overload manager by name, to shed load at the module's own point
+  /// of the request processing.
+  ///
+  /// Returns `None` if the overload manager has no load shed point with the name, the filter is an
+  /// upstream filter, or the listener of its filter chain bypasses the overload manager. Filters
+  /// that the route configuration creates, such as those of a per-route filter chain, and filters
+  /// of a filter chain that FCDS delivers do not see the bypass and get the load shed point.
+  fn get_load_shed_point(&self, name: &str) -> Option<Box<dyn EnvoyLoadShedPoint>>;
+
   /// Increment the counter with the given id from the config context.
   ///
   /// Unlike [`EnvoyHttpFilter::increment_counter`], this does not require a per-stream filter and
@@ -754,6 +830,15 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     // Safety: Envoy owns the buffer and keeps it alive until the module returns from the current
     // event hook, which outlives the borrow of `self`.
     Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
+  }
+
+  fn get_load_shed_point(&self, name: &str) -> Option<Box<dyn EnvoyLoadShedPoint>> {
+    new_load_shed_point(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+        self.raw_ptr,
+        str_to_module_buffer(name),
+      )
+    })
   }
 
   fn increment_counter(
@@ -1418,6 +1503,55 @@ pub trait EnvoyHttpFilter {
     key: &str,
     index: usize,
   ) -> Option<bool>;
+
+  /// Get the nested string metadata value.
+  ///
+  /// Path components select literal struct keys or zero-based list indices.
+  /// The first component must be a key; dots and numeric strings in keys are not interpreted.
+  /// For JWT claims, use namespace `envoy.filters.http.jwt_authn` and a path such as
+  /// `&metadata_path!["claims", "sub"]` (see [`metadata_path!`](crate::metadata_path)),
+  /// where `claims` is the configured `payload_in_metadata` key.
+  /// Returns `None` for an empty path, unavailable metadata, missing keys, out-of-range indices,
+  /// incompatible intermediate types, or a result of the wrong type.
+  /// The source selects dynamic, route, cluster, host, or
+  /// host locality metadata.
+  /// The returned buffer is valid until the end of the current event hook unless metadata changes.
+  fn get_metadata_nested_string<'a, 'b>(
+    &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    path: &[MetadataPathComponent<'b>],
+  ) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the nested number metadata value.
+  /// Path and source semantics are the same as [`Self::get_metadata_nested_string`].
+  /// Returns `None` for an empty or unresolved path or a result of the wrong type.
+  fn get_metadata_nested_number<'b>(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    path: &[MetadataPathComponent<'b>],
+  ) -> Option<f64>;
+
+  /// Get the nested bool metadata value.
+  /// Path and source semantics are the same as [`Self::get_metadata_nested_string`].
+  /// Returns `None` for an empty or unresolved path or a result of the wrong type.
+  fn get_metadata_nested_bool<'b>(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    path: &[MetadataPathComponent<'b>],
+  ) -> Option<bool>;
+
+  /// Get the number of elements in a nested metadata list.
+  /// Path and source semantics are the same as [`Self::get_metadata_nested_string`].
+  /// Returns `None` for an empty or unresolved path or a result of the wrong type.
+  fn get_metadata_nested_list_size<'b>(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    path: &[MetadataPathComponent<'b>],
+  ) -> Option<usize>;
 
   /// Get the bytes-typed filter state value with the given key.
   /// If the filter state is not found or is the wrong type, this returns `None`.
@@ -3313,6 +3447,109 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     };
     if success {
       Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_nested_string(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    path: &[MetadataPathComponent<'_>],
+  ) -> Option<EnvoyBuffer<'_>> {
+    let path = metadata_path_to_abi(path);
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_nested_string(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        path.as_ptr(),
+        path.len(),
+        &mut result,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_nested_number(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    path: &[MetadataPathComponent<'_>],
+  ) -> Option<f64> {
+    let path = metadata_path_to_abi(path);
+    let mut result: f64 = 0.0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_nested_number(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        path.as_ptr(),
+        path.len(),
+        &mut result,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_nested_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    path: &[MetadataPathComponent<'_>],
+  ) -> Option<bool> {
+    let path = metadata_path_to_abi(path);
+    let mut result: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        path.as_ptr(),
+        path.len(),
+        &mut result,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_nested_list_size(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    path: &[MetadataPathComponent<'_>],
+  ) -> Option<usize> {
+    let path = metadata_path_to_abi(path);
+    let mut result: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        path.as_ptr(),
+        path.len(),
+        &mut result,
+      )
+    };
+    if success {
+      Some(result)
     } else {
       None
     }

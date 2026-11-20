@@ -60,6 +60,12 @@ public:
    */
   bool isRemote() const { return is_remote_; }
 
+  /**
+   * Sets the span ID.
+   * @param span_id a hex-encoded span ID.
+   */
+  void setSpanId(std::string span_id) { span_id_ = std::move(span_id); }
+
 private:
   std::string version_;
   std::string trace_id_;

@@ -10,6 +10,7 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/integration/base_overload_integration_test.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/logging.h"
 
@@ -1666,6 +1667,88 @@ TEST_P(DynamicModulesIntegrationTest, RuntimeValues) {
   EXPECT_EQ("true", header("x-runtime-missing-bool"));
   EXPECT_EQ("1234", header("x-runtime-missing-int"));
   EXPECT_EQ("2.5", header("x-runtime-missing-number"));
+}
+
+class DynamicModulesLoadShedPointIntegrationTest : public BaseOverloadIntegrationTest,
+                                                   public DynamicModulesIntegrationTest {
+public:
+  // Saturates the trigger of the load shed point that the module checks.
+  void initializeOverloadedLoadShedPoint(bool bypass_overload_manager,
+                                         bool upstream_filter = false) {
+    setupOverloadManagerConfig(
+        TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "test.dynamic_module_load_shed_point"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.9
+    )EOF"));
+    config_helper_.addConfigModifier(
+        [this, bypass_overload_manager](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          *bootstrap.mutable_overload_manager() = overload_manager_config_;
+          bootstrap.mutable_static_resources()->mutable_listeners(0)->set_bypass_overload_manager(
+              bypass_overload_manager);
+        });
+    initializeFilter("load_shed_point", "test.dynamic_module_load_shed_point", "",
+                     "type.googleapis.com/google.protobuf.StringValue", upstream_filter);
+    updateResource(0.95);
+    test_server_->waitForGauge("overload.test.dynamic_module_load_shed_point.scale_percent",
+                               testing::Eq(100));
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  }
+
+  // Returns what the module told the upstream about whether it got the load shed point.
+  std::string loadShedPointPresence() {
+    const auto presence =
+        upstream_request_->headers().get(Http::LowerCaseString("x-load-shed-point"));
+    return presence.empty() ? "" : std::string(presence[0]->value().getStringView());
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, DynamicModulesLoadShedPointIntegrationTest, DynamicModulesIntegrationTestValues,
+    Extensions::DynamicModules::DynamicModuleTestLanguages::languageParamToTestName);
+
+TEST_P(DynamicModulesLoadShedPointIntegrationTest, ShedsLoad) {
+  initializeOverloadedLoadShedPoint(/*bypass_overload_manager=*/false);
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ("shed", response->body());
+  test_server_->waitForCounter("overload.test.dynamic_module_load_shed_point.shed_load_count",
+                               testing::Eq(1));
+
+  updateResource(0.8);
+  test_server_->waitForGauge("overload.test.dynamic_module_load_shed_point.scale_percent",
+                             testing::Eq(0));
+  response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("present", loadShedPointPresence());
+}
+
+TEST_P(DynamicModulesLoadShedPointIntegrationTest,
+       ListenerBypassingOverloadManagerGetsNoLoadShedPoint) {
+  initializeOverloadedLoadShedPoint(/*bypass_overload_manager=*/true);
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("absent", loadShedPointPresence());
+  EXPECT_EQ(0, test_server_->counter("overload.test.dynamic_module_load_shed_point.shed_load_count")
+                   ->value());
+}
+
+TEST_P(DynamicModulesLoadShedPointIntegrationTest, UpstreamFilterGetsNoLoadShedPoint) {
+  initializeOverloadedLoadShedPoint(/*bypass_overload_manager=*/false, /*upstream_filter=*/true);
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("absent", loadShedPointPresence());
+  EXPECT_EQ(0, test_server_->counter("overload.test.dynamic_module_load_shed_point.shed_load_count")
+                   ->value());
 }
 
 } // namespace Envoy

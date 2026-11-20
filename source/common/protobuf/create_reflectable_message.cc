@@ -452,8 +452,9 @@ void loadFileDescriptors(const FileDescriptorInfo& file_descriptor_info) {
 
 Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& message) {
   Protobuf::ReflectableMessage reflectable_message = createDynamicMessage(getTranscoder(), message);
-  ASSERT(reflectable_message,
-         absl::StrCat("Unable to create dynamic message for: ", message.GetTypeName()));
+  // Callers dereference the result, so fail loudly in release builds too rather than return null.
+  RELEASE_ASSERT(reflectable_message,
+                 absl::StrCat("Unable to create dynamic message for: ", message.GetTypeName()));
   return reflectable_message;
 }
 
