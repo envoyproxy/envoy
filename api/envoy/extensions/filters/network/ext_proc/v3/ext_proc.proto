@@ -76,7 +76,8 @@ message NetworkExternalProcessor {
 }
 
 // Options for controlling processing behavior.
-// Filter will reject the config if both read and write are SKIP mode.
+// The filter will reject the config if ``process_read`` and ``process_write`` are ``SKIP`` and
+// ``process_new_connection`` is ``NONE``.
 message ProcessingMode {
   // Defines how traffic should be handled by the external processor.
   enum DataSendMode {
@@ -87,6 +88,19 @@ message ProcessingMode {
     SKIP = 1;
   }
 
+  // Controls how new connection events are handled.
+  enum ConnectionSendMode {
+    // Skip sending the new connection event to the external processor. This is the default.
+    NONE = 0;
+
+    // Send the new connection event to the external processor upon connection establishment.
+    // When enabled, the data plane pauses connection processing and holds payload forwarding
+    // until the external processor responds, fails, or times out according to
+    // :ref:`message_timeout <envoy_v3_api_field_extensions.filters.network.ext_proc.v3.NetworkExternalProcessor.message_timeout>`
+    // and :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.network.ext_proc.v3.NetworkExternalProcessor.failure_mode_allow>`.
+    SEND = 1;
+  }
+
   // Controls whether inbound (read) data from the client is sent to the external processor.
   // Default: STREAMED
   DataSendMode process_read = 1;
@@ -94,6 +108,18 @@ message ProcessingMode {
   // Controls whether outbound (write) data to the client is sent to the external processor.
   // Default: STREAMED
   DataSendMode process_write = 2;
+
+  // Controls whether new connection events are sent to the external processor before payload
+  // processing begins. Defaults to ``NONE``.
+  //
+  // When set to ``SEND``, the data plane sends a
+  // :ref:`ProcessingRequest <envoy_v3_api_msg_service.network_ext_proc.v3.ProcessingRequest>`
+  // with
+  // :ref:`new_connection <envoy_v3_api_field_service.network_ext_proc.v3.ProcessingRequest.new_connection>`
+  // populated (along with any configured forwarded metadata and connection attributes) upon
+  // connection establishment and pauses further filter chain iteration until a response is
+  // received. Enabling this adds an external processing round-trip to connection establishment.
+  ConnectionSendMode process_new_connection = 3 [(validate.rules).enum = {defined_only: true}];
 }
 
 // The MetadataOptions structure defines options for sending dynamic metadata. Specifically,
