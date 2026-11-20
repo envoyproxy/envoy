@@ -20,6 +20,7 @@
 #include "source/common/config/resource_name.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_resource.h"
+#include "source/common/event/deferred_task.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/watcher_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -258,7 +259,42 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigPro
     parent_.onRdsConfigUpdate(scope_name_, route_provider_->configCast());
     return absl::OkStatus();
   });
+  if (on_demand_) {
+    rds_removal_callback_handle_ = route_provider_->subscription().addRemovalCallback([this]() {
+      onRouteConfigRemoved();
+      return absl::OkStatus();
+    });
+  }
   parent_.stats_.active_scopes_.inc();
+}
+
+void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::onRouteConfigRemoved() {
+  if (!on_demand_ || route_provider_ == nullptr) {
+    return;
+  }
+  ENVOY_LOG(debug, "Scope {}: on-demand route configuration removed, unloading", scope_name_);
+  // Requests paused on the scope are not stranded: they resume, re-resolve the
+  // scope and start a new on-demand fetch.
+  std::vector<std::function<void()>> pending;
+  pending.swap(on_demand_update_callbacks_);
+  // Drop the callback handles before the provider: they are owned by the
+  // provider's subscription.
+  rds_update_callback_handle_.reset();
+  rds_removal_callback_handle_.reset();
+  // The provider is the subscription's only owner and this runs from the
+  // subscription's own update, so the provider is released once the update
+  // has returned. The subscription goes away with the last provider
+  // referencing it, i.e. Envoy unsubscribes from the route configuration
+  // unless another scope still uses it.
+  Event::DeferredTaskUtil::deferredRun(
+      parent_.factory_context_.mainThreadDispatcher(),
+      [provider = std::move(route_provider_)]() mutable { provider.reset(); });
+  route_provider_.reset();
+  parent_.stats_.active_scopes_.dec();
+  parent_.onRdsConfigUpdate(scope_name_, nullptr);
+  for (auto& callback : pending) {
+    callback();
+  }
 }
 
 void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConfigProvider() {

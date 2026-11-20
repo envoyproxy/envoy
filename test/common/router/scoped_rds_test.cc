@@ -2388,6 +2388,139 @@ key:
   EXPECT_EQ(1UL, on_demand_scopes_.value());
 }
 
+// A delta RDS removal of a route table fetched on demand unloads it: the scope
+// goes back to its never-fetched state, Envoy unsubscribes from the table, and
+// the next matching request fetches it again. An eager scope keeps its table,
+// as before.
+TEST_F(ScopedRdsTest, OnDemandRouteConfigRemovalUnloadsScope) {
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+  const std::string eager_resource = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  const std::string lazy_resource = R"EOF(
+name: bar_scope
+route_configuration_name: bar_routes
+on_demand: true
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  srdsUpdateWithYaml({eager_resource, lazy_resource}, "1");
+  EXPECT_EQ(1UL, active_scopes_.value());
+  EXPECT_EQ(1UL, on_demand_scopes_.value());
+
+  // The on-demand scope is requested and its table fetched.
+  {
+    ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
+        TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
+    getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_, [](bool) {});
+  }
+  EXPECT_CALL(event_dispatcher_, post(_));
+  pushRdsConfig({"foo_routes", "bar_routes"}, "111");
+  EXPECT_EQ(2UL, active_scopes_.value());
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
+                ->name(),
+            "bar_routes");
+
+  // The server removes bar_routes: the on-demand scope drops its table and
+  // provider.
+  Protobuf::RepeatedPtrField<std::string> removed;
+  *removed.Add() = "bar_routes";
+  ASSERT_TRUE(rds_subscription_by_name_.contains("bar_routes"));
+  EXPECT_OK(rds_subscription_by_name_["bar_routes"]->onConfigUpdate({}, removed, "112"));
+  // The provider is released once the update that removed its table has
+  // returned (end of the event-loop iteration).
+  server_factory_context_.dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ(1UL, active_scopes_.value());
+  EXPECT_EQ(1UL, on_demand_scopes_.value());
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
+              IsNull());
+
+  // Removing the eager scope's table is ignored, as before.
+  Protobuf::RepeatedPtrField<std::string> removed_eager;
+  *removed_eager.Add() = "foo_routes";
+  EXPECT_OK(rds_subscription_by_name_["foo_routes"]->onConfigUpdate({}, removed_eager, "113"));
+  EXPECT_EQ(1UL, active_scopes_.value());
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
+                ->name(),
+            "foo_routes");
+
+  // The next request on the on-demand scope pauses and starts a new fetch,
+  // which the next push satisfies.
+  bool resumed = false;
+  {
+    ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
+        TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
+    getScopedRdsProvider()->onDemandRdsUpdate(
+        std::move(scope_key), event_dispatcher_,
+        [&resumed](bool scope_exist) { resumed = scope_exist; });
+  }
+  EXPECT_FALSE(resumed);
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce([](Event::PostCb cb) { cb(); });
+  pushRdsConfig({"bar_routes"}, "114");
+  EXPECT_TRUE(resumed);
+  EXPECT_EQ(2UL, active_scopes_.value());
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
+                ->name(),
+            "bar_routes");
+}
+
+// A removal that arrives while requests are still paused on the on-demand
+// scope (its table was requested but never delivered) resumes them; they
+// re-resolve the scope like a fresh request.
+TEST_F(ScopedRdsTest, OnDemandRouteConfigRemovalResumesPausedRequests) {
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+  const std::string lazy_resource = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+on_demand: true
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  srdsUpdateWithYaml({lazy_resource}, "1");
+
+  bool resumed = false;
+  {
+    ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
+        TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
+    getScopedRdsProvider()->onDemandRdsUpdate(
+        std::move(scope_key), event_dispatcher_,
+        [&resumed](bool scope_exist) { resumed = scope_exist; });
+  }
+  EXPECT_EQ(1UL, active_scopes_.value());
+  EXPECT_FALSE(resumed);
+
+  Protobuf::RepeatedPtrField<std::string> removed;
+  *removed.Add() = "foo_routes";
+  ASSERT_TRUE(rds_subscription_by_name_.contains("foo_routes"));
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce([](Event::PostCb cb) { cb(); });
+  EXPECT_OK(rds_subscription_by_name_["foo_routes"]->onConfigUpdate({}, removed, "2"));
+  server_factory_context_.dispatcher_.clearDeferredDeleteList();
+  EXPECT_TRUE(resumed);
+  EXPECT_EQ(0UL, active_scopes_.value());
+  EXPECT_EQ(1UL, on_demand_scopes_.value());
+}
+
 TEST_F(ScopedRdsTest, DanglingSubscriptionOnDemandUpdate) {
   setup();
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
