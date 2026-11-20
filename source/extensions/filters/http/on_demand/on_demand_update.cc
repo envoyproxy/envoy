@@ -5,11 +5,13 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
+#include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/upstream/od_cds_api_impl.h"
 #include "source/extensions/filters/http/well_known_names.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -26,8 +28,9 @@ public:
 
 class RdsCdsDecodeHeadersBehavior : public DecodeHeadersBehavior {
 public:
-  RdsCdsDecodeHeadersBehavior(Upstream::OdCdsApiHandlePtr odcds, std::chrono::milliseconds timeout)
-      : odcds_(std::move(odcds)), timeout_(timeout) {}
+  RdsCdsDecodeHeadersBehavior(Upstream::OdCdsApiHandlePtr odcds, std::chrono::milliseconds timeout,
+                              std::optional<ShadowDiscoveryOptions> shadow_discovery)
+      : odcds_(std::move(odcds)), timeout_(timeout), shadow_discovery_(shadow_discovery) {}
 
   void decodeHeaders(OnDemandRouteUpdate& filter) override {
     auto route = filter.handleMissingRoute();
@@ -35,11 +38,23 @@ public:
       return;
     }
     filter.handleOnDemandCds(route.value(), *odcds_, timeout_);
+    // Not while paused: onClusterDiscovered() or the re-run covers that.
+    if (shadow_discovery_.has_value() &&
+        filter.filterIterationState() == Http::FilterHeadersStatus::Continue) {
+      filter.handleShadowDiscovery(*odcds_, timeout_, *shadow_discovery_);
+    }
+  }
+
+  void onClusterDiscovered(OnDemandRouteUpdate& filter) override {
+    if (shadow_discovery_.has_value()) {
+      filter.handleShadowDiscovery(*odcds_, timeout_, *shadow_discovery_);
+    }
   }
 
 private:
   Upstream::OdCdsApiHandlePtr odcds_;
   std::chrono::milliseconds timeout_;
+  std::optional<ShadowDiscoveryOptions> shadow_discovery_;
 };
 
 } // namespace
@@ -48,16 +63,18 @@ DecodeHeadersBehaviorPtr DecodeHeadersBehavior::rds() {
   return std::make_unique<RdsDecodeHeadersBehavior>();
 }
 
-DecodeHeadersBehaviorPtr DecodeHeadersBehavior::cdsRds(Upstream::OdCdsApiHandlePtr odcds,
-                                                       std::chrono::milliseconds timeout) {
-  return std::make_unique<RdsCdsDecodeHeadersBehavior>(std::move(odcds), timeout);
+DecodeHeadersBehaviorPtr
+DecodeHeadersBehavior::cdsRds(Upstream::OdCdsApiHandlePtr odcds, std::chrono::milliseconds timeout,
+                              std::optional<ShadowDiscoveryOptions> shadow_discovery) {
+  return std::make_unique<RdsCdsDecodeHeadersBehavior>(std::move(odcds), timeout, shadow_discovery);
 }
 
 namespace {
 
 absl::StatusOr<DecodeHeadersBehaviorPtr> createDecodeHeadersBehavior(
     OptRef<const envoy::extensions::filters::http::on_demand::v3::OnDemandCds> odcds_config,
-    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor) {
+    Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+    ProtobufMessage::ValidationVisitor& validation_visitor) {
   if (!odcds_config.has_value()) {
     return DecodeHeadersBehavior::rds();
   }
@@ -106,7 +123,11 @@ absl::StatusOr<DecodeHeadersBehaviorPtr> createDecodeHeadersBehavior(
   // If changing the default timeout, please update the documentation in on_demand.proto too.
   auto timeout =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(odcds_config.ref(), timeout, 5000));
-  return DecodeHeadersBehavior::cdsRds(std::move(odcds), timeout);
+  std::optional<ShadowDiscoveryOptions> shadow_discovery;
+  if (odcds_config->has_shadow_cluster_discovery()) {
+    shadow_discovery.emplace(ShadowDiscoveryOptions{cm, runtime});
+  }
+  return DecodeHeadersBehavior::cdsRds(std::move(odcds), timeout, shadow_discovery);
 }
 
 template <typename ProtoConfig>
@@ -137,28 +158,29 @@ OnDemandFilterConfig::OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior, St
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
-    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-    absl::Status& creation_status) {
+    Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+    ProtobufMessage::ValidationVisitor& validation_visitor, absl::Status& creation_status) {
   auto behavior_or =
-      createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor);
+      createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, runtime, validation_visitor);
   SET_AND_RETURN_IF_NOT_OK(behavior_or.status(), creation_status);
   behavior_ = std::move(behavior_or.value());
 }
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
-    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-    absl::Status& creation_status, Stats::Scope& scope, const std::string& stats_prefix)
-    : OnDemandFilterConfig(proto_config, cm, validation_visitor, creation_status) {
+    Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+    ProtobufMessage::ValidationVisitor& validation_visitor, absl::Status& creation_status,
+    Stats::Scope& scope, const std::string& stats_prefix)
+    : OnDemandFilterConfig(proto_config, cm, runtime, validation_visitor, creation_status) {
   stats_.emplace(generateStats(scope, stats_prefix));
 }
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
-    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-    absl::Status& creation_status) {
+    Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+    ProtobufMessage::ValidationVisitor& validation_visitor, absl::Status& creation_status) {
   auto behavior_or =
-      createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor);
+      createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, runtime, validation_visitor);
   SET_AND_RETURN_IF_NOT_OK(behavior_or.status(), creation_status);
   behavior_ = std::move(behavior_or.value());
 }
@@ -237,6 +259,71 @@ void OnDemandRouteUpdate::handleOnDemandCds(const Router::Route& route,
       odcds.requestOnDemandClusterDiscovery(cluster_name, std::move(callback), timeout);
 }
 
+void OnDemandRouteUpdate::handleShadowDiscovery(Upstream::OdCdsApiHandle& odcds,
+                                                std::chrono::milliseconds timeout,
+                                                const ShadowDiscoveryOptions& options) {
+  // Best-effort: never touches the iteration state, discovery state or the request's own stats.
+  if (shadow_discovery_started_) {
+    return;
+  }
+  const auto route = callbacks_->route();
+  const auto headers = callbacks_->requestHeaders();
+  if (!route.has_value() || !headers.has_value() || route->routeEntry() == nullptr ||
+      headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
+    // No route, or CONNECT (never mirrored).
+    return;
+  }
+  shadow_discovery_started_ = true;
+
+  // Cluster-level policies win over route-level ones, as in the router.
+  const std::vector<Router::ShadowPolicyPtr>* policies = &route->routeEntry()->shadowPolicies();
+  if (const auto cluster_info = callbacks_->clusterInfo(); cluster_info.has_value()) {
+    const auto& cluster_policies = cluster_info->httpProtocolOptions().shadowPolicies();
+    if (!cluster_policies.empty()) {
+      policies = &cluster_policies;
+    }
+  }
+
+  absl::InlinedVector<absl::string_view, 2> requested;
+  for (const auto& policy : *policies) {
+    // Same sampling as the router.
+    if (!options.runtime_.snapshot().featureEnabled(policy->runtimeKey(), policy->defaultValue(),
+                                                    callbacks_->streamId())) {
+      continue;
+    }
+    absl::string_view cluster_name = policy->cluster();
+    if (cluster_name.empty()) {
+      // Selected by a header, as in the router.
+      if (policy->clusterHeader().get().empty()) {
+        continue;
+      }
+      const auto header = headers->get(policy->clusterHeader());
+      if (header.empty() || header[0]->value().empty()) {
+        continue;
+      }
+      cluster_name = header[0]->value().getStringView();
+    }
+    if (std::find(requested.begin(), requested.end(), cluster_name) != requested.end() ||
+        options.cluster_manager_.getThreadLocalCluster(cluster_name) != nullptr) {
+      continue;
+    }
+    requested.push_back(cluster_name);
+
+    ++shadow_discovery_in_flight_;
+    if (auto stats = config_->stats(); stats.has_value()) {
+      stats->shadow_cluster_discovery_requested_.inc();
+      stats->shadow_cluster_discovery_pending_.inc();
+    }
+    auto callback = std::make_unique<Upstream::ClusterDiscoveryCallback>(
+        [this](Upstream::ClusterDiscoveryStatus cluster_status) {
+          finishShadowClusterDiscovery(cluster_status);
+        });
+    // The handle only cancels the callback; discovery still completes if the stream ends.
+    shadow_discovery_handles_.push_back(
+        odcds.requestOnDemandClusterDiscovery(cluster_name, std::move(callback), timeout));
+  }
+}
+
 const OnDemandFilterConfig* OnDemandRouteUpdate::getConfig() {
   auto config = Http::Utility::resolveMostSpecificPerFilterConfig<OnDemandFilterConfig>(callbacks_);
   if (config != nullptr) {
@@ -268,6 +355,7 @@ void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCal
 void OnDemandRouteUpdate::onDestroy() {
   route_config_updated_callback_.reset();
   cluster_discovery_handle_.reset();
+  shadow_discovery_handles_.clear();
 }
 
 // Runs before the access logs (onDestroy() does not), so they can show a cancelled discovery.
@@ -288,9 +376,14 @@ void OnDemandRouteUpdate::onStreamComplete() {
       stats->cluster_discovery_cancelled_.inc();
       stats->cluster_discovery_pending_.dec();
     }
+    if (shadow_discovery_in_flight_ > 0) {
+      stats->shadow_cluster_discovery_cancelled_.add(shadow_discovery_in_flight_);
+      stats->shadow_cluster_discovery_pending_.sub(shadow_discovery_in_flight_);
+    }
   }
   route_discovery_in_flight_ = false;
   cluster_discovery_in_flight_ = false;
+  shadow_discovery_in_flight_ = 0;
 }
 
 // This is the callback which is called when an update requested in requestRouteConfigUpdate()
@@ -367,6 +460,8 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
   // here.
   if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
     callbacks_->downstreamCallbacks()->recreateClusterInfo();
+    // Cluster-level policies are only known now.
+    getConfig()->decodeHeadersBehavior().onClusterDiscovered(*this);
   }
   callbacks_->continueDecoding();
 }
@@ -475,6 +570,29 @@ void OnDemandRouteUpdate::finishClusterDiscovery(Upstream::ClusterDiscoveryStatu
       break;
     }
     stats->cluster_discovery_pending_.dec();
+  }
+}
+
+void OnDemandRouteUpdate::finishShadowClusterDiscovery(
+    Upstream::ClusterDiscoveryStatus cluster_status) {
+  if (shadow_discovery_in_flight_ == 0) {
+    // Stream completed; already counted as cancelled.
+    return;
+  }
+  --shadow_discovery_in_flight_;
+  if (auto stats = config_->stats(); stats.has_value()) {
+    switch (cluster_status) {
+    case Upstream::ClusterDiscoveryStatus::Available:
+      stats->shadow_cluster_discovery_available_.inc();
+      break;
+    case Upstream::ClusterDiscoveryStatus::Missing:
+      stats->shadow_cluster_discovery_missing_.inc();
+      break;
+    case Upstream::ClusterDiscoveryStatus::Timeout:
+      stats->shadow_cluster_discovery_timeout_.inc();
+      break;
+    }
+    stats->shadow_cluster_discovery_pending_.dec();
   }
 }
 
