@@ -15,7 +15,7 @@ namespace PostgresProxy {
 /**
  * Config registration for the Postgres proxy filter. @see NamedNetworkFilterConfigFactory.
  */
-Network::FilterFactoryCb
+absl::StatusOr<Network::FilterFactoryCb>
 NetworkFilters::PostgresProxy::PostgresConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
@@ -36,11 +36,13 @@ NetworkFilters::PostgresProxy::PostgresConfigFactory::createFilterFactoryFromPro
   PostgresFilterConfigSharedPtr filter_config(
       std::make_shared<PostgresFilterConfig>(config_options, context.scope()));
   if (proto_config.has_rules()) {
-    THROW_IF_NOT_OK(Filters::Common::RBAC::validateRbacRules(proto_config.rules()));
+    RETURN_IF_NOT_OK(Filters::Common::RBAC::validateRbacRules(proto_config.rules()));
     filter_config->engine_ =
         std::make_unique<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>(
             proto_config.rules(), context.messageValidationVisitor(),
             context.serverFactoryContext());
+    filter_config->authorization_enforced_ =
+        proto_config.rules().action() != envoy::config::rbac::v3::RBAC::LOG;
   }
   return [filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<PostgresFilter>(filter_config));

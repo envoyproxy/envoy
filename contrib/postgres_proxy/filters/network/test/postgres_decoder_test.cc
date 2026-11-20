@@ -28,9 +28,11 @@ public:
   MOCK_METHOD(void, incErrors, (ErrorType), (override));
   MOCK_METHOD(void, processQuery, (const std::string&), (override));
   MOCK_METHOD(bool, authorizationEnabled, (), (const, override));
-  MOCK_METHOD(bool, authorizeStartup, (), (override));
-  MOCK_METHOD(void, rejectStartup, (absl::string_view policy_id), (override));
-  MOCK_METHOD(void, rejectSSLRequest, (), (override));
+  MOCK_METHOD(bool, authorizationEnforced, (), (const, override));
+  MOCK_METHOD(bool, authorizeStartup, (StartupPacketType), (override));
+  MOCK_METHOD(void, rejectInvalidStartup, (), (override));
+  MOCK_METHOD(void, rejectEncryptionNegotiation, (absl::string_view), (override));
+  MOCK_METHOD(void, declineGSSEncryption, (), (override));
   MOCK_METHOD(bool, onSSLRequest, (), (override));
   MOCK_METHOD(bool, shouldEncryptUpstream, (), (const));
   MOCK_METHOD(void, sendUpstream, (Buffer::Instance&));
@@ -139,11 +141,12 @@ TEST_F(PostgresProxyDecoderTest, AuthorizesBeforeUpstreamSSL) {
   data_.add(attributes);
   testing::InSequence s;
   EXPECT_CALL(callbacks_, verifyDownstreamSSL()).WillOnce(testing::Return(true));
-  EXPECT_CALL(callbacks_, authorizeStartup()).WillOnce(testing::Invoke([this]() {
-    EXPECT_THAT(decoder_->getAttributes().at("user"), "postgres");
-    EXPECT_THAT(decoder_->getAttributes().at("database"), "testdb");
-    return true;
-  }));
+  EXPECT_CALL(callbacks_, authorizeStartup(DecoderCallbacks::StartupPacketType::StartupMessage))
+      .WillOnce(testing::InvokeWithoutArgs([this]() {
+        EXPECT_THAT(decoder_->getAttributes().at("user"), "postgres");
+        EXPECT_THAT(decoder_->getAttributes().at("database"), "testdb");
+        return true;
+      }));
   EXPECT_CALL(callbacks_, shouldEncryptUpstream()).WillOnce(testing::Return(true));
   EXPECT_CALL(callbacks_, sendUpstream(testing::_));
   ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::Stopped);
@@ -173,7 +176,8 @@ TEST_F(PostgresProxyDecoderTest, RejectedStartupStopDecoding) {
   data_.writeBEInt<uint32_t>(8 + attributes.size());
   data_.writeBEInt<uint32_t>(0x00030000);
   data_.add(attributes);
-  EXPECT_CALL(callbacks_, authorizeStartup()).WillOnce(testing::Return(false));
+  EXPECT_CALL(callbacks_, authorizeStartup(DecoderCallbacks::StartupPacketType::StartupMessage))
+      .WillOnce(testing::Return(false));
   EXPECT_CALL(callbacks_, shouldEncryptUpstream()).Times(0);
   ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::Stopped);
   ASSERT_THAT(decoder_->state(), DecoderImpl::State::RejectedState);
@@ -209,7 +213,7 @@ TEST_F(PostgresProxyDecoderTest, PreservesStartupNamesWithoutRbac) {
   data_.writeBEInt<uint32_t>(Postgres::Protocol::POSTGRES_PROTOCOL_VERSION_30);
   data_.add(attributes);
 
-  EXPECT_CALL(callbacks_, authorizeStartup()).Times(0);
+  EXPECT_CALL(callbacks_, authorizeStartup(testing::_)).Times(0);
   EXPECT_EQ(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
   EXPECT_EQ(decoder_->getAttributes().at("user"), user);
   EXPECT_EQ(decoder_->getAttributes().at("database"), database);
@@ -709,7 +713,7 @@ TEST_F(PostgresProxyDecoderTest, TerminateSSL) {
 TEST_F(PostgresProxyDecoderTest, RejectsPipelinedDataAfterTerminatingSSLRequest) {
   decoder_->state(DecoderImpl::State::InitState);
   ON_CALL(callbacks_, shouldPassthroughSSL()).WillByDefault(testing::Return(false));
-  EXPECT_CALL(callbacks_, rejectSSLRequest());
+  EXPECT_CALL(callbacks_, rejectEncryptionNegotiation("extra data after SSLRequest"));
   EXPECT_CALL(callbacks_, onSSLRequest()).Times(0);
 
   data_.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_MESSAGE_SIZE);
@@ -771,7 +775,9 @@ TEST_P(PostgresProxyUpstreamSSLTest, UpstreamSSLEnabled) {
   // Only "S" and "N" are valid responses.
   data_.add(std::get<0>(GetParam()));
 
-  EXPECT_CALL(callbacks_, encryptUpstream(std::get<1>(GetParam()), testing::_));
+  const bool upstream_accepted = std::get<1>(GetParam());
+  EXPECT_CALL(callbacks_, encryptUpstream(upstream_accepted, testing::_))
+      .WillOnce(testing::Return(upstream_accepted));
   // The reply from upstream should not be delivered to the client.
   ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::Stopped);
   ASSERT_THAT(decoder_->state(), std::get<2>(GetParam()));
@@ -781,12 +787,11 @@ TEST_P(PostgresProxyUpstreamSSLTest, UpstreamSSLEnabled) {
 INSTANTIATE_TEST_SUITE_P(BackendEncryptedMessagesTests, PostgresProxyUpstreamSSLTest,
                          ::testing::Values(
                              // Correct response from the server (encrypt).
-                             std::make_tuple("S", true, DecoderImpl::State::InitState),
-                             // Correct response from the server (do not encrypt).
-                             std::make_tuple("N", false, DecoderImpl::State::InitState),
-                             // Incorrect response from the server. Move to out-of-sync state.
-                             std::make_tuple("W", false, DecoderImpl::State::OutOfSyncState),
-                             std::make_tuple("WRONG", false, DecoderImpl::State::OutOfSyncState)));
+                             std::make_tuple("S", true, DecoderImpl::State::InSyncState),
+                             // Refusal or invalid response closes the connection.
+                             std::make_tuple("N", false, DecoderImpl::State::RejectedState),
+                             std::make_tuple("W", false, DecoderImpl::State::RejectedState),
+                             std::make_tuple("WRONG", false, DecoderImpl::State::RejectedState)));
 
 class FakeBuffer : public Buffer::Instance {
 public:

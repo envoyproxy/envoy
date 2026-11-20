@@ -87,8 +87,16 @@ message PostgresProxy {
   // Startup attributes, such as user and database, are exposed as dynamic metadata under
   // envoy.filters.network.postgres_proxy. Rules can also match TCP connection properties
   // and SSL peer identity when Envoy terminates downstream TLS.
-  // For SSL passthrough, rules are evaluated when the SSLRequest is received; SSLRequest and
-  // CancelRequest evaluations use only available connection properties.
+  // For SSL passthrough, rules are evaluated when the SSLRequest is received. SSLRequest and
+  // CancelRequest evaluations use the packet type and available connection properties.
   // Enabling RBAC preserves empty startup attribute values so key/value pairs are parsed correctly.
+  // The filter publishes the packet type under ``envoy.filters.network.postgres_proxy.rbac``.
+  // An ``ALLOW`` ruleset with no policies denies every connection. ``LOG`` rules can also observe a
+  // ``GSSENCRequest``.
+  // With ``ALLOW`` or ``DENY`` rules, an oversized or invalid client startup packet is rejected,
+  // including a PostgreSQL 17 direct TLS handshake. When the server declines passthrough SSL, the
+  // rules are evaluated again on the next startup packet.
+  // See the :ref:`Postgres proxy filter documentation <config_network_filters_postgres_proxy_rbac>`
+  // for the metadata and evaluation behavior in each encryption mode.
   config.rbac.v3.RBAC rules = 6;
 }

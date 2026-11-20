@@ -127,12 +127,10 @@ rules:
   for (const auto& yaml : configs) {
     envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy config;
     TestUtility::loadFromYaml(yaml, config);
-    const auto create_filter = [&]() {
-      const auto result = factory.createFilterFactoryFromProto(config, context);
-      (void)result;
-    };
-    EXPECT_THROW_WITH_REGEX(create_filter(), EnvoyException,
-                            "not supported by RBAC network filter");
+    const auto result = factory.createFilterFactoryFromProto(config, context);
+    EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(result.status().message(),
+                testing::HasSubstr("HTTP header rules are unsupported in network filters"));
   }
 }
 

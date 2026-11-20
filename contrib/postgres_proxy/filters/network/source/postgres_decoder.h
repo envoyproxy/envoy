@@ -44,11 +44,14 @@ public:
 
   virtual void processQuery(const std::string&) PURE;
 
+  enum class StartupPacketType { StartupMessage, CancelRequest, SSLRequest, GSSENCRequest };
   virtual bool authorizationEnabled() const PURE;
-  virtual bool authorizeStartup() PURE;
-  virtual void rejectStartup(absl::string_view log_policy_id) PURE;
+  virtual bool authorizationEnforced() const PURE;
+  virtual bool authorizeStartup(StartupPacketType packet_type) PURE;
+  virtual void rejectInvalidStartup() PURE;
   virtual bool shouldPassthroughSSL() const PURE;
-  virtual void rejectSSLRequest() PURE;
+  virtual void rejectEncryptionNegotiation(absl::string_view reason) PURE;
+  virtual void declineGSSEncryption() PURE;
   virtual bool onSSLRequest() PURE;
   virtual bool shouldEncryptUpstream() const PURE;
   virtual void sendUpstream(Buffer::Instance&) PURE;
@@ -107,6 +110,7 @@ public:
     InSyncState,
     OutOfSyncState,
     EncryptedState,
+    AwaitingSSLPassthroughReply,
     NegotiatingUpstreamSSL,
     RejectedState
   };
@@ -119,7 +123,10 @@ protected:
   Result onDataInit(Buffer::Instance& data, bool frontend);
   Result onDataInSync(Buffer::Instance& data, bool frontend);
   Result onDataIgnore(Buffer::Instance& data, bool frontend);
+  Result onDataAwaitingSSLPassthroughReply(Buffer::Instance& data, bool frontend);
   Result onDataInNegotiating(Buffer::Instance& data, bool frontend);
+  void sendUpstreamSSLRequest(State state_after_ssl);
+  Result rejectEncryptionNegotiation(Buffer::Instance& data, absl::string_view reason);
 
   // MsgAction defines the Decoder's method which will be invoked
   // when a specific message has been decoded.
@@ -193,6 +200,8 @@ protected:
   uint32_t message_len_{};
 
   bool encrypted_{false}; // tells if exchange is encrypted
+  bool gss_declined_{false};
+  bool ssl_passthrough_requested_{false};
 
   // Dispatchers for Backend (BE) and Frontend (FE) messages.
   MsgGroup FE_messages_;
@@ -214,6 +223,7 @@ protected:
   // while sending other packets. Currently used only when negotiating
   // upstream SSL.
   Buffer::OwnedImpl temp_storage_;
+  State state_after_upstream_ssl_{State::InSyncState};
 };
 
 } // namespace PostgresProxy

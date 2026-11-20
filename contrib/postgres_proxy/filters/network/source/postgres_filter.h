@@ -56,7 +56,8 @@ namespace PostgresProxy {
   COUNTER(notices_log)                                                                             \
   COUNTER(notices_unknown)                                                                         \
   COUNTER(authorization_allowed)                                                                   \
-  COUNTER(authorization_denied)
+  COUNTER(authorization_denied)                                                                    \
+  COUNTER(protocol_rejected)
 
 /**
  * Struct definition for all Postgres proxy stats. @see stats_macros.h
@@ -92,6 +93,7 @@ public:
   Stats::Scope& scope_;
   PostgresProxyStats stats_;
   std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngine> engine_;
+  bool authorization_enforced_{false};
 
 private:
   PostgresProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -130,15 +132,17 @@ public:
   void incTransactionsCommit() override;
   void incTransactionsRollback() override;
   void processQuery(const std::string&) override;
-  void rejectSSLRequest() override;
+  void rejectEncryptionNegotiation(absl::string_view reason) override;
+  void declineGSSEncryption() override;
   bool onSSLRequest() override;
   bool shouldEncryptUpstream() const override;
   void sendUpstream(Buffer::Instance&) override;
   bool encryptUpstream(bool, Buffer::Instance&) override;
   bool verifyDownstreamSSL() override;
   bool authorizationEnabled() const override { return config_->engine_ != nullptr; }
-  bool authorizeStartup() override;
-  void rejectStartup(absl::string_view log_policy_id) override;
+  bool authorizationEnforced() const override { return config_->authorization_enforced_; }
+  bool authorizeStartup(StartupPacketType packet_type) override;
+  void rejectInvalidStartup() override;
   bool shouldPassthroughSSL() const override {
     return config_->downstream_ssl_ == envoy::extensions::filters::network::postgres_proxy::
                                            v3alpha::PostgresProxy::DISABLE &&
@@ -165,10 +169,14 @@ public:
   const PostgresFilterConfigSharedPtr& getConfig() const { return config_; }
 
 private:
+  void rejectStartup(absl::string_view log_policy_id);
+  void recordProtocolRejection(absl::string_view details);
+
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::WriteFilterCallbacks* write_callbacks_{};
   PostgresFilterConfigSharedPtr config_;
   Buffer::OwnedImpl frontend_buffer_;
+  // Original client bytes withheld until the decoder decides whether to forward them.
   Buffer::OwnedImpl pending_startup_;
   Buffer::OwnedImpl backend_buffer_;
   std::unique_ptr<Decoder> decoder_;

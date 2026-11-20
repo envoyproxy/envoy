@@ -221,13 +221,21 @@ void PostgresFilter::processQuery(const std::string& sql) {
   }
 }
 
-void PostgresFilter::rejectSSLRequest() {
-  ENVOY_CONN_LOG(
-      debug,
-      "postgres_proxy: closing connection because data followed an SSLRequest while terminating "
-      "SSL.",
-      read_callbacks_->connection());
+void PostgresFilter::recordProtocolRejection(absl::string_view details) {
+  config_->stats_.protocol_rejected_.inc();
+  read_callbacks_->connection().streamInfo().setConnectionTerminationDetails(details);
+}
+
+void PostgresFilter::rejectEncryptionNegotiation(absl::string_view reason) {
+  recordProtocolRejection("postgres_proxy_invalid_encryption_negotiation");
+  ENVOY_CONN_LOG(debug, "postgres_proxy: closing connection during encryption negotiation: {}",
+                 read_callbacks_->connection(), reason);
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
+void PostgresFilter::declineGSSEncryption() {
+  Buffer::OwnedImpl response("N");
+  write_callbacks_->injectWriteDataToFilterChain(response, false);
 }
 
 bool PostgresFilter::onSSLRequest() {
@@ -313,10 +321,28 @@ bool PostgresFilter::encryptUpstream(bool upstream_agreed, Buffer::Instance& dat
   return encrypted;
 }
 
-bool PostgresFilter::authorizeStartup() {
+bool PostgresFilter::authorizeStartup(StartupPacketType packet_type) {
+  // Keep the decoder's packet type separate from client-supplied startup parameters.
+  Protobuf::Struct packet_metadata;
+  auto& type = (*packet_metadata.mutable_fields())["packet_type"];
+  switch (packet_type) {
+  case StartupPacketType::StartupMessage:
+    type.set_string_value("startup_message");
+    break;
+  case StartupPacketType::CancelRequest:
+    type.set_string_value("cancel_request");
+    break;
+  case StartupPacketType::SSLRequest:
+    type.set_string_value("ssl_request");
+    break;
+  case StartupPacketType::GSSENCRequest:
+    type.set_string_value("gss_enc_request");
+    break;
+  }
   // set basic attributes to metadata
   const Protobuf::Struct metadata = MessageUtil::keyValueStruct(decoder_->getAttributes());
   auto& info = read_callbacks_->connection().streamInfo();
+  info.setDynamicMetadata("envoy.filters.network.postgres_proxy.rbac", packet_metadata);
   info.setDynamicMetadata(NetworkFilterNames::get().PostgresProxy, metadata);
   std::string log_policy_id;
   const bool allowed =
@@ -340,6 +366,13 @@ void PostgresFilter::rejectStartup(absl::string_view log_policy_id) {
   // close downstream client connection
   read_callbacks_->connection().streamInfo().setConnectionTerminationDetails(
       Filters::Common::RBAC::responseDetail(log_policy_id.empty() ? "none" : log_policy_id));
+  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+}
+
+void PostgresFilter::rejectInvalidStartup() {
+  recordProtocolRejection("postgres_proxy_invalid_startup");
+  auto response = encoder_->buildErrorResponse("FATAL", "invalid startup packet", "08P01");
+  write_callbacks_->injectWriteDataToFilterChain(response, false);
   read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
 }
 

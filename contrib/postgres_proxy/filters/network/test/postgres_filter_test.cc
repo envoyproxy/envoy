@@ -492,6 +492,9 @@ TEST_F(PostgresFilterTest, TerminateSSL) {
 TEST_F(PostgresFilterTest, TerminateSSLRejectsPipelinedStartup) {
   filter_->getConfig()->terminate_ssl_ = true;
   EXPECT_CALL(read_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+  EXPECT_CALL(connection_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_,
+              setConnectionTerminationDetails("postgres_proxy_invalid_encryption_negotiation"));
   EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(connection_, addBytesSentCallback(_)).Times(0);
   EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false)).Times(0);
@@ -506,6 +509,8 @@ TEST_F(PostgresFilterTest, TerminateSSLRejectsPipelinedStartup) {
   EXPECT_EQ(filter_->onData(data_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(data_.length(), 0);
   EXPECT_EQ(filter_->getStats().sessions_terminated_ssl_.value(), 0);
+  EXPECT_EQ(filter_->getStats().protocol_rejected_.value(), 1);
+  EXPECT_EQ(filter_->getStats().authorization_denied_.value(), 0);
   EXPECT_FALSE(filter_->isSwitchedToTls());
 }
 

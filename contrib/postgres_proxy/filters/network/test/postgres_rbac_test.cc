@@ -43,6 +43,7 @@ public:
   void rules(const std::string& yaml) {
     envoy::config::rbac::v3::RBAC rules;
     TestUtility::loadFromYaml(yaml, rules);
+    config_->authorization_enforced_ = rules.action() != envoy::config::rbac::v3::RBAC::LOG;
     config_->engine_ = std::make_unique<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>(
         rules, ProtobufMessage::getStrictValidationVisitor(), context_);
   }
@@ -55,28 +56,53 @@ public:
     return body.toString();
   }
 
-  std::string cancel(uint32_t key, uint32_t length = 16) {
+  std::string cancelWithKey(absl::string_view key) {
     Buffer::OwnedImpl body;
-    body.writeBEInt<uint32_t>(length);
-    body.writeBEInt<uint32_t>(80877102);
+    body.writeBEInt<uint32_t>(Postgres::Protocol::CANCEL_REQUEST_HEADER_SIZE + key.size());
+    body.writeBEInt<uint32_t>(Postgres::Protocol::CANCEL_REQUEST_CODE);
     body.writeBEInt<uint32_t>(0x11223344);
-    body.writeBEInt<uint32_t>(key);
+    body.add(key);
     return body.toString();
   }
 
-  void expectDenied(absl::string_view details = "rbac_access_denied_matched_policy[none]") {
+  std::string cancel(uint32_t key) {
+    Buffer::OwnedImpl body;
+    body.writeBEInt<uint32_t>(key);
+    return cancelWithKey(body.toString());
+  }
+
+  std::string encryptionRequest(uint32_t code) {
+    Buffer::OwnedImpl body;
+    body.writeBEInt<uint32_t>(Postgres::Protocol::STARTUP_HEADER_SIZE);
+    body.writeBEInt<uint32_t>(code);
+    return body.toString();
+  }
+
+  void expectStartupError(absl::string_view details, absl::string_view sqlstate) {
     EXPECT_CALL(info_, setConnectionTerminationDetails(details));
     EXPECT_CALL(read_, injectReadDataToFilterChain(_, _)).Times(0);
     EXPECT_CALL(write_, injectWriteDataToFilterChain(_, false))
-        .WillOnce(Invoke([](Buffer::Instance& data, bool) {
+        .WillOnce(Invoke([sqlstate](Buffer::Instance& data, bool) {
           ASSERT_THAT(data.peekBEInt<char>(0), 'E');
-          ASSERT_THAT(data.toString(), testing::HasSubstr("28000"));
+          ASSERT_THAT(data.toString(), testing::HasSubstr(sqlstate));
         }));
     EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWrite));
   }
 
+  void expectDenied(absl::string_view details = "rbac_access_denied_matched_policy[none]") {
+    expectStartupError(details, "28000");
+  }
+
   const Protobuf::Struct& metadata() {
     return info_.metadata_.filter_metadata().at(NetworkFilterNames::get().PostgresProxy);
+  }
+
+  std::string packetType() {
+    return info_.metadata_.filter_metadata()
+        .at("envoy.filters.network.postgres_proxy.rbac")
+        .fields()
+        .at("packet_type")
+        .string_value();
   }
 
   Stats::IsolatedStoreImpl store_;
@@ -106,6 +132,30 @@ policies:
             filter: envoy.filters.network.postgres_proxy
             path: [{key: database}]
             value: {string_match: {exact: testdb}}
+)EOF";
+
+constexpr char CancelOnlyRules[] = R"EOF(
+action: ALLOW
+policies:
+  cancel:
+    principals: [{any: true}]
+    permissions:
+    - metadata:
+        filter: envoy.filters.network.postgres_proxy.rbac
+        path: [{key: packet_type}]
+        value: {string_match: {exact: cancel_request}}
+)EOF";
+
+constexpr char DenyBlockedUser[] = R"EOF(
+action: DENY
+policies:
+  blocked_user:
+    principals: [{any: true}]
+    permissions:
+    - metadata:
+        filter: envoy.filters.network.postgres_proxy
+        path: [{key: user}]
+        value: {string_match: {exact: blocked}}
 )EOF";
 
 TEST_F(PostgresRbacTest, AllowsStartup) {
@@ -233,8 +283,8 @@ class PostgresRbacSplitCancelTest : public PostgresRbacTest,
                                     public testing::WithParamInterface<size_t> {};
 
 TEST_P(PostgresRbacSplitCancelTest, AuthorizesOnlyTheCompletePacket) {
-  rules("action: DENY\npolicies: {}\n");
-  const std::string packet = cancel(0x11223344);
+  rules(CancelOnlyRules);
+  const std::string packet = cancelWithKey(std::string(256, 'k'));
   Buffer::OwnedImpl data(packet.substr(0, GetParam()));
   EXPECT_EQ(filter_->onData(data, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(data.length(), 0);
@@ -247,10 +297,38 @@ TEST_P(PostgresRbacSplitCancelTest, AuthorizesOnlyTheCompletePacket) {
   EXPECT_EQ(config_->stats_.authorization_allowed_.value(), 1);
   EXPECT_EQ(config_->stats_.authorization_denied_.value(), 0);
   EXPECT_TRUE(metadata().fields().empty());
+  EXPECT_EQ(packetType(), "cancel_request");
 }
 
 INSTANTIATE_TEST_SUITE_P(CancelFragments, PostgresRbacSplitCancelTest,
-                         testing::Values(1, 4, 7, 8, 12, 15));
+                         testing::Values(1, 4, 7, 8, 12, 15, 267));
+
+TEST_F(PostgresRbacTest, AllowsOneByteCancelKeyByPacketType) {
+  rules(CancelOnlyRules);
+  const std::string packet = cancelWithKey("k");
+  Buffer::OwnedImpl data(packet);
+  EXPECT_EQ(filter_->onData(data, false), Network::FilterStatus::Continue);
+  EXPECT_EQ(data.toString(), packet);
+  EXPECT_EQ(packetType(), "cancel_request");
+}
+
+TEST_F(PostgresRbacTest, StartupParameterCannotMatchCancelPolicy) {
+  rules(CancelOnlyRules);
+  expectDenied();
+  Buffer::OwnedImpl data(startup("user\0postgres\0packet_type\0cancel_request\0\0"s));
+  EXPECT_EQ(filter_->onData(data, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(data.length(), 0);
+  EXPECT_EQ(packetType(), "startup_message");
+}
+
+TEST_F(PostgresRbacTest, SSLRequestDoesNotMatchCancelPolicy) {
+  rules(CancelOnlyRules);
+  expectDenied();
+  Buffer::OwnedImpl data(encryptionRequest(Postgres::Protocol::SSL_REQUEST_CODE));
+  EXPECT_EQ(filter_->onData(data, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(data.length(), 0);
+  EXPECT_EQ(packetType(), "ssl_request");
+}
 
 class PostgresRbacInvalidCancelTest : public PostgresRbacTest,
                                       public testing::WithParamInterface<uint32_t> {};
@@ -258,16 +336,18 @@ class PostgresRbacInvalidCancelTest : public PostgresRbacTest,
 TEST_P(PostgresRbacInvalidCancelTest, RejectsInvalidLength) {
   rules("action: DENY\npolicies: {}\n");
   EXPECT_CALL(info_, setDynamicMetadata(_, _)).Times(0);
-  expectDenied();
-  Buffer::OwnedImpl data(cancel(0x11223300, GetParam()));
+  expectStartupError("postgres_proxy_invalid_startup", "08P01");
+  Buffer::OwnedImpl data;
+  data.writeBEInt<uint32_t>(GetParam());
+  data.writeBEInt<uint32_t>(Postgres::Protocol::CANCEL_REQUEST_CODE);
   EXPECT_EQ(filter_->onData(data, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(data.length(), 0);
-  EXPECT_EQ(config_->stats_.authorization_denied_.value(), 1);
+  EXPECT_EQ(config_->stats_.authorization_denied_.value(), 0);
+  EXPECT_EQ(config_->stats_.protocol_rejected_.value(), 1);
   EXPECT_EQ(config_->stats_.authorization_allowed_.value(), 0);
 }
 
-INSTANTIATE_TEST_SUITE_P(CancelLengths, PostgresRbacInvalidCancelTest,
-                         testing::Values(8, 12, 15, 17));
+INSTANTIATE_TEST_SUITE_P(CancelLengths, PostgresRbacInvalidCancelTest, testing::Values(8, 12, 269));
 
 class PostgresRbacSplitStartupTest : public PostgresRbacTest,
                                      public testing::WithParamInterface<size_t> {};
@@ -381,7 +461,7 @@ TEST_F(PostgresRbacTest, AuthorizesAfterSplitDownstreamSSL) {
 TEST_F(PostgresRbacTest, RejectsInvalidStartupWithRbac) {
   rules("action: DENY\npolicies: {}\n");
   EXPECT_CALL(info_, setDynamicMetadata(_, _)).Times(0);
-  expectDenied();
+  expectStartupError("postgres_proxy_invalid_startup", "08P01");
 
   // The complete packet has an unterminated attribute value.
   Buffer::OwnedImpl data(startup("user\0postgres"s));
@@ -392,8 +472,49 @@ TEST_F(PostgresRbacTest, RejectsInvalidStartupWithRbac) {
   ASSERT_THAT(filter_->onData(data, false), Network::FilterStatus::StopIteration);
   ASSERT_THAT(data.length(), 0);
   ASSERT_THAT(config_->stats_.authorization_allowed_.value(), 0);
-  ASSERT_THAT(config_->stats_.authorization_denied_.value(), 1);
+  ASSERT_THAT(config_->stats_.authorization_denied_.value(), 0);
+  EXPECT_EQ(config_->stats_.protocol_rejected_.value(), 1);
 }
+
+class PostgresUndersizedStartupTest : public PostgresRbacTest,
+                                      public testing::WithParamInterface<uint32_t> {};
+
+TEST_P(PostgresUndersizedStartupTest, RejectsWithEnforcingRules) {
+  rules("action: DENY\npolicies: {}\n");
+  EXPECT_CALL(info_, setDynamicMetadata(_, _)).Times(0);
+  expectStartupError("postgres_proxy_invalid_startup", "08P01");
+
+  // A declared length shorter than the header needs no additional bytes to reject.
+  Buffer::OwnedImpl data;
+  data.writeBEInt<uint32_t>(GetParam());
+  EXPECT_EQ(filter_->onData(data, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(data.length(), 0);
+  EXPECT_EQ(filter_->getFrontendBufLength(), 0);
+  EXPECT_EQ(config_->stats_.authorization_denied_.value(), 0);
+  EXPECT_EQ(config_->stats_.protocol_rejected_.value(), 1);
+}
+
+INSTANTIATE_TEST_SUITE_P(UndersizedStartups, PostgresUndersizedStartupTest,
+                         testing::Values(0, 3, 4, 7));
+
+class PostgresNonEnforcingStartupTest : public PostgresRbacTest,
+                                        public testing::WithParamInterface<bool> {};
+
+TEST_P(PostgresNonEnforcingStartupTest, ForwardsUndersizedStartup) {
+  if (GetParam()) {
+    rules("action: LOG\npolicies: {}\n");
+  }
+  EXPECT_CALL(connection_, close(_)).Times(0);
+  EXPECT_CALL(info_, setDynamicMetadata(_, _)).Times(0);
+  Buffer::OwnedImpl data;
+  data.writeBEInt<uint32_t>(7);
+  const std::string original = data.toString();
+  EXPECT_EQ(filter_->onData(data, false), Network::FilterStatus::Continue);
+  EXPECT_EQ(data.toString(), original);
+  EXPECT_EQ(config_->stats_.authorization_denied_.value(), 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(LoggingAndNoRules, PostgresNonEnforcingStartupTest, testing::Bool());
 
 class PostgresRbacStartupLengthTest : public PostgresRbacTest,
                                       public testing::WithParamInterface<uint32_t> {
@@ -444,7 +565,7 @@ class PostgresOversizedStartupTest : public PostgresRbacTest,
 TEST_P(PostgresOversizedStartupTest, RejectsWithRbac) {
   rules("action: DENY\npolicies: {}\n");
   EXPECT_CALL(info_, setDynamicMetadata(_, _)).Times(0);
-  expectDenied();
+  expectStartupError("postgres_proxy_invalid_startup", "08P01");
 
   // A length over the decoder's limit must be rejected without waiting for the body.
   Buffer::OwnedImpl data;
@@ -455,7 +576,8 @@ TEST_P(PostgresOversizedStartupTest, RejectsWithRbac) {
   EXPECT_EQ(filter_->onData(data, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(data.length(), 0);
   EXPECT_EQ(config_->stats_.authorization_allowed_.value(), 0);
-  EXPECT_EQ(config_->stats_.authorization_denied_.value(), 1);
+  EXPECT_EQ(config_->stats_.authorization_denied_.value(), 0);
+  EXPECT_EQ(config_->stats_.protocol_rejected_.value(), 1);
 }
 
 TEST_P(PostgresOversizedStartupTest, PreservesPassthroughWithoutRbac) {
@@ -485,6 +607,81 @@ TEST_F(PostgresRbacTest, DeniesBeforeUpstreamSSL) {
   ASSERT_THAT(data.length(), 0);
   ASSERT_THAT(config_->stats_.authorization_denied_.value(), 1);
 }
+
+TEST_F(PostgresRbacTest, RejectsClientDataWhileNegotiatingUpstreamSSL) {
+  rules(Rules);
+  config_->upstream_ssl_ =
+      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE;
+  const std::string request = encryptionRequest(Postgres::Protocol::SSL_REQUEST_CODE);
+  EXPECT_CALL(read_, injectReadDataToFilterChain(_, false))
+      .WillOnce(Invoke([&request](Buffer::Instance& data, bool) {
+        EXPECT_EQ(data.toString(), request);
+        data.drain(data.length());
+      }));
+  EXPECT_CALL(read_, startUpstreamSecureTransport()).Times(0);
+
+  Buffer::OwnedImpl data(startup());
+  ASSERT_EQ(filter_->onData(data, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(data.length(), 0);
+  EXPECT_EQ(config_->stats_.authorization_allowed_.value(), 1);
+
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  Buffer::OwnedImpl early("unexpected client data");
+  EXPECT_EQ(filter_->onData(early, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(early.length(), 0);
+
+  Buffer::OwnedImpl reply("S");
+  EXPECT_EQ(filter_->onWrite(reply, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(reply.length(), 0);
+}
+
+class PostgresRbacCancelUpstreamSSLTest : public PostgresRbacTest,
+                                          public testing::WithParamInterface<bool> {};
+
+TEST_P(PostgresRbacCancelUpstreamSSLTest, ForwardsCancelOnlyAfterStartingUpstreamSSL) {
+  rules(CancelOnlyRules);
+  config_->upstream_ssl_ =
+      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE;
+  // Legacy clients send cancellation on a separate plaintext connection.
+  config_->downstream_ssl_ =
+      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE;
+  const std::string request = encryptionRequest(Postgres::Protocol::SSL_REQUEST_CODE);
+  const std::string packet = cancel(0x11223344);
+  {
+    testing::InSequence sequence;
+    EXPECT_CALL(read_, injectReadDataToFilterChain(_, false))
+        .WillOnce(Invoke([&request](Buffer::Instance& data, bool) {
+          EXPECT_EQ(data.toString(), request);
+          data.drain(data.length());
+        }));
+    if (GetParam()) {
+      EXPECT_CALL(read_, startUpstreamSecureTransport()).WillOnce(Return(true));
+      EXPECT_CALL(read_, injectReadDataToFilterChain(_, false))
+          .WillOnce(Invoke([&packet](Buffer::Instance& data, bool) {
+            EXPECT_EQ(data.toString(), packet);
+            data.drain(data.length());
+          }));
+    } else {
+      EXPECT_CALL(read_, startUpstreamSecureTransport()).Times(0);
+      EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+    }
+  }
+
+  Buffer::OwnedImpl data(packet);
+  ASSERT_EQ(filter_->onData(data, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(data.length(), 0);
+  EXPECT_EQ(packetType(), "cancel_request");
+  EXPECT_EQ(config_->stats_.authorization_allowed_.value(), 1);
+
+  Buffer::OwnedImpl reply(GetParam() ? "S" : "N");
+  EXPECT_EQ(filter_->onWrite(reply, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(reply.length(), 0);
+  EXPECT_EQ(config_->stats_.sessions_upstream_ssl_success_.value(), GetParam() ? 1 : 0);
+  EXPECT_EQ(config_->stats_.sessions_upstream_ssl_failed_.value(), GetParam() ? 0 : 1);
+  EXPECT_EQ(config_->stats_.authorization_allowed_.value(), 1);
+}
+
+INSTANTIATE_TEST_SUITE_P(CancelUpstreamSSL, PostgresRbacCancelUpstreamSSLTest, testing::Bool());
 
 TEST_F(PostgresRbacTest, EmptyRulesDeny) {
   rules("{}");
@@ -586,23 +783,207 @@ TEST_F(PostgresRbacTest, AllowSSLPassthrough) {
   ASSERT_THAT(config_->stats_.authorization_denied_.value(), 0);
 }
 
+TEST_F(PostgresRbacTest, EnforcedSSLPassthroughRelaysAccept) {
+  rules("action: DENY\npolicies: {}\n");
+  const std::string request = encryptionRequest(Postgres::Protocol::SSL_REQUEST_CODE);
+  Buffer::OwnedImpl data(request.substr(0, 6));
+  ASSERT_EQ(filter_->onData(data, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(data.length(), 0);
+  data.add(request.substr(6));
+  ASSERT_EQ(filter_->onData(data, false), Network::FilterStatus::Continue);
+  EXPECT_EQ(data.toString(), request);
+  EXPECT_EQ(packetType(), "ssl_request");
+  EXPECT_EQ(config_->stats_.sessions_encrypted_.value(), 0);
+
+  Buffer::OwnedImpl reply("S");
+  EXPECT_EQ(filter_->onWrite(reply, false), Network::FilterStatus::Continue);
+  EXPECT_EQ(reply.toString(), "S");
+  EXPECT_EQ(config_->stats_.sessions_encrypted_.value(), 1);
+  Buffer::OwnedImpl encrypted("opaque TLS bytes");
+  EXPECT_EQ(filter_->onData(encrypted, false), Network::FilterStatus::Continue);
+  EXPECT_EQ(encrypted.toString(), "opaque TLS bytes");
+  EXPECT_EQ(config_->stats_.authorization_allowed_.value(), 1);
+}
+
+class PostgresRbacSSLFallbackTest : public PostgresRbacTest,
+                                    public testing::WithParamInterface<bool> {};
+
+TEST_P(PostgresRbacSSLFallbackTest, AuthorizesPlaintextStartupAfterServerDeclinesSSL) {
+  rules(DenyBlockedUser);
+  Buffer::OwnedImpl request(encryptionRequest(Postgres::Protocol::SSL_REQUEST_CODE));
+  ASSERT_EQ(filter_->onData(request, false), Network::FilterStatus::Continue);
+  Buffer::OwnedImpl reply("N");
+  ASSERT_EQ(filter_->onWrite(reply, false), Network::FilterStatus::Continue);
+  EXPECT_EQ(reply.toString(), "N");
+  EXPECT_EQ(config_->stats_.sessions_encrypted_.value(), 0);
+
+  const bool allowed = GetParam();
+  const std::string packet = allowed ? startup() : startup("user\0blocked\0\0"s);
+  Buffer::OwnedImpl data(packet.substr(0, 10));
+  ASSERT_EQ(filter_->onData(data, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(data.length(), 0);
+  EXPECT_EQ(config_->stats_.authorization_allowed_.value(), 1);
+
+  if (!allowed) {
+    expectDenied("rbac_access_denied_matched_policy[blocked_user]");
+  }
+  data.add(packet.substr(10));
+  EXPECT_EQ(filter_->onData(data, false),
+            allowed ? Network::FilterStatus::Continue : Network::FilterStatus::StopIteration);
+  EXPECT_EQ(data.toString(), allowed ? packet : "");
+  EXPECT_EQ(packetType(), "startup_message");
+  EXPECT_EQ(config_->stats_.authorization_allowed_.value(), allowed ? 2 : 1);
+  EXPECT_EQ(config_->stats_.authorization_denied_.value(), allowed ? 0 : 1);
+}
+
+INSTANTIATE_TEST_SUITE_P(StartupPolicyOutcomes, PostgresRbacSSLFallbackTest, testing::Bool());
+
+TEST_F(PostgresRbacTest, RejectsClientDataWhileAwaitingPassthroughReply) {
+  rules("action: DENY\npolicies: {}\n");
+  Buffer::OwnedImpl request(encryptionRequest(Postgres::Protocol::SSL_REQUEST_CODE));
+  ASSERT_EQ(filter_->onData(request, false), Network::FilterStatus::Continue);
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  Buffer::OwnedImpl early(startup());
+  EXPECT_EQ(filter_->onData(early, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(early.length(), 0);
+}
+
+TEST_F(PostgresRbacTest, RejectsRepeatedSSLRequestAfterServerDeclines) {
+  rules("action: DENY\npolicies: {}\n");
+  const std::string packet = encryptionRequest(Postgres::Protocol::SSL_REQUEST_CODE);
+  Buffer::OwnedImpl request(packet);
+  ASSERT_EQ(filter_->onData(request, false), Network::FilterStatus::Continue);
+  Buffer::OwnedImpl reply("N");
+  ASSERT_EQ(filter_->onWrite(reply, false), Network::FilterStatus::Continue);
+
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  Buffer::OwnedImpl repeated(packet);
+  EXPECT_EQ(filter_->onData(repeated, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(repeated.length(), 0);
+  EXPECT_EQ(config_->stats_.authorization_allowed_.value(), 1);
+}
+
+TEST_F(PostgresRbacTest, RelaysBackendErrorBeforeClientStartup) {
+  rules(Rules);
+  auto reply = filter_->getEncoder()->buildErrorResponse("FATAL", "cannot connect", "57P03");
+  const std::string original = reply.toString();
+  EXPECT_EQ(filter_->onWrite(reply, false), Network::FilterStatus::Continue);
+  EXPECT_EQ(reply.toString(), original);
+  EXPECT_TRUE(info_.metadata_.filter_metadata().empty());
+
+  Buffer::OwnedImpl data(startup());
+  EXPECT_EQ(filter_->onData(data, false), Network::FilterStatus::Continue);
+  EXPECT_EQ(config_->stats_.authorization_allowed_.value(), 1);
+}
+
+class PostgresRbacInvalidSSLReplyTest : public PostgresRbacTest,
+                                        public testing::WithParamInterface<std::string> {};
+
+TEST_P(PostgresRbacInvalidSSLReplyTest, ClosesWithoutRelayingUnexpectedReply) {
+  rules("action: DENY\npolicies: {}\n");
+  Buffer::OwnedImpl request(encryptionRequest(Postgres::Protocol::SSL_REQUEST_CODE));
+  ASSERT_EQ(filter_->onData(request, false), Network::FilterStatus::Continue);
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  Buffer::OwnedImpl reply(GetParam());
+  EXPECT_EQ(filter_->onWrite(reply, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(reply.length(), 0);
+  EXPECT_EQ(config_->stats_.sessions_encrypted_.value(), 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(InvalidSSLReplies, PostgresRbacInvalidSSLReplyTest,
+                         testing::Values("X", "SN"));
+
+class PostgresRbacGSSFallbackTest : public PostgresRbacTest,
+                                    public testing::WithParamInterface<bool> {};
+
+TEST_P(PostgresRbacGSSFallbackTest, DeclinesGSSAndAuthorizesTheNextPacket) {
+  rules("action: DENY\npolicies: {}\n");
+  const std::string request = encryptionRequest(Postgres::Protocol::GSSAPI_ENC_REQUEST_CODE);
+  Buffer::OwnedImpl data(request.substr(0, 4));
+  ASSERT_EQ(filter_->onData(data, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(data.length(), 0);
+  EXPECT_CALL(write_, injectWriteDataToFilterChain(_, false))
+      .WillOnce(Invoke([](Buffer::Instance& reply, bool) { EXPECT_EQ(reply.toString(), "N"); }));
+  data.add(request.substr(4));
+  ASSERT_EQ(filter_->onData(data, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(data.length(), 0);
+  EXPECT_TRUE(info_.metadata_.filter_metadata().empty());
+  EXPECT_EQ(config_->stats_.authorization_allowed_.value(), 0);
+
+  if (GetParam()) {
+    const std::string ssl = encryptionRequest(Postgres::Protocol::SSL_REQUEST_CODE);
+    data.add(ssl);
+    ASSERT_EQ(filter_->onData(data, false), Network::FilterStatus::Continue);
+    EXPECT_EQ(data.toString(), ssl);
+    data.drain(data.length());
+    Buffer::OwnedImpl reply("N");
+    ASSERT_EQ(filter_->onWrite(reply, false), Network::FilterStatus::Continue);
+    EXPECT_EQ(reply.toString(), "N");
+  }
+  const std::string packet = startup();
+  data.add(packet);
+  EXPECT_EQ(filter_->onData(data, false), Network::FilterStatus::Continue);
+  EXPECT_EQ(data.toString(), packet);
+  EXPECT_EQ(packetType(), "startup_message");
+  EXPECT_EQ(config_->stats_.authorization_allowed_.value(), GetParam() ? 2 : 1);
+}
+
+INSTANTIATE_TEST_SUITE_P(GSSFallbacks, PostgresRbacGSSFallbackTest, testing::Bool());
+
+TEST_F(PostgresRbacTest, RejectsRepeatedGSSRequest) {
+  rules("action: DENY\npolicies: {}\n");
+  const std::string request = encryptionRequest(Postgres::Protocol::GSSAPI_ENC_REQUEST_CODE);
+  Buffer::OwnedImpl data(request);
+  EXPECT_CALL(write_, injectWriteDataToFilterChain(_, false))
+      .WillOnce(Invoke([](Buffer::Instance& reply, bool) { EXPECT_EQ(reply.toString(), "N"); }));
+  ASSERT_EQ(filter_->onData(data, false), Network::FilterStatus::StopIteration);
+  data.add(request);
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_EQ(filter_->onData(data, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(data.length(), 0);
+  EXPECT_EQ(config_->stats_.authorization_allowed_.value(), 0);
+}
+
+TEST_F(PostgresRbacTest, RejectsDataPipelinedBehindGSSRequest) {
+  rules("action: DENY\npolicies: {}\n");
+  Buffer::OwnedImpl data(encryptionRequest(Postgres::Protocol::GSSAPI_ENC_REQUEST_CODE) +
+                         startup());
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_EQ(filter_->onData(data, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(data.length(), 0);
+  EXPECT_EQ(config_->stats_.authorization_allowed_.value(), 0);
+}
+
+TEST_F(PostgresRbacTest, LogRulesDoNotRejectAnOversizedFirstPacket) {
+  rules("action: LOG\npolicies: {}\n");
+  Buffer::OwnedImpl data;
+  data.writeBEInt<uint32_t>(10001);
+  const std::string packet = data.toString();
+  EXPECT_CALL(connection_, close(_)).Times(0);
+  EXPECT_EQ(filter_->onData(data, false), Network::FilterStatus::Continue);
+  EXPECT_EQ(data.toString(), packet);
+  EXPECT_EQ(config_->stats_.authorization_denied_.value(), 0);
+}
+
+TEST_F(PostgresRbacTest, LogRulesLeaveGSSEncryptionNegotiationToTheServer) {
+  rules("action: LOG\npolicies: {}\n");
+  const std::string request = encryptionRequest(Postgres::Protocol::GSSAPI_ENC_REQUEST_CODE);
+  Buffer::OwnedImpl data(request);
+  EXPECT_EQ(filter_->onData(data, false), Network::FilterStatus::Continue);
+  EXPECT_EQ(data.toString(), request);
+  EXPECT_EQ(packetType(), "gss_enc_request");
+  EXPECT_EQ(config_->stats_.authorization_allowed_.value(), 1);
+}
+
 TEST_F(PostgresRbacTest, EmptyStartupValueDoesNotBypassUserDenyRule) {
-  rules(R"EOF(
-action: DENY
-policies:
-  blocked_user:
-    principals: [{any: true}]
-    permissions:
-    - metadata:
-        filter: envoy.filters.network.postgres_proxy
-        path: [{key: user}]
-        value: {string_match: {exact: blocked}}
-)EOF");
+  rules(DenyBlockedUser);
   expectDenied("rbac_access_denied_matched_policy[blocked_user]");
   Buffer::OwnedImpl data(startup("application_name\0\0user\0blocked\0database\0testdb\0\0"s));
   ASSERT_THAT(filter_->onData(data, false), Network::FilterStatus::StopIteration);
   ASSERT_THAT(data.length(), 0);
   ASSERT_THAT(metadata().fields().at("user").string_value(), "blocked");
+  EXPECT_TRUE(metadata().fields().at("application_name").string_value().empty());
+  EXPECT_EQ(metadata().fields().count(""), 0);
   ASSERT_THAT(config_->stats_.authorization_denied_.value(), 1);
   ASSERT_THAT(config_->stats_.authorization_allowed_.value(), 0);
 }

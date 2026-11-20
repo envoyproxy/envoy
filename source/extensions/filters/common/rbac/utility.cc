@@ -16,9 +16,8 @@ namespace Common {
 namespace RBAC {
 
 static absl::Status validateFail(const std::string& header) {
-  return absl::InvalidArgumentError(fmt::format("Found header({}) rule,"
-                                                "not supported by RBAC network filter",
-                                                header));
+  return absl::InvalidArgumentError(fmt::format(
+      "Found header({}) rule. HTTP header rules are unsupported in network filters.", header));
 }
 
 static absl::Status validatePermission(const envoy::config::rbac::v3::Permission& permission) {

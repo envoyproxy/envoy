@@ -126,7 +126,7 @@ createShadowEngine(const ConfigType& config, Server::Configuration::ServerFactor
 std::string responseDetail(absl::string_view policy_id);
 
 /**
- * Validate the RBAC rules doesn't include any header or metadata rule.
+ * Validate that the RBAC rules do not use HTTP header matchers.
  */
 absl::Status validateRbacRules(const envoy::config::rbac::v3::RBAC& rules);
 
