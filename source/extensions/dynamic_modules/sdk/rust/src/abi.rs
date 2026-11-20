@@ -10952,22 +10952,22 @@ unsafe extern "C" {
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
-    /** envoy_dynamic_module_on_bootstrap_extension_runtime_update is called on the main thread once for
- each runtime key whose value changed, after the module opted in with
- envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update.
+    /** envoy_dynamic_module_on_bootstrap_extension_runtime_update is called on the main thread when the
+ value of a runtime key that the module watches with
+ envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update changes.
 
  Envoy loads a new runtime snapshot whenever a layer of the `layered_runtime` bootstrap option
  changes, for example on an RTDS update, a disk layer update or a request to the admin
- `/runtime_modify` endpoint. Envoy compares the value of every key in the new snapshot, that is
- the value of the topmost layer that sets the key, with the previous snapshot, and calls this hook
- once for every key that was added, changed or removed, in lexicographic order of the keys. A
- snapshot that changes no value calls nothing. The first comparison is against the snapshot that
- was current when the module opted in, so the values present at that point are not reported.
- Nothing is reported once the server began to shut down.
+ `/runtime_modify` endpoint. For every watched key, Envoy compares its value in the new snapshot,
+ that is the value of the topmost layer that sets the key, with its value at the previous update,
+ and calls this hook once for every watched key that was added, changed or removed, in
+ lexicographic order of the keys. A snapshot that changes no watched value calls nothing. The
+ first comparison is against the value when the module started watching the key, so that value is
+ not reported. Nothing is reported once the server began to shut down.
 
  When this is called, the runtime getters such as envoy_dynamic_module_callback_get_runtime_bool
  already return the new values on the main thread. The worker threads observe the new snapshot
- shortly after.
+ shortly after. The module can watch more keys from this hook.
 
  This hook is optional.
 
@@ -10975,8 +10975,8 @@ unsafe extern "C" {
  object.
  @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
  configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
- @param key is the runtime key whose value changed. It is owned by Envoy and valid only for the
- duration of this call.
+ @param key is the watched runtime key whose value changed. It is owned by Envoy and valid only
+ for the duration of this call.
  @param value is the new value of the key as a raw string, as given by the layer that sets it, for
  example "true" or "42". It is empty when removed is true. It is owned by Envoy and valid only for
  the duration of this call.
@@ -10992,19 +10992,25 @@ unsafe extern "C" {
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
     /** envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update is called by the module
- to opt in to envoy_dynamic_module_on_bootstrap_extension_runtime_update.
+ to watch a runtime key, so that envoy_dynamic_module_on_bootstrap_extension_runtime_update is
+ called when its value changes. Call it once for each key to watch. The key does not need to have
+ a value yet. The module can read the current value with the runtime getters such as
+ envoy_dynamic_module_callback_get_runtime_bool.
 
  This can be called during or after envoy_dynamic_module_on_bootstrap_extension_config_new, and
  must be called on the main thread.
 
  @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  object.
- @return true if the module now receives runtime updates. Returns false when it already opted in,
- when the module does not implement envoy_dynamic_module_on_bootstrap_extension_runtime_update,
- once the server began to shut down, or when called off the main thread. A call off the main
- thread also reports an Envoy bug.*/
+ @param key is the runtime key to watch, for example "envoy.reloadable_features.some_flag". It is
+ only read during the call.
+ @return true if the module now watches the key. Returns false when the key is empty or already
+ watched, when the module does not implement
+ envoy_dynamic_module_on_bootstrap_extension_runtime_update, once the server began to shut down,
+ or when called off the main thread. A call off the main thread also reports an Envoy bug.*/
     pub fn envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
         extension_config_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+        key: envoy_dynamic_module_type_module_buffer,
     ) -> bool;
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]

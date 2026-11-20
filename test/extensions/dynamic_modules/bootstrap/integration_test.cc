@@ -315,14 +315,17 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ListenerLifecycleRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_listener_lifecycle_test"));
 }
 
-// This test verifies that a Rust bootstrap extension that enabled runtime updates is told about
-// every runtime key that changes, including a runtime feature flag, with the new value, and is not
-// told about the values present when it enabled the updates or about unchanged values.
+// This test verifies that a Rust bootstrap extension is told about every change of the runtime keys
+// it watches, including a runtime feature flag, with the new value, and is not told about the
+// values present when it started watching, about unchanged values or about unwatched keys.
 TEST_P(DynamicModulesBootstrapIntegrationTest, RuntimeUpdateRust) {
   DISABLE_IF_ADMIN_DISABLED;
   config_helper_.addRuntimeOverride("dynamic_modules_test.number", "1");
-  EXPECT_LOG_CONTAINS(
-      "info", "Runtime update enabled: true",
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"info", "Runtime update enabled for dynamic_modules_test.number: true"},
+           {"info",
+            "Runtime update enabled for envoy.reloadable_features.test_feature_true: true"}}),
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_runtime_update_test"));
 
   auto runtime_modify = [this](absl::string_view query) {
@@ -338,11 +341,12 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, RuntimeUpdateRust) {
           {{"info", "Runtime update: dynamic_modules_test.number=42, getter agrees: true"},
            {"info", "Runtime update: envoy.reloadable_features.test_feature_true=false, getter "
                     "agrees: true"}}),
-      runtime_modify(
-          "dynamic_modules_test.number=42&envoy.reloadable_features.test_feature_true=false"));
+      runtime_modify("dynamic_modules_test.number=42&envoy.reloadable_features.test_feature_true="
+                     "false&dynamic_modules_test.unwatched=1"));
 
-  EXPECT_LOG_NOT_CONTAINS("info",
-                          "Runtime update:", runtime_modify("dynamic_modules_test.number=42"));
+  EXPECT_LOG_NOT_CONTAINS(
+      "info", "Runtime update:",
+      runtime_modify("dynamic_modules_test.number=42&dynamic_modules_test.unwatched=2"));
 
   // Removing the admin override of a key falls back to the lower layer, and removing the only
   // value of a key reports a removal.

@@ -99,6 +99,12 @@ protected:
   // Simulates the runtime loading a new snapshot.
   void loadRuntimeSnapshot() { context_.runtime_loader_.update_callbacks_.runCallbacks(); }
 
+  static bool watchRuntimeKey(DynamicModuleBootstrapExtensionConfig& config,
+                              absl::string_view key) {
+    return envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+        config.thisAsVoidPtr(), {key.data(), key.size()});
+  }
+
   std::string runtimeUpdates() {
     return optionalHooksFunction<const char* (*)()>(
         "bootstrap_optional_hooks_test_runtime_updates")();
@@ -2106,23 +2112,25 @@ TEST_F(BootstrapAbiImplTest, LifecycleRefusedOnceShutdownStartedAndInInitOnlyMod
   }
 }
 
-// Test that the module is told about every runtime key that was added, changed or removed, in key
-// order, and only about the changes made after it enabled runtime updates.
-TEST_F(BootstrapAbiImplTest, RuntimeUpdateReportsChangedKeys) {
+// Test that the module is told about every watched runtime key that was added, changed or removed,
+// in key order, and only about the changes made after it started watching the key.
+TEST_F(BootstrapAbiImplTest, RuntimeUpdateReportsWatchedKeys) {
   setRuntimeLayers({{{"a", "1"}, {"b", "2"}, {"c", "3"}}, {}});
   auto config = newOptionalHooksConfig();
-  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
-      config->thisAsVoidPtr()));
+  for (absl::string_view key : {"d", "c", "b", "e"}) {
+    EXPECT_TRUE(watchRuntimeKey(*config, key));
+  }
   EXPECT_EQ(1, context_.runtime_loader_.update_callbacks_.size());
   EXPECT_EQ("", runtimeUpdates());
 
-  // A key set by a higher layer reports the value of the highest layer.
-  setRuntimeLayers({{{"a", "1"}, {"b", "2"}}, {{"b", "20"}, {"d", "4"}}});
+  // A key set by a higher layer reports the value of the highest layer. The unwatched key "a" is
+  // not reported.
+  setRuntimeLayers({{{"a", "10"}, {"b", "2"}}, {{"b", "20"}, {"d", "4"}}});
   loadRuntimeSnapshot();
   EXPECT_EQ("b=20;c!;d=4;", runtimeUpdates());
 
-  // A snapshot that changes nothing reports nothing.
-  setRuntimeLayers({{{"a", "1"}}, {{"b", "20"}, {"d", "4"}}});
+  // A snapshot that changes no watched key reports nothing.
+  setRuntimeLayers({{{"a", "11"}}, {{"b", "20"}, {"d", "4"}}});
   loadRuntimeSnapshot();
   EXPECT_EQ("b=20;c!;d=4;", runtimeUpdates());
 
@@ -2133,16 +2141,41 @@ TEST_F(BootstrapAbiImplTest, RuntimeUpdateReportsChangedKeys) {
   EXPECT_EQ("b=20;c!;d=4;b=2;e=;", runtimeUpdates());
 }
 
-// Test that enabling runtime updates twice fails and keeps a single registration.
-TEST_F(BootstrapAbiImplTest, EnableRuntimeUpdateTwice) {
+// Test that the module can watch a key from the runtime update hook, and that the value of the key
+// at that point is not reported.
+TEST_F(BootstrapAbiImplTest, RuntimeUpdateWatchesKeysFromTheHook) {
+  setRuntimeLayers({{}});
+  auto config = newOptionalHooksConfig();
+  EXPECT_TRUE(watchRuntimeKey(*config, "watch_more"));
+
+  setRuntimeLayers({{{"more", "1"}, {"watch_more", "1"}}});
+  loadRuntimeSnapshot();
+  EXPECT_EQ("watch_more=1;", runtimeUpdates());
+  EXPECT_FALSE(watchRuntimeKey(*config, "more"));
+
+  setRuntimeLayers({{{"more", "2"}, {"watch_more", "1"}}});
+  loadRuntimeSnapshot();
+  EXPECT_EQ("watch_more=1;more=2;", runtimeUpdates());
+}
+
+// Test that watching a key twice fails, and that every watched key shares a single registration.
+TEST_F(BootstrapAbiImplTest, WatchRuntimeKeyTwice) {
   setRuntimeLayers({{}});
   auto config = newOptionalHooksConfig();
   EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_));
-  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
-      config->thisAsVoidPtr()));
-  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
-      config->thisAsVoidPtr()));
+  EXPECT_TRUE(watchRuntimeKey(*config, "a"));
+  EXPECT_FALSE(watchRuntimeKey(*config, "a"));
+  EXPECT_TRUE(watchRuntimeKey(*config, "b"));
   EXPECT_EQ(1, context_.runtime_loader_.update_callbacks_.size());
+}
+
+// Test that an empty key cannot be watched.
+TEST_F(BootstrapAbiImplTest, WatchEmptyRuntimeKey) {
+  setRuntimeLayers({{}});
+  auto config = newOptionalHooksConfig();
+  EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_)).Times(0);
+  EXPECT_LOG_CONTAINS("error", "cannot enable runtime update for an empty key",
+                      { EXPECT_FALSE(watchRuntimeKey(*config, "")); });
 }
 
 // Test that enabling runtime updates fails when the module does not implement the hook.
@@ -2158,19 +2191,14 @@ TEST_F(BootstrapAbiImplTest, EnableRuntimeUpdateWithoutHook) {
   EXPECT_LOG_CONTAINS("error",
                       "cannot enable runtime update since the module does not implement "
                       "envoy_dynamic_module_on_bootstrap_extension_runtime_update",
-                      {
-                        EXPECT_FALSE(
-                            envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
-                                config.value()->thisAsVoidPtr()));
-                      });
+                      { EXPECT_FALSE(watchRuntimeKey(*config.value(), "a")); });
 }
 
 // Test that runtime updates cannot be enabled once shutdown started, and stop once it starts.
 TEST_F(BootstrapAbiImplTest, RuntimeUpdateStopsOnceShutdownStarted) {
   setRuntimeLayers({{{"a", "1"}}});
   auto config = newOptionalHooksConfig();
-  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
-      config->thisAsVoidPtr()));
+  EXPECT_TRUE(watchRuntimeKey(*config, "a"));
   config->onShutdown();
   EXPECT_EQ(0, context_.runtime_loader_.update_callbacks_.size());
   setRuntimeLayers({{{"a", "2"}}});
@@ -2180,18 +2208,15 @@ TEST_F(BootstrapAbiImplTest, RuntimeUpdateStopsOnceShutdownStarted) {
   auto shut_down_config = newOptionalHooksConfig();
   shut_down_config->onShutdown();
   EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_)).Times(0);
-  EXPECT_LOG_CONTAINS("error", "cannot enable runtime update once shutdown started", {
-    EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
-        shut_down_config->thisAsVoidPtr()));
-  });
+  EXPECT_LOG_CONTAINS("error", "cannot enable runtime update once shutdown started",
+                      { EXPECT_FALSE(watchRuntimeKey(*shut_down_config, "a")); });
 }
 
 // Test that destroying the config removes its runtime update registration.
 TEST_F(BootstrapAbiImplTest, RuntimeUpdateRemovedWithTheConfig) {
   setRuntimeLayers({{}});
   auto config = newOptionalHooksConfig();
-  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
-      config->thisAsVoidPtr()));
+  EXPECT_TRUE(watchRuntimeKey(*config, "a"));
   EXPECT_EQ(1, context_.runtime_loader_.update_callbacks_.size());
   config.reset();
   EXPECT_EQ(0, context_.runtime_loader_.update_callbacks_.size());
@@ -2455,8 +2480,8 @@ TEST_F(BootstrapAbiImplTest, MainThreadCallbacksOffMainThreadFailClosed) {
        }},
       {"envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update",
        [] {
-         EXPECT_FALSE(
-             envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(nullptr));
+         EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+             nullptr, {"a", 1}));
        }},
       {"envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers",
        [] {
@@ -2801,7 +2826,8 @@ TEST_F(BootstrapAbiImplTest, ServerCallbacksRefusedOnceTheExtensionIsDestroyed) 
       envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(config_ptr));
   EXPECT_FALSE(
       envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(config_ptr));
-  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(config_ptr));
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(config_ptr,
+                                                                                       {"a", 1}));
 }
 
 // Test that the cluster writer callbacks are refused until the module enables the cluster writer.

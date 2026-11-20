@@ -3741,6 +3741,7 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_liste
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
   _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
 ) -> bool {
   false
 }

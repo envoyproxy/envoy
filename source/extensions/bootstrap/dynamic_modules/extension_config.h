@@ -25,6 +25,7 @@
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/dynamic_modules/metric_registry.h"
 
+#include "absl/container/btree_map.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/functional/function_ref.h"
 
@@ -199,13 +200,14 @@ public:
   void onListenerRemoval(const std::string& listener_name) override;
 
   /**
-   * Starts calling the module's runtime update hook once for every runtime key whose value changed
-   * in a newly loaded runtime snapshot, compared with the snapshot that was current at the previous
-   * update, or when this was called. Must be called on the main thread.
-   * @return false if already enabled, if the module does not implement the hook, or once shutdown
-   * began.
+   * Starts calling the module's runtime update hook when the value of the given runtime key changes
+   * in a newly loaded runtime snapshot, compared with its value at the previous update, or when
+   * this was called. Must be called on the main thread.
+   * @param key the runtime key to watch.
+   * @return false if the key is empty or already watched, if the module does not implement the
+   * hook, or once shutdown began.
    */
-  bool enableRuntimeUpdate();
+  bool enableRuntimeUpdate(absl::string_view key);
 
   /**
    * Enumerates the names of the currently active resources of a single kind: the active listeners'
@@ -423,20 +425,18 @@ private:
   Server::ServerLifecycleNotifier::HandlePtr listener_lifecycle_shutdown_handle_;
   bool listener_lifecycle_enabled_ = false;
 
-  // The effective value of every runtime key, viewing into the snapshot it was computed from.
-  using RuntimeValues = absl::flat_hash_map<absl::string_view, absl::string_view>;
-  static RuntimeValues runtimeValues(const Runtime::Snapshot& snapshot);
+  // Returns the raw value of the key from the topmost layer of the snapshot that sets it.
+  static std::optional<std::string> runtimeValue(const Runtime::Snapshot& snapshot,
+                                                 absl::string_view key);
 
   // Called by the runtime on the main thread once it loaded a new snapshot.
   void onRuntimeUpdate();
 
-  // Set when the module enables runtime updates via enableRuntimeUpdate(). Reset once shutdown
-  // began.
+  // Set when the module watches its first runtime key via enableRuntimeUpdate(). Reset once
+  // shutdown began.
   Common::CallbackHandlePtr runtime_update_handle_;
-  // The snapshot the next runtime update is compared with, and its values.
-  Runtime::SnapshotConstSharedPtr runtime_snapshot_;
-  RuntimeValues runtime_values_;
-  bool runtime_update_enabled_ = false;
+  // The watched runtime keys and their values at the previous update, ordered by key.
+  absl::btree_map<std::string, std::optional<std::string>> watched_runtime_values_;
 
   // Thread-local slot that carries the worker events. Allocated on the first runOnAllWorkers().
   ThreadLocal::TypedSlotPtr<> worker_slot_;

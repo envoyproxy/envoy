@@ -292,17 +292,18 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// `--mode init_only`.
   fn enable_listener_lifecycle(&self) -> bool;
 
-  /// Enable runtime update notifications. When enabled, the module receives
-  /// [`BootstrapExtensionConfig::on_runtime_update`] once for every runtime key whose value
-  /// changed in a newly loaded runtime snapshot, for example on an RTDS update, a disk layer
-  /// update or a request to the admin `/runtime_modify` endpoint. The values present when this is
-  /// called are not reported.
+  /// Watch a runtime key. The module then receives
+  /// [`BootstrapExtensionConfig::on_runtime_update`] when the value of the key changes in a newly
+  /// loaded runtime snapshot, for example on an RTDS update, a disk layer update or a request to
+  /// the admin `/runtime_modify` endpoint. Call this once for each key to watch. The key does not
+  /// need to have a value yet, and its value when this is called is not reported. Read it with the
+  /// runtime getters such as [`crate::get_runtime_bool`].
   ///
   /// This must be called on the main thread, and can be called from the config creation function.
   ///
-  /// This should be called at most once. Subsequent calls are no-ops and return `false`. This also
-  /// returns `false` once the server began to shut down.
-  fn enable_runtime_update(&self) -> bool;
+  /// Returns `false` if the key is empty or already watched, or once the server began to shut
+  /// down.
+  fn enable_runtime_update(&self, key: &str) -> bool;
 
   /// Returns the names of the currently active resources of the given kind, each at most once. See
   /// [`ActiveResourceKind`] for what each kind reports. This must be called on the main thread. It
@@ -641,16 +642,14 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   ) {
   }
 
-  /// This is called on the main thread once for every runtime key whose value changed in a newly
-  /// loaded runtime snapshot, in lexicographic order of the keys.
-  ///
-  /// This is only called if the module has opted in via
-  /// [`EnvoyBootstrapExtensionConfig::enable_runtime_update`]. The runtime getters such as
-  /// [`crate::get_runtime_bool`] already return the new value on the main thread when this is
-  /// called.
+  /// This is called on the main thread when the value of a runtime key watched via
+  /// [`EnvoyBootstrapExtensionConfig::enable_runtime_update`] changes. When several watched keys
+  /// change in the same runtime snapshot, this is called for each of them in lexicographic order
+  /// of the keys. The runtime getters such as [`crate::get_runtime_bool`] already return the new
+  /// value on the main thread when this is called.
   ///
   /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
-  /// * `key` is the runtime key whose value changed.
+  /// * `key` is the watched runtime key whose value changed.
   /// * `value` is the new raw value of the key, for example `"true"` or `"42"`, or `None` when no
   ///   runtime layer sets the key anymore.
   fn on_runtime_update(
@@ -1484,9 +1483,12 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     }
   }
 
-  fn enable_runtime_update(&self) -> bool {
+  fn enable_runtime_update(&self, key: &str) -> bool {
     unsafe {
-      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(self.raw)
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+        self.raw,
+        str_to_module_buffer(key),
+      )
     }
   }
 

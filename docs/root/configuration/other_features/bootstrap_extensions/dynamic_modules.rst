@@ -78,19 +78,20 @@ must not hold a lock across it that its worker event hook takes.
 Runtime Updates
 ---------------
 
-Once the module calls ``envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update``,
-Envoy calls ``envoy_dynamic_module_on_bootstrap_extension_runtime_update`` on the main thread for
-every :ref:`runtime <config_runtime>` key whose value changed, with the key and its new raw value,
-or with ``removed`` set when no layer sets the key anymore. Envoy compares each newly loaded runtime
-snapshot with the previous one, so an RTDS update, a disk layer update or a request to the admin
-``/runtime_modify`` endpoint reports only the keys whose value it changed, in lexicographic order.
-The values present when the module enables runtime updates are not reported. When the hook runs,
-the runtime getters such as ``envoy_dynamic_module_callback_get_runtime_bool`` already return the
-new value on the main thread.
+A module watches a :ref:`runtime <config_runtime>` key by passing it to
+``envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update``, once for each key to
+watch. Envoy then calls ``envoy_dynamic_module_on_bootstrap_extension_runtime_update`` on the main
+thread whenever the value of a watched key changes, with the key and its new raw value, or with
+``removed`` set when no layer sets the key anymore. Envoy compares each newly loaded runtime
+snapshot with the previous values of the watched keys, so an RTDS update, a disk layer update or a
+request to the admin ``/runtime_modify`` endpoint reports only the watched keys whose value it
+changed, in lexicographic order. The value of a key when the module starts watching it is not
+reported. When the hook runs, the runtime getters such as
+``envoy_dynamic_module_callback_get_runtime_bool`` already return the new value on the main thread.
 
-The module can enable runtime updates from
-``envoy_dynamic_module_on_bootstrap_extension_config_new`` onwards. Enabling fails once the server
-began to shut down, and no update is reported after that.
+The module can watch keys from ``envoy_dynamic_module_on_bootstrap_extension_config_new`` onwards,
+including from the runtime update hook. Watching fails once the server began to shut down, and no
+update is reported after that.
 
 .. _config_bootstrap_extensions_dynamic_modules_cluster_writer:
 

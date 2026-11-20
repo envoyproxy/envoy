@@ -315,7 +315,6 @@ void envoy_dynamic_module_on_bootstrap_extension_runtime_update(
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
     envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_envoy_buffer value,
     bool removed) {
-  (void)extension_config_envoy_ptr;
   (void)extension_config_module_ptr;
   appendRuntimeUpdate(key.ptr, key.length);
   if (removed) {
@@ -325,6 +324,12 @@ void envoy_dynamic_module_on_bootstrap_extension_runtime_update(
     appendRuntimeUpdate(value.ptr, value.length);
   }
   appendRuntimeUpdate(";", 1);
+  // A change of "watch_more" starts watching "more" from the hook.
+  static const char kWatchMore[] = "watch_more";
+  if (key.length == sizeof(kWatchMore) - 1 && memcmp(key.ptr, kWatchMore, key.length) == 0) {
+    envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+        extension_config_envoy_ptr, (envoy_dynamic_module_type_module_buffer){"more", 4});
+  }
 }
 
 size_t bootstrap_optional_hooks_test_worker_event_count(void) {

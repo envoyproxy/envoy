@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -144,10 +145,7 @@ void DynamicModuleBootstrapExtensionConfig::onListenerRemoval(const std::string&
   }
 }
 
-bool DynamicModuleBootstrapExtensionConfig::enableRuntimeUpdate() {
-  if (runtime_update_enabled_) {
-    return false;
-  }
+bool DynamicModuleBootstrapExtensionConfig::enableRuntimeUpdate(absl::string_view key) {
   if (on_bootstrap_extension_runtime_update_ == nullptr) {
     ENVOY_LOG(error, "cannot enable runtime update since the module does not implement "
                      "envoy_dynamic_module_on_bootstrap_extension_runtime_update");
@@ -157,51 +155,48 @@ bool DynamicModuleBootstrapExtensionConfig::enableRuntimeUpdate() {
     ENVOY_LOG(error, "cannot enable runtime update once shutdown started");
     return false;
   }
-  runtime_update_enabled_ = true;
+  if (key.empty()) {
+    ENVOY_LOG(error, "cannot enable runtime update for an empty key");
+    return false;
+  }
+  if (watched_runtime_values_.contains(key)) {
+    return false;
+  }
   Runtime::Loader& runtime = context_.runtime();
-  runtime_snapshot_ = runtime.threadsafeSnapshot();
-  runtime_values_ = runtimeValues(*runtime_snapshot_);
-  runtime_update_handle_ = runtime.addUpdateCallback([this]() { onRuntimeUpdate(); });
+  if (runtime_update_handle_ == nullptr) {
+    runtime_update_handle_ = runtime.addUpdateCallback([this]() { onRuntimeUpdate(); });
+  }
+  watched_runtime_values_.emplace(key, runtimeValue(*runtime.threadsafeSnapshot(), key));
   return true;
 }
 
-DynamicModuleBootstrapExtensionConfig::RuntimeValues
-DynamicModuleBootstrapExtensionConfig::runtimeValues(const Runtime::Snapshot& snapshot) {
-  RuntimeValues values;
-  // Layers are ordered from bottom to top, so a later layer overrides an earlier one.
-  for (const Runtime::Snapshot::OverrideLayerConstPtr& layer : snapshot.getLayers()) {
-    for (const auto& [key, entry] : layer->values()) {
-      values.insert_or_assign(key, entry.raw_string_value_);
+std::optional<std::string>
+DynamicModuleBootstrapExtensionConfig::runtimeValue(const Runtime::Snapshot& snapshot,
+                                                    absl::string_view key) {
+  // Snapshot::get() asserts against runtime feature keys, so the layers are searched instead.
+  const std::vector<Runtime::Snapshot::OverrideLayerConstPtr>& layers = snapshot.getLayers();
+  for (auto layer = layers.rbegin(); layer != layers.rend(); ++layer) {
+    const auto entry = (*layer)->values().find(key);
+    if (entry != (*layer)->values().end()) {
+      return entry->second.raw_string_value_;
     }
   }
-  return values;
+  return std::nullopt;
 }
 
 void DynamicModuleBootstrapExtensionConfig::onRuntimeUpdate() {
-  Runtime::SnapshotConstSharedPtr snapshot = context_.runtime().threadsafeSnapshot();
-  RuntimeValues values = runtimeValues(*snapshot);
-  // A removed key has no value.
-  std::vector<std::pair<absl::string_view, std::optional<absl::string_view>>> changes;
-  for (const auto& [key, value] : values) {
-    const auto previous = runtime_values_.find(key);
-    if (previous == runtime_values_.end() || previous->second != value) {
-      changes.emplace_back(key, value);
+  const Runtime::SnapshotConstSharedPtr snapshot = context_.runtime().threadsafeSnapshot();
+  // The changes are collected first, since the hook can watch more keys.
+  std::vector<std::pair<std::string, std::optional<std::string>>> changes;
+  for (auto& [key, previous_value] : watched_runtime_values_) {
+    std::optional<std::string> value = runtimeValue(*snapshot, key);
+    if (value != previous_value) {
+      previous_value = value;
+      changes.emplace_back(key, std::move(value));
     }
   }
-  for (const auto& [key, value] : runtime_values_) {
-    if (!values.contains(key)) {
-      changes.emplace_back(key, std::nullopt);
-    }
-  }
-  std::sort(changes.begin(), changes.end(),
-            [](const auto& a, const auto& b) { return a.first < b.first; });
-
-  // The removed keys view into the previous snapshot, so it must outlive the calls below.
-  const Runtime::SnapshotConstSharedPtr previous_snapshot =
-      std::exchange(runtime_snapshot_, std::move(snapshot));
-  runtime_values_ = std::move(values);
   for (const auto& [key, value] : changes) {
-    const absl::string_view raw_value = value.value_or(absl::string_view());
+    const absl::string_view raw_value = value.has_value() ? *value : absl::string_view();
     on_bootstrap_extension_runtime_update_(
         thisAsVoidPtr(), in_module_config_, {key.data(), key.size()},
         {raw_value.data(), raw_value.size()}, !value.has_value());
@@ -390,8 +385,7 @@ void DynamicModuleBootstrapExtensionConfig::onPostInit() {
 void DynamicModuleBootstrapExtensionConfig::onShutdown() {
   shutdown_started_ = true;
   runtime_update_handle_.reset();
-  runtime_values_.clear();
-  runtime_snapshot_.reset();
+  watched_runtime_values_.clear();
   if (cluster_writer_ != nullptr) {
     cluster_writer_->onShutdown();
   }
