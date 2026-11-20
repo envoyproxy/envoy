@@ -27,7 +27,7 @@ class ConnectionManager;
  * ActiveMessage represents an in-flight request from downstream that has not yet received response
  * from upstream.
  */
-class ActiveMessage : public LinkedObject<ActiveMessage>,
+class ActiveMessage : public IntrusiveListNode<ActiveMessage>,
                       public Event::DeferredDeletable,
                       Logger::Loggable<Logger::Id::rocketmq> {
 public:

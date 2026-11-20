@@ -40,6 +40,8 @@ on:
           - src: /mnt/runner
             target: RUNNER_TEMP/container/bazel_root
             chown: "runner:runner"
+      # The build image is no longer cached (it is pulled in seconds); these are accepted so
+      # callers need not change, and ignored.
       cache-build-image:
         type: string
       cache-build-image-key-suffix:
@@ -49,6 +51,15 @@ on:
         default: false
       checkout-extra:
         type: string
+      checkout-pr:
+        type: string
+        description: Check out this pull request's merge ref instead of the request's sha.
+      checkout-ref:
+        type: string
+        description: Check out this ref (full sha, branch, tag or refs/pull/N/head) instead of the request's sha.
+      checkout-repository:
+        type: string
+        description: Repository (owner/name) to fetch checkout-ref from. Defaults to this repository, and is not used for checkout-pr.
       concurrency-suffix:
         type: string
         default:
@@ -280,21 +291,6 @@ jobs:
             else . end
           | "${{ inputs.template-docker-configure }}"
 
-    # HACK/WORKAROUND for cache scope issue (https://github.com/envoyproxy/envoy/issues/37603)
-    - if: ${{ inputs.cache-build-image }}
-      id: cache-lookup
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-      with:
-        lookup-only: true
-        path: /tmp/cache
-        key: ${{ inputs.cache-build-image }}${{ inputs.cache-build-image-key-suffix }}
-    - if: ${{ inputs.cache-build-image && steps.cache-lookup.outputs.cache-hit == 'true' }}
-      name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/actions/docker/cache/restore@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
-      with:
-        image-tag: ${{ inputs.cache-build-image }}
-        key-suffix: ${{ inputs.cache-build-image-key-suffix }}
-
     - uses: envoyproxy/toolshed/actions/appauth@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       id: appauth
       name: Appauth
@@ -320,6 +316,33 @@ jobs:
         pr: ${{ fromJSON(inputs.request).request.pr }}
         ssh-key: ${{ inputs.trusted && secrets.ssh-key || '' }}
         token: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
+    - name: Checkout requested ref
+      if: inputs.checkout-ref || inputs.checkout-pr || inputs.checkout-repository
+      shell: bash
+      run: |
+        # The requested code is not this branch's, so it must not run with the app token, deploy
+        # key (both persisted in .git/config by the checkout) or signing keys of a trusted job.
+        # Enforced here rather than left to each caller.
+        if [[ -z "$REF" ]]; then
+            echo "checkout-repository needs checkout-ref or checkout-pr" >&2
+            exit 1
+        fi
+        if [[ "${{ inputs.trusted }}" == "true" ]]; then
+            echo "checkout-ref/checkout-pr can only be used with trusted: false" >&2
+            exit 1
+        fi
+        git fetch --no-tags "$REPOSITORY" "$REF"
+        git checkout --force FETCH_HEAD
+        git log -1 --format='%H %s'
+      env:
+        # A pull request's merge ref is what PR CI tests. Only the base repository has it, so it
+        # is always fetched from origin, and no API call (or token with pull request access) is
+        # needed.
+        REF: ${{ inputs.checkout-pr && format('refs/pull/{0}/merge', inputs.checkout-pr) || inputs.checkout-ref }}
+        REPOSITORY: >-
+          ${{ (inputs.checkout-repository && !inputs.checkout-pr)
+              && format('https://github.com/{0}', inputs.checkout-repository)
+              || 'origin' }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
     - uses: envoyproxy/toolshed/actions/github/checkout@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29

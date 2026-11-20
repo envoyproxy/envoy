@@ -59,6 +59,7 @@ message Zstd {
   // to train a specific dictionary for compression.
   config.core.v3.DataSource dictionary = 4;
 
-  // Value for compressor's next output buffer. If not set, defaults to 4096.
+  // Value for compressor's next output buffer. If not set, defaults to the zstd recommended
+  // output buffer size, ``ZSTD_CStreamOutSize()`` (about 128 KiB).
   google.protobuf.UInt32Value chunk_size = 5 [(validate.rules).uint32 = {lte: 65536 gte: 4096}];
 }

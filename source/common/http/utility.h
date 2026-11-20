@@ -647,10 +647,9 @@ struct AuthorityAttributes {
 };
 
 /**
- * Parse passed authority, and get that is valid FQDN or IPv4/IPv6 address, hostname and port-name.
+ * Parse passed authority, and get that is valid FQDN or IPv4/IPv6 address, hostname and port value.
  * @param host host/authority
- * @param default_port If passed authority does not have port, this value is returned
- * @return hostname parse result. that includes whether host is IP Address, hostname and port-name
+ * @return hostname parse result. that includes whether host is IP Address, hostname and port value.
  */
 AuthorityAttributes parseAuthority(absl::string_view host);
 

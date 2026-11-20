@@ -2604,6 +2604,24 @@ TEST_F(McpFilterTest, BufferLimitNotSetWhenDisabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
+// Test that buffer limit is NOT decreased when current limit is already larger
+TEST_F(McpFilterTest, BufferLimitNotDecreasedWhenCurrentLimitIsLarger) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_max_request_body_size()->set_value(8192);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  EXPECT_CALL(decoder_callbacks_, bufferLimit()).WillOnce(Return(16384));
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(_)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
 // Test body size check in PASS_THROUGH mode - allows request through and verifies
 // dynamic metadata contains is_exceeding_limit, is_mcp_request, and parsed fields.
 TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {

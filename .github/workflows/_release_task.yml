@@ -142,12 +142,18 @@ jobs:
       uses: envoyproxy/toolshed/actions/github/run@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         report-name: ci-report-sync.json
+        # The command is split on whitespace and not parsed by a shell, so the signoff, which
+        # contains a space, has to be passed as an array from `source`.
+        source: |
+          BAZEL_ARGS=(-- "--signoff=${COMMITTER}")
         command: >-
           bazel
           run
-          --config=ci @envoy_repo//:sync
-          --
-          --signoff="${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>"
+          --config=ci
+          @envoy_repo//:sync
+          "${BAZEL_ARGS[@]}"
+      env:
+        COMMITTER: ${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>
 
     - name: Create release
       if: inputs.task == 'create-release'
@@ -179,12 +185,20 @@ jobs:
       uses: envoyproxy/toolshed/actions/github/run@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         report-name: ci-report-dev.json
+        source: |
+          BAZEL_ARGS=(-- "--signoff=${COMMITTER}")
+          if [[ "$TARGET_NAME" != "main" ]]; then
+              BAZEL_ARGS+=(--patch)
+          fi
         command: >-
           bazel
           run
           --config=ci
           @envoy_repo//:dev
-          -- ${{ steps.target.outputs.name != 'main' && '--patch' || '' }}
+          "${BAZEL_ARGS[@]}"
+      env:
+        COMMITTER: ${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>
+        TARGET_NAME: ${{ steps.target.outputs.name }}
 
     - id: bzlmod
       name: Check for bzlmod

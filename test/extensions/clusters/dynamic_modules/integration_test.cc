@@ -219,10 +219,9 @@ public:
       tls_context.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(80, 'a'));
       auto config = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
           tls_context, factory_context_, {}, false);
-      addFakeUpstream(
-          *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-              std::move(config), context_manager_, server_factory_context_.serverScope()),
-          Http::CodecType::HTTP1, false);
+      addFakeUpstream(*Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+                          std::move(config), context_manager_, upstreamStatsScope()),
+                      Http::CodecType::HTTP1, false);
     }
   }
 

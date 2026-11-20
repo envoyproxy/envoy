@@ -91,7 +91,7 @@ UpstreamSocketThreadLocal* ReverseTunnelAcceptor::getLocalRegistry() const {
 }
 
 // BootstrapExtensionFactory
-Server::BootstrapExtensionPtr ReverseTunnelAcceptor::createBootstrapExtension(
+Server::BootstrapExtensionCreationResult ReverseTunnelAcceptor::createBootstrapExtension(
     const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
   ENVOY_LOG(debug, "ReverseTunnelAcceptor::createBootstrapExtension()");
   // Cast the config to the proper type.

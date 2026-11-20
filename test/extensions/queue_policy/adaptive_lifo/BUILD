@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "adaptive_lifo_queue_policy_test",
     srcs = ["adaptive_lifo_queue_policy_test.cc"],
     extension_names = ["envoy.queue_policy.adaptive_lifo"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/protobuf:message_validator_lib",
         "//source/extensions/queue_policy/adaptive_lifo:adaptive_lifo_queue_policy_impl",

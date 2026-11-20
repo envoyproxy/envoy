@@ -15,9 +15,6 @@ on:
       branch-name:
         type: string
         default: main
-      cache-docker:
-        type: boolean
-        default: true
       config-file:
         type: string
         default: ./.github/config.yml
@@ -100,14 +97,3 @@ jobs:
         ref: ${{ fromJSON(steps.env.outputs.data).request.ref }}
         sha: ${{ fromJSON(steps.env.outputs.data).request.sha }}
         target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
-
-  cache:
-    secrets:
-      app-id: ${{ secrets.lock-app-id }}
-      app-key: ${{ secrets.lock-app-key }}
-    uses: ./.github/workflows/_request_cache_docker.yml
-    needs: request
-    if: ${{ inputs.cache-docker }}
-    with:
-      caches: ${{ needs.request.outputs.caches }}
-      image-tag: ${{ fromJSON(needs.request.outputs.build-image).default }}

@@ -44,6 +44,7 @@
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/breaking_changes.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/runtime/runtime_keys.h"
 #include "source/common/signal/fatal_error_handler.h"
@@ -60,6 +61,8 @@
 #include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
 #include "source/server/utils.h"
+
+#include "absl/flags/flag.h"
 
 namespace Envoy {
 namespace Server {
@@ -415,6 +418,8 @@ absl::Status InstanceUtil::loadBootstrapConfig(
     bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap, validation_visitor);
+  absl::SetFlag(&FLAGS_breaking_change_observability_enabled,
+                bootstrap.enable_breaking_changes_observability());
   return absl::OkStatus();
 }
 
@@ -712,8 +717,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     auto config = Config::Utility::translateAnyToFactoryConfig(
         bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
         factory);
-    bootstrap_extensions_.push_back(
-        factory.createBootstrapExtension(*config, serverFactoryContext()));
+    auto extension_or_error = factory.createBootstrapExtension(*config, serverFactoryContext());
+    RETURN_IF_NOT_OK_REF(extension_or_error.status());
+    bootstrap_extensions_.push_back(std::move(extension_or_error.value()));
   }
 
   // Register the fatal actions.

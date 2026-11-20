@@ -581,7 +581,7 @@ TEST_F(ReverseConnectionClusterTest, SocketInterfaceWrongType) {
       return "envoy.bootstrap.reverse_tunnel.upstream_socket_interface";
     }
 
-    Server::BootstrapExtensionPtr
+    Server::BootstrapExtensionCreationResult
     createBootstrapExtension(const Protobuf::Message&,
                              Server::Configuration::ServerFactoryContext&) override {
       return nullptr;

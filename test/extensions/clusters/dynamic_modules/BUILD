@@ -18,6 +18,7 @@ envoy_extension_cc_dyn_module_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:cluster_async_host_selection",
         "//test/extensions/dynamic_modules/test_data/c:cluster_config_new_fail",
+        "//test/extensions/dynamic_modules/test_data/c:cluster_init_in_hooks",
         "//test/extensions/dynamic_modules/test_data/c:cluster_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:cluster_no_op",
         "//test/extensions/dynamic_modules/test_data/c:cluster_null_lb",
@@ -25,7 +26,10 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     extension_names = ["envoy.clusters.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+    },
     deps = [
         "//source/common/config:metadata_lib",
         "//source/common/http:message_lib",
@@ -67,7 +71,7 @@ envoy_extension_cc_test(
     name = "persistent_host_set_test",
     srcs = ["persistent_host_set_test.cc"],
     extension_names = ["envoy.clusters.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters/dynamic_modules:persistent_host_set_lib",
@@ -88,7 +92,10 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:cluster_integration_test",
     ],
     extension_names = ["envoy.clusters.dynamic_modules"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "tsan": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_small"},
+    },
     deps = [
         "//source/common/common:cleanup_lib",
         "//source/common/router:string_accessor_lib",

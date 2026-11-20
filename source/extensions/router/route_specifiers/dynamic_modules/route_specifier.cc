@@ -5,6 +5,8 @@
 #include <utility>
 
 #include "envoy/common/exception.h"
+#include "envoy/router/context.h"
+#include "envoy/singleton/manager.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/regex.h"
@@ -12,6 +14,7 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/hash_policy.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
 #include "source/common/http/path_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -21,7 +24,12 @@
 #include "source/common/router/retry_policy_impl.h"
 #include "source/common/router/router_ratelimit.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/utility.h"
+#include "source/common/stats/well_known_stat_names.h"
 
+#include "absl/algorithm/container.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/hash/hash.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {
@@ -252,6 +260,51 @@ absl::string_view replacedSpan(const PrefixRewriteRule& rule, absl::string_view 
                                   : Http::PathUtil::removeQueryAndFragment(path);
 }
 
+// Must name and tag the statistics exactly like
+// CommonVirtualHostImpl::VirtualClusterBase::createVclusterStats, so that a declared virtual
+// cluster shares them with the virtual cluster of the same name.
+Envoy::Router::VirtualClusterStats
+createVirtualClusterStats(Stats::Scope& scope,
+                          const Envoy::Router::VirtualClusterStatNames& stat_names,
+                          Stats::StatName virtual_host, Stats::StatName virtual_cluster) {
+  Stats::SymbolTable& symbol_table = scope.symbolTable();
+  const Stats::WellKnownStatNames& well_known = symbol_table.wellKnownStatNames();
+  const Stats::StatNameTag tags[] = {{well_known.tag_virtual_host_, virtual_host},
+                                     {well_known.tag_virtual_cluster_, virtual_cluster}};
+  const Stats::StatNameJoiner base_prefix({well_known.vhost_, well_known.vcluster_}, symbol_table);
+  const Stats::StatNameJoiner prefix(
+      {well_known.vhost_, virtual_host, well_known.vcluster_, virtual_cluster}, symbol_table);
+  Stats::LiteScopeHelper helper(scope, base_prefix.statName(), tags, prefix.statName());
+  return {stat_names, helper};
+}
+
+// The catch all virtual cluster has no name, and its statistics are named after this.
+constexpr absl::string_view CatchAllVirtualClusterName = "other";
+
+// The name a virtual cluster is declared by, which is other for the catch all virtual cluster.
+absl::string_view declaredName(const Envoy::Router::VirtualCluster& cluster) {
+  return cluster.name().has_value() ? absl::string_view(*cluster.name())
+                                    : CatchAllVirtualClusterName;
+}
+
+// The value of a request header, empty when the request carries none.
+absl::string_view headerValue(const Http::HeaderMap& headers, const Http::LowerCaseString& name) {
+  const Http::HeaderMap::GetResult value = headers.get(name);
+  return value.empty() ? absl::string_view() : value[0]->value().getStringView();
+}
+
+// Builds the wrapper, which answers the virtual cluster lookup of the router from the selection
+// when the module made one.
+template <class Wrapper, class... Args>
+std::shared_ptr<const Wrapper>
+makeWrapper(std::optional<const Envoy::Router::VirtualCluster*> virtual_cluster, Args&&... args) {
+  if (virtual_cluster.has_value()) {
+    return std::make_shared<VirtualClusterSelectingRoute<Wrapper>>(*virtual_cluster,
+                                                                   std::forward<Args>(args)...);
+  }
+  return std::make_shared<Wrapper>(std::forward<Args>(args)...);
+}
+
 } // namespace
 
 std::optional<std::string> PrefixRewriteRule::apply(absl::string_view path,
@@ -284,10 +337,10 @@ bool RouteOverrides::operator==(const RouteOverrides& other) const {
                     overrides.max_stream_duration, overrides.request_body_buffer_limit,
                     overrides.priority, overrides.cluster_not_found_response_code,
                     overrides.route_override, overrides.filter_disabled, overrides.route_name,
-                    overrides.path, overrides.prefix_rewrite_rule, overrides.finalize_regex_rewrite,
-                    overrides.host, overrides.request_headers_to_add,
-                    overrides.request_headers_to_remove, overrides.response_headers_to_add,
-                    overrides.response_headers_to_remove);
+                    overrides.virtual_cluster, overrides.path, overrides.prefix_rewrite_rule,
+                    overrides.finalize_regex_rewrite, overrides.host,
+                    overrides.request_headers_to_add, overrides.request_headers_to_remove,
+                    overrides.response_headers_to_add, overrides.response_headers_to_remove);
   };
   return fields(*this) == fields(other) && MessageUtil()(route_metadata, other.route_metadata);
 }
@@ -297,6 +350,89 @@ bool RouteOverrides::hasRouteOverrides() const {
          !route_metadata.typed_filter_metadata().empty() || !filter_disabled.empty() ||
          (route_override != nullptr && route_override->tracing != nullptr) ||
          route_name.has_value();
+}
+
+DeclaredVirtualCluster::DeclaredVirtualCluster(
+    absl::string_view name, Stats::Scope& scope,
+    const Envoy::Router::VirtualClusterStatNames& stat_names,
+    Stats::StatName virtual_host_stat_name)
+    : name_(name == CatchAllVirtualClusterName ? std::nullopt : std::optional<std::string>(name)),
+      stat_name_(name, scope.symbolTable()),
+      stats_(createVirtualClusterStats(scope, stat_names, virtual_host_stat_name,
+                                       stat_name_.statName())) {}
+
+DeclaredVirtualClusterSet::DeclaredVirtualClusterSet(
+    std::shared_ptr<DeclaredVirtualClusterRegistry> registry,
+    const VirtualClusterOverrideProto& declaration,
+    Server::Configuration::ServerFactoryContext& context)
+    : registry_(std::move(registry)), virtual_host_name_(declaration.virtual_host_name()),
+      virtual_host_stat_name_(virtual_host_name_, context.scope().symbolTable()),
+      scope_(context.scope().scopeFromStatName(Stats::StatName())) {
+  const Envoy::Router::VirtualClusterStatNames& stat_names =
+      context.routerContext().virtualClusterStatNames();
+  clusters_.reserve(declaration.names_size());
+  for (const std::string& name : declaration.names()) {
+    auto cluster = std::make_unique<const DeclaredVirtualCluster>(
+        name, *scope_, stat_names, virtual_host_stat_name_.statName());
+    const absl::string_view key = declaredName(*cluster);
+    clusters_.emplace(key, std::move(cluster));
+  }
+}
+
+const Envoy::Router::VirtualCluster* DeclaredVirtualClusterSet::find(absl::string_view name) const {
+  const auto it = clusters_.find(name);
+  return it != clusters_.end() ? it->second.get() : nullptr;
+}
+
+bool DeclaredVirtualClusterSet::declares(const VirtualClusterOverrideProto& declaration) const {
+  return static_cast<size_t>(declaration.names_size()) == clusters_.size() &&
+         absl::c_all_of(declaration.names(),
+                        [this](const std::string& name) { return clusters_.contains(name); });
+}
+
+SINGLETON_MANAGER_REGISTRATION(dynamic_module_route_specifier_virtual_clusters);
+
+DeclaredVirtualClusterSetConstSharedPtr
+DeclaredVirtualClusterRegistry::getOrCreate(const VirtualClusterOverrideProto& declaration,
+                                            Server::Configuration::ServerFactoryContext& context) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  auto registry = context.singletonManager().getTyped<DeclaredVirtualClusterRegistry>(
+      SINGLETON_MANAGER_REGISTERED_NAME(dynamic_module_route_specifier_virtual_clusters),
+      [] { return std::make_shared<DeclaredVirtualClusterRegistry>(); });
+  const auto expired = [](const std::weak_ptr<const DeclaredVirtualClusterSet>& clusters) {
+    return clusters.expired();
+  };
+  // Sweeping every entry only once the map has doubled since the last sweep keeps the cost of a
+  // call constant on average.
+  if (registry->declarations_.size() >= 2 * registry->swept_size_) {
+    for (auto& entry : registry->declarations_) {
+      std::erase_if(entry.second, expired);
+    }
+    absl::erase_if(registry->declarations_, [](const auto& entry) { return entry.second.empty(); });
+    registry->swept_size_ = registry->declarations_.size();
+  }
+  auto& shared = registry->declarations_[keyOf(declaration)];
+  std::erase_if(shared, expired);
+  for (const auto& weak_clusters : shared) {
+    auto clusters = weak_clusters.lock();
+    if (clusters != nullptr && clusters->declares(declaration)) {
+      return clusters;
+    }
+  }
+  DeclaredVirtualClusterSetConstSharedPtr clusters =
+      std::make_shared<DeclaredVirtualClusterSet>(registry, declaration, context);
+  shared.push_back(clusters);
+  return clusters;
+}
+
+DeclaredVirtualClusterRegistry::Key
+DeclaredVirtualClusterRegistry::keyOf(const VirtualClusterOverrideProto& declaration) {
+  // A sum of hashes does not depend on the order of the names.
+  uint64_t fingerprint = 0;
+  for (const std::string& name : declaration.names()) {
+    fingerprint += absl::Hash<absl::string_view>{}(name);
+  }
+  return {declaration.virtual_host_name(), fingerprint};
 }
 
 DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
@@ -317,9 +453,14 @@ DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
       continue_matching_on_failure_(
           proto_config.failure_policy() ==
           envoy::extensions::router::route_specifiers::dynamic_modules::v3::CONTINUE_MATCHING),
+      prefer_virtual_cluster_selection_(proto_config.virtual_cluster_override().prefer_selection()),
+      virtual_cluster_verify_one_in_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          proto_config.virtual_cluster_override(), verify_one_in, 1024)),
       cluster_manager_(context.serverFactoryContext().clusterManager()),
       runtime_(context.serverFactoryContext().runtime()),
       time_source_(context.serverFactoryContext().timeSource()),
+      random_(context.serverFactoryContext().api().randomGenerator()),
+      stat_prefix_(proto_config.stat_prefix()),
       stats_scope_(context.serverFactoryContext().serverScope().createScope(
           absl::StrCat(metrics_namespace, ".route_specifier.", proto_config.stat_prefix(), "."))),
       stats_{ALL_DYNAMIC_MODULE_ROUTE_SPECIFIER_STATS(
@@ -343,6 +484,11 @@ const RouteOverride*
 DynamicModuleRouteSpecifierConfig::routeOverride(absl::string_view override_id) const {
   const auto it = route_overrides_.find(override_id);
   return it != route_overrides_.end() ? &it->second : nullptr;
+}
+
+bool DynamicModuleRouteSpecifierConfig::sampleVirtualClusterComparison() const {
+  return virtual_cluster_verify_one_in_ != 0 &&
+         random_.random() % virtual_cluster_verify_one_in_ == 0;
 }
 
 bool DynamicModuleRouteSpecifierConfig::registerRouteTemplate(absl::string_view id,
@@ -389,6 +535,15 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
   if (proto_config.has_built_route_cache() && !context.routeBuilder().has_value()) {
     return absl::InvalidArgumentError(
         "built_route_cache requires a route specifier configured on a virtual host or a route");
+  }
+  // The PGV unique rule takes quadratic time, so uniqueness is checked here.
+  const auto& virtual_cluster_names = proto_config.virtual_cluster_override().names();
+  absl::flat_hash_set<absl::string_view> unique_virtual_cluster_names;
+  unique_virtual_cluster_names.reserve(virtual_cluster_names.size());
+  for (const std::string& name : virtual_cluster_names) {
+    if (!unique_virtual_cluster_names.insert(name).second) {
+      return absl::InvalidArgumentError(fmt::format("duplicate virtual cluster name '{}'", name));
+    }
   }
 
   auto on_config_new = dynamic_module->getFunctionPointer<OnRouteSpecifierConfigNewType>(
@@ -504,6 +659,10 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
 
   if (config->in_module_config_ == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize dynamic module route specifier config");
+  }
+  if (proto_config.has_virtual_cluster_override()) {
+    config->virtual_clusters_ = DeclaredVirtualClusterRegistry::getOrCreate(
+        proto_config.virtual_cluster_override(), context.serverFactoryContext());
   }
   return config;
 }
@@ -633,6 +792,47 @@ void BuiltRouteCache::removeAt(size_t index) {
   }
   entries_.pop_back();
   config_->stats().built_route_cache_entries_.dec();
+}
+
+const Envoy::Router::VirtualCluster*
+VirtualClusterSelectingVirtualHost::virtualCluster(const Http::HeaderMap& headers) const {
+  RouteSpecifierStats& stats = config_.stats();
+  if (selected_ == nullptr) {
+    stats.virtual_cluster_none_.inc();
+    return base_.virtualCluster(headers);
+  }
+  const bool prefer = config_.preferVirtualClusterSelection();
+  if (prefer && !config_.sampleVirtualClusterComparison()) {
+    stats.virtual_cluster_selected_.inc();
+    return selected_;
+  }
+  const Envoy::Router::VirtualCluster* matched = base_.virtualCluster(headers);
+  // Only a virtual host without virtual clusters matches no virtual cluster, which leaves nothing
+  // to compare the selection with.
+  if (matched == nullptr) {
+    stats.virtual_cluster_selected_.inc();
+    return selected_;
+  }
+  // Agreeing means counting in the same statistics, so a virtual cluster named other agrees with
+  // the catch all.
+  if (selected_->statName() == matched->statName()) {
+    stats.virtual_cluster_agree_.inc();
+  } else {
+    stats.virtual_cluster_disagree_.inc();
+    ENVOY_LOG(debug,
+              "dynamic module route specifier '{}' selected virtual cluster '{}' for {} '{}' "
+              "while virtual host '{}' matched '{}'",
+              config_.statPrefix(), declaredName(*selected_),
+              headerValue(headers, Http::Headers::get().Method),
+              headerValue(headers, Http::Headers::get().Path), base_.name(),
+              declaredName(*matched));
+    ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(10),
+                       "dynamic module route specifier '{}' selected virtual cluster '{}' while "
+                       "virtual host '{}' matched '{}'",
+                       config_.statPrefix(), declaredName(*selected_), base_.name(),
+                       declaredName(*matched));
+  }
+  return prefer ? selected_ : matched;
 }
 
 DynamicModuleRoute::DynamicModuleRoute(
@@ -967,7 +1167,7 @@ DynamicModuleRouteSpecifier::onRoute(Envoy::Router::RouteConstSharedPtr route,
   // the module, since only a few branches follow it.
   const auto& lookup = context.built_route_lookup;
   const bool ends_with_module =
-      !discard && result.recorded == nullptr && result.failure == Failure::None &&
+      !discard && !result.built && result.failure == Failure::None &&
       (!lookup.has_value() || (lookup->hit.has_value() && !lookup->verify));
   record_duration(config_->stats().specifier_duration_,
                   ends_with_module ? module_end : config_->timeSource().monotonicTime());
@@ -1089,7 +1289,7 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context,
     if (context.input_route == nullptr) {
       // With nothing recorded the default decision passes the route through unchanged, which is
       // what makes it safe when the module records none: the run with no route stays a run with
-      // no route. Anything recorded needs a route to be applied to.
+      // no route. Anything recorded but a virtual cluster selection needs a route to be applied to.
       if (context.overrides.hasRouteEntryOverrides() || context.overrides.hasRouteOverrides() ||
           context.user_data.has_value()) {
         return fail(Failure::OverrideWithoutRoute);
@@ -1123,12 +1323,24 @@ DynamicModuleRouteSpecifier::Decision
 DynamicModuleRouteSpecifier::wrap(Envoy::Router::RouteConstSharedPtr route,
                                   RouteSpecifierContext& context,
                                   Envoy::Router::OnRouteStatus status) const {
+  dropUnusableVirtualClusterSelection(*route, context);
   const bool route_entry_overrides = context.overrides.hasRouteEntryOverrides();
   // User data forces a wrapper even with no override, so the route destroy hook fires for the
   // produced route.
   if (!route_entry_overrides && !context.overrides.hasRouteOverrides() &&
       !context.user_data.has_value()) {
-    return {std::move(route), status};
+    if (!context.overrides.virtual_cluster.has_value()) {
+      return {std::move(route), status};
+    }
+    // A selection alone builds a route without the recorded overrides, unless the built route
+    // cache needs them to compare.
+    if (!context.built_route_lookup.has_value()) {
+      return {.route =
+                  std::make_shared<VirtualClusterSelectingRoute<DynamicModuleVirtualClusterRoute>>(
+                      *context.overrides.virtual_cluster, std::move(route), config_),
+              .status = status,
+              .built = true};
+    }
   }
   if (route_entry_overrides && route->routeEntry() == nullptr) {
     return {nullptr, status, Failure::OverrideOnNonRouteEntry};
@@ -1142,21 +1354,45 @@ DynamicModuleRouteSpecifier::wrap(Envoy::Router::RouteConstSharedPtr route,
                           metadata_pack.status().message());
     return {nullptr, status, Failure::RouteMetadata};
   }
-  Decision decision{nullptr, status};
+  Decision decision{.status = status, .built = true};
   if (route_entry_overrides) {
-    auto entry = std::make_shared<DynamicModuleRouteEntry>(
-        std::move(route), config_, std::move(context.overrides), std::move(metadata_pack.value()),
-        context.user_data);
+    auto entry = makeWrapper<DynamicModuleRouteEntry>(
+        context.overrides.virtual_cluster, std::move(route), config_, std::move(context.overrides),
+        std::move(metadata_pack.value()), context.user_data);
     decision.recorded = &entry->recordedOverrides();
     decision.route = std::move(entry);
   } else {
-    auto wrapper = std::make_shared<DynamicModuleRoute>(
-        std::move(route), config_, std::move(context.overrides), std::move(metadata_pack.value()),
-        context.user_data);
+    auto wrapper = makeWrapper<DynamicModuleRoute>(
+        context.overrides.virtual_cluster, std::move(route), config_, std::move(context.overrides),
+        std::move(metadata_pack.value()), context.user_data);
     decision.recorded = &wrapper->recordedOverrides();
     decision.route = std::move(wrapper);
   }
   return decision;
+}
+
+void DynamicModuleRouteSpecifier::dropUnusableVirtualClusterSelection(
+    const Envoy::Router::Route& route, RouteSpecifierContext& context) const {
+  if (!context.overrides.virtual_cluster.has_value()) {
+    return;
+  }
+  // The router looks the virtual cluster up only for a route entry.
+  if (route.routeEntry() == nullptr) {
+    context.overrides.virtual_cluster.reset();
+    return;
+  }
+  // A selection of none names no statistics, and a selection is only recorded when the
+  // configuration declares virtual clusters.
+  if (*context.overrides.virtual_cluster != nullptr &&
+      route.virtualHost().statName() != config_->virtualClusters()->virtualHostStatName()) {
+    config_->stats().virtual_cluster_vhost_mismatch_.inc();
+    ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(10),
+                       "dynamic module route specifier '{}' dropped a virtual cluster selection "
+                       "for virtual host '{}', which is not the declared virtual host '{}'",
+                       config_->statPrefix(), route.virtualHost().name(),
+                       config_->virtualClusters()->virtualHostName());
+    context.overrides.virtual_cluster.reset();
+  }
 }
 
 bool DynamicModuleRouteSpecifier::recordsACacheableRoute(const RouteSpecifierContext& context,

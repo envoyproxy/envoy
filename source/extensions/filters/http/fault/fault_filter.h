@@ -31,6 +31,7 @@ namespace Fault {
  * All stats for the fault filter. @see stats_macros.h
  */
 #define ALL_FAULT_FILTER_STATS(COUNTER, GAUGE)                                                     \
+  COUNTER(aborts_dry_run)                                                                          \
   COUNTER(aborts_injected)                                                                         \
   COUNTER(delays_injected)                                                                         \
   COUNTER(faults_overflow)                                                                         \
@@ -129,6 +130,10 @@ public:
   const FaultSettings* settings() { return &settings_; }
   TimeSource& timeSource() { return time_source_; }
 
+  void incAbortsDryRun(Stats::StatName downstream_cluster) {
+    incCounter(downstream_cluster, aborts_dry_run_, aborts_dry_run_base_);
+  }
+
   void incDelays(Stats::StatName downstream_cluster) {
     incCounter(downstream_cluster, delays_injected_, delays_injected_base_);
   }
@@ -148,6 +153,7 @@ private:
   Stats::Scope& scope_;
   TimeSource& time_source_;
   Stats::StatNameSetPtr stat_name_set_;
+  const Stats::StatName aborts_dry_run_;
   const Stats::StatName aborts_injected_;
   const Stats::StatName delays_injected_;
   const Stats::StatName stats_prefix_; // Includes "fault".
@@ -155,6 +161,7 @@ private:
   const Stats::StatName downstream_cluster_tag_;
   // The tag-extracted names of the per-cluster stats, pre-joined once so that charging a stat
   // only joins the full name with the dynamic cluster segment.
+  const Stats::StatName aborts_dry_run_base_;
   const Stats::StatName aborts_injected_base_;
   const Stats::StatName delays_injected_base_;
 };
@@ -201,14 +208,19 @@ public:
 
 private:
   bool faultOverflow();
+  void recordAbortsDryRunStats();
   void recordAbortsInjectedStats();
   void recordDelaysInjectedStats();
   void resetTimerState();
   void postDelayInjection(const Http::RequestHeaderMap& request_headers);
   void abortWithStatus(Http::Code http_status_code,
                        std::optional<Grpc::Status::GrpcStatus> grpc_status_code);
+  void onAbortDryRun(Http::Code http_status_code,
+                     std::optional<Grpc::Status::GrpcStatus> grpc_status_code);
+  void setFilterMetadata();
   bool matchesTargetUpstreamCluster();
   bool matchesDownstreamNodes(const Http::RequestHeaderMap& headers);
+  bool isAbortDryRun() const;
   bool isAbortEnabled(const Http::RequestHeaderMap& request_headers);
   bool isDelayEnabled(const Http::RequestHeaderMap& request_headers);
   bool isResponseRateLimitEnabled(const Http::RequestHeaderMap& request_headers);

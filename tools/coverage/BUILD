@@ -14,5 +14,7 @@ label_flag(
 coverage_report(
     name = "report",
     config = ":config",
+    # Merge the per-test tracefiles before grcov renders them; most of the report's time.
+    lcov_merge = "@lcov_merge//:lcov_merge",
     visibility = ["//visibility:public"],
 )
