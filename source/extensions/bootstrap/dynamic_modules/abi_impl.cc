@@ -762,14 +762,14 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle
 // -------------------- Runtime Update Callbacks --------------------
 
 bool envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
-    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key) {
   if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
     IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
     return false;
   }
-  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
-  return config->enableRuntimeUpdate(absl::string_view(key.ptr, key.length));
+  auto* extension = static_cast<DynamicModuleBootstrapExtension*>(extension_envoy_ptr);
+  return extension->enableRuntimeUpdate(absl::string_view(key.ptr, key.length));
 }
 
 // -------------------- Run On All Workers Callbacks --------------------

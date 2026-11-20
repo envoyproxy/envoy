@@ -11,13 +11,6 @@ fn my_new_bootstrap_extension_config_fn(
   _name: &str,
   _config: &[u8],
 ) -> Option<Box<dyn BootstrapExtensionConfig>> {
-  for key in [
-    "dynamic_modules_test.number",
-    "envoy.reloadable_features.test_feature_true",
-  ] {
-    let enabled = envoy_extension_config.enable_runtime_update(key);
-    envoy_log_info!("Runtime update enabled for {}: {}", key, enabled);
-  }
   envoy_extension_config.signal_init_complete();
   Some(Box::new(MyBootstrapExtensionConfig))
 }
@@ -31,12 +24,27 @@ impl BootstrapExtensionConfig for MyBootstrapExtensionConfig {
   ) -> Box<dyn BootstrapExtension> {
     Box::new(MyBootstrapExtension)
   }
+}
+
+struct MyBootstrapExtension;
+
+impl BootstrapExtension for MyBootstrapExtension {
+  fn on_server_initialized(&mut self, envoy_extension: &mut dyn EnvoyBootstrapExtension) {
+    for key in [
+      "dynamic_modules_test.number",
+      "dynamic_modules_test.ratio",
+      "envoy.reloadable_features.test_feature_true",
+    ] {
+      let enabled = envoy_extension.enable_runtime_update(key);
+      envoy_log_info!("Runtime update enabled for {}: {}", key, enabled);
+    }
+  }
 
   fn on_runtime_update(
-    &self,
-    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    &mut self,
+    _envoy_extension: &mut dyn EnvoyBootstrapExtension,
     key: &str,
-    value: Option<&str>,
+    value: Option<RuntimeValue>,
   ) {
     let Some(value) = value else {
       envoy_log_info!("Runtime update: {} removed", key);
@@ -44,19 +52,15 @@ impl BootstrapExtensionConfig for MyBootstrapExtensionConfig {
     };
     // The runtime getters already return the new value.
     let getter_agrees = match value {
-      "true" => get_runtime_bool(key, false),
-      "false" => !get_runtime_bool(key, true),
-      _ => get_runtime_number(key, f64::NAN).to_string() == value,
+      RuntimeValue::Bool(value) => get_runtime_bool(key, !value) == value,
+      RuntimeValue::Int(value) => get_runtime_int(key, value + 1) == value,
+      RuntimeValue::Number(value) => get_runtime_number(key, value + 1.0) == value,
     };
     envoy_log_info!(
-      "Runtime update: {}={}, getter agrees: {}",
+      "Runtime update: {}={:?}, getter agrees: {}",
       key,
       value,
       getter_agrees
     );
   }
 }
-
-struct MyBootstrapExtension;
-
-impl BootstrapExtension for MyBootstrapExtension {}

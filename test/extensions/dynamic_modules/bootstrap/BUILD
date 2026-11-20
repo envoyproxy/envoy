@@ -135,6 +135,7 @@ envoy_extension_cc_dyn_module_test(
         },
     },
     deps = [
+        "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/dynamic_modules:abi_impl",
         "//source/extensions/bootstrap/dynamic_modules:extension_config_lib",
@@ -149,6 +150,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:admin_stream_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/server:listener_manager_mocks",
         "//test/mocks/server:listener_update_callbacks_handle_mocks",
         "//test/mocks/tracing:tracing_mocks",

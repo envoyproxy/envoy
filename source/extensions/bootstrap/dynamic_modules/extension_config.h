@@ -3,12 +3,10 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/callback.h"
 #include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/watcher.h"
 #include "envoy/http/async_client.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
@@ -25,7 +23,6 @@
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/dynamic_modules/metric_registry.h"
 
-#include "absl/container/btree_map.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/functional/function_ref.h"
 
@@ -77,8 +74,12 @@ using OnBootstrapExtensionClusterWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done);
 using OnBootstrapExtensionListenerWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done);
-using OnBootstrapExtensionRuntimeUpdateType =
-    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_update);
+using OnBootstrapExtensionRuntimeBoolUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update);
+using OnBootstrapExtensionRuntimeIntUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_int_update);
+using OnBootstrapExtensionRuntimeNumberUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_number_update);
 
 class DynamicModuleBootstrapExtension;
 
@@ -200,16 +201,6 @@ public:
   void onListenerRemoval(const std::string& listener_name) override;
 
   /**
-   * Starts calling the module's runtime update hook when the value of the given runtime key changes
-   * in a newly loaded runtime snapshot, compared with its value at the previous update, or when
-   * this was called. Must be called on the main thread during on_bootstrap_extension_config_new.
-   * @param key the runtime key to watch.
-   * @return false if the key is empty or already watched, if the module does not implement the
-   * hook, or once on_bootstrap_extension_config_new returned.
-   */
-  bool enableRuntimeUpdate(absl::string_view key);
-
-  /**
    * Enumerates the names of the currently active resources of a single kind: the active listeners'
    * filter chains (inline, default and routable FCDS chains), the clusters, the transport socket
    * match names present in every cluster that has matches, or the active dynamic secrets. `emit`
@@ -270,6 +261,11 @@ public:
   void onExtensionDestroyed();
 
   /**
+   * Whether the server began to shut down or the extension was destroyed.
+   */
+  bool shutdownStarted() const { return shutdown_started_; }
+
+  /**
    * Returns the admin server, or nothing once the extension is destroyed.
    */
   OptRef<Server::Admin> admin();
@@ -308,7 +304,10 @@ public:
       on_bootstrap_extension_cluster_writer_update_done_ = nullptr;
   OnBootstrapExtensionListenerWriterUpdateDoneType
       on_bootstrap_extension_listener_writer_update_done_ = nullptr;
-  OnBootstrapExtensionRuntimeUpdateType on_bootstrap_extension_runtime_update_ = nullptr;
+  OnBootstrapExtensionRuntimeBoolUpdateType on_bootstrap_extension_runtime_bool_update_ = nullptr;
+  OnBootstrapExtensionRuntimeIntUpdateType on_bootstrap_extension_runtime_int_update_ = nullptr;
+  OnBootstrapExtensionRuntimeNumberUpdateType on_bootstrap_extension_runtime_number_update_ =
+      nullptr;
 
   // The name of the extension.
   const std::string extension_name_;
@@ -349,9 +348,6 @@ public:
   // Per-request label values use a stack-local Stats::StatNameDynamicPool in the increment
   // callbacks (see abi_impl.cc).
   bool stat_creation_frozen_ = false;
-  // The module can only watch runtime keys during on_bootstrap_extension_config_new, so that the
-  // runtime update hook cannot change the watched keys while Envoy iterates over them.
-  bool runtime_watch_frozen_ = false;
 
   // Temporary storage for the admin response body. Set by the
   // envoy_dynamic_module_callback_bootstrap_extension_admin_set_response callback during
@@ -427,29 +423,6 @@ private:
   // Handle for the shutdown lifecycle callback that cleans up listener_update_callbacks_handle_.
   Server::ServerLifecycleNotifier::HandlePtr listener_lifecycle_shutdown_handle_;
   bool listener_lifecycle_enabled_ = false;
-
-  // The value of a watched runtime key. The numbers are compared as well as the raw string, since
-  // the raw string of a number can be rounded and then hide a change of the number.
-  struct RuntimeValue {
-    bool operator==(const RuntimeValue& other) const;
-
-    std::string raw_;
-    std::optional<uint64_t> uint_;
-    std::optional<double> double_;
-  };
-
-  // Returns the value of the key from the topmost layer of the snapshot that sets it.
-  static std::optional<RuntimeValue> runtimeValue(const Runtime::Snapshot& snapshot,
-                                                  absl::string_view key);
-
-  // Called by the runtime on the main thread once it loaded a new snapshot.
-  void onRuntimeUpdate();
-
-  // Set when the module watches its first runtime key via enableRuntimeUpdate(). Reset once
-  // shutdown began.
-  Common::CallbackHandlePtr runtime_update_handle_;
-  // The watched runtime keys and their values at the previous update, ordered by key.
-  absl::btree_map<std::string, std::optional<RuntimeValue>> watched_runtime_values_;
 
   // Thread-local slot that carries the worker events. Allocated on the first runOnAllWorkers().
   ThreadLocal::TypedSlotPtr<> worker_slot_;

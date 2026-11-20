@@ -100,11 +100,9 @@ envoy_cc_library(
     deps = [
         ":cluster_writer_lib",
         ":listener_writer_lib",
-        "//envoy/common:callback",
         "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:async_client_interface",
-        "//envoy/runtime:runtime_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/server:listener_manager_interface",
         "//envoy/server:options_interface",
@@ -119,7 +117,6 @@ envoy_cc_library(
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/dynamic_modules:metric_registry",
-        "@abseil-cpp//absl/container:btree",
     ],
 )
 
@@ -130,12 +127,15 @@ envoy_cc_library(
     deps = [
         ":extension_config_lib",
         "//envoy/common:callback",
+        "//envoy/runtime:runtime_interface",
         "//envoy/server:bootstrap_extension_config_interface",
         "//envoy/server:lifecycle_notifier_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/types:variant",
     ],
 )
 

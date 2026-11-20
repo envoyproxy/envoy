@@ -526,7 +526,7 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_listene
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update, false,
-          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+          envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers, false,

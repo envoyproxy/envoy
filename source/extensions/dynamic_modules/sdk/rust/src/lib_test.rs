@@ -3740,7 +3740,7 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_liste
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
-  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
   _key: abi::envoy_dynamic_module_type_module_buffer,
 ) -> bool {
   false
@@ -8781,7 +8781,7 @@ fn test_bootstrap_extension_cluster_lifecycle_default_noop() {
 
 #[test]
 fn test_bootstrap_extension_runtime_update() {
-  static UPDATES: std::sync::Mutex<Vec<(String, Option<String>)>> =
+  static UPDATES: std::sync::Mutex<Vec<(String, Option<RuntimeValue>)>> =
     std::sync::Mutex::new(Vec::new());
 
   struct TestBootstrapExtensionConfig;
@@ -8792,84 +8792,63 @@ fn test_bootstrap_extension_runtime_update() {
     ) -> Box<dyn BootstrapExtension> {
       Box::new(TestBootstrapExtension)
     }
-
-    fn on_runtime_update(
-      &self,
-      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
-      key: &str,
-      value: Option<&str>,
-    ) {
-      UPDATES
-        .lock()
-        .unwrap()
-        .push((key.to_string(), value.map(str::to_string)));
-    }
   }
 
   struct TestBootstrapExtension;
-  impl BootstrapExtension for TestBootstrapExtension {}
-
-  fn new_config(
-    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
-    _name: &str,
-    _config: &[u8],
-  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
-    Some(Box::new(TestBootstrapExtensionConfig))
+  impl BootstrapExtension for TestBootstrapExtension {
+    fn on_runtime_update(
+      &mut self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+      key: &str,
+      value: Option<RuntimeValue>,
+    ) {
+      UPDATES.lock().unwrap().push((key.to_string(), value));
+    }
   }
 
-  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
-  let config_ptr = bootstrap::init_bootstrap_extension_config(
-    &mut envoy_config,
-    "test",
-    b"config",
-    &(new_config as NewBootstrapExtensionConfigFunction),
-  );
-  assert!(!config_ptr.is_null());
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+  assert!(!extension_ptr.is_null());
 
   let buffer = |s: &'static str| abi::envoy_dynamic_module_type_envoy_buffer {
     ptr: s.as_ptr() as *const _,
     length: s.len(),
   };
-  let null_buffer = abi::envoy_dynamic_module_type_envoy_buffer {
-    ptr: std::ptr::null(),
-    length: 0,
-  };
 
   UPDATES.lock().unwrap().clear();
-  envoy_dynamic_module_on_bootstrap_extension_runtime_update(
+  envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update(
     std::ptr::null_mut(),
-    config_ptr,
+    extension_ptr,
     buffer("some.flag"),
-    buffer("true"),
+    true,
     false,
   );
-  envoy_dynamic_module_on_bootstrap_extension_runtime_update(
+  envoy_dynamic_module_on_bootstrap_extension_runtime_int_update(
     std::ptr::null_mut(),
-    config_ptr,
-    buffer("some.empty"),
-    null_buffer,
+    extension_ptr,
+    buffer("some.int"),
+    42,
     false,
   );
-  envoy_dynamic_module_on_bootstrap_extension_runtime_update(
+  envoy_dynamic_module_on_bootstrap_extension_runtime_number_update(
     std::ptr::null_mut(),
-    config_ptr,
-    buffer("some.removed"),
-    null_buffer,
+    extension_ptr,
+    buffer("some.number"),
+    1.5,
     true,
   );
   assert_eq!(
     *UPDATES.lock().unwrap(),
     vec![
-      ("some.flag".to_string(), Some("true".to_string())),
-      ("some.empty".to_string(), Some(String::new())),
-      ("some.removed".to_string(), None),
+      ("some.flag".to_string(), Some(RuntimeValue::Bool(true))),
+      ("some.int".to_string(), Some(RuntimeValue::Int(42))),
+      ("some.number".to_string(), None),
     ]
   );
 
-  // Clean up.
-  unsafe {
-    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
-  }
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
 }
 
 #[test]
@@ -8887,42 +8866,31 @@ fn test_bootstrap_extension_runtime_update_default_noop() {
   struct TestBootstrapExtension;
   impl BootstrapExtension for TestBootstrapExtension {}
 
-  fn new_config(
-    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
-    _name: &str,
-    _config: &[u8],
-  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
-    Some(Box::new(TestBootstrapExtensionConfig))
-  }
-
-  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
-  let config_ptr = bootstrap::init_bootstrap_extension_config(
-    &mut envoy_config,
-    "test",
-    b"config",
-    &(new_config as NewBootstrapExtensionConfigFunction),
-  );
-  assert!(!config_ptr.is_null());
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+  assert!(!extension_ptr.is_null());
 
   let key = "some.flag";
-  envoy_dynamic_module_on_bootstrap_extension_runtime_update(
+  envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update(
     std::ptr::null_mut(),
-    config_ptr,
+    extension_ptr,
     abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: key.as_ptr() as *const _,
       length: key.len(),
     },
-    abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null(),
-      length: 0,
-    },
+    false,
     true,
   );
 
-  // Clean up.
-  unsafe {
-    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
-  }
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+}
+
+#[test]
+fn test_bootstrap_extension_enable_runtime_update() {
+  let envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  assert!(!envoy_extension.enable_runtime_update("some.flag"));
 }
 
 #[test]

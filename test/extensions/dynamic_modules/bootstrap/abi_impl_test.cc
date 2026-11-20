@@ -1,10 +1,10 @@
 #include <atomic>
-#include <cmath>
 #include <thread>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 
+#include "source/common/runtime/runtime_impl.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -17,6 +17,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin_stream.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_manager.h"
 #include "test/mocks/server/listener_update_callbacks_handle.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -86,7 +87,9 @@ protected:
     return optional_hooks_module_->getFunctionPointer<FunctionType>(name).value();
   }
 
-  // Makes the runtime report a snapshot whose layers set the given raw values, bottom to top.
+  // Makes the runtime report a snapshot whose layers set the given values, bottom to top. The
+  // values are parsed the way a static layer parses them: "true" and "false" as booleans and the
+  // rest as strings, which can also hold numbers.
   void
   setRuntimeLayers(const std::vector<absl::flat_hash_map<std::string, std::string>>& layer_values) {
     auto snapshot = std::make_shared<TestRuntimeSnapshot>();
@@ -97,39 +100,28 @@ protected:
         .WillByDefault(testing::Return(snapshot));
   }
 
-  // Like setRuntimeLayers(), with entries that can also set the numbers.
-  void setRuntimeEntries(const std::vector<Runtime::Snapshot::EntryMap>& layer_entries) {
-    auto snapshot = std::make_shared<TestRuntimeSnapshot>();
-    for (const auto& entries : layer_entries) {
-      snapshot->layers_.push_back(std::make_unique<TestRuntimeLayer>(entries));
-    }
-    ON_CALL(context_.runtime_loader_, threadsafeSnapshot())
-        .WillByDefault(testing::Return(snapshot));
-  }
-
-  static Runtime::Snapshot::Entry numberEntry(const std::string& raw, double value) {
-    Runtime::Snapshot::Entry entry;
-    entry.raw_string_value_ = raw;
-    entry.double_value_ = value;
-    return entry;
-  }
-
   // Simulates the runtime loading a new snapshot.
   void loadRuntimeSnapshot() { context_.runtime_loader_.update_callbacks_.runCallbacks(); }
 
-  static bool enableRuntimeUpdate(DynamicModuleBootstrapExtensionConfig& config,
-                                  absl::string_view key) {
-    return envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
-        config.thisAsVoidPtr(), {key.data(), key.size()});
+  // Creates the extension of the config and notifies it that the server is initialized.
+  std::unique_ptr<DynamicModuleBootstrapExtension>
+  initializeExtension(DynamicModuleBootstrapExtensionConfigSharedPtr config) {
+    auto extension = std::make_unique<DynamicModuleBootstrapExtension>(std::move(config));
+    EXPECT_TRUE(extension->initializeInModuleExtension());
+    extension->onServerInitialized(server_);
+    return extension;
   }
 
-  // Watches the key as if the module did it during on_bootstrap_extension_config_new.
-  static bool watchRuntimeKey(DynamicModuleBootstrapExtensionConfig& config,
-                              absl::string_view key) {
-    config.runtime_watch_frozen_ = false;
-    const bool watched = enableRuntimeUpdate(config, key);
-    config.runtime_watch_frozen_ = true;
-    return watched;
+  static bool enableRuntimeUpdate(DynamicModuleBootstrapExtension& extension,
+                                  absl::string_view key) {
+    return envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+        static_cast<void*>(&extension), {key.data(), key.size()});
+  }
+
+  // Returns whether Envoy accepted each key that the module watched from on_server_initialized.
+  std::string runtimeWatchResults() {
+    return optionalHooksFunction<const char* (*)()>(
+        "bootstrap_optional_hooks_test_runtime_watch_results")();
   }
 
   std::string runtimeUpdates() {
@@ -139,6 +131,7 @@ protected:
 
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  testing::NiceMock<Server::MockInstance> server_;
   Extensions::DynamicModules::DynamicModulePtr optional_hooks_module_;
 
 private:
@@ -146,10 +139,15 @@ private:
   public:
     explicit TestRuntimeLayer(const absl::flat_hash_map<std::string, std::string>& values) {
       for (const auto& [key, value] : values) {
-        values_[key].raw_string_value_ = value;
+        Protobuf::Value proto_value;
+        if (value == "true" || value == "false") {
+          proto_value.set_bool_value(value == "true");
+        } else {
+          proto_value.set_string_value(value);
+        }
+        values_[key] = Runtime::SnapshotImpl::createEntry(proto_value, "");
       }
     }
-    explicit TestRuntimeLayer(Runtime::Snapshot::EntryMap values) : values_(std::move(values)) {}
     const std::string& name() const override { return name_; }
     const Runtime::Snapshot::EntryMap& values() const override { return values_; }
 
@@ -2140,119 +2138,127 @@ TEST_F(BootstrapAbiImplTest, LifecycleRefusedOnceShutdownStartedAndInInitOnlyMod
   }
 }
 
-// Test that the module is told about every watched runtime key that was added, changed or removed,
-// in key order, and only about the changes made after it started watching the key.
+// Test that the extension is told about every watched runtime key that was added, changed or
+// removed, in key order, and only about the changes made after it started watching the key.
 TEST_F(BootstrapAbiImplTest, RuntimeUpdateReportsWatchedKeys) {
   setRuntimeLayers({{{"a", "1"}, {"b", "2"}, {"c", "3"}}, {}});
-  auto config = newOptionalHooksConfig();
-  for (absl::string_view key : {"d", "c", "b", "e"}) {
-    EXPECT_TRUE(watchRuntimeKey(*config, key));
-  }
+  auto extension = initializeExtension(newOptionalHooksConfig("watch_runtime_keys:d,c,b,e"));
+  EXPECT_EQ("+d;+c;+b;+e;", runtimeWatchResults());
   EXPECT_EQ(1, context_.runtime_loader_.update_callbacks_.size());
   EXPECT_EQ("", runtimeUpdates());
 
   // A key set by a higher layer reports the value of the highest layer. The unwatched key "a" is
-  // not reported.
+  // not reported, and a removed key reports its previous value.
   setRuntimeLayers({{{"a", "10"}, {"b", "2"}}, {{"b", "20"}, {"d", "4"}}});
   loadRuntimeSnapshot();
-  EXPECT_EQ("b=20;c!;d=4;", runtimeUpdates());
+  EXPECT_EQ("b=i:20;c!i:3;d=i:4;", runtimeUpdates());
 
   // A snapshot that changes no watched key reports nothing.
-  setRuntimeLayers({{{"a", "11"}}, {{"b", "20"}, {"d", "4"}}});
+  setRuntimeLayers({{{"a", "11"}}, {{"b", "20"}, {"d", "4.0"}}});
   loadRuntimeSnapshot();
-  EXPECT_EQ("b=20;c!;d=4;", runtimeUpdates());
+  EXPECT_EQ("b=i:20;c!i:3;d=i:4;", runtimeUpdates());
 
-  // An empty value is reported as a value, not as a removal. Removing the override of a key that a
-  // lower layer sets reports the value of the lower layer.
-  setRuntimeLayers({{{"a", "1"}, {"b", "2"}}, {{"d", "4"}, {"e", ""}}});
+  // Removing the override of a key that a lower layer sets reports the value of the lower layer.
+  setRuntimeLayers({{{"a", "1"}, {"b", "2"}}, {{"d", "4"}, {"e", "true"}}});
   loadRuntimeSnapshot();
-  EXPECT_EQ("b=20;c!;d=4;b=2;e=;", runtimeUpdates());
+  EXPECT_EQ("b=i:20;c!i:3;d=i:4;b=i:2;e=b:true;", runtimeUpdates());
 }
 
-// Test that a change of a number is reported even when its rounded raw string does not change, and
-// that a NaN that stays NaN is not reported.
-TEST_F(BootstrapAbiImplTest, RuntimeUpdateComparesNumbers) {
-  setRuntimeEntries({{{"n", numberEntry("1e+06", 1000000)}, {"nan", numberEntry("nan", NAN)}}});
-  auto config = newOptionalHooksConfig();
-  EXPECT_TRUE(watchRuntimeKey(*config, "n"));
-  EXPECT_TRUE(watchRuntimeKey(*config, "nan"));
-
-  setRuntimeEntries({{{"n", numberEntry("1e+06", 1000001)}, {"nan", numberEntry("nan", NAN)}}});
-  loadRuntimeSnapshot();
-  EXPECT_EQ("n=1e+06;", runtimeUpdates());
-
-  setRuntimeEntries({{{"n", numberEntry("1e+06", 1000001)}, {"nan", numberEntry("nan", NAN)}}});
-  loadRuntimeSnapshot();
-  EXPECT_EQ("n=1e+06;", runtimeUpdates());
-
-  // A number that appears or disappears with the same raw string is a change too.
-  setRuntimeLayers({{{"n", "1e+06"}, {"nan", "nan"}}});
-  loadRuntimeSnapshot();
-  EXPECT_EQ("n=1e+06;n=1e+06;nan=nan;", runtimeUpdates());
-}
-
-// Test that the module can watch a key during on_bootstrap_extension_config_new.
-TEST_F(BootstrapAbiImplTest, WatchRuntimeKeyDuringConfigNew) {
+// Test that a value is reported through the hook of its type, that a change of type is a change,
+// that a NaN that stays NaN is not reported, and that a value that is neither a boolean nor a
+// number counts as unset.
+TEST_F(BootstrapAbiImplTest, RuntimeUpdateReportsTypedValues) {
   setRuntimeLayers({{}});
-  auto config = newOptionalHooksConfig("watch_runtime_key");
-  EXPECT_TRUE(config->runtime_watch_frozen_);
-  EXPECT_EQ(1, context_.runtime_loader_.update_callbacks_.size());
-
-  setRuntimeLayers({{{"a", "1"}}});
-  loadRuntimeSnapshot();
-  EXPECT_EQ("a=1;", runtimeUpdates());
+  auto extension = initializeExtension(newOptionalHooksConfig("watch_runtime_keys:k"));
+  std::string expected;
+  for (const auto& [value, update] : std::vector<std::pair<std::string, std::string>>{
+           {"1.5", "k=n:1.5;"},
+           {"1000000", "k=i:1000000;"},
+           {"1000001", "k=i:1000001;"},
+           {"1000001.0", ""},
+           {"-1", "k=n:-1;"},
+           {"0", "k=i:0;"},
+           {"false", "k=b:false;"},
+           {"nan", "k=n:nan;"},
+           {"nan", ""},
+           {"text", "k!n:nan;"},
+           {"other text", ""},
+           {"true", "k=b:true;"},
+       }) {
+    setRuntimeLayers({{{"k", value}}});
+    loadRuntimeSnapshot();
+    expected += update;
+    EXPECT_EQ(expected, runtimeUpdates()) << value;
+  }
 }
 
-// Test that the module cannot watch a key once on_bootstrap_extension_config_new returned.
-TEST_F(BootstrapAbiImplTest, WatchRuntimeKeyAfterConfigNew) {
+// Test that the changes of a type are not reported when the module does not implement its hook.
+TEST_F(BootstrapAbiImplTest, RuntimeUpdateSkipsTypesWithoutAHook) {
   setRuntimeLayers({{}});
-  auto config = newOptionalHooksConfig();
+  auto config = newOptionalHooksConfig("watch_runtime_keys:k");
+  config->on_bootstrap_extension_runtime_bool_update_ = nullptr;
+  config->on_bootstrap_extension_runtime_int_update_ = nullptr;
+  auto extension = initializeExtension(config);
+  EXPECT_EQ("+k;", runtimeWatchResults());
+  for (absl::string_view value : {"true", "1", "1.5"}) {
+    setRuntimeLayers({{{"k", std::string(value)}}});
+    loadRuntimeSnapshot();
+  }
+  EXPECT_EQ("k=n:1.5;", runtimeUpdates());
+}
+
+// Test that the extension cannot watch a key outside of on_server_initialized.
+TEST_F(BootstrapAbiImplTest, WatchRuntimeKeyOutsideServerInitialized) {
+  setRuntimeLayers({{}});
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(newOptionalHooksConfig());
+  EXPECT_TRUE(extension->initializeInModuleExtension());
   EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_)).Times(0);
-  EXPECT_LOG_CONTAINS("error",
-                      "cannot enable runtime update after "
-                      "envoy_dynamic_module_on_bootstrap_extension_config_new returned",
-                      { EXPECT_FALSE(enableRuntimeUpdate(*config, "a")); });
+  const std::string error = "cannot enable runtime update outside of "
+                            "envoy_dynamic_module_on_bootstrap_extension_server_initialized";
+  EXPECT_LOG_CONTAINS("error", error, { EXPECT_FALSE(enableRuntimeUpdate(*extension, "a")); });
+  extension->onServerInitialized(server_);
+  EXPECT_LOG_CONTAINS("error", error, { EXPECT_FALSE(enableRuntimeUpdate(*extension, "a")); });
 }
 
-// Test that the module cannot watch a key from the runtime update hook.
+// Test that the extension cannot watch a key from the runtime update hook.
 TEST_F(BootstrapAbiImplTest, WatchRuntimeKeyFromTheHook) {
   setRuntimeLayers({{}});
-  auto config = newOptionalHooksConfig();
-  EXPECT_TRUE(watchRuntimeKey(*config, "watch_more"));
+  auto extension = initializeExtension(newOptionalHooksConfig("watch_runtime_keys:watch_more"));
+  EXPECT_EQ("+watch_more;", runtimeWatchResults());
 
   setRuntimeLayers({{{"more", "1"}, {"watch_more", "1"}}});
   EXPECT_LOG_CONTAINS("error",
-                      "cannot enable runtime update after "
-                      "envoy_dynamic_module_on_bootstrap_extension_config_new returned",
+                      "cannot enable runtime update outside of "
+                      "envoy_dynamic_module_on_bootstrap_extension_server_initialized",
                       { loadRuntimeSnapshot(); });
-  EXPECT_EQ("watch_more=1;", runtimeUpdates());
+  EXPECT_EQ("watch_more=i:1;", runtimeUpdates());
 
   setRuntimeLayers({{{"more", "2"}, {"watch_more", "1"}}});
   loadRuntimeSnapshot();
-  EXPECT_EQ("watch_more=1;", runtimeUpdates());
+  EXPECT_EQ("watch_more=i:1;", runtimeUpdates());
 }
 
 // Test that watching a key twice fails, and that every watched key shares a single registration.
 TEST_F(BootstrapAbiImplTest, WatchRuntimeKeyTwice) {
   setRuntimeLayers({{}});
-  auto config = newOptionalHooksConfig();
   EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_));
-  EXPECT_TRUE(watchRuntimeKey(*config, "a"));
-  EXPECT_FALSE(watchRuntimeKey(*config, "a"));
-  EXPECT_TRUE(watchRuntimeKey(*config, "b"));
+  auto extension = initializeExtension(newOptionalHooksConfig("watch_runtime_keys:a,a,b"));
+  EXPECT_EQ("+a;-a;+b;", runtimeWatchResults());
   EXPECT_EQ(1, context_.runtime_loader_.update_callbacks_.size());
 }
 
 // Test that an empty key cannot be watched.
 TEST_F(BootstrapAbiImplTest, WatchEmptyRuntimeKey) {
   setRuntimeLayers({{}});
-  auto config = newOptionalHooksConfig();
   EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_)).Times(0);
-  EXPECT_LOG_CONTAINS("error", "cannot enable runtime update for an empty key",
-                      { EXPECT_FALSE(watchRuntimeKey(*config, "")); });
+  std::unique_ptr<DynamicModuleBootstrapExtension> extension;
+  EXPECT_LOG_CONTAINS("error", "cannot enable runtime update for an empty key", {
+    extension = initializeExtension(newOptionalHooksConfig("watch_runtime_keys:"));
+  });
+  EXPECT_EQ("-;", runtimeWatchResults());
 }
 
-// Test that enabling runtime updates fails when the module does not implement the hook.
+// Test that enabling runtime updates fails when the module implements none of the hooks.
 TEST_F(BootstrapAbiImplTest, EnableRuntimeUpdateWithoutHook) {
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
@@ -2261,32 +2267,45 @@ TEST_F(BootstrapAbiImplTest, EnableRuntimeUpdateWithoutHook) {
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
   ASSERT_OK(config);
+  auto extension = initializeExtension(config.value());
   EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_)).Times(0);
   EXPECT_LOG_CONTAINS("error",
-                      "cannot enable runtime update since the module does not implement "
-                      "envoy_dynamic_module_on_bootstrap_extension_runtime_update",
-                      { EXPECT_FALSE(watchRuntimeKey(*config.value(), "a")); });
+                      "cannot enable runtime update since the module implements none of the "
+                      "envoy_dynamic_module_on_bootstrap_extension_runtime_*_update hooks",
+                      { EXPECT_FALSE(enableRuntimeUpdate(*extension, "a")); });
+}
+
+// Test that the extension cannot watch a key when the server shut down before it initialized its
+// extensions.
+TEST_F(BootstrapAbiImplTest, WatchRuntimeKeyOnceShutdownStarted) {
+  setRuntimeLayers({{}});
+  ON_CALL(server_, isShutdown()).WillByDefault(testing::Return(true));
+  EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_)).Times(0);
+  std::unique_ptr<DynamicModuleBootstrapExtension> extension;
+  EXPECT_LOG_CONTAINS("error", "cannot enable runtime update once shutdown started", {
+    extension = initializeExtension(newOptionalHooksConfig("watch_runtime_keys:a"));
+  });
+  EXPECT_EQ("-a;", runtimeWatchResults());
 }
 
 // Test that runtime updates stop once shutdown started.
 TEST_F(BootstrapAbiImplTest, RuntimeUpdateStopsOnceShutdownStarted) {
   setRuntimeLayers({{{"a", "1"}}});
-  auto config = newOptionalHooksConfig();
-  EXPECT_TRUE(watchRuntimeKey(*config, "a"));
+  auto config = newOptionalHooksConfig("watch_runtime_keys:a");
+  auto extension = initializeExtension(config);
+  EXPECT_EQ("+a;", runtimeWatchResults());
   config->onShutdown();
-  EXPECT_EQ(0, context_.runtime_loader_.update_callbacks_.size());
   setRuntimeLayers({{{"a", "2"}}});
   loadRuntimeSnapshot();
   EXPECT_EQ("", runtimeUpdates());
 }
 
-// Test that destroying the config removes its runtime update registration.
-TEST_F(BootstrapAbiImplTest, RuntimeUpdateRemovedWithTheConfig) {
+// Test that destroying the extension removes its runtime update registration.
+TEST_F(BootstrapAbiImplTest, RuntimeUpdateRemovedWithTheExtension) {
   setRuntimeLayers({{}});
-  auto config = newOptionalHooksConfig();
-  EXPECT_TRUE(watchRuntimeKey(*config, "a"));
+  auto extension = initializeExtension(newOptionalHooksConfig("watch_runtime_keys:a"));
   EXPECT_EQ(1, context_.runtime_loader_.update_callbacks_.size());
-  config.reset();
+  extension.reset();
   EXPECT_EQ(0, context_.runtime_loader_.update_callbacks_.size());
 }
 
@@ -2874,7 +2893,6 @@ TEST_F(BootstrapAbiImplTest, ServerCallbacksRefusedOnceTheExtensionIsDestroyed) 
   EXPECT_CALL(context_, clusterManager()).Times(0);
   EXPECT_CALL(context_, admin()).Times(0);
   EXPECT_CALL(context_, options()).Times(0);
-  EXPECT_CALL(context_, runtime()).Times(0);
   void* config_ptr = config->thisAsVoidPtr();
   std::vector<envoy_dynamic_module_type_module_http_header> headers = {
       {":method", 7, "GET", 3}, {":path", 5, "/", 1}, {"host", 4, "example.com", 11}};
@@ -2894,8 +2912,6 @@ TEST_F(BootstrapAbiImplTest, ServerCallbacksRefusedOnceTheExtensionIsDestroyed) 
       envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(config_ptr));
   EXPECT_FALSE(
       envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(config_ptr));
-  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(config_ptr,
-                                                                                       {"a", 1}));
 }
 
 // Test that the cluster writer callbacks are refused until the module enables the cluster writer.
