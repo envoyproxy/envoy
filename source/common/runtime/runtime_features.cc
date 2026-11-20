@@ -227,6 +227,10 @@ RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
 // they read is empty, instead of passing that prefix as a string and relying on every filter to
 // prepend it to its stat names itself.
 RUNTIME_GUARD(envoy_reloadable_features_use_stats_prefix_scope_for_http_filter);
+// When enabled, PreviousPrioritiesRetryPriorityFactory validates its config once at config-load
+// time instead of downcasting and validating on every request on the data path. Disable to restore
+// the legacy deferred validation behavior.
+RUNTIME_GUARD(envoy_reloadable_features_validate_retry_priority_config_at_load);
 // When an on-demand VHDS request asks for an alias the server has already answered (including
 // with an empty resource meaning the virtual host doesn't exist), answer it from the published
 // route configuration instead of sending another VHDS request and waiting for the response.

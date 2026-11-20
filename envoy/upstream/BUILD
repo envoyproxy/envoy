@@ -135,6 +135,7 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:types_interface",
         "//envoy/upstream:upstream_interface",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 

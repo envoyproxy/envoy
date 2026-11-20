@@ -5,6 +5,7 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/router/retry.h"
+#include "envoy/upstream/retry.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
@@ -12,6 +13,7 @@
 
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/upstream/retry_priority.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
@@ -153,6 +155,95 @@ TEST_F(RetryPolicyFactoryTest, CustomRetryPolicyFactoryRegistration) {
   ASSERT_TRUE(policy_or_error.ok()) << policy_or_error.status();
   ASSERT_NE(*policy_or_error, nullptr);
   EXPECT_EQ(7u, (*policy_or_error)->numRetries());
+}
+
+class TestValidatingRetryPriorityFactory : public Upstream::RetryPriorityFactory {
+public:
+  explicit TestValidatingRetryPriorityFactory(bool should_fail) : should_fail_(should_fail) {}
+
+  absl::StatusOr<Upstream::RetryPriorityFactoryCb>
+  createRetryPriorityFactory(const Protobuf::Message&,
+                             ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    ++factory_calls_;
+    // Exercise the validation visitor during config load to verify it is valid at load time.
+    EXPECT_FALSE(validation_visitor.skipValidation());
+    if (should_fail_) {
+      return absl::InvalidArgumentError("invalid test retry priority config");
+    }
+    return [this](uint32_t retry_count) -> Upstream::RetryPrioritySharedPtr {
+      last_retry_count_ = retry_count;
+      return std::make_shared<NiceMock<Upstream::MockRetryPriority>>(Upstream::HealthyLoad({100u}),
+                                                                     Upstream::DegradedLoad({0u}));
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  std::string name() const override { return "envoy.retry_priorities.test_validating"; }
+
+  uint32_t factoryCalls() const { return factory_calls_; }
+  uint32_t lastRetryCount() const { return last_retry_count_; }
+
+private:
+  const bool should_fail_;
+  uint32_t factory_calls_{0};
+  uint32_t last_retry_count_{0};
+};
+
+// Regression test: errors returned by RetryPriorityFactory::createRetryPriorityFactory must be
+// propagated from RetryPolicyImpl::create at config load time.
+TEST_F(RetryPolicyFactoryTest, PropagatesRetryPriorityFactoryErrorAtLoad) {
+  TestValidatingRetryPriorityFactory priority_factory(/*should_fail=*/true);
+  Registry::InjectFactory<Upstream::RetryPriorityFactory> registered(priority_factory);
+
+  envoy::config::route::v3::RetryPolicy retry_policy_proto;
+  retry_policy_proto.set_retry_on("5xx");
+  auto* retry_priority = retry_policy_proto.mutable_retry_priority();
+  retry_priority->set_name(priority_factory.name());
+  ASSERT_TRUE(retry_priority->mutable_typed_config()->PackFrom(Protobuf::Struct()));
+
+  absl::StatusOr<std::shared_ptr<RetryPolicyImpl>> policy_or_error = RetryPolicyImpl::create(
+      retry_policy_proto, ProtobufMessage::getStrictValidationVisitor(), factory_context_);
+  EXPECT_THAT(policy_or_error, StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(policy_or_error, HasStatusMessage(HasSubstr("invalid test retry priority config")));
+  EXPECT_EQ(1u, priority_factory.factoryCalls());
+}
+
+// Regression test: RetryPolicyImpl invokes createRetryPriorityFactory once at config load time
+// and creates per-request instances on the data path without retaining the ValidationVisitor.
+TEST_F(RetryPolicyFactoryTest, RetryPriorityFactoryCalledOnceAtLoadNotOnDataPath) {
+  TestValidatingRetryPriorityFactory priority_factory(/*should_fail=*/false);
+  Registry::InjectFactory<Upstream::RetryPriorityFactory> registered(priority_factory);
+
+  envoy::config::route::v3::RetryPolicy retry_policy_proto;
+  retry_policy_proto.set_retry_on("5xx");
+  retry_policy_proto.mutable_num_retries()->set_value(4);
+  auto* retry_priority = retry_policy_proto.mutable_retry_priority();
+  retry_priority->set_name(priority_factory.name());
+  ASSERT_TRUE(retry_priority->mutable_typed_config()->PackFrom(Protobuf::Struct()));
+
+  std::shared_ptr<RetryPolicyImpl> policy;
+  {
+    // Use a short-lived ValidationVisitor that is destroyed before data-path calls.
+    ProtobufMessage::StrictValidationVisitorImpl scoped_visitor;
+    auto policy_or_error =
+        RetryPolicyImpl::create(retry_policy_proto, scoped_visitor, factory_context_);
+    ASSERT_TRUE(policy_or_error.ok()) << policy_or_error.status();
+    policy = std::move(*policy_or_error);
+  }
+  EXPECT_EQ(1u, priority_factory.factoryCalls());
+
+  // Calling retryPriority() after scoped_visitor is out of scope must not re-invoke
+  // createRetryPriorityFactory and must return distinct per-request instances.
+  const auto priority1 = policy->retryPriority();
+  const auto priority2 = policy->retryPriority();
+  ASSERT_NE(priority1, nullptr);
+  ASSERT_NE(priority2, nullptr);
+  EXPECT_NE(priority1, priority2);
+  EXPECT_EQ(1u, priority_factory.factoryCalls());
+  EXPECT_EQ(4u, priority_factory.lastRetryCount());
 }
 
 } // namespace
