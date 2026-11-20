@@ -8,6 +8,7 @@
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.validate.h"
 #include "envoy/config/subscription.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -2386,6 +2387,127 @@ key:
             "foo_routes");
   EXPECT_EQ(1UL, active_scopes_.value());
   EXPECT_EQ(1UL, on_demand_scopes_.value());
+}
+
+// A scope updated (same name, different bytes) while a request is paused on it
+// must not strand the request: the pending callback moves to the replacing
+// helper and runs when its route table arrives.
+TEST_F(ScopedRdsTest, OnDemandCallbackSurvivesScopeUpdate) {
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+  const std::string lazy_resource = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+on_demand: true
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  srdsUpdateWithYaml({lazy_resource}, "1");
+  EXPECT_EQ(1UL, on_demand_scopes_.value());
+
+  // A request pauses on the scope; the RDS subscription for foo_routes starts.
+  bool resumed = false;
+  ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
+      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
+  getScopedRdsProvider()->onDemandRdsUpdate(
+      std::move(scope_key), event_dispatcher_,
+      [&resumed](bool scope_exist) { resumed = scope_exist; });
+  EXPECT_FALSE(resumed);
+
+  // The scope is updated before the route table arrives (here: a metadata-free
+  // byte change via a second key fragment). This replaces the scope's RDS
+  // provider helper.
+  const std::string updated_lazy_resource = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+on_demand: true
+key:
+  fragments:
+    - string_key: x-foo-key
+    - string_key: x-foo-key-2
+)EOF";
+  srdsUpdateWithYaml({updated_lazy_resource}, "2");
+  EXPECT_EQ(1UL, all_scopes_.value());
+  EXPECT_EQ(1UL, on_demand_scopes_.value());
+  EXPECT_FALSE(resumed);
+
+  // The route table arrives: the paused request resumes.
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce([](Event::PostCb cb) { cb(); });
+  pushRdsConfig({"foo_routes"}, "111");
+  EXPECT_TRUE(resumed);
+}
+
+// A scope updated to eager (on_demand: false) while a request is paused on it
+// resumes the request as soon as the eager scope's route table arrives.
+TEST_F(ScopedRdsTest, OnDemandCallbackSurvivesUpdateToEagerScope) {
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+  const std::string lazy_resource = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+on_demand: true
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  srdsUpdateWithYaml({lazy_resource}, "1");
+
+  bool resumed = false;
+  ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
+      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
+  getScopedRdsProvider()->onDemandRdsUpdate(
+      std::move(scope_key), event_dispatcher_,
+      [&resumed](bool scope_exist) { resumed = scope_exist; });
+
+  const std::string eager_resource = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  srdsUpdateWithYaml({eager_resource}, "2");
+  EXPECT_EQ(0UL, on_demand_scopes_.value());
+  EXPECT_FALSE(resumed);
+
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce([](Event::PostCb cb) { cb(); });
+  pushRdsConfig({"foo_routes"}, "111");
+  EXPECT_TRUE(resumed);
+}
+
+// A scope removed while a request is paused on it resumes the request, which
+// then finds no scope.
+TEST_F(ScopedRdsTest, OnDemandCallbackRunsOnScopeRemoval) {
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+  const std::string lazy_resource = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+on_demand: true
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  srdsUpdateWithYaml({lazy_resource}, "1");
+
+  bool resumed = false;
+  ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
+      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
+  getScopedRdsProvider()->onDemandRdsUpdate(
+      std::move(scope_key), event_dispatcher_,
+      [&resumed](bool scope_exist) { resumed = scope_exist; });
+  EXPECT_FALSE(resumed);
+
+  // Removing the scope destroys its helper, which resumes the request instead
+  // of dropping it.
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce([](Event::PostCb cb) { cb(); });
+  EXPECT_OK(srds_subscription_->onConfigUpdate({}, "2"));
+  EXPECT_EQ(0UL, all_scopes_.value());
+  EXPECT_TRUE(resumed);
 }
 
 TEST_F(ScopedRdsTest, DanglingSubscriptionOnDemandUpdate) {
