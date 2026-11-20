@@ -3,11 +3,13 @@
 
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/quic/load_balancer/load_balancer_config.h"
 #include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
@@ -54,20 +56,20 @@ encryptionParamaters(uint8_t version_int = 0, std::string key_str = "0123456789a
 // correct functionality of the BPF program.
 class KernelBpfTester {
 public:
-  KernelBpfTester(uint32_t concurrency, EnvoyQuicConnectionIdGeneratorFactory& factory) {
-    auto bpf_socket_option = factory.createCompatibleLinuxBpfSocketOption(concurrency);
-    if (bpf_socket_option == nullptr) {
-      ENVOY_LOG_MISC(error, "Cannot test BPF filter on this OS/kernel");
-      non_default_host_ = (concurrency / 2);
-      return;
-    }
+  static absl::StatusOr<KernelBpfTester> create(uint32_t concurrency,
+                                                EnvoyQuicConnectionIdGeneratorFactory& factory) {
+    auto opt_or_error = factory.createCompatibleLinuxBpfSocketOption(concurrency);
+    RETURN_IF_NOT_OK_REF(opt_or_error.status());
+    return KernelBpfTester(concurrency, std::move(opt_or_error.value()));
+  }
 
+  KernelBpfTester(uint32_t concurrency, Network::Socket::OptionConstSharedPtr option) {
     sockets_.resize(1);
 
     // Create the first socket on an unused address.
     std::tie(address_, sockets_[0]) = Network::Test::bindFreeLoopbackPort(
         Network::Address::IpVersion::v4, Network::Socket::Type::Datagram, true);
-    sockets_[0]->addOption(bpf_socket_option);
+    sockets_[0]->addOption(option);
     Network::Socket::applyOptions(sockets_[0]->options(), *sockets_[0],
                                   envoy::config::core::v3::SocketOption::STATE_BOUND);
 
@@ -127,9 +129,6 @@ public:
 
     return recipient;
   }
-
-  // True if a BPF filter was available on this platform; false if not.
-  bool initialized() const { return !sockets_.empty(); }
 
   // The host that the client is directed to if there isn't a valid QUIC header.
   uint32_t defaultHost() const {
@@ -363,25 +362,33 @@ TEST(QuicLbTest, WorkerSelector) {
       encryptionParamaters(0));
   absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
       Factory::create(cfg, factory_context);
+  ASSERT_OK(factory_or_status.status());
   constexpr uint32_t concurrency = 8;
   QuicConnectionIdWorkerSelector selector =
       factory_or_status.value()->getCompatibleConnectionIdWorkerSelector(concurrency);
 
-  KernelBpfTester bpf_tester(concurrency, *(factory_or_status.value()));
+  auto bpf_tester = KernelBpfTester::create(concurrency, *factory_or_status.value());
+  if (absl::IsUnimplemented(bpf_tester.status())) {
+    ENVOY_LOG_MISC(error, "Cannot test BPF filter on this OS/kernel");
+  } else {
+    ASSERT_OK(bpf_tester);
+  }
+  const uint32_t default_host = bpf_tester.ok() ? bpf_tester->defaultHost() : UINT32_MAX / 2;
+  const uint32_t non_default_host =
+      bpf_tester.ok() ? bpf_tester->nonDefaultHost() : (default_host + 1) % concurrency;
 
   Buffer::OwnedImpl buffer;
 
   // Define a macro so that failure line numbers are useful.
 #define BPF_EXPECT_EQ(a, b)                                                                        \
-  if (bpf_tester.initialized()) {                                                                  \
+  if (bpf_tester.ok()) {                                                                           \
     EXPECT_EQ(a, b);                                                                               \
   }
 
   // Packet too short.
   buffer.add(std::string(8, 0));
-  const uint32_t default_value = bpf_tester.defaultHost();
-  EXPECT_EQ(default_value, selector(buffer, default_value));
-  BPF_EXPECT_EQ(default_value, bpf_tester.sendAndGetRecipient(buffer));
+  EXPECT_EQ(default_host, selector(buffer, default_host));
+  BPF_EXPECT_EQ(default_host, bpf_tester->sendAndGetRecipient(buffer));
 
   // Long header too short.
   buffer = Buffer::OwnedImpl();
@@ -389,13 +396,13 @@ TEST(QuicLbTest, WorkerSelector) {
   uint8_t* buf = reinterpret_cast<uint8_t*>(buffer.linearize(buffer.length()));
   buf[0] = 0x80; // Long header
   buf[5] = 20;   // `DCID` length
-  EXPECT_EQ(default_value, selector(buffer, default_value));
-  BPF_EXPECT_EQ(default_value, bpf_tester.sendAndGetRecipient(buffer));
+  EXPECT_EQ(default_host, selector(buffer, default_host));
+  BPF_EXPECT_EQ(default_host, bpf_tester->sendAndGetRecipient(buffer));
 
   // Long header: packet shorter than encoded CID length.
   buffer.add(std::string(5, 0));
-  EXPECT_EQ(default_value, selector(buffer, default_value));
-  BPF_EXPECT_EQ(default_value, bpf_tester.sendAndGetRecipient(buffer));
+  EXPECT_EQ(default_host, selector(buffer, default_host));
+  BPF_EXPECT_EQ(default_host, bpf_tester->sendAndGetRecipient(buffer));
 
   // Long header: success.
   buffer = Buffer::OwnedImpl();
@@ -403,9 +410,9 @@ TEST(QuicLbTest, WorkerSelector) {
   buf = reinterpret_cast<uint8_t*>(buffer.linearize(buffer.length()));
   buf[0] = 0x80; // Long header
   buf[5] = 8;    // `DCID` length
-  buf[5 + 8] = (4 * concurrency) + bpf_tester.nonDefaultHost();
-  EXPECT_EQ(bpf_tester.nonDefaultHost(), selector(buffer, default_value));
-  BPF_EXPECT_EQ(bpf_tester.nonDefaultHost(), bpf_tester.sendAndGetRecipient(buffer));
+  buf[5 + 8] = (4 * concurrency) + non_default_host;
+  EXPECT_EQ(non_default_host, selector(buffer, default_host));
+  BPF_EXPECT_EQ(non_default_host, bpf_tester->sendAndGetRecipient(buffer));
 
   // Short header: too short.
   buffer = Buffer::OwnedImpl();
@@ -413,8 +420,8 @@ TEST(QuicLbTest, WorkerSelector) {
   buf = reinterpret_cast<uint8_t*>(buffer.linearize(buffer.length()));
   buf[0] = 0x00; // Short header
   buf[1] = 12;   // Encoded length.
-  EXPECT_EQ(default_value, selector(buffer, default_value));
-  BPF_EXPECT_EQ(default_value, bpf_tester.sendAndGetRecipient(buffer));
+  EXPECT_EQ(default_host, selector(buffer, default_host));
+  BPF_EXPECT_EQ(default_host, bpf_tester->sendAndGetRecipient(buffer));
 
   // Short header: invalid concurrency.
   buffer = Buffer::OwnedImpl();
@@ -423,18 +430,166 @@ TEST(QuicLbTest, WorkerSelector) {
   buf[0] = 0x00;                // Short header
   buf[1] = 8;                   // Encoded length.
   buf[1 + 8 + 1] = concurrency; // Worker ID suffix.
-  EXPECT_EQ(default_value, selector(buffer, default_value));
-  BPF_EXPECT_EQ(default_value, bpf_tester.sendAndGetRecipient(buffer));
+  EXPECT_EQ(default_host, selector(buffer, default_host));
+  BPF_EXPECT_EQ(default_host, bpf_tester->sendAndGetRecipient(buffer));
 
   // Short header: valid.
   buffer = Buffer::OwnedImpl();
   buffer.add(std::string(12, 0));
   buf = reinterpret_cast<uint8_t*>(buffer.linearize(buffer.length()));
-  buf[0] = 0x00;                                // Short header
-  buf[1] = 8;                                   // Encoded length.
-  buf[1 + 8 + 1] = bpf_tester.nonDefaultHost(); // Worker ID suffix.
-  EXPECT_EQ(bpf_tester.nonDefaultHost(), selector(buffer, default_value));
-  BPF_EXPECT_EQ(bpf_tester.nonDefaultHost(), bpf_tester.sendAndGetRecipient(buffer));
+  buf[0] = 0x00;                     // Short header
+  buf[1] = 8;                        // Encoded length.
+  buf[1 + 8 + 1] = non_default_host; // Worker ID suffix.
+  EXPECT_EQ(non_default_host, selector(buffer, default_host));
+  BPF_EXPECT_EQ(non_default_host, bpf_tester->sendAndGetRecipient(buffer));
+}
+
+class QuicLbSecretUpdateTest : public testing::TestWithParam<bool> {
+public:
+  void initialize(bool has_secret) {
+    has_secret_ = has_secret;
+    secret_ = encryptionParamaters().generic_secret();
+    auto manager = std::make_unique<testing::StrictMock<Secret::MockSecretManager>>();
+    auto& manager_ref = *manager;
+    factory_context_.server_factory_context_.secret_manager_ = std::move(manager);
+    EXPECT_CALL(manager_ref, findOrCreateGenericSecretProvider(_, _, _, _, _))
+        .WillOnce(testing::Return(secret_provider_));
+    EXPECT_CALL(*secret_provider_, addValidationCallback(_))
+        .WillOnce([this](std::function<absl::Status(const SecretType&)> callback) {
+          validation_callback_ = std::move(callback);
+          return nullptr;
+        });
+    EXPECT_CALL(*secret_provider_, addUpdateCallback(_))
+        .WillOnce([this](std::function<absl::Status()> callback) {
+          update_callback_ = std::move(callback);
+          return nullptr;
+        });
+    EXPECT_CALL(*secret_provider_, secret()).WillRepeatedly([this]() -> SecretType* {
+      return has_secret_ ? &secret_ : nullptr;
+    });
+
+    envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config config;
+    config.mutable_server_id()->set_inline_string("server");
+    config.set_nonce_length_bytes(10);
+    config.set_unencrypted_mode(GetParam());
+    config.mutable_encryption_parameters()->set_name(kSecretName);
+    config.mutable_encryption_parameters()->mutable_sds_config();
+    auto result = Factory::create(config, factory_context_);
+    ASSERT_OK(result.status());
+    factory_ = std::move(result.value());
+  }
+
+  absl::Status applySecret(uint8_t version, const std::string& key = "0123456789abcdef") {
+    auto candidate = encryptionParamaters(version, key);
+    RETURN_IF_NOT_OK(validation_callback_(candidate.generic_secret()));
+    secret_ = candidate.generic_secret();
+    has_secret_ = true;
+    return update_callback_();
+  }
+
+  quic::QuicConnectionId nextConnectionId() {
+    auto generator = createTypedIdGenerator(*factory_);
+    auto connection_id = generator->GenerateNextConnectionId(quic::QuicConnectionId{});
+    EXPECT_TRUE(connection_id.has_value());
+    return connection_id.value_or(quic::QuicConnectionId{});
+  }
+
+  // The server ID and nonce in an encrypted `connection_id`, decrypted with `version` and `key`.
+  static std::string decrypt(const quic::QuicConnectionId& connection_id, uint8_t version,
+                             absl::string_view key) {
+    auto config = quic::LoadBalancerConfig::Create(version, 6, 10, key);
+    EXPECT_TRUE(config.has_value());
+    uint8_t plaintext[quic::kLoadBalancerBlockSize];
+    EXPECT_TRUE(config->BlockDecrypt(reinterpret_cast<const uint8_t*>(connection_id.data() + 1),
+                                     plaintext));
+    return {reinterpret_cast<const char*>(plaintext), sizeof(plaintext)};
+  }
+
+  // The nonce in a decrypted connection ID, as the QUICHE encoder writes it: the low 8
+  // bytes, then the rest, in host byte order.
+  static absl::uint128 nonce(absl::string_view plaintext) {
+    uint64_t low = 0;
+    uint16_t high = 0;
+    memcpy(&low, plaintext.data() + 6, sizeof(low));
+    memcpy(&high, plaintext.data() + 6 + sizeof(low), sizeof(high));
+    return absl::MakeUint128(high, low);
+  }
+
+  void expectConnectionId(uint8_t version, absl::string_view key = "0123456789abcdef") {
+    const auto connection_id = nextConnectionId();
+    EXPECT_EQ(static_cast<uint8_t>(connection_id.data()[0]) >> quic::kConnectionIdLengthBits,
+              version);
+    ASSERT_EQ(connection_id.length(), 18);
+    if (GetParam()) {
+      EXPECT_EQ(absl::string_view(connection_id.data() + 1, 6), "server");
+    } else {
+      EXPECT_EQ(decrypt(connection_id, version, key).substr(0, 6), "server");
+    }
+  }
+
+  using SecretType = envoy::extensions::transport_sockets::tls::v3::GenericSecret;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  std::shared_ptr<testing::StrictMock<Secret::MockGenericSecretConfigProvider>> secret_provider_ =
+      std::make_shared<testing::StrictMock<Secret::MockGenericSecretConfigProvider>>();
+  SecretType secret_;
+  bool has_secret_{false};
+  std::function<absl::Status(const SecretType&)> validation_callback_;
+  std::function<absl::Status()> update_callback_;
+  std::unique_ptr<Factory> factory_;
+};
+
+INSTANTIATE_TEST_SUITE_P(EncryptionModes, QuicLbSecretUpdateTest, testing::Bool());
+
+TEST_P(QuicLbSecretUpdateTest, IdenticalUpdateIsANoop) {
+  initialize(true);
+  expectConnectionId(0);
+  EXPECT_LOG_NOT_CONTAINS("warn", "'encryption_key' changed", EXPECT_OK(applySecret(0)));
+  expectConnectionId(0);
+  if (GetParam()) {
+    return; // Unencrypted mode hides the nonce behind a hash.
+  }
+  // The encoder was not touched: a new config would have started from a new random nonce.
+  const auto before = nonce(decrypt(nextConnectionId(), 0, "0123456789abcdef"));
+  EXPECT_OK(applySecret(0));
+  const auto after = nonce(decrypt(nextConnectionId(), 0, "0123456789abcdef"));
+  EXPECT_EQ(after, before + 1);
+}
+
+TEST_P(QuicLbSecretUpdateTest, SameVersionWithDifferentKeyIsApplied) {
+  initialize(true);
+  const auto candidate = encryptionParamaters(0, "fedcba9876543210");
+  EXPECT_OK(validation_callback_(candidate.generic_secret()));
+  if (GetParam()) {
+    // The key is not used in unencrypted mode, so nothing changes.
+    EXPECT_LOG_NOT_CONTAINS("warn", "'encryption_key' changed",
+                            EXPECT_OK(applySecret(0, "fedcba9876543210")));
+    expectConnectionId(0);
+    return;
+  }
+  EXPECT_LOG_CONTAINS("warn", "'encryption_key' changed without changing 'configuration_version' 0",
+                      EXPECT_OK(applySecret(0, "fedcba9876543210")));
+  expectConnectionId(0, "fedcba9876543210");
+  EXPECT_NE(decrypt(nextConnectionId(), 0, "0123456789abcdef").substr(0, 6), "server");
+
+  // Applied again, the same key and version are a no-op.
+  EXPECT_LOG_NOT_CONTAINS("warn", "'encryption_key' changed",
+                          EXPECT_OK(applySecret(0, "fedcba9876543210")));
+  expectConnectionId(0, "fedcba9876543210");
+
+  // Rotating to another version, and back to a previous one, still works.
+  EXPECT_OK(applySecret(1, "fedcba9876543210"));
+  expectConnectionId(1, "fedcba9876543210");
+  EXPECT_OK(applySecret(0, "0123456789abcdef"));
+  expectConnectionId(0, "0123456789abcdef");
+}
+
+TEST_P(QuicLbSecretUpdateTest, DeferredSecretInitialization) {
+  initialize(false);
+  EXPECT_EQ(applySecret(0, "bad").code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_OK(applySecret(0));
+  expectConnectionId(0);
+  EXPECT_OK(applySecret(0, "fedcba9876543210"));
+  expectConnectionId(0, "fedcba9876543210");
 }
 
 TEST(QuicLbTest, EmptySecretCallback) {
@@ -457,10 +612,10 @@ TEST(QuicLbTest, EmptySecretCallback) {
   EXPECT_CALL(*secret_provider, addValidationCallback(_));
   std::function<absl::Status()> update_callback;
   EXPECT_CALL(*secret_provider, addUpdateCallback(_))
-      .WillOnce(testing::Invoke([&](std::function<absl::Status()> cb) {
+      .WillOnce([&](std::function<absl::Status()> cb) {
         update_callback = cb;
         return nullptr;
-      }));
+      });
   EXPECT_CALL(*secret_provider, secret()).WillRepeatedly(testing::Return(nullptr));
 
   absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =

@@ -1389,7 +1389,7 @@ TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, ScalarHistogramDefineAndReco
   EXPECT_TRUE(config->metrics().getHistogramById(histogram_id).has_value());
 }
 
-TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, MetricIdsAreSequentialAndIndependent) {
+TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, MetricIdsAreSequentialAcrossTypes) {
   auto config = makeConfig();
   unfreezeStatCreation(*config);
   auto* config_ptr = static_cast<void*>(config.get());
@@ -1424,8 +1424,8 @@ TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, MetricIdsAreSequentialAndInd
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(
                 config_ptr, metricBuffer("second_gauge"), nullptr, 0, &second_gauge_id));
-  EXPECT_EQ(1, first_gauge_id);
-  EXPECT_EQ(2, second_gauge_id);
+  EXPECT_EQ(3, first_gauge_id);
+  EXPECT_EQ(4, second_gauge_id);
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(
                 config_ptr, second_gauge_id, nullptr, 0, 9));
@@ -1444,8 +1444,8 @@ TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, MetricIdsAreSequentialAndInd
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
                 config_ptr, metricBuffer("second_histogram"), nullptr, 0, &second_histogram_id));
-  EXPECT_EQ(1, first_histogram_id);
-  EXPECT_EQ(2, second_histogram_id);
+  EXPECT_EQ(5, first_histogram_id);
+  EXPECT_EQ(6, second_histogram_id);
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
                 config_ptr, second_histogram_id, nullptr, 0, 11));
@@ -1484,7 +1484,7 @@ TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, LabeledMetricsDefineAndOpera
             envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(
                 config_ptr, metricBuffer("labeled_gauge"), label_names.data(), label_names.size(),
                 &gauge_id));
-  EXPECT_EQ(1, gauge_id);
+  EXPECT_EQ(2, gauge_id);
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(
                 config_ptr, gauge_id, label_values.data(), label_values.size(), 10));
@@ -1506,7 +1506,7 @@ TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, LabeledMetricsDefineAndOpera
             envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
                 config_ptr, metricBuffer("labeled_histogram"), label_names.data(),
                 label_names.size(), &histogram_id));
-  EXPECT_EQ(1, histogram_id);
+  EXPECT_EQ(3, histogram_id);
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
                 config_ptr, histogram_id, label_values.data(), label_values.size(), 42));

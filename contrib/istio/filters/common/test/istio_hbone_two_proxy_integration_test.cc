@@ -67,9 +67,13 @@ protected:
     ConfigHelper::setProtocolOptions(cluster, options);
   }
 
+  // `app_qualified` / `version_qualified` set app.kubernetes.io/name and
+  // app.kubernetes.io/version when non-empty.
   static void setNode(ConfigHelper& helper, const std::string& workload, const std::string& ns,
                       const std::string& cluster, const std::string& canonical,
-                      const std::string& app) {
+                      const std::string& app, const std::string& version = "v1",
+                      const std::string& app_qualified = "",
+                      const std::string& version_qualified = "") {
     helper.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto& node = *bootstrap.mutable_node();
       node.set_id(absl::StrCat(workload, "-id"));
@@ -83,7 +87,14 @@ protected:
       labels[std::string(Istio::Common::CanonicalNameLabel)].set_string_value(canonical);
       labels[std::string(Istio::Common::CanonicalRevisionLabel)].set_string_value("v1");
       labels[std::string(Istio::Common::AppNameLabel)].set_string_value(app);
-      labels[std::string(Istio::Common::AppVersionLabel)].set_string_value("v1");
+      labels[std::string(Istio::Common::AppVersionLabel)].set_string_value(version);
+      if (!app_qualified.empty()) {
+        labels[std::string(Istio::Common::AppNameQualifiedLabel)].set_string_value(app_qualified);
+      }
+      if (!version_qualified.empty()) {
+        labels[std::string(Istio::Common::AppVersionQualifiedLabel)].set_string_value(
+            version_qualified);
+      }
     });
   }
 
@@ -155,7 +166,8 @@ protected:
 
     // 2. SERVER sidecar (INBOUND): HCM terminates CONNECT and routes to the app,
     //    advertising its identity as a baggage header on the CONNECT response.
-    setNode(config_helper_, "server-v1", "server-ns", "server-cluster", "server-svc", "server-app");
+    setNode(config_helper_, "server-v1", "server-ns", "server-cluster", "server-svc", "server-app",
+            server_version_, server_app_qualified_, server_version_qualified_);
     // istio.stats on the terminating HCM emits waypoint-reporter stats for the
     // CONNECT stream (the server terminating HBONE is the waypoint; reporter=waypoint
     // matches TestStatsServerWaypointProxyCONNECT). Prepended first so the chain is
@@ -243,8 +255,8 @@ typed_config:
             value: "%FILTER_STATE(baggage:PLAIN)%")EOF"
                                                                       : "";
     client_config_ = std::make_unique<ConfigHelper>(version_, pristine);
-    setNode(*client_config_, "client-v1", "client-ns", "client-cluster", "client-svc",
-            "client-app");
+    setNode(*client_config_, "client-v1", "client-ns", "client-cluster", "client-svc", "client-app",
+            client_version_, client_app_qualified_, client_version_qualified_);
     client_config_->addConfigModifier([server_port, loopback, connect_request_baggage](
                                           envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* sr = bootstrap.mutable_static_resources();
@@ -607,6 +619,16 @@ filter_chains:
   // upstream host IP via the workload-discovery provider reading workloads_path_.
   bool server_resolve_backend_{false};
   std::string workloads_path_;
+  // Raw version node label per side. Tests set it apart from the canonical revision
+  // ("v1") to check which label a peer's version comes from.
+  std::string client_version_{"v1"};
+  std::string server_version_{"v1"};
+  // Optional app.kubernetes.io/name and app.kubernetes.io/version node labels per
+  // side, set alongside the raw app/version labels. Empty means not set.
+  std::string client_app_qualified_;
+  std::string client_version_qualified_;
+  std::string server_app_qualified_;
+  std::string server_version_qualified_;
   std::unique_ptr<ConfigHelper> client_config_;
   IntegrationTestServerPtr client_sidecar_;
 };
@@ -801,6 +823,48 @@ resources:
   EXPECT_EQ("ratings-v1", tagValue(*server, "destination_workload").value_or(""));
   EXPECT_EQ("bookinfo", tagValue(*server, "destination_workload_namespace").value_or(""));
   EXPECT_EQ("ratings", tagValue(*server, "destination_canonical_service").value_or(""));
+}
+
+// Both sides carry app.kubernetes.io/name and app.kubernetes.io/version node labels that
+// differ from their raw app/version labels. Each side reports its own app/version from the
+// raw labels, so the identity it advertises in baggage (CONNECT request for the client,
+// CONNECT response for the server) must use the raw labels too. The raw version also differs
+// from the canonical revision, so baggage carries app.version instead of falling back to
+// service.version.
+TEST_P(IstioHboneTwoProxyIntegrationTest, ServerWaypointAppLabelPrecedenceOverHbone) {
+  client_version_ = "client-raw-version";
+  server_version_ = "server-raw-version";
+  client_app_qualified_ = "client-qualified-app";
+  client_version_qualified_ = "client-qualified-version";
+  server_app_qualified_ = "server-qualified-app";
+  server_version_qualified_ = "server-qualified-version";
+  initializeHbone();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("outbound"));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  FakeRawConnectionPtr app_conn;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(app_conn));
+  ASSERT_TRUE(app_conn->waitForData(5));
+  ASSERT_TRUE(app_conn->write("world"));
+  tcp_client->waitForData("world");
+  tcp_client->close();
+  ASSERT_TRUE(app_conn->close());
+
+  // The waypoint learns the client identity from the CONNECT-request baggage.
+  auto server = waitForIstioCounter(test_server_->statStore(), "istio_requests_total");
+  ASSERT_NE(server, nullptr);
+  EXPECT_EQ("waypoint", tagValue(*server, "reporter").value_or(""));
+  EXPECT_EQ("client-app", tagValue(*server, "source_app").value_or(""));
+  EXPECT_EQ("client-raw-version", tagValue(*server, "source_version").value_or(""));
+
+  // The client learns the server identity from the CONNECT-response baggage.
+  auto client =
+      waitForIstioCounter(client_sidecar_->statStore(), "istio_tcp_connections_opened_total");
+  ASSERT_NE(client, nullptr);
+  EXPECT_EQ("source", tagValue(*client, "reporter").value_or(""));
+  EXPECT_EQ("client-app", tagValue(*client, "source_app").value_or(""));
+  EXPECT_EQ("server-app", tagValue(*client, "destination_app").value_or(""));
+  EXPECT_EQ("server-raw-version", tagValue(*client, "destination_version").value_or(""));
 }
 
 // Related upstream e2e: stats_plugin/TestStatsServerWaypointProxyCONNECT (empty-metadata case).

@@ -8,6 +8,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -60,6 +61,8 @@ token_bucket:
   max_tokens: 1
   fill_interval: 0.2s
 )EOF");
+  // Tokens are (time_now - time_old) * fill_rate_; step past the floating-point boundary.
+  simTime().advanceTimeWait(std::chrono::microseconds(1));
 
   InSequence s;
   ActiveFilter active_filter(config_);
@@ -77,6 +80,8 @@ token_bucket:
   max_tokens: 1
   fill_interval: 0.2s
 )EOF");
+  // Tokens are (time_now - time_old) * fill_rate_; step past the floating-point boundary.
+  simTime().advanceTimeWait(std::chrono::microseconds(1));
 
   // First connection is OK.
   InSequence s;
@@ -94,8 +99,9 @@ token_bucket:
                                         "local_rate_limit.local_rate_limit_stats.rate_limited")
                    ->value());
 
-  // Refill the bucket.
-  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  // Tokens are (time_now - time_old) * fill_rate_; refill just past the floating-point boundary.
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200) +
+                                                 std::chrono::microseconds(1));
 
   // Third connection is OK.
   ActiveFilter active_filter3(config_);
@@ -113,6 +119,8 @@ runtime_enabled:
   default_value: true
   runtime_key: foo_key
 )EOF");
+  // Tokens are (time_now - time_old) * fill_rate_; step past the floating-point boundary.
+  simTime().advanceTimeWait(std::chrono::microseconds(1));
 
   // First connection is OK.
   InSequence s;
@@ -234,6 +242,24 @@ token_bucket:
   }
 
   configs.clear();
+}
+
+// The filter's stats carry the stat prefix as an explicit tag.
+TEST_F(LocalRateLimitFilterTest, StatsAreTagged) {
+  initialize(R"EOF(
+stat_prefix: local_rate_limit_stats
+token_bucket:
+  max_tokens: 1
+  fill_interval: 0.2s
+)EOF");
+
+  const Stats::CounterSharedPtr rate_limited = TestUtility::findCounter(
+      stats_store_, "local_rate_limit.local_rate_limit_stats.rate_limited");
+  ASSERT_NE(rate_limited, nullptr);
+  EXPECT_EQ("local_rate_limit.rate_limited", rate_limited->tagExtractedName());
+  ASSERT_EQ(1U, rate_limited->tags().size());
+  EXPECT_EQ("envoy.local_network_ratelimit_prefix", rate_limited->tags()[0].name_);
+  EXPECT_EQ("local_rate_limit_stats", rate_limited->tags()[0].value_);
 }
 
 } // namespace LocalRateLimitFilter

@@ -51,6 +51,7 @@ public:
   MOCK_METHOD(const Stats::SinkPredicates*, sinkPredicates, (), (const));
   MOCK_METHOD(bool, enableDeferredCreationStats, (), (const));
   MOCK_METHOD(uint32_t, evictOnFlush, (), (const));
+  MOCK_METHOD(const std::string&, evictionIntervalRuntimeKey, (), (const));
 };
 
 class MockServerFactoryContext : public virtual ServerFactoryContext {

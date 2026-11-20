@@ -104,7 +104,7 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
 
   // Get the map of all the latest existing hosts, which is used to filter out the existing
   // hosts in the process of updating cluster memberships.
-  HostMapConstSharedPtr all_hosts = parent_.prioritySet().crossPriorityHostMap();
+  HostLookupMapConstSharedPtr all_hosts = parent_.prioritySet().crossPriorityHostMap();
   ASSERT(all_hosts != nullptr);
 
   const uint32_t overprovisioning_factor = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -251,11 +251,6 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
                                            std::chrono::milliseconds(stale_after_ms));
     }
   }
-
-  // Pause LEDS messages until the EDS config is finished processing.
-  const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
-  Config::ScopedResume resume_leds =
-      transport_factory_context_->serverFactoryContext().xdsManager().pause(type_url);
 
   update(cluster_load_assignment);
   // If previously used a cached version, remove the subscription from the cache's
@@ -412,7 +407,7 @@ bool EdsClusterImpl::updateHostsPerLocality(
     const uint32_t priority, bool weighted_priority_health, const uint32_t overprovisioning_factor,
     const HostVector& new_hosts, LocalityWeightsMap& locality_weights_map,
     LocalityWeightsMap& new_locality_weights_map, PriorityStateManager& priority_state_manager,
-    const HostMap& all_hosts, const absl::flat_hash_set<std::string>& all_new_hosts) {
+    const HostLookupMap& all_hosts, const absl::flat_hash_set<std::string>& all_new_hosts) {
   const auto& host_set = priority_set_.getOrCreateHostSet(priority, overprovisioning_factor);
   HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
 
@@ -430,8 +425,10 @@ bool EdsClusterImpl::updateHostsPerLocality(
   // performance implications, since this has the knock on effect that we rebuild the load balancers
   // and locality scheduler. See the comment in BaseDynamicClusterImpl::updateDynamicHostList
   // about this. In the future we may need to do better here.
-  const bool hosts_updated = updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added,
-                                                   hosts_removed, all_hosts, all_new_hosts);
+  const bool hosts_updated = updateDynamicHostList(
+      new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
+      [&all_hosts](const std::string& address) { return all_hosts.findHost(address); },
+      all_new_hosts);
   if (hosts_updated || host_set.weightedPriorityHealth() != weighted_priority_health ||
       host_set.overprovisioningFactor() != overprovisioning_factor ||
       locality_weights_map != new_locality_weights_map) {

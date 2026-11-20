@@ -91,6 +91,10 @@ void KeySources::Source::removeKey(Http::RequestHeaderMap& headers) const {
     const auto& header = absl::get<Http::LowerCaseString>(source_);
     headers.remove(header);
   } else if (query_source_) {
+    // No :path means there is no query string to strip the key from (for example CONNECT requests).
+    if (headers.Path() == nullptr) {
+      return;
+    }
     auto params =
         Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
     absl::string_view key = absl::get<std::string>(source_);

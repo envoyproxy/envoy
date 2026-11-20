@@ -10,25 +10,60 @@ import (
 
 func init() {
 	sdk.RegisterHttpFilterConfigFactories(map[string]shared.HttpFilterConfigFactory{
-		"stats_callbacks":            &statsCallbacksConfigFactory{},
-		"header_callbacks":           &headerCallbacksConfigFactory{},
-		"local_reply_callbacks":      &localReplyCallbacksConfigFactory{},
-		"reset_stream":               &resetStreamConfigFactory{},
-		"send_go_away_and_close":     &sendGoAwayAndCloseConfigFactory{},
-		"recreate_stream":            &recreateStreamConfigFactory{},
-		"socket_option_callbacks":    &socketOptionCallbacksConfigFactory{},
-		"span_callbacks":             &spanCallbacksConfigFactory{},
-		"span_across_callbacks":      &spanAcrossCallbacksConfigFactory{},
-		"cluster_callbacks":          &clusterCallbacksConfigFactory{},
-		"send_response":              &sendResponseConfigFactory{},
-		"dynamic_metadata_callbacks": &dynamicMetadataCallbacksConfigFactory{},
-		"filter_state_callbacks":     &filterStateCallbacksConfigFactory{},
-		"body_callbacks":             &bodyCallbacksConfigFactory{},
-		"config_init_failure":        &configInitFailureConfigFactory{},
+		"downstream_direct_remote_address": &downstreamDirectRemoteAddressConfigFactory{},
+		"stats_callbacks":                  &statsCallbacksConfigFactory{},
+		"header_callbacks":                 &headerCallbacksConfigFactory{},
+		"local_reply_callbacks":            &localReplyCallbacksConfigFactory{},
+		"reset_stream":                     &resetStreamConfigFactory{},
+		"send_go_away_and_close":           &sendGoAwayAndCloseConfigFactory{},
+		"recreate_stream":                  &recreateStreamConfigFactory{},
+		"socket_option_callbacks":          &socketOptionCallbacksConfigFactory{},
+		"span_callbacks":                   &spanCallbacksConfigFactory{},
+		"span_across_callbacks":            &spanAcrossCallbacksConfigFactory{},
+		"cluster_callbacks":                &clusterCallbacksConfigFactory{},
+		"send_response":                    &sendResponseConfigFactory{},
+		"dynamic_metadata_callbacks":       &dynamicMetadataCallbacksConfigFactory{},
+		"filter_state_callbacks":           &filterStateCallbacksConfigFactory{},
+		"filter_state_object_callbacks":    &filterStateObjectCallbacksConfigFactory{},
+		"body_callbacks":                   &bodyCallbacksConfigFactory{},
+		"config_init_failure":              &configInitFailureConfigFactory{},
 	})
 }
 
 func main() {}
+
+type downstreamDirectRemoteAddressConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *downstreamDirectRemoteAddressConfigFactory) Create(shared.HttpFilterConfigHandle,
+	[]byte) (shared.HttpFilterFactory, error) {
+	return &downstreamDirectRemoteAddressFilterFactory{}, nil
+}
+
+type downstreamDirectRemoteAddressFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *downstreamDirectRemoteAddressFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	return &downstreamDirectRemoteAddressFilter{handle: h}
+}
+
+type downstreamDirectRemoteAddressFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+}
+
+func (f *downstreamDirectRemoteAddressFilter) OnRequestHeaders(headers shared.HeaderMap,
+	_ bool) shared.HeadersStatus {
+	address, ok := f.handle.GetDownstreamDirectRemoteAddress()
+	if ok {
+		headers.Set("x-downstream-peer", address.ToUnsafeString())
+	} else {
+		headers.Set("x-downstream-peer", "unavailable")
+	}
+	return shared.HeadersStatusContinue
+}
 
 // --- config_init_failure ---
 type configInitFailureConfigFactory struct {
@@ -131,6 +166,7 @@ func (p *headerCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
 	p.handle.ClearRouteCache()
 	p.handle.RefreshRouteCluster()
+	p.handle.DrainConnectionUponCompletion()
 
 	testHeaders(headers)
 
@@ -588,6 +624,12 @@ func (p *dynamicMetadataCallbacksFilter) OnRequestHeaders(headers shared.HeaderM
 	//   12 02 01 02        field 2 (value)    = 0x01 0x02
 	p.handle.SetTypedMetadata("ns_req_header_typed",
 		[]byte{0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02})
+	if typeURL, value, ok := p.handle.GetTypedMetadata(shared.MetadataSourceTypeDynamic, "ns_req_header_typed"); !ok || typeURL.ToUnsafeString() != "t/x" || value.ToUnsafeString() != "\x01\x02" {
+		panic("typed metadata mismatch")
+	}
+	if _, _, ok := p.handle.GetTypedMetadata(shared.MetadataSourceTypeDynamic, "missing"); ok {
+		panic("unexpected typed metadata")
+	}
 
 	// Try getting metadata from router, cluster, and host.
 	if val, ok := p.handle.GetMetadataString(shared.MetadataSourceTypeRoute,
@@ -759,6 +801,20 @@ func (p *filterStateCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 		val.ToUnsafeString() != "typed_value" {
 		panic(fmt.Sprintf("typed filter state mismatch: ok=%v val=%q", ok, val.ToUnsafeString()))
 	}
+	if !p.handle.SetFilterStateValue("shared_filter_state_key", []byte("shared_filter_state_value"),
+		shared.FilterStateLifeSpanConnection, shared.FilterStateStreamSharingSharedWithUpstreamConnection) {
+		panic("failed to set filter state value")
+	}
+	if val, ok := p.handle.GetFilterState("shared_filter_state_key"); !ok ||
+		val.ToUnsafeString() != "shared_filter_state_value" {
+		panic(fmt.Sprintf("shared filter state mismatch: ok=%v val=%q", ok, val.ToUnsafeString()))
+	}
+	if !p.handle.HasFilterState("envoy.test.http_typed_object_for_rust") {
+		panic("expected HasFilterState to return true for existing key")
+	}
+	if p.handle.HasFilterState("nonexistent_key") {
+		panic("expected HasFilterState to return false for missing key")
+	}
 	return shared.HeadersStatusContinue
 }
 
@@ -799,6 +855,107 @@ func (p *filterStateCallbacksFilter) testFilterState(key, value string) {
 	if _, ok := p.handle.GetFilterState("key"); ok {
 		panic("filter state key found")
 	}
+}
+
+// --- filter_state_object_callbacks ---
+type filterStateObjectCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+type filterStateObjectCallbacksFactory struct {
+	shared.EmptyHttpFilterFactory
+	configHandle shared.HttpFilterConfigHandle
+}
+
+func (f *filterStateObjectCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &filterStateObjectCallbacksFactory{configHandle: handle}, nil
+}
+
+type filterStateObjectCallbacksFilter struct {
+	handle       shared.HttpFilterHandle
+	configHandle shared.HttpFilterConfigHandle
+	shared.EmptyHttpFilter
+}
+
+func (f *filterStateObjectCallbacksFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	filter := &filterStateObjectCallbacksFilter{handle: handle, configHandle: f.configHandle}
+	// No stream info yet, so the store fails.
+	rejected := filter.newTracked("rejected")
+	if handle.SetFilterStateObject("go_object", rejected, shared.FilterStateLifeSpanRequest) {
+		panic("store without stream info unexpectedly succeeded")
+	}
+	if !rejected.destroyed {
+		panic("rejected filter state object not destroyed")
+	}
+	return filter
+}
+
+type trackedObject struct {
+	name         string
+	destroyed    bool
+	configHandle shared.HttpFilterConfigHandle
+}
+
+func (o *trackedObject) OnFilterStateObjectDestroy() {
+	if o.destroyed {
+		panic(fmt.Sprintf("filter state object %s destroyed twice", o.name))
+	}
+	o.destroyed = true
+	o.configHandle.Log(shared.LogLevelInfo, "filter state object %s destroyed", o.name)
+}
+
+type panickingObject struct{}
+
+func (panickingObject) OnFilterStateObjectDestroy() {
+	panic("filter state object destructor panic")
+}
+
+func (p *filterStateObjectCallbacksFilter) newTracked(name string) *trackedObject {
+	return &trackedObject{name: name, configHandle: p.configHandle}
+}
+
+func (p *filterStateObjectCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if _, ok := p.handle.GetFilterStateObject("go_object"); ok {
+		panic("unexpected filter state object before store")
+	}
+
+	first := p.newTracked("first")
+	if !p.handle.SetFilterStateObject("go_object", first, shared.FilterStateLifeSpanRequest) {
+		panic("failed to store first filter state object")
+	}
+	if got, ok := p.handle.GetFilterStateObject("go_object"); !ok || got != any(first) {
+		panic(fmt.Sprintf("filter state object mismatch after store: ok=%v got=%v", ok, got))
+	}
+
+	second := p.newTracked("second")
+	if !p.handle.SetFilterStateObject("go_object", second, shared.FilterStateLifeSpanRequest) {
+		panic("failed to overwrite filter state object")
+	}
+	if !first.destroyed {
+		panic("first filter state object not destroyed on overwrite")
+	}
+	if got, ok := p.handle.GetFilterStateObject("go_object"); !ok || got != any(second) {
+		panic(fmt.Sprintf("filter state object mismatch after overwrite: ok=%v got=%v", ok, got))
+	}
+
+	if !p.handle.SetFilterStateObject("go_plain_object", "plain", shared.FilterStateLifeSpanRequest) {
+		panic("failed to store plain filter state object")
+	}
+	if got, ok := p.handle.GetFilterStateObject("go_plain_object"); !ok || got != "plain" {
+		panic(fmt.Sprintf("plain filter state object mismatch: ok=%v got=%v", ok, got))
+	}
+
+	if !p.handle.SetFilterStateObject("go_panicking_object", panickingObject{},
+		shared.FilterStateLifeSpanFilterChain) {
+		panic("failed to store panicking filter state object")
+	}
+
+	p.handle.SetFilterState("go_bytes", []byte("bytes"))
+	if _, ok := p.handle.GetFilterStateObject("go_bytes"); ok {
+		panic("bytes filter state returned as an object")
+	}
+	return shared.HeadersStatusContinue
 }
 
 // --- body_callbacks ---

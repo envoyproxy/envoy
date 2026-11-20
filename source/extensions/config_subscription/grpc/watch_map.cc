@@ -1,12 +1,15 @@
 #include "source/extensions/config_subscription/grpc/watch_map.h"
 
+#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/cleanup.h"
+#include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {
@@ -30,19 +33,83 @@ Watch* WatchMap::addWatch(SubscriptionCallbacks& callbacks,
   return watch_ptr;
 }
 
+void WatchMap::forgetWatch(Watch* watch) {
+  wildcard_watches_.erase(watch); // may or may not be in there, but we want it gone.
+  forgetAccept(watch);
+  // Drop the queued replay so the pointer is not kept after the watch is freed below; a new
+  // watch allocated at the same address must not inherit it.
+  pending_replays_.erase(watch);
+  watches_.erase(watch);
+}
+
+bool WatchMap::watchTrackedInInterest(Watch* watch) {
+  for (const auto& [name, watches] : watch_interest_) {
+    if (watches.contains(watch)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void WatchMap::forgetAccept(Watch* watch) {
+  // Remove this watch from the glob reverse-index, using its own record of accepted patterns.
+  for (absl::string_view pattern : watch->accept_patterns_) {
+    if (pattern == Wildcard) {
+      accept_wildcard_watches_.erase(watch);
+      continue;
+    }
+    // "<prefix>/*" -- keyed by "<prefix>".
+    auto it = accept_prefix_watches_.find(pattern.substr(0, pattern.size() - 2));
+    if (it != accept_prefix_watches_.end()) {
+      it->second.erase(watch);
+      if (it->second.empty()) {
+        accept_prefix_watches_.erase(it);
+      }
+    }
+  }
+}
+
+void WatchMap::updateWildcardWatches(Watch* watch) {
+  // accept() patterns are evaluated FIRST and take precedence: a watch that has declared any
+  // accept() pattern is routed by those patterns (plus its concrete names) only, so it is never a
+  // catch-all wildcard watch here -- even if its resource_names_ is empty or contains "*". This is
+  // what lets a watch subscribe to the wildcard on the wire while routing only a subset (e.g.
+  // VHDS). To keep wildcard routing while using accept(), the caller includes "*" in the accept()
+  // patterns, which is tracked separately in accept_wildcard_watches_.
+  if (!watch->accept_patterns_.empty()) {
+    wildcard_watches_.erase(watch);
+    return;
+  }
+  // No accept() filter: the watched set defines routing. An explicit "*" or an empty watched set
+  // makes the watch a catch-all wildcard; otherwise it is routed only its specific resource names.
+  if (watch->resource_names_.contains(Wildcard) || watch->resource_names_.empty()) {
+    wildcard_watches_.insert(watch);
+  } else {
+    wildcard_watches_.erase(watch);
+  }
+}
+
 void WatchMap::removeWatch(Watch* watch) {
+  // Contract: the caller must first empty this watch's resource-name interest via
+  // updateWatchInterest(watch, {}) so that the per-name reference counts in watch_interest_ are
+  // decremented and any resulting server-side unsubscribe is emitted (see findRemovals()). Removal
+  // here only cleans the membership structures (wildcard_watches_, the accept_*
+  // indices, watches_); it deliberately does not touch watch_interest_. If the watch is still
+  // referenced by any watch_interest_ entry, a resource name was leaked (and the server never told
+  // to unsubscribe it), so fail loudly in debug builds.
+  ASSERT(!watchTrackedInInterest(watch),
+         "removeWatch() called before the watch's resource names were drained via "
+         "updateWatchInterest(watch, {})");
   if (deferred_removed_during_update_ != nullptr) {
     deferred_removed_during_update_->insert(watch);
   } else {
-    wildcard_watches_.erase(watch); // may or may not be in there, but we want it gone.
-    watches_.erase(watch);
+    forgetWatch(watch);
   }
 }
 
 void WatchMap::removeDeferredWatches() {
-  for (auto& watch : *deferred_removed_during_update_) {
-    wildcard_watches_.erase(watch); // may or may not be in there, but we want it gone.
-    watches_.erase(watch);
+  for (auto* watch : *deferred_removed_during_update_) {
+    forgetWatch(watch);
   }
   deferred_removed_during_update_ = nullptr;
 }
@@ -50,12 +117,6 @@ void WatchMap::removeDeferredWatches() {
 AddedRemoved
 WatchMap::updateWatchInterest(Watch* watch,
                               const absl::flat_hash_set<std::string>& update_to_these_names) {
-  if (update_to_these_names.empty() || update_to_these_names.contains(Wildcard)) {
-    wildcard_watches_.insert(watch);
-  } else {
-    wildcard_watches_.erase(watch);
-  }
-
   absl::flat_hash_set<std::string> newly_added_to_watch;
   SetUtil::setDifference(update_to_these_names, watch->resource_names_, newly_added_to_watch);
 
@@ -63,6 +124,7 @@ WatchMap::updateWatchInterest(Watch* watch,
   SetUtil::setDifference(watch->resource_names_, update_to_these_names, newly_removed_from_watch);
 
   watch->resource_names_ = update_to_these_names;
+  updateWildcardWatches(watch);
 
   // First resources are added and only then removed, so a watch won't be removed
   // if its interest has been replaced (rather than completely removed).
@@ -80,10 +142,74 @@ WatchMap::updateWatchInterest(Watch* watch,
   return {std::move(added_resources), std::move(removed_resources)};
 }
 
+AddedRemoved
+WatchMap::updateWatchInterest(Watch* watch,
+                              const absl::flat_hash_set<std::string>& resources_to_add,
+                              const absl::flat_hash_set<std::string>& resources_to_remove) {
+  absl::flat_hash_set<std::string> newly_added_to_watch;
+  for (const auto& name : resources_to_add) {
+    if (!resources_to_remove.contains(name) && watch->resource_names_.insert(name).second) {
+      newly_added_to_watch.insert(name);
+    }
+  }
+
+  absl::flat_hash_set<std::string> newly_removed_from_watch;
+  for (const auto& name : resources_to_remove) {
+    if (watch->resource_names_.erase(name) > 0) {
+      newly_removed_from_watch.insert(name);
+    }
+  }
+
+  updateWildcardWatches(watch);
+
+  absl::flat_hash_set<std::string> added_resources = findAdditions(newly_added_to_watch, watch);
+  absl::flat_hash_set<std::string> removed_resources =
+      findRemovals(newly_removed_from_watch, watch);
+  // Remove cached resource that are no longer relevant.
+  if (eds_resources_cache_.has_value()) {
+    for (const auto& resource_name : removed_resources) {
+      // This may pass a resource_name that is not in the cache, for example
+      // if the resource contents has never arrived.
+      eds_resources_cache_->removeResource(resource_name);
+    }
+  }
+  return {std::move(added_resources), std::move(removed_resources)};
+}
+
+void WatchMap::accept(Watch* watch, const absl::flat_hash_set<std::string>& patterns) {
+  // Forget any previous other-resource interest, so we can precisely update the reverse-index.
+  forgetAccept(watch);
+  watch->accept_patterns_.clear();
+
+  for (absl::string_view pattern : patterns) {
+    if (pattern == Wildcard) {
+      accept_wildcard_watches_.insert(watch);
+    } else if (absl::EndsWith(pattern, "/*")) {
+      // A "<prefix>/*" glob: accept every resource named "<prefix>/...". Keyed by "<prefix>".
+      accept_prefix_watches_[pattern.substr(0, pattern.size() - 2)].insert(watch);
+    } else {
+      IS_ENVOY_BUG("accept() requires the '*' wildcard or a '<prefix>/*' glob");
+      continue;
+    }
+    // Record the pattern on the watch itself (forward index), so it can be cleaned up precisely.
+    watch->accept_patterns_.insert(std::string(pattern));
+  }
+
+  updateWildcardWatches(watch);
+}
+
 absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
-  absl::flat_hash_set<Watch*> ret;
-  if (!use_namespace_matching_) {
-    ret = wildcard_watches_;
+  absl::flat_hash_set<Watch*> ret = wildcard_watches_;
+  // Watches that accepted every other resource via accept("*").
+  ret.insert(accept_wildcard_watches_.begin(), accept_wildcard_watches_.end());
+  // Watches that accepted this resource's prefix via accept("<prefix>/*").
+  if (!accept_prefix_watches_.empty()) {
+    const std::string prefix = namespaceFromName(resource_name);
+    if (!prefix.empty()) {
+      if (auto it = accept_prefix_watches_.find(prefix); it != accept_prefix_watches_.end()) {
+        ret.insert(it->second.begin(), it->second.end());
+      }
+    }
   }
   const bool is_xdstp = XdsResourceIdentifier::hasXdsTpScheme(resource_name);
   xds::core::v3::ResourceName xdstp_resource;
@@ -105,9 +231,7 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
   // only happen for glob collections. TODO(htuch): It should be possible to have much more
   // efficient matchers here.
   if (watches_interested == watch_interest_.end()) {
-    if (use_namespace_matching_) {
-      watches_interested = watch_interest_.find(namespaceFromName(resource_name));
-    } else if (is_xdstp) {
+    if (is_xdstp) {
       // Replace resource name component with glob for purpose of matching.
       const auto pos = xdstp_resource.id().find_last_of('/');
       xdstp_resource.set_id(pos == std::string::npos ? "*"
@@ -173,11 +297,24 @@ void WatchMap::onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
       // 3) Otherwise, we can skip onConfigUpdate for this watch.
       if (map_is_single_wildcard || !watch->state_of_the_world_empty_) {
         watch->state_of_the_world_empty_ = true;
+        watch->notified_ = true;
         THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate({}, version_info));
       }
     } else {
       watch->state_of_the_world_empty_ = false;
+      watch->notified_ = true;
       THROW_IF_NOT_OK(watch->callbacks_.onConfigUpdate(this_watch_updates->second, version_info));
+    }
+  }
+
+  // A name absent from a state-of-the-world response is not evicted: for explicitly named
+  // types (EDS, RDS, ...) the server may legitimately send a subset, and the watches that
+  // already hold the resource keep it too. The cache follows what those watches hold.
+  if (replay_enabled_) {
+    for (uint32_t resource_idx = 0; resource_idx < resources.size(); ++resource_idx) {
+      if (interesting_resources[resource_idx]) {
+        cacheResource(*resources[resource_idx], version_info);
+      }
     }
   }
 
@@ -205,11 +342,13 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<Protobuf::Any>& r
     return;
   }
 
+  OpaqueResourceDecoder& resource_decoder = (*watches_.begin())->resource_decoder_;
+  Protobuf::Arena batch_arena(resource_decoder.arenaOptions());
   std::vector<DecodedResourcePtr> decoded_resources;
   decoded_resources.reserve(resources.size());
   for (const auto& r : resources) {
     decoded_resources.emplace_back(THROW_OR_RETURN_VALUE(
-        DecodedResourceImpl::fromResource((*watches_.begin())->resource_decoder_, r, version_info),
+        DecodedResourceImpl::fromResource(resource_decoder, r, version_info, batch_arena),
         DecodedResourceImplPtr));
   }
 
@@ -227,6 +366,9 @@ void WatchMap::onConfigUpdate(
   // Build a pair of maps: from watches, to the set of resources {added,removed} that each watch
   // cares about. Each entry in the map-pair is then a nice little bundle that can be fed directly
   // into the individual onConfigUpdate()s.
+  Protobuf::Arena batch_arena(watches_.empty()
+                                  ? Protobuf::ArenaOptions{}
+                                  : (*watches_.begin())->resource_decoder_.arenaOptions());
   std::vector<DecodedResourcePtr> decoded_resources;
   absl::flat_hash_map<Watch*, std::vector<DecodedResourceRef>> per_watch_added;
   // If the server behaves according to the protocol, it will only send the
@@ -241,7 +383,7 @@ void WatchMap::onConfigUpdate(
       continue;
     }
     decoded_resources.emplace_back(
-        new DecodedResourceImpl((*interested_in_r.begin())->resource_decoder_, *r));
+        new DecodedResourceImpl((*interested_in_r.begin())->resource_decoder_, *r, batch_arena));
     for (const auto& interested_watch : interested_in_r) {
       per_watch_added[interested_watch].emplace_back(*decoded_resources.back());
     }
@@ -262,6 +404,7 @@ void WatchMap::onConfigUpdate(
     if (deferred_removed_during_update_->count(cur_watch) > 0) {
       continue;
     }
+    cur_watch->notified_ = true;
     const auto removed = per_watch_removed.find(cur_watch);
     if (removed == per_watch_removed.end()) {
       // additions only, no removals
@@ -280,13 +423,24 @@ void WatchMap::onConfigUpdate(
     if (deferred_removed_during_update_->count(cur_watch) > 0) {
       continue;
     }
+    cur_watch->notified_ = true;
     THROW_IF_NOT_OK(
         cur_watch->callbacks_.onConfigUpdate({}, resource_to_remove, system_version_info));
   }
   // notify empty update
   if (added_resources.empty() && removed_resources.empty()) {
     for (auto& cur_watch : wildcard_watches_) {
+      cur_watch->notified_ = true;
       THROW_IF_NOT_OK(cur_watch->callbacks_.onConfigUpdate({}, {}, system_version_info));
+    }
+  }
+
+  if (replay_enabled_) {
+    for (const auto& resource : decoded_resources) {
+      cacheResource(*resource, resource->version());
+    }
+    for (const auto& name : removed_resources) {
+      cached_resources_.erase(name);
     }
   }
 
@@ -320,8 +474,10 @@ WatchMap::findAdditions(const absl::flat_hash_set<std::string>& newly_added_to_w
       newly_added_to_subscription.insert(name);
       watch_interest_[name] = {watch};
     } else {
-      // Add this watch to the already-existing set at watch_interest_[name]
+      // Add this watch to the already-existing set at watch_interest_[name]. The name is already
+      // subscribed, so the server will not send the resource again for this watch.
       entry->second.insert(watch);
+      queueReplay(watch, name);
     }
   }
   return newly_added_to_subscription;
@@ -340,10 +496,110 @@ WatchMap::findRemovals(const absl::flat_hash_set<std::string>& newly_removed_fro
     entry->second.erase(watch);
     if (entry->second.empty()) {
       watch_interest_.erase(entry);
+      cached_resources_.erase(name);
       newly_removed_from_subscription.insert(name);
     }
   }
+  // A watch that dropped a name before its replay ran must not receive it.
+  if (auto pending = pending_replays_.find(watch); pending != pending_replays_.end()) {
+    for (const auto& name : newly_removed_from_watch) {
+      pending->second.erase(name);
+    }
+    if (pending->second.empty()) {
+      pending_replays_.erase(pending);
+    }
+  }
   return newly_removed_from_subscription;
+}
+
+const std::string& WatchMap::secretTypeUrl() {
+  CONSTRUCT_ON_FIRST_USE(std::string,
+                         getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>());
+}
+
+void WatchMap::cacheResource(const DecodedResource& resource, const std::string& version) {
+  // Only explicitly named interest is cached: a resource routed through a wildcard or glob
+  // watch has no per-name reference count, and a wildcard subscription is resent in full anyway.
+  if (!resource.hasResource() || !watch_interest_.contains(resource.name())) {
+    return;
+  }
+  // CopyFrom() is not available on MessageLite in lite proto builds. Merging into the freshly
+  // created empty message is equivalent.
+  Protobuf::Arena::UniquePtr<Protobuf::Message> copy =
+      Protobuf::Arena::UnsafeWrapUniquePtr(nullptr, resource.resource().New());
+  copy->CheckTypeAndMergeFrom(resource.resource());
+  cached_resources_.insert_or_assign(resource.name(),
+                                     CachedResource{std::move(copy), resource.aliases(), version});
+}
+
+void WatchMap::queueReplay(Watch* watch, const std::string& name) {
+  // A watch that has already been notified holds a state built from server responses; only a
+  // watch that has never heard anything is caught up from the cache.
+  if (!replay_enabled_ || watch->notified_ || !cached_resources_.contains(name) ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.xds_replay_cached_resources")) {
+    return;
+  }
+  pending_replays_[watch].insert(name);
+  replay_cb_->scheduleCallbackNextIteration();
+}
+
+void WatchMap::replayCachedResources() {
+  // Take the queue first: a delivery may add or remove watches, and must not disturb this pass.
+  auto pending = std::move(pending_replays_);
+  pending_replays_.clear();
+  for (auto& [watch, names] : pending) {
+    // The watch may have been removed since the replay was queued, or a server response may
+    // have reached it first, in which case the response wins.
+    if (!watches_.contains(watch) || watch->notified_) {
+      continue;
+    }
+    std::vector<DecodedResourcePtr> decoded;
+    std::vector<DecodedResourceRef> refs;
+    std::string version;
+    for (const auto& name : names) {
+      // The entry may be gone if a delta removal followed the join, e.g. a watch added from
+      // inside the removal's own callbacks, which are not told about the removal. The interest
+      // check is defensive: findRemovals() already drops a name the watch stopped watching.
+      auto cached = cached_resources_.find(name);
+      if (cached == cached_resources_.end() || !watch->resource_names_.contains(name)) {
+        continue;
+      }
+      // Merge into an empty message rather than CopyFrom(); see cacheResource().
+      Protobuf::Arena::UniquePtr<Protobuf::Message> copy =
+          Protobuf::Arena::UnsafeWrapUniquePtr(nullptr, cached->second.resource_->New());
+      copy->CheckTypeAndMergeFrom(*cached->second.resource_);
+      decoded.push_back(std::make_unique<DecodedResourceImpl>(
+          std::move(copy), name, cached->second.aliases_, cached->second.version_,
+          /*from_cache=*/true));
+      refs.emplace_back(*decoded.back());
+      version = cached->second.version_;
+    }
+    if (refs.empty()) {
+      continue;
+    }
+    ENVOY_LOG(debug, "Replaying {} cached {} resource(s) to a late watch", refs.size(), type_url_);
+    // The resource was accepted when it arrived, and there is no response to NACK, so a failure
+    // here is only logged and the watch keeps waiting. The resources are marked fromCache(), so
+    // GrpcSubscriptionImpl keeps its initial fetch timeout running until a replay is accepted.
+    watch->notified_ = true;
+    TRY_ASSERT_MAIN_THREAD {
+      absl::Status status;
+      if (is_delta_) {
+        status = watch->callbacks_.onConfigUpdate(refs, {}, version);
+      } else {
+        // The watch now holds resources, so a later state-of-the-world update that drops them
+        // must be delivered to it (see the delivery loop in onConfigUpdate()).
+        watch->state_of_the_world_empty_ = false;
+        status = watch->callbacks_.onConfigUpdate(refs, version);
+      }
+      if (!status.ok()) {
+        ENVOY_LOG(warn, "Replay of cached {} resources rejected: {}", type_url_, status.message());
+      }
+    }
+    END_TRY
+    CATCH(const EnvoyException& e,
+          { ENVOY_LOG(warn, "Replay of cached {} resources failed: {}", type_url_, e.what()); });
+  }
 }
 
 } // namespace Config

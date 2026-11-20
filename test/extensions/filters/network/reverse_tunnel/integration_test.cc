@@ -1,3 +1,4 @@
+#include <optional>
 #include <thread>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -62,6 +63,15 @@ typed_config:
 
     // Call parent initialize to complete setup.
     BaseIntegrationTest::initialize();
+  }
+
+  // Number of samples currently recorded in the initiator setup-latency histogram.
+  uint64_t tunnelSetupTimeSampleCount() {
+    auto histogram = test_server_->histogram("reverse_tunnel_initiator.tunnel_setup_time");
+    if (histogram == nullptr) {
+      return 0;
+    }
+    return TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram);
   }
 
 protected:
@@ -218,12 +228,24 @@ typed_config:
     return request;
   }
 
-  void runEndToEndReverseConnectionHandshakeScenario();
+  void runEndToEndReverseConnectionHandshakeScenario(bool drain_at_end = true);
+  void drainReverseTunnelListenersAndAwaitStop();
   void addDrainingAwareReverseConnectionHcmListener(uint32_t reverse_connection_count = 1);
+  void
+  addDrainingAwareReverseConnectionHcmListenerWithMetadata(uint32_t reverse_connection_count = 1);
+  void addDrainingAwareTcpHcmListenerWithMetadata();
+  void addDrainingAwareHcmListenerWithMetadata(const std::string& listener_address_yaml);
   void completeReverseTunnelHandshake(FakeRawConnection& connection) const;
   void startHttp2Session(FakeRawConnection& connection) const;
   static FakeRawConnection::ValidatorFunction
   waitForHttp2FrameType(Http::Http2::Http2Frame::Type type);
+  static size_t countHttp2Frames(absl::string_view data, Http::Http2::Http2Frame::Type type);
+  // Reads the next frame starting at `offset` and advances it past the frame.
+  static std::optional<Http::Http2::Http2Frame::Type> readFrameType(FakeRawConnection& connection,
+                                                                    size_t& offset);
+  static std::optional<Http::Http2::Http2Frame::Type> readFrameType(IntegrationTcpClient& client);
+
+  static constexpr absl::string_view kTcpListenerName = "drain_aware_tcp_listener";
   static const char* frameTypeToString(Http::Http2::Http2Frame::Type type);
   static void logHttp2Frames(absl::string_view label, const std::string& data);
 
@@ -246,6 +268,7 @@ void ReverseTunnelFilterIntegrationTest::addDrainingAwareReverseConnectionHcmLis
 
         const std::string listener_yaml = fmt::format(R"EOF(
 name: reverse_connection_listener
+stat_prefix: reverse_conn_listener
 address:
   socket_address:
     address: "rc://e2e-node:e2e-cluster:e2e-tenant@cluster_0:{}"
@@ -276,6 +299,73 @@ filter_chains:
             "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 )EOF",
                                                       reverse_connection_count);
+
+        auto* listener = bootstrap.mutable_static_resources()->add_listeners();
+        TestUtility::loadFromYaml(listener_yaml, *listener);
+      });
+}
+
+void ReverseTunnelFilterIntegrationTest::addDrainingAwareReverseConnectionHcmListenerWithMetadata(
+    uint32_t reverse_connection_count) {
+  addDrainingAwareHcmListenerWithMetadata(fmt::format(R"EOF(
+name: reverse_connection_listener
+address:
+  socket_address:
+    address: "rc://e2e-node:e2e-cluster:e2e-tenant@cluster_0:{}"
+    port_value: 0
+    resolver_name: envoy.resolvers.reverse_connection
+)EOF",
+                                                      reverse_connection_count));
+}
+
+void ReverseTunnelFilterIntegrationTest::addDrainingAwareTcpHcmListenerWithMetadata() {
+  addDrainingAwareHcmListenerWithMetadata(
+      fmt::format(R"EOF(
+name: {}
+address:
+  socket_address:
+    address: "{}"
+    port_value: 0
+)EOF",
+                  kTcpListenerName, Network::Test::getLoopbackAddressString(GetParam())));
+}
+
+void ReverseTunnelFilterIntegrationTest::addDrainingAwareHcmListenerWithMetadata(
+    const std::string& listener_address_yaml) {
+  config_helper_.addConfigModifier(
+      [listener_address_yaml](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        bootstrap.mutable_static_resources()->clear_listeners();
+
+        // METADATA at 0.2s, soft GOAWAY at 0.4s, final GOAWAY at drain_timeout (0.8s).
+        const std::string listener_yaml = absl::StrCat(listener_address_yaml, R"EOF(
+filter_chains:
+- filters:
+  - name: envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.reverse_tunnel.v3.DrainAwareHttpConnectionManager
+      enable_drain_with_goaway: true
+      hcm_config:
+        stat_prefix: reverse_connection_hcm
+        codec_type: HTTP2
+        http2_protocol_options: {allow_metadata: true}
+        drain_timeout: 0.8s
+        route_config:
+          name: local_route
+          virtual_hosts:
+          - name: local_service
+            domains: ["*"]
+            routes:
+            - match:
+                prefix: "/"
+              direct_response:
+                status: 200
+        http_filters:
+        - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      metadata_delay: 0.2s
+      shutdown_notice_delay: 0.4s
+)EOF");
 
         auto* listener = bootstrap.mutable_static_resources()->add_listeners();
         TestUtility::loadFromYaml(listener_yaml, *listener);
@@ -314,23 +404,59 @@ void ReverseTunnelFilterIntegrationTest::startHttp2Session(FakeRawConnection& co
 
 FakeRawConnection::ValidatorFunction
 ReverseTunnelFilterIntegrationTest::waitForHttp2FrameType(Http::Http2::Http2Frame::Type type) {
-  return [type](const std::string& data) -> bool {
-    size_t offset = 0;
-    while (offset + Http::Http2::Http2Frame::HeaderSize <= data.size()) {
-      Http::Http2::Http2Frame frame;
-      const absl::string_view frame_view(data.data() + offset, Http::Http2::Http2Frame::HeaderSize);
-      frame.setHeader(frame_view);
-      const size_t total_size = Http::Http2::Http2Frame::HeaderSize + frame.payloadSize();
-      if (offset + total_size > data.size()) {
-        return false;
-      }
-      if (frame.type() == type) {
-        return true;
-      }
-      offset += total_size;
+  return [type](const std::string& data) -> bool { return countHttp2Frames(data, type) > 0; };
+}
+
+size_t ReverseTunnelFilterIntegrationTest::countHttp2Frames(absl::string_view data,
+                                                            Http::Http2::Http2Frame::Type type) {
+  size_t count = 0;
+  size_t offset = 0;
+  while (offset + Http::Http2::Http2Frame::HeaderSize <= data.size()) {
+    Http::Http2::Http2Frame frame;
+    frame.setHeader(data.substr(offset, Http::Http2::Http2Frame::HeaderSize));
+    const size_t total_size = Http::Http2::Http2Frame::HeaderSize + frame.payloadSize();
+    if (offset + total_size > data.size()) {
+      break;
     }
-    return false;
-  };
+    if (frame.type() == type) {
+      ++count;
+    }
+    offset += total_size;
+  }
+  return count;
+}
+
+std::optional<Http::Http2::Http2Frame::Type>
+ReverseTunnelFilterIntegrationTest::readFrameType(FakeRawConnection& connection, size_t& offset) {
+  std::string data;
+  if (!connection.waitForData(
+          FakeRawConnection::waitForAtLeastBytes(offset + Http::Http2::Http2Frame::HeaderSize),
+          &data)) {
+    return std::nullopt;
+  }
+  Http::Http2::Http2Frame frame;
+  frame.setHeader(absl::string_view(data).substr(offset, Http::Http2::Http2Frame::HeaderSize));
+  const size_t frame_end = offset + Http::Http2::Http2Frame::HeaderSize + frame.payloadSize();
+  if (!connection.waitForData(FakeRawConnection::waitForAtLeastBytes(frame_end), &data)) {
+    return std::nullopt;
+  }
+  offset = frame_end;
+  return frame.type();
+}
+
+std::optional<Http::Http2::Http2Frame::Type>
+ReverseTunnelFilterIntegrationTest::readFrameType(IntegrationTcpClient& client) {
+  if (!client.waitForData(Http::Http2::Http2Frame::HeaderSize)) {
+    return std::nullopt;
+  }
+  Http::Http2::Http2Frame frame;
+  frame.setHeader(client.data());
+  const size_t frame_size = Http::Http2::Http2Frame::HeaderSize + frame.payloadSize();
+  if (!client.waitForData(frame_size)) {
+    return std::nullopt;
+  }
+  client.clearData(frame_size);
+  return frame.type();
 }
 
 const char*
@@ -385,7 +511,8 @@ void ReverseTunnelFilterIntegrationTest::logHttp2Frames(absl::string_view label,
   }
 }
 
-void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeScenario() {
+void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeScenario(
+    bool drain_at_end) {
   const uint32_t upstream_port = GetParam() == Network::Address::IpVersion::v4 ? 15000 : 15001;
   const std::string loopback_addr =
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1";
@@ -419,6 +546,7 @@ void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeSc
 
     auto* rc_listener = bootstrap.mutable_static_resources()->add_listeners();
     rc_listener->set_name("reverse_connection_listener");
+    rc_listener->set_stat_prefix("reverse_conn_listener");
     auto* rc_address = rc_listener->mutable_address()->mutable_socket_address();
     rc_address->set_address("rc://e2e-node:e2e-cluster:e2e-tenant@upstream_cluster:1");
     rc_address->set_port_value(0);
@@ -454,6 +582,17 @@ void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeSc
 
   test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 
+  // Successful full-capacity setup must record a setup-latency sample.
+  test_server_->waitUntilHistogramHasSamples("reverse_tunnel_initiator.tunnel_setup_time",
+                                             std::chrono::milliseconds(5000));
+  EXPECT_EQ(tunnelSetupTimeSampleCount(), 1);
+
+  if (drain_at_end) {
+    drainReverseTunnelListenersAndAwaitStop();
+  }
+}
+
+void ReverseTunnelFilterIntegrationTest::drainReverseTunnelListenersAndAwaitStop() {
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
   EXPECT_TRUE(admin_response->complete());
@@ -511,47 +650,47 @@ TEST_P(ReverseTunnelFilterIntegrationTest, PartialRequestHandling) {
   addReverseTunnelFilter();
   initialize();
 
-  std::string http_request = createHttpRequestWithRtHeaders(
-      "GET", "/reverse_connections/request", "integration-test-node", "integration-test-cluster",
-      "integration-test-tenant", "abcdefghijklmno");
+  const std::string http_request =
+      createHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "integration-test-node",
+                                     "integration-test-cluster", "integration-test-tenant");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
 
-  // Send request in chunks but ensure the body only completes on the third chunk.
-  // Split the HTTP request into headers and body, then stream body in parts.
-  const std::string::size_type hdr_end = http_request.find("\r\n\r\n");
-  ASSERT_NE(hdr_end, std::string::npos);
-  const std::string headers = http_request.substr(0, hdr_end + 4);
-  const std::string body = http_request.substr(hdr_end + 4);
-  ASSERT_GT(body.size(), 8u);
+  // Stream the body-less handshake in two parts. The server must wait for the full request before
+  // responding.
+  const std::string::size_type split = http_request.size() / 2;
+  const std::string part1 = http_request.substr(0, split);
+  const std::string part2 = http_request.substr(split);
 
-  const size_t part = body.size() / 4; // Ensure first 2 parts are not enough to complete.
-  const std::string body1 = body.substr(0, part);
-  const std::string body2 = body.substr(part, part);
-  const std::string body3 = body.substr(2 * part);
-
-  // First write: headers + small part of body.
-  if (!tcp_client->write(headers + body1, /*end_stream=*/false)) {
-    // Server may have already processed and responded; validate response and exit.
+  if (!tcp_client->write(part1, /*end_stream=*/false)) {
     tcp_client->waitForData("HTTP/1.1 200 OK");
     return;
   }
-  // Second write: more body but still not complete. If the server already completed,.
-  // the write can fail due to disconnect; treat that as acceptable and verify response.
-  if (!tcp_client->write(body2, /*end_stream=*/false)) {
-    tcp_client->waitForData("HTTP/1.1 200 OK");
-    return;
-  }
-  // Third write: remaining body to complete the request. Same tolerance as above.
-  if (!tcp_client->write(body3, /*end_stream=*/false)) {
+  if (!tcp_client->write(part2, /*end_stream=*/false)) {
     tcp_client->waitForData("HTTP/1.1 200 OK");
     return;
   }
 
-  // Should receive complete HTTP response.
   tcp_client->waitForData("HTTP/1.1 200 OK");
-  // Server may keep connection open (auto_close_connections: false). Close client side.
   tcp_client->close();
+}
+
+// A handshake request that carries a body is rejected with 400.
+TEST_P(ReverseTunnelFilterIntegrationTest, HandshakeWithBodyRejected) {
+  addReverseTunnelFilter();
+  initialize();
+
+  const std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "integration-test-node", "integration-test-cluster",
+      "integration-test-tenant", "handshake-body");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  if (!tcp_client->write(http_request)) {
+    tcp_client->waitForData("HTTP/1.1 400 Bad Request");
+    return;
+  }
+  tcp_client->waitForData("HTTP/1.1 400 Bad Request");
+  tcp_client->waitForDisconnect();
 }
 
 TEST_P(ReverseTunnelFilterIntegrationTest, WrongPathReturns404) {
@@ -681,6 +820,39 @@ TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshakeCus
   runEndToEndReverseConnectionHandshakeScenario();
 }
 
+TEST_P(ReverseTunnelFilterIntegrationTest, AdminTunnelsEndpointListsEstablishedConnection) {
+  DISABLE_IF_ADMIN_DISABLED;
+  runEndToEndReverseConnectionHandshakeScenario(/*drain_at_end=*/false);
+
+  test_server_->waitForGauge("listener.reverse_conn_listener.downstream_cx_active", Ge(1));
+
+  BufferingStreamDecoderPtr response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/reverse_tunnel/tunnels", "",
+                                         Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("text/plain", response->headers().getContentTypeValue());
+  EXPECT_EQ("e2e-node:e2e-cluster:e2e-tenant: 1\n", response->body());
+
+  drainReverseTunnelListenersAndAwaitStop();
+}
+
+TEST_P(ReverseTunnelFilterIntegrationTest, AdminTunnelsEndpointCountsTunnelsAfterListenerStop) {
+  DISABLE_IF_ADMIN_DISABLED;
+  runEndToEndReverseConnectionHandshakeScenario(/*drain_at_end=*/false);
+  test_server_->waitForGauge("listener.reverse_conn_listener.downstream_cx_active", Ge(1));
+
+  drainReverseTunnelListenersAndAwaitStop();
+  EXPECT_GE(test_server_->gauge("listener.reverse_conn_listener.downstream_cx_active")->value(), 1);
+
+  BufferingStreamDecoderPtr response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/reverse_tunnel/tunnels", "",
+                                         Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("e2e-node:e2e-cluster:e2e-tenant: 1\n", response->body());
+}
+
 TEST_P(ReverseTunnelFilterIntegrationTest, DrainingAwareHcmSendsGoAwayOnReverseConnections) {
   DISABLE_IF_ADMIN_DISABLED;
   drain_strategy_ = Server::DrainStrategy::Immediate;
@@ -734,6 +906,132 @@ TEST_P(ReverseTunnelFilterIntegrationTest, DrainingAwareHcmSendsGoAwayOnReverseC
   // Advance simulated time past the 1s drain_time so the graceful drain completion timer fires.
   timeSystem().advanceTimeWait(std::chrono::seconds(2));
   // Confirm the full chain completed: workers stopped the listener and called.
+  test_server_->waitForCounter("listener_manager.listener_stopped", Ge(1));
+}
+
+// With enable_drain_with_goaway and the drain delays configured, a graceful listener
+// drain emits the three drain phases on the wire in order: a METADATA frame (client propagation)
+// first, then a GOAWAY. The METADATA frame must arrive before any GOAWAY so the peer redials
+// before being told to stop new streams.
+TEST_P(ReverseTunnelFilterIntegrationTest, DrainingAwareHcmSendsMetadataThenGoAway) {
+  DISABLE_IF_ADMIN_DISABLED;
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(1);
+  addDrainingAwareReverseConnectionHcmListenerWithMetadata(1);
+  initialize();
+
+  FakeRawConnectionPtr reverse_conn;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(reverse_conn));
+  completeReverseTunnelHandshake(*reverse_conn);
+  // Let the wrapper detach its HTTP/1 handshake codec before sending HTTP/2 bytes.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  startHttp2Session(*reverse_conn);
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  reverse_conn->clearData();
+
+  BufferingStreamDecoderPtr admin_response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners?graceful",
+                                         "", Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(admin_response->complete());
+  ASSERT_EQ("200", admin_response->headers().getStatusValue());
+
+  // The drain key/value are HPACK-encoded inside the METADATA frame, so their content is verified
+  // in the unit tests rather than here.
+  size_t offset = 0;
+  EXPECT_EQ(Http::Http2::Http2Frame::Type::Metadata, readFrameType(*reverse_conn, offset));
+  EXPECT_EQ(Http::Http2::Http2Frame::Type::GoAway, readFrameType(*reverse_conn, offset));
+  EXPECT_EQ(Http::Http2::Http2Frame::Type::GoAway, readFrameType(*reverse_conn, offset));
+
+  EXPECT_TRUE(reverse_conn->close());
+  timeSystem().advanceTimeWait(std::chrono::seconds(2));
+  test_server_->waitForCounter("listener_manager.listener_stopped", Ge(1));
+}
+
+// A non-reverse connection on the same config ignores the delays: it gets the soft GOAWAY right
+// away and the final GOAWAY at drain_timeout, with no METADATA frame.
+TEST_P(ReverseTunnelFilterIntegrationTest, DrainingAwareHcmNonReverseConnectionIgnoresDelays) {
+  DISABLE_IF_ADMIN_DISABLED;
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(1);
+  addDrainingAwareTcpHcmListenerWithMetadata();
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(std::string(kTcpListenerName)));
+  ASSERT_TRUE(tcp_client->write(
+      absl::StrCat(Http::Http2::Http2Frame::Preamble,
+                   std::string(Http::Http2::Http2Frame::makeEmptySettingsFrame())),
+      false));
+  ASSERT_TRUE(tcp_client->waitForData(Http::Http2::Http2Frame::HeaderSize));
+  ASSERT_TRUE(tcp_client->write(std::string(Http::Http2::Http2Frame::makeEmptySettingsFrame(
+                                    Http::Http2::Http2Frame::SettingsFlags::Ack)),
+                                false));
+  tcp_client->clearData();
+
+  BufferingStreamDecoderPtr admin_response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners?graceful",
+                                         "", Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(admin_response->complete());
+  ASSERT_EQ("200", admin_response->headers().getStatusValue());
+
+  EXPECT_EQ(Http::Http2::Http2Frame::Type::GoAway, readFrameType(*tcp_client));
+  EXPECT_EQ(Http::Http2::Http2Frame::Type::GoAway, readFrameType(*tcp_client));
+
+  tcp_client->close();
+  timeSystem().advanceTimeWait(std::chrono::seconds(2));
+  test_server_->waitForCounter("listener_manager.listener_stopped", Ge(1));
+}
+
+TEST_P(ReverseTunnelFilterIntegrationTest, AdminTunnelsEndpointCountDropsAsDrainedTunnelsClose) {
+  DISABLE_IF_ADMIN_DISABLED;
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(1);
+  addDrainingAwareReverseConnectionHcmListener(/*reverse_connection_count=*/2);
+  initialize();
+
+  auto query_tunnels = [this]() {
+    BufferingStreamDecoderPtr response =
+        IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/reverse_tunnel/tunnels",
+                                           "", Http::CodecType::HTTP1, GetParam());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    return std::string(response->body());
+  };
+
+  FakeRawConnectionPtr reverse_conn_1;
+  FakeRawConnectionPtr reverse_conn_2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(reverse_conn_1));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(reverse_conn_2));
+  completeReverseTunnelHandshake(*reverse_conn_1);
+  completeReverseTunnelHandshake(*reverse_conn_2);
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  startHttp2Session(*reverse_conn_1);
+  startHttp2Session(*reverse_conn_2);
+
+  test_server_->waitForGauge("listener.reverse_conn_listener.downstream_cx_active", Eq(2));
+  EXPECT_EQ("e2e-node:e2e-cluster:e2e-tenant: 2\n", query_tunnels());
+
+  BufferingStreamDecoderPtr admin_response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners?graceful",
+                                         "", Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(admin_response->complete());
+  ASSERT_EQ("200", admin_response->headers().getStatusValue());
+  ASSERT_TRUE(reverse_conn_1->waitForData(
+      waitForHttp2FrameType(Http::Http2::Http2Frame::Type::GoAway), nullptr));
+  ASSERT_TRUE(reverse_conn_2->waitForData(
+      waitForHttp2FrameType(Http::Http2::Http2Frame::Type::GoAway), nullptr));
+
+  // Draining tunnels stay counted until they actually close.
+  EXPECT_EQ("e2e-node:e2e-cluster:e2e-tenant: 2\n", query_tunnels());
+
+  ASSERT_TRUE(reverse_conn_1->close());
+  test_server_->waitForGauge("listener.reverse_conn_listener.downstream_cx_active", Eq(1));
+  EXPECT_EQ("e2e-node:e2e-cluster:e2e-tenant: 1\n", query_tunnels());
+
+  ASSERT_TRUE(reverse_conn_2->close());
+  test_server_->waitForGauge("listener.reverse_conn_listener.downstream_cx_active", Eq(0));
+  EXPECT_EQ("", query_tunnels());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(2));
   test_server_->waitForCounter("listener_manager.listener_stopped", Ge(1));
 }
 

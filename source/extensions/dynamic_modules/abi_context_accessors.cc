@@ -87,6 +87,28 @@ const Protobuf::Value& dynamicMetadataValue(const StreamInfo::StreamInfo& stream
   return Envoy::Config::Metadata::metadataValue(&metadata, filter_name_str, path_parts);
 }
 
+// Whether key is held at a level of the filter state chain other than the one a write at life_span
+// stores to: the first level whose life span is at least life_span.
+bool heldAtOtherLifeSpan(const StreamInfo::FilterStateSharedPtr& filter_state,
+                         absl::string_view key, StreamInfo::FilterState::LifeSpan life_span) {
+  if (!filter_state->hasDataWithName(key)) {
+    return false;
+  }
+  StreamInfo::FilterStateSharedPtr target = filter_state;
+  while (target != nullptr && target->lifeSpan() < life_span) {
+    target = target->parent();
+  }
+  if (target == nullptr || !target->hasDataWithName(key)) {
+    return true;
+  }
+  const StreamInfo::FilterStateSharedPtr above = target->parent();
+  if (above != nullptr && above->hasDataWithName(key)) {
+    return true;
+  }
+  // The target holds key. A lower level holds it too if the leaf's lookup finds another object.
+  return filter_state->getDataReadOnlyGeneric(key) != target->getDataReadOnlyGeneric(key);
+}
+
 } // namespace
 
 HeadersMapOptConstRef
@@ -864,6 +886,45 @@ void ContextAccessor::setDynamicMetadataStringBatch(
   stream_info.setDynamicMetadata(std::string(filter_name), metadata_value);
 }
 
+bool ContextAccessor::setDynamicMetadataStruct(StreamInfo::StreamInfo& stream_info,
+                                               absl::string_view filter_name,
+                                               absl::string_view serialized_struct) {
+  Protobuf::Struct metadata_value;
+  if (!metadata_value.ParseFromString(serialized_struct)) {
+    ENVOY_LOG_EVERY_POW_2_TO_LOGGER(
+        Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), warn,
+        "dynamic module set dynamic metadata namespace '{}' with a buffer of {} bytes that does "
+        "not parse as a google.protobuf.Struct, so the call is ignored",
+        filter_name, serialized_struct.size());
+    return false;
+  }
+  if (metadata_value.fields().empty()) {
+    // An empty struct is a no-op and must not create the namespace.
+    return true;
+  }
+  stream_info.setDynamicMetadata(std::string(filter_name), metadata_value);
+  return true;
+}
+
+bool ContextAccessor::setDynamicTypedMetadata(StreamInfo::StreamInfo& stream_info,
+                                              absl::string_view filter_name,
+                                              absl::string_view serialized_any) {
+  Protobuf::Any typed_value;
+  if (!typed_value.ParseFromString(serialized_any) || typed_value.type_url().empty()) {
+    ENVOY_LOG_EVERY_POW_2_TO_LOGGER(
+        Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), warn,
+        "dynamic module set typed dynamic metadata namespace '{}' with a buffer of {} bytes that "
+        "is not a google.protobuf.Any with a type URL, so the call is ignored",
+        filter_name, serialized_any.size());
+    return false;
+  }
+  // Assign rather than merge so the whole Any is swapped at once. Merging an Any field by field
+  // could keep the type URL of one call with the value of another.
+  (*stream_info.dynamicMetadata().mutable_typed_filter_metadata())[std::string(filter_name)] =
+      std::move(typed_value);
+  return true;
+}
+
 bool ContextAccessor::getFilterStateBytes(const StreamInfo::StreamInfo& stream_info,
                                           envoy_dynamic_module_type_module_buffer key,
                                           envoy_dynamic_module_type_envoy_buffer* result) {
@@ -883,15 +944,33 @@ bool ContextAccessor::getFilterStateBytes(const StreamInfo::StreamInfo& stream_i
   return true;
 }
 
+bool ContextAccessor::canSetFilterState(const StreamInfo::FilterStateSharedPtr& filter_state,
+                                        absl::string_view key,
+                                        StreamInfo::FilterState::LifeSpan life_span) {
+  if (heldAtOtherLifeSpan(filter_state, key, life_span)) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "filter state key '{}' is already set at a different life span", key);
+    return false;
+  }
+  return true;
+}
+
 bool ContextAccessor::setFilterStateBytes(
     StreamInfo::StreamInfo& stream_info, absl::string_view key, absl::string_view value,
-    std::optional<StreamInfo::FilterState::LifeSpan> life_span) {
-  auto accessor = std::make_unique<Router::StringAccessorImpl>(value);
-  if (life_span.has_value()) {
-    stream_info.filterState()->setData(key, std::move(accessor), life_span.value());
-  } else {
-    stream_info.filterState()->setData(key, std::move(accessor));
+    std::optional<StreamInfo::FilterState::LifeSpan> life_span,
+    std::optional<StreamInfo::StreamSharingMayImpactPooling> stream_sharing) {
+  const auto& filter_state = stream_info.filterState();
+  if (!filter_state) {
+    return false;
   }
+  const auto effective_life_span =
+      life_span.value_or(StreamInfo::FilterState::LifeSpan::FilterChain);
+  if (!canSetFilterState(filter_state, key, effective_life_span)) {
+    return false;
+  }
+  filter_state->setData(key, std::make_shared<Router::StringAccessorImpl>(value),
+                        effective_life_span,
+                        stream_sharing.value_or(StreamInfo::StreamSharingMayImpactPooling::None));
   return true;
 }
 
@@ -913,11 +992,13 @@ bool ContextAccessor::setFilterStateTyped(
     return false;
   }
 
-  if (life_span.has_value()) {
-    stream_info.filterState()->setData(key, std::move(object), life_span.value());
-  } else {
-    stream_info.filterState()->setData(key, std::move(object));
+  const auto& filter_state = stream_info.filterState();
+  const auto effective_life_span =
+      life_span.value_or(StreamInfo::FilterState::LifeSpan::FilterChain);
+  if (!canSetFilterState(filter_state, key, effective_life_span)) {
+    return false;
   }
+  filter_state->setData(key, std::move(object), effective_life_span);
   return true;
 }
 

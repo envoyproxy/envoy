@@ -56,6 +56,9 @@ public:
 
     const std::string& backingString() const { return result_backing_string_; }
 
+    // Moves the backing string out. result() must not be used afterwards.
+    std::string releaseBackingString() && { return std::move(result_backing_string_); }
+
   private:
     std::optional<absl::string_view> result_;
     // Valid only if result_ relies on memory allocation that must live beyond the call. See above.
@@ -83,11 +86,8 @@ public:
           present_(explicit_present) {}
 
     bool matchesHeaders(const HeaderMap& request_headers) const override {
-      const auto header_value = getAllOfHeaderAsString(request_headers, name_);
-
-      // If treat_missing_as_empty is false, and the header_value is empty,
-      // return true iff invert_match is the same as present_.
-      if (!header_value.result().has_value() && !treat_missing_as_empty_) {
+      // Missing-as-empty makes presence independent of the actual header entries.
+      if (!treat_missing_as_empty_ && request_headers.get(name_).empty()) {
         return invert_match_ == present_;
       }
 

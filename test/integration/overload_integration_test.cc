@@ -7,9 +7,11 @@
 
 #include "test/config/utility.h"
 #include "test/integration/base_overload_integration_test.h"
+#include "test/integration/downstream_connection_tracker.h"
 #include "test/integration/filters/block_filter.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #ifdef ENVOY_ENABLE_QUIC
 #include "test/extensions/quic/proof_source/pending_proof_source.pb.h"
@@ -19,7 +21,6 @@
 
 using testing::Eq;
 using testing::Ge;
-using testing::InvokeWithoutArgs;
 
 namespace Envoy {
 
@@ -183,6 +184,13 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
     return; // only relevant for downstream HTTP1.x connections
   }
 
+  // Keepalive behavior does not need the default five-second drain period.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             cm) {
+        *cm.mutable_drain_timeout() = ProtobufUtil::TimeUtil::MillisecondsToDuration(100);
+      });
+
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
       name: "envoy.overload_actions.disable_http_keepalive"
@@ -309,6 +317,54 @@ TEST_P(OverloadIntegrationTest, BypassOverloadManagerTest) {
   codec_client_->close();
 }
 
+TEST_P(OverloadIntegrationTest, MultipleResourceMonitorsOfSameTypeDifferentNames) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* overload_manager = bootstrap.mutable_overload_manager();
+    overload_manager->mutable_refresh_interval()->set_seconds(0);
+    overload_manager->mutable_refresh_interval()->set_nanos(1000000);
+
+    auto* m1 = overload_manager->add_resource_monitors();
+    m1->set_name("custom_monitor_alpha");
+    m1->mutable_typed_config()->set_type_url("type.googleapis.com/test.common.config.DummyConfig");
+
+    auto* m2 = overload_manager->add_resource_monitors();
+    m2->set_name("custom_monitor_beta");
+    m2->mutable_typed_config()->set_type_url("type.googleapis.com/test.common.config.DummyConfig");
+
+    auto* action = overload_manager->add_actions();
+    action->set_name("envoy.overload_actions.stop_accepting_requests");
+    auto* trigger = action->add_triggers();
+    trigger->set_name("custom_monitor_beta");
+    trigger->mutable_threshold()->set_value(0.5);
+  });
+
+  initialize();
+
+  ASSERT_GE(fake_resource_monitor_factory_.monitors().size(), 2);
+  auto* monitor_alpha = fake_resource_monitor_factory_.monitors()[0];
+  auto* monitor_beta = fake_resource_monitor_factory_.monitors()[1];
+
+  // Set pressure on monitor_alpha to 0.9 and monitor_beta to 0.2.
+  monitor_alpha->setResourcePressure(0.9);
+  monitor_beta->setResourcePressure(0.2);
+
+  test_server_->waitForGauge("overload.custom_monitor_alpha.pressure", Eq(90));
+  test_server_->waitForGauge("overload.custom_monitor_beta.pressure", Eq(20));
+
+  // Action stop_accepting_requests is bound to custom_monitor_beta (threshold
+  // 0.5), so it should be inactive (0).
+  test_server_->waitForGauge("overload.envoy.overload_actions.stop_accepting_requests.active",
+                             Eq(0));
+
+  // Now set monitor_beta pressure to 0.8 (> 0.5 threshold).
+  monitor_beta->setResourcePressure(0.8);
+  test_server_->waitForGauge("overload.custom_monitor_beta.pressure", Eq(80));
+
+  // Action stop_accepting_requests should now become active (1).
+  test_server_->waitForGauge("overload.envoy.overload_actions.stop_accepting_requests.active",
+                             Eq(1));
+}
+
 // TODO: add another test for HTTP2
 TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
   if (downstreamProtocol() != Http::CodecType::HTTP3) {
@@ -329,6 +385,7 @@ TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   // Wait for the connection to be fully established.
   test_server_->waitForCounter("http.config_test.downstream_cx_http3_total", Ge(1));
+  test_server_->waitForGauge("http.config_test.downstream_cx_http3_idle", Eq(1));
 
   // 2. Send a request and wait for the response to complete.
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
@@ -339,6 +396,7 @@ TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForGauge("http.config_test.downstream_cx_http3_idle", Eq(1));
 
   // At this point, the EnvoyQuicServerSession should have added itself to the
   // EnvoyQuicDispatcher's idle list.
@@ -348,9 +406,18 @@ TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
   test_server_->waitForGauge("overload.envoy.overload_actions.close_idle_http_connections.active",
                              Eq(1));
 
-  // 3. Advance time past the 10s saturated min_time_before_termination_allowed
-  // and trigger the check_idle_connection_timer (which runs every 100ms).
-  timeSystem().advanceTimeWait(std::chrono::seconds(10));
+  // 3. Wait past the 10s saturated min_time_before_termination_allowed for the
+  // worker's idle connection timer (which runs every 100ms) to close the idle
+  // QUIC session. Pass dispatcher_ so the client's 25ms delayed-ACK timer can
+  // fire and ACK the response FIN, closing the QUIC stream on the server and
+  // adding the session back to the idle list.
+  const std::string close_idle_counter_name =
+      version_ == Network::Address::IpVersion::v4
+          ? "listener.127.0.0.1_0.downstream_cx_overload_close_idle"
+          : "listener.[__1]_0.downstream_cx_overload_close_idle";
+  test_server_->waitForCounter(close_idle_counter_name, Eq(1),
+                               std::chrono::milliseconds(15000) * TIMEOUT_FACTOR,
+                               dispatcher_.get());
 
   // 4. Wait for the connection to be closed by the server.
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -358,6 +425,7 @@ TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
   // Check that the close reason was correct (this stat is incremented in
   // EnvoyQuicDispatcher)
   test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
+  test_server_->waitForGauge("http.config_test.downstream_cx_http3_idle", Eq(0));
 
   codec_client_->close();
 
@@ -367,7 +435,8 @@ TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
                              Eq(0));
 }
 
-class Http2RawFrameOverloadIntegrationTest : public BaseOverloadIntegrationTest,
+class Http2RawFrameOverloadIntegrationTest : public Event::TestUsingSimulatedTime,
+                                             public BaseOverloadIntegrationTest,
                                              public Http2RawFrameIntegrationTest,
                                              public testing::Test {
 public:
@@ -396,8 +465,11 @@ protected:
   }
 };
 
-class OverloadScaledTimerIntegrationTest : public OverloadIntegrationTest {
+class OverloadScaledTimerIntegrationTest : public Event::TestUsingSimulatedTime,
+                                           public OverloadIntegrationTest {
 protected:
+  DownstreamConnectionTracker downstream_connections_{config_helper_, *dispatcher_};
+
   void initializeOverloadManager(
       const envoy::config::overload::v3::ScaleTimersOverloadActionConfig& config) {
     envoy::config::overload::v3::OverloadAction overload_action =
@@ -410,6 +482,16 @@ protected:
             saturation_threshold: 0.9
     )EOF");
     std::ignore = overload_action.mutable_typed_config()->PackFrom(config);
+    if (downstreamProtocol() != Http::CodecType::HTTP1) {
+      // These tests exercise scaled timeouts, not the subsequent GOAWAY drain and delayed close.
+      // HTTP/1 keeps its drain period so the tests can send a final request before disconnecting.
+      config_helper_.addConfigModifier(
+          [](envoy::extensions::filters::network::http_connection_manager::v3::
+                 HttpConnectionManager& cm) {
+            cm.mutable_drain_timeout()->Clear();
+            cm.mutable_delayed_close_timeout()->Clear();
+          });
+    }
     OverloadIntegrationTest::initializeOverloadManager(overload_action);
   }
 };
@@ -438,11 +520,21 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
+  if (GetParam().downstream_protocol == Http::CodecType::HTTP2) {
+    test_server_->waitForGauge("http.config_test.downstream_cx_http2_idle", Eq(0));
+  } else if (GetParam().downstream_protocol == Http::CodecType::HTTP3) {
+    test_server_->waitForGauge("http.config_test.downstream_cx_http3_idle", Eq(0));
+  }
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
 
   // At this point, the connection should be idle but still open.
   ASSERT_TRUE(codec_client_->connected());
+  if (GetParam().downstream_protocol == Http::CodecType::HTTP2) {
+    test_server_->waitForGauge("http.config_test.downstream_cx_http2_idle", Eq(1));
+  } else if (GetParam().downstream_protocol == Http::CodecType::HTTP3) {
+    test_server_->waitForGauge("http.config_test.downstream_cx_http3_idle", Eq(1));
+  }
 
   // Set the load so the timer is reduced but not to the minimum value.
   updateResource(0.8);
@@ -474,6 +566,11 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(codec_client_->sawGoAway());
+    if (GetParam().downstream_protocol == Http::CodecType::HTTP2) {
+      test_server_->waitForGauge("http.config_test.downstream_cx_http2_idle", Eq(0));
+    } else if (GetParam().downstream_protocol == Http::CodecType::HTTP3) {
+      test_server_->waitForGauge("http.config_test.downstream_cx_http3_idle", Eq(0));
+    }
   }
   codec_client_->close();
 }
@@ -552,7 +649,11 @@ TEST_P(OverloadScaledTimerIntegrationTest, Http1SafeMaxConnectionDuration) {
         cm.set_http1_safe_max_connection_duration(true);
         // Drain timeout is not used for max_connection_duration if
         // http1_safe_max_connection_duration is enabled.
-        cm.mutable_drain_timeout()->MergeFrom(ProtobufUtil::TimeUtil::SecondsToDuration(0));
+        cm.mutable_drain_timeout()->CopyFrom(ProtobufUtil::TimeUtil::SecondsToDuration(0));
+        // Close the connection only once the final response has been written. A delayed close
+        // timer runs on simulated time and can fire before the response is written, so the
+        // client would see the connection close instead of the response.
+        cm.mutable_delayed_close_timeout()->CopyFrom(ProtobufUtil::TimeUtil::SecondsToDuration(0));
         cm.mutable_common_http_protocol_options()->mutable_max_connection_duration()->MergeFrom(
             ProtobufUtil::TimeUtil::SecondsToDuration(20));
       });
@@ -656,6 +757,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
       makeRawHttpConnection(makeClientConnection((lookupPort("http"))), std::nullopt, std::nullopt,
                             /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client_->connected());
+  ASSERT_TRUE(downstream_connections_.waitForConnection(1));
 
   // Advancing past the minimum time shouldn't close the connection.
   timeSystem().advanceTimeWait(std::chrono::seconds(3));
@@ -673,6 +775,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
       makeRawHttpConnection(makeClientConnection((lookupPort("http"))), std::nullopt, std::nullopt,
                             /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client2->connected());
+  ASSERT_TRUE(downstream_connections_.waitForConnection(2));
   // Advancing past the minimum time and wait for the proxy to notice and close both connections.
   timeSystem().advanceTimeWait(std::chrono::seconds(3));
   test_server_->waitForCounter("http.config_test.downstream_cx_idle_timeout", Ge(2));
@@ -727,6 +830,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
       makeRawHttpConnection(makeClientConnection((lookupPort("http"))), std::nullopt, std::nullopt,
                             /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client_->connected());
+  ASSERT_TRUE(downstream_connections_.waitForConnection(1));
 
   // Advancing past the minimum time shouldn't close the connection.
   timeSystem().advanceTimeWait(std::chrono::seconds(3));
@@ -744,6 +848,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsD
       makeRawHttpConnection(makeClientConnection((lookupPort("http"))), std::nullopt, std::nullopt,
                             /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client2->connected());
+  ASSERT_TRUE(downstream_connections_.waitForConnection(2));
   // Advancing past the minimum time and wait for the proxy to notice and close both connections.
   timeSystem().advanceTimeWait(std::chrono::seconds(3));
   test_server_->waitForCounter("http.config_test.downstream_cx_max_duration_reached", Ge(2));
@@ -876,7 +981,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
   Network::TransportSocketCallbacks* transport_callbacks;
   EXPECT_CALL(*bad_transport_socket, setTransportSocketCallbacks)
       .WillOnce(SaveArgAddress(&transport_callbacks));
-  ON_CALL(*bad_transport_socket, doRead).WillByDefault(InvokeWithoutArgs([&] {
+  ON_CALL(*bad_transport_socket, doRead).WillByDefault([&] {
     Buffer::OwnedImpl buffer;
     transport_callbacks->connection().dispatcher().exit();
     // Read some amount of data; what's more important is whether the socket was remote-closed. That
@@ -886,11 +991,11 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
                                  ? Network::PostIoAction::Close
                                  : Network::PostIoAction::KeepOpen,
                              0, false};
-  }));
-  ON_CALL(*bad_transport_socket, doWrite).WillByDefault(InvokeWithoutArgs([&] {
+  });
+  ON_CALL(*bad_transport_socket, doWrite).WillByDefault([&] {
     transport_callbacks->connection().dispatcher().exit();
     return Network::IoResult{Network::PostIoAction::KeepOpen, 0, false};
-  }));
+  });
 
   ConnectionStatusCallbacks connect_callbacks;
   Network::Address::InstanceConstSharedPtr address =
@@ -907,6 +1012,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
 
   // At this point, the connection should be idle but the SSL handshake isn't done.
   EXPECT_FALSE(connect_callbacks.connected());
+  ASSERT_TRUE(downstream_connections_.waitForConnection());
 
   // Set the load so the timer is reduced but not to the minimum value.
   updateResource(0.8);
@@ -927,16 +1033,17 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
 
   // The bad client will continue attempting to read, eventually noticing the remote close and
   // closing the connection.
-  while (!connect_callbacks.closed()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  ASSERT_TRUE(IntegrationUtil::runDispatcherUntil(
+      *dispatcher_, [&connect_callbacks] { return connect_callbacks.closed(); },
+      "TLS peer disconnect after handshake timeout"));
 
   // The transport-level connection was never completed, and the connection was closed.
   EXPECT_FALSE(connect_callbacks.connected());
   EXPECT_TRUE(connect_callbacks.closed());
 }
 
-class MultipleReduceTimeoutsActionsIntegrationTest : public OverloadIntegrationTest {
+class MultipleReduceTimeoutsActionsIntegrationTest : public Event::TestUsingSimulatedTime,
+                                                     public OverloadIntegrationTest {
 protected:
   MultipleReduceTimeoutsActionsIntegrationTest() {
     second_factory_ = std::make_unique<FakeResourceMonitorFactory2>();
@@ -1472,6 +1579,43 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayAndClosesConn
   EXPECT_FALSE(second_request_decoder->complete());
 }
 
+TEST_P(LoadShedPointIntegrationTest, Http2ServerResetStreamOnBeginHeaders) {
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP2) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http2_server_reset_stream_on_begin_headers"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  updateResource(0.95);
+  test_server_->waitForGauge(
+      "overload.envoy.load_shed_points.http2_server_reset_stream_on_begin_headers.scale_percent",
+      Eq(100));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_EQ(Http::StreamResetReason::RemoteRefusedStreamReset, response->resetReason());
+  test_server_->waitForCounter("http2.stream_refused_errors", Eq(1));
+
+  updateResource(0.80);
+  test_server_->waitForGauge(
+      "overload.envoy.load_shed_points.http2_server_reset_stream_on_begin_headers.scale_percent",
+      Eq(0));
+
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+}
+
 TEST_P(LoadShedPointIntegrationTest, HttpConnectionMnagerCloseConnectionCreatingCodec) {
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
     return;
@@ -1682,16 +1826,24 @@ TEST_P(LoadShedPointIntegrationTest, Http3ServerDispatchSendsGoAwayAndClosesConn
   test_server_->waitForCounter("http.config_test.downstream_rq_http3_total", Eq(1));
 
   // Put envoy in overloaded state to send GOAWAY frames and close the
-  // connection.
+  // connection on new stream creation.
   updateResource(0.95);
   test_server_->waitForGauge("overload.envoy.load_shed_points.http3_server_go_away_and_close_on_"
                              "dispatch.scale_percent",
                              Eq(100));
 
+  // Sending data on the existing in-flight stream should not trigger GOAWAY or close the
+  // connection.
+  Buffer::OwnedImpl first_request_body{"foo"};
+  first_request_encoder.encodeData(first_request_body, true);
+  ASSERT_TRUE(first_request_decoder->waitForEndStream());
+  EXPECT_TRUE(first_request_decoder->complete());
+  EXPECT_FALSE(codec_client_->sawGoAway());
+
   auto second_request_decoder = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   // The downstream should receive the GOAWAY and the connection should be
-  // closed.
+  // closed when creating the new stream.
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   EXPECT_TRUE(codec_client_->sawGoAway());
 
@@ -1740,6 +1892,9 @@ TEST_P(LoadShedPointIntegrationTest, Http3ServerDispatchSendsGoAwayCompletingPen
   // so the second request should also complete.
   EXPECT_TRUE(second_request_decoder->waitForEndStream());
   EXPECT_TRUE(second_request_decoder->complete());
+  test_server_->waitForCounter("http3.goaway_sent", Eq(1));
+  test_server_->waitForCounter(
+      "overload.envoy.load_shed_points.http3_server_go_away_on_dispatch.shed_load_count", Eq(1));
 
   codec_client_->close();
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -1870,8 +2025,11 @@ TEST_P(OverloadIntegrationTest, WorkerWatchdogMegaMiss) {
   // Verify that the global workers megamiss counter is incremented.
   test_server_->waitForCounter("workers.watchdog_mega_miss", Ge(1));
 
-  EXPECT_TRUE(response->waitForEndStream(std::chrono::seconds(20)));
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Verifies that when the runtime guard is disabled, worker threads fallback to the main thread
@@ -1908,8 +2066,11 @@ TEST_P(OverloadIntegrationTest, WorkerWatchdogMegaMissDisabled) {
   EXPECT_EQ(test_server_->counter("server.worker_0.watchdog_mega_miss")->value(), 0);
   EXPECT_EQ(test_server_->counter("workers.watchdog_mega_miss")->value(), 0);
 
-  EXPECT_TRUE(response->waitForEndStream(std::chrono::seconds(20)));
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 class TcpProxyLoadShedPointIntegrationTest

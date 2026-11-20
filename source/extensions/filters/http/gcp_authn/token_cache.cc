@@ -9,9 +9,9 @@ namespace HttpFilters {
 namespace GcpAuthn {
 
 namespace {
-uint64_t generateCacheKey(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+uint64_t generateCacheKey(absl::string_view serialized_audience,
                           const std::optional<std::string>& fingerprint) {
-  uint64_t key = MessageUtil::hash(audience);
+  uint64_t key = HashUtil::xxHash64(serialized_audience);
   if (fingerprint.has_value()) {
     key = HashUtil::xxHash64(fingerprint.value(), key);
   }
@@ -22,14 +22,15 @@ uint64_t generateCacheKey(const envoy::extensions::filters::http::gcp_authn::v3:
 std::optional<std::string>
 TokenCacheImpl::lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
                        const std::optional<std::string>& fingerprint) {
-  uint64_t key = generateCacheKey(audience, fingerprint);
+  const std::string serialized_audience = MessageUtil::serializeDeterministically(audience);
+  const uint64_t key = generateCacheKey(serialized_audience, fingerprint);
   typename LRUCache::ScopedLookup lookup(&lru_cache_, key);
   if (lookup.found()) {
-    GcpToken* const found_token = lookup.value();
-    // Verify that there is no hash collision by doing a deep comparison on both Audience and
+    CachedToken* const found_token = lookup.value();
+    // Verify that there is no hash collision by comparing the serialized audience and the
     // fingerprint.
     if (found_token->fingerprint != fingerprint ||
-        !Protobuf::util::MessageDifferencer::Equals(found_token->audience, audience)) {
+        found_token->serialized_audience != serialized_audience) {
       return std::nullopt;
     }
     // Verify the validness of the token by checking its expiration time field.
@@ -48,9 +49,12 @@ TokenCacheImpl::lookUp(const envoy::extensions::filters::http::gcp_authn::v3::Au
 }
 
 void TokenCacheImpl::insert(std::unique_ptr<GcpToken> token) {
-  uint64_t key = generateCacheKey(token->audience, token->fingerprint);
-  // Release the token to transfer the ownership.
-  lru_cache_.insert(key, token.release(), 1);
+  std::string serialized_audience = MessageUtil::serializeDeterministically(token->audience);
+  const uint64_t key = generateCacheKey(serialized_audience, token->fingerprint);
+  lru_cache_.insert(key,
+                    new CachedToken{std::move(token->token), token->expires_at,
+                                    std::move(token->fingerprint), std::move(serialized_audience)},
+                    1);
 }
 
 } // namespace GcpAuthn

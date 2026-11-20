@@ -29,7 +29,6 @@
 
 using envoy::config::bootstrap::v3::Bootstrap;
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::StrictMock;
@@ -94,12 +93,11 @@ public:
     // Delegate call to mock async client manager to real async client manager.
     ON_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
             getOrCreateRawAsyncClientWithHashKey(_, _, _))
-        .WillByDefault(
-            Invoke([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                       Stats::Scope& scope, bool skip_cluster_check) {
-              return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
-                  config_with_hash_key, scope, skip_cluster_check);
-            }));
+        .WillByDefault([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                           Stats::Scope& scope, bool skip_cluster_check) {
+          return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
+              config_with_hash_key, scope, skip_cluster_check);
+        });
     ExtAuthzFilterConfig factory;
     return factory.createFilterFactoryFromProto(ext_authz_config, "stats", context_).value();
   }
@@ -268,7 +266,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfiguration) {
   EXPECT_FALSE(typed_config.disabled());
   EXPECT_TRUE(typed_config.grpcService().has_value());
 
-  const auto& grpc_service = typed_config.grpcService().value();
+  const auto& grpc_service = typed_config.grpcService()->config();
   EXPECT_TRUE(grpc_service.has_envoy_grpc());
   EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_high_qps");
 
@@ -429,7 +427,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteServiceTypeSwitchingHttpToGrpc) {
   EXPECT_TRUE(merged_config.grpcService().has_value());
   EXPECT_FALSE(merged_config.httpService().has_value());
 
-  const auto& grpc_service = merged_config.grpcService().value();
+  const auto& grpc_service = merged_config.grpcService()->config();
   EXPECT_TRUE(grpc_service.has_envoy_grpc());
   EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_grpc_cluster");
   EXPECT_EQ(grpc_service.envoy_grpc().authority(), "ext-authz.example.com");
@@ -500,7 +498,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceWithTimeout) {
   EXPECT_TRUE(typed_config.grpcService().has_value());
   EXPECT_FALSE(typed_config.httpService().has_value());
 
-  const auto& grpc_service = typed_config.grpcService().value();
+  const auto& grpc_service = typed_config.grpcService()->config();
   EXPECT_TRUE(grpc_service.has_envoy_grpc());
   EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_custom_grpc");
   EXPECT_EQ(grpc_service.envoy_grpc().authority(), "custom-ext-authz.example.com");
@@ -546,7 +544,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteEmptyContextExtensionsMerging) {
 
   // Should use gRPC service from more specific
   EXPECT_TRUE(merged_config.grpcService().has_value());
-  EXPECT_EQ(merged_config.grpcService().value().envoy_grpc().cluster_name(), "specific_cluster");
+  EXPECT_EQ(merged_config.grpcService()->config().envoy_grpc().cluster_name(), "specific_cluster");
 
   // Should preserve context extensions from less specific since more specific has none
   const auto& context_extensions = merged_config.contextExtensions();
@@ -600,7 +598,7 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfigurationMerging) {
 
   // Check that more specific gRPC service is used
   EXPECT_TRUE(merged_config.grpcService().has_value());
-  const auto& grpc_service = merged_config.grpcService().value();
+  const auto& grpc_service = merged_config.grpcService()->config();
   EXPECT_TRUE(grpc_service.has_envoy_grpc());
   EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_high_qps");
 
@@ -722,15 +720,14 @@ TEST_F(ExtAuthzFilterHttpTest, HttpClientFactoryPerRouteHttpServiceOverride) {
       &context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_);
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
               send_(_, _, _))
-      .WillOnce(Invoke([&async_request](Http::RequestMessagePtr&,
-                                        Http::AsyncClient::Callbacks& callbacks,
-                                        const Http::AsyncClient::RequestOptions&)
-                           -> Http::AsyncClient::Request* {
+      .WillOnce([&async_request](
+                    Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
         Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
             Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
         callbacks.onSuccess(async_request, std::move(response));
         return nullptr;
-      }));
+      });
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
@@ -913,9 +910,9 @@ TEST_F(ExtAuthzFilterGrpcTest, GrpcClientFactoryPerRouteGrpcServiceOverride) {
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
               getOrCreateRawAsyncClientWithHashKey(_, _, true))
       .WillRepeatedly(
-          Invoke([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                     Stats::Scope& scope,
-                     bool skip_cluster_check) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
+          [&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+              Stats::Scope& scope,
+              bool skip_cluster_check) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
             // The per-route gRPC client creation should call getOrCreateRawAsyncClientWithHashKey
             // with a config matching the per-route cluster "per_route_ext_authz_cluster".
             if (config_with_hash_key.config().envoy_grpc().cluster_name() ==
@@ -927,7 +924,7 @@ TEST_F(ExtAuthzFilterGrpcTest, GrpcClientFactoryPerRouteGrpcServiceOverride) {
             // A client is made for the default cluster during initialization.
             return async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
                 config_with_hash_key, scope, skip_cluster_check);
-          }));
+          });
 
   EXPECT_CALL(*mock_per_route_grpc_client, sendRaw(_, _, _, _, _, _))
       .WillRepeatedly([](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
@@ -973,6 +970,121 @@ TEST_F(ExtAuthzFilterGrpcTest, GrpcClientFactoryPerRouteGrpcServiceOverride) {
     decoder_filter->onDestroy();
   });
   EXPECT_TRUE(per_route_cluster_requested);
+}
+
+// Verify that ExtAuthz.read_raw_header_value is propagated to GrpcClientImpl for both the default
+// filter factory client and per-route gRPC service overrides.
+TEST_F(ExtAuthzFilterGrpcTest, GrpcClientFactoryReadRawHeaderValue) {
+  const std::string ext_authz_config_yaml = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "default_ext_authz_cluster"
+  failure_mode_allow: false
+  read_raw_header_value: true
+  )EOF";
+
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_authz_config;
+  Http::FilterFactoryCb filter_factory;
+  runOnMainBlocking([&]() {
+    TestUtility::loadFromYaml(ext_authz_config_yaml, ext_authz_config);
+    filter_factory = createFilterFactory(ext_authz_config);
+  });
+
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_proto;
+  per_route_proto.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("per_route_ext_authz_cluster");
+  FilterConfigPerRoute per_route_filter_config = makePerRoute(per_route_proto);
+
+  auto mock_default_grpc_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
+  auto mock_per_route_grpc_client = std::make_shared<NiceMock<Grpc::MockAsyncClient>>();
+
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
+              getOrCreateRawAsyncClientWithHashKey(_, _, true))
+      .WillRepeatedly([&](const Envoy::Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                          Stats::Scope&, bool) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
+        if (config_with_hash_key.config().envoy_grpc().cluster_name() ==
+            "per_route_ext_authz_cluster") {
+          return mock_per_route_grpc_client;
+        }
+        return mock_default_grpc_client;
+      });
+
+  auto respond_with_raw_header = [](absl::string_view header_raw_value) {
+    return [header_raw_value](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
+                              Grpc::RawAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
+                              const Http::AsyncClient::RequestOptions&) -> Grpc::AsyncRequest* {
+      envoy::service::auth::v3::CheckResponse check_response;
+      check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+      auto* header = check_response.mutable_ok_response()->add_headers();
+      header->mutable_header()->set_key("x-raw-authz");
+      header->mutable_header()->set_raw_value(header_raw_value);
+
+      std::string serialized_response;
+      std::ignore = check_response.SerializeToString(&serialized_response);
+      auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
+      callbacks.onSuccessRaw(std::move(response), parent_span);
+      return nullptr;
+    };
+  };
+
+  EXPECT_CALL(*mock_default_grpc_client, sendRaw(_, _, _, _, _, _))
+      .WillRepeatedly(respond_with_raw_header("default-raw-value"));
+  EXPECT_CALL(*mock_per_route_grpc_client, sendRaw(_, _, _, _, _, _))
+      .WillRepeatedly(respond_with_raw_header("per-route-raw-value"));
+
+  runOnAllWorkersBlocking([&, filter_factory]() {
+    auto addr = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
+
+    // 1. Default route uses the factory-constructed GrpcClientImpl.
+    {
+      Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
+      ASSERT_NE(filter, nullptr);
+
+      NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+      NiceMock<Envoy::Network::MockConnection> connection;
+      connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr);
+      connection.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr);
+      ON_CALL(decoder_callbacks, connection())
+          .WillByDefault(Return(OptRef<const Network::Connection>{connection}));
+
+      filter->setDecoderFilterCallbacks(decoder_callbacks);
+      Http::TestRequestHeaderMapImpl request_headers{
+          {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+      EXPECT_EQ("default-raw-value", request_headers.get_("x-raw-authz"));
+
+      std::shared_ptr<Http::StreamDecoderFilter> decoder_filter = filter;
+      decoder_filter->onDestroy();
+    }
+
+    // 2. Overridden route uses Filter::createPerRouteGrpcClient.
+    {
+      Http::StreamFilterSharedPtr filter = createFilterFromFilterFactory(filter_factory);
+      ASSERT_NE(filter, nullptr);
+
+      NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+      NiceMock<Envoy::Network::MockConnection> connection;
+      connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr);
+      connection.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr);
+      ON_CALL(decoder_callbacks, connection())
+          .WillByDefault(Return(OptRef<const Network::Connection>{connection}));
+
+      Router::RouteSpecificFilterConfigs per_route_configs;
+      per_route_configs.push_back(&per_route_filter_config);
+      ON_CALL(decoder_callbacks, perFilterConfigs()).WillByDefault(Return(per_route_configs));
+
+      filter->setDecoderFilterCallbacks(decoder_callbacks);
+      Http::TestRequestHeaderMapImpl request_headers{
+          {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+      EXPECT_EQ("per-route-raw-value", request_headers.get_("x-raw-authz"));
+
+      std::shared_ptr<Http::StreamDecoderFilter> decoder_filter = filter;
+      decoder_filter->onDestroy();
+    }
+  });
 }
 
 } // namespace ExtAuthz

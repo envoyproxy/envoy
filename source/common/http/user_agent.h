@@ -11,6 +11,7 @@
 #include "envoy/stats/timespan.h"
 
 #include "source/common/stats/symbol_table.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -48,13 +49,11 @@ struct UserAgentContext {
  */
 struct UserAgentStats {
   /**
-   * @param device the flat 'user_agent.<device>' prefix of the stats.
-   * @param device_tags the tags describing that same device.
-   * @param scope the scope the stats are created in, which already carries any enclosing prefix.
+   * @param helper the helper the stats are created with, which carries the 'user_agent.<device>'
+   * prefix and the tags describing that device.
    * @param context the pre-resolved stat name tokens.
    */
-  UserAgentStats(Stats::StatName device, Stats::StatNameTagSpan device_tags, Stats::Scope& scope,
-                 const UserAgentContext& context);
+  UserAgentStats(Stats::LiteScopeHelper& helper, const UserAgentContext& context);
 
   Stats::Counter& downstream_cx_total_;
   Stats::Counter& downstream_cx_destroy_remote_active_rq_;

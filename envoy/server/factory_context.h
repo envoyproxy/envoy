@@ -38,6 +38,8 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/singleton/threadsafe_singleton.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 
 namespace Regex {
@@ -396,6 +398,18 @@ public:
    * @return the stats scope of the cluster. This will last as long as the cluster is valid
    * */
   virtual Stats::Scope& scope() PURE;
+
+  /**
+   * @return the optional scope that statsPrefix() has already been applied to. Only the filters
+   *         that are created with that very stats prefix may be given this scope. See
+   *         Server::Configuration::ExtraFactoryContext::stats_prefix_scope.
+   */
+  virtual OptRef<Stats::Scope> statsPrefixScope() { return {}; }
+
+  /**
+   * @return the stats prefix that statsPrefixScope() stands in for.
+   */
+  virtual absl::string_view statsPrefix() const { return {}; }
 };
 
 } // namespace Configuration

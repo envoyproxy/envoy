@@ -1,15 +1,18 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_dyn_module_test",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     data = [
@@ -22,6 +25,14 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:matcher_missing_match",
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op",
     ],
+    extension_names = ["envoy.matching.matchers.dynamic_modules"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -32,7 +43,7 @@ envoy_cc_dyn_module_test(
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "matcher_test",
     srcs = ["matcher_test.cc"],
     data = [
@@ -40,6 +51,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:matcher_error",
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op",
     ],
+    extension_names = ["envoy.matching.matchers.dynamic_modules"],
     deps = [
         "//source/extensions/matching/input_matchers/dynamic_modules:matcher_lib",
         "//test/extensions/dynamic_modules:util",
@@ -48,21 +60,29 @@ envoy_cc_dyn_module_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
+    extension_names = ["envoy.matching.matchers.dynamic_modules"],
     deps = [
         "//source/extensions/matching/input_matchers/dynamic_modules:matcher_lib",
         "//test/test_common:utility_lib",
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:matcher_check_headers",
     ],
+    extension_names = ["envoy.matching.matchers.dynamic_modules"],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/matching/http/dynamic_modules:data_input_lib",
         "//source/extensions/matching/input_matchers/dynamic_modules:config",

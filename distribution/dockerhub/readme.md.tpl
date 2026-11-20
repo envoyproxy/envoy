@@ -16,7 +16,7 @@
 {% for version in stable_versions %}
 - [v{{ version }}-latest](https://github.com/envoyproxy/envoy/blob/release/v{{ version }}/distribution/docker/Dockerfile-envoy)
 {% endfor %}
-- [dev](https://github.com/envoyproxy/envoy/blob/main/distribution/docker/Dockerfile-envoy)
+- [dev](https://github.com/envoyproxy/envoy/blob/main/distribution/docker/BUILD) (built with Bazel)
 
 
 ## Quick reference (cont.)
@@ -75,8 +75,3 @@ in Envoy `main` from which it was created.
 
 For example, after a build at commit `7c1c4a0e`, an image will be created for `envoyproxy/envoy:dev-7c1c4a0e10a7a0771ac06ce8cf8fa2c6ce86281b`
 and the image `envoyproxy/envoy:dev` will be tagged to it until the next build.
-
-### `envoyproxy/envoy:google-vrp-<version>`
-
-These images contain tools for testing and researching vulnerabilities as part of the [Google
-Vulnerability Reward Program (VRP)](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/google_vrp.html)

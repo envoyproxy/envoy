@@ -7,6 +7,7 @@ import "envoy/extensions/filters/common/jwks/v3/jwt_handshake.proto";
 
 import "google/protobuf/duration.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -97,7 +98,7 @@ message Validation {
 // Configuration for the reverse tunnel network filter.
 // This filter handles reverse tunnel connection acceptance and rejection by processing
 // HTTP requests where required identification values are provided via HTTP headers.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message ReverseTunnel {
   // Ping interval for health checks on established reverse tunnel connections.
   // If not specified, defaults to ``2 seconds``.
@@ -106,13 +107,10 @@ message ReverseTunnel {
     gte {nanos: 1000000}
   }];
 
-  // Whether to automatically close connections after processing reverse tunnel requests.
-  //
-  // * When set to ``true``, connections are closed after acceptance or rejection.
-  // * When set to ``false``, connections remain open for potential reuse.
-  //
-  // Defaults to ``false``.
-  bool auto_close_connections = 2;
+  // Deprecated. The handshake connection is always detached once the acceptance response is
+  // flushed so tunnel bytes have a single reader. Ignored.
+  bool auto_close_connections = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // HTTP path to match for reverse tunnel requests.
   // If not specified, defaults to ``/reverse_connections/request``.
@@ -179,4 +177,11 @@ message ReverseTunnel {
   // worker it is finally rebalanced to, so it is best-effort unless ``skip_rebalancing`` is ``true``.
   // Default: false.
   bool enable_connection_limit = 9;
+
+  // Maximum time to receive a complete handshake request. If not specified, defaults to ``10s``.
+  // On expiry the connection is closed and ``handshake.timeout`` is incremented.
+  google.protobuf.Duration handshake_timeout = 11 [(validate.rules).duration = {
+    lte {seconds: 300}
+    gt {}
+  }];
 }

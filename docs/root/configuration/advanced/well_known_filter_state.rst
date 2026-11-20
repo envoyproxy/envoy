@@ -97,7 +97,19 @@ The following lists the filter state object keys used by the Envoy extensions to
   * ``anon_tor``: TOR exit node check result (``true`` or ``false``);
   * ``anon_proxy``: public proxy check result (``true`` or ``false``);
   * ``isp``: ISP name;
-  * ``apple_private_relay``: iCloud Private Relay check result (``true`` or ``false``).
+  * ``apple_private_relay``: iCloud Private Relay check result (``true`` or ``false``);
+  * ``city_geoname_id``: GeoNames ID of the city;
+  * ``latitude``: approximate WGS84 latitude (4 decimal places);
+  * ``longitude``: approximate WGS84 longitude (4 decimal places);
+  * ``time_zone``: IANA time zone (e.g. ``Europe/London``);
+  * ``postal_code``: postal code;
+  * ``region_name``: English name of the region;
+  * ``region_geoname_id``: GeoNames ID of the region;
+  * ``subregion_geoname_id``: GeoNames ID of the subregion;
+  * ``country_geoname_id``: GeoNames ID of the country;
+  * ``continent_geoname_id``: GeoNames ID of the continent;
+  * ``metro_code``: metro/DMA code (US only);
+  * ``country_name``: English name of the country.
 
 ``envoy.filters.http.mcp.request``
   :ref:`MCP filter <config_http_filters_mcp>` stores parsed MCP (Model Context Protocol) JSON-RPC
@@ -115,6 +127,34 @@ The following lists the filter state object keys used by the Envoy extensions to
   <envoy_v3_api_msg_extensions.http.ai_filters.request_info.v3.RequestInfo>` read it from the
   payload or, for Gemini, the request path. Accepts a non-empty model name as a constructor, e.g.
   "gpt-4o".
+
+``envoy.ai.llm_protocol.response``
+  Names the backend's wire API to the :ref:`transcoder AI filter
+  <config_http_filters_ai_protocol_manager_transcoder_instructions>` and to response token-usage
+  extraction, ahead of the route's ``response`` declaration. Accepts an :ref:`LLMProtocol
+  <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` enum-value name as a constructor, e.g.
+  "GEMINI_GENERATE_CONTENT". Supports field access with ``llm_protocol``.
+
+``envoy.ai.binding.request``
+  The :ref:`binding <config_http_filters_ai_protocol_manager_transcoder_instructions>` the
+  client's request arrived in, under which the transcoder's ``TO_IR`` leg reads its path and
+  body. Accepts a URI pattern (``/...``) or an :ref:`LLMBinding
+  <envoy_v3_api_msg_type.ai.v3.LLMBinding>` in JSON (``{...}``) as a constructor.
+
+``envoy.ai.binding.response``
+  The :ref:`binding <config_http_filters_ai_protocol_manager_transcoder_instructions>` the
+  backend expects, which the transcoder's ``FROM_IR`` leg renders into the request's ``:path``
+  and applies to its body. Accepts a URI pattern or an :ref:`LLMBinding
+  <envoy_v3_api_msg_type.ai.v3.LLMBinding>` in JSON as a constructor.
+
+``envoy.ai.binding.read``
+  What the transcoder's ``TO_IR`` leg read from the client's path, set once per stream. Supports
+  field access with ``model`` and the names of the path's other variables, e.g. ``location``.
+
+``envoy.ai.model.resolved``
+  The model the transcoder sends upstream in place of the one the request names, in the body and
+  in the rendered path alike. Accepts a non-empty model name as a constructor, e.g.
+  "gemini-2.5-flash".
 
 ``envoy.network.network_namespace``
   Contains the value of the downstream connection's Linux network namespace if it differs from the default.

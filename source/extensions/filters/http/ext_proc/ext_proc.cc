@@ -1,7 +1,10 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
+#include <algorithm>
+#include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <utility>
 
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
@@ -292,6 +295,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
       allowed_override_modes_(config.allowed_override_modes()),
       grpc_service_(getFilterGrpcService(config)),
+      grpc_service_config_with_hash_key_(config.grpc_service()),
       mutation_checker_(config.mutation_rules(), context.regexEngine()),
       filter_metadata_(config.filter_metadata()),
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
@@ -318,7 +322,11 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       graceful_grpc_close_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_graceful_grpc_close")),
       allow_content_length_header_(config.allow_content_length_header()),
-      emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)) {
+      emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)),
+      max_streamed_body_chunk_size_(
+          config.has_max_streamed_body_chunk_size()
+              ? std::make_optional(config.max_streamed_body_chunk_size().value())
+              : std::nullopt) {
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
   }
@@ -666,6 +674,10 @@ FilterConfigPerRoute::FilterConfigPerRoute(
       emit_client_span_(config.overrides().has_emit_client_span()
                             ? std::optional<bool>(config.overrides().emit_client_span().value())
                             : std::nullopt),
+      max_streamed_body_chunk_size_(
+          config.overrides().has_max_streamed_body_chunk_size()
+              ? std::make_optional(config.overrides().max_streamed_body_chunk_size().value())
+              : std::nullopt),
       processing_request_modifier_factory_cb_(
           createProcessingRequestModifierCb(config.overrides(), builder, context)) {}
 
@@ -702,6 +714,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       emit_client_span_(more_specific.emitClientSpan().has_value()
                             ? more_specific.emitClientSpan()
                             : less_specific.emitClientSpan()),
+      max_streamed_body_chunk_size_(more_specific.maxStreamedBodyChunkSize().has_value()
+                                        ? more_specific.maxStreamedBodyChunkSize()
+                                        : less_specific.maxStreamedBodyChunkSize()),
       processing_request_modifier_factory_cb_(
           more_specific.processing_request_modifier_factory_cb_
               ? more_specific.processing_request_modifier_factory_cb_
@@ -804,13 +819,13 @@ Filter::StreamOpenState Filter::openStream() {
     auto options = Http::AsyncClient::StreamOptions()
                        .setParentSpan(decoder_callbacks_->activeSpan())
                        .setParentContext(grpc_context)
-                       .setBufferBodyForRetry(grpc_service_.has_retry_policy())
+                       .setBufferBodyForRetry(grpcServiceConfig().has_retry_policy())
                        .setSampled(emit_client_span_ ? std::nullopt : std::make_optional(false))
                        .setRemoteCloseTimeout(config_->remoteCloseTimeout());
 
     ExternalProcessorClient* grpc_client = dynamic_cast<ExternalProcessorClient*>(client_.get());
     ExternalProcessorStreamPtr stream_object =
-        grpc_client->start(*this, config_with_hash_key_, options, watermark_callbacks_);
+        grpc_client->start(*this, grpcServiceConfigWithHashKey(), options, watermark_callbacks_);
 
     if (processing_complete_ || stream_object == nullptr) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called.
@@ -991,6 +1006,11 @@ FilterDataStatus Filter::handleDataBufferedMode(ProcessorState& state, Buffer::I
 
 FilterDataStatus Filter::handleDataStreamedModeBase(ProcessorState& state, Buffer::Instance& data,
                                                     bool end_stream) {
+  // For empty data chunk with end_stream false, do not send it to the ext_proc server.
+  if (emptyDataWithFalseEos(data, end_stream)) {
+    return state.getBodyCallbackResultInStreamedMode(end_stream);
+  }
+
   switch (openStream()) {
   case StreamOpenState::Error:
     return FilterDataStatus::StopIterationNoBuffer;
@@ -1000,19 +1020,11 @@ FilterDataStatus Filter::handleDataStreamedModeBase(ProcessorState& state, Buffe
     break;
   }
 
-  ProcessingRequest req = setupBodyChunk(state, data, end_stream);
-  if (state.bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
-    state.enqueueStreamingChunk(data, end_stream);
-  } else {
-    // For FULL_DUPLEX_STREAMED mode, just drain the data.
-    data.drain(data.length());
-  }
   // If the current state is HeadersCallback, stays in that state.
-  if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-    sendBodyChunk(state, ProcessorState::CallbackState::HeadersCallback, req);
-  } else {
-    sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
-  }
+  auto cb_state = state.callbackState() == ProcessorState::CallbackState::HeadersCallback
+                      ? ProcessorState::CallbackState::HeadersCallback
+                      : ProcessorState::CallbackState::StreamedBodyCallback;
+  sendStreamedBodyChunk(state, data, cb_state, end_stream);
   return state.getBodyCallbackResultInStreamedMode(end_stream);
 }
 
@@ -1091,7 +1103,10 @@ FilterDataStatus Filter::handleDataBufferedPartialMode(ProcessorState& state,
 }
 
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
-  state.setBodyReceived(true);
+  // Don't count empty body chunk with false end_stream.
+  if (!emptyDataWithFalseEos(data, end_stream)) {
+    state.setBodyReceived(true);
+  }
 
   if (config_->observabilityMode()) {
     return sendDataInObservabilityMode(data, state, end_stream);
@@ -1459,6 +1474,37 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
   stats_.stream_msgs_sent_.inc();
 }
 
+void Filter::sendStreamedBodyChunk(ProcessorState& state, Buffer::Instance& data,
+                                   ProcessorState::CallbackState new_state, bool end_stream) {
+  if (!max_streamed_body_chunk_size_.has_value() ||
+      data.length() < *max_streamed_body_chunk_size_) {
+    auto req = setupBodyChunk(state, data, end_stream);
+    if (state.bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
+      state.enqueueStreamingChunk(data, end_stream);
+    } else {
+      // For FULL_DUPLEX_STREAMED mode, just drain the data.
+      data.drain(data.length());
+    }
+    sendBodyChunk(state, new_state, req);
+    return;
+  }
+
+  const uint64_t max_chunk_size = *max_streamed_body_chunk_size_;
+  while (data.length() > 0) {
+    const uint64_t chunk_length = std::min(max_chunk_size, data.length());
+    Buffer::OwnedImpl chunk_buffer;
+    // Incrementally drain data buffer.
+    chunk_buffer.move(data, chunk_length);
+    const bool chunk_end_stream = (data.length() == 0) ? end_stream : false;
+
+    auto req = setupBodyChunk(state, chunk_buffer, chunk_end_stream);
+    if (state.bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
+      state.enqueueStreamingChunk(chunk_buffer, chunk_end_stream);
+    }
+    sendBodyChunk(state, new_state, req);
+  }
+}
+
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers,
                           bool observability_mode) {
   // Skip if the trailers is already sent to the server.
@@ -1503,7 +1549,7 @@ void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info)
       logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
     }
     // Only set upstream host in logging info once.
-    if (logging_info_->upstreamHost() == nullptr) {
+    if (logging_info_->upstreamHost() == nullptr && stream_info->upstreamInfo().has_value()) {
       logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
     }
 
@@ -1518,10 +1564,10 @@ void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info)
   }
 
   absl::string_view destination = "";
-  if (config_with_hash_key_.config().has_envoy_grpc()) {
-    destination = config_with_hash_key_.config().envoy_grpc().cluster_name();
-  } else if (config_with_hash_key_.config().has_google_grpc()) {
-    destination = config_with_hash_key_.config().google_grpc().target_uri();
+  if (grpcServiceConfig().has_envoy_grpc()) {
+    destination = grpcServiceConfig().envoy_grpc().cluster_name();
+  } else if (grpcServiceConfig().has_google_grpc()) {
+    destination = grpcServiceConfig().google_grpc().target_uri();
   }
   logging_info_->setDestination(destination);
 }
@@ -1533,7 +1579,7 @@ void Filter::logStreamInfo() {
     return;
   }
 
-  if (grpc_service_.has_envoy_grpc()) {
+  if (grpcServiceConfig().has_envoy_grpc()) {
     // Envoy gRPC service
     logStreamInfoBase(stream_ != nullptr ? &stream_->streamInfo() : nullptr);
   } else {
@@ -1742,7 +1788,7 @@ void Filter::handleErrorResponse(absl::Status processing_status) {
   ImmediateResponse invalid_mutation_response;
   invalid_mutation_response.mutable_status()->set_code(
       static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
-  invalid_mutation_response.set_details(std::string(processing_status.message()));
+  invalid_mutation_response.set_details(processing_status.message());
   sendImmediateResponse(invalid_mutation_response);
 }
 
@@ -2229,23 +2275,28 @@ void Filter::mergePerRouteConfig() {
     decoding_state_.setProcessingMode(*(merged_config->processingMode()));
     encoding_state_.setProcessingMode(*(merged_config->processingMode()));
   }
+  std::optional<envoy::config::core::v3::GrpcService> grpc_service;
   if (merged_config->grpcService().has_value()) {
     ENVOY_STREAM_LOG(trace, "Setting new GrpcService from per-route configuration",
                      *decoder_callbacks_);
-    grpc_service_ = *merged_config->grpcService();
-    config_with_hash_key_.setConfig(*merged_config->grpcService());
+    grpc_service = *merged_config->grpcService();
   }
   if (!merged_config->grpcInitialMetadata().empty()) {
     ENVOY_STREAM_LOG(trace, "Overriding grpc initial metadata from per-route configuration",
                      *decoder_callbacks_);
-    envoy::config::core::v3::GrpcService config = config_with_hash_key_.config();
-    auto ptr = config.mutable_initial_metadata();
+    if (!grpc_service.has_value()) {
+      grpc_service = grpcServiceConfig();
+    }
+    auto ptr = grpc_service->mutable_initial_metadata();
     for (const auto& header : merged_config->grpcInitialMetadata()) {
       ENVOY_STREAM_LOG(trace, "Setting grpc initial metadata {} = {}", *decoder_callbacks_,
                        header.key(), header.value());
       mergeHeaderValuesField(*ptr, header);
     }
-    config_with_hash_key_.setConfig(config);
+  }
+  if (grpc_service.has_value()) {
+    route_config_with_hash_key_ =
+        std::make_unique<Grpc::GrpcServiceConfigWithHashKey>(std::move(*grpc_service));
   }
 
   // For metadata namespaces, we only override the existing value if we have a
@@ -2326,6 +2377,12 @@ void Filter::mergePerRouteConfig() {
     ENVOY_STREAM_LOG(trace, "Setting new emitClientSpan from per-route configuration",
                      *decoder_callbacks_);
     emit_client_span_ = merged_config->emitClientSpan().value();
+  }
+
+  if (merged_config->maxStreamedBodyChunkSize().has_value()) {
+    ENVOY_STREAM_LOG(trace, "Setting new maxStreamedBodyChunkSize from per-route configuration",
+                     *decoder_callbacks_);
+    max_streamed_body_chunk_size_ = merged_config->maxStreamedBodyChunkSize().value();
   }
 
   if (merged_config->hasProcessingRequestModifierConfig()) {

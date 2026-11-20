@@ -14,11 +14,9 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/utility.h"
-#include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
-#include "source/common/router/vhds.h"
 
 namespace Envoy {
 namespace Router {
@@ -62,8 +60,7 @@ absl::Status RdsRouteConfigSubscription::afterProviderUpdate() {
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     RdsRouteConfigSubscriptionSharedPtr&& subscription,
     Server::Configuration::ServerFactoryContext& factory_context)
-    : base_(subscription, factory_context), config_update_info_(subscription->routeConfigUpdate()),
-      factory_context_(factory_context) {
+    : base_(subscription, factory_context), config_update_info_(subscription->routeConfigUpdate()) {
   // The subscription referenced by the 'base_' and by 'this' is the same.
   // In it the provider is already set by the 'base_' so it points to that.
   // Need to set again to point to 'this'.
@@ -79,36 +76,7 @@ absl::Status RdsRouteConfigProviderImpl::onConfigUpdate() {
   if (!status.ok()) {
     return status;
   }
-
-  const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
-  // Regular (non-VHDS) RDS updates don't populate aliases fields in resources.
-  if (aliases.empty()) {
-    return absl::OkStatus();
-  }
-
-  const auto config =
-      std::static_pointer_cast<const ConfigImpl>(config_update_info_->parsedConfiguration());
-  // Notifies connections that RouteConfiguration update has been propagated.
-  // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
-  // the VHDS update request do not match the aliases in the update response
-  for (auto it = config_update_callbacks_.begin(); it != config_update_callbacks_.end();) {
-    auto found = aliases.find(it->alias_);
-    if (found != aliases.end()) {
-      // TODO(dmitri-d) HeaderMapImpl is expensive, need to profile this
-      auto host_header = Http::RequestHeaderMapImpl::create();
-      host_header->setHost(VhdsSubscription::aliasToDomainName(it->alias_));
-      const bool host_exists = config->virtualHostExists(*host_header);
-      std::weak_ptr<Http::RouteConfigUpdatedCallback> current_cb(it->cb_);
-      it->thread_local_dispatcher_.post([current_cb, host_exists] {
-        if (auto cb = current_cb.lock()) {
-          (*cb)(host_exists);
-        }
-      });
-      it = config_update_callbacks_.erase(it);
-    } else {
-      it++;
-    }
-  }
+  config_update_info_->onVhdsConfigPublished();
   return absl::OkStatus();
 }
 
@@ -122,21 +90,8 @@ ConfigConstSharedPtr RdsRouteConfigProviderImpl::configCast() const {
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
-  auto alias = VhdsSubscription::domainNameToAlias(
-      config_update_info_->protobufConfigurationCast().name(), for_domain);
-  // The RdsRouteConfigProviderImpl instance can go away before the dispatcher has a chance to
-  // execute the callback. still_alive shared_ptr will be deallocated when the current instance of
-  // the RdsRouteConfigProviderImpl is deallocated; we rely on a weak_ptr to still_alive flag to
-  // determine if the RdsRouteConfigProviderImpl instance is still valid.
-  factory_context_.mainThreadDispatcher().post(
-      [this, maybe_still_alive = std::weak_ptr<bool>(still_alive_), alias, &thread_local_dispatcher,
-       route_config_updated_cb]() -> void {
-        if (maybe_still_alive.lock()) {
-          subscription().updateOnDemand(alias);
-          config_update_callbacks_.push_back(
-              {alias, thread_local_dispatcher, route_config_updated_cb});
-        }
-      });
+  config_update_info_->requestVirtualHostsUpdate(for_domain, thread_local_dispatcher,
+                                                 route_config_updated_cb);
 }
 RouteConfigProviderSharedPtr RdsFactoryImpl::createRdsRouteConfigProvider(
     const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,

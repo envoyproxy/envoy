@@ -91,7 +91,9 @@ protected:
    */
   void notifyFilter();
 
+private:
   // Filter that originated this request.
+  // Private, so that requests can only reach it through notifyFilter().
   AbstractRequestListener& filter_;
 
   // Whether the filter_ reference is still viable.

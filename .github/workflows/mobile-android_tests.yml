@@ -51,7 +51,6 @@ jobs:
     needs: load
     with:
       args: ${{ matrix.args }}
-      container: ${{ needs.load.outputs.build-image && fromJSON(needs.load.outputs.build-image).mobile || '' }}
       request: ${{ needs.load.outputs.request }}
       target: ${{ matrix.target }}
       timeout-minutes: 90

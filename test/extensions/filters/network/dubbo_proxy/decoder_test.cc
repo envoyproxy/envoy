@@ -25,25 +25,24 @@ public:
 
   void initHandler() {
     ON_CALL(delegate_, newStream(_, _))
-        .WillByDefault(Invoke([this](MessageMetadataSharedPtr data,
-                                     ContextSharedPtr ctx) -> ActiveStream* {
+        .WillByDefault([this](MessageMetadataSharedPtr data,
+                              ContextSharedPtr ctx) -> ActiveStream* {
           this->active_stream_ = std::make_shared<NiceMock<MockActiveStream>>(handler_, data, ctx);
           return active_stream_.get();
-        }));
+        });
   }
 
   void initProtocolDecoder(MessageType type, int32_t body_size) {
     ON_CALL(protocol_, decodeHeader(_, _))
-        .WillByDefault(
-            Invoke([=](Buffer::Instance&,
-                       MessageMetadataSharedPtr metadata) -> std::pair<ContextSharedPtr, bool> {
-              auto context = std::make_shared<ContextImpl>();
-              context->setHeaderSize(16);
-              context->setBodySize(body_size);
-              metadata->setMessageType(type);
+        .WillByDefault([=](Buffer::Instance&,
+                           MessageMetadataSharedPtr metadata) -> std::pair<ContextSharedPtr, bool> {
+          auto context = std::make_shared<ContextImpl>();
+          context->setHeaderSize(16);
+          context->setBodySize(body_size);
+          metadata->setMessageType(type);
 
-              return {context, true};
-            }));
+          return {context, true};
+        });
   }
 
   NiceMock<MockProtocol> protocol_;
@@ -126,9 +125,9 @@ TEST_F(DubboDecoderStateMachineTest, SerializeRpcInvocationException) {
   EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(0);
 
   EXPECT_CALL(protocol_, decodeData(_, _, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, ContextSharedPtr, MessageMetadataSharedPtr) -> bool {
+      .WillOnce([&](Buffer::Instance&, ContextSharedPtr, MessageMetadataSharedPtr) -> bool {
         throw EnvoyException(fmt::format("mock serialize exception"));
-      }));
+      });
 
   DecoderStateMachine dsm(protocol_, delegate_);
 
@@ -146,9 +145,9 @@ TEST_F(DubboDecoderStateMachineTest, SerializeRpcResultException) {
   EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(0);
 
   EXPECT_CALL(protocol_, decodeData(_, _, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, ContextSharedPtr, MessageMetadataSharedPtr) -> bool {
+      .WillOnce([&](Buffer::Instance&, ContextSharedPtr, MessageMetadataSharedPtr) -> bool {
         throw EnvoyException(fmt::format("mock serialize exception"));
-      }));
+      });
 
   DecoderStateMachine dsm(protocol_, delegate_);
 
@@ -160,10 +159,10 @@ TEST_F(DubboDecoderStateMachineTest, SerializeRpcResultException) {
 TEST_F(DubboDecoderStateMachineTest, ProtocolDecodeException) {
   EXPECT_CALL(delegate_, newStream(_, _)).Times(0);
   EXPECT_CALL(protocol_, decodeHeader(_, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [](Buffer::Instance&, MessageMetadataSharedPtr) -> std::pair<ContextSharedPtr, bool> {
             throw EnvoyException(fmt::format("mock protocol decode exception"));
-          }));
+          });
 
   DecoderStateMachine dsm(protocol_, delegate_);
 
@@ -175,8 +174,10 @@ TEST_F(DubboDecoderStateMachineTest, ProtocolDecodeException) {
 TEST_F(DubboDecoderTest, NeedMoreDataForProtocolHeader) {
   EXPECT_CALL(request_callbacks_, newStream()).Times(0);
   EXPECT_CALL(protocol_, decodeHeader(_, _))
-      .WillOnce(Invoke([](Buffer::Instance&, MessageMetadataSharedPtr)
-                           -> std::pair<ContextSharedPtr, bool> { return {nullptr, false}; }));
+      .WillOnce(
+          [](Buffer::Instance&, MessageMetadataSharedPtr) -> std::pair<ContextSharedPtr, bool> {
+            return {nullptr, false};
+          });
 
   RequestDecoder decoder(protocol_, request_callbacks_);
 
@@ -188,24 +189,24 @@ TEST_F(DubboDecoderTest, NeedMoreDataForProtocolHeader) {
 
 TEST_F(DubboDecoderTest, NeedMoreDataForProtocolBody) {
   EXPECT_CALL(protocol_, decodeHeader(_, _))
-      .WillOnce(Invoke([](Buffer::Instance&,
-                          MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
+      .WillOnce([](Buffer::Instance&,
+                   MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
         metadate->setMessageType(MessageType::Response);
         auto context = std::make_shared<ContextImpl>();
         context->setHeaderSize(16);
         context->setBodySize(10);
         return {context, true};
-      }));
+      });
   EXPECT_CALL(protocol_, decodeData(_, _, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, ContextSharedPtr, MessageMetadataSharedPtr) -> bool {
+      .WillOnce([&](Buffer::Instance&, ContextSharedPtr, MessageMetadataSharedPtr) -> bool {
         return false;
-      }));
+      });
 
   std::shared_ptr<NiceMock<MockActiveStream>> active_stream;
 
-  EXPECT_CALL(response_callbacks_, newStream()).WillOnce(Invoke([this]() -> StreamHandler& {
+  EXPECT_CALL(response_callbacks_, newStream()).WillOnce([this]() -> StreamHandler& {
     return handler_;
-  }));
+  });
   EXPECT_CALL(response_callbacks_, onHeartbeat(_)).Times(0);
   EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(0);
 
@@ -222,14 +223,14 @@ TEST_F(DubboDecoderTest, DecodeResponseMessage) {
   buffer.add(std::string({'\xda', '\xbb', '\xc2', 0x00}));
 
   EXPECT_CALL(protocol_, decodeHeader(_, _))
-      .WillOnce(Invoke([](Buffer::Instance&,
-                          MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
+      .WillOnce([](Buffer::Instance&,
+                   MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
         metadate->setMessageType(MessageType::Response);
         auto context = std::make_shared<ContextImpl>();
         context->setHeaderSize(16);
         context->setBodySize(10);
         return {context, true};
-      }));
+      });
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
   EXPECT_CALL(response_callbacks_, newStream()).WillOnce(ReturnRef(handler_));
   EXPECT_CALL(response_callbacks_, onHeartbeat(_)).Times(0);
@@ -245,14 +246,14 @@ TEST_F(DubboDecoderTest, DecodeResponseMessage) {
 
   EXPECT_EQ(ProtocolType::Dubbo, decoder.protocol().type());
   EXPECT_CALL(protocol_, decodeHeader(_, _))
-      .WillOnce(Invoke([](Buffer::Instance&,
-                          MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
+      .WillOnce([](Buffer::Instance&,
+                   MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
         metadate->setMessageType(MessageType::Response);
         auto context = std::make_shared<ContextImpl>();
         context->setHeaderSize(16);
         context->setBodySize(10);
         return {context, true};
-      }));
+      });
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
   EXPECT_CALL(response_callbacks_, newStream()).WillOnce(ReturnRef(handler_));
   EXPECT_CALL(response_callbacks_, onHeartbeat(_)).Times(0);

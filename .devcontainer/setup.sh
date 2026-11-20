@@ -11,4 +11,4 @@ sudo chown -R "$(id -u):$(id -g)" "${BUILD_DIR}"
 # Ensure that toolchain is downloaded.
 ./ci/do_ci.sh pre_refresh_compdb
 
-sudo ln -sf "${BUILD_DIR}"/bazel_root/base-envoy-compdb/external/llvm_toolchain_llvm/bin/{clang-format,clangd} /usr/local/bin/
+sudo ln -sf "${BUILD_DIR}"/bazel_root/base-envoy-compdb/external/toolchains_llvm++llvm+llvm_toolchain/bin/{clang-format,clangd} /usr/local/bin/

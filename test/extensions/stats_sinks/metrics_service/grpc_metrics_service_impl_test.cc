@@ -14,7 +14,6 @@
 using namespace std::chrono_literals;
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -38,12 +37,12 @@ public:
 
   void expectStreamStart(MockMetricsStream& stream, MetricsServiceCallbacks** callbacks_to_set) {
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
-        .WillOnce(Invoke([&stream, callbacks_to_set](absl::string_view, absl::string_view,
-                                                     Grpc::RawAsyncStreamCallbacks& callbacks,
-                                                     const Http::AsyncClient::StreamOptions&) {
+        .WillOnce([&stream, callbacks_to_set](absl::string_view, absl::string_view,
+                                              Grpc::RawAsyncStreamCallbacks& callbacks,
+                                              const Http::AsyncClient::StreamOptions&) {
           *callbacks_to_set = dynamic_cast<MetricsServiceCallbacks*>(&callbacks);
           return &stream;
-        }));
+        });
   }
 
   LocalInfo::MockLocalInfo local_info_;
@@ -74,12 +73,11 @@ TEST_F(GrpcMetricsStreamerImplTest, StreamFailure) {
   InSequence s;
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
-      .WillOnce(
-          Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
-                    const Http::AsyncClient::StreamOptions&) {
-            callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
-            return nullptr;
-          }));
+      .WillOnce([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
+                   const Http::AsyncClient::StreamOptions&) {
+        callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
+        return nullptr;
+      });
   ON_CALL(local_info_, node()).WillByDefault(testing::ReturnRef(local_info_.node_));
   auto metrics =
       std::make_unique<Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>>();
@@ -157,16 +155,16 @@ TEST_F(MetricsServiceSinkTest, CheckStatsCount) {
   addCounterToSnapshot("test_counter", 1, 100);
   addGaugeToSnapshot("test_gauge", 1);
 
-  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+  EXPECT_CALL(*streamer_, send(_)).WillOnce([](MetricsPtr&& metrics) {
     EXPECT_EQ(2, metrics->size());
-  }));
+  });
   sink.flush(snapshot_);
 
   // Verify only newly added metrics come after endFlush call.
   gauge_storage_.back()->used_ = false;
-  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+  EXPECT_CALL(*streamer_, send(_)).WillOnce([](MetricsPtr&& metrics) {
     EXPECT_EQ(1, metrics->size());
-  }));
+  });
   sink.flush(snapshot_);
 }
 
@@ -179,10 +177,10 @@ TEST_F(MetricsServiceSinkTest, ReportCountersValues) {
 
   addCounterToSnapshot("test_counter", 1, 100);
 
-  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+  EXPECT_CALL(*streamer_, send(_)).WillOnce([](MetricsPtr&& metrics) {
     EXPECT_EQ(1, metrics->size());
     EXPECT_EQ(100, (*metrics)[0].metric(0).counter().value());
-  }));
+  });
   sink.flush(snapshot_);
 }
 
@@ -199,14 +197,14 @@ TEST_F(MetricsServiceSinkTest, ReportCountersAsDeltas) {
         sink(streamer_, true, false,
              envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
 
-    EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+    EXPECT_CALL(*streamer_, send(_)).WillOnce([](MetricsPtr&& metrics) {
       ASSERT_EQ(1, metrics->size());
       EXPECT_EQ("test_counter", (*metrics)[0].name());
 
       const auto& metric = (*metrics)[0].metric(0);
       EXPECT_EQ(1, metric.counter().value());
       EXPECT_EQ(0, metric.label().size());
-    }));
+    });
     sink.flush(snapshot_);
   }
 
@@ -217,14 +215,14 @@ TEST_F(MetricsServiceSinkTest, ReportCountersAsDeltas) {
         sink(streamer_, true, true,
              envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
 
-    EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+    EXPECT_CALL(*streamer_, send(_)).WillOnce([](MetricsPtr&& metrics) {
       ASSERT_EQ(1, metrics->size());
       EXPECT_EQ("tag-counter-name", (*metrics)[0].name());
 
       const auto& metric = (*metrics)[0].metric(0);
       EXPECT_EQ(1, metric.counter().value());
       EXPECT_EQ(1, metric.label().size());
-    }));
+    });
     sink.flush(snapshot_);
   }
 }
@@ -250,7 +248,7 @@ TEST_F(MetricsServiceSinkTest, ReportMetricsWithTags) {
         sink(streamer_, false, false,
              envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
 
-    EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+    EXPECT_CALL(*streamer_, send(_)).WillOnce([](MetricsPtr&& metrics) {
       EXPECT_EQ(4, metrics->size());
 
       EXPECT_EQ("full-counter-name", (*metrics)[0].name());
@@ -264,7 +262,7 @@ TEST_F(MetricsServiceSinkTest, ReportMetricsWithTags) {
 
       EXPECT_EQ("full-histogram-name", (*metrics)[3].name());
       EXPECT_EQ(0, (*metrics)[3].metric(0).label().size());
-    }));
+    });
     sink.flush(snapshot_);
   }
 
@@ -278,7 +276,7 @@ TEST_F(MetricsServiceSinkTest, ReportMetricsWithTags) {
       sink(streamer_, false, true,
            envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
 
-  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([&expected_label_pair](MetricsPtr&& metrics) {
+  EXPECT_CALL(*streamer_, send(_)).WillOnce([&expected_label_pair](MetricsPtr&& metrics) {
     EXPECT_EQ(4, metrics->size());
 
     EXPECT_EQ("tag-counter-name", (*metrics)[0].name());
@@ -296,7 +294,7 @@ TEST_F(MetricsServiceSinkTest, ReportMetricsWithTags) {
     EXPECT_EQ("tag-histogram-name", (*metrics)[3].name());
     EXPECT_EQ(1, (*metrics)[3].metric(0).label().size());
     EXPECT_TRUE(TestUtility::protoEqual(expected_label_pair, (*metrics)[0].metric(0).label()[0]));
-  }));
+  });
   sink.flush(snapshot_);
 }
 
@@ -338,7 +336,7 @@ TEST_F(MetricsServiceSinkTest, HistogramEmitModeBoth) {
       sink(streamer_, true, false,
            envoy::config::metrics::v3::HistogramEmitMode::SUMMARY_AND_HISTOGRAM);
 
-  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+  EXPECT_CALL(*streamer_, send(_)).WillOnce([](MetricsPtr&& metrics) {
     ASSERT_EQ(2, metrics->size());
     EXPECT_EQ("test_histogram", (*metrics)[0].name());
     EXPECT_EQ("test_histogram", (*metrics)[1].name());
@@ -348,7 +346,7 @@ TEST_F(MetricsServiceSinkTest, HistogramEmitModeBoth) {
     EXPECT_TRUE(metric1.summary().has_sample_sum());
     const auto& metric2 = (*metrics)[1].metric(0);
     EXPECT_TRUE(metric2.has_histogram());
-  }));
+  });
   sink.flush(snapshot_);
 }
 
@@ -360,14 +358,14 @@ TEST_F(MetricsServiceSinkTest, HistogramEmitModeSummary) {
                      envoy::service::metrics::v3::StreamMetricsResponse>
       sink(streamer_, true, false, envoy::config::metrics::v3::HistogramEmitMode::SUMMARY);
 
-  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+  EXPECT_CALL(*streamer_, send(_)).WillOnce([](MetricsPtr&& metrics) {
     ASSERT_EQ(1, metrics->size());
     EXPECT_EQ("test_histogram", (*metrics)[0].name());
 
     const auto& metric1 = (*metrics)[0].metric(0);
     EXPECT_TRUE(metric1.has_summary());
     EXPECT_TRUE(metric1.summary().has_sample_sum());
-  }));
+  });
   sink.flush(snapshot_);
 }
 
@@ -379,13 +377,13 @@ TEST_F(MetricsServiceSinkTest, HistogramEmitModeHistogram) {
                      envoy::service::metrics::v3::StreamMetricsResponse>
       sink(streamer_, true, false, envoy::config::metrics::v3::HistogramEmitMode::HISTOGRAM);
 
-  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+  EXPECT_CALL(*streamer_, send(_)).WillOnce([](MetricsPtr&& metrics) {
     ASSERT_EQ(1, metrics->size());
     EXPECT_EQ("test_histogram", (*metrics)[0].name());
 
     const auto& metric1 = (*metrics)[0].metric(0);
     EXPECT_TRUE(metric1.has_histogram());
-  }));
+  });
   sink.flush(snapshot_);
 }
 
@@ -402,12 +400,12 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingWithMultipleBatches) {
   MockMetricsStream stream;
   MetricsServiceCallbacks* callbacks;
   EXPECT_CALL(*batch_async_client, startRaw(_, _, _, _))
-      .WillOnce(Invoke([&stream, &callbacks](absl::string_view, absl::string_view,
-                                             Grpc::RawAsyncStreamCallbacks& cb,
-                                             const Http::AsyncClient::StreamOptions&) {
+      .WillOnce([&stream, &callbacks](absl::string_view, absl::string_view,
+                                      Grpc::RawAsyncStreamCallbacks& cb,
+                                      const Http::AsyncClient::StreamOptions&) {
         callbacks = dynamic_cast<MetricsServiceCallbacks*>(&cb);
         return &stream;
-      }));
+      });
 
   // Identifier sent with first batch, then 2 more batches
   EXPECT_CALL(local_info_, node());
@@ -436,12 +434,12 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingExactMatch) {
   MockMetricsStream stream;
   MetricsServiceCallbacks* callbacks;
   EXPECT_CALL(*batch_async_client, startRaw(_, _, _, _))
-      .WillOnce(Invoke([&stream, &callbacks](absl::string_view, absl::string_view,
-                                             Grpc::RawAsyncStreamCallbacks& cb,
-                                             const Http::AsyncClient::StreamOptions&) {
+      .WillOnce([&stream, &callbacks](absl::string_view, absl::string_view,
+                                      Grpc::RawAsyncStreamCallbacks& cb,
+                                      const Http::AsyncClient::StreamOptions&) {
         callbacks = dynamic_cast<MetricsServiceCallbacks*>(&cb);
         return &stream;
-      }));
+      });
 
   EXPECT_CALL(local_info_, node());
   // Should result in 1 batch (with identifier included)
@@ -469,12 +467,12 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingSmallerThanBatchSize) {
   MockMetricsStream stream;
   MetricsServiceCallbacks* callbacks;
   EXPECT_CALL(*batch_async_client, startRaw(_, _, _, _))
-      .WillOnce(Invoke([&stream, &callbacks](absl::string_view, absl::string_view,
-                                             Grpc::RawAsyncStreamCallbacks& cb,
-                                             const Http::AsyncClient::StreamOptions&) {
+      .WillOnce([&stream, &callbacks](absl::string_view, absl::string_view,
+                                      Grpc::RawAsyncStreamCallbacks& cb,
+                                      const Http::AsyncClient::StreamOptions&) {
         callbacks = dynamic_cast<MetricsServiceCallbacks*>(&cb);
         return &stream;
-      }));
+      });
 
   EXPECT_CALL(local_info_, node());
   // Should send all in one batch (with identifier included)
@@ -526,12 +524,12 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingWithEmptyMetrics) {
   MockMetricsStream stream;
   MetricsServiceCallbacks* callbacks;
   EXPECT_CALL(*batch_async_client, startRaw(_, _, _, _))
-      .WillOnce(Invoke([&stream, &callbacks](absl::string_view, absl::string_view,
-                                             Grpc::RawAsyncStreamCallbacks& cb,
-                                             const Http::AsyncClient::StreamOptions&) {
+      .WillOnce([&stream, &callbacks](absl::string_view, absl::string_view,
+                                      Grpc::RawAsyncStreamCallbacks& cb,
+                                      const Http::AsyncClient::StreamOptions&) {
         callbacks = dynamic_cast<MetricsServiceCallbacks*>(&cb);
         return &stream;
-      }));
+      });
 
   EXPECT_CALL(local_info_, node());
   // Should send one message (with identifier included)
@@ -554,12 +552,12 @@ TEST_F(GrpcMetricsStreamerImplTest, BatchingSizeOne) {
   MockMetricsStream stream;
   MetricsServiceCallbacks* callbacks;
   EXPECT_CALL(*batch_async_client, startRaw(_, _, _, _))
-      .WillOnce(Invoke([&stream, &callbacks](absl::string_view, absl::string_view,
-                                             Grpc::RawAsyncStreamCallbacks& cb,
-                                             const Http::AsyncClient::StreamOptions&) {
+      .WillOnce([&stream, &callbacks](absl::string_view, absl::string_view,
+                                      Grpc::RawAsyncStreamCallbacks& cb,
+                                      const Http::AsyncClient::StreamOptions&) {
         callbacks = dynamic_cast<MetricsServiceCallbacks*>(&cb);
         return &stream;
-      }));
+      });
 
   EXPECT_CALL(local_info_, node());
   // Expect 3 batches (first one includes identifier)

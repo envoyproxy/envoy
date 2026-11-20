@@ -14,9 +14,9 @@ using testing::_;
 class MockServerCodecCallbacks : public ServerCodecCallbacks {
 public:
   MockServerCodecCallbacks() {
-    ON_CALL(*this, writeToConnection(_))
-        .WillByDefault(
-            testing::Invoke([](Buffer::Instance& buffer) { buffer.drain(buffer.length()); }));
+    ON_CALL(*this, writeToConnection(_)).WillByDefault([](Buffer::Instance& buffer) {
+      buffer.drain(buffer.length());
+    });
   }
 
   MOCK_METHOD(void, onDecodingSuccess, (RequestHeaderFramePtr, std::optional<StartTime>));
@@ -30,9 +30,9 @@ public:
 class MockClientCodecCallbacks : public ClientCodecCallbacks {
 public:
   MockClientCodecCallbacks() {
-    ON_CALL(*this, writeToConnection(_))
-        .WillByDefault(
-            testing::Invoke([](Buffer::Instance& buffer) { buffer.drain(buffer.length()); }));
+    ON_CALL(*this, writeToConnection(_)).WillByDefault([](Buffer::Instance& buffer) {
+      buffer.drain(buffer.length());
+    });
   }
 
   MOCK_METHOD(void, onDecodingSuccess, (ResponseHeaderFramePtr, std::optional<StartTime>));

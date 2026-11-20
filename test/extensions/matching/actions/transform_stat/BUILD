@@ -1,16 +1,20 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "transform_stat_test",
     srcs = ["transform_stat_test.cc"],
+    extension_names = ["envoy.matching.actions.transform_stat"],
     deps = [
         "//envoy/registry",
         "//source/common/config:utility_lib",

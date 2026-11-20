@@ -70,12 +70,7 @@ public:
   StatNames& statNames() override { return stat_names_; }
 
 private:
-  // Creates an array of stat-name elements, comprising the protocol, optional
-  // service and method, and a suffix.
-  Stats::ElementVec statElements(Protocol protocol,
-                                 const std::optional<RequestStatNames>& request_names,
-                                 Stats::Element suffix);
-
+  Stats::SymbolTable& symbol_table_;
   Stats::StatNamePool stat_name_pool_;
   const Stats::StatName grpc_;
   const Stats::StatName grpc_web_;
@@ -86,6 +81,8 @@ private:
   const Stats::StatName request_message_count_;
   const Stats::StatName response_message_count_;
   const Stats::StatName upstream_rq_time_;
+  const Stats::StatName service_tag_name_;
+  const Stats::StatName method_tag_name_;
 
   StatNames stat_names_;
 };

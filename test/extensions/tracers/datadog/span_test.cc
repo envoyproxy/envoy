@@ -118,15 +118,30 @@ public:
   }
 };
 
+// ID generator producing a 128-bit trace ID, and span IDs that differ from
+// each other and from the trace ID.
+class DistinctIDGenerator : public datadog::tracing::IDGenerator {
+  mutable std::uint64_t next_span_id_ = 0xdeadbeef;
+
+public:
+  std::uint64_t span_id() const override { return next_span_id_++; }
+
+  datadog::tracing::TraceID trace_id(const datadog::tracing::TimePoint&) const override {
+    return datadog::tracing::TraceID{/*low=*/0xcafebabe, /*high=*/0x0123456789abcdef};
+  }
+};
+
 // Test class to verify Datadog tracer behaviors
 class DatadogTracerSpanTest : public testing::Test {
 public:
   DatadogTracerSpanTest()
       : test_logger_(std::make_shared<TestLogger>()),
-        id_generator_(std::make_shared<FixedIDGenerator>(0xcafebabe)), tracer_(createTracer()) {}
+        id_generator_(std::make_shared<FixedIDGenerator>(0xcafebabe)),
+        tracer_(createTracer(id_generator_)) {}
 
   // Creates a Datadog tracer for testing
-  datadog::tracing::Tracer createTracer() {
+  datadog::tracing::Tracer
+  createTracer(std::shared_ptr<const datadog::tracing::IDGenerator> id_generator) {
     datadog::tracing::TracerConfig config;
     config.service = "test-service";
     config.logger = test_logger_;
@@ -157,7 +172,7 @@ public:
       validated_config = datadog::tracing::finalize_config(config);
       EXPECT_TRUE(validated_config);
     }
-    return {*validated_config, id_generator_};
+    return {*validated_config, std::move(id_generator)};
   }
 
 protected:
@@ -392,13 +407,26 @@ TEST_F(DatadogTracerSpanTest, Baggage) {
   EXPECT_EQ("", span.getBaggage("foo"));
 }
 
-TEST_F(DatadogTracerSpanTest, GetTraceId) {
-  auto dd_span = tracer_.create_span();
-  Span span(std::move(dd_span));
+TEST_F(DatadogTracerSpanTest, GetTraceIdAndSpanId) {
+  datadog::tracing::Tracer tracer = createTracer(std::make_shared<DistinctIDGenerator>());
+  Span parent(tracer.create_span());
+  const Tracing::SpanPtr child =
+      parent.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());
+
+  // dd-trace-cpp uses the low 64 bits of the trace ID as the ID of a trace's
+  // root span.
+  EXPECT_EQ("0123456789abcdef00000000cafebabe", parent.getTraceId());
+  EXPECT_EQ("00000000cafebabe", parent.getSpanId());
+  EXPECT_EQ("0123456789abcdef00000000cafebabe", child->getTraceId());
+  EXPECT_EQ("00000000deadbeef", child->getSpanId());
+}
+
+TEST_F(DatadogTracerSpanTest, GetTraceIdAndSpanIdArePadded) {
+  Span span(tracer_.create_span());
 
   // We set the ID to 0xcafebabe in our test fixture
-  EXPECT_EQ("cafebabe", span.getTraceId());
-  EXPECT_EQ("", span.getSpanId());
+  EXPECT_EQ("000000000000000000000000cafebabe", span.getTraceId());
+  EXPECT_EQ("00000000cafebabe", span.getSpanId());
 }
 
 TEST_F(DatadogTracerSpanTest, NoOpMode) {

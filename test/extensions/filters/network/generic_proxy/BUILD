@@ -4,6 +4,10 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -22,12 +26,19 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "route_test",
     srcs = [
         "route_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.filters.network.generic_proxy"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":fake_codec_lib",
         "//source/common/buffer:buffer_lib",
@@ -41,12 +52,23 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "proxy_test",
     srcs = [
         "proxy_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.filters.network.generic_proxy"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":fake_codec_lib",
         "//source/common/access_log:access_log_lib",
@@ -64,12 +86,23 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = [
         "config_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.filters.network.generic_proxy"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":fake_codec_lib",
         "//source/common/buffer:buffer_lib",
@@ -91,12 +124,18 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "integration_test",
     srcs = [
         "integration_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.filters.network.generic_proxy"],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     tags = [
         "cpu:3",
     ],
@@ -123,12 +162,19 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "match_test",
     srcs = [
         "match_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.filters.network.generic_proxy"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":fake_codec_lib",
         "//source/extensions/filters/network/generic_proxy:match_lib",
@@ -136,12 +182,13 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "access_log_test",
     srcs = [
         "access_log_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.filters.network.generic_proxy"],
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         ":fake_codec_lib",
         "//source/common/formatter:substitution_formatter_lib",
@@ -156,30 +203,36 @@ envoy_cc_test(
     srcs = [
         "stream_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/network/generic_proxy/interface:stream_interface",
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "tracing_test",
     srcs = [
         "tracing_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.filters.network.generic_proxy"],
     deps = [
         ":fake_codec_lib",
         "//source/extensions/filters/network/generic_proxy:tracing_lib",
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "stats_test",
     srcs = [
         "stats_test.cc",
     ],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.filters.network.generic_proxy"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/network/generic_proxy:stats_lib",
         "//test/mocks/server:server_factory_context_mocks",

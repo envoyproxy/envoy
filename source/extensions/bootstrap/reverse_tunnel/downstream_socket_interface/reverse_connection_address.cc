@@ -24,6 +24,11 @@ ReverseConnectionAddress::ReverseConnectionAddress(const ReverseConnectionConfig
   address_string_ = fmt::format("{}:{}", ReverseConnectionIp::address_str_,
                                 kReverseConnectionListenerPortPlaceholder);
 
+  // Build the loopback sockaddr once so sockAddr() can hand out a stable, per-instance pointer.
+  sockaddr_in_.sin_family = AF_INET;
+  sockaddr_in_.sin_port = htons(kReverseConnectionListenerPortPlaceholder);
+  sockaddr_in_.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // 127.0.0.1
+
   ENVOY_LOG_MISC(debug, "reverse connection address: logical_name={}, address={}", logical_name_,
                  address_string_);
 }
@@ -47,12 +52,7 @@ absl::string_view ReverseConnectionAddress::asStringView() const { return addres
 const std::string& ReverseConnectionAddress::logicalName() const { return logical_name_; }
 
 const sockaddr* ReverseConnectionAddress::sockAddr() const {
-  // Return a valid localhost sockaddr structure with placeholder port.
-  static struct sockaddr_in addr;
-  addr.sin_family = AF_INET;
-  addr.sin_port = htons(kReverseConnectionListenerPortPlaceholder);
-  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // 127.0.0.1
-  return reinterpret_cast<const sockaddr*>(&addr);
+  return reinterpret_cast<const sockaddr*>(&sockaddr_in_);
 }
 
 socklen_t ReverseConnectionAddress::sockAddrLen() const { return sizeof(struct sockaddr_in); }

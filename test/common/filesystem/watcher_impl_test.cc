@@ -110,6 +110,36 @@ TEST_F(WatcherImplTest, Create) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+TEST_F(WatcherImplTest, Created) {
+  Filesystem::WatcherPtr watcher = dispatcher_->createFilesystemWatcher();
+
+  const std::string dir = TestEnvironment::temporaryPath("envoy_test/watcher_created");
+  TestEnvironment::createPath(dir);
+
+  WatchCallback created_callback;
+  // Watchers that don't request Created observe no change for the same event.
+  WatchCallback unrequested_callback;
+  EXPECT_CALL(unrequested_callback, called(testing::_)).Times(0);
+  ASSERT_OK(watcher->addWatch(dir + "/", Watcher::Events::Modified | Watcher::Events::MovedTo,
+                              [&](uint32_t events) {
+                                unrequested_callback.called(events);
+                                return absl::OkStatus();
+                              }));
+  ASSERT_OK(watcher->addWatch(dir + "/", Watcher::Events::Created, [&](uint32_t events) {
+    created_callback.called(events);
+    dispatcher_->exit();
+    return absl::OkStatus();
+  }));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Creating a file without writing it generates only IN_CREATE.
+  EXPECT_CALL(created_callback, called(Watcher::Events::Created));
+  {
+    std::ofstream file(dir + "/new_file");
+  }
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 TEST_F(WatcherImplTest, Modify) {
   Filesystem::WatcherPtr watcher = dispatcher_->createFilesystemWatcher();
 

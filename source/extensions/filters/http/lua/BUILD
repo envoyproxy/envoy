@@ -48,6 +48,7 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//envoy/registry",
         "//envoy/stream_info:stream_info_interface",
+        "//source/common/config:metadata_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
@@ -55,6 +56,7 @@ envoy_cc_library(
         "//source/extensions/filters/common/lua:protobuf_converter_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )
 

@@ -1,7 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -17,7 +16,17 @@ envoy_extension_cc_test(
     name = "redis_cluster_test",
     srcs = ["redis_cluster_test.cc"],
     extension_names = ["envoy.clusters.redis"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
@@ -57,7 +66,10 @@ envoy_extension_cc_test(
     name = "redis_cluster_lb_test",
     srcs = ["redis_cluster_lb_test.cc"],
     extension_names = ["envoy.clusters.redis"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "coverage": {"link": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/event:dispatcher_lib",
@@ -93,7 +105,12 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["redis_cluster_integration_test.cc"],
     extension_names = ["envoy.clusters.redis"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/clusters/redis:redis_cluster",
         "//source/extensions/clusters/redis:redis_cluster_lb",
@@ -122,9 +139,9 @@ envoy_cc_mock(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "crc16_test",
     srcs = ["crc16_test.cc"],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.clusters.redis"],
     deps = ["//source/extensions/clusters/redis:crc16_lib"],
 )

@@ -5,6 +5,7 @@
 #include "source/common/jwt/verify.h"
 
 #include "source/common/jwt/check_audience.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
@@ -187,6 +188,16 @@ Status verifySignatureEd25519(absl::string_view key, absl::string_view signature
   return Status::JwtVerificationFail;
 }
 
+bool thumbprintMismatch(const Jwt& jwt, const Jwks::Pubkey& jwk) {
+  if (!jwt.x5t_s256_.empty() && !jwk.x5t_s256_.empty()) {
+    return jwt.x5t_s256_ != jwk.x5t_s256_;
+  }
+  if (!jwt.x5t_.empty() && !jwk.x5t_.empty()) {
+    return jwt.x5t_ != jwk.x5t_;
+  }
+  return false;
+}
+
 } // namespace
 
 Status verifyJwtWithoutTimeChecking(const Jwt& jwt, const Jwks& jwks) {
@@ -198,6 +209,11 @@ Status verifyJwtWithoutTimeChecking(const Jwt& jwt, const Jwks& jwks) {
     // verification.
     // If kid is not specified in JWT, try all JWK.
     if (!jwt.kid_.empty() && !jwk->kid_.empty() && jwk->kid_ != jwt.kid_) {
+      continue;
+    }
+    // Without a kid, the certificate thumbprint selects the key the same way.
+    if (jwt.kid_.empty() && thumbprintMismatch(jwt, *jwk) &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.jwt_authn_select_key_by_x5t")) {
       continue;
     }
 

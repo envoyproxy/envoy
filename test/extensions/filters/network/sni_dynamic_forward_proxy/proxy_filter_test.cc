@@ -369,10 +369,9 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
-      .WillOnce(Invoke([&](absl::string_view, uint16_t, bool,
-                           ProxyFilter::LoadDnsCacheEntryCallbacks&) {
+      .WillOnce([&](absl::string_view, uint16_t, bool, ProxyFilter::LoadDnsCacheEntryCallbacks&) {
         return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
-      }));
+      });
 
   EXPECT_CALL(*host_info, address()).Times(2).WillRepeatedly(Return(host_info->address_));
 
@@ -404,10 +403,9 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
-      .WillOnce(Invoke([&](absl::string_view, uint16_t, bool,
-                           ProxyFilter::LoadDnsCacheEntryCallbacks&) {
+      .WillOnce([&](absl::string_view, uint16_t, bool, ProxyFilter::LoadDnsCacheEntryCallbacks&) {
         return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
-      }));
+      });
 
   EXPECT_CALL(*host_info, address());
 

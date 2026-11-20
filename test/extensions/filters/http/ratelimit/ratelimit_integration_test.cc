@@ -184,6 +184,10 @@ public:
     if (fake_ratelimit_connection_ != nullptr) {
       AssertionResult result = fake_ratelimit_connection_->close();
       RELEASE_ASSERT(result, result.message());
+      // close() only flushes: wait for the disconnect so that the fake upstream thread is not still
+      // draining the write buffer, and releasing outbound frames, when the codec is destroyed.
+      result = fake_ratelimit_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
     cleanupUpstreamAndDownstream();
   }
@@ -268,6 +272,28 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType,
 TEST_P(RatelimitIntegrationTest, Ok) {
   initialize();
   basicFlow();
+}
+
+TEST_P(RatelimitIntegrationTest, ShadowModeDescriptor) {
+  initialize();
+  initiateClientConnection();
+  waitForRatelimitRequest();
+
+  ratelimit_requests_[0]->startGrpcStream();
+  envoy::service::ratelimit::v3::RateLimitResponse response_msg;
+  response_msg.set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OK);
+  auto* descriptor_status = response_msg.add_statuses();
+  descriptor_status->set_code(envoy::service::ratelimit::v3::RateLimitResponse::OK);
+  descriptor_status->set_shadow_over_limit(true);
+  ratelimit_requests_[0]->sendGrpcMessage(response_msg);
+  ratelimit_requests_[0]->finishGrpcStream(Grpc::Status::Ok);
+
+  waitForSuccessfulUpstreamResponse(0);
+  cleanup();
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.shadow_over_limit")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
 }
 
 TEST_P(RatelimitIntegrationTest, OkWithHeaders) {

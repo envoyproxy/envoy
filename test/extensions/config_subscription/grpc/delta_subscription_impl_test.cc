@@ -5,6 +5,7 @@
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/decoded_resource_impl.h"
 
 #include "test/extensions/config_subscription/grpc/delta_subscription_test_harness.h"
 
@@ -42,6 +43,23 @@ TEST_P(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
   subscription_->updateResourceInterest({"name4"});
 }
 
+TEST_P(DeltaSubscriptionImplTest, RequestOnDemandUpdate) {
+  startSubscription({"name1", "name2"});
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
+
+  expectSendMessage({"name3"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->requestOnDemandUpdate({"name3"});
+  EXPECT_TRUE(statsAre(2, 0, 0, 0, 0, 0, 0, ""));
+
+  expectSendMessage({"name4"}, {"name3"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->update({"name4"}, {"name3"});
+  EXPECT_TRUE(statsAre(3, 0, 0, 0, 0, 0, 0, ""));
+
+  expectSendMessage({}, {"name4"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->update({}, {"name4"});
+  EXPECT_TRUE(statsAre(4, 0, 0, 0, 0, 0, 0, ""));
+}
+
 // Checks that after a pause(), no requests are sent until resume().
 // Also demonstrates the collapsing of subscription interest updates into a single
 // request. (This collapsing happens any time multiple updates arrive before a request
@@ -66,6 +84,141 @@ TEST_P(DeltaSubscriptionImplTest, PauseHoldsRequest) {
 TEST_P(DeltaSubscriptionImplTest, ResponseCausesAck) {
   startSubscription({"name1"});
   deliverConfigUpdate({"name1"}, "someversion", true);
+}
+
+// Regression test for on-demand updates: a resource requested via requestOnDemandUpdate() that was
+// not part of the initial (non-wildcard) subscription must still be routed to the subscription's
+// callbacks. Previously requestOnDemandUpdate() only updated the subscription sent to the server,
+// not the watch-map routing, so the response for such a resource was silently dropped.
+TEST_P(DeltaSubscriptionImplTest, OnDemandUpdateRoutesResponseToWatch) {
+  // A concrete (non-wildcard) initial subscription, as ODCDS uses.
+  startSubscription({"name1"});
+  deliverConfigUpdate({"name1"}, "version1", true);
+
+  // Request a brand-new resource on demand. This must subscribe on the wire...
+  expectSendMessage({"name2"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->requestOnDemandUpdate({"name2"});
+  Mock::VerifyAndClearExpectations(&async_stream_);
+
+  // ...and register watch-map interest, so the server's response for it reaches the callbacks.
+  const std::string version = "version2";
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
+  response->set_nonce(last_response_nonce_);
+  response->set_system_version_info(version);
+  response->set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
+  envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+  load_assignment.set_cluster_name("name2");
+  auto* resource = response->add_resources();
+  resource->set_name("name2");
+  resource->set_version(version);
+  std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
+
+  bool delivered_name2 = false;
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version))
+      .WillOnce([&delivered_name2](const std::vector<DecodedResourceRef>& added_resources,
+                                   const Protobuf::RepeatedPtrField<std::string>&,
+                                   const std::string&) {
+        EXPECT_EQ(1, added_resources.size());
+        if (!added_resources.empty()) {
+          EXPECT_EQ("name2", added_resources[0].get().name());
+        }
+        delivered_name2 = true;
+        return absl::OkStatus();
+      });
+  expectSendMessage({}, version); // ACK
+  onDiscoveryResponse(std::move(response));
+  EXPECT_TRUE(delivered_name2);
+}
+
+// Regression test for the VHDS-style pattern: a subscription that accepts a glob prefix for routing
+// (accept("<rc1>/*"), as VHDS does for its route configuration) then requests, on demand, a
+// resource that is NOT covered by that glob (here under a different "<rc2>/" prefix). The response
+// for the on-demand resource must still be routed to the callbacks. Before the fix,
+// requestOnDemandUpdate() only updated the wire subscription; a resource matched by neither the
+// glob nor a start()-time name matched no watch and was silently dropped.
+TEST_P(DeltaSubscriptionImplTest, OnDemandUpdateOutsideAcceptGlobRoutesResponse) {
+  startSubscription({"name1"});
+  deliverConfigUpdate({"name1"}, "version1", true);
+
+  // Accept everything under "rc1/" for routing only (no wire subscription); mirrors VHDS.
+  subscription_->accept({"rc1/*"});
+
+  // Request an on-demand resource under a DIFFERENT prefix ("rc2/"), i.e. not covered by the glob.
+  // This must subscribe on the wire...
+  expectSendMessage({"rc2/vhost"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->requestOnDemandUpdate({"rc2/vhost"});
+  Mock::VerifyAndClearExpectations(&async_stream_);
+
+  // ...and register watch-map interest, so the server's response for it reaches the callbacks even
+  // though it matches neither the "rc1/*" glob nor the initial "name1" subscription.
+  const std::string version = "version2";
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
+  response->set_nonce(last_response_nonce_);
+  response->set_system_version_info(version);
+  response->set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
+  envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+  load_assignment.set_cluster_name("rc2/vhost");
+  auto* resource = response->add_resources();
+  resource->set_name("rc2/vhost");
+  resource->set_version(version);
+  std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
+
+  bool delivered = false;
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version))
+      .WillOnce([&delivered](const std::vector<DecodedResourceRef>& added_resources,
+                             const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+        EXPECT_EQ(1, added_resources.size());
+        if (!added_resources.empty()) {
+          EXPECT_EQ("rc2/vhost", added_resources[0].get().name());
+        }
+        delivered = true;
+        return absl::OkStatus();
+      });
+  expectSendMessage({}, version); // ACK
+  onDiscoveryResponse(std::move(response));
+  EXPECT_TRUE(delivered);
+}
+
+// accept() may be called before start() (as VHDS does): the patterns are buffered and applied when
+// the watch is created in start(), before the gRPC stream starts, so the routing filter is in
+// effect before any resource can be delivered. Verifies the buffered accept() is actually applied.
+TEST_P(DeltaSubscriptionImplTest, AcceptBeforeStartIsApplied) {
+  // Declare the accept glob BEFORE start(); the watch does not exist yet, so this is buffered.
+  subscription_->accept({"rc1/*"});
+  startSubscription({"name1"});
+  deliverConfigUpdate({"name1"}, "version1", true);
+
+  // A resource under the accepted "rc1/*" glob is routed even though it was never explicitly
+  // requested -- proving the buffered accept() was applied during start().
+  const std::string version = "version2";
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
+  response->set_nonce(last_response_nonce_);
+  response->set_system_version_info(version);
+  response->set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
+  envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+  load_assignment.set_cluster_name("rc1/foo");
+  auto* resource = response->add_resources();
+  resource->set_name("rc1/foo");
+  resource->set_version(version);
+  std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
+
+  bool delivered = false;
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version))
+      .WillOnce([&delivered](const std::vector<DecodedResourceRef>& added_resources,
+                             const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+        EXPECT_EQ(1, added_resources.size());
+        if (!added_resources.empty()) {
+          EXPECT_EQ("rc1/foo", added_resources[0].get().name());
+        }
+        delivered = true;
+        return absl::OkStatus();
+      });
+  expectSendMessage({}, version); // ACK
+  onDiscoveryResponse(std::move(response));
+  EXPECT_TRUE(delivered);
 }
 
 // Checks that after a pause(), no ACK requests are sent until resume(), but that after the
@@ -114,14 +267,14 @@ TEST_P(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   }
   // All ACK sendMessage()s will happen upon calling resume().
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
-      .WillRepeatedly(Invoke([this](Buffer::InstancePtr& buffer, bool) {
+      .WillRepeatedly([this](Buffer::InstancePtr& buffer, bool) {
         API_NO_BOOST(envoy::service::discovery::v3::DeltaDiscoveryRequest) message;
         EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
         const std::string nonce = message.response_nonce();
         if (!nonce.empty()) {
           nonce_acks_sent_.push(nonce);
         }
-      }));
+      });
   // DeltaSubscriptionTestHarness's dtor will check that all ACKs were sent with the correct nonces,
   // in the correct order.
 }
@@ -184,6 +337,55 @@ TEST_P(DeltaSubscriptionNoGrpcStreamTest, NoGrpcStream) {
 
   subscription->start({"name1"});
   subscription->updateResourceInterest({"name1", "name2"});
+}
+
+class DeltaSubscriptionImplInitFetchTimeoutTest : public DeltaSubscriptionTestHarness,
+                                                  public testing::TestWithParam<LegacyOrUnified> {
+protected:
+  DeltaSubscriptionImplInitFetchTimeoutTest()
+      : DeltaSubscriptionTestHarness(GetParam(), std::chrono::milliseconds(1000)) {}
+
+  void TearDown() override { doSubscriptionTearDown(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionImplInitFetchTimeoutTest,
+                         DeltaSubscriptionImplInitFetchTimeoutTest,
+                         testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
+
+DecodedResourcePtr replayedClusterLoadAssignment(const std::string& name) {
+  auto cla =
+      Protobuf::Arena::MakeUnique<envoy::config::endpoint::v3::ClusterLoadAssignment>(nullptr);
+  cla->set_cluster_name(name);
+  return std::make_unique<DecodedResourceImpl>(std::move(cla), name, std::vector<std::string>{},
+                                               "v1", /*from_cache=*/true);
+}
+
+TEST_P(DeltaSubscriptionImplInitFetchTimeoutTest, RejectedReplayKeepsInitFetchTimeout) {
+  expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
+  startSubscription({"cluster0"});
+
+  DecodedResourcePtr replayed = replayedClusterLoadAssignment("cluster0");
+  const std::vector<DecodedResourceRef> refs{*replayed};
+  EXPECT_CALL(*init_timeout_timer_, disableTimer()).Times(0);
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "v1"))
+      .WillOnce(Return(absl::InvalidArgumentError("rejected")));
+  EXPECT_FALSE(subscription_->onConfigUpdate(refs, {}, "v1").ok());
+
+  // The server will not resend the resource, so the timeout must still fire.
+  expectDisableInitFetchTimeoutTimer();
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(ConfigUpdateFailureReason::FetchTimedout, nullptr));
+  callInitFetchTimeoutCb();
+}
+
+TEST_P(DeltaSubscriptionImplInitFetchTimeoutTest, AcceptedReplayDisablesInitFetchTimeout) {
+  expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
+  startSubscription({"cluster0"});
+
+  DecodedResourcePtr replayed = replayedClusterLoadAssignment("cluster0");
+  const std::vector<DecodedResourceRef> refs{*replayed};
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "v1")).WillOnce(Return(absl::OkStatus()));
+  expectDisableInitFetchTimeoutTimer();
+  EXPECT_TRUE(subscription_->onConfigUpdate(refs, {}, "v1").ok());
 }
 
 } // namespace

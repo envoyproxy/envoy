@@ -61,9 +61,38 @@ typed_config:
     upstream_tls_ = true;
     // This configures the upstream to use the connection grid (automatically
     // selecting protocol and allowing HTTP/3)
-    config_helper_.configureUpstreamTls(/*use_alpn=*/true, /*http3=*/true, alt_cache);
+    config_helper_.configureUpstreamTls(
+        /*use_alpn=*/true, /*http3=*/true, alt_cache,
+        [this](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
+          tls_context.set_auto_host_sni(auto_host_sni_);
+        });
+    if (auto_host_sni_) {
+      config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+        cluster->mutable_load_assignment()
+            ->mutable_endpoints(0)
+            ->mutable_lb_endpoints(0)
+            ->mutable_endpoint()
+            ->set_hostname("upstream.lyft.com");
+        // Turn off `auto_sni` so that the request host does not override the SNI.
+        auto& protocol_options = (*cluster->mutable_typed_extension_protocol_options())
+            ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"];
+        auto http_protocol_options =
+            MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(protocol_options);
+        http_protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(false);
+        std::ignore = protocol_options.PackFrom(http_protocol_options);
+      });
+    }
 
     HttpProtocolIntegrationTest::initialize();
+  }
+
+  // Returns the SNI that the current upstream connection received.
+  std::string upstreamSni() {
+    std::string sni;
+    EXPECT_TRUE(fake_upstream_connection_->sharedConnection().executeOnDispatcher(
+        [&sni](Network::Connection& connection) { sni = connection.ssl()->sni(); }));
+    return sni;
   }
 
   void writeAltSvcToFile(uint32_t index) {
@@ -122,6 +151,8 @@ typed_config:
   // If this is set to true, it pre-fills the alt-svc cache, setting up HTTP/3
   // support and pointing at the HTTP/3 upstream.
   bool write_alt_svc_to_file_ = false;
+  // If this is set to true, the upstream host has a hostname and the cluster sets `auto_host_sni`.
+  bool auto_host_sni_ = false;
 };
 
 TEST_P(FilterIntegrationTest, AltSvc) {
@@ -158,6 +189,37 @@ TEST_P(FilterIntegrationTest, AltSvc) {
   auto response2 = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
                                                  response_size, 1, timeout);
   checkSimpleRequestSuccess(request_size, response_size, response2.get());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http3_total", Eq(1));
+}
+
+// With `auto_host_sni`, the Alt-Svc header is cached for the upstream host's hostname. The grid
+// looks up that hostname to find HTTP/3, and the HTTP/3 connection sends it as SNI.
+TEST_P(FilterIntegrationTest, AltSvcWithAutoHostSni) {
+  auto_host_sni_ = true;
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  int port = fake_upstreams_[1]->localAddress()->ip()->port();
+  std::string alt_svc = absl::StrCat("h3=\":", port, "\"; ma=86400");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
+
+  // The first request goes out over HTTP/2 and caches the Alt-Svc header.
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0, 0);
+  checkSimpleRequestSuccess(0, 0, response.get());
+  EXPECT_EQ("upstream.lyft.com", upstreamSni());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http2_total", Eq(1));
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
+  fake_upstream_connection_.reset();
+  // Stop the HTTP/2 upstream so that only HTTP/3 can serve the next request.
+  fake_upstreams_[0]->cleanUp();
+
+  // The second request goes out over HTTP/3 because of the cached Alt-Svc header.
+  auto response2 =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0, 1);
+  checkSimpleRequestSuccess(0, 0, response2.get());
+  EXPECT_EQ("upstream.lyft.com", upstreamSni());
   test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http3_total", Eq(1));
 }
 

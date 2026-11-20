@@ -33,10 +33,11 @@ public:
   fetchUnboundAccessToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
                           GcpAuthnClient::Callbacks& callbacks) override;
   void fetchBoundJwt(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-                     const std::string& fingerprint, GcpAuthnClient::Callbacks& callbacks) override;
+                     const std::string& fingerprint, const std::string& cert_pem,
+                     GcpAuthnClient::Callbacks& callbacks) override;
   void
   fetchBoundAccessToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-                        const std::string& fingerprint,
+                        const std::string& fingerprint, const std::string& cert_pem,
                         GcpAuthnClient::Callbacks& callbacks) override;
   void
   fetchIamAccessToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
@@ -54,10 +55,6 @@ private:
   enum class TokenType { Jwt, AccessToken, BoundJwt, BoundAccessToken, IamAccessToken };
 
   void onError(absl::string_view error_msg);
-  void makeTokenRequest(TokenType token_type,
-                        const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-                        const std::string& final_url, const std::optional<std::string>& fingerprint,
-                        GcpAuthnClient::Callbacks& callbacks);
   void sendRequest(TokenType token_type,
                    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
                    const std::optional<std::string>& fingerprint, Http::RequestMessagePtr request,

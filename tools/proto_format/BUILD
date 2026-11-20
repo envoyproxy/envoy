@@ -6,6 +6,10 @@ load("//tools/base:envoy_python.bzl", "envoy_py_data")
 
 licenses(["notice"])  # Apache 2
 
+GIT_RUNTIME = "//tools/git:runtime"
+
+GIT_TOOLCHAIN = "@envoy_toolshed//git:toolchain_type"
+
 # Files to include when building or comparing the normalized API
 API_FILES = [
     "BUILD",
@@ -99,17 +103,18 @@ genrule(
     outs = ["formatted-api-hashes.txt"],
     cmd = """
     TEMPDIR=$$(mktemp -d) \
-    && git -C $$TEMPDIR init -q \
+    && $(GIT) -C $$TEMPDIR init -q \
     && mkdir $$TEMPDIR/api \
     && tar xf $(location :formatted_api) -C $$TEMPDIR/api \
-    && git -C $$TEMPDIR add api/ \
-    && git -C $$TEMPDIR ls-files -s api/ > $@ \
+    && $(GIT) -C $$TEMPDIR add api/ \
+    && $(GIT) -C $$TEMPDIR ls-files -s api/ > $@ \
     && rm -rf $$TEMPDIR
     """,
-    # Requires git - this avoids adding git to rbe workers
-    # this could be resolved by the addition of rules_git
-    tags = ["no-remote-exec"],
-    tools = [":formatted_api"],
+    toolchains = [GIT_TOOLCHAIN],
+    tools = [
+        ":formatted_api",
+        GIT_RUNTIME,
+    ],
 )
 
 py_binary(
@@ -171,7 +176,8 @@ genrule(
     name = "local_api_hashes",
     outs = ["api-hashes.txt"],
     cmd = """
-    git -C %s ls-files -os ":!:api/%s" "api/%s" > $@
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+        $(GIT) -c safe.directory='*' -C %s ls-files -os ":!:api/%s" "api/%s" > $@
     """ % (
         PATH,
         '" ":!:api/'.join(API_FILES_IGNORED),
@@ -179,6 +185,8 @@ genrule(
     ),
     stamp = True,
     tags = ["no-remote-exec"],
+    toolchains = [GIT_TOOLCHAIN],
+    tools = [GIT_RUNTIME],
 )
 
 # Stamped, local build to get porcelain status of local api tree
@@ -186,7 +194,8 @@ genrule(
     name = "local_api_changes",
     outs = ["api-changes.txt"],
     cmd = """
-    git -C %s status --porcelain ":!:api/%s" "api/%s" > $@
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+        $(GIT) -c safe.directory='*' -C %s status --porcelain ":!:api/%s" "api/%s" > $@
     """ % (
         PATH,
         '" ":!:api/'.join(API_FILES_IGNORED),
@@ -194,4 +203,6 @@ genrule(
     ),
     stamp = True,
     tags = ["no-remote-exec"],
+    toolchains = [GIT_TOOLCHAIN],
+    tools = [GIT_RUNTIME],
 )

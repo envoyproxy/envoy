@@ -13,6 +13,7 @@
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.validate.h"
 #include "envoy/thread_local/thread_local_object.h"
 
+#include "source/common/common/hash.h"
 #include "source/common/common/token_bucket_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/common/factory_base.h"
@@ -28,6 +29,16 @@ using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports;
 using BucketAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse::BucketAction;
 using BucketQuotaUsage =
     ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports::BucketQuotaUsage;
+
+// The hash does not depend on the order of the entries, since protobuf map iteration order is
+// unspecified. Requests and RLQS responses find their buckets by this hash.
+inline size_t hashBucketId(const BucketId& bucket_id) {
+  uint64_t hash = 0;
+  for (const auto& [key, value] : bucket_id.bucket()) {
+    hash += HashUtil::xxHash64(value, HashUtil::xxHash64(key));
+  }
+  return hash;
+}
 
 struct QuotaUsage {
   QuotaUsage(uint64_t num_requests_allowed, uint64_t num_requests_denied,

@@ -8,6 +8,9 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
 
+#include "absl/strings/str_cat.h"
+#include "fmt/format.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace GeoipProviders {
@@ -17,6 +20,7 @@ namespace {
 constexpr const char* MMDB_CITY_LOOKUP_PATH[] = {"city", "names", "en", nullptr};
 constexpr const char* MMDB_REGION_LOOKUP_PATH[] = {"subdivisions", "0", "iso_code", nullptr};
 constexpr const char* MMDB_COUNTRY_LOOKUP_PATH[] = {"country", "iso_code", nullptr};
+constexpr const char* MMDB_COUNTRY_NAME_LOOKUP_PATH[] = {"country", "names", "en", nullptr};
 constexpr const char* MMDB_ASN_LOOKUP_PATH[] = {"autonomous_system_number", nullptr};
 constexpr const char* MMDB_ASN_ORG_LOOKUP_PATH[] = {"autonomous_system_organization", nullptr};
 constexpr const char* MMDB_ISP_LOOKUP_PATH[] = {"isp", nullptr};
@@ -27,6 +31,21 @@ constexpr const char* MMDB_ANON_VPN_LOOKUP_PATH[] = {"is_anonymous_vpn", nullptr
 constexpr const char* MMDB_ANON_HOSTING_LOOKUP_PATH[] = {"is_hosting_provider", nullptr};
 constexpr const char* MMDB_ANON_TOR_LOOKUP_PATH[] = {"is_tor_exit_node", nullptr};
 constexpr const char* MMDB_ANON_PROXY_LOOKUP_PATH[] = {"is_public_proxy", nullptr};
+constexpr const char* MMDB_CITY_GEONAME_ID_LOOKUP_PATH[] = {"city", "geoname_id", nullptr};
+constexpr const char* MMDB_LATITUDE_LOOKUP_PATH[] = {"location", "latitude", nullptr};
+constexpr const char* MMDB_LONGITUDE_LOOKUP_PATH[] = {"location", "longitude", nullptr};
+constexpr const char* MMDB_TIME_ZONE_LOOKUP_PATH[] = {"location", "time_zone", nullptr};
+constexpr const char* MMDB_POSTAL_CODE_LOOKUP_PATH[] = {"postal", "code", nullptr};
+constexpr const char* MMDB_REGION_NAME_LOOKUP_PATH[] = {"subdivisions", "0", "names", "en",
+                                                        nullptr};
+constexpr const char* MMDB_REGION_GEONAME_ID_LOOKUP_PATH[] = {"subdivisions", "0", "geoname_id",
+                                                              nullptr};
+constexpr const char* MMDB_SUBREGION_GEONAME_ID_LOOKUP_PATH[] = {"subdivisions", "1", "geoname_id",
+                                                                 nullptr};
+constexpr const char* MMDB_COUNTRY_GEONAME_ID_LOOKUP_PATH[] = {"country", "geoname_id", nullptr};
+constexpr const char* MMDB_CONTINENT_GEONAME_ID_LOOKUP_PATH[] = {"continent", "geoname_id",
+                                                                 nullptr};
+constexpr const char* MMDB_METRO_CODE_LOOKUP_PATH[] = {"location", "metro_code", nullptr};
 
 enum class LookupValueTransform { None, ApplePrivateRelay };
 
@@ -39,9 +58,21 @@ struct LookupFieldSpec {
 constexpr LookupFieldSpec CITY_LOOKUP_FIELDS[] = {
     {GeoField::City, MMDB_CITY_LOOKUP_PATH},
     {GeoField::Region, MMDB_REGION_LOOKUP_PATH},
+    {GeoField::CityGeonameId, MMDB_CITY_GEONAME_ID_LOOKUP_PATH},
+    {GeoField::Latitude, MMDB_LATITUDE_LOOKUP_PATH},
+    {GeoField::Longitude, MMDB_LONGITUDE_LOOKUP_PATH},
+    {GeoField::TimeZone, MMDB_TIME_ZONE_LOOKUP_PATH},
+    {GeoField::PostalCode, MMDB_POSTAL_CODE_LOOKUP_PATH},
+    {GeoField::RegionName, MMDB_REGION_NAME_LOOKUP_PATH},
+    {GeoField::RegionGeonameId, MMDB_REGION_GEONAME_ID_LOOKUP_PATH},
+    {GeoField::SubregionGeonameId, MMDB_SUBREGION_GEONAME_ID_LOOKUP_PATH},
+    {GeoField::MetroCode, MMDB_METRO_CODE_LOOKUP_PATH},
 };
 constexpr LookupFieldSpec COUNTRY_LOOKUP_FIELDS[] = {
     {GeoField::Country, MMDB_COUNTRY_LOOKUP_PATH},
+    {GeoField::CountryName, MMDB_COUNTRY_NAME_LOOKUP_PATH},
+    {GeoField::CountryGeonameId, MMDB_COUNTRY_GEONAME_ID_LOOKUP_PATH},
+    {GeoField::ContinentGeonameId, MMDB_CONTINENT_GEONAME_ID_LOOKUP_PATH},
 };
 constexpr LookupFieldSpec ASN_LOOKUP_FIELDS[] = {
     {GeoField::Asn, MMDB_ASN_LOOKUP_PATH},
@@ -100,16 +131,25 @@ std::optional<std::string> lookupValue(MMDB_lookup_result_s& mmdb_lookup_result,
     return std::nullopt;
   }
 
-  if (entry_data.type == MMDB_DATA_TYPE_UTF8_STRING) {
+  switch (entry_data.type) {
+  case MMDB_DATA_TYPE_UTF8_STRING:
     return std::string(entry_data.utf8_string, entry_data.data_size);
-  }
-  if (entry_data.type == MMDB_DATA_TYPE_UINT32 && entry_data.uint32 > 0) {
-    return std::to_string(entry_data.uint32);
-  }
-  if (entry_data.type == MMDB_DATA_TYPE_BOOLEAN) {
+  case MMDB_DATA_TYPE_UINT32:
+    // A value of 0 is treated as unset (e.g. GeoNames ID not available).
+    return entry_data.uint32 > 0 ? std::make_optional(std::to_string(entry_data.uint32))
+                                 : std::nullopt;
+  case MMDB_DATA_TYPE_UINT16:
+    // A value of 0 is treated as unset (e.g. metro code not available).
+    return entry_data.uint16 > 0 ? std::make_optional(std::to_string(entry_data.uint16))
+                                 : std::nullopt;
+  case MMDB_DATA_TYPE_BOOLEAN:
     return entry_data.boolean ? "true" : "false";
+  case MMDB_DATA_TYPE_DOUBLE:
+    // Fixed 4-decimal-place format for predictable output (e.g. "58.4167", "-122.3149").
+    return fmt::format("{:.4f}", entry_data.double_value);
+  default:
+    return std::nullopt;
   }
-  return std::nullopt;
 }
 
 void populateGeoLookupResults(const GeoipProviderConfig& config,
@@ -162,6 +202,19 @@ GeoipProviderConfig::GeoipProviderConfig(
     // Use geo_field_keys (preferred).
     const auto& keys = common_config.geo_field_keys();
     set_common_field_keys(keys);
+    // Extended fields — only available in geo_field_keys, not in the deprecated geo_headers_to_add.
+    setFieldKey(GeoField::CityGeonameId, keys.city_geoname_id());
+    setFieldKey(GeoField::Latitude, keys.latitude());
+    setFieldKey(GeoField::Longitude, keys.longitude());
+    setFieldKey(GeoField::TimeZone, keys.time_zone());
+    setFieldKey(GeoField::PostalCode, keys.postal_code());
+    setFieldKey(GeoField::RegionName, keys.region_name());
+    setFieldKey(GeoField::RegionGeonameId, keys.region_geoname_id());
+    setFieldKey(GeoField::SubregionGeonameId, keys.subregion_geoname_id());
+    setFieldKey(GeoField::CountryGeonameId, keys.country_geoname_id());
+    setFieldKey(GeoField::ContinentGeonameId, keys.continent_geoname_id());
+    setFieldKey(GeoField::MetroCode, keys.metro_code());
+    setFieldKey(GeoField::CountryName, keys.country_name());
   } else if (common_config.has_geo_headers_to_add()) {
     // Fall back to deprecated geo_headers_to_add for backward compatibility.
     const auto& headers = common_config.geo_headers_to_add();
@@ -169,6 +222,18 @@ GeoipProviderConfig::GeoipProviderConfig(
     // TODO(barroca): When the is_anon field is fully deprecated, remove this fallback.
     if (headers.anon().empty()) {
       setFieldKey(GeoField::Anon, headers.is_anon());
+    }
+  }
+
+  // Reject at config load time when fields that require a specific database are configured
+  // without that database, rather than hitting IS_ENVOY_BUG on every lookup.
+  if (config.city_db_path().empty()) {
+    if (hasConfiguredField(*this, CITY_LOOKUP_FIELDS)) {
+      throw EnvoyException("city_db_path is required for the configured geo_field_keys");
+    }
+    if (config.country_db_path().empty() && hasConfiguredField(*this, COUNTRY_LOOKUP_FIELDS)) {
+      throw EnvoyException(
+          "country_db_path or city_db_path is required for the configured geo_field_keys");
     }
   }
 
@@ -189,6 +254,9 @@ void GeoipProviderConfig::registerGeoDbStats(const absl::string_view& db_type) {
 
 void GeoipProviderConfig::setFieldKey(GeoField field, const std::string& value) {
   field_keys_[enumToInt(field)] = getOptionalString(value);
+  if (!value.empty()) {
+    field_key_names_.emplace_back(value);
+  }
 }
 
 void GeoipProviderConfig::incCounter(Stats::StatName name) {
@@ -204,10 +272,9 @@ DbFileStats generateDbFileStats(Stats::Scope& scope, GeoDbType db_type,
                                 const std::string& db_path) {
   const std::string db_name = Stats::Utility::sanitizeStatsName(db_path);
   const absl::string_view base_prefix = dbTypeName(db_type);
-  const Stats::TaggedStatName prefix(scope.symbolTable(), base_prefix, {{DB_NAME_TAG, db_name}},
-                                     absl::StrCat(base_prefix, ".", db_name));
-  return {ALL_MAXMIND_DB_FILE_STATS(POOL_COUNTER_TAGGED(scope, prefix),
-                                    POOL_GAUGE_TAGGED(scope, prefix))};
+  Stats::LiteScopeHelper helper(scope, base_prefix, {{DB_NAME_TAG, db_name}},
+                                absl::StrCat(base_prefix, ".", db_name));
+  return {ALL_MAXMIND_DB_FILE_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper))};
 }
 
 } // namespace
@@ -304,7 +371,7 @@ void GeoipProvider::lookupInCityDb(
     int mmdb_error = MMDB_SUCCESS;
     auto city_db_ptr = getCityDb();
     // Used for testing.
-    synchronizer_.syncPoint(std::string(CITY_DB_TYPE).append("_lookup_pre_complete"));
+    synchronizer_.syncPoint(absl::StrCat(CITY_DB_TYPE, "_lookup_pre_complete"));
     if (!city_db_ptr) {
       IS_ENVOY_BUG("Maxmind city database must be initialised for performing lookups");
       return;
@@ -343,7 +410,7 @@ void GeoipProvider::lookupInAsnDb(
     int mmdb_error = MMDB_SUCCESS;
     auto asn_db_ptr = getAsnDb();
     // Used for testing.
-    synchronizer_.syncPoint(std::string(ASN_DB_TYPE).append("_lookup_pre_complete"));
+    synchronizer_.syncPoint(absl::StrCat(ASN_DB_TYPE, "_lookup_pre_complete"));
     if (!asn_db_ptr) {
       if (isIspDbSet()) {
         // ASN information can be looked up from ISP database as well, so we don't need to
@@ -381,7 +448,7 @@ void GeoipProvider::lookupInAnonDb(
     int mmdb_error = MMDB_SUCCESS;
     auto anon_db_ptr = getAnonDb();
     // Used for testing.
-    synchronizer_.syncPoint(std::string(ANON_DB_TYPE).append("_lookup_pre_complete"));
+    synchronizer_.syncPoint(absl::StrCat(ANON_DB_TYPE, "_lookup_pre_complete"));
     if (!anon_db_ptr) {
       IS_ENVOY_BUG("Maxmind anon database must be initialised for performing lookups");
       return;
@@ -416,7 +483,7 @@ void GeoipProvider::lookupInIspDb(
     int mmdb_error = MMDB_SUCCESS;
     auto isp_db_ptr = getIspDb();
     // Used for testing.
-    synchronizer_.syncPoint(std::string(ISP_DB_TYPE).append("_lookup_pre_complete"));
+    synchronizer_.syncPoint(absl::StrCat(ISP_DB_TYPE, "_lookup_pre_complete"));
     if (!isp_db_ptr) {
       IS_ENVOY_BUG("Maxmind isp database must be initialised for performing lookups");
       return;
@@ -458,7 +525,7 @@ void GeoipProvider::lookupInCountryDb(
     int mmdb_error = MMDB_SUCCESS;
     auto country_db_ptr = getCountryDb();
     // Used for testing.
-    synchronizer_.syncPoint(std::string(COUNTRY_DB_TYPE).append("_lookup_pre_complete"));
+    synchronizer_.syncPoint(absl::StrCat(COUNTRY_DB_TYPE, "_lookup_pre_complete"));
     if (!country_db_ptr) {
       if (isCityDbSet()) {
         // Country information can be looked up from City database as well, so we don't need to

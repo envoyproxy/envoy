@@ -153,7 +153,7 @@ public:
 
   // MCP validation getters
   bool isValidMcp() const { return is_valid_mcp_; }
-  bool isResponse() const { return has_result_ || has_error_; }
+  bool isResponse() const { return !has_method_ && (has_result_ || has_error_); }
   const std::string& getMethod() const { return method_; }
 
 private:
@@ -200,8 +200,13 @@ private:
   };
   std::stack<NestedContext> context_stack_;
 
-  // Current path tracking
-  std::vector<std::string> path_stack_;
+  // Current path tracking: one frame per open object (root and empty-key
+  // objects included), so StartObject/EndObject always pair up. Each frame
+  // stores the path length to restore on EndObject.
+  struct PathFrame {
+    size_t cache_size_before;
+  };
+  std::vector<PathFrame> path_stack_;
 
   // Track collected fields
   absl::flat_hash_set<std::string> collected_fields_;

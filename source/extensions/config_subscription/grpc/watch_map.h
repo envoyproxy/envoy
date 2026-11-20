@@ -7,6 +7,7 @@
 #include "envoy/config/custom_config_validators.h"
 #include "envoy/config/eds_resources_cache.h"
 #include "envoy/config/subscription.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/assert.h"
@@ -36,6 +37,15 @@ struct Watch {
   // Whether the most recent update contained any resources this watch cares about.
   // If true, a new update that also contains no resources can skip this watch.
   bool state_of_the_world_empty_{true};
+  // Whether onConfigUpdate() has ever been called on this watch, by a server response or a
+  // replay. Only a watch that has never been notified receives a cached resource replay.
+  bool notified_{false};
+  // Glob patterns this watch accepts via accept() (the "*" wildcard and/or
+  // "<prefix>/*" suffix globs). These affect routing only and never the subscription; a watch that
+  // holds any of them is never treated as a catch-all (empty-interest) wildcard watch. This is the
+  // forward index; the WatchMap keeps the reverse index in accept_wildcard_watches_ and
+  // accept_prefix_watches_ (mirroring resource_names_ <-> watch_interest_).
+  absl::flat_hash_set<std::string> accept_patterns_;
 };
 
 // NOTE: Users are responsible for eventually calling removeWatch() on the Watch* returned
@@ -70,12 +80,24 @@ struct Watch {
 // The WatchMap is responsible to update the cache with the resource contents, and it is
 // up to the specific xDS type subscription handler (i.e., EdsClusterImpl), to fetch
 // the resource from the cache.
+//
+// For SDS only, the WatchMap also keeps the last resource delivered for every explicitly
+// watched name while at least one watch is interested in it. When a watch that has never been
+// notified joins a name that is already subscribed (so no new request is sent and the server
+// will not resend an unchanged resource), the cached resource is replayed to that watch on the
+// next dispatcher iteration through its regular onConfigUpdate(). Wildcard and glob interest is
+// never cached.
 class WatchMap : public UntypedConfigUpdateCallbacks, public Logger::Loggable<Logger::Id::config> {
 public:
-  WatchMap(const bool use_namespace_matching, const std::string& type_url,
-           CustomConfigValidators* config_validators, EdsResourcesCacheOptRef eds_resources_cache)
-      : use_namespace_matching_(use_namespace_matching), type_url_(type_url),
-        config_validators_(config_validators), eds_resources_cache_(eds_resources_cache) {
+  WatchMap(const std::string& type_url, CustomConfigValidators* config_validators,
+           EdsResourcesCacheOptRef eds_resources_cache, Event::Dispatcher& dispatcher,
+           bool is_delta)
+      : type_url_(type_url), config_validators_(config_validators),
+        eds_resources_cache_(eds_resources_cache), is_delta_(is_delta),
+        replay_enabled_(type_url == secretTypeUrl()),
+        replay_cb_(replay_enabled_
+                       ? dispatcher.createSchedulableCallback([this] { replayCachedResources(); })
+                       : nullptr) {
     // If eds resources cache is provided, then the type must be ClusterLoadAssignment.
     ASSERT(!eds_resources_cache_.has_value() ||
            (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>()));
@@ -93,6 +115,33 @@ public:
   //    Y will be in removed_.
   AddedRemoved updateWatchInterest(Watch* watch,
                                    const absl::flat_hash_set<std::string>& update_to_these_names);
+
+  // Incremental counterpart to the single-argument updateWatchInterest(): adds 'resources_to_add'
+  // and/or removes 'resources_to_remove' from the watch's interest without disturbing the remaining
+  // names it already watches. Returns, in added_, the names that are new across the entire
+  // subscription (the caller should subscribe to these) and, in removed_, the names that no watch
+  // is interested in anymore (the caller should unsubscribe from these). A name of the form
+  // "<prefix>/*" registers a suffix-glob interest: the watch will then receive every resource named
+  // "<prefix>/<id>". This is how a watch can accept resources that were not named at addWatch()
+  // time (e.g. on-demand or VHDS virtual hosts).
+  AddedRemoved updateWatchInterest(Watch* watch,
+                                   const absl::flat_hash_set<std::string>& resources_to_add,
+                                   const absl::flat_hash_set<std::string>& resources_to_remove);
+
+  // Declares the routing-acceptance patterns for the given watch (replacing any previously declared
+  // patterns). These are evaluated FIRST and take precedence: a watch that has declared any accept
+  // pattern is routed only the resources matching 'patterns' (plus the concrete names it watches),
+  // and is never treated as a catch-all wildcard watch -- even if its resource_names_ is empty or
+  // contains "*". This lets a watch subscribe to the wildcard on the wire while routing only a
+  // subset (e.g. VHDS virtual hosts under a route configuration). To keep wildcard routing, include
+  // "*" in the patterns.
+  //
+  // Each pattern must be the wildcard "*" (accept every resource) or a "<prefix>/*" glob (accept
+  // every resource named "<prefix>/..."). Unlike updateWatchInterest(), this
+  // affects routing ONLY: the patterns are held in dedicated structures, are never added to
+  // watch_interest_, and never contribute to the subscription sent to the management server.
+  // Passing an empty set clears the previously declared patterns and restores default routing.
+  void accept(Watch* watch, const absl::flat_hash_set<std::string>& patterns);
 
   // Expects that the watch to be removed has already had all of its resource names removed via
   // updateWatchInterest().
@@ -118,8 +167,32 @@ public:
     config_validators_ = config_validators;
   }
 
+  // For tests: whether a resource is currently cached for the given name.
+  bool hasCachedResourceForTest(const std::string& name) const {
+    return cached_resources_.contains(name);
+  }
+
 private:
+  // The last resource delivered for an explicitly watched name. The resource is an owned copy:
+  // decoded resources are allocated on a per-batch arena and do not outlive the dispatch.
+  struct CachedResource {
+    Protobuf::Arena::UniquePtr<Protobuf::Message> resource_;
+    std::vector<std::string> aliases_;
+    std::string version_;
+  };
+
   void removeDeferredWatches();
+
+  // Erases the watch from every routing structure (wildcard, glob, and named interest).
+  void forgetWatch(Watch* watch);
+  void forgetAccept(Watch* watch);
+
+  // Returns true if 'watch' is still referenced by any watch_interest_ entry. Used only by the
+  // removeWatch() debug assertion that enforces the drain-first contract.
+  bool watchTrackedInInterest(Watch* watch);
+
+  // Updates wildcard_watches_ based on the current state of the given watch.
+  void updateWildcardWatches(Watch* watch);
 
   // Given a list of names that are new to an individual watch, returns those names that are in fact
   // new to the entire subscription.
@@ -133,6 +206,15 @@ private:
 
   // Returns the union of watch_interest_[resource_name] and wildcard_watches_.
   absl::flat_hash_set<Watch*> watchesInterestedIn(const std::string& resource_name);
+
+  static const std::string& secretTypeUrl();
+  // Stores a copy of the resource for later replay if its name is explicitly watched.
+  void cacheResource(const DecodedResource& resource, const std::string& version);
+  // Queues a replay of the cached resource for 'name', if any, to 'watch' if it has never been
+  // notified.
+  void queueReplay(Watch* watch, const std::string& name);
+  // Delivers queued replays. Runs from the dispatcher, never from inside an update.
+  void replayCachedResources();
 
   absl::flat_hash_set<std::unique_ptr<Watch>> watches_;
 
@@ -149,10 +231,31 @@ private:
   // 2) Enables efficient lookup of all interested watches when a resource has been updated.
   absl::flat_hash_map<std::string, absl::flat_hash_set<Watch*>> watch_interest_;
 
-  const bool use_namespace_matching_;
+  // Glob interest registered via accept(). Unlike wildcard_watches_/watch_interest_
+  // above, these affect routing only and never contribute to the subscription. Parallel to
+  // wildcard_watches_: watches that accept every resource (registered with "*").
+  absl::flat_hash_set<Watch*> accept_wildcard_watches_;
+  // Parallel to watch_interest_: maps a name prefix P (from a "P/*" pattern) to the watches that
+  // accept every resource named "P/...".
+  absl::flat_hash_map<std::string, absl::flat_hash_set<Watch*>> accept_prefix_watches_;
+
+  // Last delivered resource per explicitly watched name; an entry exists only while
+  // watch_interest_ has the name.
+  absl::flat_hash_map<std::string, CachedResource> cached_resources_;
+  // Watches that joined an already-subscribed, cached name and are waiting for the replay,
+  // with the names each one joined.
+  absl::flat_hash_map<Watch*, absl::flat_hash_set<std::string>> pending_replays_;
+
   const std::string type_url_;
   CustomConfigValidators* config_validators_;
   EdsResourcesCacheOptRef eds_resources_cache_;
+  // Whether the owning mux delivers through the delta form of onConfigUpdate(). A replay uses the
+  // same form, so a watch sees exactly what the mux would deliver.
+  const bool is_delta_;
+  // Cache and replay are limited to SDS for now.
+  const bool replay_enabled_;
+  // Only created when replay is enabled for this type.
+  Event::SchedulableCallbackPtr replay_cb_;
 };
 
 } // namespace Config

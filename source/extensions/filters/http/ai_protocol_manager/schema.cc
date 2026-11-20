@@ -117,7 +117,7 @@ Schema Schema::oneOf(std::vector<Schema> candidates) {
 std::vector<std::string> Schema::offloadableFieldPaths(absl::string_view current_path) const {
   std::vector<std::string> paths;
   if (is_offloadable_) {
-    paths.push_back(std::string(current_path));
+    paths.emplace_back(current_path);
   }
   switch (type_) {
   case Type::Object:
@@ -338,7 +338,7 @@ absl::Status Schema::validateOneOf(const nlohmann::json& json, absl::string_view
     if (status.ok()) {
       return absl::OkStatus();
     }
-    failure_reasons.push_back(std::string(status.message()));
+    failure_reasons.emplace_back(status.message());
   }
   return absl::InvalidArgumentError(absl::StrCat("field '", path,
                                                  "' did not match any allowed oneof schemas: [",

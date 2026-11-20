@@ -133,10 +133,12 @@ public:
                        lua_State* state) PURE;
 
   /**
-   * @return const Protobuf::Struct& the value of metadata inside the lua filter scope of current
-   * route entry.
+   * @param ns supplies the namespace of the metadata. If it is empty, the filter config name is
+   * used and the filter canonical name is used as a fallback.
+   * @return const Protobuf::Struct& the value of metadata under the namespace of current route
+   * entry.
    */
-  virtual const Protobuf::Struct& metadata() const PURE;
+  virtual const Protobuf::Struct& metadata(absl::string_view ns) const PURE;
 
   /**
    * @return StreamInfo::StreamInfo& the current stream info handle. This handle is mutable to
@@ -329,6 +331,8 @@ private:
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTrailers);
 
   /**
+   * @param 1 (string): optional namespace of the metadata. The filter config name is used if it
+   *        is not set.
    * @return a handle to the metadata.
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaMetadata);
@@ -458,7 +462,7 @@ private:
     request_headers_wrapper_.reset();
     body_wrapper_.reset();
     trailers_wrapper_.reset();
-    metadata_wrapper_.reset();
+    metadata_wrappers_.clear();
     filter_context_wrapper_.reset();
     stream_info_wrapper_.reset();
     connection_wrapper_.reset();
@@ -490,7 +494,10 @@ private:
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> request_headers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
+  // The metadata wrappers keyed by the namespace. The empty key is used for the default namespace.
+  absl::flat_hash_map<std::string,
+                      Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper>>
+      metadata_wrappers_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper>
       filter_context_wrapper_;
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> stream_info_wrapper_;
@@ -676,7 +683,7 @@ private:
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
-    const Protobuf::Struct& metadata() const override;
+    const Protobuf::Struct& metadata(absl::string_view ns) const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override {
       return callbacks_->connection().ptr();
@@ -715,7 +722,7 @@ private:
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
-    const Protobuf::Struct& metadata() const override;
+    const Protobuf::Struct& metadata(absl::string_view ns) const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override {
       return callbacks_->connection().ptr();
