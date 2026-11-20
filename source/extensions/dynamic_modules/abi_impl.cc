@@ -1094,6 +1094,22 @@ WEAK_STUB(envoy_dynamic_module_type_metrics_result,
           envoy_dynamic_module_type_lb_config_envoy_ptr, size_t,
           envoy_dynamic_module_type_module_buffer*, size_t, uint64_t)
 
+WEAK_STUB(envoy_dynamic_module_type_http_callout_init_result,
+          envoy_dynamic_module_callback_lb_config_http_callout,
+          envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest,
+          envoy_dynamic_module_type_lb_config_envoy_ptr, uint64_t*,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_http_header*,
+          size_t, envoy_dynamic_module_type_module_buffer, uint64_t)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_lb_config_enable_timer,
+               envoy_dynamic_module_type_lb_config_envoy_ptr, uint64_t)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_lb_config_disable_timer,
+               envoy_dynamic_module_type_lb_config_envoy_ptr)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_lb_config_schedule_on_server_initialized,
+               envoy_dynamic_module_type_lb_config_envoy_ptr)
+
 // ---------------------- Matcher callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the matcher extension abi_impl.cc when the matcher extension is used.

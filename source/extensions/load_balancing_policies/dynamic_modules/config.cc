@@ -92,16 +92,20 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
     }
     config_bytes = std::move(config_or_error.value());
   }
-  auto lb_config_or_error =
-      DynamicModuleLbConfig::create(typed_config.lb_policy_name(), config_bytes, metrics_namespace,
-                                    std::move(dynamic_module), context.serverScope());
-  if (!lb_config_or_error.ok()) {
+  const auto fail = [&](absl::string_view message) -> absl::Status {
     Envoy::Extensions::DynamicModules::incrementLoadFailure(
         context, typed_config.lb_policy_name(),
         Envoy::Extensions::DynamicModules::ConfigInitErrorStat);
     return absl::InvalidArgumentError(
         fmt::format("failed to create load balancer config for module '{}': {}",
-                    module_config.name(), lb_config_or_error.status().message()));
+                    module_config.name(), message));
+  };
+
+  auto lb_config_or_error =
+      DynamicModuleLbConfig::create(typed_config.lb_policy_name(), config_bytes, metrics_namespace,
+                                    std::move(dynamic_module), context.serverScope());
+  if (!lb_config_or_error.ok()) {
+    return fail(lb_config_or_error.status().message());
   }
 
   // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
@@ -112,7 +116,12 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
     context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
   }
 
-  return std::make_unique<TypedDynamicModuleLbConfig>(std::move(lb_config_or_error.value()));
+  auto typed_lb_config_or_error =
+      TypedDynamicModuleLbConfig::create(std::move(lb_config_or_error.value()), context);
+  if (!typed_lb_config_or_error.ok()) {
+    return fail(typed_lb_config_or_error.status().message());
+  }
+  return std::move(typed_lb_config_or_error.value());
 }
 
 REGISTER_FACTORY(Factory, Upstream::TypedLoadBalancerFactory);
