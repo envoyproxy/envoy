@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ratelimit.v3;
 
-import "envoy/annotations/deprecation.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/ratelimit/v3/rls.proto";
 import "envoy/config/route/v3/route_components.proto";
@@ -11,6 +10,7 @@ import "envoy/type/v3/http_status.proto";
 
 import "google/protobuf/duration.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
