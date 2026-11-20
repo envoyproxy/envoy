@@ -1627,11 +1627,11 @@ UpstreamDrainManager::~UpstreamDrainManager() {
   // so cancel all pending drains, which causes the connections to be closed.
   if (!drainers_.empty()) {
     auto& dispatcher = drainers_.begin()->second->dispatcher();
+    const auto close_type = Runtime::runtimeFeatureEnabled(
+                                "envoy.reloadable_features.tcp_proxy_send_rst_on_drain_abort")
+                                ? Network::ConnectionCloseType::AbortReset
+                                : Network::ConnectionCloseType::NoFlush;
     while (!drainers_.empty()) {
-      const auto close_type = Runtime::runtimeFeatureEnabled(
-                                  "envoy.reloadable_features.tcp_proxy_send_rst_on_drain_abort")
-                                  ? Network::ConnectionCloseType::AbortReset
-                                  : Network::ConnectionCloseType::NoFlush;
       auto begin = drainers_.begin();
       Drainer* key = begin->first;
       begin->second->cancelDrain(close_type);
