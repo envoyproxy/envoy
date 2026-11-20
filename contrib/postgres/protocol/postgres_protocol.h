@@ -37,9 +37,9 @@ constexpr uint32_t CANCEL_REQUEST_CODE = 0x04d2162e;
 constexpr uint32_t GSSAPI_ENC_REQUEST_CODE = 0x04d21630;
 
 // Message size constants.
-constexpr uint32_t STARTUP_HEADER_SIZE = 8;             // Length(4) + Version/Code(4).
-constexpr uint32_t SSL_REQUEST_MESSAGE_SIZE = 8;        // Length(4) + Code(4).
-constexpr uint32_t CANCEL_REQUEST_MESSAGE_SIZE = 16;    // Length(4) + Code(4) + PID(4) + Key(4).
+constexpr uint32_t STARTUP_HEADER_SIZE = 8;          // Length(4) + Version/Code(4).
+constexpr uint32_t SSL_REQUEST_MESSAGE_SIZE = 8;     // Length(4) + Code(4).
+constexpr uint32_t CANCEL_REQUEST_MESSAGE_SIZE = 16; // Length(4) + Code(4) + PID(4) + Key(4).
 constexpr uint32_t CANCEL_REQUEST_HEADER_SIZE =
     STARTUP_HEADER_SIZE + sizeof(uint32_t); // Includes PID.
 constexpr uint32_t CANCEL_REQUEST_MIN_SIZE = CANCEL_REQUEST_HEADER_SIZE + 1;
