@@ -9,6 +9,8 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/tracers/opentelemetry/samplers/sampler.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -33,9 +35,22 @@ public:
   std::string getDescription() const override;
   uint64_t traceIdToUint64(const std::string& trace_id) noexcept;
 
+  /**
+   * @return the randomness value R of the OpenTelemetry consistent probability sampling
+   * specification: the 7 rightmost bytes (56 bits) of the trace id, which W3C Trace Context Level 2
+   * requires to be random. Returns 0 if the trace id is not 32 hex characters.
+   */
+  static uint64_t traceIdRandomness(absl::string_view trace_id);
+
+  /**
+   * @return the rejection threshold T for the sampling percentage: a trace is sampled when R >= T.
+   */
+  static uint64_t rejectionThreshold(const envoy::type::v3::FractionalPercent& percentage);
+
 private:
   std::string description_;
   const envoy::type::v3::FractionalPercent sampling_percentage_;
+  const uint64_t rejection_threshold_;
 };
 
 } // namespace OpenTelemetry
