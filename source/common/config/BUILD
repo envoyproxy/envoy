@@ -14,7 +14,6 @@ envoy_cc_library(
     hdrs = ["ecds_subscription_registry.h"],
     deps = [
         ":xds_resource_lib",
-        "//envoy/server:factory_context_interface",
         "//envoy/singleton:instance_interface",
         "//envoy/singleton:manager_interface",
         "//source/common/common:cleanup_lib",

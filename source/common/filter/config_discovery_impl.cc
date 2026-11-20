@@ -9,7 +9,6 @@
 #include "source/common/common/containers.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/ecds_subscription_registry.h"
-#include "source/common/config/xds_resource.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 
@@ -69,10 +68,9 @@ absl::StatusOr<std::unique_ptr<FilterConfigSubscription>> FilterConfigSubscripti
     std::shared_ptr<FilterConfigProviderManagerImplBase> filter_config_provider_manager,
     const std::string& subscription_id) {
   std::unique_ptr<Cleanup> name_reservation;
-  if (config_source.has_ads() ||
-      Config::XdsResourceIdentifier::hasXdsTpScheme(filter_config_name)) {
+  if (config_source.has_ads()) {
     auto reservation =
-        Config::EcdsSubscriptionRegistry::get(factory_context)
+        Config::EcdsSubscriptionRegistry::get(factory_context.singletonManager())
             ->reserve(filter_config_name, Config::EcdsSubscriptionRegistry::Sharing::Shared);
     RETURN_IF_NOT_OK(reservation.status());
     name_reservation = std::move(*reservation);

@@ -188,7 +188,7 @@ TEST_F(ExtensionConfigSubscriptionTest, RefusesRepeatedAdsNamesAndReleasesReserv
   EXPECT_FALSE(ExtensionConfigSubscription::create("test-config", source("test.Config", true),
                                                    "other", context_, callback())
                    .ok());
-  auto registry = Config::EcdsSubscriptionRegistry::get(context_);
+  auto registry = Config::EcdsSubscriptionRegistry::get(context_.singletonManager());
   EXPECT_FALSE(
       registry->reserve("test-config", Config::EcdsSubscriptionRegistry::Sharing::Shared).ok());
   first.reset();
@@ -196,7 +196,7 @@ TEST_F(ExtensionConfigSubscriptionTest, RefusesRepeatedAdsNamesAndReleasesReserv
 }
 
 TEST_F(ExtensionConfigSubscriptionTest, RefusesAnAdsNameAlreadyHeldByFilters) {
-  auto registry = Config::EcdsSubscriptionRegistry::get(context_);
+  auto registry = Config::EcdsSubscriptionRegistry::get(context_.singletonManager());
   auto first_filter =
       registry->reserve("test-config", Config::EcdsSubscriptionRegistry::Sharing::Shared);
   auto second_filter =
@@ -234,7 +234,7 @@ TEST_F(ExtensionConfigSubscriptionTest, RefusesEquivalentXdsTpNamesAndReleasesRe
       .Times(0);
   EXPECT_FALSE(
       ExtensionConfigSubscription::create(reordered, source(), "other", context_, callback()).ok());
-  auto registry = Config::EcdsSubscriptionRegistry::get(context_);
+  auto registry = Config::EcdsSubscriptionRegistry::get(context_.singletonManager());
   EXPECT_FALSE(
       registry->reserve(reordered, Config::EcdsSubscriptionRegistry::Sharing::Shared).ok());
   subscription->reset();

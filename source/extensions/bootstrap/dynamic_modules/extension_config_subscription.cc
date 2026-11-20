@@ -85,8 +85,9 @@ absl::StatusOr<std::unique_ptr<ExtensionConfigSubscription>> ExtensionConfigSubs
   auto result = std::unique_ptr<ExtensionConfigSubscription>(new ExtensionConfigSubscription(
       *normalized, source, extension_name, context, std::move(callback)));
   if (source.config_source().has_ads() || Config::XdsResourceIdentifier::hasXdsTpScheme(name)) {
-    auto reservation = Config::EcdsSubscriptionRegistry::get(context)->reserve(
-        *normalized, Config::EcdsSubscriptionRegistry::Sharing::Exclusive);
+    auto reservation =
+        Config::EcdsSubscriptionRegistry::get(context.singletonManager())
+            ->reserve(*normalized, Config::EcdsSubscriptionRegistry::Sharing::Exclusive);
     RETURN_IF_NOT_OK(reservation.status());
     result->name_reservation_ = std::move(*reservation);
   }

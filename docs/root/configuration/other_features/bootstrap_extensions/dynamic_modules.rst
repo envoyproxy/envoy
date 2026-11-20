@@ -188,9 +188,10 @@ initialization to subscribe to one named
 :ref:`TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>` resource. It
 passes a JSON-encoded :ref:`ExtensionConfigSource
 <envoy_v3_api_msg_config.core.v3.ExtensionConfigSource>` with its configuration source and allowed
-``type_urls``. Default configurations and wildcard names are not supported. On ADS and xDS-TP,
-the resource name must not be shared with another bootstrap extension or filter ECDS subscription.
-The subscription ends when shutdown begins.
+``type_urls``. Default configurations and wildcard names are not supported. Another bootstrap
+extension cannot use the same ADS or xDS-TP name. Filter ECDS subscriptions conflict only on ADS.
+The first subscriber keeps the name until its subscription ends. The bootstrap subscription ends
+when shutdown begins.
 
 ``envoy_dynamic_module_on_bootstrap_extension_ecds_update`` receives the resource name, version,
 payload type and configuration on the main thread. Payloads use the startup configuration

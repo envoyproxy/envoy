@@ -4,8 +4,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/server/factory_context.h"
 #include "envoy/singleton/instance.h"
+#include "envoy/singleton/manager.h"
 
 #include "source/common/common/cleanup.h"
 
@@ -24,8 +24,7 @@ class EcdsSubscriptionRegistry : public Singleton::Instance,
 public:
   enum class Sharing { Shared, Exclusive };
 
-  static std::shared_ptr<EcdsSubscriptionRegistry>
-  get(Server::Configuration::ServerFactoryContext& context);
+  static std::shared_ptr<EcdsSubscriptionRegistry> get(Singleton::Manager& manager);
 
   absl::StatusOr<std::unique_ptr<Cleanup>> reserve(absl::string_view name, Sharing sharing);
 

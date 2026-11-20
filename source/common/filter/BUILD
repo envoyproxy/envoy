@@ -23,7 +23,6 @@ envoy_cc_library(
         "//source/common/config:ecds_subscription_registry_lib",
         "//source/common/config:resource_type_helper_lib",
         "//source/common/config:utility_lib",
-        "//source/common/config:xds_resource_lib",
         "//source/common/grpc:common_lib",
         "//source/common/init:manager_lib",
         "//source/common/init:target_lib",

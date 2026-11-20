@@ -456,7 +456,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DestroyReady) {
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, AdsFilterNamesPreventExclusiveSubscriptions) {
   TypeParam test;
   test.setup();
-  auto registry = Config::EcdsSubscriptionRegistry::get(test.server_factory_context_);
+  auto registry =
+      Config::EcdsSubscriptionRegistry::get(test.server_factory_context_.singletonManager());
   EXPECT_FALSE(registry->reserve("foo", Config::EcdsSubscriptionRegistry::Sharing::Exclusive).ok());
   EXPECT_CALL(test.init_watcher_, ready());
   test.provider_.reset();
@@ -465,8 +466,9 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, AdsFilterNamesPreventExclusiv
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, AdsFiltersRefuseExclusiveNames) {
   TypeParam test;
-  auto reservation = Config::EcdsSubscriptionRegistry::get(test.server_factory_context_)
-                         ->reserve("foo", Config::EcdsSubscriptionRegistry::Sharing::Exclusive);
+  auto reservation =
+      Config::EcdsSubscriptionRegistry::get(test.server_factory_context_.singletonManager())
+          ->reserve("foo", Config::EcdsSubscriptionRegistry::Sharing::Exclusive);
   ASSERT_OK(reservation);
   envoy::config::core::v3::ExtensionConfigSource source;
   source.mutable_config_source()->mutable_ads();
@@ -476,7 +478,21 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, AdsFiltersRefuseExclusiveName
                               source, "foo", test.server_factory_context_, test.factory_context_,
                               test.server_factory_context_.cluster_manager_, true,
                               test.getFilterType(), test.getMatcher(), "parent."),
-                          EnvoyException, "already has a subscription");
+                          EnvoyException, "already has a bootstrap module subscription");
+}
+
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, PathFilterNamesDoNotReserveSharedStreams) {
+  TypeParam test;
+  const std::string name = "xdstp://invalid";
+  envoy::config::core::v3::ExtensionConfigSource source;
+  source.mutable_config_source()->set_path("unused.yaml");
+  source.add_type_urls(test.getTypeUrl());
+  EXPECT_CALL(test.init_manager_, add(_));
+  auto provider = test.filter_config_provider_manager_->createDynamicFilterConfigProvider(
+      source, name, test.server_factory_context_, test.factory_context_,
+      test.server_factory_context_.cluster_manager_, true, test.getFilterType(), test.getMatcher(),
+      "parent.");
+  EXPECT_EQ(provider->name(), name);
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
