@@ -456,5 +456,27 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
   connection_socket->close();
 }
 
+TEST(EnvoyQuicUtilsTest, CreateConnectionSocketFailure) {
+  Network::Address::InstanceConstSharedPtr peer_addr =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 54321, nullptr);
+  Network::Address::InstanceConstSharedPtr no_local_addr = nullptr;
+
+  testing::NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_calls{&os_sys_calls};
+  ON_CALL(os_sys_calls, socket(_, _, _))
+      .WillByDefault(Return(Api::SysCallSocketResult{-1, SOCKET_ERROR_NOT_SUP}));
+
+  EXPECT_ENVOY_BUG(
+      {
+        auto connection_socket = createConnectionSocket(peer_addr, no_local_addr, nullptr);
+        ASSERT_NE(connection_socket, nullptr);
+        EXPECT_FALSE(connection_socket->isOpen());
+        EXPECT_FALSE(connection_socket->ioHandle().isOpen());
+        EXPECT_FALSE(connection_socket->ioHandle().wasConnected());
+        EXPECT_EQ(connection_socket->detectedTransportProtocol(), "quic");
+      },
+      "socket(2) failed");
+}
+
 } // namespace Quic
 } // namespace Envoy
