@@ -178,7 +178,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
                                     const ResponseMetadata& metadata,
                                     UpdateHeadersCallback on_complete) {
   const auto& simple_lookup_context = static_cast<const SimpleLookupContext&>(lookup_context);
-  const std::string serialized_key =
+  const SerializedKey serialized_key =
       MessageUtil::serializeDeterministically(simple_lookup_context.request().key());
   absl::WriterMutexLock lock(mutex_);
   auto iter = map_.find(serialized_key);
@@ -213,7 +213,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
-  const std::string serialized_key = MessageUtil::serializeDeterministically(request.key());
+  const SerializedKey serialized_key = MessageUtil::serializeDeterministically(request.key());
   absl::ReaderMutexLock lock(mutex_);
   auto iter = map_.find(serialized_key);
   if (iter == map_.end()) {
@@ -237,7 +237,7 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
 bool SimpleHttpCache::insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
                              ResponseMetadata&& metadata, std::string&& body,
                              Http::ResponseTrailerMapPtr&& trailers) {
-  std::string serialized_key = MessageUtil::serializeDeterministically(key);
+  SerializedKey serialized_key = MessageUtil::serializeDeterministically(key);
   absl::WriterMutexLock lock(mutex_);
   map_[std::move(serialized_key)] = SimpleHttpCache::Entry{
       std::move(response_headers), std::move(metadata), std::move(body), std::move(trailers)};
@@ -291,9 +291,9 @@ bool SimpleHttpCache::varyInsert(const Key& request_key,
   }
 
   varied_request_key.add_custom_fields(vary_identifier.value());
-  std::string serialized_varied_request_key =
+  SerializedKey serialized_varied_request_key =
       MessageUtil::serializeDeterministically(varied_request_key);
-  std::string serialized_request_key = MessageUtil::serializeDeterministically(request_key);
+  SerializedKey serialized_request_key = MessageUtil::serializeDeterministically(request_key);
 
   absl::WriterMutexLock lock(mutex_);
   map_[std::move(serialized_varied_request_key)] = SimpleHttpCache::Entry{

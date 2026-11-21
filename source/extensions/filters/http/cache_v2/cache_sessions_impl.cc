@@ -964,7 +964,7 @@ void CacheSession::performValidation() {
 std::shared_ptr<CacheSession> CacheSessionsImpl::getEntry(const Key& key) {
   const SystemTime now = time_source_.systemTime();
   cache().touch(key, now);
-  std::string serialized_key = MessageUtil::serializeDeterministically(key);
+  SerializedKey serialized_key = MessageUtil::serializeDeterministically(key);
   absl::MutexLock lock(mu_);
   auto [it, is_new] = entries_.try_emplace(std::move(serialized_key));
   if (is_new) {

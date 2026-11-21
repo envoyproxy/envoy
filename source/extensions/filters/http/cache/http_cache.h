@@ -70,6 +70,12 @@ using LookupResultPtr = std::unique_ptr<LookupResult>;
 // just their hashes) match.
 size_t stableHashKey(const Key& key);
 
+// The deterministic serialization of a Key, as
+// MessageUtil::serializeDeterministically() returns it. In-memory caches key
+// their maps by it, since hashing and comparing the bytes costs less than
+// hashing and comparing the Key message.
+using SerializedKey = std::string;
+
 // LookupRequest holds everything about a request that's needed to look for a
 // response in a cache, to evaluate whether an entry from a cache is usable, and
 // to determine what ranges are needed.

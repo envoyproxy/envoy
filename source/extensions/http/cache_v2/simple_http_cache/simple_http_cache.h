@@ -53,8 +53,7 @@ public:
               std::shared_ptr<CacheProgressReceiver> progress) override;
 
   absl::Mutex mu_;
-  // Keyed by the deterministic serialization of each cache key.
-  absl::flat_hash_map<std::string, std::shared_ptr<Entry>> entries_ ABSL_GUARDED_BY(mu_);
+  absl::flat_hash_map<SerializedKey, std::shared_ptr<Entry>> entries_ ABSL_GUARDED_BY(mu_);
 };
 
 } // namespace CacheV2

@@ -168,7 +168,7 @@ CacheInfo SimpleHttpCache::cacheInfo() const {
 
 void SimpleHttpCache::lookup(LookupRequest&& request, LookupCallback&& callback) {
   LookupResult result;
-  const std::string serialized_key = MessageUtil::serializeDeterministically(request.key());
+  const SerializedKey serialized_key = MessageUtil::serializeDeterministically(request.key());
   {
     absl::ReaderMutexLock lock(mu_);
     auto it = entries_.find(serialized_key);
@@ -184,7 +184,7 @@ void SimpleHttpCache::lookup(LookupRequest&& request, LookupCallback&& callback)
 }
 
 void SimpleHttpCache::evict(Event::Dispatcher&, const Key& key) {
-  const std::string serialized_key = MessageUtil::serializeDeterministically(key);
+  const SerializedKey serialized_key = MessageUtil::serializeDeterministically(key);
   absl::WriterMutexLock lock(mu_);
   entries_.erase(serialized_key);
 }
@@ -192,7 +192,7 @@ void SimpleHttpCache::evict(Event::Dispatcher&, const Key& key) {
 void SimpleHttpCache::updateHeaders(Event::Dispatcher&, const Key& key,
                                     const Http::ResponseHeaderMap& updated_headers,
                                     const ResponseMetadata& updated_metadata) {
-  const std::string serialized_key = MessageUtil::serializeDeterministically(key);
+  const SerializedKey serialized_key = MessageUtil::serializeDeterministically(key);
   absl::WriterMutexLock lock(mu_);
   auto it = entries_.find(serialized_key);
   if (it == entries_.end()) {
@@ -207,7 +207,7 @@ void SimpleHttpCache::insert(Event::Dispatcher&, Key key, Http::ResponseHeaderMa
                              std::shared_ptr<CacheProgressReceiver> progress) {
   auto entry = std::make_shared<Entry>(Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers),
                                        std::move(metadata));
-  std::string serialized_key = MessageUtil::serializeDeterministically(key);
+  SerializedKey serialized_key = MessageUtil::serializeDeterministically(key);
   {
     absl::WriterMutexLock lock(mu_);
     entries_.emplace(std::move(serialized_key), entry);

@@ -54,8 +54,7 @@ public:
                   const VaryAllowList& vary_allow_list, Http::ResponseTrailerMapPtr&& trailers);
 
   absl::Mutex mutex_;
-  // Keyed by the deterministic serialization of each cache key.
-  absl::flat_hash_map<std::string, Entry> map_ ABSL_GUARDED_BY(mutex_);
+  absl::flat_hash_map<SerializedKey, Entry> map_ ABSL_GUARDED_BY(mutex_);
 };
 
 } // namespace Cache

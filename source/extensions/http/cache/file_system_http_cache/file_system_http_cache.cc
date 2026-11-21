@@ -323,13 +323,13 @@ void FileSystemHttpCache::updateHeaders(const LookupContext& base_lookup_context
 absl::string_view FileSystemHttpCache::cachePath() const { return shared_->cachePath(); }
 
 bool FileSystemHttpCache::workInProgress(const Key& key) {
-  const std::string serialized_key = MessageUtil::serializeDeterministically(key);
+  const SerializedKey serialized_key = MessageUtil::serializeDeterministically(key);
   absl::MutexLock lock(cache_mu_);
   return entries_being_written_.contains(serialized_key);
 }
 
 std::shared_ptr<Cleanup> FileSystemHttpCache::maybeStartWritingEntry(const Key& key) {
-  std::string serialized_key = MessageUtil::serializeDeterministically(key);
+  SerializedKey serialized_key = MessageUtil::serializeDeterministically(key);
   absl::MutexLock lock(cache_mu_);
   if (!entries_being_written_.emplace(serialized_key).second) {
     return nullptr;
