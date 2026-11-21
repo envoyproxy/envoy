@@ -268,7 +268,8 @@ TEST(MetadataTest, ConstMetadataSharedPoolSharesMetadataWithEqualBytes) {
   const std::shared_ptr<const envoy::config::core::v3::Metadata> shared_metadata =
       pool->getObject(metadata);
   EXPECT_EQ(shared_metadata, pool->getObject(reordered_metadata));
-  // A pool with a single entry compares without hashing, so this checks the functors directly too.
+  // In an optimized build a pool with a single entry compares without hashing, so this checks the
+  // functors directly too.
   EXPECT_EQ(SerializedMetadataHash{}(metadata), SerializedMetadataHash{}(reordered_metadata));
   EXPECT_TRUE(SerializedMetadataEqual{}(metadata, reordered_metadata));
 
