@@ -21,6 +21,7 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
@@ -47,6 +48,7 @@
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/load_stats_reporter_impl.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "absl/hash/hash.h"
 #include "absl/status/status.h"
@@ -381,6 +383,14 @@ absl::Status
 ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   ASSERT(!initialized_);
   initialized_ = true;
+
+  // Built here rather than in the constructor so that loggers which need the cluster manager
+  // (e.g. gRPC access log sinks) can be created.
+  Server::GenericFactoryContextImpl generic_context(context_, context_.messageValidationVisitor());
+  for (const auto& log : bootstrap.cluster_manager().async_client_upstream_log()) {
+    async_client_router_config_->upstream_logs_.push_back(
+        AccessLog::AccessLogFactory::fromProto(log, generic_context));
+  }
 
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
   // the secondary clusters are loaded. As it currently stands all non-EDS clusters and EDS which

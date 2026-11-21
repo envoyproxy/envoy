@@ -517,7 +517,7 @@ message Admin {
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message ClusterManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.ClusterManager";
@@ -563,6 +563,12 @@ message ClusterManager {
   // inline during requests. This will save memory and CPU cycles in cases where
   // there are lots of inactive clusters and ``> 1`` worker thread.
   bool enable_deferred_cluster_creation = 5;
+
+  // Upstream access logs for requests sent by Envoy's internal HTTP and Envoy gRPC async clients
+  // (for example ext_authz, ext_proc or JWKS fetches). These are written in the same way as the
+  // router's :ref:`upstream_log
+  // <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log>`.
+  repeated accesslog.v3.AccessLog async_client_upstream_log = 6;
 }
 
 // Allows you to specify different watchdog configs for different subsystems.
