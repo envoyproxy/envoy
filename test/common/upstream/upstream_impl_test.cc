@@ -59,6 +59,7 @@
 #include "test/mocks/upstream/transport_socket_match.h"
 #include "test/mocks/upstream/typed_load_balancer_factory.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
@@ -7903,6 +7904,62 @@ TEST_F(StaticClusterImplTest, RingHashUsesEndpointHostnameForHashing) {
         .WillRepeatedly(Return(HashUtil::xxHash64("10.0.0.2:443_0")));
     EXPECT_EQ(hosts[1], lb->chooseHost(&context).host);
   }
+}
+
+TEST_P(StrictDnsClusterImplParamTest, WarnSkipDrainingOnResolutionWithoutSingleEndpoint) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
+  const std::string yaml_template = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    cluster_type:
+      name: envoy.cluster.dns
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+        all_addresses_in_single_endpoint: {}
+        {}
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  const std::string warning = "skip_draining_on_resolution is set to true but only takes effect";
+
+  // Explicitly enabled on a strict DNS cluster: misconfiguration.
+  EXPECT_LOG_CONTAINS("warn", warning, {
+    auto cluster =
+        *createStrictDnsCluster(parseClusterFromV3Yaml(fmt::format(
+                                    yaml_template, false, "skip_draining_on_resolution: true")),
+                                factory_context, dns_resolver_);
+  });
+  // Unset defaults to true but is not a misconfiguration.
+  EXPECT_LOG_NOT_CONTAINS("warn", warning, {
+    auto cluster =
+        *createStrictDnsCluster(parseClusterFromV3Yaml(fmt::format(yaml_template, false, "")),
+                                factory_context, dns_resolver_);
+  });
+  // Explicitly disabled on a strict DNS cluster.
+  EXPECT_LOG_NOT_CONTAINS("warn", warning, {
+    auto cluster =
+        *createStrictDnsCluster(parseClusterFromV3Yaml(fmt::format(
+                                    yaml_template, false, "skip_draining_on_resolution: false")),
+                                factory_context, dns_resolver_);
+  });
+  // Explicitly enabled on a logical DNS cluster.
+  EXPECT_LOG_NOT_CONTAINS("warn", warning, {
+    auto cluster =
+        *createStrictDnsCluster(parseClusterFromV3Yaml(fmt::format(
+                                    yaml_template, true, "skip_draining_on_resolution: true")),
+                                factory_context, dns_resolver_);
+  });
 }
 
 } // namespace

@@ -29,6 +29,15 @@ DnsClusterFactory::createClusterWithConfig(
 
   RETURN_IF_NOT_OK(dns_resolver_or_error.status());
 
+  if (proto_config.has_skip_draining_on_resolution() &&
+      proto_config.skip_draining_on_resolution().value() &&
+      !proto_config.all_addresses_in_single_endpoint()) {
+    ENVOY_LOG(warn,
+              "cluster '{}': skip_draining_on_resolution is set to true but only takes effect when "
+              "all_addresses_in_single_endpoint is true; it is ignored for this cluster",
+              cluster.name());
+  }
+
   absl::StatusOr<std::unique_ptr<ClusterImplBase>> cluster_or_error;
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
