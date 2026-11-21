@@ -280,6 +280,9 @@ areas:
   websocket:
     title: websocket
 
+  xds:
+    title: xds
+
   zipkin:
     title: zipkin
   zstd:

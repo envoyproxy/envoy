@@ -1,3 +1,5 @@
+#include <tuple>
+
 #include "envoy/config/config_validator.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/registry/registry.h"
@@ -28,12 +30,24 @@ using testing::HasSubstr;
 using testing::Return;
 using testing::ReturnRef;
 
+absl::string_view sotwGrpcMuxFactoryName() {
+  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")
+             ? "envoy.config_mux.sotw_grpc_mux_factory"
+             : "envoy.config_mux.grpc_mux_factory";
+}
+
+absl::string_view deltaGrpcMuxFactoryName() {
+  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")
+             ? "envoy.config_mux.delta_grpc_mux_factory"
+             : "envoy.config_mux.new_grpc_mux_factory";
+}
+
 // A gRPC MuxFactory that returns a MockGrpcMux instance when trying to instantiate a mux for the
 // `envoy.config_mux.grpc_mux_factory` type. This enables testing call expectations on the ADS gRPC
 // mux.
 class MockGrpcMuxFactory : public MuxFactory {
 public:
-  MockGrpcMuxFactory(absl::string_view name = "envoy.config_mux.grpc_mux_factory") : name_(name) {
+  MockGrpcMuxFactory(absl::string_view name = sotwGrpcMuxFactoryName()) : name_(name) {
     ON_CALL(*this, create(_, _, _, _, _, _, _, _, _, _, _, _))
         .WillByDefault(
             [](std::shared_ptr<Grpc::RawAsyncClient>&&, std::shared_ptr<Grpc::RawAsyncClient>&&,
@@ -1029,7 +1043,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceSotwNonGrpc) {
   )EOF");
   const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(res.message(), HasSubstr("envoy.config_mux.grpc_mux_factory not found"));
+  EXPECT_THAT(res.message(), HasSubstr(absl::StrCat(sotwGrpcMuxFactoryName(), " not found")));
   // Restore the mux factories.
   Registry::FactoryRegistry<MuxFactory>::factories() = saved_factories;
   Registry::InjectFactory<MuxFactory>::resetTypeMappings();
@@ -1069,7 +1083,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceDeltaNonGrpc) {
   )EOF");
   const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(res.message(), HasSubstr("envoy.config_mux.new_grpc_mux_factory not found"));
+  EXPECT_THAT(res.message(), HasSubstr(absl::StrCat(deltaGrpcMuxFactoryName(), " not found")));
   // Restore the mux factories.
   Registry::FactoryRegistry<MuxFactory>::factories() = saved_factories;
   Registry::InjectFactory<MuxFactory>::resetTypeMappings();
@@ -1253,7 +1267,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceNoAuthority) 
 TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceDeltaGrpc) {
   testing::InSequence s;
   // Replace the created GrpcMux mock with a delta-xDS one.
-  NiceMock<MockGrpcMuxFactory> factory("envoy.config_mux.new_grpc_mux_factory");
+  NiceMock<MockGrpcMuxFactory> factory(deltaGrpcMuxFactoryName());
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
   EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
       .WillOnce([&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
