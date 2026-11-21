@@ -95,4 +95,21 @@ message OverrideHost {
   // hosts is present.
   config.cluster.v3.LoadBalancingPolicy fallback_policy = 3
       [(validate.rules).message = {required: true}];
+
+  // Names of internal listeners whose :ref:`internal addresses
+  // <envoy_v3_api_msg_config.core.v3.EnvoyInternalAddress>` an override host may also match.
+  //
+  // If an override host ``IP:Port`` is not present in the cluster, it is looked up again as an
+  // internal address with each of these server listener names, in order, and the override host as
+  // its ``endpoint_id``. For example, with ``connect_originate`` in this list, ``10.0.0.5:8080``
+  // also matches the endpoint ``envoy://connect_originate/10.0.0.5:8080``.
+  //
+  // This lets an endpoint picker that returns ``IP:Port`` work with clusters whose endpoints are
+  // reached through an internal listener, such as a listener that tunnels the request to the
+  // endpoint over HTTP CONNECT.
+  //
+  // When a host is matched this way, the value written to ``selected_host_key`` is the override
+  // host as it was given (``IP:Port``), not the internal address.
+  repeated string internal_listener_names = 4
+      [(validate.rules).repeated = {items {string {min_len: 1}}}];
 }
