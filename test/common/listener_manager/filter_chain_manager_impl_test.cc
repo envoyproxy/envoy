@@ -463,6 +463,50 @@ TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {
   );
 }
 
+// A source range with prefix_len 0 matches every source address, so a chain whose
+// only source range is a catch-all duplicates a chain with no source range.
+TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchCatchAllSourceRangeFails) {
+  envoy::config::listener::v3::FilterChain new_filter_chain1 = filter_chain_template_;
+  envoy::config::listener::v3::FilterChain new_filter_chain2 = filter_chain_template_;
+  auto* source_range = new_filter_chain2.mutable_filter_chain_match()->add_source_prefix_ranges();
+  source_range->set_address_prefix("0.0.0.0");
+  source_range->mutable_prefix_len()->set_value(0);
+
+  EXPECT_EQ(filter_chain_manager_
+                ->addFilterChains(nullptr,
+                                  std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                      &new_filter_chain1, &new_filter_chain2},
+                                  nullptr, filter_chain_factory_builder_, *filter_chain_manager_,
+                                  nullptr, empty_config_source_, dummy_fcds_callbacks_)
+                .message(),
+            "error adding listener '127.0.0.1:1234': filter chain 'foo' has the "
+            "same matching rules defined as 'foo'"
+#ifdef ENVOY_ENABLE_YAML
+            ". duplicate matcher is: "
+            "{\"source_prefix_ranges\":[{\"address_prefix\":\"0.0.0.0\",\"prefix_len\":0}],"
+            "\"destination_port\":10000}"
+
+#endif
+  );
+}
+
+// A catch-all source range on its own is valid: with no equivalent chain to
+// duplicate, the chain must still be accepted.
+TEST_P(FilterChainManagerImplTest, CatchAllSourceRangeWithoutDuplicateSucceeds) {
+  envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
+  auto* source_range = new_filter_chain.mutable_filter_chain_match()->add_source_prefix_ranges();
+  source_range->set_address_prefix("0.0.0.0");
+  source_range->mutable_prefix_len()->set_value(0);
+
+  EXPECT_TRUE(filter_chain_manager_
+                  ->addFilterChains(nullptr,
+                                    std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                        &new_filter_chain},
+                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_,
+                                    nullptr, empty_config_source_, dummy_fcds_callbacks_)
+                  .ok());
+}
+
 class MockFcdsClientCallbacks : public FcdsClientCallbacks {
 public:
   MOCK_METHOD(void, drainFilterChain, (Network::DrainableFilterChainSharedPtr draining),
