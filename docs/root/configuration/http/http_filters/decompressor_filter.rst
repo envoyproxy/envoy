@@ -21,6 +21,17 @@ Currently the filter supports :ref:`gzip <envoy_v3_api_msg_extensions.compressio
 and :ref:`zstd <envoy_v3_api_msg_extensions.compression.zstd.decompressor.v3.Zstd>`
 compression only. Other compression libraries can be supported as extensions.
 
+The zstd decompressor computes a threshold for each call from the compressed input size multiplied by
+:ref:`max_inflate_ratio <envoy_v3_api_field_extensions.compression.zstd.decompressor.v3.Zstd.max_inflate_ratio>`,
+plus :ref:`max_block_size <envoy_v3_api_field_extensions.compression.zstd.decompressor.v3.Zstd.max_block_size>` bytes.
+A small input chunk can complete a block started in an earlier chunk. If this happens, set
+``max_block_size`` to the sender's maximum uncompressed block size (up to 128 KiB).
+The defaults are a ratio of 100 and a block allowance of zero.
+
+Envoy forwards the output of the step that crosses the threshold, increments ``zstd_generic_error``,
+and ends the current call. Output can exceed the threshold by up to one decompressor output buffer.
+Later calls can continue decoding with a fresh threshold.
+
 An example configuration of the filter may look like the following:
 
 .. code-block:: yaml
@@ -99,6 +110,24 @@ multiple decompressor filters enabled only for requests or responses. For instan
           enabled:
             default_value: false
             runtime_key: request_decompressor_enabled
+
+Upstream HTTP Filter Support
+----------------------------
+
+The decompressor filter can also be configured as an upstream HTTP filter, for example in the
+:ref:`router upstream filters <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_http_filters>`
+or the cluster's
+:ref:`HTTP protocol options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.http_filters>`.
+This is useful, for example, to decompress responses only from clusters that send compressed
+content, or to decompress requests before they are sent to a cluster that cannot accept them.
+When configured on a cluster, the filter's statistics are rooted at ``cluster.<name>.``.
+
+.. attention::
+
+  Request decompression in an upstream filter does not currently work with retries. The filter
+  removes ``content-encoding`` from the request headers, and the router does not restore it before a
+  retry, so the retried request is sent with the original compressed body but without
+  ``content-encoding``. Response decompression is not affected.
 
 .. _decompressor-statistics:
 

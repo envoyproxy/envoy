@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 load(
@@ -16,7 +17,17 @@ envoy_extension_cc_test(
     name = "matchers_test",
     srcs = ["matchers_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/stream_info:filter_state_lib",
@@ -41,7 +52,17 @@ envoy_extension_cc_test(
     name = "engine_impl_test",
     srcs = ["engine_impl_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/common/rbac:engine_lib",
@@ -63,7 +84,17 @@ envoy_extension_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/stats:isolated_store_lib",
@@ -83,5 +114,20 @@ envoy_extension_cc_mock(
     deps = [
         "//source/extensions/filters/common/rbac:engine_lib",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "extension_input_lib",
+    hdrs = ["extension_input.h"],
+    deps = [
+        "//envoy/http:filter_interface",
+        "//envoy/matcher:matcher_interface",
+        "//source/common/common:fmt_lib",
+        "//source/common/protobuf",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
+        "@xds//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )

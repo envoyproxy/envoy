@@ -68,6 +68,7 @@ FilterConfig::FilterConfig(
       enable_retry_after_header_(config.enable_retry_after_header() &&
                                  status_ == Http::Code::TooManyRequests),
       vh_rate_limits_(config.vh_rate_limits()),
+      rate_limits_override_option_(config.rate_limits_override_option()),
       rate_limited_grpc_status_(
           config.rate_limited_as_resource_exhausted()
               ? std::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
@@ -90,6 +91,17 @@ FilterConfig::FilterConfig(
   if (per_route && !config.has_token_bucket()) {
     creation_status = absl::InvalidArgumentError(
         "local rate limit token bucket must be set for per filter configs");
+    return;
+  }
+
+  // TODO(wbpcode): support the per connection rate limiting with the rate limits override option
+  // after the per connection limiter is fixed to be keyed by the config that creates it.
+  if (rate_limit_per_connection_ &&
+      rate_limits_override_option_ !=
+          envoy::extensions::common::ratelimit::v3::RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED) {
+    creation_status =
+        absl::InvalidArgumentError("rate_limits_override_option is set and "
+                                   "local_rate_limit_per_downstream_connection is set to true");
     return;
   }
 
@@ -167,20 +179,13 @@ bool FilterConfig::enforced() const {
   return filter_enforced_.has_value() ? filter_enforced_->enabled() : false;
 }
 
-Filter::Filter(FilterConfigSharedPtr config)
-    : config_(std::move(config)), used_config_(config_.get()) {}
+Filter::Filter(FilterConfigSharedPtr config) : config_(std::move(config)), used_config_(*config_) {}
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  const auto* route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
-
   // We can never assume that the configuration/route will not change between
   // decodeHeaders() and encodeHeaders().
-  // Store the configuration because we will use it later in encodeHeaders().
-  if (route_config != nullptr) {
-    ASSERT(used_config_ == config_.get());
-    used_config_ = route_config; // Overwrite the used configuration.
-  }
+  // Store the configurations because we will use them later in encodeHeaders().
+  initializeUsedConfigs();
 
   rate_limit_enabled_ = used_config_->enabled();
   if (!rate_limit_enabled_) {
@@ -189,24 +194,32 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   used_config_->stats().enabled_.inc();
 
-  std::vector<RateLimit::Descriptor> descriptors;
-  if (used_config_->hasDescriptors()) {
-    if (used_config_->hasRateLimitConfigs()) {
-      used_config_->populateDescriptors(headers, /*response_headers=*/nullptr,
-                                        decoder_callbacks_->streamInfo(), descriptors,
-                                        /*on_stream_done=*/false);
-    } else {
-      populateDescriptors(descriptors, headers);
+  Filters::Common::LocalRateLimit::LocalRateLimiter::Result result;
+  if (override_option_ !=
+      envoy::extensions::common::ratelimit::v3::RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED) {
+    // The legacy rate limits of the route and virtual host are ignored completely.
+    result = requestAllowedByConfigs(headers);
+  } else {
+    std::vector<RateLimit::Descriptor> descriptors;
+    if (used_config_->hasDescriptors()) {
+      if (used_config_->hasRateLimitConfigs()) {
+        used_config_->populateDescriptors(headers, /*response_headers=*/nullptr,
+                                          decoder_callbacks_->streamInfo(), descriptors,
+                                          /*on_stream_done=*/false);
+      } else {
+        populateDescriptors(descriptors, headers);
+      }
     }
+
+    if (ENVOY_LOG_CHECK_LEVEL(debug)) {
+      for (const auto& request_descriptor : descriptors) {
+        ENVOY_LOG(debug, "populate descriptor: {}", request_descriptor.toString());
+      }
+    }
+
+    result = requestAllowed(descriptors);
   }
 
-  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
-    for (const auto& request_descriptor : descriptors) {
-      ENVOY_LOG(debug, "populate descriptor: {}", request_descriptor.toString());
-    }
-  }
-
-  auto result = requestAllowed(descriptors);
   // The global limiter, route limiter, or connection level limiter are all have longer life
   // than the request, so we can safely store the token bucket context reference.
   token_bucket_context_ = result.token_bucket_context;
@@ -275,9 +288,16 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
 }
 
 void Filter::onDestroy() {
+  if (!rate_limit_enabled_) {
+    return;
+  }
+  if (override_option_ !=
+      envoy::extensions::common::ratelimit::v3::RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED) {
+    consumeStreamDoneByConfigs();
+    return;
+  }
   // Completion accounting needs local descriptors and embedded apply_on_stream_done rate limits.
-  if (!rate_limit_enabled_ || !used_config_->hasDescriptors() ||
-      !used_config_->hasStreamDoneActions()) {
+  if (!used_config_->hasDescriptors() || !used_config_->hasStreamDoneActions()) {
     return;
   }
   // Read the headers from the stream rather than keeping references to them.
@@ -300,6 +320,34 @@ void Filter::onDestroy() {
   }
 }
 
+void Filter::consumeStreamDoneByConfigs() {
+  const auto configs = appliedConfigs();
+  if (std::none_of(configs.begin(), configs.end(),
+                   [](const FilterConfig& config) { return config.hasStreamDoneActions(); })) {
+    return;
+  }
+  // Read the headers from the stream rather than keeping references to them.
+  const auto request_headers = decoder_callbacks_->requestHeaders();
+  if (!request_headers.has_value()) {
+    return;
+  }
+  const auto response_headers = decoder_callbacks_->responseHeaders();
+
+  // Same as the request path: every applied level consumes its own shared token buckets with the
+  // descriptors generated by its own rate limits.
+  std::vector<RateLimit::Descriptor> descriptors;
+  for (const FilterConfig& config : configs) {
+    if (!config.hasStreamDoneActions()) {
+      continue;
+    }
+    descriptors.clear();
+    config.populateDescriptors(*request_headers, response_headers.ptr(),
+                               decoder_callbacks_->streamInfo(), descriptors,
+                               /*on_stream_done=*/true);
+    config.consumeDescriptors(descriptors);
+  }
+}
+
 Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
 Filter::requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) {
   return used_config_->rateLimitPerConnection()
@@ -308,6 +356,8 @@ Filter::requestAllowed(absl::Span<const RateLimit::Descriptor> request_descripto
 }
 
 Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionRateLimiter() {
+  // TODO(wbpcode): the limiter is stored under a single key, so the config of the first request
+  // on a connection is used for all the following requests on it, even if they use other configs.
   ASSERT(used_config_->rateLimitPerConnection());
 
   auto typed_state =
@@ -326,6 +376,77 @@ Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionR
   }
 
   return const_cast<Filters::Common::LocalRateLimit::LocalRateLimiterImpl&>(typed_state->value());
+}
+
+void Filter::initializeUsedConfigs() {
+  used_configs_.clear();
+  // In ascending order of specificity. Reverse it to put the most specific one first.
+  const auto route_configs = Http::Utility::getAllPerFilterConfig<FilterConfig>(decoder_callbacks_);
+  for (auto it = route_configs.rbegin(); it != route_configs.rend(); ++it) {
+    used_configs_.push_back(*it);
+  }
+  // The filter level config is the least specific one.
+  used_configs_.push_back(*config_);
+  used_config_ = used_configs_.front().get();
+
+  // The most specific set option wins.
+  override_option_ =
+      envoy::extensions::common::ratelimit::v3::RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED;
+  for (const FilterConfig& config : used_configs_) {
+    if (config.rateLimitsOverrideOption() !=
+        envoy::extensions::common::ratelimit::v3::RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED) {
+      override_option_ = config.rateLimitsOverrideOption();
+      break;
+    }
+  }
+}
+
+absl::Span<const std::reference_wrapper<const FilterConfig>> Filter::appliedConfigs() const {
+  return absl::MakeConstSpan(used_configs_)
+      .subspan(0, override_option_ == envoy::extensions::common::ratelimit::v3::ALL_LEVELS
+                      ? used_configs_.size()
+                      : 1);
+}
+
+Filters::Common::LocalRateLimit::LocalRateLimiter::Result
+Filter::requestAllowedByConfigs(const Http::RequestHeaderMap& headers) {
+  ASSERT(used_config_.has_value());
+  ASSERT(!used_configs_.empty());
+
+  std::optional<Filters::Common::LocalRateLimit::LocalRateLimiter::Result> result;
+  std::vector<RateLimit::Descriptor> descriptors;
+  for (const FilterConfig& config : appliedConfigs()) {
+    descriptors.clear();
+
+    // Every level only matches the descriptors generated by its own rate limits against its own
+    // token buckets.
+    if (config.hasRateLimitConfigs()) {
+      config.populateDescriptors(headers, /*response_headers=*/nullptr,
+                                 decoder_callbacks_->streamInfo(), descriptors,
+                                 /*on_stream_done=*/false);
+    }
+
+    if (ENVOY_LOG_CHECK_LEVEL(debug)) {
+      for (const auto& request_descriptor : descriptors) {
+        ENVOY_LOG(debug, "populate descriptor: {}", request_descriptor.toString());
+      }
+    }
+
+    // The per connection rate limiting is ignored and the shared token buckets are always used.
+    auto level_result = config.requestAllowed(descriptors);
+
+    const bool shadow = level_result.token_bucket_context != nullptr &&
+                        level_result.token_bucket_context->shadowMode();
+    if (!level_result.allowed && !shadow) {
+      return level_result;
+    }
+
+    // Keep the result of the most specific level, or the first shadow mode rejection.
+    if (!result.has_value() || (result->allowed && !level_result.allowed)) {
+      result = std::move(level_result);
+    }
+  }
+  return result.value();
 }
 
 void Filter::populateDescriptors(std::vector<RateLimit::Descriptor>& descriptors,

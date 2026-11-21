@@ -1,13 +1,16 @@
+#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/common/base64.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -306,6 +309,257 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ClusterLifecycleRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_cluster_lifecycle_test"));
 }
 
+TEST_P(DynamicModulesBootstrapIntegrationTest, EcdsConfigRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", testDataDir("rust"), 1);
+  for (const auto* path : {"/ecds_a", "/ecds_b"}) {
+    config_helper_.addBootstrapExtension(fmt::format(R"EOF(
+name: envoy.bootstrap.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension
+  dynamic_module_config:
+    name: bootstrap_ecds_test
+  extension_name: test
+  extension_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: {}
+)EOF",
+                                                     path));
+  }
+  HttpIntegrationTest::initialize();
+
+  const auto response = [](absl::string_view version, absl::string_view value) {
+    return fmt::format(R"EOF(
+version_info: "{}"
+resources:
+- "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
+  name: test-config
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: "{}"
+)EOF",
+                       version, value);
+  };
+  const std::string config_path =
+      TestEnvironment::writeStringToFileForTest("bootstrap_ecds.yaml", response("", "enabled"));
+  envoy::config::core::v3::ExtensionConfigSource source;
+  source.mutable_config_source()->mutable_path_config_source()->set_path(config_path);
+  source.mutable_config_source()->set_resource_api_version(envoy::config::core::v3::V3);
+  source.add_type_urls("type.googleapis.com/google.protobuf.StringValue");
+  const auto source_json = MessageUtil::getJsonStringFromMessageOrError(source);
+  EXPECT_EQ(writerModuleRequest("/ecds_a", "subscribe", source_json), "enabled");
+  EXPECT_EQ(writerModuleRequest("/ecds_b", "subscribe", source_json), "enabled");
+  EXPECT_EQ(writerModuleRequest("/ecds_a", "version", ""), "");
+
+  const auto replace_config = [&](const std::string& contents) {
+    TestEnvironment::renameFile(
+        TestEnvironment::writeStringToFileForTest("bootstrap_ecds_update.yaml", contents),
+        config_path);
+  };
+  const auto expect_config = [&](absl::string_view expected) {
+    EXPECT_EQ(writerModuleRequest("/ecds_a", "", ""), expected);
+    EXPECT_EQ(writerModuleRequest("/ecds_b", "", ""), expected);
+  };
+
+  replace_config(response("2", "disabled"));
+  test_server_->waitForCounter(
+      "extension_config_discovery.bootstrap.test-config.test.update_success", testing::Ge(4));
+  expect_config("disabled");
+
+  replace_config(response("3", "rejected"));
+  test_server_->waitForCounter(
+      "extension_config_discovery.bootstrap.test-config.test.update_rejected", testing::Ge(2));
+  expect_config("disabled");
+
+  replace_config("version_info: '4'\nresources: []\n");
+  test_server_->waitForCounter(
+      "extension_config_discovery.bootstrap.test-config.test.update_success", testing::Ge(6));
+  expect_config("disabled");
+
+  replace_config(response("5", ""));
+  test_server_->waitForCounter(
+      "extension_config_discovery.bootstrap.test-config.test.update_success", testing::Ge(8));
+  expect_config("");
+}
+
+class BootstrapEcdsIntegrationTest : public Event::TestUsingSimulatedTime,
+                                     public DynamicModulesBootstrapIntegrationTest {
+public:
+  void configureAds(bool unified_mux, envoy::config::core::v3::ApiConfigSource::ApiType api_type) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      unified_mux ? "true" : "false");
+    // the stats mode is selected before runtime overrides are loaded
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", true);
+    config_helper_.addConfigModifier(
+        [api_type](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* ads = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+          ads->set_api_type(api_type);
+          ads->set_transport_api_version(envoy::config::core::v3::V3);
+          ads->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("cluster_0");
+        });
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+  }
+
+  void testAdsTtlRemoval(bool unified_mux) {
+    DISABLE_IF_ADMIN_DISABLED;
+    configureAds(unified_mux, envoy::config::core::v3::ApiConfigSource::GRPC);
+    config_helper_.addBootstrapExtension(R"EOF(
+name: envoy.bootstrap.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension
+  dynamic_module_config:
+    name: bootstrap_ecds_test
+  extension_name: second
+  extension_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: /ecds_second
+)EOF");
+    initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_ecds_test", "test", "/ecds");
+
+    const std::string source =
+        R"({"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["type.googleapis.com/google.protobuf.StringValue"]})";
+    EXPECT_EQ(writerModuleRequest("/ecds", "subscribe", source), "removed");
+    FakeHttpConnectionPtr connection;
+    FakeStreamPtr stream;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, connection));
+    ASSERT_TRUE(connection->waitForNewStream(*dispatcher_, stream));
+    stream->startGrpcStream();
+    envoy::service::discovery::v3::DiscoveryRequest request;
+    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_THAT(request.resource_names(), testing::ElementsAre("test-config"));
+
+    envoy::config::core::v3::TypedExtensionConfig config;
+    config.set_name("test-config");
+    Protobuf::StringValue value;
+    value.set_value("keep-on-removal");
+    MessageUtil::packFrom(*config.mutable_typed_config(), value);
+    envoy::service::discovery::v3::Resource resource;
+    resource.set_name("test-config");
+    resource.set_version("1");
+    resource.mutable_ttl()->set_seconds(1);
+    MessageUtil::packFrom(*resource.mutable_resource(), config);
+    envoy::service::discovery::v3::DiscoveryResponse response;
+    response.set_version_info("1");
+    response.set_nonce("1");
+    response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
+    MessageUtil::packFrom(*response.add_resources(), resource);
+    stream->sendGrpcMessage(response);
+    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_FALSE(request.has_error_detail());
+    EXPECT_EQ(writerModuleRequest("/ecds", "", ""), "keep-on-removal");
+    auto counter = test_server_->counter(
+        "extension_config_discovery.bootstrap.test-config.test.update_success");
+    ASSERT_NE(counter, nullptr);
+    EXPECT_EQ(counter->tagExtractedName(),
+              "extension_config_discovery.bootstrap.test-config.update_success");
+    EXPECT_THAT(counter->tags(), testing::Contains(Stats::Tag{"config_name", "test"}));
+
+    auto duplicate =
+        IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/ecds_second?subscribe",
+                                           source, Http::CodecType::HTTP1, version_);
+    EXPECT_EQ(duplicate->headers().getStatusValue(), "400");
+    EXPECT_EQ(duplicate->body(), "subscription failed");
+
+    resource.clear_resource();
+    response.clear_resources();
+    response.set_nonce("heartbeat");
+    MessageUtil::packFrom(*response.add_resources(), resource);
+    EXPECT_LOG_NOT_CONTAINS("warn", "rejected ECDS removal", {
+      stream->sendGrpcMessage(response);
+      ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+      EXPECT_FALSE(request.has_error_detail());
+      EXPECT_EQ(writerModuleRequest("/ecds", "", ""), "keep-on-removal");
+    });
+
+    EXPECT_LOG_CONTAINS("warn", "rejected ECDS removal for test-config", {
+      timeSystem().advanceTimeWait(std::chrono::seconds(2));
+      EXPECT_EQ(writerModuleRequest("/ecds", "", ""), "keep-on-removal");
+    });
+    ASSERT_TRUE(connection->close());
+    ASSERT_TRUE(connection->waitForDisconnect());
+  }
+
+  void testDeltaAds(bool unified_mux) {
+    DISABLE_IF_ADMIN_DISABLED;
+    configureAds(unified_mux, envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+    initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_ecds_test", "test", "/ecds");
+    EXPECT_EQ(
+        writerModuleRequest(
+            "/ecds", "subscribe",
+            R"({"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["type.googleapis.com/google.protobuf.StringValue"]})"),
+        "removed");
+    FakeHttpConnectionPtr connection;
+    FakeStreamPtr stream;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, connection));
+    ASSERT_TRUE(connection->waitForNewStream(*dispatcher_, stream));
+    stream->startGrpcStream();
+    envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_THAT(request.resource_names_subscribe(), testing::ElementsAre("test-config"));
+
+    envoy::service::discovery::v3::DeltaDiscoveryResponse response;
+    response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
+    response.set_nonce("missing");
+    response.add_removed_resources("test-config");
+    stream->sendGrpcMessage(response);
+    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_FALSE(request.has_error_detail());
+    EXPECT_EQ(writerModuleRequest("/ecds", "", ""), "removed");
+
+    response.clear_removed_resources();
+    response.set_nonce("accepted");
+    response.set_system_version_info("system-v1");
+    auto* resource = response.add_resources();
+    resource->set_name("test-config");
+    resource->set_version("resource-v1");
+    envoy::config::core::v3::TypedExtensionConfig config;
+    config.set_name("test-config");
+    Protobuf::StringValue value;
+    value.set_value("enabled");
+    MessageUtil::packFrom(*config.mutable_typed_config(), value);
+    MessageUtil::packFrom(*resource->mutable_resource(), config);
+    stream->sendGrpcMessage(response);
+    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_FALSE(request.has_error_detail());
+    EXPECT_EQ(writerModuleRequest("/ecds", "", ""), "enabled");
+    EXPECT_EQ(writerModuleRequest("/ecds", "version", ""), "resource-v1");
+
+    response.set_nonce("rejected");
+    response.set_system_version_info("system-v2");
+    resource->set_version("resource-v2");
+    value.set_value("rejected");
+    MessageUtil::packFrom(*config.mutable_typed_config(), value);
+    MessageUtil::packFrom(*resource->mutable_resource(), config);
+    stream->sendGrpcMessage(response);
+    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_TRUE(request.has_error_detail());
+    EXPECT_EQ(request.response_nonce(), "rejected");
+    EXPECT_EQ(writerModuleRequest("/ecds", "", ""), "enabled");
+    EXPECT_EQ(writerModuleRequest("/ecds", "version", ""), "resource-v1");
+
+    response.clear_resources();
+    response.set_nonce("removed");
+    response.add_removed_resources("test-config");
+    stream->sendGrpcMessage(response);
+    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_FALSE(request.has_error_detail());
+    EXPECT_EQ(writerModuleRequest("/ecds", "", ""), "removed");
+    ASSERT_TRUE(connection->close());
+    ASSERT_TRUE(connection->waitForDisconnect());
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, BootstrapEcdsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(BootstrapEcdsIntegrationTest, AdsTtlRemovalRust) { testAdsTtlRemoval(false); }
+
+TEST_P(BootstrapEcdsIntegrationTest, UnifiedAdsTtlRemovalRust) { testAdsTtlRemoval(true); }
+
+TEST_P(BootstrapEcdsIntegrationTest, DeltaAdsRust) { testDeltaAds(false); }
+
+TEST_P(BootstrapEcdsIntegrationTest, UnifiedDeltaAdsRust) { testDeltaAds(true); }
+
 // This test verifies that the Rust bootstrap extension can receive listener lifecycle events
 // (add/update and removal) via the ListenerUpdateCallbacks mechanism.
 TEST_P(DynamicModulesBootstrapIntegrationTest, ListenerLifecycleRust) {
@@ -313,6 +567,53 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ListenerLifecycleRust) {
       Envoy::ExpectedLogMessages({{"info", "Bootstrap listener lifecycle test: server initialized"},
                                   {"info", "Listener lifecycle enabled: true"}}),
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_listener_lifecycle_test"));
+}
+
+// This test verifies that a Rust bootstrap extension is told about every change of the runtime keys
+// it watches, including a runtime feature flag, with the new value, and is not told about the
+// values present when it started watching, about unchanged values or about unwatched keys.
+TEST_P(DynamicModulesBootstrapIntegrationTest, RuntimeUpdateRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  config_helper_.addRuntimeOverride("dynamic_modules_test.number", "1");
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"info", "Runtime update enabled for dynamic_modules_test.number: true"},
+           {"info", "Runtime update enabled for dynamic_modules_test.ratio: true"},
+           {"info",
+            "Runtime update enabled for envoy.reloadable_features.test_feature_true: true"}}),
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_runtime_update_test"));
+
+  auto runtime_modify = [this](absl::string_view query) {
+    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+        lookupPort("admin"), "POST", absl::StrCat("/runtime_modify?", query), "",
+        Http::CodecType::HTTP1, version_);
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  };
+
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"info", "Runtime update: dynamic_modules_test.number=Int(42), getter agrees: true"},
+           {"info", "Runtime update: dynamic_modules_test.ratio=Number(0.25), getter agrees: true"},
+           {"info", "Runtime update: envoy.reloadable_features.test_feature_true=Bool(false), "
+                    "getter agrees: true"}}),
+      runtime_modify(
+          "dynamic_modules_test.number=42&dynamic_modules_test.ratio=0.25&envoy."
+          "reloadable_features.test_feature_true=false&dynamic_modules_test.unwatched=1"));
+
+  EXPECT_LOG_NOT_CONTAINS(
+      "info", "Runtime update:",
+      runtime_modify("dynamic_modules_test.number=42&dynamic_modules_test.unwatched=2"));
+
+  // Removing the admin override of a key falls back to the lower layer, and removing the only
+  // value of a key reports a removal.
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"info", "Runtime update: dynamic_modules_test.number=Int(1), getter agrees: true"},
+           {"info", "Runtime update: dynamic_modules_test.ratio removed"},
+           {"info", "Runtime update: envoy.reloadable_features.test_feature_true removed"}}),
+      runtime_modify("dynamic_modules_test.number=&dynamic_modules_test.ratio=&envoy.reloadable_"
+                     "features.test_feature_true="));
 }
 
 // This test verifies that a bootstrap extension can register a function in the process-wide
@@ -438,6 +739,59 @@ typed_config:
     // No x-routed-to header should be present.
     EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-routed-to")).empty());
   }
+}
+
+TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigSnapshotRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_admin()->add_allow_paths()->set_prefix("/snapshot");
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    cluster->set_name("snapshot_extra");
+    cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+    cluster->mutable_connect_timeout()->set_seconds(1);
+  });
+  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_config_snapshot_test");
+  auto denied = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/config_dump", "",
+                                                   Http::CodecType::HTTP1, version_);
+  EXPECT_EQ("403", denied->headers().getStatusValue());
+
+  auto collect = [this](absl::string_view path) {
+    auto response = IntegrationUtil::makeSingleRequest(
+        lookupPort("admin"), "GET", std::string(path), "", Http::CodecType::HTTP1, version_);
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    envoy::admin::v3::ConfigDump dump;
+    TestUtility::loadFromJson(response->body(), dump);
+    return dump;
+  };
+  auto snapshot = collect("/snapshot");
+  ASSERT_EQ(2, snapshot.configs_size());
+  envoy::admin::v3::ClustersConfigDump clusters;
+  ASSERT_TRUE(snapshot.configs(0).UnpackTo(&clusters));
+  ASSERT_EQ(2, clusters.static_clusters_size());
+  std::vector<std::string> cluster_names;
+  for (const auto& entry : clusters.static_clusters()) {
+    envoy::config::cluster::v3::Cluster cluster;
+    ASSERT_TRUE(entry.cluster().UnpackTo(&cluster));
+    cluster_names.push_back(cluster.name());
+  }
+  EXPECT_THAT(cluster_names, testing::UnorderedElementsAre("cluster_0", "snapshot_extra"));
+  envoy::admin::v3::ListenersConfigDump listeners;
+  ASSERT_TRUE(snapshot.configs(1).UnpackTo(&listeners));
+  ASSERT_EQ(1, listeners.dynamic_listeners_size());
+  envoy::config::listener::v3::Listener listener;
+  ASSERT_TRUE(listeners.dynamic_listeners(0).active_state().listener().UnpackTo(&listener));
+  EXPECT_EQ("http", listener.name());
+  EXPECT_FALSE(listener.filter_chains().empty());
+
+  snapshot = collect("/snapshot?filtered");
+  ASSERT_EQ(2, snapshot.configs_size());
+  ASSERT_TRUE(snapshot.configs(0).UnpackTo(&clusters));
+  ASSERT_EQ(1, clusters.static_clusters_size());
+  envoy::config::cluster::v3::Cluster cluster;
+  ASSERT_TRUE(clusters.static_clusters(0).cluster().UnpackTo(&cluster));
+  EXPECT_EQ("cluster_0", cluster.name());
+  ASSERT_TRUE(snapshot.configs(1).UnpackTo(&listeners));
+  EXPECT_EQ(0, listeners.dynamic_listeners_size());
 }
 
 // Verifies a Rust bootstrap extension can enumerate active resource names by kind via

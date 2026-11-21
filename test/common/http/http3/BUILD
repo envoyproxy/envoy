@@ -15,6 +15,14 @@ envoy_cc_test(
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = envoy_select_enable_http3([
         "//source/common/event:dispatcher_lib",

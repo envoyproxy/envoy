@@ -33,7 +33,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "isolated_store_impl_test",
     srcs = ["isolated_store_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_matcher_lib",
@@ -45,7 +51,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "histogram_impl_test",
     srcs = ["histogram_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/stats:histogram_lib",
         "//source/common/stats:symbol_table_lib",
@@ -155,7 +167,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "stats_matcher_impl_test",
     srcs = ["stats_matcher_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/memory:stats_lib",
         "//source/common/stats:stats_matcher_lib",
@@ -197,7 +215,7 @@ envoy_cc_fuzz_test(
     name = "stat_merger_fuzz_test",
     srcs = ["stat_merger_fuzz_test.cc"],
     corpus = "stat_merger_corpus",
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"fuzz_coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/stats:symbol_table_lib",
@@ -209,7 +227,7 @@ envoy_cc_fuzz_test(
     name = "symbol_table_fuzz_test",
     srcs = ["symbol_table_fuzz_test.cc"],
     corpus = "symbol_table_corpus",
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"fuzz_coverage": {"link": "linux_x64_small"}},
     deps = [
         ":stat_test_utility_lib",
         "//source/common/buffer:buffer_lib",
@@ -371,7 +389,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "thread_local_store_test",
     srcs = ["thread_local_store_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":real_thread_test_base",
         ":stat_test_utility_lib",
