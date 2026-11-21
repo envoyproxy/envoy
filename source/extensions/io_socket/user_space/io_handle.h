@@ -6,6 +6,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/filter_state.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
@@ -29,7 +31,31 @@ public:
    */
   virtual void mergeInto(envoy::config::core::v3::Metadata& metadata,
                          StreamInfo::FilterState& filter_state) PURE;
+
+  /**
+   * Record why the listener side of the internal connection closed it. Called by the listener side
+   * when it closes the connection. The client side handles the close in a later event loop
+   * iteration on the same dispatcher, so the details are always recorded before it reads them.
+   * @param local_close_reason the local close reason of the listener side connection.
+   * @param upstream_transport_failure_reason the upstream transport failure reason recorded in the
+   * listener side connection's stream info, e.g. by tcp_proxy when it fails to connect upstream.
+   */
+  virtual void setCloseDetails(absl::string_view local_close_reason,
+                               absl::string_view upstream_transport_failure_reason) PURE;
+
+  /**
+   * @return the details recorded by setCloseDetails(), formatted as
+   * "<CloseDetailsLocalClosePrefix><local close reason>|
+   * <CloseDetailsUpstreamFailurePrefix><upstream transport failure reason>", where empty fields
+   * are omitted. Empty if nothing was recorded.
+   */
+  virtual absl::string_view closeDetails() const PURE;
 };
+
+// Prefixes of the fields of PassthroughState::closeDetails().
+constexpr absl::string_view CloseDetailsLocalClosePrefix = "internal_listener_close:";
+constexpr absl::string_view CloseDetailsUpstreamFailurePrefix =
+    "internal_listener_upstream_failure:";
 
 using PassthroughStateSharedPtr = std::shared_ptr<PassthroughState>;
 using PassthroughStatePtr = std::unique_ptr<PassthroughState>;

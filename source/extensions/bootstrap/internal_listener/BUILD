@@ -99,6 +99,7 @@ envoy_cc_library(
         "//source/common/listener_manager:active_tcp_listener",
         "//source/common/network:connection_lib",
         "//source/common/network:listener_filter_buffer_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/io_socket/user_space:config",

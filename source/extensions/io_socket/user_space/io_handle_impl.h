@@ -211,12 +211,16 @@ public:
                   const StreamInfo::FilterState::Objects& filter_state_objects) override;
   void mergeInto(envoy::config::core::v3::Metadata& metadata,
                  StreamInfo::FilterState& filter_state) override;
+  void setCloseDetails(absl::string_view local_close_reason,
+                       absl::string_view upstream_transport_failure_reason) override;
+  absl::string_view closeDetails() const override { return close_details_; }
 
 protected:
   enum class State { Created, Initialized, Done };
   State state_{State::Created};
   std::unique_ptr<envoy::config::core::v3::Metadata> metadata_;
   StreamInfo::FilterState::Objects filter_state_objects_;
+  std::string close_details_;
 };
 
 using IoHandleImplPtr = std::unique_ptr<IoHandleImpl>;

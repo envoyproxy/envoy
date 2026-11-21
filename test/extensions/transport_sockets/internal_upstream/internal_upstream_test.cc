@@ -53,6 +53,10 @@ public:
   MOCK_METHOD(void, mergeInto,
               (envoy::config::core::v3::Metadata & metadata,
                StreamInfo::FilterState& filter_state));
+  MOCK_METHOD(void, setCloseDetails,
+              (absl::string_view local_close_reason,
+               absl::string_view upstream_transport_failure_reason));
+  MOCK_METHOD(absl::string_view, closeDetails, (), (const));
 };
 
 class InternalSocketTest : public testing::Test {

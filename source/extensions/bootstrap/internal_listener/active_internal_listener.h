@@ -19,6 +19,7 @@
 #include "source/common/common/non_copyable.h"
 #include "source/common/listener_manager/active_stream_listener_base.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/io_socket/user_space/io_handle.h"
 
 #include "spdlog/spdlog.h"
 
@@ -26,6 +27,26 @@ namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace InternalListener {
+
+/**
+ * An active connection accepted by an internal listener. When this side closes the connection, it
+ * records why in the PassthroughState shared with the client side, so that the client side can
+ * report the reason (e.g. tcp_proxy failed to connect upstream) instead of a bare connection
+ * termination. If passthrough_state is nullptr, it behaves like an ActiveTcpConnection.
+ */
+class ActiveInternalConnection : public Server::ActiveTcpConnection {
+public:
+  ActiveInternalConnection(Server::ActiveConnections& active_connections,
+                           Network::ConnectionPtr&& new_connection, TimeSource& time_system,
+                           std::unique_ptr<StreamInfo::StreamInfo>&& stream_info,
+                           IoSocket::UserSpace::PassthroughStateSharedPtr passthrough_state);
+
+  // Network::ConnectionCallbacks
+  void onEvent(Network::ConnectionEvent event) override;
+
+private:
+  const IoSocket::UserSpace::PassthroughStateSharedPtr passthrough_state_;
+};
 
 class ActiveInternalListener : public Network::InternalListener,
                                public Server::OwnedActiveStreamListenerBase {
