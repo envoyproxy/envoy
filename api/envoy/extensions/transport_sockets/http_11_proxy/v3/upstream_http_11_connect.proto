@@ -4,8 +4,11 @@ package envoy.extensions.transport_sockets.http_11_proxy.v3;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
+import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.http_11_proxy.v3";
 option java_outer_classname = "UpstreamHttp11ConnectProto";
@@ -36,11 +39,63 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // If the ``default_proxy_address`` is set and proxy address is not found in
 // ``typed_filter_metadata``, the default proxy address is used.
 //
+// Securing the connection to the proxy:
+// =====================================
+// By default the connection to the proxy is plaintext and the ``CONNECT`` request is only sent
+// when the underlying transport socket is secure (plaintext requests are sent to the proxy using
+// absolute-form URLs). If :ref:`proxy_transport_socket
+// <envoy_v3_api_field_extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport.proxy_transport_socket>`
+// or proxy credentials (:ref:`proxy_authorization
+// <envoy_v3_api_field_extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport.proxy_authorization>`
+// or :ref:`proxy_basic_auth
+// <envoy_v3_api_field_extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport.proxy_basic_auth>`)
+// are set, the socket operates in tunnel mode instead: the connection to the proxy is established
+// with ``proxy_transport_socket`` (for example TLS), a ``CONNECT`` request carrying the optional
+// ``Proxy-Authorization`` header is always sent, and once the proxy responds with HTTP status 200
+// the underlying transport socket (TLS or plaintext) runs inside the tunnel.
+//
+// [#next-free-field: 6]
 message Http11ProxyUpstreamTransport {
+  // Username and password credentials for the proxy, sent as
+  // ``Proxy-Authorization: Basic base64(username ":" password)`` as defined in
+  // `RFC 7617 <https://www.rfc-editor.org/rfc/rfc7617>`_.
+  message BasicAuth {
+    // The username. As required by RFC 7617, it must not contain a colon.
+    string username = 1 [(validate.rules).string = {min_len: 1 not_contains: ":"}];
+
+    // The password, provided inline, from a file, or from an environment variable. It is read
+    // when the configuration is loaded; to rotate it, update the configuration or use
+    // :ref:`proxy_authorization
+    // <envoy_v3_api_field_extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport.proxy_authorization>`
+    // with SDS instead.
+    config.core.v3.DataSource password = 2
+        [(validate.rules).message = {required: true}, (udpa.annotations.sensitive) = true];
+  }
+
   // The underlying transport socket being wrapped. Defaults to plaintext (raw_buffer) if unset.
   config.core.v3.TransportSocket transport_socket = 1;
 
   // Specifies the default proxy address to use if the proxy address is not present in the
   // ``typed_filter_metadata`` of the endpoint.
   config.core.v3.Address default_proxy_address = 2;
+
+  // The transport socket used for the connection to the proxy itself, for example
+  // ``envoy.transport_sockets.tls`` to connect to an HTTPS proxy. Its configuration (SNI,
+  // certificate validation, client certificates, ALPN) applies to the proxy, not to the
+  // endpoint. ALPN, if set, should only offer ``http/1.1``. Defaults to plaintext (raw_buffer) if
+  // unset. It is only used for connections that are routed through a proxy.
+  config.core.v3.TransportSocket proxy_transport_socket = 3;
+
+  // The credentials sent to the proxy in the ``Proxy-Authorization`` header of the ``CONNECT``
+  // request. If unset, no ``Proxy-Authorization`` header is sent.
+  oneof proxy_auth {
+    // A generic secret whose value is sent verbatim as the ``Proxy-Authorization`` header value,
+    // for example ``Basic dXNlcjpwYXNzd29yZA==`` or ``Bearer <token>``. The secret can be
+    // provided statically in the bootstrap or fetched (and rotated) via SDS. Use this for
+    // authentication schemes other than Basic.
+    tls.v3.SdsSecretConfig proxy_authorization = 4;
+
+    // Username and password credentials. Envoy builds the Basic ``Proxy-Authorization`` header.
+    BasicAuth proxy_basic_auth = 5;
+  }
 }

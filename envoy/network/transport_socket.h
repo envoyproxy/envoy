@@ -324,6 +324,13 @@ public:
   }
 
   /**
+   * @return true if connections routed through an HTTP/1.1 proxy by this factory are always
+   *         tunneled with CONNECT, including plaintext ones. In that case HTTP/1.1 requests must
+   *         be sent in origin-form rather than absolute-form.
+   */
+  virtual bool tunnelsHttp11ProxyTraffic() const { return false; }
+
+  /**
    * Returns true if the transport socket created by this factory supports some form of ALPN
    * negotiation.
    */
