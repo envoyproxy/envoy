@@ -8,6 +8,7 @@
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/tls/cert_compression.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
 
@@ -180,7 +181,11 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
         std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context), accept_untrusted),
         std::make_unique<quic::QuicClientSessionCache>());
 
-    registerCertCompression(tls_config.crypto_config_->ssl_ctx());
+    using Extensions::TransportSockets::Tls::CertCompression;
+    CertCompression::registerAlgorithms(
+        tls_config.crypto_config_->ssl_ctx(), CertCompression::Mode::Decompress,
+        CertCompression::enabledAlgorithms(clientContextConfig()->certificateCompression(),
+                                           /*quic=*/true));
 
     if (client_certificates_enabled_) {
       absl::Status status = configureQuicClientCertChain(

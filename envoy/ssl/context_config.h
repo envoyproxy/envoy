@@ -132,6 +132,9 @@ public:
   virtual std::optional<
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
   compliancePolicy() const PURE;
+
+  virtual const envoy::extensions::transport_sockets::tls::v3::CertificateCompression&
+  certificateCompression() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

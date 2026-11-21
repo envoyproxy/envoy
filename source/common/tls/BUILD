@@ -233,6 +233,7 @@ envoy_cc_library(
         "server_context_impl.h",
     ],
     deps = [
+        ":cert_compression_lib",
         ":context_lib",
         "//source/common/common:byte_order_lib",
         "//source/common/tls/ocsp:ocsp_lib",
@@ -300,10 +301,12 @@ envoy_cc_library(
         "//envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/synchronization",
         "@brotli//:brotlidec",
         "@brotli//:brotlienc",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

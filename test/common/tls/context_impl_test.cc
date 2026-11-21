@@ -13,6 +13,7 @@
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/ssl.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/tls/cert_compression.h"
 #include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
@@ -298,6 +299,59 @@ TEST_F(SslContextImplTest, EcdsaCapabilitiesHonorSupportedVersionsContent) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.tls_ecdsa_selection_check_supported_versions", "false"}});
   EXPECT_TRUE(ecdsa_capable({ecdhe_rsa}, tls12_only));
+}
+#endif // ENVOY_SSL_OPENSSL
+
+#ifndef ENVOY_SSL_OPENSSL
+bool certCompressionRegistered(Ssl::Context& context, uint16_t alg) {
+  auto ssl = dynamic_cast<ContextImpl&>(context).newSsl(nullptr, nullptr);
+  RELEASE_ASSERT(ssl.ok(), "");
+  // BoringSSL rejects registering an algorithm that the SSL_CTX already has.
+  return SSL_CTX_add_cert_compression_alg(SSL_get_SSL_CTX(ssl->get()), alg, nullptr,
+                                          CertCompression::decompressZlib) == 0;
+}
+
+TEST_F(SslContextImplTest, ClientCertificateCompression) {
+  for (const bool zlib : {false, true}) {
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+    if (zlib) {
+      tls_context.mutable_common_tls_context()
+          ->mutable_certificate_compression()
+          ->mutable_zlib()
+          ->set_value(true);
+    }
+    auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+    auto context = *manager_.createSslClientContext(*store_.rootScope(), *cfg);
+    EXPECT_EQ(zlib, certCompressionRegistered(*context, TLSEXT_cert_compression_zlib));
+    EXPECT_FALSE(certCompressionRegistered(*context, TLSEXT_cert_compression_brotli));
+  }
+}
+
+TEST_F(SslContextImplTest, ServerCertificateCompression) {
+  for (const bool brotli : {false, true}) {
+    const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+  )EOF";
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+    if (brotli) {
+      tls_context.mutable_common_tls_context()
+          ->mutable_certificate_compression()
+          ->mutable_brotli()
+          ->set_value(true);
+    }
+    auto cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+    Ssl::ServerContextSharedPtr context =
+        *manager_.createSslServerContext(*store_.rootScope(), *cfg, nullptr);
+    auto cleanup = cleanUpHelper(context);
+    EXPECT_EQ(brotli, certCompressionRegistered(*context, TLSEXT_cert_compression_brotli));
+    EXPECT_FALSE(certCompressionRegistered(*context, TLSEXT_cert_compression_zlib));
+  }
 }
 #endif // ENVOY_SSL_OPENSSL
 

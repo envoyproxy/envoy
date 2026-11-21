@@ -137,6 +137,8 @@ public:
   MOCK_METHOD(
       std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>,
       compliancePolicy, (), (const));
+  MOCK_METHOD(const envoy::extensions::transport_sockets::tls::v3::CertificateCompression&,
+              certificateCompression, (), (const));
   MOCK_METHOD(OptRef<Ssl::UpstreamTlsCertificateSelectorFactory>, tlsCertificateSelectorFactory, (),
               (const, override));
   Ssl::HandshakerCapabilities capabilities_;
@@ -147,6 +149,7 @@ public:
   std::string sigalgs_{""};
   Network::Address::IpList iplist_;
   std::string path_;
+  envoy::extensions::transport_sockets::tls::v3::CertificateCompression certificate_compression_;
 };
 
 class MockServerContextConfig : public ServerContextConfig {
@@ -188,6 +191,8 @@ public:
   MOCK_METHOD(
       std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>,
       compliancePolicy, (), (const));
+  MOCK_METHOD(const envoy::extensions::transport_sockets::tls::v3::CertificateCompression&,
+              certificateCompression, (), (const));
   MOCK_METHOD(const std::vector<std::string>&, serverNames, (), (const));
 
   Ssl::HandshakerCapabilities capabilities_;
@@ -199,6 +204,7 @@ public:
   std::string path_;
   std::vector<SessionTicketKey> ticket_keys_;
   std::vector<std::string> server_names_;
+  envoy::extensions::transport_sockets::tls::v3::CertificateCompression certificate_compression_;
 };
 
 class MockTlsCertificateConfig : public TlsCertificateConfig {

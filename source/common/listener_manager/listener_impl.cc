@@ -840,10 +840,14 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
           "doesn't work with connection balancer.");
     }
     absl::Status creation_status = absl::OkStatus();
-    udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
+    auto quic_listener_factory = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
         validation_visitor_, *listener_factory_context_, creation_status);
     RETURN_IF_NOT_OK(creation_status);
+    auto cert_compression = Quic::ActiveQuicListenerFactory::certCompressionForListener(config);
+    RETURN_IF_NOT_OK_REF(cert_compression.status());
+    quic_listener_factory->setCertCompression(*cert_compression);
+    udp_listener_config_->listener_factory_ = std::move(quic_listener_factory);
 
     if (config.udp_listener_config().has_udp_packet_packet_writer_config()) {
       auto* quic_packet_writer_factory_factory =
@@ -1312,6 +1316,18 @@ ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::Listen
     return InPlaceUpdate::None;
   }
 
+#ifdef ENVOY_ENABLE_QUIC
+  // In place updates keep the QUIC listener's SSL_CTX, where certificate compression is set.
+  if (new_config.udp_listener_config().has_quic_options()) {
+    const auto old_compression =
+        Quic::ActiveQuicListenerFactory::certCompressionForListener(configInternal());
+    const auto new_compression =
+        Quic::ActiveQuicListenerFactory::certCompressionForListener(new_config);
+    if (!old_compression.ok() || !new_compression.ok() || *old_compression != *new_compression) {
+      return InPlaceUpdate::None;
+    }
+  }
+#endif
   if (ListenerMessageUtil::filterChainOnlyChange(configInternal(), new_config)) {
     // We need to calculate the reuse port's default value then ensure whether it is changed or not.
     // Since reuse port's default value isn't the YAML bool field default value. When
