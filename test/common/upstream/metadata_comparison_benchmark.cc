@@ -151,8 +151,9 @@ BENCHMARK(bmUpdateHostListHash)
     ->Args({5000, 20})
     ->Unit(::benchmark::kMillisecond);
 
-// Simulate the hash comparison updateDynamicHostList makes when two hosts hold distinct metadata
-// objects, with both hashes already computed.
+// Time only the hash comparison updateDynamicHostList makes when two hosts hold distinct metadata
+// objects. This benchmark computes both hashes beforehand, while an update computes the new host's
+// hash during that comparison.
 void bmUpdateHostListCachedHash(::benchmark::State& state) {
   const int num_hosts = state.range(0);
   const int num_fields = state.range(1);
