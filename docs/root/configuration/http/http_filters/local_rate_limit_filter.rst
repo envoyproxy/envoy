@@ -120,13 +120,14 @@ Using rate limit descriptors for local rate limiting
 ----------------------------------------------------
 
 Rate limit descriptors can be used to override local per-route rate limiting.
-A route's :ref:`rate limit action <envoy_v3_api_msg_config.route.v3.RateLimit>`
-is used to match up a :ref:`local descriptor
+The :ref:`rate limit actions <envoy_v3_api_msg_config.route.v3.RateLimit>` in
+:ref:`rate_limits <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limits>`
+are used to match up a :ref:`local descriptor
 <envoy_v3_api_msg_extensions.common.ratelimit.v3.LocalRateLimitDescriptor>` in
 the filter config descriptor list. The local descriptor's token bucket
 settings are then used to decide if the request should be rate limited or not
-depending on whether the local descriptor's entries match the route's rate
-limit actions descriptor entries. If there is no matching descriptor entries,
+depending on whether the local descriptor's entries match the rate limit
+actions descriptor entries. If there is no matching descriptor entries,
 the default token bucket is used. All the matched local descriptors will be
 sorted by tokens per second and try to consume tokens in order, in most cases
 if one of them is limited, the remaining descriptors will not consume their tokens.

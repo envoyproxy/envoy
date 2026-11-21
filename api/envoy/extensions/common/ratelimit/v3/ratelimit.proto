@@ -36,6 +36,10 @@ enum XRateLimitHeadersRFCVersion {
   DRAFT_VERSION_03 = 1;
 }
 
+// .. attention::
+//
+//   This enum is deprecated. It is only used by the deprecated :ref:`LocalRateLimit.vh_rate_limits
+//   <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.vh_rate_limits>`.
 enum VhRateLimitsOptions {
   // Use the virtual host rate limits unless the route has a rate limit policy.
   OVERRIDE = 0;
