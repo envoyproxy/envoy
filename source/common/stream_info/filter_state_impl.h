@@ -45,10 +45,6 @@ public:
   bool hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) const override;
   FilterState::ObjectsPtr objectsSharedWithUpstreamConnection() const override;
 
-  void setIndexedData(
-      FilterStateIndex index, std::shared_ptr<Object> data,
-      FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain,
-      StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) override;
   const Object* getIndexedDataReadOnlyGeneric(FilterStateIndex index) const override;
   Object* getIndexedDataMutableGeneric(FilterStateIndex index) override;
   std::shared_ptr<Object> getIndexedDataSharedMutableGeneric(FilterStateIndex index) override;
@@ -56,6 +52,12 @@ public:
 
   FilterState::LifeSpan lifeSpan() const override { return life_span_; }
   FilterStateSharedPtr parent() const override { return parent_; }
+
+protected:
+  void setIndexedDataGeneric(
+      FilterStateIndex index, std::shared_ptr<Object> data,
+      FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain,
+      StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) override;
 
 private:
   // This only checks the local data_storage_ for data_name existence.

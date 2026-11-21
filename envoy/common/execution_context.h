@@ -41,8 +41,9 @@ public:
     if (!isEnabled() || !info.has_value()) {
       return nullptr;
     }
-    const auto* const_context = info->filterState().getIndexedDataReadOnly<ExecutionContext>(
-        StreamInfo::FilterStateIndex::ConnectionExecutionContext);
+    const auto* const_context =
+        info->filterState()
+            .getIndexedDataReadOnly<StreamInfo::FilterStateIndex::ConnectionExecutionContext>();
     return const_cast<ExecutionContext*>(const_context);
   }
 

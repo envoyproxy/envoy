@@ -150,6 +150,22 @@ TEST_F(TransportSocketOptionsImplTest, DynamicObjects) {
   EXPECT_EQ(sans, transport_socket_options->verifySubjectAltNameListOverride());
 }
 
+TEST_F(TransportSocketOptionsImplTest, MismatchedIndexedFilterStateTypesIgnored) {
+  // Storing non-canonical FilterState::Object subtypes under indexed keys via string setData must
+  // be safely ignored by TransportSocketOptionsUtility::fromFilterState without type confusion.
+  filter_state_.setData(UpstreamServerName::key(), std::make_shared<NonHashableObj>(),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state_.setData(UpstreamSubjectAltNames::key(), std::make_shared<NonHashableObj>(),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(nullptr, TransportSocketOptionsUtility::fromFilterState(filter_state_));
+
+  setFilterStateObject(ApplicationProtocols::key(), "h2");
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  ASSERT_NE(nullptr, transport_socket_options);
+  EXPECT_EQ(std::nullopt, transport_socket_options->serverNameOverride());
+  EXPECT_TRUE(transport_socket_options->verifySubjectAltNameListOverride().empty());
+}
+
 TEST_F(TransportSocketOptionsImplTest, DownstreamNetworkNamespace) {
   const std::string network_namespace_filepath = "/var/run/netns/production";
 
@@ -168,8 +184,7 @@ TEST_F(TransportSocketOptionsImplTest, NetworkNamespaceSharedWithUpstream) {
   const std::string network_namespace_filepath = "/var/run/netns/staging";
 
   // Set network namespace as shared with upstream connection via indexed API.
-  filter_state_.setIndexedData(
-      StreamInfo::FilterStateIndex::NetworkNamespace,
+  filter_state_.setIndexedData<StreamInfo::FilterStateIndex::NetworkNamespace>(
       std::make_unique<DownstreamNetworkNamespace>(network_namespace_filepath),
       StreamInfo::FilterState::LifeSpan::Connection,
       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
