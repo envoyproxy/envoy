@@ -436,6 +436,32 @@ TEST_P(McpFilterIntegrationTest, PerRouteVirtualHostLevel) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// A body that isn't a complete MCP message after its first data frame, followed by an empty end of
+// stream, used to make the filter read from a null pointer.
+TEST_P(McpFilterIntegrationTest, NonMcpBodyThenEmptyEndStream) {
+  initializeFilter();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"},
+                                     {"accept", "application/json, text/event-stream"}});
+  auto& encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  Buffer::OwnedImpl body(R"({"hello":"world"})");
+  encoder.encodeData(body, false);
+  Buffer::OwnedImpl empty;
+  encoder.encodeData(empty, true);
+
+  waitForNextUpstreamRequest();
+  EXPECT_EQ(R"({"hello":"world"})", upstream_request_->body().toString());
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Test chunk-by-chunk request body parsing
 TEST_P(McpFilterIntegrationTest, ChunkByChunkBodyParsing) {
   initializeFilter();
