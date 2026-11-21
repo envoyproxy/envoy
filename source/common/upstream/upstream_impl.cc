@@ -2675,8 +2675,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
       hosts_changed |= updateEdsHealthFlag(*host, *existing_host);
 
-      // Did metadata change? Hosts with equal metadata usually share one pooled object. Objects
-      // that differ can still hold equal metadata, so their hashes decide.
+      // Did metadata change? Hosts built through the metadata pool share one object when their
+      // metadata serializes to the same bytes. Other hosts, such as those of DNS clusters, hold
+      // their own copies, and distinct objects can still hold equal metadata, so hashes decide.
       const bool metadata_changed = host->metadata() != existing_host->metadata() &&
                                     host->metadataHash() != existing_host->metadataHash();
 

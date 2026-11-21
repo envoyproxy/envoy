@@ -251,17 +251,25 @@ TEST(MetadataTest, ConstMetadataSharedPoolSharesMetadataWithEqualBytes) {
   ConstMetadataSharedPoolSharedPtr pool =
       Metadata::getConstMetadataSharedPool(singleton_manager, dispatcher);
 
+  // Two maps with only a few entries can iterate in the same order by chance, which would hide a
+  // serialization that does not sort them, so this inserts many entries in opposite orders.
+  constexpr int num_entries = 16;
   envoy::config::core::v3::Metadata metadata;
-  Metadata::mutableMetadataValue(metadata, "namespace", "a").set_string_value("1");
-  Metadata::mutableMetadataValue(metadata, "namespace", "b").set_string_value("2");
   envoy::config::core::v3::Metadata reordered_metadata;
-  Metadata::mutableMetadataValue(reordered_metadata, "namespace", "b").set_string_value("2");
-  Metadata::mutableMetadataValue(reordered_metadata, "namespace", "a").set_string_value("1");
+  for (int i = 0; i < num_entries; ++i) {
+    const int reversed = num_entries - 1 - i;
+    Metadata::mutableMetadataValue(metadata, "namespace", "key_" + std::to_string(i))
+        .set_string_value(std::to_string(i));
+    Metadata::mutableMetadataValue(reordered_metadata, "namespace",
+                                   "key_" + std::to_string(reversed))
+        .set_string_value(std::to_string(reversed));
+  }
   const std::shared_ptr<const envoy::config::core::v3::Metadata> shared_metadata =
       pool->getObject(metadata);
   EXPECT_EQ(shared_metadata, pool->getObject(reordered_metadata));
 
-  Metadata::mutableMetadataValue(reordered_metadata, "namespace", "a").set_string_value("3");
+  // A changed value of the same size still gets its own object.
+  Metadata::mutableMetadataValue(reordered_metadata, "namespace", "key_0").set_string_value("9");
   EXPECT_NE(shared_metadata, pool->getObject(reordered_metadata));
 }
 
