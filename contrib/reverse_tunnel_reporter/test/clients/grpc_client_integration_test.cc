@@ -735,21 +735,22 @@ TEST_P(GrpcClientIntegrationTest, UpstreamAdminDrainMetadata) {
     completeReq(std::chrono::milliseconds(1000), resp);
   };
 
-  // Convenience aliases for the long stat names. The upstream's final GOAWAY is counted by the
-  // drain-aware upstream codec stat (server-root scoped), not the per-cluster http2 codec stat, so
-  // it is unambiguous regardless of how many http2 codecs exist.
+  // Convenience aliases for the long stat names.
   const std::string closed_total =
       "envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service.reporters.event_reporter."
       "reverse_tunnel_closed_total";
   const std::string established_total =
       "envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service.reporters.event_reporter."
       "reverse_tunnel_established_total";
-  const std::string goaway_sent = "reverse_tunnel_upstream_codec.goaway_sent";
+  const std::string drain_started = "reverse_tunnel_upstream_codec.drain_started";
+  const std::string goaway_sent = "cluster.reverse_connection_cluster.http2.goaway_sent";
 
   // (1) Tunnel established, nothing closed yet. Baseline: the tunnel is routable.
   EXPECT_EQ(0, test_server_->counter(closed_total)->value());
-  EXPECT_EQ(0, test_server_->counter(goaway_sent)->value());
+  EXPECT_EQ(0, test_server_->counter(drain_started)->value());
   sendDirectRequest();
+  ASSERT_NE(nullptr, test_server_->counter(goaway_sent));
+  EXPECT_EQ(0, test_server_->counter(goaway_sent)->value());
 
   // Hold a /slow stream open on the old tunnel before starting the drain so we verify in-flight
   // requests survive both the drain METADATA and the final GOAWAY + pool drain.
@@ -765,6 +766,7 @@ TEST_P(GrpcClientIntegrationTest, UpstreamAdminDrainMetadata) {
   ASSERT_TRUE(admin_response != nullptr);
   ASSERT_TRUE(admin_response->complete());
   EXPECT_EQ("200", admin_response->headers().Status()->value().getStringView());
+  EXPECT_EQ(1, test_server_->counter(drain_started)->value());
 
   // The downstream redials as soon as it receives the drain METADATA (sent immediately on the admin
   // trigger), so established_total==2 follows within ~1-2s; ~10s is a tight CI-safe bound.

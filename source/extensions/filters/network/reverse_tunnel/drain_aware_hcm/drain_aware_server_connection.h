@@ -30,8 +30,8 @@ class DrainAwareServerConnectionCallbacks : public Http::ServerConnectionCallbac
                                             public Logger::Loggable<Logger::Id::filter> {
 public:
   DrainAwareServerConnectionCallbacks(Http::ServerConnectionCallbacks& inner,
-                                      std::function<void()> on_peer_goaway)
-      : inner_(inner), on_peer_goaway_(std::move(on_peer_goaway)) {}
+                                      std::function<void()> on_peer_drain)
+      : inner_(inner), on_peer_drain_(std::move(on_peer_drain)) {}
 
   // Http::ServerConnectionCallbacks
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder,
@@ -66,16 +66,16 @@ public:
 private:
   // Invokes the peer-drain callback at most once per connection.
   void triggerPeerDrain() {
-    if (peer_goaway_handled_ || !on_peer_goaway_) {
+    if (peer_drain_handled_ || !on_peer_drain_) {
       return;
     }
 
-    peer_goaway_handled_ = true;
-    on_peer_goaway_();
+    peer_drain_handled_ = true;
+    on_peer_drain_();
   }
   Http::ServerConnectionCallbacks& inner_;
-  std::function<void()> on_peer_goaway_;
-  bool peer_goaway_handled_{false};
+  std::function<void()> on_peer_drain_;
+  bool peer_drain_handled_{false};
 };
 
 // Per-connection drain schedule. Every delay is an offset from the start of the drain. A
@@ -238,7 +238,8 @@ private:
   }
 
   // Declared before inner_ so the codec (which holds a reference to this wrapper) is destroyed
-  // before the wrapper. Null when the peer-GOAWAY re-dial path is disabled.
+  // before the wrapper. Null when the peer-drain (GOAWAY or drain METADATA) re-dial path is
+  // disabled.
   std::unique_ptr<DrainAwareServerConnectionCallbacks> callbacks_wrapper_;
   Http::ServerConnectionPtr inner_;
   Network::Connection& connection_;

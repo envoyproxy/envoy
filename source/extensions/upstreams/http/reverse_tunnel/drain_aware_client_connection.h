@@ -94,10 +94,9 @@ public:
                              const ReverseTunnelUpstreamCodecStats& stats,
                              Event::Dispatcher& dispatcher,
                              UpstreamCodecDrainRegistrySharedPtr registry,
-                             absl::string_view cluster, bool send_drain_metadata = false)
+                             absl::string_view cluster)
       : callbacks_(std::move(callbacks)), inner_(std::move(inner)), stats_(stats),
-        dispatcher_(dispatcher), registry_(std::move(registry)), cluster_(cluster),
-        send_drain_metadata_(send_drain_metadata) {
+        dispatcher_(dispatcher), registry_(std::move(registry)), cluster_(cluster) {
     ENVOY_LOG(debug, "reverse_tunnel upstream codec: drain-aware client connection installed");
     if (registry_ != nullptr) {
       registry_->add(cluster_, *this);
@@ -111,20 +110,19 @@ public:
   }
 
   /**
-   * Begin a graceful, two-phase drain from the upstream (client) side. When `send_drain_metadata_`
-   * is enabled, sends a stream-0 drain METADATA frame immediately so the peer can redial a
-   * replacement tunnel (requires `http2_protocol_options.allow_metadata` on the cluster), then
-   * sends a final GOAWAY and drains the pool connection after `drain_time`. Idempotent.
+   * Begin a graceful, two-phase drain from the upstream (client) side. Sends a stream-0 drain
+   * METADATA frame immediately so the peer can redial a replacement tunnel (requires
+   * `http2_protocol_options.allow_metadata` on the cluster), then sends a final GOAWAY and drains
+   * the pool connection after `drain_time`. Idempotent.
    */
   void startGracefulDrain(std::chrono::milliseconds drain_time) {
     if (draining_) {
       return;
     }
+    stats_.drain_started_.inc();
     draining_ = true;
-    ENVOY_LOG(info,
-              "reverse_tunnel upstream codec: starting graceful drain (send_drain_metadata={}, "
-              "final GOAWAY in {}ms)",
-              send_drain_metadata_, drain_time.count());
+    ENVOY_LOG(info, "reverse_tunnel upstream codec: starting graceful drain (final GOAWAY in {}ms)",
+              drain_time.count());
     // Phase 2 (deferred): after the drain window, send the final GOAWAY and gracefully drain this
     // connection out of the pool. We deliberately do NOT force-close it: a hard close would abort
     // in-flight requests, whereas draining lets them finish while new requests move to the
@@ -132,10 +130,7 @@ public:
     // synchronously close the connection and destroy this object on a write error; since the timer
     // is owned by this, it is cancelled on destruction and no member is touched afterward.
     drain_timer_ = dispatcher_.createTimer([this]() {
-      ENVOY_LOG(debug,
-                "reverse_tunnel upstream codec: drain timer fired; final GOAWAY + pool drain");
-      stats_.goaway_sent_.inc();
-      inner_->goAway();
+      goAway();
       // NOTE: if this connection is already idle the pool closes it here, which may deferred-delete
       // this object; do not touch members afterwards.
       callbacks_->drainOwnPoolConnection();
@@ -154,7 +149,6 @@ public:
   Envoy::Http::Status dispatch(Buffer::Instance& data) override { return inner_->dispatch(data); }
   void goAway() override {
     ENVOY_LOG(debug, "reverse_tunnel upstream codec: sending GOAWAY on drain");
-    stats_.goaway_sent_.inc();
     inner_->goAway();
   }
   Envoy::Http::Protocol protocol() override { return inner_->protocol(); }
@@ -171,14 +165,10 @@ public:
   }
 
 private:
-  // Emits a stream-0 drain METADATA frame to the peer when `send_drain_metadata_` is enabled.
-  // Requires `http2_protocol_options.allow_metadata` on the cluster; otherwise the underlying
-  // HTTP/2 codec drops the frame.
+  // Emits a stream-0 drain METADATA frame to the peer. Requires
+  // `http2_protocol_options.allow_metadata` on the cluster; otherwise the underlying HTTP/2 codec
+  // drops the frame and increments `http2.metadata_dropped`.
   void sendDrainMetadata() {
-    if (!send_drain_metadata_) {
-      return;
-    }
-
     inner_->encodeMetadata(
         Bootstrap::ReverseConnection::ReverseConnectionUtility::createDrainMetadata());
   }
@@ -192,7 +182,6 @@ private:
   const std::string cluster_;
   Event::TimerPtr drain_timer_;
   bool draining_{false};
-  const bool send_drain_metadata_;
 };
 
 } // namespace ReverseTunnel

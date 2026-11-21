@@ -56,9 +56,9 @@ ReverseTunnelUpstreamCodecOptions::createClientCodec(const Context& context) con
       cluster.httpProtocolOptions().http2Options(),
       cluster.maxResponseHeadersKb().value_or(Envoy::Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
       cluster.maxResponseHeadersCount(), Envoy::Http::Http2::ProdNghttp2SessionFactory::get());
-  return std::make_unique<DrainAwareClientConnection>(
-      std::move(inner), std::move(callbacks), stats_, context.connection.dispatcher(), registry_,
-      cluster.name(), send_drain_metadata_);
+  return std::make_unique<DrainAwareClientConnection>(std::move(inner), std::move(callbacks),
+                                                      stats_, context.connection.dispatcher(),
+                                                      registry_, cluster.name());
 }
 
 absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>
@@ -69,16 +69,10 @@ ReverseTunnelUpstreamCodecFactory::createProtocolOptionsConfig(
       const ReverseTunnelProto::ReverseTunnelUpstreamCodecOptions&>(
       config, context.messageValidationVisitor());
 
-  if (typed_config.send_drain_metadata() && !typed_config.enable_drain_with_goaway()) {
-    return absl::InvalidArgumentError(
-        "reverse_tunnel: send_drain_metadata requires enable_drain_with_goaway to be true");
-  }
-
   // Logged once per cluster config load, unlike the per-connection codec lifecycle logs.
   ENVOY_LOG_MISC(info,
-                 "reverse_tunnel: drain-aware upstream codec configured "
-                 "(drain_with_goaway={}, send_drain_metadata={})",
-                 typed_config.enable_drain_with_goaway(), typed_config.send_drain_metadata());
+                 "reverse_tunnel: drain-aware upstream codec configured (drain_with_goaway={})",
+                 typed_config.enable_drain_with_goaway());
 
   auto& server_context = context.serverFactoryContext();
 
