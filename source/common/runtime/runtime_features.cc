@@ -162,6 +162,10 @@ RUNTIME_GUARD(envoy_reloadable_features_oauth2_client_retries_respect_user_retry
 // false once their cookie TTL has elapsed and no legacy cookies remain in circulation.
 // TODO: flip the default to false and remove the flag once the migration window has elapsed.
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_legacy_cbc_decrypt_compat);
+// When enabled, the on-demand secret certificate selector fails a handshake whose certificate the
+// OCSP staple policy rejects, as the default certificate selector does, instead of completing it
+// without an OCSP response.
+RUNTIME_GUARD(envoy_reloadable_features_on_demand_secret_enforce_ocsp_staple_policy);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_vhds_no_recreate_stream);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_vhds_require_route_match);
 RUNTIME_GUARD(envoy_reloadable_features_orca_accept_unpadded_base64);

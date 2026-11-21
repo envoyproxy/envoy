@@ -10,6 +10,7 @@
 #include "source/common/ssl/tls_certificate_config_impl.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/server_context_impl.h"
+#include "source/common/tls/stats.h"
 #include "source/extensions/transport_sockets/tls/cert_selectors/common/async_context.h"
 
 namespace Envoy {
@@ -67,9 +68,15 @@ public:
 
   /**
    * Asynchronous handle constructor must also keep the callback for the secret manager.
+   * @param ssl_stats counts a certificate that fails the OCSP staple policy. The secret manager
+   * that owns it is the only caller of notify().
+   * @param name the secret name, which a certificate that fails the OCSP staple policy logs.
+   * @param connection_id the connection of the handshake, which the same log names.
    */
-  Handle(Ssl::CertificateSelectionCallbackPtr&& cb, bool client_ocsp_capable)
-      : cb_(std::move(cb)), client_ocsp_capable_(client_ocsp_capable) {}
+  Handle(Ssl::CertificateSelectionCallbackPtr&& cb, bool client_ocsp_capable, SslStats& ssl_stats,
+         absl::string_view name, std::optional<uint64_t> connection_id)
+      : cb_(std::move(cb)), client_ocsp_capable_(client_ocsp_capable), ssl_stats_(ssl_stats),
+        name_(name), connection_id_(connection_id) {}
 
   /**
    * Notify the pending connection that the context is available.
@@ -82,6 +89,9 @@ private:
   AsyncContextConstSharedPtr active_context_;
   Ssl::CertificateSelectionCallbackPtr cb_;
   bool client_ocsp_capable_{false};
+  OptRef<SslStats> ssl_stats_;
+  std::string name_;
+  std::optional<uint64_t> connection_id_;
 };
 
 using HandleSharedPtr = std::shared_ptr<Handle>;
@@ -134,10 +144,18 @@ public:
 
   /**
    * Start fetching the certificate via a subscription.
+   * @param connection_id the connection of the handshake, which a certificate that fails the OCSP
+   * staple policy logs.
    */
   HandleSharedPtr fetchCertificate(absl::string_view secret_name,
                                    Ssl::CertificateSelectionCallbackPtr&& cb,
-                                   bool client_ocsp_capable);
+                                   bool client_ocsp_capable, std::optional<uint64_t> connection_id);
+
+  /**
+   * @return the TLS stats in the scope of the TLS context that owns the selector, which are the
+   * stats the default certificate selector counts in.
+   */
+  SslStats& sslStats() { return ssl_stats_; }
 
 private:
   void doRemoveCertificateConfig(absl::string_view);
@@ -146,6 +164,8 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
   const envoy::config::core::v3::ConfigSource config_source_;
   AsyncContextFactory context_factory_;
+  const Stats::ScopeSharedPtr ssl_stats_scope_;
+  SslStats ssl_stats_;
 
   // Main-thread accessible context config subscriptions and callbacks.
   struct CacheEntry {
@@ -169,7 +189,7 @@ public:
 
 protected:
   Ssl::SelectionResult doSelectTlsContext(const std::string& name, const bool client_ocsp_capable,
-                                          Ssl::CertificateSelectionCallbackPtr cb);
+                                          const SSL& ssl, Ssl::CertificateSelectionCallbackPtr cb);
   std::shared_ptr<SecretManager> secret_manager_;
 };
 

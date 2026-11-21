@@ -6,6 +6,7 @@
 
 #include "envoy/server/factory_context.h"
 #include "envoy/ssl/context_config.h"
+#include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/tls_certificate_config.h"
 #include "envoy/stats/scope.h"
 
@@ -92,6 +93,20 @@ public:
 
   const Ssl::TlsContext& tlsContext() const override;
 };
+
+/**
+ * Serves a selected TLS context with its OCSP response when the OCSP staple policy staples it, or
+ * fails the selection when the policy rejects the certificate, as the default certificate selector
+ * does. The calling selector logs a failed selection in its own terms.
+ * @param tls_context the selected TLS context.
+ * @param client_ocsp_capable true when the client requested an OCSP response.
+ * @param ocsp_staple_policy the OCSP staple policy that applies to the TLS context.
+ * @param handle the handle to attach to the connection when the selection succeeds.
+ * @return the selection result.
+ */
+Ssl::SelectionResult serveTlsContext(const Ssl::TlsContext& tls_context, bool client_ocsp_capable,
+                                     Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy,
+                                     Ssl::SelectionHandleConstSharedPtr handle = nullptr);
 
 } // namespace CertificateSelectors
 } // namespace Tls
