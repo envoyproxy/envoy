@@ -24,6 +24,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/hash.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/dependent_type_urls.h"
 #include "source/common/config/null_grpc_mux_impl.h"
@@ -413,8 +414,9 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
       // include a conditional ads_mux_->start() call, if other uses cases for "post-cluster-init"
       // functionality pops up.
       auto status_or_cluster =
-          loadCluster(cluster, MessageUtil::hash(cluster), "", /*added_via_api=*/false,
-                      required_for_ads, active_clusters_);
+          loadCluster(cluster, MessageUtil::hash(cluster),
+                      HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)), "",
+                      /*added_via_api=*/false, required_for_ads, active_clusters_);
       RETURN_IF_NOT_OK_REF(status_or_cluster.status());
     }
   }
@@ -432,8 +434,9 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
       // Passing "false" for required_for_ads because an ADS cluster cannot be
       // defined using EDS (or non-primary cluster).
       auto status_or_cluster =
-          loadCluster(cluster, MessageUtil::hash(cluster), "", /*added_via_api=*/false,
-                      /*required_for_ads=*/false, active_clusters_);
+          loadCluster(cluster, MessageUtil::hash(cluster),
+                      HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)), "",
+                      /*added_via_api=*/false, /*required_for_ads=*/false, active_clusters_);
       if (!status_or_cluster.status().ok()) {
         return status_or_cluster.status();
       }
@@ -826,12 +829,10 @@ ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cluster
     if (!cluster_data.blockUpdate(*new_hash)) {
       return false;
     }
-    // MessageUtil::hash() unpacks Any payloads and skips unknown fields, so it finds a config
-    // unchanged whose bytes differ because the management server encoded an Any payload
-    // differently, such as with its map entries in another order, or sent fields this Envoy doesn't
-    // know. Keeping the new bytes lets later pushes of them skip MessageUtil::hash(), so a server
-    // that re-encodes once, such as after a restart or an upgrade, doesn't pay for both hashes on
-    // every push.
+    // On a full-proto build MessageUtil::hash() finds a config unchanged even when the sender
+    // re-encodes an Any payload, such as with its map entries in another order. Keeping the new
+    // bytes lets every later push from a sender that re-encodes once, such as after a restart or an
+    // upgrade, skip MessageUtil::hash().
     cluster_data.serialized_config_hash_ = serialized_hash;
     return true;
   };
@@ -879,7 +880,8 @@ ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cluster
   // Preserve the previous cluster data to avoid early destroy. The same cluster should be added
   // before destroy to avoid early initialization complete.
   auto status_or_cluster =
-      loadCluster(cluster, *new_hash, std::string(version_info), /*added_via_api=*/true,
+      loadCluster(cluster, *new_hash, serialized_hash, std::string(version_info),
+                  /*added_via_api=*/true,
                   /*required_for_ads=*/false, warming_clusters_, avoid_cds_removal);
   RETURN_IF_NOT_OK_REF(status_or_cluster.status());
   const ClusterDataPtr previous_cluster = std::move(status_or_cluster.value());
@@ -971,11 +973,10 @@ bool ClusterManagerImpl::removeCluster(absl::string_view cluster_name, const boo
   return removed;
 }
 
-absl::StatusOr<ClusterManagerImpl::ClusterDataPtr>
-ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                                const uint64_t cluster_hash, const std::string& version_info,
-                                bool added_via_api, const bool required_for_ads,
-                                ClusterMap& cluster_map, const bool avoid_cds_removal) {
+absl::StatusOr<ClusterManagerImpl::ClusterDataPtr> ClusterManagerImpl::loadCluster(
+    const envoy::config::cluster::v3::Cluster& cluster, const uint64_t cluster_hash,
+    const uint64_t serialized_cluster_hash, const std::string& version_info, bool added_via_api,
+    const bool required_for_ads, ClusterMap& cluster_map, const bool avoid_cds_removal) {
   absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
       new_cluster_pair_or_error =
           factory_.clusterFromProto(cluster, outlier_event_logger_, added_via_api);
@@ -1038,17 +1039,18 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   ClusterDataPtr result;
   auto cluster_entry_it = cluster_map.find(cluster_info->name());
   if (cluster_entry_it != cluster_map.end()) {
-    result = std::exchange(cluster_entry_it->second,
-                           std::make_unique<ClusterData>(
-                               cluster, cluster_hash, version_info, added_via_api, required_for_ads,
-                               std::move(new_cluster), time_source_, avoid_cds_removal));
+    result = std::exchange(
+        cluster_entry_it->second,
+        std::make_unique<ClusterData>(cluster, cluster_hash, serialized_cluster_hash, version_info,
+                                      added_via_api, required_for_ads, std::move(new_cluster),
+                                      time_source_, avoid_cds_removal));
   } else {
     bool inserted = false;
     std::tie(cluster_entry_it, inserted) = cluster_map.emplace(
         cluster_info->name(),
-        std::make_unique<ClusterData>(cluster, cluster_hash, version_info, added_via_api,
-                                      required_for_ads, std::move(new_cluster), time_source_,
-                                      avoid_cds_removal));
+        std::make_unique<ClusterData>(cluster, cluster_hash, serialized_cluster_hash, version_info,
+                                      added_via_api, required_for_ads, std::move(new_cluster),
+                                      time_source_, avoid_cds_removal));
     ASSERT(inserted);
   }
 

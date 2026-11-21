@@ -1480,7 +1480,7 @@ TEST_P(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
     auto new_listener = listener;
     f(new_listener);
     EXPECT_EQ(ListenerImpl::create(new_listener, "version", *manager_, "foo", true, false,
-                                   /*hash=*/static_cast<uint64_t>(0))
+                                   /*hash=*/static_cast<uint64_t>(0), /*serialized_hash=*/0)
                   .status()
                   .message(),
               "error adding listener named 'foo': has "
@@ -2498,18 +2498,23 @@ filter_chains: {}
   any.set_type_url("type.googleapis.com/google.protobuf.Struct");
   any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
 
+  const auto serialized_config_hash = [this]() {
+    return dynamic_cast<ListenerImpl&>(manager_->listeners().front().get()).serializedConfigHash();
+  };
+
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_TRUE(addOrUpdateListener(listener));
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(listener)),
+            serialized_config_hash());
 
   any.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
   EXPECT_FALSE(addOrUpdateListener(listener));
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
   // The listener keeps the new bytes, so that the next push of them skips MessageUtil::hash().
-  EXPECT_EQ(
-      HashUtil::xxHash64(MessageUtil::serializeDeterministically(listener)),
-      dynamic_cast<ListenerImpl&>(manager_->listeners().front().get()).serializedConfigHash());
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(listener)),
+            serialized_config_hash());
 
   EXPECT_CALL(*listener_foo, onDestroy());
 }
@@ -7830,13 +7835,13 @@ filter_chains: {}
       TestUtility::parseYaml<envoy::config::listener::v3::Listener>(yaml_config3);
 
   auto listener1 = ListenerImpl::create(config1, "", *manager_, config1.name(), false, false,
-                                        MessageUtil::hash(config1));
+                                        MessageUtil::hash(config1), /*serialized_hash=*/0);
   ASSERT_OK(listener1);
   auto listener2 = ListenerImpl::create(config2, "", *manager_, config2.name(), false, false,
-                                        MessageUtil::hash(config2));
+                                        MessageUtil::hash(config2), /*serialized_hash=*/0);
   ASSERT_OK(listener2);
   auto listener3 = ListenerImpl::create(config3, "", *manager_, config3.name(), false, false,
-                                        MessageUtil::hash(config3));
+                                        MessageUtil::hash(config3), /*serialized_hash=*/0);
   ASSERT_OK(listener3);
 
   EXPECT_FALSE(listener1.value()->hasCompatibleAddress(*(listener2.value())));
@@ -8509,6 +8514,11 @@ filter_chains:
   EXPECT_CALL(listener_foo_update1->target_, initialize());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+  // The in place update keeps the bytes of its own config.
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(
+                parseListenerFromV3Yaml(listener_foo_update1_yaml))),
+            dynamic_cast<ListenerImpl&>(manager_->listeners(ListenerManager::WARMING).front().get())
+                .serializedConfigHash());
 
   EXPECT_EQ(1UL, manager_->listeners().size());
 
@@ -9505,7 +9515,7 @@ filter_chains:
   std::unique_ptr<ListenerImpl>
   listenerWithBoundAddresses(const envoy::config::listener::v3::Listener& listener_proto,
                              const std::vector<std::string>& bound_addresses) {
-    auto listener = *ListenerImpl::create(listener_proto, "", *manager_, "foo", true, false, 0);
+    auto listener = *ListenerImpl::create(listener_proto, "", *manager_, "foo", true, false, 0, 0);
     for (const std::string& bound_address : bound_addresses) {
       auto socket_factory = std::make_unique<NiceMock<Network::MockListenSocketFactory>>();
       ON_CALL(*socket_factory, localAddress())
@@ -11220,8 +11230,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, InvalidExtendConnectionBalanceCon
   extend_balance_config->mutable_typed_config()->set_type_url(
       "type.googleapis.com/google.protobuf.test");
 
-  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
-                                             /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl =
+      *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                            /*hash=*/static_cast<uint64_t>(0), /*serialized_hash=*/0);
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
@@ -11237,8 +11248,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, EmptyConnectionBalanceConfig) {
   auto listener = createIPv4Listener("TCPListener");
   listener.mutable_connection_balance_config();
 
-  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
-                                             /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl =
+      *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                            /*hash=*/static_cast<uint64_t>(0), /*serialized_hash=*/0);
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
@@ -11296,8 +11308,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, CpuLocalityBalanceUsesNopBalancer
   listener.mutable_connection_balance_config()->mutable_cpu_locality_balance();
   EXPECT_CALL(os_sys_calls_, supportsReusePortBpfCpuSteering()).WillRepeatedly(Return(true));
 
-  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
-                                             /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl =
+      *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                            /*hash=*/static_cast<uint64_t>(0), /*serialized_hash=*/0);
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
@@ -11324,8 +11337,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
   listener.mutable_connection_balance_config()->mutable_cpu_locality_balance();
   EXPECT_CALL(os_sys_calls_, supportsReusePortBpfCpuSteering()).WillRepeatedly(Return(false));
 
-  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
-                                             /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl =
+      *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                            /*hash=*/static_cast<uint64_t>(0), /*serialized_hash=*/0);
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
@@ -11348,8 +11362,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
   listener.mutable_connection_balance_config()->mutable_cpu_locality_balance();
   EXPECT_CALL(os_sys_calls_, supportsReusePortBpfCpuSteering()).WillRepeatedly(Return(true));
 
-  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
-                                             /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl =
+      *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                            /*hash=*/static_cast<uint64_t>(0), /*serialized_hash=*/0);
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
@@ -11371,8 +11386,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
   listener.mutable_connection_balance_config()->mutable_cpu_locality_balance();
   EXPECT_CALL(os_sys_calls_, supportsReusePortBpfCpuSteering()).WillRepeatedly(Return(true));
 
-  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
-                                             /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl =
+      *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                            /*hash=*/static_cast<uint64_t>(0), /*serialized_hash=*/0);
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));

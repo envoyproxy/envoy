@@ -259,12 +259,14 @@ public:
    * @param workers_started supplies whether the listener is being added before or after workers
    *        have been started. This controls various behavior related to init management.
    * @param hash supplies the hash to use for duplicate checking.
+   * @param serialized_hash supplies the hash of the deterministic serialization of config, which
+   *        duplicate checking compares before hash.
    * @param concurrency is the number of listeners instances to be created.
    */
   static absl::StatusOr<std::unique_ptr<ListenerImpl>>
   create(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
          ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-         bool workers_started, uint64_t hash);
+         bool workers_started, uint64_t hash, uint64_t serialized_hash);
   ~ListenerImpl() override;
 
   // The kind of in place update that supportUpdateFilterChain() allows.
@@ -280,7 +282,7 @@ public:
   absl::StatusOr<std::unique_ptr<ListenerImpl>>
   newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
                              const std::string& version_info, bool workers_started, uint64_t hash,
-                             InPlaceUpdate in_place_update);
+                             uint64_t serialized_hash, InPlaceUpdate in_place_update);
   /**
    * Determine if in place filter chain update could be executed at this moment.
    * @return the kind of in place update to the new config, or None if it must replace the entire
@@ -458,8 +460,9 @@ public:
 private:
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash, Stats::ScopeSharedPtr scope,
-               Stats::ScopeSharedPtr listener_scope, absl::Status& creation_status);
+               bool workers_started, uint64_t hash, uint64_t serialized_hash,
+               Stats::ScopeSharedPtr scope, Stats::ScopeSharedPtr listener_scope,
+               absl::Status& creation_status);
   struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
     UdpListenerConfigImpl(const envoy::config::listener::v3::UdpListenerConfig config)
         : config_(config) {}
@@ -511,7 +514,8 @@ private:
   ListenerImpl(ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
                const std::string& version_info, ListenerManagerImpl& parent,
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
-               bool in_place_address_update, absl::Status& creation_status);
+               uint64_t serialized_hash, bool in_place_address_update,
+               absl::Status& creation_status);
   // Determine if the in place update could also change the addresses of this listener.
   bool supportUpdateAddresses(const envoy::config::listener::v3::Listener& new_config) const;
   // Helpers for constructor.

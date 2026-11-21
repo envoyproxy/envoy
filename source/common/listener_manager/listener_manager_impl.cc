@@ -739,12 +739,11 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     return false;
   }
 
-  ENVOY_LOG(debug, "begin add/update listener: name={}", name);
-
   // A listener whose serialized config is unchanged blocks the update without MessageUtil::hash(),
   // which only runs for the configs that change or serialize differently.
   const uint64_t serialized_hash =
       HashUtil::xxHash64(MessageUtil::serializeDeterministically(config));
+  ENVOY_LOG(debug, "begin add/update listener: name={} serialized_hash={}", name, serialized_hash);
   std::optional<uint64_t> hash;
   const auto block_lds_update = [&config, serialized_hash, &hash](ListenerImpl& listener) {
     if (listener.serializedConfigHash() == serialized_hash) {
@@ -756,12 +755,10 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     if (!listener.blockLdsUpdate(*hash)) {
       return false;
     }
-    // MessageUtil::hash() unpacks Any payloads and skips unknown fields, so it finds a config
-    // unchanged whose bytes differ because the management server encoded an Any payload
-    // differently, such as with its map entries in another order, or sent fields this Envoy doesn't
-    // know. Keeping the new bytes lets later pushes of them skip MessageUtil::hash(), so a server
-    // that re-encodes once, such as after a restart or an upgrade, doesn't pay for both hashes on
-    // every push.
+    // On a full-proto build MessageUtil::hash() finds a config unchanged even when the sender
+    // re-encodes an Any payload, such as with its map entries in another order. Keeping the new
+    // bytes lets every later push from a sender that re-encodes once, such as after a restart or an
+    // upgrade, skip MessageUtil::hash().
     listener.setSerializedConfigHash(serialized_hash);
     return true;
   };
@@ -807,14 +804,14 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     auto listener_or_error =
         (*existing_active_listener)
             ->newListenerWithFilterChain(config, version_info, workers_started_, *hash,
-                                         in_place_update_kind);
+                                         serialized_hash, in_place_update_kind);
     RETURN_IF_NOT_OK_REF(listener_or_error.status());
     new_listener = std::move(*listener_or_error);
     stats_.listener_in_place_updated_.inc();
   } else {
     ENVOY_LOG(debug, "use full listener update path for listener name={} hash={}", name, *hash);
     auto listener_or_error = ListenerImpl::create(config, version_info, *this, name, added_via_api,
-                                                  workers_started_, *hash);
+                                                  workers_started_, *hash, serialized_hash);
     RETURN_IF_NOT_OK_REF(listener_or_error.status());
     new_listener = std::move(*listener_or_error);
   }

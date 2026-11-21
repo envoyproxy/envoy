@@ -120,12 +120,10 @@ RouteConfigUpdateReceiverImpl::changedConfigHashes(const Protobuf::Message& rc) 
   }
   const uint64_t hash = MessageUtil::hash(rc);
   if (hash == last_config_hashes.hash) {
-    // MessageUtil::hash() unpacks Any payloads and skips unknown fields, so it finds a route
-    // configuration unchanged whose bytes differ because the management server encoded an Any
-    // payload differently, such as with its map entries in another order, or sent fields this
-    // Envoy doesn't know. Keeping the new bytes lets later pushes of them skip MessageUtil::hash(),
-    // so a server that re-encodes once, such as after a restart or an upgrade, doesn't pay for both
-    // hashes on every push.
+    // On a full-proto build MessageUtil::hash() finds a route configuration unchanged even when
+    // the sender re-encodes an Any payload, such as with its map entries in another order. Keeping
+    // the new bytes lets every later push from a sender that re-encodes once, such as after a
+    // restart or an upgrade, skip MessageUtil::hash().
     last_config_hashes.serialized_hash = serialized_hash;
     return std::nullopt;
   }

@@ -12,8 +12,10 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/base64.h"
+#include "source/common/common/hash.h"
 #include "source/common/config/opaque_resource_decoder_impl.h"
 #include "source/common/init/manager_impl.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/rds/common/route_config_provider_manager_impl.h"
 #include "source/common/rds/rds_route_config_provider_impl.h"
 #include "source/common/rds/rds_route_config_subscription.h"
@@ -183,14 +185,21 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdateWithReserializedAnyIsNoop) {
   any.set_type_url("type.googleapis.com/google.protobuf.Struct");
   any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
 
+  const auto& receiver = dynamic_cast<const RouteConfigUpdateReceiverImpl&>(*config_update_);
+
   EXPECT_OK(config_update_->onRdsUpdate(route_config, "1"));
   EXPECT_EQ("1", config_update_->configInfo().value().version_);
   const uint64_t config_hash = config_update_->configHash();
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(route_config)),
+            receiver.serializedConfigHash());
 
   any.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
   EXPECT_OK(config_update_->onRdsUpdate(route_config, "2"));
   EXPECT_EQ("1", config_update_->configInfo().value().version_);
   EXPECT_EQ(config_hash, config_update_->configHash());
+  // The receiver keeps the new bytes, so that the next push of them skips MessageUtil::hash().
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(route_config)),
+            receiver.serializedConfigHash());
 }
 
 class RdsConfigProviderManagerTest : public RdsTestBase {

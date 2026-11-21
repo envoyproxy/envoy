@@ -173,6 +173,10 @@ public:
     return clusters;
   }
 
+  uint64_t activeClusterSerializedConfigHash(const std::string& name) const {
+    return active_clusters_.at(name)->serialized_config_hash_;
+  }
+
   const ClusterInitializationMap& clusterInitializationMap() const {
     return cluster_initialization_map_;
   }

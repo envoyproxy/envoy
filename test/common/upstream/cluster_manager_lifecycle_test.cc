@@ -1,4 +1,6 @@
 #include "source/common/common/base64.h"
+#include "source/common/common/hash.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/common/upstream/cluster_manager_impl_test_common.h"
 #include "test/mocks/upstream/cds_api.h"
@@ -708,6 +710,19 @@ TEST_P(ClusterManagerLifecycleTest, UpdateWithReserializedAnyIsNoop) {
   any.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
   EXPECT_FALSE(*cluster_manager_->addOrUpdateCluster(cluster, "version2"));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+
+  // The cluster keeps the new bytes, so that the next push of them skips MessageUtil::hash().
+  cluster1->initialize_callback_();
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)),
+            cluster_manager_->activeClusterSerializedConfigHash("fake_cluster"));
+
+  // An active cluster blocks the update the same way.
+  any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+  EXPECT_FALSE(*cluster_manager_->addOrUpdateCluster(cluster, "version3"));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)),
+            cluster_manager_->activeClusterSerializedConfigHash("fake_cluster"));
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
