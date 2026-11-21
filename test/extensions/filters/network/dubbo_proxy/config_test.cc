@@ -250,7 +250,7 @@ multiple_route_config:
       parseDubboProxyFromV3Yaml(yaml);
   EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_).IgnoreError(),
                           EnvoyException,
-                          "both mutiple_route_config and route_config is present in DubboProxy");
+                          "both multiple_route_config and route_config is present in DubboProxy");
 }
 #endif
 
