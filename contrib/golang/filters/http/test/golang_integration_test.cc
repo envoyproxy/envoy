@@ -880,8 +880,7 @@ typed_config:
 
   void testUpstreamOverrideHost(const std::string expected_status_code,
                                 const std::string expected_upstream_host, std::string path,
-                                bool bad_host = false, const std::string add_endpoint = "",
-                                bool retry = false) {
+                                const std::string add_endpoint = "", bool retry = false) {
     if (retry) {
       config_helper_.addConfigModifier(
           [](envoy::extensions::filters::network::http_connection_manager::v3::
@@ -919,17 +918,11 @@ typed_config:
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "POST"}, {":path", path}, {":scheme", "http"}, {":authority", "test.com"}};
 
-    auto encoder_decoder = codec_client_->startRequest(request_headers);
-    Http::RequestEncoder& request_encoder = encoder_decoder.first;
-    auto response = std::move(encoder_decoder.second);
-
-    if (!bad_host) {
-      codec_client_->sendData(request_encoder, "helloworld", true);
-      if (expected_status_code == "200") {
-        waitForNextUpstreamRequest(0, std::chrono::milliseconds(100000));
-        Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-        upstream_request_->encodeHeaders(response_headers, true);
-      }
+    auto response = codec_client_->makeRequestWithBody(request_headers, "helloworld", true);
+    if (expected_status_code == "200") {
+      waitForNextUpstreamRequest(0, std::chrono::milliseconds(100000));
+      Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+      upstream_request_->encodeHeaders(response_headers, true);
     }
 
     ASSERT_TRUE(response->waitForEndStream(std::chrono::milliseconds(100000)));
@@ -2071,7 +2064,7 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost) {
 
 // Set a non-IP host, C++ side will return error and not route to cluster.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_BadHost) {
-  testUpstreamOverrideHost("403", "", "/test?upstreamOverrideHost=badhost", true);
+  testUpstreamOverrideHost("403", "", "/test?upstreamOverrideHost=badhost");
 }
 
 // Set an unavailable host, and the host is not in the cluster, will req the valid host in the
@@ -2081,7 +2074,7 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_NotFound) {
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
   const std::string url_host =
       GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
-  testUpstreamOverrideHost("200", expected_host, "/test?upstreamOverrideHost=" + url_host, false);
+  testUpstreamOverrideHost("200", expected_host, "/test?upstreamOverrideHost=" + url_host);
 }
 
 // Set an unavailable host, and the host is in the cluster, but not available(can not connect to the
@@ -2093,8 +2086,7 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Unavaliable) {
       GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1" : "::2";
   const std::string url_host =
       GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
-  testUpstreamOverrideHost("503", "", "/test?upstreamOverrideHost=" + url_host, false,
-                           add_endpoint);
+  testUpstreamOverrideHost("503", "", "/test?upstreamOverrideHost=" + url_host, add_endpoint);
 }
 
 // Set an unavailable host, and the host is in the cluster, but not available(can not connect to the
@@ -2107,7 +2099,7 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Unavaliable_Re
       GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1" : "::2";
   const std::string url_host =
       GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
-  testUpstreamOverrideHost("200", expected_host, "/test?upstreamOverrideHost=" + url_host, false,
+  testUpstreamOverrideHost("200", expected_host, "/test?upstreamOverrideHost=" + url_host,
                            add_endpoint, true);
 }
 
@@ -2123,7 +2115,7 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict) {
 
   testUpstreamOverrideHost(
       "503", "", "/test?upstreamOverrideHost=" + url_host + "&upstreamOverrideHostStrict=true",
-      false, add_endpoint);
+      add_endpoint);
 }
 
 // Set an unavailable host with strict mode, and the host is not in the cluster, will req the
@@ -2135,8 +2127,7 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFoun
       GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
 
   testUpstreamOverrideHost(
-      "503", "", "/test?upstreamOverrideHost=" + url_host + "&upstreamOverrideHostStrict=true",
-      false);
+      "503", "", "/test?upstreamOverrideHost=" + url_host + "&upstreamOverrideHostStrict=true");
 }
 
 // Same as SetUpstreamOverrideHost_InvalidHost_Strict_NotFound, but called from a goroutine so the
@@ -2146,9 +2137,9 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFoun
   const std::string url_host =
       GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
 
-  testUpstreamOverrideHost(
-      "503", "",
-      "/test?upstreamOverrideHost=" + url_host + "&upstreamOverrideHostStrict=true&async=1", false);
+  testUpstreamOverrideHost("503", "",
+                           "/test?upstreamOverrideHost=" + url_host +
+                               "&upstreamOverrideHostStrict=true&async=1");
 }
 
 // Set an unavailable host with strict mode and retry, and the host is in the cluster.
@@ -2164,7 +2155,7 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_Retry) 
   testUpstreamOverrideHost("200", expected_host,
                            "/test?upstreamOverrideHost=" + url_host +
                                "&upstreamOverrideHostStrict=true",
-                           false, add_endpoint, true);
+                           add_endpoint, true);
 }
 
 // Set an unavailable host with strict mode and retry, and the host is not in the cluster, will req
@@ -2175,8 +2166,8 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFoun
   const std::string url_host =
       GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
   testUpstreamOverrideHost(
-      "503", "", "/test?upstreamOverrideHost=" + url_host + "&upstreamOverrideHostStrict=true",
-      false, "", true);
+      "503", "", "/test?upstreamOverrideHost=" + url_host + "&upstreamOverrideHostStrict=true", "",
+      true);
 }
 
 // Test DrainConnectionUponCompletion triggers connection draining for HTTP/1.1.
