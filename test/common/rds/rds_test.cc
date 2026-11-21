@@ -191,7 +191,7 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdateWithReserializedAnyIsNoop) {
   EXPECT_EQ("1", config_update_->configInfo().value().version_);
   const uint64_t config_hash = config_update_->configHash();
   EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(route_config)),
-            receiver.serializedConfigHash());
+            receiver.serializedConfigHashForTest());
 
   any.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
   EXPECT_OK(config_update_->onRdsUpdate(route_config, "2"));
@@ -199,7 +199,13 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdateWithReserializedAnyIsNoop) {
   EXPECT_EQ(config_hash, config_update_->configHash());
   // The receiver keeps the new bytes, so that the next push of them skips MessageUtil::hash().
   EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(route_config)),
-            receiver.serializedConfigHash());
+            receiver.serializedConfigHashForTest());
+
+  // A changed route configuration still applies.
+  route_config.add_internal_only_headers("x-foo");
+  EXPECT_OK(config_update_->onRdsUpdate(route_config, "3"));
+  EXPECT_EQ("3", config_update_->configInfo().value().version_);
+  EXPECT_NE(config_hash, config_update_->configHash());
 }
 
 class RdsConfigProviderManagerTest : public RdsTestBase {

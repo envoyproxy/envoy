@@ -755,10 +755,11 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     if (!listener.blockLdsUpdate(*hash)) {
       return false;
     }
-    // On a full-proto build MessageUtil::hash() finds a config unchanged even when the sender
-    // re-encodes an Any payload, such as with its map entries in another order. Keeping the new
-    // bytes lets every later push from a sender that re-encodes once, such as after a restart or an
-    // upgrade, skip MessageUtil::hash().
+    // Storing the hash of these bytes lets the next push of the same bytes skip
+    // MessageUtil::hash(). A blocked update brings new bytes when the listener is static, or on a
+    // full-proto build when the sender re-encodes an Any payload of an unchanged config, such as
+    // with its map entries in another order after a restart or an upgrade. A sender that
+    // re-encodes on every push gains nothing.
     listener.setSerializedConfigHash(serialized_hash);
     return true;
   };
@@ -767,9 +768,11 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   auto existing_warming_listener = getListenerByName(warming_listeners_, name);
 
   // The listener should be updated back to its original state and the warming listener should be
-  // removed.
+  // removed. A warming listener only exists for an update that the active one did not block, so a
+  // push of the warming listener's own bytes skips this check and its MessageUtil::hash().
   if (existing_warming_listener != warming_listeners_.end() &&
       existing_active_listener != active_listeners_.end() &&
+      (*existing_warming_listener)->serializedConfigHash() != serialized_hash &&
       block_lds_update(**existing_active_listener)) {
     warming_listeners_.erase(existing_warming_listener);
     updateWarmingActiveGauges();

@@ -2569,6 +2569,11 @@ filter_chains:
   EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
   checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
 
+  // Pushing the warming config again keeps it warming.
+  EXPECT_FALSE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
   // Update foo back to original active, should cause the warming listener to be removed.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));

@@ -876,9 +876,9 @@ private:
 
     const envoy::config::cluster::v3::Cluster cluster_config_;
     const uint64_t config_hash_;
-    // The hash of the deterministic serialization of this config, which finds an unchanged config
-    // without the reflection that config_hash_ needs. An update that blockUpdate() blocks replaces
-    // it, so that repeated pushes of the same bytes skip MessageUtil::hash().
+    // The hash of the deterministic serialization of the config this cluster was built from, or of
+    // the last update that blockUpdate() blocked. A push of the same bytes matches it without
+    // MessageUtil::hash().
     uint64_t serialized_config_hash_;
     const std::string version_info_;
     // Don't change the order of cluster_ and thread_aware_lb_ as the thread_aware_lb_ may

@@ -175,7 +175,7 @@ public:
   bool configWarming() const override { return warmer_.warming(); }
 
   uint64_t configHash() const override { return last_config_hashes_.hash; }
-  uint64_t serializedConfigHash() const { return last_config_hashes_.serialized_hash; }
+  uint64_t serializedConfigHashForTest() const { return last_config_hashes_.serialized_hash; }
   const std::optional<RouteConfigProvider::ConfigInfo>& configInfo() const override;
   ConfigConstSharedPtr parsedConfiguration() const override { return config_; }
   SystemTime lastUpdated() const override { return last_updated_; }

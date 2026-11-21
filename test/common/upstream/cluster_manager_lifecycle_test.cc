@@ -727,6 +727,51 @@ TEST_P(ClusterManagerLifecycleTest, UpdateWithReserializedAnyIsNoop) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
+// An active cluster keeps the bytes it was built from, blocks a re-encoded update and keeps its
+// bytes, and still applies a changed update.
+TEST_P(ClusterManagerLifecycleTest, UpdateActiveWithReserializedAnyIsNoop) {
+  create(defaultConfig());
+
+  auto cluster = defaultStaticCluster("fake_cluster");
+  // The same struct with its two fields serialized in two orders.
+  Protobuf::Any& any = (*cluster.mutable_metadata()->mutable_typed_filter_metadata())["foo"];
+  any.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster1, initialize(_));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster, "version1"));
+  cluster1->initialize_callback_();
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)),
+            cluster_manager_->activeClusterSerializedConfigHash("fake_cluster"));
+
+  any.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  EXPECT_FALSE(*cluster_manager_->addOrUpdateCluster(cluster, "version2"));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)),
+            cluster_manager_->activeClusterSerializedConfigHash("fake_cluster"));
+
+  cluster.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
+  std::shared_ptr<MockClusterMockPrioritySet> cluster2(new NiceMock<MockClusterMockPrioritySet>());
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+      .WillOnce(Return(std::make_pair(cluster2, nullptr)));
+  EXPECT_CALL(*cluster2, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster2, initialize(_)).WillOnce([](std::function<void()> initialize_callback) {
+    initialize_callback();
+  });
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster, "version3"));
+  checkStats(1 /*added*/, 1 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)),
+            cluster_manager_->activeClusterSerializedConfigHash("fake_cluster"));
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
+}
+
 TEST_P(ClusterManagerLifecycleTest, DynamicAddRemove) {
   create(defaultConfig());
 

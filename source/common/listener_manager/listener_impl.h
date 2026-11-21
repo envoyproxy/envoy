@@ -581,9 +581,9 @@ private:
   // The hash does not cover the FCDS filter chains. It is only used to skip the LDS updates that
   // do not change the listener config.
   const uint64_t maybe_stale_hash_;
-  // The hash of the deterministic serialization of this config, which finds an unchanged config
-  // without the reflection that maybe_stale_hash_ needs. An update that blockLdsUpdate() blocks
-  // replaces it, so that repeated pushes of the same bytes skip MessageUtil::hash().
+  // The hash of the deterministic serialization of the config this listener was built from, or of
+  // the last update that blockLdsUpdate() blocked. A push of the same bytes matches it without
+  // MessageUtil::hash().
   uint64_t serialized_config_hash_;
   const uint32_t tcp_backlog_size_;
   const uint32_t max_connections_to_accept_per_socket_event_;
