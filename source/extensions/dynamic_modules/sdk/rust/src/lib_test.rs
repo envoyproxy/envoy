@@ -3367,6 +3367,99 @@ fn test_network_filter_watermark_callbacks() {
 // Bootstrap Extension FFI stubs for testing.
 // =============================================================================
 
+pub mod config_snapshot_stubs {
+  use super::*;
+  use crate::abi::envoy_dynamic_module_type_bootstrap_config_snapshot_result as SnapshotResult;
+  use std::sync::atomic::Ordering;
+  use std::sync::Arc;
+
+  #[derive(Default)]
+  pub struct TestHost {
+    pub providers: Vec<String>,
+    pub name_regex: Option<String>,
+    pub snapshot: Option<TestSnapshot>,
+    pub result: Option<SnapshotResult>,
+  }
+
+  pub struct TestSnapshot {
+    pub json: Option<Vec<u8>>,
+    pub drops: Arc<AtomicUsize>,
+  }
+
+  impl Drop for TestSnapshot {
+    fn drop(&mut self) {
+      self.drops.fetch_add(1, Ordering::Relaxed);
+    }
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+    host: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    providers: *const abi::envoy_dynamic_module_type_module_buffer,
+    count: usize,
+    name_regex: abi::envoy_dynamic_module_type_module_buffer,
+    output: *mut abi::envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr,
+  ) -> SnapshotResult {
+    let host = unsafe { &mut *host.cast::<TestHost>() };
+    let providers = unsafe { crate::ffi_helpers::slice_from_raw_or_empty(providers, count) };
+    host.providers = providers
+      .iter()
+      .map(|provider| {
+        let bytes = unsafe {
+          crate::ffi_helpers::slice_from_raw_or_empty(provider.ptr.cast::<u8>(), provider.length)
+        };
+        std::str::from_utf8(bytes).unwrap().to_owned()
+      })
+      .collect();
+    host.name_regex = if name_regex.ptr.is_null() {
+      None
+    } else {
+      let bytes = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(name_regex.ptr.cast::<u8>(), name_regex.length)
+      };
+      Some(std::str::from_utf8(bytes).unwrap().to_owned())
+    };
+    unsafe { *output = std::ptr::null_mut() };
+    if let Some(result) = host.result {
+      return result;
+    }
+    let Some(snapshot) = host.snapshot.take() else {
+      return SnapshotResult::Unavailable;
+    };
+    unsafe { *output = Box::into_raw(Box::new(snapshot)).cast() };
+    SnapshotResult::Success
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+    raw: abi::envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr,
+    callback: abi::envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn,
+    user_data: *mut std::ffi::c_void,
+  ) -> bool {
+    let snapshot = unsafe { &*raw.cast::<TestSnapshot>() };
+    let Some(json) = &snapshot.json else {
+      return false;
+    };
+    unsafe {
+      callback.unwrap()(
+        abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: json.as_ptr().cast(),
+          length: json.len(),
+        },
+        user_data,
+      );
+    }
+    true
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(
+    raw: abi::envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr,
+  ) {
+    drop(unsafe { Box::from_raw(raw.cast::<TestSnapshot>()) });
+  }
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(
   _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,

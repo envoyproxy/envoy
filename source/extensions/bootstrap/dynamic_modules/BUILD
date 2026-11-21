@@ -10,6 +10,22 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "config_snapshot_lib",
+    srcs = ["config_snapshot.cc"],
+    hdrs = ["config_snapshot.h"],
+    deps = [
+        "//envoy/common:exception_lib",
+        "//envoy/server:config_tracker_interface",
+        "//source/common/protobuf:utility_lib",
+        "@abseil-cpp//absl/algorithm:container",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "cluster_writer_lib",
     srcs = ["cluster_writer.cc"],
     hdrs = ["cluster_writer.h"],
@@ -99,12 +115,14 @@ envoy_cc_library(
     hdrs = ["extension_config.h"],
     deps = [
         ":cluster_writer_lib",
+        ":config_snapshot_lib",
         ":listener_writer_lib",
         "//envoy/common:optref_lib",
         "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_manager_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:async_client_interface",
+        "//envoy/server:admin_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/server:listener_manager_interface",
         "//envoy/server:options_interface",
@@ -112,7 +130,10 @@ envoy_cc_library(
         "//envoy/thread_local:thread_local_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:matchers_lib",
+        "//source/common/common:regex_lib",
         "//source/common/common:thread_lib",
         "//source/common/http:message_lib",
         "//source/common/init:target_lib",
@@ -145,6 +166,7 @@ envoy_cc_library(
     name = "abi_impl",
     srcs = ["abi_impl.cc"],
     deps = [
+        ":config_snapshot_lib",
         ":extension_config_lib",
         ":extension_lib",
         "//envoy/server:admin_interface",
@@ -152,6 +174,7 @@ envoy_cc_library(
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "@abseil-cpp//absl/container:inlined_vector",
         "@abseil-cpp//absl/strings",
     ],
 )

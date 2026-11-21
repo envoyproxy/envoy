@@ -242,6 +242,34 @@ public:
   std::shared_ptr<Router::MockRoute> route_;
 };
 
+class MockUpstreamStreamFilterCallbacks : public UpstreamStreamFilterCallbacks {
+public:
+  MockUpstreamStreamFilterCallbacks();
+  ~MockUpstreamStreamFilterCallbacks() override;
+
+  MOCK_METHOD(StreamInfo::StreamInfo&, upstreamStreamInfo, ());
+  MOCK_METHOD(StreamInfo::StreamInfo&, downstreamStreamInfo, ());
+  MOCK_METHOD(OptRef<WebTransportSession>, downstreamWebTransportSession, ());
+  MOCK_METHOD(OptRef<Router::GenericUpstream>, upstream, ());
+  MOCK_METHOD(void, dumpState, (std::ostream & os, int indent_level), (const));
+  MOCK_METHOD(bool, pausedForConnect, (), (const));
+  MOCK_METHOD(void, setPausedForConnect, (bool value));
+  MOCK_METHOD(bool, pausedForWebsocketUpgrade, (), (const));
+  MOCK_METHOD(void, setPausedForWebsocketUpgrade, (bool value));
+  MOCK_METHOD(bool, pausedForGenericUpgrade, (), (const));
+  MOCK_METHOD(void, setPausedForGenericUpgrade, (bool value));
+  MOCK_METHOD(void, disableRouteTimeoutForWebsocketUpgrade, ());
+  MOCK_METHOD(void, disablePerTryTimeoutForWebsocketUpgrade, ());
+  MOCK_METHOD(const ConnectionPool::Instance::StreamOptions&, upstreamStreamOptions, (), (const));
+  MOCK_METHOD(void, addUpstreamCallbacks, (UpstreamCallbacks & callbacks));
+  MOCK_METHOD(void, setUpstreamToDownstream,
+              (Router::UpstreamToDownstream & upstream_to_downstream_interface));
+
+  testing::NiceMock<StreamInfo::MockStreamInfo> upstream_stream_info_;
+  testing::NiceMock<StreamInfo::MockStreamInfo> downstream_stream_info_;
+  ConnectionPool::Instance::StreamOptions stream_options_;
+};
+
 class MockSidestreamWatermarkCallbacks : public SidestreamWatermarkCallbacks {
 public:
   ~MockSidestreamWatermarkCallbacks() override = default;
@@ -303,7 +331,7 @@ public:
   // NOLINTNEXTLINE(readability-identifier-naming)
   void sendLocalReply_(Code code, absl::string_view body,
                        std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                       const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                       std::optional<Grpc::Status::GrpcStatus> grpc_status,
                        absl::string_view details);
 
   void encode1xxHeaders(ResponseHeaderMapPtr&& headers) override { encode1xxHeaders_(*headers); }
@@ -356,7 +384,6 @@ public:
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool stream_destroyed_{};
-  NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
 class MockStreamEncoderFilterCallbacks : public StreamEncoderFilterCallbacks,

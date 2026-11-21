@@ -9587,6 +9587,42 @@ typedef enum {
 } envoy_dynamic_module_type_bootstrap_active_resource_kind;
 
 /**
+ * A configuration snapshot owned by the module. Release it with
+ * envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete before
+ * envoy_dynamic_module_on_bootstrap_extension_config_destroy returns for its owning config.
+ * It may move between threads, but must not be used concurrently.
+ */
+typedef void* envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr;
+
+/**
+ * Receives JSON owned by Envoy and valid only during this invocation.
+ *
+ * @param json is the encoded snapshot. Its pointer is non-null.
+ * @param user_data is the opaque pointer supplied to the serialize callback and may be null.
+ */
+typedef void (*envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn)(
+    envoy_dynamic_module_type_envoy_buffer json, void* user_data);
+
+/**
+ * The result of envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new.
+ */
+typedef enum envoy_dynamic_module_type_bootstrap_config_snapshot_result {
+  // the snapshot was collected and redacted
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success = 0,
+  // called off the main thread, before
+  // envoy_dynamic_module_on_bootstrap_extension_server_initialized, during shutdown, from a
+  // cluster or listener lifecycle hook, whatever triggered it, from another bootstrap hook Envoy
+  // runs inside an xDS update or a resource's destruction, or while another collection runs
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed = 1,
+  // the name regex is invalid or its RE2 program size exceeds re2.max_program_size.error_level
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_InvalidRegex = 2,
+  // admin support is unavailable
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_Unavailable = 3,
+  // collection failed for any other reason, such as a provider that throws or returns no message
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_CollectionFailed = 4,
+} envoy_dynamic_module_type_bootstrap_config_snapshot_result;
+
+/**
  * The callback type invoked once per active resource name during enumeration.
  *
  * @param name is the name of the resource. The buffer is owned by Envoy and is valid only for the
@@ -10610,6 +10646,63 @@ bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
 bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer path_prefix);
+
+// -------------------- Bootstrap Extension Callbacks - Configuration Snapshots --------------------
+
+/**
+ * Collects and redacts selected providers synchronously on the main thread. Missing providers are
+ * omitted, duplicates are collected once, and results are sorted by provider key. An empty
+ * selection collects nothing. Endpoint dumps are not included. Cost grows with the selected
+ * resources, so combine frequent notifications into one collection.
+ *
+ * Collection is refused in cluster or listener lifecycle hooks, whatever triggered them, and in
+ * other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction. Providers can
+ * contain partial changes under the previous version. Defer collection with the bootstrap config
+ * scheduler. Callout failures during cluster removal are already reported from a posted callback.
+ *
+ * Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
+ * configuration may retain sensitive data. No admin listener is needed, and admin allow_paths does
+ * not restrict access.
+ *
+ * @param config_envoy_ptr is the non-null pointer to the bootstrap extension configuration.
+ * @param providers is an array of provider keys, borrowed for this call. May be null only when
+ * providers_count is zero. Each key's pointer must be non-null when its length is nonzero.
+ * @param providers_count is the number of entries in providers.
+ * @param name_regex is a full-match RE2 resource name filter, ignored by providers without name
+ * filtering. A null pointer or zero length disables filtering. The buffer is borrowed for this
+ * call.
+ * @param snapshot_out is a non-null output pointer. Receives the module-owned snapshot on success,
+ * or null on failure. Release it with the snapshot delete callback before its config is destroyed.
+ * @return the collection result. A call off the main thread also reports an Envoy bug.
+ */
+envoy_dynamic_module_type_bootstrap_config_snapshot_result
+envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    const envoy_dynamic_module_type_module_buffer* providers, size_t providers_count,
+    envoy_dynamic_module_type_module_buffer name_regex,
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr* snapshot_out);
+
+/**
+ * Encodes the snapshot as envoy.admin.v3.ConfigDump JSON on any thread without consuming it.
+ * Encoding can be expensive; use a module-owned thread to avoid blocking Envoy's main thread or
+ * workers.
+ *
+ * @param snapshot is a non-null snapshot handle. Must not be used concurrently.
+ * @param json_fn is a non-null callback invoked synchronously once on success, and not on failure.
+ * @param user_data is an opaque pointer passed to json_fn and may be null.
+ * @return true on success, false if encoding fails, including for unknown or unlinked Any types.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot,
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn json_fn, void* user_data);
+
+/**
+ * Deletes a snapshot on any thread.
+ *
+ * @param snapshot is the snapshot to release, or null. Must not be in use by another call.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot);
 
 // -------------------- Bootstrap Extension Callbacks - Cluster Lifecycle --------------------
 

@@ -239,6 +239,47 @@ The version is ``version_info`` for SotW and ``system_version_info`` for Delta. 
 version is not a per-resource version, and nonces are scoped to an xDS stream and resource type.
 Resource payloads are not included. Strings are valid only during the callback.
 
+.. _config_bootstrap_extensions_dynamic_modules_config_snapshots:
+
+Configuration Snapshots
+-----------------------
+
+Bootstrap modules can collect selected configuration providers with
+``envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new``. The Rust SDK exposes
+this as ``get_config_snapshot``.
+
+Provider keys include ``bootstrap``, ``clusters``, ``listeners``,
+``routes``, ``route_scopes``, ``secrets`` and the registered ``ecds_filter_*`` providers. Missing keys
+are omitted, duplicates are collected once, and an empty selection collects nothing. Providers
+appear in key order, as in :ref:`/config_dump <operations_admin_interface_config_dump>`.
+Endpoint dumps are not included. An optional full-match RE2 regular expression filters resource names
+for providers that support it. A missing or empty expression disables filtering.
+
+Collection and sensitive-field redaction run synchronously on the main thread after server
+initialization and before shutdown begins. Their cost grows with the selected resources. Combine
+frequent notifications into one collection.
+
+Collection is refused in cluster or listener lifecycle hooks, whatever triggered them, and in
+other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction. Providers can
+contain partially applied changes with an old version. Defer collection with the bootstrap config
+scheduler. Callout failures during cluster removal are already reported from a posted callback.
+
+Creation returns a result distinguishing a refused call, an invalid or oversized name expression,
+unavailable admin support, and a provider failure. Calls are refused off the main thread, before
+initialization, after shutdown begins, inside those hooks, or while another collection runs.
+
+JSON encoding can also be expensive. Use a module-owned thread to avoid blocking Envoy's main thread
+or workers. Encoding and deletion can run on any thread. Release each snapshot before its owning
+bootstrap configuration's destroy hook returns. Modules must stop and join workers holding snapshots
+during configuration teardown. A snapshot must not be used concurrently.
+
+Redaction covers only protobuf fields annotated as sensitive, as with ``/config_dump``. Metadata,
+opaque strings and module configuration can still contain sensitive data. JSON encoding can fail
+when an ``Any`` contains an unknown or unlinked protobuf type.
+
+This API needs admin support compiled in, but does not need an admin listener and is not restricted
+by admin ``allow_paths``.
+
 Use Cases
 ---------
 
