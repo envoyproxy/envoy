@@ -77,7 +77,7 @@ public:
       return api_->threadFactory();
     });
     ON_CALL(file_system_, fileReadToEnd(_))
-        .WillByDefault([&](const std::string& file) -> absl::StatusOr<std::string> {
+        .WillByDefault([&](absl::string_view file) -> absl::StatusOr<std::string> {
           return api_->fileSystem().fileReadToEnd(file);
         });
     ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));

@@ -165,7 +165,7 @@ CgroupCpuUtil::validateCgroupFileContent(const std::string& content, const std::
 // Returns CgroupPathInfo with relative path and version, or std::nullopt if no suitable `cgroup`
 // found.
 std::optional<CgroupPathInfo> CgroupCpuUtil::getCurrentCgroupPath(Filesystem::Instance& fs) {
-  const auto result = fs.fileReadToEnd(std::string(PROC_CGROUP_PATH));
+  const auto result = fs.fileReadToEnd(PROC_CGROUP_PATH);
   if (!result.ok()) {
     // `/proc/self/cgroup` doesn't exist - not in a `cgroup`
     ENVOY_LOG_MISC(warn,
@@ -455,7 +455,7 @@ std::optional<double> CgroupCpuUtil::readActualLimits(const CpuFiles& cpu_files,
 // - Result: single mount point with highest priority
 //
 std::optional<CgroupMount> CgroupCpuUtil::discoverCgroupMount(Filesystem::Instance& fs) {
-  const auto result = fs.fileReadToEnd(std::string(PROC_MOUNTINFO_PATH));
+  const auto result = fs.fileReadToEnd(PROC_MOUNTINFO_PATH);
   if (!result.ok()) {
     // /proc/self/mountinfo doesn't exist - not in a cgroup
     ENVOY_LOG_MISC(warn, "Cannot read /proc/self/mountinfo: not in a cgroup or file doesn't exist");
