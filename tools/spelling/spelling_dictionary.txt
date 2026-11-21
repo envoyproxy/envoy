@@ -772,6 +772,7 @@ cmsghdr
 codebase
 codec
 codecs
+codel
 codepath
 codepoint
 codepoints
