@@ -756,10 +756,11 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
       return false;
     }
     // Storing the hash of these bytes lets the next push of the same bytes skip
-    // MessageUtil::hash(). A blocked update brings new bytes when the listener is static, or on a
-    // full-proto build when the sender re-encodes an Any payload of an unchanged config, such as
-    // with its map entries in another order after a restart or an upgrade. A sender that
-    // re-encodes on every push gains nothing.
+    // MessageUtil::hash(). A blocked update brings new bytes when the listener is static, or when
+    // MessageUtil::hash() finds a config with other bytes equal, for example on a full-proto build
+    // when the sender re-encodes an Any payload with its map entries in another order after a
+    // restart or an upgrade. A sender that re-encodes on every push pays for the serialization on
+    // top of MessageUtil::hash().
     listener.setSerializedConfigHash(serialized_hash);
     return true;
   };

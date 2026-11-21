@@ -727,8 +727,8 @@ TEST_P(ClusterManagerLifecycleTest, UpdateWithReserializedAnyIsNoop) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
-// An active cluster keeps the bytes it was built from, blocks a re-encoded update and keeps its
-// bytes, and still applies a changed update.
+// An active cluster keeps the bytes it was built from, blocks a re-encoded update and keeps that
+// update's bytes, and still applies a changed update.
 TEST_P(ClusterManagerLifecycleTest, UpdateActiveWithReserializedAnyIsNoop) {
   create(defaultConfig());
 

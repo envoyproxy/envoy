@@ -2585,6 +2585,128 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
+// A re-encoded push of the warming config keeps it warming, and a re-encoded push of the active
+// config reverts to the active listener.
+TEST_P(ListenerManagerImplTest, UpdateActiveToWarmAndBackWithReserializedAny) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+
+  envoy::config::listener::v3::Listener listener_foo = parseListenerFromV3Yaml(R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF");
+  // The same struct with its two fields serialized in two orders.
+  const std::string struct_bytes = Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g=");
+  const std::string reordered_struct_bytes = Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo=");
+  Protobuf::Any& any = (*listener_foo.mutable_metadata()->mutable_typed_filter_metadata())["foo"];
+  any.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any.set_value(struct_bytes);
+
+  ListenerHandle* listener_foo_handle = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo_handle->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(listener_foo));
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  listener_foo_handle->target_.ready();
+  worker_->callAddCompletion();
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // Update foo into warming.
+  envoy::config::listener::v3::Listener listener_foo_update1 = listener_foo;
+  listener_foo_update1.mutable_per_connection_buffer_limit_bytes()->set_value(999);
+  ListenerHandle* listener_foo_update1_handle = expectListenerCreate(true, true);
+  EXPECT_CALL(*listener_factory_.socket_, duplicate());
+  EXPECT_CALL(listener_foo_update1_handle->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(listener_foo_update1));
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  // A re-encoded push of the warming config keeps it warming and keeps the new bytes.
+  (*listener_foo_update1.mutable_metadata()->mutable_typed_filter_metadata())["foo"].set_value(
+      reordered_struct_bytes);
+  EXPECT_FALSE(addOrUpdateListener(listener_foo_update1));
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(listener_foo_update1)),
+            dynamic_cast<ListenerImpl&>(manager_->listeners(ListenerManager::WARMING).front().get())
+                .serializedConfigHash());
+
+  // A re-encoded push of the active config removes the warming listener.
+  any.set_value(reordered_struct_bytes);
+  EXPECT_CALL(*listener_foo_update1_handle, onDestroy());
+  EXPECT_TRUE(addOrUpdateListener(listener_foo));
+  checkStats(__LINE__, 1, 2, 0, 0, 1, 0, 0);
+  EXPECT_EQ(0UL, manager_->listeners(ListenerManager::WARMING).size());
+
+  EXPECT_CALL(*listener_foo_handle, onDestroy());
+}
+
+// A listener matches the stored serialized hash before MessageUtil::hash(), and a push of the
+// warming listener's bytes never reverts to the active listener.
+TEST_P(ListenerManagerImplTest, SerializedConfigHashIsCheckedBeforeMessageHash) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+
+  const envoy::config::listener::v3::Listener listener_foo = parseListenerFromV3Yaml(R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF");
+  ListenerHandle* listener_foo_handle = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo_handle->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(listener_foo));
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  listener_foo_handle->target_.ready();
+  worker_->callAddCompletion();
+
+  envoy::config::listener::v3::Listener listener_foo_update1 = listener_foo;
+  listener_foo_update1.mutable_per_connection_buffer_limit_bytes()->set_value(999);
+  ListenerHandle* listener_foo_update1_handle = expectListenerCreate(true, true);
+  EXPECT_CALL(*listener_factory_.socket_, duplicate());
+  EXPECT_CALL(listener_foo_update1_handle->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(listener_foo_update1));
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  auto& active =
+      dynamic_cast<ListenerImpl&>(manager_->listeners(ListenerManager::ACTIVE).front().get());
+  auto& warming =
+      dynamic_cast<ListenerImpl&>(manager_->listeners(ListenerManager::WARMING).front().get());
+
+  // A push of the warming bytes stays blocked even if the active listener stored them.
+  active.setSerializedConfigHash(
+      HashUtil::xxHash64(MessageUtil::serializeDeterministically(listener_foo_update1)));
+  EXPECT_FALSE(addOrUpdateListener(listener_foo_update1));
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  // A push whose bytes match the stored hash is blocked without MessageUtil::hash(), which would
+  // find this config changed.
+  envoy::config::listener::v3::Listener listener_foo_update2 = listener_foo;
+  listener_foo_update2.mutable_per_connection_buffer_limit_bytes()->set_value(1000);
+  warming.setSerializedConfigHash(
+      HashUtil::xxHash64(MessageUtil::serializeDeterministically(listener_foo_update2)));
+  EXPECT_FALSE(addOrUpdateListener(listener_foo_update2));
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  // Pushing the active config still removes the warming listener.
+  EXPECT_CALL(*listener_foo_update1_handle, onDestroy());
+  EXPECT_TRUE(addOrUpdateListener(listener_foo));
+  checkStats(__LINE__, 1, 2, 0, 0, 1, 0, 0);
+
+  EXPECT_CALL(*listener_foo_handle, onDestroy());
+}
+
 TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleAddresses) {
   InSequence s;
 
