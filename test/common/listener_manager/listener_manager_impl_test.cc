@@ -2,6 +2,7 @@
 
 #include <cerrno>
 #include <chrono>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
@@ -9538,7 +9539,7 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, AddAddressWithoutReusePort) 
 // An in place update drains the default filter chain only when it rebuilds or removes it.
 TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, DrainDefaultFilterChainOnlyWhenNotReused) {
   startWorkers();
-  // The listener handle expects one filter chain build, so every other build loads its filters.
+  // The listener handle expects one filter chain build, so each further build loads its filters.
   const auto expect_filter_chain_build = [this]() {
     EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillOnce(testing::DoDefault())
@@ -9546,6 +9547,11 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, DrainDefaultFilterChainOnlyW
   };
   auto listener_proto = listenerProto({"127.0.0.1"});
   listener_proto.mutable_default_filter_chain()->set_name("default");
+  // A default filter chain holding a NaN is never equal to itself, so only its identity shows that
+  // the new listener reuses it.
+  Config::Metadata::mutableMetadataValue(
+      *listener_proto.mutable_default_filter_chain()->mutable_metadata(), "test", "nan")
+      .set_number_value(std::numeric_limits<double>::quiet_NaN());
   auto socket = expectListenSocket("127.0.0.1:1234");
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
   expect_filter_chain_build();

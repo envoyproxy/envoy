@@ -218,8 +218,9 @@ public:
     filter_chains_ = listener_config_.filter_chains();
   }
 
-  // Measures in place updates of a manager with the origin filter chains to the updated ones.
-  void updateFilterChains(
+  // Measures in place updates of a manager with the origin filter chains to the updated ones, and
+  // returns how many origin filter chains the updates drained.
+  size_t updateFilterChains(
       ::benchmark::State& state,
       absl::Span<const envoy::config::listener::v3::FilterChain* const> origin_filter_chains,
       absl::Span<const envoy::config::listener::v3::FilterChain* const> updated_filter_chains) {
@@ -238,6 +239,7 @@ public:
           nullptr, updated_filter_chains, nullptr, dummy_builder_, filter_chain_manager, nullptr,
           empty_config_source_, dummy_fcds_callbacks_));
     }
+    return origin_filter_chain_manager.drainingFilterChains().size();
   }
 
   static std::vector<const envoy::config::listener::v3::FilterChain*>
@@ -292,7 +294,8 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateTest)
   }
 
   initialize(state);
-  updateFilterChains(state, filter_chains_, filter_chains_);
+  RELEASE_ASSERT(updateFilterChains(state, filter_chains_, filter_chains_) == 0,
+                 "an unchanged filter chain was rebuilt");
 }
 
 // Measures an in place update whose filter chains equal the ones it replaces but serialize
@@ -320,7 +323,9 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateReencode
         ->mutable_typed_config()
         ->set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
   }
-  updateFilterChains(state, pointersTo(origin_messages), pointersTo(updated_messages));
+  RELEASE_ASSERT(
+      updateFilterChains(state, pointersTo(origin_messages), pointersTo(updated_messages)) == 0,
+      "an equal filter chain was rebuilt");
 }
 
 // Measures an in place update that changes every filter chain.

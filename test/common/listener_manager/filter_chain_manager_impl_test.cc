@@ -433,6 +433,8 @@ TEST_P(FilterChainManagerImplTest, ReuseFilterChainWithReserializedAny) {
   envoy::config::listener::v3::FilterChain reserialized_filter_chain = filter_chain;
   reserialized_filter_chain.mutable_filters(0)->mutable_typed_config()->set_value(
       Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  ASSERT_NE(MessageUtil::serializeDeterministically(filter_chain),
+            MessageUtil::serializeDeterministically(reserialized_filter_chain));
 
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _));
   addSingleFilterChainHelper(filter_chain);
@@ -458,6 +460,8 @@ TEST_P(FilterChainManagerImplTest, ReuseDefaultFilterChainWithReserializedAny) {
   envoy::config::listener::v3::FilterChain reserialized_default_filter_chain = default_filter_chain;
   reserialized_default_filter_chain.mutable_filters(0)->mutable_typed_config()->set_value(
       Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  ASSERT_NE(MessageUtil::serializeDeterministically(default_filter_chain),
+            MessageUtil::serializeDeterministically(reserialized_default_filter_chain));
 
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
       .WillOnce(Return(build_out_filter_chain_))
@@ -513,6 +517,8 @@ TEST_P(FilterChainManagerImplTest, ReuseFilterChainWithReserializedAnyAcrossUpda
   envoy::config::listener::v3::FilterChain reserialized_filter_chain = filter_chain;
   reserialized_filter_chain.mutable_filters(0)->mutable_typed_config()->set_value(
       Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  ASSERT_NE(MessageUtil::serializeDeterministically(filter_chain),
+            MessageUtil::serializeDeterministically(reserialized_filter_chain));
   const auto add_filter_chain = [this](FilterChainManagerImpl& manager,
                                        const envoy::config::listener::v3::FilterChain& message) {
     EXPECT_OK(manager.addFilterChains(

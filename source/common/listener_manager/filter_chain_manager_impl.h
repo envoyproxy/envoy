@@ -392,7 +392,7 @@ private:
 
   // A filter chain with MessageUtil::hash() of its message.
   struct FcContext {
-    std::size_t message_hash;
+    std::size_t message_hash{};
     Network::DrainableFilterChainSharedPtr filter_chain;
   };
   using FcContextMap = absl::flat_hash_map<std::string, FcContext>;
@@ -403,7 +403,7 @@ private:
   using FcContextsByMessageHash = absl::flat_hash_map<std::size_t, const FcContextMap::value_type*>;
 
   const FilterChainManagerImpl* getOriginFilterChainManager() { return origin_.value(); }
-  // Returns the context of the origin filter chain that serializes to the same bytes as the message
+  // Returns the context of an origin filter chain that serializes to the same bytes as the message
   // or is equal to it. On a miss, the returned context has the hash of the message and no filter
   // chain.
   FcContext
