@@ -169,13 +169,19 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
 }
 
-bool FilterChainManagerImpl::filterChainMessagesEqual(
-    const envoy::config::listener::v3::FilterChain& lhs,
-    const envoy::config::listener::v3::FilterChain& rhs) {
+namespace {
+
+// Returns true if the filter chain messages serialize to the same bytes or are equal. The bytes are
+// compared first, so that the reflection-based comparison only runs for messages that change or
+// serialize differently.
+bool filterChainMessagesEqual(const envoy::config::listener::v3::FilterChain& lhs,
+                              const envoy::config::listener::v3::FilterChain& rhs) {
   return MessageUtil::serializeDeterministically(lhs) ==
              MessageUtil::serializeDeterministically(rhs) ||
          Protobuf::util::MessageDifferencer::Equals(lhs, rhs);
 }
+
+} // namespace
 
 absl::Status FilterChainManagerImpl::addFilterChains(
     const xds::type::matcher::v3::Matcher* filter_chain_matcher,

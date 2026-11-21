@@ -239,19 +239,10 @@ public:
 
   static bool isWildcardServerName(const std::string& name);
 
-  // Returns true if the filter chain messages are equal. The deterministic serializations are
-  // compared first, so that the reflection-based comparison only runs for the messages that change
-  // or serialize differently.
-  static bool filterChainMessagesEqual(const envoy::config::listener::v3::FilterChain& lhs,
-                                       const envoy::config::listener::v3::FilterChain& rhs);
-
   const std::vector<Network::DrainableFilterChainSharedPtr>& drainingFilterChains() const {
     return draining_filter_chains_;
   }
 
-  const std::optional<envoy::config::listener::v3::FilterChain>& defaultFilterChainMessage() const {
-    return default_filter_chain_message_;
-  }
   const Network::DrainableFilterChainSharedPtr& defaultFilterChain() const {
     return default_filter_chain_;
   }
@@ -406,12 +397,15 @@ private:
   };
   using FcContextMap = absl::flat_hash_map<std::string, FcContext>;
   // The origin filter chains by MessageUtil::hash(), to find equal messages that serialize
-  // differently.
+  // differently. Only one chain per hash is kept. The chains of a listener differ in their names
+  // or their matches, which the hash covers, so two share a hash only on a collision, and a chain
+  // that misses then is rebuilt and its origin chain drained, as a changed chain is.
   using FcContextsByMessageHash = absl::flat_hash_map<std::size_t, const FcContextMap::value_type*>;
 
   const FilterChainManagerImpl* getOriginFilterChainManager() { return origin_.value(); }
-  // Returns the context of the origin filter chain that is equal to the message. On a miss, the
-  // returned context has the hash of the message and no filter chain.
+  // Returns the context of the origin filter chain that serializes to the same bytes as the message
+  // or is equal to it. On a miss, the returned context has the hash of the message and no filter
+  // chain.
   FcContext
   findExistingFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain_message,
                           const std::string& serialized_message,

@@ -7,6 +7,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/protobuf/message_validator.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/common/network/socket_impl.h"
 
@@ -217,6 +218,38 @@ public:
     filter_chains_ = listener_config_.filter_chains();
   }
 
+  // Measures in place updates of a manager with the origin filter chains to the updated ones.
+  void updateFilterChains(
+      ::benchmark::State& state,
+      absl::Span<const envoy::config::listener::v3::FilterChain* const> origin_filter_chains,
+      absl::Span<const envoy::config::listener::v3::FilterChain* const> updated_filter_chains) {
+    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+    std::vector<Network::Address::InstanceConstSharedPtr> addresses;
+    addresses.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+    FilterChainManagerImpl origin_filter_chain_manager{addresses, factory_context, init_manager_};
+    THROW_IF_NOT_OK(origin_filter_chain_manager.addFilterChains(
+        nullptr, origin_filter_chains, nullptr, dummy_builder_, origin_filter_chain_manager,
+        nullptr, empty_config_source_, dummy_fcds_callbacks_));
+    for (auto _ : state) {
+      UNREFERENCED_PARAMETER(_);
+      FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_,
+                                                  origin_filter_chain_manager};
+      THROW_IF_NOT_OK(filter_chain_manager.addFilterChains(
+          nullptr, updated_filter_chains, nullptr, dummy_builder_, filter_chain_manager, nullptr,
+          empty_config_source_, dummy_fcds_callbacks_));
+    }
+  }
+
+  static std::vector<const envoy::config::listener::v3::FilterChain*>
+  pointersTo(const std::vector<envoy::config::listener::v3::FilterChain>& filter_chains) {
+    std::vector<const envoy::config::listener::v3::FilterChain*> pointers;
+    pointers.reserve(filter_chains.size());
+    for (const auto& filter_chain : filter_chains) {
+      pointers.push_back(&filter_chain);
+    }
+    return pointers;
+  }
+
   std::string listener_yaml_config_;
   envoy::config::listener::v3::Listener listener_config_;
   absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chains_;
@@ -259,21 +292,52 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateTest)
   }
 
   initialize(state);
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  std::vector<Network::Address::InstanceConstSharedPtr> addresses;
-  addresses.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
-  FilterChainManagerImpl origin_filter_chain_manager{addresses, factory_context, init_manager_};
-  THROW_IF_NOT_OK(origin_filter_chain_manager.addFilterChains(
-      nullptr, filter_chains_, nullptr, dummy_builder_, origin_filter_chain_manager, nullptr,
-      empty_config_source_, dummy_fcds_callbacks_));
-  for (auto _ : state) {
-    UNREFERENCED_PARAMETER(_);
-    FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_,
-                                                origin_filter_chain_manager};
-    THROW_IF_NOT_OK(filter_chain_manager.addFilterChains(
-        nullptr, filter_chains_, nullptr, dummy_builder_, filter_chain_manager, nullptr,
-        empty_config_source_, dummy_fcds_callbacks_));
+  updateFilterChains(state, filter_chains_, filter_chains_);
+}
+
+// Measures an in place update whose filter chains equal the ones it replaces but serialize
+// differently, as when a control plane encodes their Any payloads again.
+BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateReencodedTest)
+(::benchmark::State& state) {
+  if (benchmark::skipExpensiveBenchmarks() && state.range(0) > 64) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
   }
+
+  initialize(state);
+  // The same struct with its two fields serialized in two orders.
+  std::vector<envoy::config::listener::v3::FilterChain> origin_messages;
+  std::vector<envoy::config::listener::v3::FilterChain> updated_messages;
+  origin_messages.reserve(filter_chains_.size());
+  updated_messages.reserve(filter_chains_.size());
+  for (const auto* filter_chain : filter_chains_) {
+    auto& origin_message = origin_messages.emplace_back(*filter_chain);
+    auto* typed_config = origin_message.add_filters()->mutable_typed_config();
+    typed_config->set_type_url("type.googleapis.com/google.protobuf.Struct");
+    typed_config->set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+    updated_messages.emplace_back(origin_message)
+        .mutable_filters(0)
+        ->mutable_typed_config()
+        ->set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  }
+  updateFilterChains(state, pointersTo(origin_messages), pointersTo(updated_messages));
+}
+
+// Measures an in place update that changes every filter chain.
+BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateChangedTest)
+(::benchmark::State& state) {
+  if (benchmark::skipExpensiveBenchmarks() && state.range(0) > 64) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
+  initialize(state);
+  std::vector<envoy::config::listener::v3::FilterChain> updated_messages;
+  updated_messages.reserve(filter_chains_.size());
+  for (const auto* filter_chain : filter_chains_) {
+    updated_messages.emplace_back(*filter_chain).set_name("changed");
+  }
+  updateFilterChains(state, filter_chains_, pointersTo(updated_messages));
 }
 
 BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
@@ -313,6 +377,18 @@ BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
     })
     ->Unit(::benchmark::kMillisecond);
 BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateTest)
+    ->Ranges({
+        // scale of the chains
+        {1, 4096},
+    })
+    ->Unit(::benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateReencodedTest)
+    ->Ranges({
+        // scale of the chains
+        {1, 4096},
+    })
+    ->Unit(::benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateChangedTest)
     ->Ranges({
         // scale of the chains
         {1, 4096},

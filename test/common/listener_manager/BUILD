@@ -343,6 +343,7 @@ envoy_cc_benchmark_binary(
     srcs = ["filter_chain_benchmark_test.cc"],
     rbe_pool = {"build": "linux_x64_small"},
     deps = [
+        "//source/common/common:base64_lib",
         "//source/common/listener_manager:filter_chain_manager_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",

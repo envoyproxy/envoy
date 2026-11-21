@@ -1442,13 +1442,12 @@ void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
   }
 
   // Filter chain manager maintains an optional default filter chain besides the filter chains
-  // indexed by message.
-  if (filter_chain_manager_->defaultFilterChainMessage().has_value() &&
-      (!another_listener.filter_chain_manager_->defaultFilterChainMessage().has_value() ||
-       !FilterChainManagerImpl::filterChainMessagesEqual(
-           *another_listener.filter_chain_manager_->defaultFilterChainMessage(),
-           *filter_chain_manager_->defaultFilterChainMessage()))) {
-    callback(*filter_chain_manager_->defaultFilterChain());
+  // indexed by their serialized messages. The new listener of an in place update is built from
+  // this one, so it holds the same default filter chain exactly when it reuses it.
+  const auto& default_filter_chain = filter_chain_manager_->defaultFilterChain();
+  if (default_filter_chain != nullptr &&
+      default_filter_chain != another_listener.filter_chain_manager_->defaultFilterChain()) {
+    callback(*default_filter_chain);
   }
 }
 

@@ -9535,6 +9535,41 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, AddAddressWithoutReusePort) 
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
+// An in place update drains the default filter chain only when it rebuilds it.
+TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, DrainDefaultFilterChainOnlyWhenRebuilt) {
+  startWorkers();
+  // The listener handle expects one filter chain build, so every other build loads its filters.
+  const auto expect_filter_chain_build = [this]() {
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+        .WillOnce(testing::DoDefault())
+        .RetiresOnSaturation();
+  };
+  auto listener_proto = listenerProto({"127.0.0.1"});
+  listener_proto.mutable_default_filter_chain()->set_name("default");
+  auto socket = expectListenSocket("127.0.0.1:1234");
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  expect_filter_chain_build();
+  EXPECT_CALL(*worker_, addListener(Eq(std::nullopt), _, _, _, _));
+  EXPECT_TRUE(addOrUpdateListener(listener_proto));
+  worker_->callAddCompletion();
+
+  listener_proto.mutable_filter_chains(0)->set_name("bar");
+  expect_filter_chain_build();
+  EXPECT_CALL(
+      *worker_,
+      onFilterChainDrain(_, ElementsAre(Pointee(Property(&Network::FilterChain::name, "foo"))), _));
+  updateInPlace(listener_proto);
+
+  listener_proto.mutable_default_filter_chain()->set_name("new_default");
+  expect_filter_chain_build();
+  EXPECT_CALL(*worker_,
+              onFilterChainDrain(
+                  _, ElementsAre(Pointee(Property(&Network::FilterChain::name, "default"))), _));
+  updateInPlace(listener_proto);
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
 // Linux is the only platform allowing the enable_reuse_port as true.
 #ifdef __linux__
 // With the runtime guard disabled, an address update drains the entire listener.
