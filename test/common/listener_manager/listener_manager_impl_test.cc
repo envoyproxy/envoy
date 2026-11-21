@@ -9433,8 +9433,14 @@ filter_chains:
     return socket;
   }
 
-  ListenerHandle* addActiveListener(const envoy::config::listener::v3::Listener& listener_proto) {
+  // Adds an active listener that builds 1 + further_filter_chain_builds filter chains. gMock tries
+  // the newest expectation first, so the listener handle takes the last build.
+  ListenerHandle* addActiveListener(const envoy::config::listener::v3::Listener& listener_proto,
+                                    uint32_t further_filter_chain_builds = 0) {
     ListenerHandle* listener_handle = expectListenerCreate(false, true);
+    for (uint32_t i = 0; i < further_filter_chain_builds; i++) {
+      expectFilterChainBuild();
+    }
     EXPECT_CALL(*worker_, addListener(Eq(std::nullopt), _, _, _, _));
     EXPECT_TRUE(addOrUpdateListener(listener_proto));
     worker_->callAddCompletion();
@@ -9446,18 +9452,6 @@ filter_chains:
     EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillOnce(testing::DoDefault())
         .RetiresOnSaturation();
-  }
-
-  // Adds an active listener with one inline filter chain and a default filter chain, which is the
-  // filter chain the returned listener handle follows.
-  ListenerHandle* addActiveListenerWithDefaultFilterChain(
-      const envoy::config::listener::v3::Listener& listener_proto) {
-    ListenerHandle* listener_handle = expectListenerCreate(false, true);
-    expectFilterChainBuild();
-    EXPECT_CALL(*worker_, addListener(Eq(std::nullopt), _, _, _, _));
-    EXPECT_TRUE(addOrUpdateListener(listener_proto));
-    worker_->callAddCompletion();
-    return listener_handle;
   }
 
   // Applies the update in place and returns the drain timer of the replaced listener.
@@ -9567,7 +9561,7 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, DrainDefaultFilterChainOnlyW
       *listener_proto.mutable_default_filter_chain()->mutable_metadata(), "test", "nan")
       .set_number_value(std::numeric_limits<double>::quiet_NaN());
   auto socket = expectListenSocket("127.0.0.1:1234");
-  ListenerHandle* listener_foo = addActiveListenerWithDefaultFilterChain(listener_proto);
+  ListenerHandle* listener_foo = addActiveListener(listener_proto, 1);
 
   listener_proto.mutable_filter_chains(0)->set_name("bar");
   expectFilterChainBuild();
@@ -9593,7 +9587,8 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, DrainDefaultFilterChainOnlyW
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
-// An in place update keeps a default filter chain whose Any payload it encodes again.
+// An in place update keeps a default filter chain whose Any payload arrives serialized in another
+// order.
 TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, KeepDefaultFilterChainWithReserializedAny) {
   startWorkers();
   auto listener_proto = listenerProto({"127.0.0.1"});
@@ -9605,7 +9600,7 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, KeepDefaultFilterChainWithRe
   // The same struct with its two fields serialized in two orders.
   typed_metadata.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
   auto socket = expectListenSocket("127.0.0.1:1234");
-  ListenerHandle* listener_foo = addActiveListenerWithDefaultFilterChain(listener_proto);
+  ListenerHandle* listener_foo = addActiveListener(listener_proto, 1);
 
   auto reserialized_listener_proto = listener_proto;
   reserialized_listener_proto.mutable_filter_chains(0)->set_name("bar");

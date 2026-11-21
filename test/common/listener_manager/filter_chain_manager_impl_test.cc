@@ -82,6 +82,24 @@ public:
   MOCK_METHOD(void, notifyFilterChainUpdateCallbacks, (absl::string_view filter_chain_name));
 };
 
+namespace {
+
+// The same struct with its two fields serialized in two orders.
+constexpr absl::string_view SerializedStruct = "CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g=";
+constexpr absl::string_view ReserializedStruct = "CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo=";
+
+// Returns the filter chain with one more filter, whose typed config is the Base64 encoded struct.
+envoy::config::listener::v3::FilterChain
+withStructFilter(envoy::config::listener::v3::FilterChain filter_chain,
+                 absl::string_view base64_struct) {
+  auto* typed_config = filter_chain.add_filters()->mutable_typed_config();
+  typed_config->set_type_url("type.googleapis.com/google.protobuf.Struct");
+  typed_config->set_value(Base64::decode(base64_struct));
+  return filter_chain;
+}
+
+} // namespace
+
 class FilterChainManagerImplTest : public testing::TestWithParam<bool> {
 public:
   struct DummyFcdsClientCallbacks : public FcdsClientCallbacks {
@@ -425,14 +443,9 @@ TEST_P(FilterChainManagerImplTest, UpdateFilterChainsBetweenVersions) {
 
 // A filter chain whose Any payload is serialized differently is still reused.
 TEST_P(FilterChainManagerImplTest, ReuseFilterChainWithReserializedAny) {
-  // The same struct with its two fields serialized in two orders.
-  envoy::config::listener::v3::FilterChain filter_chain = filter_chain_template_;
-  auto* typed_config = filter_chain.add_filters()->mutable_typed_config();
-  typed_config->set_type_url("type.googleapis.com/google.protobuf.Struct");
-  typed_config->set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
-  envoy::config::listener::v3::FilterChain reserialized_filter_chain = filter_chain;
-  reserialized_filter_chain.mutable_filters(0)->mutable_typed_config()->set_value(
-      Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  const auto filter_chain = withStructFilter(filter_chain_template_, SerializedStruct);
+  const auto reserialized_filter_chain =
+      withStructFilter(filter_chain_template_, ReserializedStruct);
   ASSERT_NE(MessageUtil::serializeDeterministically(filter_chain),
             MessageUtil::serializeDeterministically(reserialized_filter_chain));
 
@@ -452,14 +465,10 @@ TEST_P(FilterChainManagerImplTest, ReuseFilterChainWithReserializedAny) {
 
 // A default filter chain whose Any payload is serialized differently is still reused.
 TEST_P(FilterChainManagerImplTest, ReuseDefaultFilterChainWithReserializedAny) {
-  // The same struct with its two fields serialized in two orders.
-  envoy::config::listener::v3::FilterChain default_filter_chain;
-  auto* typed_config = default_filter_chain.add_filters()->mutable_typed_config();
-  typed_config->set_type_url("type.googleapis.com/google.protobuf.Struct");
-  typed_config->set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
-  envoy::config::listener::v3::FilterChain reserialized_default_filter_chain = default_filter_chain;
-  reserialized_default_filter_chain.mutable_filters(0)->mutable_typed_config()->set_value(
-      Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  const auto default_filter_chain =
+      withStructFilter(envoy::config::listener::v3::FilterChain(), SerializedStruct);
+  const auto reserialized_default_filter_chain =
+      withStructFilter(envoy::config::listener::v3::FilterChain(), ReserializedStruct);
   ASSERT_NE(MessageUtil::serializeDeterministically(default_filter_chain),
             MessageUtil::serializeDeterministically(reserialized_default_filter_chain));
 
@@ -509,14 +518,9 @@ TEST_P(FilterChainManagerImplTest, RebuildFilterChainWithEqualHashButDifferentMe
 
 // A reused filter chain keeps its hash, so later updates reuse it by its bytes or by its hash.
 TEST_P(FilterChainManagerImplTest, ReuseFilterChainWithReserializedAnyAcrossUpdates) {
-  // The same struct with its two fields serialized in two orders.
-  envoy::config::listener::v3::FilterChain filter_chain = filter_chain_template_;
-  auto* typed_config = filter_chain.add_filters()->mutable_typed_config();
-  typed_config->set_type_url("type.googleapis.com/google.protobuf.Struct");
-  typed_config->set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
-  envoy::config::listener::v3::FilterChain reserialized_filter_chain = filter_chain;
-  reserialized_filter_chain.mutable_filters(0)->mutable_typed_config()->set_value(
-      Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  const auto filter_chain = withStructFilter(filter_chain_template_, SerializedStruct);
+  const auto reserialized_filter_chain =
+      withStructFilter(filter_chain_template_, ReserializedStruct);
   ASSERT_NE(MessageUtil::serializeDeterministically(filter_chain),
             MessageUtil::serializeDeterministically(reserialized_filter_chain));
   const auto add_filter_chain = [this](FilterChainManagerImpl& manager,

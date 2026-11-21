@@ -342,8 +342,9 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateChangedT
   for (const auto* filter_chain : filter_chains_) {
     updated_messages.emplace_back(*filter_chain).set_name("changed");
   }
-  RELEASE_ASSERT(updateFilterChains(state, filter_chains_, pointersTo(updated_messages)) ==
-                     state.iterations() * filter_chains_.size(),
+  // Count the drains first, since the benchmark loop sets the iteration count.
+  const size_t drains = updateFilterChains(state, filter_chains_, pointersTo(updated_messages));
+  RELEASE_ASSERT(drains == state.iterations() * filter_chains_.size(),
                  "a changed filter chain was reused");
 }
 

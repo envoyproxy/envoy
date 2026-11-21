@@ -36,6 +36,7 @@
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Server {
@@ -397,10 +398,9 @@ private:
   };
   using FcContextMap = absl::flat_hash_map<std::string, FcContext>;
   // The origin filter chains by MessageUtil::hash(), to find equal messages that serialize
-  // differently. Only one chain per hash is kept. The chains of a listener differ in their names
-  // or their matches, which the hash covers, so two share a hash only on a collision, and a chain
-  // that misses then is rebuilt and its origin chain drained, as a changed chain is.
-  using FcContextsByMessageHash = absl::flat_hash_map<std::size_t, const FcContextMap::value_type*>;
+  // differently. Filter chains that differ can share a hash, so each hash keeps all of them.
+  using FcContextsByMessageHash =
+      absl::flat_hash_map<std::size_t, absl::InlinedVector<const FcContextMap::value_type*, 1>>;
 
   const FilterChainManagerImpl* getOriginFilterChainManager() { return origin_.value(); }
   // Returns the context of an origin filter chain that serializes to the same bytes as the message

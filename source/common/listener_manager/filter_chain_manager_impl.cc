@@ -202,7 +202,7 @@ absl::Status FilterChainManagerImpl::addFilterChains(
   if (origin != nullptr) {
     origin_fc_contexts.reserve(origin->fc_contexts_.size());
     for (const auto& origin_fc_context : origin->fc_contexts_) {
-      origin_fc_contexts.emplace(origin_fc_context.second.message_hash, &origin_fc_context);
+      origin_fc_contexts[origin_fc_context.second.message_hash].push_back(&origin_fc_context);
     }
   }
 
@@ -978,10 +978,13 @@ FilterChainManagerImpl::FcContext FilterChainManagerImpl::findExistingFilterChai
   const std::size_t message_hash = MessageUtil::hash(filter_chain_message);
   const auto iter = origin_fc_contexts.find(message_hash);
   if (iter != origin_fc_contexts.end()) {
-    envoy::config::listener::v3::FilterChain origin_message;
-    if (origin_message.ParseFromString(iter->second->first) &&
-        Protobuf::util::MessageDifferencer::Equals(origin_message, filter_chain_message)) {
-      return iter->second->second;
+    for (const auto* origin_fc_context : iter->second) {
+      // A message that fails to parse back has its filter chain rebuilt.
+      envoy::config::listener::v3::FilterChain origin_message;
+      if (origin_message.ParseFromString(origin_fc_context->first) &&
+          Protobuf::util::MessageDifferencer::Equals(origin_message, filter_chain_message)) {
+        return origin_fc_context->second;
+      }
     }
   }
   return {message_hash, nullptr};
