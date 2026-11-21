@@ -1,7 +1,18 @@
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "envoy/common/exception.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
+#include "envoy/server/factory_context.h"
+#include "envoy/ssl/tls_certificate_config.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
@@ -14,6 +25,9 @@
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/status.h"
+#include "absl/strings/string_view.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
@@ -26,6 +40,7 @@ namespace OnDemand {
 namespace {
 
 using StatusHelpers::StatusIs;
+using ::testing::_;
 using ::testing::NiceMock;
 using ::testing::Return;
 
@@ -95,6 +110,105 @@ TEST_F(OnDemandTest, QuicCall) {
   bool sni;
   absl::InlinedVector<int, 3> curve;
   EXPECT_DEATH(selector->findTlsContext("", curve, false, &sni), "Not supported with QUIC");
+}
+
+TEST_F(OnDemandTest, ValidCacheLimitsConfig) {
+  const std::string config_yaml = R"EOF(
+    config_source:
+      ads: {}
+    certificate_mapper:
+      name: static-name
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+        name: server
+    max_active_secrets: 100
+    max_pending_secrets: 16
+  )EOF";
+  EXPECT_OK(create(config_yaml));
+}
+
+TEST_F(OnDemandTest, InvalidZeroMaxActiveSecrets) {
+  const std::string config_yaml = R"EOF(
+    config_source:
+      ads: {}
+    certificate_mapper:
+      name: static-name
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+        name: server
+    max_active_secrets: 0
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(create(config_yaml).IgnoreError(), EnvoyException,
+                          "MaxActiveSecrets.*greater than 0");
+}
+
+TEST_F(OnDemandTest, InvalidZeroMaxPendingSecrets) {
+  const std::string config_yaml = R"EOF(
+    config_source:
+      ads: {}
+    certificate_mapper:
+      name: static-name
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+        name: server
+    max_pending_secrets: 0
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(create(config_yaml).IgnoreError(), EnvoyException,
+                          "MaxPendingSecrets.*greater than 0");
+}
+
+TEST_F(OnDemandTest, StaleQueuedRemovalDoesNotEraseReinsertedEntry) {
+  envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
+  TestUtility::loadFromYaml(defaultConfig(), config);
+
+  std::vector<Event::PostCb> queued_posts;
+  EXPECT_CALL(factory_context_.server_context_.dispatcher_, post(_))
+      .WillRepeatedly([&queued_posts](Event::PostCb cb) { queued_posts.push_back(std::move(cb)); });
+
+  auto secret_manager = std::make_shared<SecretManager>(
+      config, factory_context_,
+      [](Stats::Scope&, Server::Configuration::ServerFactoryContext&,
+         const Ssl::TlsCertificateConfig&, absl::Status&) { return nullptr; });
+
+  auto gauge_value = [&](absl::string_view name) {
+    return factory_context_.store_.gauge(std::string(name), Stats::Gauge::ImportMode::Accumulate)
+        .value();
+  };
+
+  // Generation 1 inserted.
+  secret_manager->addCertificateConfig("example.com", nullptr, {});
+  EXPECT_EQ(1, gauge_value("on_demand_secret.cert_active"));
+  EXPECT_EQ(1, gauge_value("on_demand_secret.cert_pending"));
+
+  // Enqueue two pending removals targeting generation 1 (one simulates the stale SDS post queued
+  // just before eviction/removal; the second retires generation 1).
+  EXPECT_OK(secret_manager->removeCertificateConfig("example.com", 1));
+  EXPECT_OK(secret_manager->removeCertificateConfig("example.com", 1));
+  ASSERT_EQ(2, queued_posts.size());
+  auto stale_gen1_removal = std::move(queued_posts[0]);
+  auto active_gen1_removal = std::move(queued_posts[1]);
+  queued_posts.clear();
+
+  // Retire generation 1 and immediately re-insert the same name as generation 2.
+  active_gen1_removal();
+  EXPECT_EQ(0, gauge_value("on_demand_secret.cert_active"));
+  EXPECT_EQ(0, gauge_value("on_demand_secret.cert_pending"));
+
+  secret_manager->addCertificateConfig("example.com", nullptr, {});
+  EXPECT_EQ(1, gauge_value("on_demand_secret.cert_active"));
+  EXPECT_EQ(1, gauge_value("on_demand_secret.cert_pending"));
+
+  // Executing the stale queued removal from generation 1 must be a no-op (ABA guard).
+  stale_gen1_removal();
+  EXPECT_EQ(1, gauge_value("on_demand_secret.cert_active"));
+  EXPECT_EQ(1, gauge_value("on_demand_secret.cert_pending"));
+
+  // A removal carrying generation 2 removes the live entry as expected.
+  EXPECT_OK(secret_manager->removeCertificateConfig("example.com", 2));
+  ASSERT_EQ(1, queued_posts.size());
+  queued_posts[0]();
+  EXPECT_EQ(0, gauge_value("on_demand_secret.cert_active"));
+  EXPECT_EQ(0, gauge_value("on_demand_secret.cert_pending"));
 }
 
 TEST(FilterStateMapper, Derivation) {

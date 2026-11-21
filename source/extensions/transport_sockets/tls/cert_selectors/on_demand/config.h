@@ -1,5 +1,11 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <string>
+
+#include "envoy/event/deferred_deletable.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -7,10 +13,13 @@
 #include "envoy/ssl/handshaker.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/common/fair_sieve_cache.h"
 #include "source/common/ssl/tls_certificate_config_impl.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/server_context_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_selectors/common/async_context.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,10 +28,19 @@ namespace Tls {
 namespace CertificateSelectors {
 namespace OnDemand {
 
+// Well-known FilterState key (Router::StringAccessor) carrying the tenant identifier used for
+// per-tenant fair sharing in the on-demand secret cache.
+inline constexpr absl::string_view TenantIdFilterStateKey =
+    "envoy.tls.certificate_selectors.on_demand_secret.tenant_id";
+
 #define ALL_CERT_SELECTION_STATS(COUNTER, GAUGE, HISTOGRAM)                                        \
   COUNTER(cert_requested)                                                                          \
   COUNTER(cert_updated)                                                                            \
-  GAUGE(cert_active, Accumulate)
+  COUNTER(cert_evicted)                                                                            \
+  COUNTER(cert_ownership_transferred)                                                              \
+  COUNTER(cert_pending_rejected)                                                                   \
+  GAUGE(cert_active, Accumulate)                                                                   \
+  GAUGE(cert_pending, Accumulate)
 
 struct CertSelectionStats {
   ALL_CERT_SELECTION_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
@@ -35,13 +53,21 @@ using ConfigProto =
 using UpdateCb = std::function<absl::Status(absl::string_view, const Ssl::TlsCertificateConfig&)>;
 using RemoveCb = std::function<absl::Status(absl::string_view)>;
 
-class AsyncContextConfig {
+class AsyncContextConfig : public Event::DeferredDeletable {
 public:
   AsyncContextConfig(absl::string_view cert_name,
                      Server::Configuration::ServerFactoryContext& factory_context,
                      const envoy::config::core::v3::ConfigSource& config_source,
                      OptRef<Init::Manager> init_manager, UpdateCb update_cb, RemoveCb remove_cb);
   const std::optional<Ssl::TlsCertificateConfigImpl>& certConfig() const { return cert_config_; }
+
+  // Event::DeferredDeletable
+  void deleteIsPending() override {
+    // Unregister callbacks immediately so no further update/remove callbacks from the same xDS
+    // batch can fire for an evicted secret before deferred deletion completes.
+    update_cb_handle_.reset();
+    remove_cb_handle_.reset();
+  }
 
 private:
   absl::Status loadCert();
@@ -51,9 +77,9 @@ private:
   std::optional<Ssl::TlsCertificateConfigImpl> cert_config_;
   const Secret::TlsCertificateConfigProviderSharedPtr cert_provider_;
   UpdateCb update_cb_;
-  const Common::CallbackHandlePtr update_cb_handle_;
+  Common::CallbackHandlePtr update_cb_handle_;
   RemoveCb remove_cb_;
-  const Common::CallbackHandlePtr remove_cb_handle_;
+  Common::CallbackHandlePtr remove_cb_handle_;
 };
 using AsyncContextConfigConstPtr = std::unique_ptr<AsyncContextConfig>;
 
@@ -102,7 +128,8 @@ public:
    * MUST be called on the main thread.
    */
   void addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle,
-                            OptRef<Init::Manager> init_manager);
+                            OptRef<Init::Manager> init_manager,
+                            FairSieve::TenantId tenant_id = FairSieve::kDefaultTenantId);
   /**
    * Handle an updated certificate config by notifying any pending connections.
    * MUST be called on the main thread.
@@ -117,47 +144,73 @@ public:
   absl::Status updateAll();
 
   /**
-   * Delete any cached state for the secret including its active subscription.
+   * Delete any cached state for the secret including its active subscription, gated by
+   * `expected_generation` when supplied so an older queued removal cannot erase a newer entry
+   * created for the same secret name after eviction and re-fetch (ABA safety).
    */
-  absl::Status removeCertificateConfig(absl::string_view);
+  absl::Status removeCertificateConfig(absl::string_view secret_name,
+                                       std::optional<uint64_t> expected_generation = std::nullopt);
 
   /**
-   * Update the thread local caches with the certificates.
-   * @param cert_ctx the new context or nullptr to remove the secret.
+   * Retrieve the thread local certificate and record a hit for `tenant_id` when bounded eviction
+   * is enabled.
    */
-  void setContext(absl::string_view secret_name, AsyncContextConstSharedPtr cert_ctx);
-
-  /**
-   * Retrieve the thread local certificate.
-   */
-  std::optional<AsyncContextConstSharedPtr> getContext(absl::string_view secret_name) const;
+  std::optional<AsyncContextConstSharedPtr>
+  getContext(absl::string_view secret_name,
+             FairSieve::TenantId tenant_id = FairSieve::kDefaultTenantId) const;
 
   /**
    * Start fetching the certificate via a subscription.
    */
   HandleSharedPtr fetchCertificate(absl::string_view secret_name,
                                    Ssl::CertificateSelectionCallbackPtr&& cb,
-                                   bool client_ocsp_capable);
+                                   bool client_ocsp_capable,
+                                   FairSieve::TenantId tenant_id = FairSieve::kDefaultTenantId);
+
+  /**
+   * Returns true if either `max_active_secrets` or `max_pending_secrets` is configured.
+   */
+  bool trackingEnabled() const { return policy_.trackingEnabled(); }
 
 private:
-  void doRemoveCertificateConfig(absl::string_view);
+  struct CachedCert {
+    AsyncContextConstSharedPtr context_;
+    FairSieve::HitStateSharedPtr hit_state_;
+  };
+
+  void updateContexts(absl::string_view secret_name, CachedCert cached_cert,
+                      const std::optional<std::string>& evicted_name = std::nullopt);
+  void doRemoveCertificateConfig(absl::string_view secret_name,
+                                 std::optional<uint64_t> expected_generation);
   const Stats::ScopeSharedPtr stats_scope_;
+  // Gauge conservation invariants (main thread, outside active mutations):
+  //  - `cert_active == cache_.size() == n_ready + n_pending`
+  //  - `cert_pending == n_pending`
+  //  - `cert_requested == cert_active + cert_evicted + n_removed`
   CertSelectionStatsSharedPtr stats_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   const envoy::config::core::v3::ConfigSource config_source_;
   AsyncContextFactory context_factory_;
+  FairSieve::Policy policy_;
+  // Strictly monotonic allocation counter used to tag each `CacheEntry` for ABA-safe async
+  // removal (`live_entry.generation_ > stale_posted_generation` after eviction + re-fetch).
+  uint64_t next_entry_generation_{1};
 
-  // Main-thread accessible context config subscriptions and callbacks.
+  // Main-thread accessible context config subscriptions and callbacks. Stored via `unique_ptr` for
+  // pointer stability across synchronous eviction inside `AsyncContextConfig` construction (and a
+  // newly inserted pending entry can never self-evict during its own activation).
   struct CacheEntry {
+    uint64_t generation_{0};
     AsyncContextConfigConstPtr cert_config_;
     AsyncContextConstSharedPtr cert_context_;
+    FairSieve::HitStateSharedPtr hit_state_;
     std::vector<std::weak_ptr<Handle>> callbacks_;
   };
-  absl::flat_hash_map<std::string, CacheEntry> cache_;
+  absl::flat_hash_map<std::string, std::unique_ptr<CacheEntry>> cache_;
 
   // Lock-free map to retrieve ready TLS contexts by name.
   struct ThreadLocalCerts : public ThreadLocal::ThreadLocalObject {
-    absl::flat_hash_map<std::string, AsyncContextConstSharedPtr> ctx_by_name_;
+    absl::flat_hash_map<std::string, CachedCert> ctx_by_name_;
   };
   ThreadLocal::TypedSlot<ThreadLocalCerts> cert_contexts_;
 };
@@ -169,7 +222,8 @@ public:
 
 protected:
   Ssl::SelectionResult doSelectTlsContext(const std::string& name, const bool client_ocsp_capable,
-                                          Ssl::CertificateSelectionCallbackPtr cb);
+                                          Ssl::CertificateSelectionCallbackPtr cb,
+                                          FairSieve::TenantId tenant_id);
   std::shared_ptr<SecretManager> secret_manager_;
 };
 

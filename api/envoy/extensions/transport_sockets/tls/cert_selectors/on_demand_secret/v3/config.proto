@@ -5,6 +5,8 @@ package envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -25,6 +27,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // Similar to the regular SDS, the certificate is configured using the outer common TLS context,
 // e.g. by setting the FIPS compliance policy on the loaded certificate.
+// [#next-free-field: 6]
 message Config {
   // Defines the configuration source of the secrets.
   config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
@@ -41,4 +44,34 @@ message Config {
   // requests). The parent resource initializes immediately without waiting for the fetch to
   // complete.
   repeated string prefetch_secret_names = 3;
+
+  // Maximum number of active (loaded) secrets cached in memory. When unset, the cache is unbounded.
+  //
+  // When the active cache reaches this limit and a newly fetched secret finishes loading, an
+  // existing active secret is evicted using work-conserving per-tenant Fair-SIEVE with lazy
+  // cross-tenant ownership transfer:
+  //
+  // * Connections may supply a tenant identifier via the string filter state object
+  //   (``Router::StringAccessor``) named
+  //   ``envoy.tls.certificate_selectors.on_demand_secret.tenant_id``. For upstream selectors, this
+  //   object may be shared from the downstream connection. Connections without this filter state
+  //   object share a single default tenant bucket, reducing the policy to global SIEVE.
+  // * Eviction selects the tenant with the largest active secret count (max-min fair sharing),
+  //   breaking ties in favor of evicting from the incoming tenant.
+  // * Within the selected tenant's intrusive FIFO queue, a moving SIEVE hand sweeps from tail
+  //   toward head. If a shared secret was most recently hit by a different tenant whose active
+  //   count is strictly smaller by at least two, ownership transfers in O(1) to that tenant's queue
+  //   instead of evicting the shared secret. Otherwise, visited secrets have their visited bit
+  //   cleared (lazy promotion) and the first unvisited secret is evicted (quick demotion).
+  google.protobuf.UInt32Value max_active_secrets = 4 [(validate.rules).uint32 = {gt: 0}];
+
+  // Maximum number of in-flight (pending) secret subscriptions waiting for an initial SDS response.
+  // When unset, pending subscriptions are unbounded.
+  //
+  // When this limit is reached, new on-demand secret fetches are rejected (failing the requesting
+  // handshake) while duplicate handshakes for an already-pending secret continue to coalesce. When
+  // per-tenant filter state is in use, multi-tenant admission applies dynamic thresholds
+  // (Choudhury & Hahne, alpha=1) so a single flooding tenant cannot consume all pending capacity
+  // and starve sparse tenants.
+  google.protobuf.UInt32Value max_pending_secrets = 5 [(validate.rules).uint32 = {gt: 0}];
 }
