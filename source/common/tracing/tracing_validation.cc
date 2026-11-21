@@ -15,13 +15,6 @@ namespace Tracing {
 
 namespace {
 
-// W3C Trace Context constants
-constexpr size_t kTraceParentExpectedSize = 55;
-constexpr size_t kVersionHexSize = 2;
-constexpr size_t kTraceIdHexSize = 32;
-constexpr size_t kParentIdHexSize = 16;
-constexpr size_t kTraceFlagsHexSize = 2;
-
 // W3C Baggage constants
 constexpr size_t kMaxBaggageSize = 8192;
 constexpr size_t kMaxBaggageMembers = 64;
@@ -143,7 +136,7 @@ bool isValidBaggageValue(absl::string_view value) {
 } // namespace
 
 bool isValidTraceParent(absl::string_view trace_parent) {
-  if (trace_parent.size() < kTraceParentExpectedSize) {
+  if (trace_parent.size() < W3cTraceConstants::kTraceparentHeaderSize) {
     return false;
   }
 
@@ -157,8 +150,10 @@ bool isValidTraceParent(absl::string_view trace_parent) {
   absl::string_view parent_id = components[2];
   absl::string_view flags = components[3];
 
-  if (version.size() != kVersionHexSize || trace_id.size() != kTraceIdHexSize ||
-      parent_id.size() != kParentIdHexSize || flags.size() != kTraceFlagsHexSize) {
+  if (version.size() != W3cTraceConstants::kVersionHexSize ||
+      trace_id.size() != W3cTraceConstants::kTraceIdHexSize ||
+      parent_id.size() != W3cTraceConstants::kParentIdHexSize ||
+      flags.size() != W3cTraceConstants::kTraceFlagsHexSize) {
     return false;
   }
 

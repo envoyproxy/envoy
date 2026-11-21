@@ -27,14 +27,11 @@ envoy_cc_library(
     srcs = [
         "b3_span_context.cc",
         "opentelemetry_tracer_impl.cc",
-        "span_context_extractor.cc",
         "tracer.cc",
     ],
     hdrs = [
         "b3_span_context.h",
         "opentelemetry_tracer_impl.h",
-        "span_context.h",
-        "span_context_extractor.h",
         "tracer.h",
     ],
     copts = [
@@ -43,6 +40,7 @@ envoy_cc_library(
         "-DHAVE_ABSEIL",
     ],
     deps = [
+        ":span_context_lib",
         ":trace_exporter",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/tracing:trace_context_interface",
@@ -55,10 +53,34 @@ envoy_cc_library(
         "//source/extensions/tracers/common:factory_base_lib",
         "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
         "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:string_view",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@opentelemetry-cpp//api",
         "@opentelemetry-proto//:trace_proto_cc",
         "@opentelemetry-proto//:trace_service_proto_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "span_context_lib",
+    srcs = [
+        "span_context_extractor.cc",
+    ],
+    hdrs = [
+        "span_context.h",
+        "span_context_extractor.h",
+    ],
+    deps = [
+        "//envoy/common:exception_lib",
+        "//envoy/tracing:tracer_interface",
+        "//source/common/common:statusor_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/tracing:trace_context_lib",
+        "//source/common/tracing:tracing_validation_lib",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 
