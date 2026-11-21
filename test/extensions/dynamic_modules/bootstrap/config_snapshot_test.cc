@@ -7,6 +7,9 @@
 #include "source/extensions/bootstrap/dynamic_modules/config_snapshot.h"
 #include "source/server/admin/config_tracker_impl.h"
 
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/mocks/upstream/host.h"
 #include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
@@ -18,7 +21,12 @@ namespace Bootstrap {
 namespace DynamicModules {
 namespace {
 
-TEST(ConfigSnapshotTest, SelectsProvidersOnceWithoutTraversingEndpoints) {
+class ConfigSnapshotTest : public testing::Test {
+protected:
+  testing::StrictMock<Upstream::MockClusterManager> cluster_manager_;
+};
+
+TEST_F(ConfigSnapshotTest, SelectsProvidersOnceWithoutTraversingEndpoints) {
   Server::ConfigTrackerImpl tracker;
   int calls = 0;
   auto bootstrap = tracker.add("bootstrap", [&calls](const Matchers::StringMatcher&) {
@@ -30,14 +38,16 @@ TEST(ConfigSnapshotTest, SelectsProvidersOnceWithoutTraversingEndpoints) {
     return std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
   });
   const std::vector<absl::string_view> providers{"bootstrap", "routes", "bootstrap"};
-  auto snapshot = ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{});
+  auto snapshot = ConfigSnapshot::collect(tracker, cluster_manager_, providers,
+                                          Matchers::UniversalStringMatcher{});
   ASSERT_OK(snapshot);
   EXPECT_EQ(calls, 1);
   auto json = snapshot.value()->serialize();
   ASSERT_OK(json);
   EXPECT_THAT(json.value(), testing::HasSubstr("BootstrapConfigDump"));
   EXPECT_THAT(json.value(), testing::Not(testing::HasSubstr("EndpointsConfigDump")));
-  auto empty = ConfigSnapshot::collect(tracker, {}, Matchers::UniversalStringMatcher{});
+  auto empty =
+      ConfigSnapshot::collect(tracker, cluster_manager_, {}, Matchers::UniversalStringMatcher{});
   ASSERT_OK(empty);
   EXPECT_EQ(calls, 1);
   auto empty_json = empty.value()->serialize();
@@ -45,7 +55,7 @@ TEST(ConfigSnapshotTest, SelectsProvidersOnceWithoutTraversingEndpoints) {
   EXPECT_EQ(empty_json.value(), "{}");
 }
 
-TEST(ConfigSnapshotTest, EncodesOnWorkerAndRedactsSecrets) {
+TEST_F(ConfigSnapshotTest, EncodesOnWorkerAndRedactsSecrets) {
   Server::ConfigTrackerImpl tracker;
   auto owner = tracker.add("bootstrap", [](const Matchers::StringMatcher&) {
     auto dump = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
@@ -57,7 +67,8 @@ TEST(ConfigSnapshotTest, EncodesOnWorkerAndRedactsSecrets) {
     return dump;
   });
   const std::vector<absl::string_view> providers{"bootstrap"};
-  auto collected = ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{});
+  auto collected = ConfigSnapshot::collect(tracker, cluster_manager_, providers,
+                                           Matchers::UniversalStringMatcher{});
   ASSERT_OK(collected);
   std::string json;
   std::thread worker([snapshot = std::move(collected.value()), &json]() {
@@ -73,16 +84,17 @@ TEST(ConfigSnapshotTest, EncodesOnWorkerAndRedactsSecrets) {
   EXPECT_THAT(json, testing::Not(testing::HasSubstr("private-material")));
 }
 
-TEST(ConfigSnapshotTest, ReportsProviderFailure) {
+TEST_F(ConfigSnapshotTest, ReportsProviderFailure) {
   Server::ConfigTrackerImpl tracker;
   auto owner = tracker.add(
       "failed", [](const Matchers::StringMatcher&) { return ProtobufTypes::MessagePtr{}; });
   const std::vector<absl::string_view> providers{"failed"};
-  EXPECT_FALSE(
-      ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{}).ok());
+  EXPECT_FALSE(ConfigSnapshot::collect(tracker, cluster_manager_, providers,
+                                       Matchers::UniversalStringMatcher{})
+                   .ok());
 }
 
-TEST(ConfigSnapshotTest, ProviderCanUnregisterDuringCollection) {
+TEST_F(ConfigSnapshotTest, ProviderCanUnregisterDuringCollection) {
   Server::ConfigTrackerImpl tracker;
   Server::ConfigTracker::EntryOwnerPtr owner;
   int calls = 0;
@@ -92,7 +104,8 @@ TEST(ConfigSnapshotTest, ProviderCanUnregisterDuringCollection) {
     return std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
   });
   const std::vector<absl::string_view> providers{"bootstrap"};
-  auto snapshot = ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{});
+  auto snapshot = ConfigSnapshot::collect(tracker, cluster_manager_, providers,
+                                          Matchers::UniversalStringMatcher{});
   ASSERT_OK(snapshot);
   auto json = snapshot.value()->serialize();
   ASSERT_OK(json);
@@ -100,7 +113,7 @@ TEST(ConfigSnapshotTest, ProviderCanUnregisterDuringCollection) {
   EXPECT_TRUE(tracker.getCallbacksMap().empty());
 }
 
-TEST(ConfigSnapshotTest, OrdersProvidersAndPassesNameMatcher) {
+TEST_F(ConfigSnapshotTest, OrdersProvidersAndPassesNameMatcher) {
   Server::ConfigTrackerImpl tracker;
   auto clusters = tracker.add("clusters", [](const Matchers::StringMatcher& matcher) {
     auto dump = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
@@ -117,8 +130,9 @@ TEST(ConfigSnapshotTest, OrdersProvidersAndPassesNameMatcher) {
     return std::make_unique<envoy::admin::v3::ListenersConfigDump>();
   });
   const std::vector<absl::string_view> providers{"listeners", "clusters", "clusters"};
-  auto snapshot = ConfigSnapshot::collect(
-      tracker, providers, Matchers::StringMatcherImpl::createExactMatcher("selected"));
+  auto snapshot =
+      ConfigSnapshot::collect(tracker, cluster_manager_, providers,
+                              Matchers::StringMatcherImpl::createExactMatcher("selected"));
   ASSERT_OK(snapshot);
   auto json = snapshot.value()->serialize();
   ASSERT_OK(json);
@@ -133,7 +147,7 @@ TEST(ConfigSnapshotTest, OrdersProvidersAndPassesNameMatcher) {
   EXPECT_EQ(json->find("ClustersConfigDump", clusters_pos + 1), std::string::npos);
 }
 
-TEST(ConfigSnapshotTest, SkipsProviderUnregisteredDuringCollection) {
+TEST_F(ConfigSnapshotTest, SkipsProviderUnregisteredDuringCollection) {
   Server::ConfigTrackerImpl tracker;
   auto removed = tracker.add("removed", [](const Matchers::StringMatcher&) {
     ADD_FAILURE() << "unregistered provider called";
@@ -144,7 +158,8 @@ TEST(ConfigSnapshotTest, SkipsProviderUnregisteredDuringCollection) {
     return std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
   });
   const std::vector<absl::string_view> providers{"bootstrap", "removed"};
-  auto snapshot = ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{});
+  auto snapshot = ConfigSnapshot::collect(tracker, cluster_manager_, providers,
+                                          Matchers::UniversalStringMatcher{});
   ASSERT_OK(snapshot);
   auto json = snapshot.value()->serialize();
   ASSERT_OK(json);
@@ -152,7 +167,7 @@ TEST(ConfigSnapshotTest, SkipsProviderUnregisteredDuringCollection) {
   EXPECT_THAT(*json, testing::Not(testing::HasSubstr("ClustersConfigDump")));
 }
 
-TEST(ConfigSnapshotTest, UsesReplacementProviderDuringCollection) {
+TEST_F(ConfigSnapshotTest, UsesReplacementProviderDuringCollection) {
   Server::ConfigTrackerImpl tracker;
   auto replaced = tracker.add("replaced", [](const Matchers::StringMatcher&) {
     ADD_FAILURE() << "replaced provider called";
@@ -166,7 +181,8 @@ TEST(ConfigSnapshotTest, UsesReplacementProviderDuringCollection) {
     return std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
   });
   const std::vector<absl::string_view> providers{"bootstrap", "replaced"};
-  auto snapshot = ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{});
+  auto snapshot = ConfigSnapshot::collect(tracker, cluster_manager_, providers,
+                                          Matchers::UniversalStringMatcher{});
   ASSERT_OK(snapshot);
   auto json = snapshot.value()->serialize();
   ASSERT_OK(json);
@@ -174,20 +190,94 @@ TEST(ConfigSnapshotTest, UsesReplacementProviderDuringCollection) {
   EXPECT_THAT(*json, testing::Not(testing::HasSubstr("ClustersConfigDump")));
 }
 
-TEST(ConfigSnapshotTest, ContainsProviderExceptions) {
+TEST_F(ConfigSnapshotTest, FiltersEndpointAssignmentsBeforeReadingHosts) {
+  Server::ConfigTrackerImpl tracker;
+  testing::NiceMock<Upstream::MockClusterMockPrioritySet> selected;
+  selected.info_->eds_service_name_ = "selected-service";
+
+  testing::NiceMock<Upstream::MockClusterMockPrioritySet> excluded;
+  excluded.info_->name_ = "excluded-cluster";
+  auto excluded_host = std::make_shared<testing::StrictMock<Upstream::MockHost>>();
+  excluded.priority_set_.getMockHostSet(0)->hosts_.push_back(excluded_host);
+
+  EXPECT_CALL(cluster_manager_, hasActiveClusters()).WillOnce(testing::Return(true));
+  EXPECT_CALL(cluster_manager_, forEachActiveCluster(testing::_))
+      .WillOnce([&](std::function<void(const Upstream::Cluster&)> callback) {
+        callback(selected);
+        callback(excluded);
+      });
+  const std::vector<absl::string_view> providers{"endpoint", "endpoint"};
+  auto snapshot =
+      ConfigSnapshot::collect(tracker, cluster_manager_, providers,
+                              Matchers::StringMatcherImpl::createExactMatcher("selected-service"));
+  ASSERT_OK(snapshot);
+  auto json = snapshot.value()->serialize();
+  ASSERT_OK(json);
+  EXPECT_THAT(*json, testing::HasSubstr("selected-service"));
+  EXPECT_THAT(*json, testing::Not(testing::HasSubstr("excluded-cluster")));
+}
+
+TEST_F(ConfigSnapshotTest, OmitsEndpointsWithoutActiveClusters) {
+  Server::ConfigTrackerImpl tracker;
+  EXPECT_CALL(cluster_manager_, hasActiveClusters()).WillOnce(testing::Return(false));
+  const std::vector<absl::string_view> providers{"endpoint"};
+  auto snapshot = ConfigSnapshot::collect(tracker, cluster_manager_, providers,
+                                          Matchers::UniversalStringMatcher{});
+  ASSERT_OK(snapshot);
+  auto json = snapshot.value()->serialize();
+  ASSERT_OK(json);
+  EXPECT_EQ(*json, "{}");
+}
+
+TEST_F(ConfigSnapshotTest, UsesRegisteredEndpointProvider) {
+  Server::ConfigTrackerImpl tracker;
+  auto endpoint = tracker.add("endpoint", [](const Matchers::StringMatcher&) {
+    return std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
+  });
+  const std::vector<absl::string_view> providers{"endpoint"};
+  auto snapshot = ConfigSnapshot::collect(tracker, cluster_manager_, providers,
+                                          Matchers::UniversalStringMatcher{});
+  ASSERT_OK(snapshot);
+  auto json = snapshot.value()->serialize();
+  ASSERT_OK(json);
+  EXPECT_THAT(*json, testing::HasSubstr("EndpointsConfigDump"));
+}
+
+TEST_F(ConfigSnapshotTest, SkipsRegisteredEndpointProviderUnregisteredDuringCollection) {
+  Server::ConfigTrackerImpl tracker;
+  auto endpoint = tracker.add("endpoint", [](const Matchers::StringMatcher&) {
+    ADD_FAILURE() << "unregistered endpoint provider called";
+    return std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
+  });
+  auto bootstrap = tracker.add("bootstrap", [&](const Matchers::StringMatcher&) {
+    endpoint.reset();
+    return std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+  });
+  const std::vector<absl::string_view> providers{"endpoint", "bootstrap"};
+  auto snapshot = ConfigSnapshot::collect(tracker, cluster_manager_, providers,
+                                          Matchers::UniversalStringMatcher{});
+  ASSERT_OK(snapshot);
+  auto json = snapshot.value()->serialize();
+  ASSERT_OK(json);
+  EXPECT_THAT(*json, testing::HasSubstr("BootstrapConfigDump"));
+  EXPECT_THAT(*json, testing::Not(testing::HasSubstr("EndpointsConfigDump")));
+}
+
+TEST_F(ConfigSnapshotTest, ContainsProviderExceptions) {
   Server::ConfigTrackerImpl tracker;
   auto owner =
       tracker.add("failed", [](const Matchers::StringMatcher&) -> ProtobufTypes::MessagePtr {
         throw EnvoyException("provider failed");
       });
   const std::vector<absl::string_view> providers{"failed"};
-  EXPECT_THAT(ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{})
+  EXPECT_THAT(ConfigSnapshot::collect(tracker, cluster_manager_, providers,
+                                      Matchers::UniversalStringMatcher{})
                   .status()
                   .message(),
               testing::HasSubstr("provider failed"));
 }
 
-TEST(ConfigSnapshotTest, ReportsJsonEncodingFailure) {
+TEST_F(ConfigSnapshotTest, ReportsJsonEncodingFailure) {
   Server::ConfigTrackerImpl tracker;
   auto owner = tracker.add("bootstrap", [](const Matchers::StringMatcher&) {
     auto dump = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
@@ -197,7 +287,8 @@ TEST(ConfigSnapshotTest, ReportsJsonEncodingFailure) {
     return dump;
   });
   const std::vector<absl::string_view> providers{"bootstrap"};
-  auto snapshot = ConfigSnapshot::collect(tracker, providers, Matchers::UniversalStringMatcher{});
+  auto snapshot = ConfigSnapshot::collect(tracker, cluster_manager_, providers,
+                                          Matchers::UniversalStringMatcher{});
   ASSERT_OK(snapshot);
   EXPECT_FALSE(snapshot.value()->serialize().ok());
 }

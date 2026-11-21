@@ -39,6 +39,7 @@ impl BootstrapExtensionConfig for SnapshotConfig {
         &[
           ConfigSnapshotProvider::Listeners,
           ConfigSnapshotProvider::Clusters,
+          ConfigSnapshotProvider::Endpoints,
         ],
         name_regex,
       )

@@ -337,8 +337,13 @@ Provider keys include ``bootstrap``, ``clusters``, ``listeners``,
 ``routes``, ``route_scopes``, ``secrets`` and the registered ``ecds_filter_*`` providers. Missing keys
 are omitted, duplicates are collected once, and an empty selection collects nothing. Providers
 appear in key order, as in :ref:`/config_dump <operations_admin_interface_config_dump>`.
-Endpoint dumps are not included. An optional full-match RE2 regular expression filters resource names
-for providers that support it. A missing or empty expression disables filtering.
+Selecting ``endpoint`` includes endpoint assignments for active clusters, as with
+``/config_dump?include_eds``. An optional full-match RE2 regular expression filters resource names
+for providers that support it. A missing or empty expression disables filtering. For endpoints,
+the filter matches the EDS service name, or the cluster name if no service name is set.
+
+Cluster lifecycle hooks do not fire when only a cluster's hosts or their health change, so a
+snapshot shows endpoint changes only when the module collects again.
 
 Collection and sensitive-field redaction run synchronously on the main thread after server
 initialization and before shutdown begins. Their cost grows with the selected resources. Combine
