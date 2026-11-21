@@ -2,6 +2,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "envoy/data/ai/v3/token_usage.pb.h"
@@ -2622,6 +2623,98 @@ TEST_F(AiProtocolManagerFilterTest,
   EXPECT_EQ(
       encoded_injected_.toString(),
       R"({"model":"gpt-4","usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12},"tagged":true})");
+}
+
+TEST_F(AiProtocolManagerFilterResponseTest, FragmentedOversizedTerminalPublishesFailed) {
+  setup("{default_llm_protocol: OPENAI_RESPONSES, limits: {max_sse_event_size: 64}}");
+  sendHeaders("text/event-stream");
+  sendData("event: response.", false);
+  sendData("completed\ndata: {\"type\":\"response.completed\",\"response\":{"
+           "\"usage\":{\"input_tokens\":3,\"output_tokens\":4,\"total_tokens\":7},"
+           "\"padding\":\"" +
+               std::string(512, 'x') + "\"}}\n\n",
+           true);
+  EXPECT_EQ(counterValue("sse_event_too_large"), 1);
+  EXPECT_EQ(counterValue("token_usage_failed"), 1);
+  EXPECT_EQ(counterValue("token_usage_missing"), 0);
+  EXPECT_EQ(counterValue("token_usage_partial"), 0);
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::FAILED);
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::OPENAI_RESPONSES);
+  EXPECT_FALSE(typed->has_total_tokens());
+}
+
+class OversizedSseMetadataTest
+    : public AiProtocolManagerFilterResponseTest,
+      public testing::WithParamInterface<std::tuple<std::string, size_t, bool>> {};
+
+TEST_P(OversizedSseMetadataTest, FinalEventTypeDeterminesExtractionStatus) {
+  const auto& [fields, frame_size, skippable] = GetParam();
+  setup("{default_llm_protocol: OPENAI_RESPONSES, limits: {max_sse_event_size: 64}}");
+  sendHeaders("text/event-stream");
+  const std::string event = fields +
+                            "data: {\"type\":\"response.completed\",\"response\":{"
+                            "\"usage\":{\"input_tokens\":3,\"output_tokens\":4,\"total_tokens\":7},"
+                            "\"padding\":\"" +
+                            std::string(512, 'x') + "\"}}\n\n";
+  for (size_t offset = 0; offset < event.size(); offset += frame_size) {
+    sendData(absl::string_view(event).substr(offset, frame_size),
+             offset + frame_size >= event.size());
+  }
+  EXPECT_EQ(counterValue("sse_event_too_large"), 1);
+  EXPECT_EQ(counterValue("response_parse_error"), 0);
+  EXPECT_EQ(counterValue("token_usage_partial"), 0);
+  EXPECT_EQ(counterValue("token_usage_failed"), skippable ? 0 : 1);
+  EXPECT_EQ(counterValue("token_usage_missing"), skippable ? 1 : 0);
+  if (skippable) {
+    EXPECT_TRUE(typed_metadata_writes_.empty());
+  } else {
+    const auto typed = singleTypedWrite("envoy.ai.token_usage");
+    ASSERT_TRUE(typed.has_value());
+    EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::FAILED);
+    EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::OPENAI_RESPONSES);
+    EXPECT_FALSE(typed->has_total_tokens());
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    FrameBoundaries, OversizedSseMetadataTest,
+    testing::Combine(
+        testing::Values(
+            std::string("event: response.completed\n"),
+            std::string("event: response.output_text.delta\nevent: response.completed\n"),
+            std::string("event: response.completed\nevent: response.failed\n")),
+        testing::Values(size_t{1}, size_t{16}, size_t{19}, size_t{4096}), testing::Values(false)));
+
+INSTANTIATE_TEST_SUITE_P(
+    SkippableOverrides, OversizedSseMetadataTest,
+    testing::Combine(testing::Values(std::string(
+                         "event: response.completed\nevent: response.output_text.delta\n")),
+                     testing::Values(size_t{1}, size_t{16}, size_t{4096}), testing::Values(true)));
+
+TEST_F(AiProtocolManagerFilterResponseTest, LostAnthropicUsagePreservesPartialSnapshot) {
+  setup("{default_llm_protocol: ANTHROPIC_MESSAGES, limits: {max_sse_event_size: 256}}");
+  sendHeaders("text/event-stream");
+  sendData("event: message_start\ndata: {\"type\":\"message_start\",\"message\":{"
+           "\"usage\":{\"input_tokens\":9,\"output_tokens\":1}}}\n\n",
+           false);
+  sendData(
+      "event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":7},"
+      "\"padding\":\"" +
+          std::string(512, 'x') + "\"}\n\n",
+      false);
+  sendData("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n", true);
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::PARTIAL);
+  EXPECT_EQ(typed->input_tokens().value(), 9);
+  EXPECT_EQ(typed->output_tokens().value(), 1);
+  EXPECT_EQ(typed->total_tokens().value(), 10);
+  EXPECT_EQ(counterValue("token_usage_partial"), 1);
+  EXPECT_EQ(counterValue("token_usage_failed"), 0);
+  EXPECT_EQ(counterValue("token_usage_missing"), 0);
+  EXPECT_EQ(counterValue("sse_event_too_large"), 1);
 }
 
 } // namespace
