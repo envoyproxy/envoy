@@ -824,16 +824,10 @@ TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedEscapes) {
 }
 
 TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedInvalidEscapes) {
-  RespValue unescaped;
-  unescaped.type(RespType::BulkString);
-  unescaped.asString() = "xyucx0";
-
+  // A non-hex byte after the escape introducer is a protocol error.
   buffer_.add("\"\\xyu\\c\\x0\"\r\n");
-  decoder_.decode(buffer_);
-  EXPECT_EQ(1UL, decoded_values_.size());
-  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
-  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
-  EXPECT_EQ(unescaped, decoded_values_[0]->asArray()[0]);
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "invalid hex escape in request");
 }
 
 // A double-quoted token that begins directly with a hex escape (``"\xAB"``) must
@@ -853,10 +847,28 @@ TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedLeadingHexEscape) {
 }
 
 // A literal 'x' earlier in the token must not be mistaken for the hex-escape
-// introducer: `"xx\x41"` used to terminate the process via an uncaught
-// std::invalid_argument from std::stoul. It must now raise ProtocolError.
-TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedInvalidHexEscapeLiteralX) {
+// introducer: "xx\x41" must decode to "xxA".
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedHexEscapeAfterLiteralX) {
+  RespValue unescaped;
+  unescaped.type(RespType::BulkString);
+  unescaped.asString() = "xxA";
+
   buffer_.add("\"xx\\x41\"\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(unescaped, decoded_values_[0]->asArray()[0]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedNonHexEscapeRejected) {
+  buffer_.add("\"\\xG\"\r\n");
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "invalid hex escape in request");
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedTruncatedHexEscapeRejected) {
+  buffer_.add("\"\\x4\"\r\n");
   EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
                             "invalid hex escape in request");
 }

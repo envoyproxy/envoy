@@ -704,7 +704,8 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         throw ProtocolError("unbalanced quotes in request");
       } else if (buffer[0] == 'x') {
         state_ = State::InlineStringQuotedEscapeHex;
-        pending_value_stack_.front().value_->asString().push_back(buffer[0]);
+        pending_hex_count_ = 0;
+        pending_hex_value_ = 0;
       } else {
         char c;
         switch (buffer[0]) {
@@ -742,25 +743,19 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
     case State::InlineStringQuotedEscapeHex: {
       ENVOY_LOG(trace, "parse slice: InlineStringQuotedEscapeHex: {}", buffer[0]);
 
-      if (!std::isxdigit(buffer[0])) {
-        state_ = State::InlineStringQuoted;
-        break;
+      // Exactly two hex digits must follow the escape introducer. Any other byte, including the
+      // closing quote or end of line, is a malformed escape. Digits are counted in decoder state,
+      // so a literal x earlier in the token is never misread as the escape introducer.
+      const auto c = static_cast<unsigned char>(buffer[0]);
+      if (!std::isxdigit(c)) {
+        throw ProtocolError("invalid hex escape in request");
       }
-
-      auto& s = pending_value_stack_.front().value_->asString();
-      ASSERT((!s.empty() && s.back() == 'x') || (s.size() > 1 && s[s.size() - 2] == 'x'));
-      s.push_back(buffer[0]);
-      if (s.size() >= 3 && s[s.size() - 3] == 'x') {
-        // The 'x' may be a literal from earlier in the token rather than the
-        // escape introducer (e.g. "xx\x41"), in which case stoul would throw
-        // std::invalid_argument, which is not caught by the callers (they only
-        // catch ProtocolError), crashing the process. Validate first.
-        if (!std::isxdigit(s[s.size() - 2]) || !std::isxdigit(s[s.size() - 1])) {
-          throw ProtocolError("invalid hex escape in request");
-        }
-        char c = static_cast<char>(std::stoul(&s[s.size() - 2], nullptr, 16));
-        s.resize(s.size() - 3);
-        s.push_back(c);
+      const uint8_t digit = static_cast<uint8_t>(std::isdigit(c) ? c - '0' : std::tolower(c) - 'a' + 10);
+      pending_hex_value_ = static_cast<uint8_t>(pending_hex_value_ * 16 + digit);
+      if (++pending_hex_count_ == 2) {
+        pending_value_stack_.front().value_->asString().push_back(static_cast<char>(pending_hex_value_));
+        pending_hex_count_ = 0;
+        pending_hex_value_ = 0;
         state_ = State::InlineStringQuoted;
       }
 
