@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["set_metadata_filter.h"],
     deps = [
         "//envoy/server:filter_config_interface",
+        "//envoy/stream_info:filter_state_interface",
         "//source/common/config:well_known_names",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",

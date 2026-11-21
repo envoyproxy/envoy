@@ -24,6 +24,7 @@ envoy_extension_cc_test(
         "tsan": {"link": "linux_x64_small"},
     },
     deps = [
+        "//source/common/stream_info:filter_state_lib",
         "//source/extensions/filters/http/set_metadata:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:logging_lib",
