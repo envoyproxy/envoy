@@ -278,6 +278,7 @@ TEST_F(ProfileActionTest, DoesNotUseFactoryContextAfterConstruction) {
 
   // Put a context with a different Api in the same storage, as a later stack frame would.
   testing::StrictMock<Api::MockApi> other_api;
+  EXPECT_CALL(other_api, fileSystem()).Times(0);
   context.reset();
   context.emplace(Server::Configuration::GuardDogActionFactoryContext{other_api, *dispatcher_,
                                                                       *stats_.rootScope(), "test"});
@@ -287,7 +288,6 @@ TEST_F(ProfileActionTest, DoesNotUseFactoryContextAfterConstruction) {
                {{Thread::ThreadId(10), now}}, now);
 
   EXPECT_EQ(TestUtility::findCounter(stats_, "test.profile_action.attempted")->value(), 1);
-  EXPECT_FALSE(api_->fileSystem().directoryExists(nonexistent_path));
 }
 
 TEST_F(ProfileActionTest, ShouldNotProfileIfNoTids) {

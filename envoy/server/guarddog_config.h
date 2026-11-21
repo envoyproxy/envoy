@@ -54,7 +54,9 @@ public:
    * Creates a particular GuardDog Action factory implementation.
    *
    * @param config supplies the configuration for the action.
-   * @param context supplies the GuardDog Action's context.
+   * @param context supplies the GuardDog Action's context. It is only valid during this call: an
+   *        action may keep the references it holds (api_, dispatcher_, stats_), but not the
+   * context.
    * @return GuardDogActionPtr the GuardDogAction object.
    */
   virtual GuardDogActionPtr createGuardDogActionFromProto(
