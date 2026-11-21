@@ -231,13 +231,15 @@ public:
 
   /**
    * This can be used to continue the decoding of the HTTP request after the processing has been
-   * stopped at the normal HTTP event hooks such as decodeHeaders or encodeHeaders.
+   * stopped at decodeHeaders, decodeData or decodeTrailers. A call while the request is iterating
+   * is ignored, since the filter manager forbids a repeat continue.
    */
   void continueDecoding();
 
   /**
    * This can be used to continue the encoding of the HTTP response after the processing has been
-   * stopped at the normal HTTP event hooks such as encodeHeaders or encodeData.
+   * stopped at encodeHeaders, encodeData or encodeTrailers. A call while the response is iterating
+   * is ignored, since the filter manager forbids a repeat continue.
    */
   void continueEncoding();
 
@@ -311,9 +313,17 @@ private:
 
   // True when the decode or encode direction is in the continue state. Tracked per direction to
   // avoid prohibited repeat continueDecoding() or continueEncoding() calls, and so a continue in
-  // one direction never suppresses a resume in the other.
-  bool decode_in_continue_ = false;
-  bool encode_in_continue_ = false;
+  // one direction never suppresses a resume in the other. Each headers, body or trailers hook that
+  // calls the module sets its direction's flag from the module's status, true when the filter
+  // manager keeps the filter iterating and false when it stops it. continueDecoding() or
+  // continueEncoding() set it true before calling the filter manager, and the encodeData() and
+  // encodeTrailers() early returns after a local reply set the encode flag true, since their
+  // Continue resumes the filter. Nothing else writes one.
+  // Both start true, as the filter manager starts every filter iterating, so a continue before a
+  // hook stops the direction is ignored instead of resuming headers that have not reached the
+  // filter.
+  bool decode_in_continue_ = true;
+  bool encode_in_continue_ = true;
 
   // This helps to avoid reentering the module when sending a local reply. For example, if
   // sendLocalReply() is called, encodeHeaders and encodeData will be called again inline on top of
