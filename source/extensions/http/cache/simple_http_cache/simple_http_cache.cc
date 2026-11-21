@@ -5,7 +5,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/header_map_impl.h"
-#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -178,8 +177,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
                                     const ResponseMetadata& metadata,
                                     UpdateHeadersCallback on_complete) {
   const auto& simple_lookup_context = static_cast<const SimpleLookupContext&>(lookup_context);
-  const SerializedKey serialized_key =
-      MessageUtil::serializeDeterministically(simple_lookup_context.request().key());
+  const SerializedKey serialized_key = serializeKey(simple_lookup_context.request().key());
   absl::WriterMutexLock lock(mutex_);
   auto iter = map_.find(serialized_key);
   auto post_complete = [on_complete = std::move(on_complete),
@@ -199,7 +197,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
       std::move(post_complete)(false);
       return;
     }
-    iter = map_.find(MessageUtil::serializeDeterministically(varied_key.value()));
+    iter = map_.find(serializeKey(varied_key.value()));
     if (iter == map_.end() || !iter->second.response_headers_) {
       std::move(post_complete)(false);
       return;
@@ -213,7 +211,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
-  const SerializedKey serialized_key = MessageUtil::serializeDeterministically(request.key());
+  const SerializedKey serialized_key = serializeKey(request.key());
   absl::ReaderMutexLock lock(mutex_);
   auto iter = map_.find(serialized_key);
   if (iter == map_.end()) {
@@ -237,7 +235,7 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
 bool SimpleHttpCache::insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
                              ResponseMetadata&& metadata, std::string&& body,
                              Http::ResponseTrailerMapPtr&& trailers) {
-  SerializedKey serialized_key = MessageUtil::serializeDeterministically(key);
+  SerializedKey serialized_key = serializeKey(key);
   absl::WriterMutexLock lock(mutex_);
   map_[std::move(serialized_key)] = SimpleHttpCache::Entry{
       std::move(response_headers), std::move(metadata), std::move(body), std::move(trailers)};
@@ -256,7 +254,7 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
   }
   Key& varied_request_key = varied_key.value();
 
-  auto iter = map_.find(MessageUtil::serializeDeterministically(varied_request_key));
+  auto iter = map_.find(serializeKey(varied_request_key));
   if (iter == map_.end()) {
     return SimpleHttpCache::Entry{};
   }
@@ -291,9 +289,8 @@ bool SimpleHttpCache::varyInsert(const Key& request_key,
   }
 
   varied_request_key.add_custom_fields(vary_identifier.value());
-  SerializedKey serialized_varied_request_key =
-      MessageUtil::serializeDeterministically(varied_request_key);
-  SerializedKey serialized_request_key = MessageUtil::serializeDeterministically(request_key);
+  SerializedKey serialized_varied_request_key = serializeKey(varied_request_key);
+  SerializedKey serialized_request_key = serializeKey(request_key);
 
   absl::WriterMutexLock lock(mutex_);
   map_[std::move(serialized_varied_request_key)] = SimpleHttpCache::Entry{

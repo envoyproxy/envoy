@@ -42,18 +42,18 @@ struct LookupResult {
 // leaves alpha, any improvements to stableHashKey that would change its output
 // for existing callers is a breaking change.
 //
-// For non-persistent storage, use MessageUtil, which has no long-term stability
-// guarantees.
+// For non-persistent storage, use SerializedKey, which has no long-term
+// stability guarantees.
 //
 // When providing a cached response, Caches must ensure that the keys (and not
 // just their hashes) match.
 size_t stableHashKey(const Key& key);
 
-// The deterministic serialization of a Key, as
-// MessageUtil::serializeDeterministically() returns it. In-memory caches key
-// their maps by it, since hashing and comparing the bytes costs less than
-// hashing and comparing the Key message.
+// The deterministic serialization of a Key, which in-memory maps and sets of
+// Keys use as their key, since for a typical Key serializing it and hashing the
+// bytes costs less than hashing and comparing the message.
 using SerializedKey = std::string;
+SerializedKey serializeKey(const Key& key);
 
 // LookupRequest holds everything about a request that's needed to look for a
 // response in a cache, to evaluate whether an entry from a cache is usable, and

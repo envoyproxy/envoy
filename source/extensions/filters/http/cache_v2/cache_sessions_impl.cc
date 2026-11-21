@@ -3,7 +3,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/utility.h"
-#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/cache_v2/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache_v2/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache_v2/cache_headers_utils.h"
@@ -964,7 +963,7 @@ void CacheSession::performValidation() {
 std::shared_ptr<CacheSession> CacheSessionsImpl::getEntry(const Key& key) {
   const SystemTime now = time_source_.systemTime();
   cache().touch(key, now);
-  SerializedKey serialized_key = MessageUtil::serializeDeterministically(key);
+  SerializedKey serialized_key = serializeKey(key);
   absl::MutexLock lock(mu_);
   auto [it, is_new] = entries_.try_emplace(std::move(serialized_key));
   if (is_new) {

@@ -4,7 +4,6 @@
 
 #include "source/common/filesystem/directory.h"
 #include "source/common/http/header_map_impl.h"
-#include "source/common/protobuf/utility.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
@@ -323,13 +322,13 @@ void FileSystemHttpCache::updateHeaders(const LookupContext& base_lookup_context
 absl::string_view FileSystemHttpCache::cachePath() const { return shared_->cachePath(); }
 
 bool FileSystemHttpCache::workInProgress(const Key& key) {
-  const SerializedKey serialized_key = MessageUtil::serializeDeterministically(key);
+  const SerializedKey serialized_key = serializeKey(key);
   absl::MutexLock lock(cache_mu_);
   return entries_being_written_.contains(serialized_key);
 }
 
 std::shared_ptr<Cleanup> FileSystemHttpCache::maybeStartWritingEntry(const Key& key) {
-  SerializedKey serialized_key = MessageUtil::serializeDeterministically(key);
+  SerializedKey serialized_key = serializeKey(key);
   absl::MutexLock lock(cache_mu_);
   if (!entries_being_written_.emplace(serialized_key).second) {
     return nullptr;

@@ -70,7 +70,6 @@ envoy_cc_library(
         ":cacheability_utils_lib",
         ":upstream_request_lib",
         "//source/common/common:cancel_wrapper_lib",
-        "//source/common/protobuf:utility_lib",
     ],
 )
 
@@ -173,6 +172,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:deterministic_hash_lib",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/cache_v2/v3:pkg_cc_proto",
     ],
 )

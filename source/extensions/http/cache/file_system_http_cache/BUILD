@@ -47,7 +47,6 @@ envoy_cc_extension(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
-        "//source/common/protobuf:utility_lib",
         "//source/extensions/common/async_files",
         "//source/extensions/filters/http/cache:http_cache_lib",
         "@abseil-cpp//absl/base",
