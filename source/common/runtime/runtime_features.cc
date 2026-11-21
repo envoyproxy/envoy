@@ -136,6 +136,7 @@ RUNTIME_GUARD(envoy_reloadable_features_json_formatter_omit_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_add_verification_status_header);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_sanitize_payload_headers_filter_wide);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_select_key_by_x5t);
+RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_split_comma_joined_headers);
 // A SotW LDS update removes only the listeners received through LDS, so it no longer removes the
 // listeners that other components add. Disable to remove every dynamic listener not in the
 // update.
