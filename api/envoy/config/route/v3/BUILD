@@ -14,6 +14,7 @@ api_proto_package(
         "//envoy/type/tracing/v3:pkg",
         "//envoy/type/v3:pkg",
         "@xds//udpa/annotations:pkg",
+        "@xds//xds/annotations/v3:pkg",
         "@xds//xds/type/matcher/v3:pkg",
     ],
 )

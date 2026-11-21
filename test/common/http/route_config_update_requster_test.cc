@@ -24,7 +24,7 @@ public:
 class RdsRouteConfigUpdateRequesterTest : public testing::Test {
 protected:
   RdsRouteConfigUpdateRequesterTest() : requester_(&provider_) {
-    ON_CALL(*route_config_, usesVhds()).WillByDefault(Return(true));
+    ON_CALL(*route_config_, onDemandVhdsEnabled()).WillByDefault(Return(true));
   }
 
   void requestUpdate(RequestHeaderMap& headers, bool& updated) {
