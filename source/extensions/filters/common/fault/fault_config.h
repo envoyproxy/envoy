@@ -8,6 +8,7 @@
 
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
+#include "source/common/router/header_parser.h"
 #include "source/common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -69,6 +70,7 @@ public:
   }
 
   const std::string& responseBody() const { return response_body_; }
+  const Router::HeaderParser& responseHeadersParser() const { return *response_headers_parser_; }
   bool dryRun() const { return dry_run_; }
 
 private:
@@ -145,6 +147,7 @@ private:
   using AbortProviderPtr = std::unique_ptr<AbortProvider>;
 
   AbortProviderPtr provider_;
+  Router::HeaderParserPtr response_headers_parser_;
   const std::string response_body_;
   const bool dry_run_;
 };

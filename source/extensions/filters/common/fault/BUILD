@@ -17,6 +17,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:header_parser_lib",
         "@envoy_api//envoy/extensions/filters/common/fault/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/fault/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
