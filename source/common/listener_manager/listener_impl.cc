@@ -1251,8 +1251,8 @@ void ListenerImpl::dumpListenerConfig(Protobuf::Any& dump) const {
 
 void ListenerImpl::debugLog(const std::string& message) {
   UNREFERENCED_PARAMETER(message);
-  ENVOY_LOG(debug, "{}: name={}, original_hash={}, tag={}, address={}", message, name_,
-            maybe_stale_hash_, listener_tag_,
+  ENVOY_LOG(debug, "{}: name={}, original_hash={}, serialized_hash={}, tag={}, address={}", message,
+            name_, maybe_stale_hash_, serialized_config_hash_, listener_tag_,
             absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()));
 }
 

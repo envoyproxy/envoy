@@ -176,6 +176,9 @@ public:
   uint64_t activeClusterSerializedConfigHash(const std::string& name) const {
     return active_clusters_.at(name)->serialized_config_hash_;
   }
+  void setActiveClusterSerializedConfigHash(const std::string& name, uint64_t hash) {
+    active_clusters_.at(name)->serialized_config_hash_ = hash;
+  }
 
   const ClusterInitializationMap& clusterInitializationMap() const {
     return cluster_initialization_map_;

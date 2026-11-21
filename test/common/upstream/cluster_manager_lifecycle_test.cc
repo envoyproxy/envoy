@@ -728,8 +728,8 @@ TEST_P(ClusterManagerLifecycleTest, UpdateWithReserializedAnyIsNoop) {
 }
 
 // An active cluster keeps the bytes it was built from, blocks a re-encoded update and keeps that
-// update's bytes, rejects a rejected update again when it is resent, and still applies a changed
-// update.
+// update's bytes, rejects a rejected update again when it is resent, still applies a changed
+// update, and matches its stored bytes before MessageUtil::hash().
 TEST_P(ClusterManagerLifecycleTest, UpdateActiveWithReserializedAnyIsNoop) {
   create(defaultConfig());
 
@@ -756,14 +756,18 @@ TEST_P(ClusterManagerLifecycleTest, UpdateActiveWithReserializedAnyIsNoop) {
   EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)),
             cluster_manager_->activeClusterSerializedConfigHash("fake_cluster"));
 
-  // A rejected update is rejected again when it is resent.
+  // A rejected update is rejected again when it is resent. Returning a null cluster from the
+  // factory is converted to an error status by the test factory.
   auto rejected_cluster = cluster;
   rejected_cluster.mutable_per_connection_buffer_limit_bytes()->set_value(54321);
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .Times(2)
-      .WillRepeatedly(Return(std::make_pair(nullptr, nullptr)));
-  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(rejected_cluster, "version3").ok());
-  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(rejected_cluster, "version3").ok());
+      .WillRepeatedly(Return(std::make_pair(ClusterSharedPtr(), nullptr)));
+  EXPECT_THAT(cluster_manager_->addOrUpdateCluster(rejected_cluster, "version3"),
+              StatusHelpers::HasStatusMessage("Failed to create cluster from proto"));
+  EXPECT_THAT(cluster_manager_->addOrUpdateCluster(rejected_cluster, "version3"),
+              StatusHelpers::HasStatusMessage("Failed to create cluster from proto"));
+  // A rejected update still counts as modified, since the stat moves before the cluster loads.
   checkStats(1 /*added*/, 2 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
   cluster.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
@@ -778,6 +782,14 @@ TEST_P(ClusterManagerLifecycleTest, UpdateActiveWithReserializedAnyIsNoop) {
   checkStats(1 /*added*/, 3 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
   EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)),
             cluster_manager_->activeClusterSerializedConfigHash("fake_cluster"));
+
+  // A push whose bytes match the stored hash is blocked without MessageUtil::hash(), which would
+  // find this config changed. The test sets the stored hash by hand, which no push does.
+  cluster.mutable_per_connection_buffer_limit_bytes()->set_value(23456);
+  cluster_manager_->setActiveClusterSerializedConfigHash(
+      "fake_cluster", HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)));
+  EXPECT_FALSE(*cluster_manager_->addOrUpdateCluster(cluster, "version5"));
+  checkStats(1 /*added*/, 3 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));

@@ -2647,7 +2647,8 @@ filter_chains:
 }
 
 // A listener matches the stored serialized hash before MessageUtil::hash(), and a push of the
-// warming listener's bytes never reverts to the active listener.
+// warming listener's bytes skips the revert check. The test sets the stored hashes by hand, which
+// no push does, so that a revert check or a MessageUtil::hash() that ran would change the result.
 TEST_P(ListenerManagerImplTest, SerializedConfigHashIsCheckedBeforeMessageHash) {
   InSequence s;
 
@@ -2684,14 +2685,13 @@ filter_chains:
   auto& warming =
       dynamic_cast<ListenerImpl&>(manager_->listeners(ListenerManager::WARMING).front().get());
 
-  // A push of the warming bytes stays blocked even if the active listener stored them.
-  active.setSerializedConfigHash(
-      HashUtil::xxHash64(MessageUtil::serializeDeterministically(listener_foo_update1)));
+  // A push of the warming bytes stays blocked even with the active listener set to match them.
+  active.setSerializedConfigHash(warming.serializedConfigHash());
   EXPECT_FALSE(addOrUpdateListener(listener_foo_update1));
   checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
 
-  // A push whose bytes match the stored hash is blocked without MessageUtil::hash(), which would
-  // find this config changed.
+  // A push whose bytes match the hash set on the warming listener is blocked without
+  // MessageUtil::hash(), which would find this config changed.
   envoy::config::listener::v3::Listener listener_foo_update2 = listener_foo;
   listener_foo_update2.mutable_per_connection_buffer_limit_bytes()->set_value(1000);
   warming.setSerializedConfigHash(

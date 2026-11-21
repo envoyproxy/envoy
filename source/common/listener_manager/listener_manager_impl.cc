@@ -739,8 +739,8 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     return false;
   }
 
-  // A listener whose serialized config is unchanged blocks the update without MessageUtil::hash(),
-  // which only runs for a new config or one whose bytes differ.
+  // Each check below compares the serialized config first, so MessageUtil::hash() only runs for a
+  // new config or one whose bytes differ from the listener it is compared with.
   const uint64_t serialized_hash =
       HashUtil::xxHash64(MessageUtil::serializeDeterministically(config));
   ENVOY_LOG(debug, "begin add/update listener: name={} serialized_hash={}", name, serialized_hash);
@@ -756,12 +756,12 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
       return false;
     }
     // Storing the hash of these bytes lets the next push of the same bytes skip
-    // MessageUtil::hash(). A blocked update brings new bytes when the listener is static, or when
-    // MessageUtil::hash() finds a config with other bytes equal, for example on a full-proto build
-    // when the sender re-encodes an Any payload with its map entries in another order after a
-    // restart or an upgrade. Without this, every later push of these bytes would pay for both
-    // hashes, which costs more than MessageUtil::hash() alone. A sender that re-encodes on every
-    // push pays for both anyway.
+    // MessageUtil::hash(). An update that this listener blocks, or that reverts to it, brings new
+    // bytes when the listener is static, or when MessageUtil::hash() finds the config equal
+    // although its bytes differ, for example on a full-proto build when the sender re-encodes an
+    // Any payload with its map entries in another order after a restart or an upgrade. Without
+    // this, every later push of these bytes would pay for both hashes, which costs more than
+    // MessageUtil::hash() alone. A sender that re-encodes on every push pays for both anyway.
     listener.setSerializedConfigHash(serialized_hash);
     return true;
   };
