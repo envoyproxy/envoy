@@ -3917,6 +3917,47 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_listener_wri
   }
 }
 
+// Counts its calls, since its result cannot differ from both other writer stubs.
+static FILTER_CHAIN_CONFIG_WRITER_ENABLE_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> bool {
+  FILTER_CHAIN_CONFIG_WRITER_ENABLE_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  filter_chain_name: abi::envoy_dynamic_module_type_module_buffer,
+  filter_chain: abi::envoy_dynamic_module_type_module_buffer,
+  update_id_out: *mut u64,
+) -> abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result {
+  // Reports the argument lengths through the update ID so that the test can check them.
+  unsafe {
+    *update_id_out = (filter_chain_name.length * 100 + filter_chain.length) as u64;
+  }
+  abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  filter_chain_name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result {
+  // Finds only the filter chain that the test removes, so that the test checks the name.
+  let filter_chain_name = unsafe {
+    std::slice::from_raw_parts(filter_chain_name.ptr as *const u8, filter_chain_name.length)
+  };
+  if filter_chain_name == b"writer.chain" {
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result::Success
+  } else {
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result::NotFound
+  }
+}
+
 // =============================================================================
 // Bootstrap Extension Tests
 // =============================================================================
@@ -9053,6 +9094,17 @@ fn test_bootstrap_extension_worker_and_writer_default_noop() {
       length: 0,
     },
   );
+  envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    1,
+    cluster_name_buf,
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status::Active,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    },
+  );
 
   // Clean up.
   unsafe {
@@ -9079,6 +9131,14 @@ fn test_bootstrap_extension_worker_event_and_writer_hooks() {
     String,
   );
   static LISTENER_UPDATE_DONE: std::sync::Mutex<Option<ListenerUpdateDone>> =
+    std::sync::Mutex::new(None);
+  type FilterChainUpdateDone = (
+    u64,
+    String,
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status,
+    String,
+  );
+  static FILTER_CHAIN_UPDATE_DONE: std::sync::Mutex<Option<FilterChainUpdateDone>> =
     std::sync::Mutex::new(None);
 
   struct TestBootstrapExtensionConfig;
@@ -9133,6 +9193,22 @@ fn test_bootstrap_extension_worker_event_and_writer_hooks() {
       *LISTENER_UPDATE_DONE.lock().unwrap() = Some((
         update_id,
         listener_name.to_string(),
+        status,
+        error_details.to_string(),
+      ));
+    }
+
+    fn on_filter_chain_config_writer_update_done(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      update_id: u64,
+      filter_chain_name: &str,
+      status: abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status,
+      error_details: &str,
+    ) {
+      *FILTER_CHAIN_UPDATE_DONE.lock().unwrap() = Some((
+        update_id,
+        filter_chain_name.to_string(),
         status,
         error_details.to_string(),
       ));
@@ -9221,6 +9297,32 @@ fn test_bootstrap_extension_worker_event_and_writer_hooks() {
     ))
   );
 
+  let filter_chain_name = "writer.chain";
+  let filter_chain_error_details = "the listener manager rejected filter chain writer.chain";
+  envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    7,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: filter_chain_name.as_ptr() as *const _,
+      length: filter_chain_name.len(),
+    },
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status::Failed,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: filter_chain_error_details.as_ptr() as *const _,
+      length: filter_chain_error_details.len(),
+    },
+  );
+  assert_eq!(
+    *FILTER_CHAIN_UPDATE_DONE.lock().unwrap(),
+    Some((
+      7,
+      "writer.chain".to_string(),
+      abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status::Failed,
+      "the listener manager rejected filter chain writer.chain".to_string(),
+    ))
+  );
+
   unsafe {
     envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
   }
@@ -9258,6 +9360,24 @@ fn test_bootstrap_extension_config_run_on_all_workers_and_writers() {
   assert_eq!(
     envoy_config.listener_writer_remove("writer.listener"),
     abi::envoy_dynamic_module_type_bootstrap_listener_writer_removal_result::Success
+  );
+
+  assert!(envoy_config.enable_filter_chain_config_writer());
+  assert_eq!(
+    FILTER_CHAIN_CONFIG_WRITER_ENABLE_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+  // The stub encodes the lengths of the name and the filter chain in the update ID.
+  assert_eq!(
+    envoy_config.filter_chain_config_writer_add_or_update("writer.chain", b"xyz"),
+    (
+      abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result::Success,
+      1203
+    )
+  );
+  assert_eq!(
+    envoy_config.filter_chain_config_writer_remove("writer.chain"),
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result::Success
   );
 }
 
@@ -15917,6 +16037,49 @@ fn noop_scheduler_as_boxed_trait_object() {
   bootstrap::EnvoyBootstrapExtensionConfigScheduler::commit(&NoopScheduler, 1);
   cluster::EnvoyClusterScheduler::commit(&NoopScheduler, 2);
   stats_sink::EnvoyStatSinkConfigScheduler::commit(&NoopScheduler, 3);
+}
+
+#[cfg(test)]
+mod ecds_tests {
+  use crate::abi;
+  use crate::bootstrap::*;
+
+  #[derive(Default)]
+  struct TestHost {
+    subscription: Option<(String, String)>,
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+    host: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_module_buffer,
+    source: abi::envoy_dynamic_module_type_module_buffer,
+  ) -> bool {
+    let host = unsafe { &mut *host.cast::<TestHost>() };
+    let read = |buffer: abi::envoy_dynamic_module_type_module_buffer| {
+      let bytes = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(buffer.ptr.cast::<u8>(), buffer.length)
+      };
+      std::str::from_utf8(bytes).unwrap().to_owned()
+    };
+    host.subscription = Some((read(name), read(source)));
+    true
+  }
+
+  #[test]
+  fn subscribes_with_borrowed_config_source() {
+    let mut host = TestHost::default();
+    let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
+    let source = r#"{"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["type.googleapis.com/test.Config"]}"#;
+    assert!(envoy.subscribe_ecds(EcdsSubscription {
+      name: "test-config",
+      source_json: source,
+    }));
+    assert_eq!(
+      host.subscription,
+      Some(("test-config".to_owned(), source.to_owned()))
+    );
+  }
 }
 
 mod xds_tests {

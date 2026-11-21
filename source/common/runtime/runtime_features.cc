@@ -323,6 +323,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_async_client_downstream_flow_contr
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_rx_queue_overflow_socket_options);
 // TODO(abeyad): Flip to true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_ip_packet_info_socket_options);
+// When enabled, the admin filter returns to the event loop between the chunks of a response.
+// TODO(wbpcode): flip to true after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_admin_filter_yield_between_chunks);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.

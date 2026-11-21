@@ -20,6 +20,8 @@
 #include "source/common/init/target_impl.h"
 #include "source/extensions/bootstrap/dynamic_modules/cluster_writer.h"
 #include "source/extensions/bootstrap/dynamic_modules/config_snapshot.h"
+#include "source/extensions/bootstrap/dynamic_modules/extension_config_subscription.h"
+#include "source/extensions/bootstrap/dynamic_modules/filter_chain_config_writer.h"
 #include "source/extensions/bootstrap/dynamic_modules/listener_writer.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
@@ -78,6 +80,10 @@ using OnBootstrapExtensionClusterWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done);
 using OnBootstrapExtensionListenerWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done);
+using OnBootstrapExtensionFilterChainConfigWriterUpdateDoneType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done);
+using OnBootstrapExtensionEcdsUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_ecds_update);
 using OnBootstrapExtensionRuntimeBoolUpdateType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update);
 using OnBootstrapExtensionRuntimeIntUpdateType =
@@ -168,6 +174,11 @@ public:
   bool enableClusterLifecycle();
 
   /**
+   * Subscribes once to a named ECDS configuration after server initialization.
+   */
+  bool subscribeEcds(absl::string_view name, absl::string_view source_json);
+
+  /**
    * Collects and redacts the selected configuration providers on the main thread.
    */
   absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
@@ -191,6 +202,9 @@ public:
     }
     if (listener_writer_ != nullptr) {
       listener_writer_->onServerInitialized(listener_manager);
+    }
+    if (filter_chain_config_writer_ != nullptr) {
+      filter_chain_config_writer_->onServerInitialized(listener_manager);
     }
   }
 
@@ -279,6 +293,13 @@ public:
   bool enableListenerWriter();
 
   /**
+   * Creates the filter chain config writer, which lets the module add, update and remove filter
+   * chains. Must be called on the main thread.
+   * @return false if the filter chain config writer already exists or shutdown began.
+   */
+  bool enableFilterChainConfigWriter();
+
+  /**
    * Called on the main thread once Envoy finished initializing, right before it starts its
    * workers.
    */
@@ -334,6 +355,7 @@ public:
 
   // The following hooks are optional and stay nullptr when the module does not implement them.
   OnBootstrapExtensionXdsUpdateType on_bootstrap_extension_xds_update_ = nullptr;
+  OnBootstrapExtensionEcdsUpdateType on_bootstrap_extension_ecds_update_ = nullptr;
   OnBootstrapExtensionWorkerEventType on_bootstrap_extension_worker_event_ = nullptr;
   OnBootstrapExtensionRunOnAllWorkersDoneType on_bootstrap_extension_run_on_all_workers_done_ =
       nullptr;
@@ -341,6 +363,8 @@ public:
       on_bootstrap_extension_cluster_writer_update_done_ = nullptr;
   OnBootstrapExtensionListenerWriterUpdateDoneType
       on_bootstrap_extension_listener_writer_update_done_ = nullptr;
+  OnBootstrapExtensionFilterChainConfigWriterUpdateDoneType
+      on_bootstrap_extension_filter_chain_config_writer_update_done_ = nullptr;
   OnBootstrapExtensionRuntimeBoolUpdateType on_bootstrap_extension_runtime_bool_update_ = nullptr;
   OnBootstrapExtensionRuntimeIntUpdateType on_bootstrap_extension_runtime_int_update_ = nullptr;
   OnBootstrapExtensionRuntimeNumberUpdateType on_bootstrap_extension_runtime_number_update_ =
@@ -395,6 +419,8 @@ public:
   DynamicModuleClusterWriterPtr cluster_writer_;
   // The listener writer, or nullptr until the module enables it.
   DynamicModuleListenerWriterPtr listener_writer_;
+  // The filter chain config writer, or nullptr until the module enables it.
+  DynamicModuleFilterChainConfigWriterPtr filter_chain_config_writer_;
 
 private:
   void notifyXdsUpdate(absl::string_view type_url,
@@ -449,6 +475,8 @@ private:
   // Handle for the shutdown lifecycle callback that cleans up cluster_update_callbacks_handle_.
   Server::ServerLifecycleNotifier::HandlePtr cluster_lifecycle_shutdown_handle_;
   bool cluster_lifecycle_enabled_ = false;
+
+  std::unique_ptr<ExtensionConfigSubscription> extension_config_subscription_;
 
   // True once the server is initialized, set when the listener manager is provided during
   // onServerInitialized. The cluster manager is only safe to access after this point.

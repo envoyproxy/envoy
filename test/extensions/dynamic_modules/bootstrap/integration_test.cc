@@ -7,10 +7,12 @@
 
 #include "source/common/common/base64.h"
 #include "source/common/config/resource_name.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -176,14 +178,10 @@ public:
     return writerModuleRequest("/writer", action, body);
   }
 
-  // Builds a listener that responds to every request with a 200.
-  envoy::config::listener::v3::Listener directResponseListener(const std::string& name) {
-    envoy::config::listener::v3::Listener listener;
-    listener.set_name(name);
-    envoy::config::core::v3::SocketAddress* socket_address =
-        listener.mutable_address()->mutable_socket_address();
-    socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
-    socket_address->set_port_value(0);
+  // Builds a filter chain that responds to every request with the status.
+  envoy::config::listener::v3::FilterChain directResponseFilterChain(const std::string& name,
+                                                                     uint32_t status = 200) {
+    envoy::config::listener::v3::FilterChain filter_chain;
     TestUtility::loadFromYaml(fmt::format(R"EOF(
 name: {}
 filters:
@@ -197,14 +195,51 @@ filters:
         domains: ["*"]
         routes:
         - match: {{ prefix: "/" }}
-          direct_response: {{ status: 200 }}
+          direct_response: {{ status: {} }}
     http_filters:
     - name: envoy.filters.http.router
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 )EOF",
-                                          name, name),
-                              *listener.add_filter_chains());
+                                          name, name, status),
+                              filter_chain);
+    return filter_chain;
+  }
+
+  // Builds a listener that finds its filter chain by name without an FCDS config source.
+  envoy::config::listener::v3::Listener fcdsListener(const std::string& name,
+                                                     const std::string& filter_chain_name) {
+    envoy::config::listener::v3::Listener listener;
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
+name: {}
+address:
+  socket_address:
+    address: {}
+    port_value: 0
+fcds_config: {{}}
+filter_chain_matcher:
+  on_no_match:
+    action:
+      name: filter-chain-name
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: {}
+)EOF",
+                                          name, Network::Test::getLoopbackAddressString(version_),
+                                          filter_chain_name),
+                              listener);
+    return listener;
+  }
+
+  // Builds a listener that responds to every request with a 200.
+  envoy::config::listener::v3::Listener directResponseListener(const std::string& name) {
+    envoy::config::listener::v3::Listener listener;
+    listener.set_name(name);
+    envoy::config::core::v3::SocketAddress* socket_address =
+        listener.mutable_address()->mutable_socket_address();
+    socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
+    socket_address->set_port_value(0);
+    *listener.add_filter_chains() = directResponseFilterChain(name);
     return listener;
   }
 
@@ -216,13 +251,13 @@ filters:
     test_server_->waitForGauge("dynamicmodulescustom.last_done_event_id", testing::Eq(event_id));
   }
 
-  // Sends a request to the listener that was registered as the port and checks that it succeeds.
-  void expectDirectResponse(const std::string& port_name) {
+  // Sends a request to the listener that was registered as the port and checks its status.
+  void expectDirectResponse(const std::string& port_name, absl::string_view status = "200") {
     codec_client_ = makeHttpConnection(lookupPort(port_name));
     IntegrationStreamDecoderPtr response =
         codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ(status, response->headers().getStatusValue());
     codec_client_->close();
   }
 };
@@ -373,6 +408,257 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ClusterLifecycleRust) {
                                   {"info", "Cluster lifecycle enabled: true"}}),
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_cluster_lifecycle_test"));
 }
+
+TEST_P(DynamicModulesBootstrapIntegrationTest, EcdsConfigRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", testDataDir("rust"), 1);
+  for (const auto* path : {"/ecds_a", "/ecds_b"}) {
+    config_helper_.addBootstrapExtension(fmt::format(R"EOF(
+name: envoy.bootstrap.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension
+  dynamic_module_config:
+    name: bootstrap_ecds_test
+  extension_name: test
+  extension_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: {}
+)EOF",
+                                                     path));
+  }
+  HttpIntegrationTest::initialize();
+
+  const auto response = [](absl::string_view version, absl::string_view value) {
+    return fmt::format(R"EOF(
+version_info: "{}"
+resources:
+- "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
+  name: test-config
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: "{}"
+)EOF",
+                       version, value);
+  };
+  const std::string config_path =
+      TestEnvironment::writeStringToFileForTest("bootstrap_ecds.yaml", response("", "enabled"));
+  envoy::config::core::v3::ExtensionConfigSource source;
+  source.mutable_config_source()->mutable_path_config_source()->set_path(config_path);
+  source.mutable_config_source()->set_resource_api_version(envoy::config::core::v3::V3);
+  source.add_type_urls("type.googleapis.com/google.protobuf.StringValue");
+  const auto source_json = MessageUtil::getJsonStringFromMessageOrError(source);
+  EXPECT_EQ(writerModuleRequest("/ecds_a", "subscribe", source_json), "enabled");
+  EXPECT_EQ(writerModuleRequest("/ecds_b", "subscribe", source_json), "enabled");
+  EXPECT_EQ(writerModuleRequest("/ecds_a", "version", ""), "");
+
+  const auto replace_config = [&](const std::string& contents) {
+    TestEnvironment::renameFile(
+        TestEnvironment::writeStringToFileForTest("bootstrap_ecds_update.yaml", contents),
+        config_path);
+  };
+  const auto expect_config = [&](absl::string_view expected) {
+    EXPECT_EQ(writerModuleRequest("/ecds_a", "", ""), expected);
+    EXPECT_EQ(writerModuleRequest("/ecds_b", "", ""), expected);
+  };
+
+  replace_config(response("2", "disabled"));
+  test_server_->waitForCounter(
+      "extension_config_discovery.bootstrap.test-config.test.update_success", testing::Ge(4));
+  expect_config("disabled");
+
+  replace_config(response("3", "rejected"));
+  test_server_->waitForCounter(
+      "extension_config_discovery.bootstrap.test-config.test.update_rejected", testing::Ge(2));
+  expect_config("disabled");
+
+  replace_config("version_info: '4'\nresources: []\n");
+  test_server_->waitForCounter(
+      "extension_config_discovery.bootstrap.test-config.test.update_success", testing::Ge(6));
+  expect_config("disabled");
+
+  replace_config(response("5", ""));
+  test_server_->waitForCounter(
+      "extension_config_discovery.bootstrap.test-config.test.update_success", testing::Ge(8));
+  expect_config("");
+}
+
+class BootstrapEcdsIntegrationTest : public Event::TestUsingSimulatedTime,
+                                     public DynamicModulesBootstrapIntegrationTest {
+public:
+  void configureAds(bool unified_mux, envoy::config::core::v3::ApiConfigSource::ApiType api_type) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      unified_mux ? "true" : "false");
+    // the stats mode is selected before runtime overrides are loaded
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", true);
+    config_helper_.addConfigModifier(
+        [api_type](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* ads = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+          ads->set_api_type(api_type);
+          ads->set_transport_api_version(envoy::config::core::v3::V3);
+          ads->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("cluster_0");
+        });
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+  }
+
+  void testAdsTtlRemoval(bool unified_mux) {
+    DISABLE_IF_ADMIN_DISABLED;
+    configureAds(unified_mux, envoy::config::core::v3::ApiConfigSource::GRPC);
+    config_helper_.addBootstrapExtension(R"EOF(
+name: envoy.bootstrap.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension
+  dynamic_module_config:
+    name: bootstrap_ecds_test
+  extension_name: second
+  extension_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: /ecds_second
+)EOF");
+    initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_ecds_test", "test", "/ecds");
+
+    const std::string source =
+        R"({"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["type.googleapis.com/google.protobuf.StringValue"]})";
+    EXPECT_EQ(writerModuleRequest("/ecds", "subscribe", source), "removed");
+    FakeHttpConnectionPtr connection;
+    FakeStreamPtr stream;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, connection));
+    ASSERT_TRUE(connection->waitForNewStream(*dispatcher_, stream));
+    stream->startGrpcStream();
+    envoy::service::discovery::v3::DiscoveryRequest request;
+    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_THAT(request.resource_names(), testing::ElementsAre("test-config"));
+
+    envoy::config::core::v3::TypedExtensionConfig config;
+    config.set_name("test-config");
+    Protobuf::StringValue value;
+    value.set_value("keep-on-removal");
+    MessageUtil::packFrom(*config.mutable_typed_config(), value);
+    envoy::service::discovery::v3::Resource resource;
+    resource.set_name("test-config");
+    resource.set_version("1");
+    resource.mutable_ttl()->set_seconds(1);
+    MessageUtil::packFrom(*resource.mutable_resource(), config);
+    envoy::service::discovery::v3::DiscoveryResponse response;
+    response.set_version_info("1");
+    response.set_nonce("1");
+    response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
+    MessageUtil::packFrom(*response.add_resources(), resource);
+    stream->sendGrpcMessage(response);
+    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_FALSE(request.has_error_detail());
+    EXPECT_EQ(writerModuleRequest("/ecds", "", ""), "keep-on-removal");
+    auto counter = test_server_->counter(
+        "extension_config_discovery.bootstrap.test-config.test.update_success");
+    ASSERT_NE(counter, nullptr);
+    EXPECT_EQ(counter->tagExtractedName(),
+              "extension_config_discovery.bootstrap.test-config.update_success");
+    EXPECT_THAT(counter->tags(), testing::Contains(Stats::Tag{"config_name", "test"}));
+
+    auto duplicate =
+        IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/ecds_second?subscribe",
+                                           source, Http::CodecType::HTTP1, version_);
+    EXPECT_EQ(duplicate->headers().getStatusValue(), "400");
+    EXPECT_EQ(duplicate->body(), "subscription failed");
+
+    resource.clear_resource();
+    response.clear_resources();
+    response.set_nonce("heartbeat");
+    MessageUtil::packFrom(*response.add_resources(), resource);
+    EXPECT_LOG_NOT_CONTAINS("warn", "rejected ECDS removal", {
+      stream->sendGrpcMessage(response);
+      ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+      EXPECT_FALSE(request.has_error_detail());
+      EXPECT_EQ(writerModuleRequest("/ecds", "", ""), "keep-on-removal");
+    });
+
+    EXPECT_LOG_CONTAINS("warn", "rejected ECDS removal for test-config", {
+      timeSystem().advanceTimeWait(std::chrono::seconds(2));
+      EXPECT_EQ(writerModuleRequest("/ecds", "", ""), "keep-on-removal");
+    });
+    ASSERT_TRUE(connection->close());
+    ASSERT_TRUE(connection->waitForDisconnect());
+  }
+
+  void testDeltaAds(bool unified_mux) {
+    DISABLE_IF_ADMIN_DISABLED;
+    configureAds(unified_mux, envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+    initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_ecds_test", "test", "/ecds");
+    EXPECT_EQ(
+        writerModuleRequest(
+            "/ecds", "subscribe",
+            R"({"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["type.googleapis.com/google.protobuf.StringValue"]})"),
+        "removed");
+    FakeHttpConnectionPtr connection;
+    FakeStreamPtr stream;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, connection));
+    ASSERT_TRUE(connection->waitForNewStream(*dispatcher_, stream));
+    stream->startGrpcStream();
+    envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_THAT(request.resource_names_subscribe(), testing::ElementsAre("test-config"));
+
+    envoy::service::discovery::v3::DeltaDiscoveryResponse response;
+    response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
+    response.set_nonce("missing");
+    response.add_removed_resources("test-config");
+    stream->sendGrpcMessage(response);
+    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_FALSE(request.has_error_detail());
+    EXPECT_EQ(writerModuleRequest("/ecds", "", ""), "removed");
+
+    response.clear_removed_resources();
+    response.set_nonce("accepted");
+    response.set_system_version_info("system-v1");
+    auto* resource = response.add_resources();
+    resource->set_name("test-config");
+    resource->set_version("resource-v1");
+    envoy::config::core::v3::TypedExtensionConfig config;
+    config.set_name("test-config");
+    Protobuf::StringValue value;
+    value.set_value("enabled");
+    MessageUtil::packFrom(*config.mutable_typed_config(), value);
+    MessageUtil::packFrom(*resource->mutable_resource(), config);
+    stream->sendGrpcMessage(response);
+    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_FALSE(request.has_error_detail());
+    EXPECT_EQ(writerModuleRequest("/ecds", "", ""), "enabled");
+    EXPECT_EQ(writerModuleRequest("/ecds", "version", ""), "resource-v1");
+
+    response.set_nonce("rejected");
+    response.set_system_version_info("system-v2");
+    resource->set_version("resource-v2");
+    value.set_value("rejected");
+    MessageUtil::packFrom(*config.mutable_typed_config(), value);
+    MessageUtil::packFrom(*resource->mutable_resource(), config);
+    stream->sendGrpcMessage(response);
+    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_TRUE(request.has_error_detail());
+    EXPECT_EQ(request.response_nonce(), "rejected");
+    EXPECT_EQ(writerModuleRequest("/ecds", "", ""), "enabled");
+    EXPECT_EQ(writerModuleRequest("/ecds", "version", ""), "resource-v1");
+
+    response.clear_resources();
+    response.set_nonce("removed");
+    response.add_removed_resources("test-config");
+    stream->sendGrpcMessage(response);
+    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_FALSE(request.has_error_detail());
+    EXPECT_EQ(writerModuleRequest("/ecds", "", ""), "removed");
+    ASSERT_TRUE(connection->close());
+    ASSERT_TRUE(connection->waitForDisconnect());
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, BootstrapEcdsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(BootstrapEcdsIntegrationTest, AdsTtlRemovalRust) { testAdsTtlRemoval(false); }
+
+TEST_P(BootstrapEcdsIntegrationTest, UnifiedAdsTtlRemovalRust) { testAdsTtlRemoval(true); }
+
+TEST_P(BootstrapEcdsIntegrationTest, DeltaAdsRust) { testDeltaAds(false); }
+
+TEST_P(BootstrapEcdsIntegrationTest, UnifiedDeltaAdsRust) { testDeltaAds(true); }
 
 // This test verifies that the Rust bootstrap extension can receive listener lifecycle events
 // (add/update and removal) via the ListenerUpdateCallbacks mechanism.
@@ -1306,6 +1592,54 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ListenerWriterWithLdsRust) {
       testing::HasSubstr("2 writer.a Failed listener writer.a exists and is not owned by this "
                          "extension"));
   EXPECT_EQ("NotFound", writerRequest("remove=writer.a", ""));
+}
+
+// Verifies that a listener waits for the filter chain that a module writes, serves its updates, and
+// stops serving it once the module removes it.
+TEST_P(DynamicModulesBootstrapIntegrationTest, FilterChainConfigWriterRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  initializeWithWriter("");
+
+  std::string serialized;
+  ASSERT_TRUE(fcdsListener("writer.fcds", "chain.a").SerializeToString(&serialized));
+  EXPECT_EQ("Success 1", writerRequest("add=writer.fcds", serialized));
+  test_server_->waitForGauge("dynamic_modules.listener_writer.listeners_owned.config_name.writer",
+                             testing::Eq(1));
+  test_server_->waitForGauge("listener_manager.total_listeners_warming", testing::Eq(1));
+  EXPECT_EQ(
+      0, test_server_->counter("dynamic_modules.listener_writer.update_active.config_name.writer")
+             ->value());
+  ASSERT_TRUE(directResponseFilterChain("chain.a").SerializeToString(&serialized));
+  EXPECT_EQ("Success 1", writerRequest("add_filter_chain=chain.a", serialized));
+  test_server_->waitForCounter(
+      "dynamic_modules.filter_chain_config_writer.update_active.config_name.writer",
+      testing::Eq(1));
+  test_server_->waitForCounter("dynamic_modules.listener_writer.update_active.config_name.writer",
+                               testing::Eq(1));
+  runOnAllWorkers(1);
+  registerTestServerPorts({"http", "writer"});
+  expectDirectResponse("writer");
+
+  ASSERT_TRUE(directResponseFilterChain("chain.a", 404).SerializeToString(&serialized));
+  EXPECT_EQ("Success 2", writerRequest("add_filter_chain=chain.a", serialized));
+  test_server_->waitForCounter(
+      "dynamic_modules.filter_chain_config_writer.update_active.config_name.writer",
+      testing::Eq(2));
+  runOnAllWorkers(2);
+  expectDirectResponse("writer", "404");
+  // The done hook ran for the listener write and the two filter chain writes.
+  test_server_->waitForCounter("dynamicmodulescustom.update_done_total", testing::Eq(3));
+  const std::string outcomes = writerRequest("outcomes", "");
+  EXPECT_THAT(outcomes, testing::HasSubstr("1 chain.a Active"));
+  EXPECT_THAT(outcomes, testing::HasSubstr("2 chain.a Active"));
+
+  EXPECT_EQ("Success", writerRequest("remove_filter_chain=chain.a", ""));
+  test_server_->waitForGauge(
+      "dynamic_modules.filter_chain_config_writer.filter_chains_owned.config_name.writer",
+      testing::Eq(0));
+  runOnAllWorkers(3);
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("writer"));
+  tcp_client->waitForDisconnect();
 }
 
 } // namespace DynamicModules
