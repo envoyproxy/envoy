@@ -2648,7 +2648,8 @@ filter_chains:
 
 // A listener matches the stored serialized hash before MessageUtil::hash(), and a push of the
 // warming listener's bytes skips the revert check. The test sets the stored hashes by hand, which
-// no push does, so that a revert check or a MessageUtil::hash() that ran would change the result.
+// no push does, so that a revert check that ran, or a MessageUtil::hash() that decided a check,
+// would change the result.
 TEST_P(ListenerManagerImplTest, SerializedConfigHashIsCheckedBeforeMessageHash) {
   InSequence s;
 

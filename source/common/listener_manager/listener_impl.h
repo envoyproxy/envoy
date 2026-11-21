@@ -341,8 +341,8 @@ public:
 
   /**
    * @return the hash of the deterministic serialization of the config this listener was built from,
-   *         or of the last update that blockLdsUpdate() blocked, which the duplicate check compares
-   *         before MessageUtil::hash().
+   *         or of the last update that blockLdsUpdate() blocked, which the revert and duplicate
+   *         checks compare before MessageUtil::hash().
    */
   uint64_t serializedConfigHash() const { return serialized_config_hash_; }
   void setSerializedConfigHash(uint64_t serialized_config_hash) {

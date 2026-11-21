@@ -1158,7 +1158,8 @@ TEST_P(ListenerFcdsIntegrationTest, LdsRemovalWithSharedFcds) {
   test_server_->waitForCounter("listener_manager.lds.update_success", Ge(2));
 
   // In both SotW and Delta, only Listener A is removed (or omitted).
-  // Listener B is untouched because its config is identical, so the listener manager blocks it.
+  // Listener B is untouched. In SotW the listener manager blocks its identical config, and in Delta
+  // the update does not name it.
   // So only Listener A goes to draining.
   test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(1));
 
