@@ -1,3 +1,10 @@
+#include <cstdint>
+#include <memory>
+
+#include "envoy/http/codec.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
+
 #include "source/common/common/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/router/upstream_codec_filter.h"
@@ -5,6 +12,7 @@
 
 #include "test/common/http/common.h"
 #include "test/common/memory/memory_test_utility.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/router/router_filter_interface.h"
 #include "test/test_common/test_runtime.h"
 
@@ -465,6 +473,543 @@ TEST_F(UpstreamRequestTest, ReentrantResetDuringDecodeMetadata) {
   Http::MetadataMap metadata;
   Http::FilterMetadataStatus status = codec_filter->decodeMetadata(metadata);
   EXPECT_EQ(status, Http::FilterMetadataStatus::StopIterationForLocalReply);
+  upstream_request_.reset();
+}
+
+// Upstream filter helper for testing request- and response-direction watermark propagation.
+class WatermarkTestUpstreamFilter : public Http::StreamFilter {
+public:
+  // Http::StreamDecoderFilter
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    if (raise_decoder_watermark_on_headers_) {
+      decoder_callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+    }
+    return Http::FilterHeadersStatus::Continue;
+  }
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
+    return Http::FilterDataStatus::Continue;
+  }
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
+    return Http::FilterTrailersStatus::Continue;
+  }
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
+  }
+
+  // Http::StreamEncoderFilter
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
+    return Http::Filter1xxHeadersStatus::Continue;
+  }
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
+    return Http::FilterDataStatus::Continue;
+  }
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override {
+    return Http::FilterTrailersStatus::Continue;
+  }
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
+    encoder_callbacks_ = &callbacks;
+  }
+
+  void onDestroy() override {
+    if (lower_decoder_watermark_on_destroy_) {
+      decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+    }
+    if (upstream_wm_cb_ != nullptr) {
+      decoder_callbacks_->removeUpstreamWatermarkCallbacks(*upstream_wm_cb_);
+      upstream_wm_cb_ = nullptr;
+    }
+    if (downstream_wm_cb_ != nullptr) {
+      decoder_callbacks_->removeDownstreamWatermarkCallbacks(*downstream_wm_cb_);
+      downstream_wm_cb_ = nullptr;
+    }
+  }
+
+  void subscribeUpstreamWatermark(Http::UpstreamWatermarkCallbacks& cb) {
+    upstream_wm_cb_ = &cb;
+    decoder_callbacks_->addUpstreamWatermarkCallbacks(cb);
+  }
+  void subscribeDownstreamWatermark(Http::DownstreamWatermarkCallbacks& cb) {
+    downstream_wm_cb_ = &cb;
+    decoder_callbacks_->addDownstreamWatermarkCallbacks(cb);
+  }
+
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
+  Http::UpstreamWatermarkCallbacks* upstream_wm_cb_{nullptr};
+  Http::DownstreamWatermarkCallbacks* downstream_wm_cb_{nullptr};
+  bool raise_decoder_watermark_on_headers_{false};
+  bool lower_decoder_watermark_on_destroy_{false};
+};
+
+class UpstreamRequestWatermarkTest : public UpstreamRequestTest {
+public:
+  void initializeWithWatermarkFilter(bool add_second_filter = false) {
+    router_filter_interface_.callbacks_.cluster_info_ = router_filter_interface_.cluster_info_;
+    filter_ = std::make_shared<WatermarkTestUpstreamFilter>();
+    if (add_second_filter) {
+      second_filter_ = std::make_shared<WatermarkTestUpstreamFilter>();
+    }
+    EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain(_))
+        .WillOnce([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+          callbacks.addStreamFilter(filter_);
+          if (second_filter_ != nullptr) {
+            callbacks.addStreamFilter(second_filter_);
+          }
+          callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+          return true;
+        });
+    ON_CALL(router_filter_interface_.callbacks_, addDownstreamWatermarkCallbacks(_))
+        .WillByDefault([&](Http::DownstreamWatermarkCallbacks& cb) { router_ds_wm_cb_ = &cb; });
+    initialize();
+  }
+
+  void startAndEstablishPool() {
+    GenericConnectionPoolCallbacks* pool_callbacks = nullptr;
+    EXPECT_CALL(*conn_pool_, newStream(_)).WillOnce([&](GenericConnectionPoolCallbacks* callbacks) {
+      pool_callbacks = callbacks;
+    });
+    upstream_request_->acceptHeadersFromRouter(false);
+    ASSERT_NE(pool_callbacks, nullptr);
+    auto mock_upstream = std::make_unique<NiceMock<MockGenericUpstream>>();
+    mock_upstream_ = mock_upstream.get();
+    pool_callbacks->onPoolReady(std::move(mock_upstream), host_, connection_info_provider_,
+                                stream_info_, Http::Protocol::Http2);
+    bridge_ = &pool_callbacks->upstreamToDownstream();
+  }
+
+  uint64_t clusterCounter(const std::string& name) {
+    return router_filter_interface_.cluster_info_->stats_store_.counter(name).value();
+  }
+
+  std::shared_ptr<WatermarkTestUpstreamFilter> filter_;
+  std::shared_ptr<WatermarkTestUpstreamFilter> second_filter_;
+  MockGenericUpstream* mock_upstream_{nullptr};
+  UpstreamToDownstream* bridge_{nullptr};
+  Http::DownstreamWatermarkCallbacks* router_ds_wm_cb_{nullptr};
+};
+
+// Request-direction high/low watermarks propagate to both downstream callbacks and upstream
+// filters subscribed via addUpstreamWatermarkCallbacks(), and late subscribers catch up.
+TEST_F(UpstreamRequestWatermarkTest, UpstreamWatermarkCallbacksForwardedAndLateSubscriberCaughtUp) {
+  initializeWithWatermarkFilter();
+  startAndEstablishPool();
+
+  testing::StrictMock<Http::MockUpstreamWatermarkCallbacks> upstream_wm_cb;
+  filter_->subscribeUpstreamWatermark(upstream_wm_cb);
+
+  EXPECT_CALL(router_filter_interface_.callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(upstream_wm_cb, onAboveWriteBufferHighWatermark());
+  bridge_->onAboveWriteBufferHighWatermark();
+  EXPECT_EQ(1U, clusterCounter("upstream_flow_control_backed_up_total"));
+
+  testing::StrictMock<Http::MockUpstreamWatermarkCallbacks> late_subscriber;
+  EXPECT_CALL(late_subscriber, onAboveWriteBufferHighWatermark());
+  filter_->decoder_callbacks_->addUpstreamWatermarkCallbacks(late_subscriber);
+
+  EXPECT_CALL(router_filter_interface_.callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_CALL(upstream_wm_cb, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(late_subscriber, onBelowWriteBufferLowWatermark());
+  bridge_->onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(1U, clusterCounter("upstream_flow_control_drained_total"));
+
+  filter_->decoder_callbacks_->removeUpstreamWatermarkCallbacks(late_subscriber);
+  upstream_request_.reset();
+}
+
+// Resetting/cleaning up an UpstreamRequest while above high watermark unwinds downstream
+// callbacks cleanly without leaking depth.
+TEST_F(UpstreamRequestWatermarkTest, UpstreamWatermarkUnwoundOnCleanUp) {
+  initializeWithWatermarkFilter();
+  startAndEstablishPool();
+
+  testing::StrictMock<Http::MockUpstreamWatermarkCallbacks> upstream_wm_cb;
+  filter_->subscribeUpstreamWatermark(upstream_wm_cb);
+
+  EXPECT_CALL(router_filter_interface_.callbacks_, onDecoderFilterAboveWriteBufferHighWatermark())
+      .Times(2);
+  EXPECT_CALL(upstream_wm_cb, onAboveWriteBufferHighWatermark()).Times(2);
+  bridge_->onAboveWriteBufferHighWatermark();
+  bridge_->onAboveWriteBufferHighWatermark();
+
+  EXPECT_CALL(router_filter_interface_.callbacks_, onDecoderFilterBelowWriteBufferLowWatermark())
+      .Times(2);
+  upstream_request_.reset();
+  EXPECT_EQ(2U, clusterCounter("upstream_flow_control_drained_total"));
+}
+
+// An upstream filter that lowers its own decoder watermark inside onDestroy() must not trigger a
+// double-unwind or assert in UpstreamRequest::cleanUp().
+TEST_F(UpstreamRequestWatermarkTest, UpstreamWatermarkFilterLowInOnDestroyDoesNotDoubleUnwind) {
+  initializeWithWatermarkFilter();
+  filter_->raise_decoder_watermark_on_headers_ = true;
+  filter_->lower_decoder_watermark_on_destroy_ = true;
+
+  EXPECT_CALL(*conn_pool_, newStream(_));
+  EXPECT_CALL(router_filter_interface_.callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  upstream_request_->acceptHeadersFromRouter(false);
+
+  EXPECT_CALL(router_filter_interface_.callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
+  upstream_request_.reset();
+  EXPECT_EQ(1U, clusterCounter("upstream_flow_control_drained_total"));
+}
+
+// Reentrant cleanUp() during onDecoderFilterAboveWriteBufferHighWatermark() combined with a filter
+// lowering its decoder watermark in onDestroy() must not underflow upstream_high_watermark_count_.
+TEST_F(UpstreamRequestWatermarkTest, ReentrantCleanUpDuringUpstreamHighWatermarkDoesNotCrash) {
+  initializeWithWatermarkFilter();
+  filter_->raise_decoder_watermark_on_headers_ = true;
+  filter_->lower_decoder_watermark_on_destroy_ = true;
+
+  EXPECT_CALL(*conn_pool_, newStream(_));
+  EXPECT_CALL(router_filter_interface_.callbacks_, onDecoderFilterAboveWriteBufferHighWatermark())
+      .WillOnce([&] { upstream_request_->cleanUp(); });
+  EXPECT_CALL(router_filter_interface_.callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
+  upstream_request_->acceptHeadersFromRouter(false);
+  upstream_request_.reset();
+  EXPECT_EQ(1U, clusterCounter("upstream_flow_control_drained_total"));
+}
+
+// Reentrant enableDataFromDownstreamForFlowControl() inside the downstream callback of
+// disableDataFromDownstreamForFlowControl() must not leak an unmatched upstream high watermark.
+TEST_F(UpstreamRequestWatermarkTest,
+       ReentrantLowWatermarkDuringDisableDataDoesNotLeakUpstreamWatermark) {
+  initializeWithWatermarkFilter();
+  startAndEstablishPool();
+
+  int high_count = 0;
+  int low_count = 0;
+  testing::NiceMock<Http::MockUpstreamWatermarkCallbacks> upstream_wm_cb;
+  ON_CALL(upstream_wm_cb, onAboveWriteBufferHighWatermark()).WillByDefault([&] { ++high_count; });
+  ON_CALL(upstream_wm_cb, onBelowWriteBufferLowWatermark()).WillByDefault([&] { ++low_count; });
+  filter_->subscribeUpstreamWatermark(upstream_wm_cb);
+
+  EXPECT_CALL(router_filter_interface_.callbacks_, onDecoderFilterAboveWriteBufferHighWatermark())
+      .WillOnce([&] { bridge_->onBelowWriteBufferLowWatermark(); });
+  EXPECT_CALL(router_filter_interface_.callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
+
+  bridge_->onAboveWriteBufferHighWatermark();
+  EXPECT_EQ(high_count, low_count);
+  upstream_request_.reset();
+}
+
+// During cleanUp() -> destroyFilters(), a filter lowering its decoder watermark in onDestroy()
+// must not deliver live onBelowWriteBufferLowWatermark() callbacks to sibling filters.
+TEST_F(UpstreamRequestWatermarkTest, OnDestroyFilterLowWatermarkDoesNotNotifySiblingFilter) {
+  initializeWithWatermarkFilter(/*add_second_filter=*/true);
+  filter_->raise_decoder_watermark_on_headers_ = true;
+  filter_->lower_decoder_watermark_on_destroy_ = true;
+
+  testing::StrictMock<Http::MockUpstreamWatermarkCallbacks> sibling_cb;
+  second_filter_->subscribeUpstreamWatermark(sibling_cb);
+
+  EXPECT_CALL(*conn_pool_, newStream(_));
+  EXPECT_CALL(router_filter_interface_.callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(sibling_cb, onAboveWriteBufferHighWatermark());
+  upstream_request_->acceptHeadersFromRouter(false);
+
+  EXPECT_CALL(router_filter_interface_.callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_CALL(sibling_cb, onBelowWriteBufferLowWatermark()).Times(0);
+  upstream_request_.reset();
+}
+
+// Downstream backpressure after response start propagates to upstream filters subscribed via
+// addDownstreamWatermarkCallbacks() while calling upstream->readDisable() and charging stats
+// exactly once (not doubled between UpstreamRequest and UpstreamCodecFilter).
+TEST_F(UpstreamRequestWatermarkTest, DownstreamWatermarkForwardedOnceWithoutDoubleReadDisable) {
+  initializeWithWatermarkFilter();
+  startAndEstablishPool();
+  ASSERT_NE(router_ds_wm_cb_, nullptr);
+
+  testing::StrictMock<Http::MockDownstreamWatermarkCallbacks> upstream_filter_ds_cb;
+  filter_->subscribeDownstreamWatermark(upstream_filter_ds_cb);
+
+  ON_CALL(router_filter_interface_, downstreamResponseStarted()).WillByDefault(Return(true));
+  auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl({{":status", "200"}}));
+  bridge_->decodeHeaders(std::move(response_headers), false);
+
+  EXPECT_CALL(*mock_upstream_, readDisable(true));
+  EXPECT_CALL(upstream_filter_ds_cb, onAboveWriteBufferHighWatermark());
+  router_ds_wm_cb_->onAboveWriteBufferHighWatermark();
+  EXPECT_EQ(1U, clusterCounter("upstream_flow_control_paused_reading_total"));
+
+  EXPECT_CALL(*mock_upstream_, readDisable(false));
+  EXPECT_CALL(upstream_filter_ds_cb, onBelowWriteBufferLowWatermark());
+  router_ds_wm_cb_->onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(1U, clusterCounter("upstream_flow_control_resumed_reading_total"));
+
+  upstream_request_.reset();
+}
+
+// Pre-response downstream watermarks are deferred until Router::Filter commits the response,
+// cancel out if downstream drains before response headers, and flush once to both
+// UpstreamCodecFilter and upstream filter subscribers on commit.
+TEST_F(UpstreamRequestWatermarkTest, DownstreamWatermarkDeferredBeforeResponseHeadersAndFlushed) {
+  initializeWithWatermarkFilter();
+  startAndEstablishPool();
+  ASSERT_NE(router_ds_wm_cb_, nullptr);
+
+  testing::StrictMock<Http::MockDownstreamWatermarkCallbacks> upstream_filter_ds_cb;
+  filter_->subscribeDownstreamWatermark(upstream_filter_ds_cb);
+
+  ON_CALL(router_filter_interface_, downstreamResponseStarted()).WillByDefault(Return(false));
+  EXPECT_CALL(*mock_upstream_, readDisable(_)).Times(0);
+  router_ds_wm_cb_->onAboveWriteBufferHighWatermark();
+  router_ds_wm_cb_->onAboveWriteBufferHighWatermark();
+  router_ds_wm_cb_->onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(0U, clusterCounter("upstream_flow_control_paused_reading_total"));
+  EXPECT_EQ(0U, clusterCounter("upstream_flow_control_resumed_reading_total"));
+
+  // Router commits response headers: sets downstreamResponseStarted() and flushes deferred count.
+  EXPECT_CALL(*mock_upstream_, readDisable(true));
+  EXPECT_CALL(upstream_filter_ds_cb, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(router_filter_interface_, onUpstreamHeaders(_, _, _, false))
+      .WillOnce([&](uint64_t, Http::ResponseHeaderMapPtr&&, UpstreamRequest& req, bool) {
+        ON_CALL(router_filter_interface_, downstreamResponseStarted()).WillByDefault(Return(true));
+        req.maybeHandleDeferredReadDisable();
+      });
+  auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl({{":status", "200"}}));
+  bridge_->decodeHeaders(std::move(response_headers), false);
+  EXPECT_EQ(1U, clusterCounter("upstream_flow_control_paused_reading_total"));
+
+  EXPECT_CALL(*mock_upstream_, readDisable(false));
+  EXPECT_CALL(upstream_filter_ds_cb, onBelowWriteBufferLowWatermark());
+  router_ds_wm_cb_->onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(1U, clusterCounter("upstream_flow_control_resumed_reading_total"));
+
+  upstream_request_.reset();
+}
+
+// Retriable 503 headers do not flush deferred downstream watermarks, call upstream->readDisable(),
+// or charge upstream_flow_control_paused_reading_total on the discarded attempt.
+TEST_F(UpstreamRequestWatermarkTest, Retriable503DoesNotFlushDeferredWatermark) {
+  initializeWithWatermarkFilter();
+  startAndEstablishPool();
+  ASSERT_NE(router_ds_wm_cb_, nullptr);
+
+  testing::StrictMock<Http::MockDownstreamWatermarkCallbacks> upstream_filter_ds_cb;
+  filter_->subscribeDownstreamWatermark(upstream_filter_ds_cb);
+
+  ON_CALL(router_filter_interface_, downstreamResponseStarted()).WillByDefault(Return(false));
+  router_ds_wm_cb_->onAboveWriteBufferHighWatermark();
+
+  EXPECT_CALL(*mock_upstream_, readDisable(_)).Times(0);
+  EXPECT_CALL(upstream_filter_ds_cb, onAboveWriteBufferHighWatermark()).Times(0);
+  EXPECT_CALL(router_filter_interface_, onUpstreamHeaders(503, _, _, false))
+      .WillOnce([&](uint64_t, Http::ResponseHeaderMapPtr&&, UpstreamRequest& req, bool) {
+        req.resetStream();
+      });
+  auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl({{":status", "503"}}));
+  bridge_->decodeHeaders(std::move(response_headers), false);
+  EXPECT_EQ(0U, clusterCounter("upstream_flow_control_paused_reading_total"));
+
+  upstream_request_.reset();
+}
+
+// Downstream low watermarks arriving reentrantly during maybeHandleDeferredReadDisable() cancel
+// remaining deferred counts or unwind cleanly without asserting.
+TEST_F(UpstreamRequestWatermarkTest, DownstreamLowWatermarkDuringDeferredReadDisableDoesNotAssert) {
+  initializeWithWatermarkFilter();
+  startAndEstablishPool();
+  ASSERT_NE(router_ds_wm_cb_, nullptr);
+
+  ON_CALL(router_filter_interface_, downstreamResponseStarted()).WillByDefault(Return(false));
+  router_ds_wm_cb_->onAboveWriteBufferHighWatermark();
+  router_ds_wm_cb_->onAboveWriteBufferHighWatermark();
+
+  int read_disable_depth = 0;
+  ON_CALL(*mock_upstream_, readDisable(_)).WillByDefault([&](bool disable) {
+    read_disable_depth += disable ? 1 : -1;
+  });
+
+  testing::NiceMock<Http::MockDownstreamWatermarkCallbacks> upstream_filter_ds_cb;
+  EXPECT_CALL(upstream_filter_ds_cb, onAboveWriteBufferHighWatermark()).WillOnce([&] {
+    // First low cancels the 2nd un-flushed deferred count; second low unwinds the 1st.
+    router_ds_wm_cb_->onBelowWriteBufferLowWatermark();
+    router_ds_wm_cb_->onBelowWriteBufferLowWatermark();
+  });
+  filter_->subscribeDownstreamWatermark(upstream_filter_ds_cb);
+
+  ON_CALL(router_filter_interface_, downstreamResponseStarted()).WillByDefault(Return(true));
+  upstream_request_->maybeHandleDeferredReadDisable();
+  EXPECT_EQ(0, read_disable_depth);
+
+  upstream_request_.reset();
+}
+
+// Reentrant stream reset inside maybeHandleDeferredReadDisable() stops further deferred flushes
+// without UAF or dangling iterator traversal.
+TEST_F(UpstreamRequestWatermarkTest, ReentrantResetDuringDeferredReadDisableStopsFlushing) {
+  initializeWithWatermarkFilter();
+  startAndEstablishPool();
+  ASSERT_NE(router_ds_wm_cb_, nullptr);
+
+  ON_CALL(router_filter_interface_, downstreamResponseStarted()).WillByDefault(Return(false));
+  router_ds_wm_cb_->onAboveWriteBufferHighWatermark();
+  router_ds_wm_cb_->onAboveWriteBufferHighWatermark();
+
+  EXPECT_CALL(router_filter_interface_.callbacks_, resetStream(_, _)).WillOnce([&] {
+    upstream_request_->cleanUp();
+  });
+  testing::StrictMock<Http::MockDownstreamWatermarkCallbacks> resetting_cb;
+  EXPECT_CALL(resetting_cb, onAboveWriteBufferHighWatermark()).WillOnce([&] {
+    filter_->decoder_callbacks_->resetStream();
+  });
+  filter_->subscribeDownstreamWatermark(resetting_cb);
+
+  // UpstreamCodecFilter was registered before resetting_cb, so it runs on the first deferred
+  // callback before resetting_cb cleans up the stream; the second deferred callback must not run.
+  EXPECT_CALL(*mock_upstream_, readDisable(true));
+  ON_CALL(router_filter_interface_, downstreamResponseStarted()).WillByDefault(Return(true));
+  upstream_request_->maybeHandleDeferredReadDisable();
+  EXPECT_TRUE(upstream_request_->cleanedUp());
+
+  upstream_request_.reset();
+}
+
+// Self-unsubscribing inside DownstreamWatermarkCallbacks or UpstreamWatermarkCallbacks must not
+// invalidate iteration or cause heap-use-after-free.
+TEST_F(UpstreamRequestWatermarkTest, ReentrantSelfUnsubscribeInWatermarkCallbacksDoesNotUaf) {
+  initializeWithWatermarkFilter(/*add_second_filter=*/true);
+  startAndEstablishPool();
+  ASSERT_NE(router_ds_wm_cb_, nullptr);
+
+  // 1. Downstream watermark self-unsubscribe still notifies UpstreamCodecFilter.
+  testing::StrictMock<Http::MockDownstreamWatermarkCallbacks> self_removing_ds_cb;
+  EXPECT_CALL(self_removing_ds_cb, onAboveWriteBufferHighWatermark()).WillOnce([&] {
+    filter_->decoder_callbacks_->removeDownstreamWatermarkCallbacks(self_removing_ds_cb);
+    filter_->downstream_wm_cb_ = nullptr;
+  });
+  filter_->subscribeDownstreamWatermark(self_removing_ds_cb);
+
+  ON_CALL(router_filter_interface_, downstreamResponseStarted()).WillByDefault(Return(true));
+  EXPECT_CALL(*mock_upstream_, readDisable(true));
+  router_ds_wm_cb_->onAboveWriteBufferHighWatermark();
+
+  // 2. Upstream watermark self-unsubscribe still notifies the sibling subscriber.
+  testing::StrictMock<Http::MockUpstreamWatermarkCallbacks> self_removing_us_cb;
+  testing::StrictMock<Http::MockUpstreamWatermarkCallbacks> sibling_us_cb;
+  EXPECT_CALL(self_removing_us_cb, onAboveWriteBufferHighWatermark()).WillOnce([&] {
+    filter_->decoder_callbacks_->removeUpstreamWatermarkCallbacks(self_removing_us_cb);
+    filter_->upstream_wm_cb_ = nullptr;
+  });
+  EXPECT_CALL(sibling_us_cb, onAboveWriteBufferHighWatermark());
+  filter_->subscribeUpstreamWatermark(self_removing_us_cb);
+  second_filter_->subscribeUpstreamWatermark(sibling_us_cb);
+
+  bridge_->onAboveWriteBufferHighWatermark();
+
+  upstream_request_.reset();
+}
+
+// Upstream encoder filter backpressure (onEncoderFilterAboveWriteBufferHighWatermark) immediately
+// pauses upstream reading even before downstreamResponseStarted() and composes cleanly with
+// deferred/active downstream backpressure.
+TEST_F(UpstreamRequestWatermarkTest,
+       UpstreamEncoderFilterWatermarkComposesWithDownstreamWatermark) {
+  initializeWithWatermarkFilter();
+  startAndEstablishPool();
+  ASSERT_NE(router_ds_wm_cb_, nullptr);
+
+  testing::StrictMock<Http::MockDownstreamWatermarkCallbacks> upstream_filter_ds_cb;
+  filter_->subscribeDownstreamWatermark(upstream_filter_ds_cb);
+
+  ON_CALL(router_filter_interface_, downstreamResponseStarted()).WillByDefault(Return(false));
+  EXPECT_CALL(*mock_upstream_, readDisable(true));
+  EXPECT_CALL(upstream_filter_ds_cb, onAboveWriteBufferHighWatermark());
+  filter_->encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
+  EXPECT_EQ(1U, clusterCounter("upstream_flow_control_paused_reading_total"));
+
+  EXPECT_CALL(*mock_upstream_, readDisable(_)).Times(0);
+  router_ds_wm_cb_->onAboveWriteBufferHighWatermark();
+
+  EXPECT_CALL(*mock_upstream_, readDisable(true));
+  EXPECT_CALL(upstream_filter_ds_cb, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(router_filter_interface_, onUpstreamHeaders(_, _, _, false))
+      .WillOnce([&](uint64_t, Http::ResponseHeaderMapPtr&&, UpstreamRequest& req, bool) {
+        ON_CALL(router_filter_interface_, downstreamResponseStarted()).WillByDefault(Return(true));
+        req.maybeHandleDeferredReadDisable();
+      });
+  auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl({{":status", "200"}}));
+  bridge_->decodeHeaders(std::move(response_headers), false);
+  EXPECT_EQ(2U, clusterCounter("upstream_flow_control_paused_reading_total"));
+
+  EXPECT_CALL(*mock_upstream_, readDisable(false));
+  EXPECT_CALL(upstream_filter_ds_cb, onBelowWriteBufferLowWatermark());
+  filter_->encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark();
+
+  EXPECT_CALL(*mock_upstream_, readDisable(false));
+  EXPECT_CALL(upstream_filter_ds_cb, onBelowWriteBufferLowWatermark());
+  router_ds_wm_cb_->onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(2U, clusterCounter("upstream_flow_control_resumed_reading_total"));
+
+  upstream_request_.reset();
+}
+
+// Encoder watermarks fired before onPoolReady() or after clearRequestEncoder() must not
+// null-dereference upstream() or issue unbalanced readDisable(false) calls.
+TEST_F(UpstreamRequestWatermarkTest, PrePoolReadyAndPostClearEncoderWatermarksAreSafe) {
+  initializeWithWatermarkFilter();
+
+  filter_->encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
+  EXPECT_EQ(0U, clusterCounter("upstream_flow_control_paused_reading_total"));
+
+  startAndEstablishPool();
+
+  EXPECT_CALL(*mock_upstream_, readDisable(_)).Times(0);
+  filter_->encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark();
+  EXPECT_EQ(0U, clusterCounter("upstream_flow_control_resumed_reading_total"));
+
+  EXPECT_CALL(*mock_upstream_, readDisable(true));
+  filter_->encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
+  upstream_request_->clearRequestEncoder();
+  filter_->encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark();
+  EXPECT_EQ(0U, clusterCounter("upstream_flow_control_resumed_reading_total"));
+
+  upstream_request_.reset();
+}
+
+// Lowering an encoder watermark raised before onPoolReady() must not steal an active downstream
+// readDisable(true) and prematurely resume upstream reading.
+TEST_F(UpstreamRequestWatermarkTest, PrePoolHighWatermarkNotStolenByDownstreamLowWatermark) {
+  initializeWithWatermarkFilter();
+
+  // 1. Pre-pool encoder high watermark is recorded as unapplied.
+  filter_->encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
+
+  startAndEstablishPool();
+  ASSERT_NE(router_ds_wm_cb_, nullptr);
+
+  int read_disable_depth = 0;
+  ON_CALL(*mock_upstream_, readDisable(_)).WillByDefault([&](bool disable) {
+    read_disable_depth += disable ? 1 : -1;
+  });
+
+  // 2. Response starts and downstream backs up -> upstream readDisable(true) applied.
+  ON_CALL(router_filter_interface_, downstreamResponseStarted()).WillByDefault(Return(true));
+  auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl({{":status", "200"}}));
+  bridge_->decodeHeaders(std::move(response_headers), false);
+  router_ds_wm_cb_->onAboveWriteBufferHighWatermark();
+  ASSERT_EQ(1, read_disable_depth);
+
+  // 3. Lowering the pre-pool watermark absorbs the unapplied high watermark without resuming.
+  filter_->encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark();
+  EXPECT_EQ(1, read_disable_depth);
+
+  // 4. Downstream drains -> upstream resumes cleanly.
+  router_ds_wm_cb_->onBelowWriteBufferLowWatermark();
+  EXPECT_EQ(0, read_disable_depth);
+
   upstream_request_.reset();
 }
 

@@ -118,3 +118,5 @@ message BreakingChangeFilterConfig {
 }
 message StatsPrefixFilterConfig {
 }
+message BidirectionalWatermarkObserverFilterConfig {
+}

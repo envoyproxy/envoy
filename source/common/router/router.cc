@@ -1898,6 +1898,14 @@ void Filter::onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
   downstream_response_started_ = true;
   final_upstream_request_ = &upstream_request;
   resetOtherUpstreams(upstream_request);
+  // Flush downstream high watermarks that were deferred before the response started, now that
+  // downstream_response_started_ is set and competing hedges have been reset. Fanout may reset or
+  // complete the stream synchronously via an upstream filter's watermark callback, so bail out
+  // before forwarding headers if upstream_request was torn down.
+  upstream_request.maybeHandleDeferredReadDisable();
+  if (upstream_request.cleanedUp()) {
+    return;
+  }
 
   // Don't send retries after 100-Continue has been sent on. Arguably we could attempt to do a
   // retry, assume the next upstream would also send an 100-Continue and swallow the second one
@@ -2124,6 +2132,16 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   // Make sure that for request hedging, we end up with the correct final upstream info.
   callbacks_->streamInfo().setUpstreamInfo(final_upstream_request_->streamInfo().upstreamInfo());
   resetOtherUpstreams(upstream_request);
+  // Flush deferred downstream high watermarks only after retry/redirect checks pass,
+  // downstream_response_started_ is set, and losing hedges are reset, so discarded attempts never
+  // pause upstream filters or charge paused-reading stats. Skipped on end_stream since no body
+  // remains; bail out if a filter watermark callback synchronously tore down the request.
+  if (!end_stream) {
+    upstream_request.maybeHandleDeferredReadDisable();
+    if (upstream_request.cleanedUp()) {
+      return;
+    }
+  }
 
   // Modify response headers after we have set the final upstream info because we may need to
   // modify the headers based on the upstream host.
