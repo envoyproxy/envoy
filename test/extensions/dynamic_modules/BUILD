@@ -10,7 +10,9 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_sh_test",
 )
+load(":abi_exports.bzl", "abi_exports_test_bin")
 
 licenses(["notice"])  # Apache 2
 
@@ -157,4 +159,31 @@ rust_clippy(
         "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
         "//source/extensions/dynamic_modules/sdk/rust:rust_runtime",
     ],
+)
+
+# abi_exports_test runs against envoy-static (which links every registered extension and
+# exports the symbols in bazel/exported_symbols.txt via --dynamic-list), with translation units
+# that define callbacks built with -fvisibility=hidden.
+abi_exports_test_bin(
+    name = "abi_exports_test_bin",
+    bin = "//source/exe:envoy-static",
+    target_compatible_with = ["@platforms//os:linux"],
+)
+
+envoy_sh_test(
+    name = "abi_exports_test",
+    srcs = ["abi_exports_test.sh"],
+    coverage = False,
+    data = [
+        ":abi_exports_test_bin",
+        "//bazel:exported_symbols_windows.def",
+        "@llvm_toolchain_llvm//:readelf",
+    ],
+    env = {
+        "ABI_EXPORTS_TEST_BIN": "$(rootpath :abi_exports_test_bin)",
+        "CALLBACK_DEF": "$(rootpath //bazel:exported_symbols_windows.def)",
+        "READELF": "$(rootpath @llvm_toolchain_llvm//:readelf)",
+    },
+    tags = ["skip_on_windows"],
+    target_compatible_with = ["@platforms//os:linux"],
 )
