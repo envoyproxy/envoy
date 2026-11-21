@@ -3,7 +3,9 @@
 
 #include <string>
 
+#include "absl/strings/escaping.h"
 #include "absl/strings/substitute.h"
+#include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
 #include "bazel/cc_proto_descriptor_library/testdata/test-extension.pb.h"
 #include "bazel/cc_proto_descriptor_library/testdata/test-extension_descriptor.pb.h"
 #include "bazel/cc_proto_descriptor_library/testdata/test.pb.h"
@@ -12,6 +14,7 @@
 #include "bazel/cc_proto_descriptor_library/text_format_transcoder.h"
 #include "gmock/gmock.h"
 #include "google/protobuf/descriptor.h"
+#include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/dynamic_message.h"
 #include "google/protobuf/text_format.h"
 #include "gtest/gtest.h"
@@ -74,6 +77,61 @@ bar: "hello world"
                                      &concrete_message));
 
   ASSERT_THAT(concrete_message.bar(), Eq("hello world"));
+}
+
+TEST(TextFormatTranscoderTest, InvalidDescriptorsAreNotRegistered) {
+  const auto& original =
+      protobuf::reflection::bazel_cc_proto_descriptor_library_testdata_test::kFileDescriptorInfo;
+  std::string descriptor_bytes;
+  ASSERT_TRUE(absl::Base64Unescape(original.file_descriptor_bytes_base64, &descriptor_bytes));
+  for (const auto& invalid_bytes : {std::string(original.file_descriptor_bytes_base64) + "!",
+                                    absl::Base64Escape(descriptor_bytes + "\x80")}) {
+    cc_proto_descriptor_library::TextFormatTranscoder reserializer(false);
+    const cc_proto_descriptor_library::internal::FileDescriptorInfo invalid_descriptor{
+        original.file_name, invalid_bytes, original.deps};
+    EXPECT_DEBUG_DEATH(reserializer.loadFileDescriptors(invalid_descriptor),
+                       "Failed to parse embedded file descriptor for: .*test\\.proto");
+
+    testdata::dynamic_descriptors::Foo concrete_message;
+    std::string error_text;
+    StringErrorCollector error_collector(error_text);
+    EXPECT_FALSE(reserializer.parseInto("bar: 'hello world'", &concrete_message, &error_collector));
+    EXPECT_EQ(error_text,
+              "0(0): Could not find descriptor for: testdata.dynamic_descriptors.Foo\n");
+
+    reserializer.loadFileDescriptors(original);
+    ASSERT_TRUE(reserializer.parseInto("bar: 'hello world'", &concrete_message));
+    EXPECT_EQ(concrete_message.bar(), "hello world");
+  }
+}
+
+TEST(TextFormatTranscoderTest, UnbuildableDescriptorsAreNotRegistered) {
+  const auto& original =
+      protobuf::reflection::bazel_cc_proto_descriptor_library_testdata_test::kFileDescriptorInfo;
+  google::protobuf::FileDescriptorProto descriptor;
+  testdata::dynamic_descriptors::Foo::descriptor()->file()->CopyTo(&descriptor);
+  // Parses, but references a type that does not exist, so it cannot be built.
+  auto* field = descriptor.mutable_message_type(0)->mutable_field(0);
+  field->set_type(google::protobuf::FieldDescriptorProto::TYPE_MESSAGE);
+  field->set_type_name(".testdata.dynamic_descriptors.DoesNotExist");
+  std::string serialized_descriptor;
+  ASSERT_TRUE(descriptor.SerializeToString(&serialized_descriptor));
+  const auto descriptor_bytes = absl::Base64Escape(serialized_descriptor);
+  const cc_proto_descriptor_library::internal::FileDescriptorInfo unbuildable_descriptor{
+      original.file_name, descriptor_bytes, original.deps};
+  cc_proto_descriptor_library::TextFormatTranscoder reserializer(false);
+  EXPECT_DEBUG_DEATH(reserializer.loadFileDescriptors(unbuildable_descriptor),
+                     "Failed to build embedded file descriptor for: .*test\\.proto");
+
+  testdata::dynamic_descriptors::Foo concrete_message;
+  std::string error_text;
+  StringErrorCollector error_collector(error_text);
+  EXPECT_FALSE(reserializer.parseInto("bar: 'hello world'", &concrete_message, &error_collector));
+  EXPECT_EQ(error_text, "0(0): Could not find descriptor for: testdata.dynamic_descriptors.Foo\n");
+
+  reserializer.loadFileDescriptors(original);
+  ASSERT_TRUE(reserializer.parseInto("bar: 'hello world'", &concrete_message));
+  EXPECT_EQ(concrete_message.bar(), "hello world");
 }
 
 TEST(TextToBinaryReserializerTest, TextFormatWithExtensionWorks) {

@@ -563,16 +563,18 @@ bool DynamicModuleCluster::addHosts(
       continue;
     }
 
-    auto locality = std::make_shared<envoy::config::core::v3::Locality>();
+    envoy::config::core::v3::Locality locality_proto;
     if (!regions[i].empty()) {
-      locality->set_region(regions[i]);
+      locality_proto.set_region(regions[i]);
     }
     if (!zones[i].empty()) {
-      locality->set_zone(zones[i]);
+      locality_proto.set_zone(zones[i]);
     }
     if (!sub_zones[i].empty()) {
-      locality->set_sub_zone(sub_zones[i]);
+      locality_proto.set_sub_zone(sub_zones[i]);
     }
+    // Hosts in the same locality share one Locality object instead of each holding a copy.
+    auto locality = constLocalitySharedPool()->getObject(locality_proto);
 
     // Build endpoint metadata if provided.
     Upstream::MetadataConstSharedPtr endpoint_metadata = nullptr;

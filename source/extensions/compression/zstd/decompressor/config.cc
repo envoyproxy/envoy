@@ -10,7 +10,9 @@ ZstdDecompressorFactory::ZstdDecompressorFactory(
     const envoy::extensions::compression::zstd::decompressor::v3::Zstd& zstd, Stats::Scope& scope,
     Event::Dispatcher& dispatcher, Api::Api& api, ThreadLocal::SlotAllocator& tls)
     : scope_(scope),
-      chunk_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(zstd, chunk_size, ZSTD_DStreamOutSize())) {
+      chunk_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(zstd, chunk_size, ZSTD_DStreamOutSize())),
+      max_inflate_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(zstd, max_inflate_ratio, 100)),
+      max_block_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(zstd, max_block_size, 0)) {
   if (zstd.dictionaries_size() > 0) {
     ddict_manager_ = std::make_unique<ZstdDDictManager>(
         zstd.dictionaries(), dispatcher, api, tls, false,
@@ -22,7 +24,8 @@ ZstdDecompressorFactory::ZstdDecompressorFactory(
 
 Envoy::Compression::Decompressor::DecompressorPtr
 ZstdDecompressorFactory::createDecompressor(const std::string& stats_prefix) {
-  return std::make_unique<ZstdDecompressorImpl>(scope_, stats_prefix, ddict_manager_, chunk_size_);
+  return std::make_unique<ZstdDecompressorImpl>(scope_, stats_prefix, ddict_manager_, chunk_size_,
+                                                max_inflate_ratio_, max_block_size_);
 }
 
 Envoy::Compression::Decompressor::DecompressorFactoryPtr

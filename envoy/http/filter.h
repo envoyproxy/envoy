@@ -237,6 +237,9 @@ public:
   // Returns a handle to the upstream stream's stream info.
   virtual StreamInfo::StreamInfo& upstreamStreamInfo() PURE;
 
+  // Returns a handle to the downstream stream's stream info.
+  virtual StreamInfo::StreamInfo& downstreamStreamInfo() PURE;
+
   // Returns the WebTransport session of the *downstream* stream paired with this upstream request,
   // if any. Used by the upstream WebTransport codec to obtain the downstream session so it can
   // bridge the two. Defaults to an empty OptRef for non-WebTransport streams.
@@ -1204,6 +1207,9 @@ public:
    *
    * When called in encodeData, the trailers map will be initialized to an empty map and returned by
    * reference. Calling this function more than once is invalid.
+   *
+   * Filters after the caller observe end_stream == false on the current data frame and then receive
+   * the new trailers via encodeTrailers(), including when one of them stops data iteration.
    *
    * @return a reference to the newly created trailers map.
    */

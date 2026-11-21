@@ -80,7 +80,6 @@ envoy_cc_library(
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":cds_api_lib",
         ":cluster_discovery_manager_lib",

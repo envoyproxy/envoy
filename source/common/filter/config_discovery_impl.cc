@@ -8,6 +8,7 @@
 
 #include "source/common/common/containers.h"
 #include "source/common/common/thread.h"
+#include "source/common/config/ecds_subscription_registry.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 
@@ -66,11 +67,20 @@ absl::StatusOr<std::unique_ptr<FilterConfigSubscription>> FilterConfigSubscripti
     Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
     std::shared_ptr<FilterConfigProviderManagerImplBase> filter_config_provider_manager,
     const std::string& subscription_id) {
+  std::unique_ptr<Cleanup> name_reservation;
+  if (config_source.has_ads()) {
+    auto reservation =
+        Config::EcdsSubscriptionRegistry::get(factory_context.singletonManager())
+            ->reserve(filter_config_name, Config::EcdsSubscriptionRegistry::Sharing::Shared);
+    RETURN_IF_NOT_OK(reservation.status());
+    name_reservation = std::move(*reservation);
+  }
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<FilterConfigSubscription>(new FilterConfigSubscription(
       config_source, filter_config_name, factory_context, cluster_manager, stat_prefix,
       filter_config_provider_manager, subscription_id, creation_status));
   RETURN_IF_NOT_OK_REF(creation_status);
+  ret->ecds_name_reservation_ = std::move(name_reservation);
   return ret;
 }
 FilterConfigSubscription::FilterConfigSubscription(
