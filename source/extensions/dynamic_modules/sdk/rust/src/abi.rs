@@ -10170,7 +10170,8 @@ pub enum envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_
 #[repr(u32)]
 /** envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status is the outcome of a
  write that envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done
- reports.*/
+ reports. Unlike the cluster and listener writer statuses, it has no OwnershipLost, since Envoy
+ does not notice when another extension writes or removes the same filter chain.*/
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status {
     Active = 0,

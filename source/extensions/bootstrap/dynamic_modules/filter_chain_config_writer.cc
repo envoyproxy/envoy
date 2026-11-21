@@ -39,7 +39,7 @@ DynamicModuleFilterChainConfigWriter::DynamicModuleFilterChainConfigWriter(
     UpdateDoneCallback update_done)
     : ResourceWriter(extension_name, context, std::move(update_done),
                      {"filter_chain_config_writer", "filter_chains_owned",
-                      /*ownership_can_be_lost=*/false},
+                      /*notices_ownership_loss=*/false},
                      /*resource_type_url=*/""),
       init_target_(
           absl::StrCat("dynamic_modules_bootstrap_filter_chain_config_writer:", config_name_),

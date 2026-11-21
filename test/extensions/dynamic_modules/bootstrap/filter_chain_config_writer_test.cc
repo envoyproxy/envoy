@@ -470,8 +470,8 @@ TEST_F(FilterChainConfigWriterTest, RemovalDuringAFailedFirstApplyRemovesNothing
   EXPECT_EQ(RemovalNotFound, writer_->removeFilterChain("writer.a"));
 }
 
-// Like FCDS updates, the apply passes of the filter chain config writer hold back no xDS requests.
-// The writer has no ownership statistics.
+// Envoy lists no dependent xDS types for a filter chain, so the writer passes no type URL and its
+// apply passes take no xDS pause of their own. The writer has no ownership statistics.
 TEST_F(FilterChainConfigWriterTest, HoldsBackNoXdsRequestsAndHasNoOwnershipStatistics) {
   createInitializedWriter();
   write("writer.a");

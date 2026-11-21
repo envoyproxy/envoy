@@ -78,9 +78,9 @@ struct WriterStatNames {
   absl::string_view prefix;
   // The gauge of the resources that the module owns, for example clusters_owned.
   absl::string_view owned;
-  // Whether another source can take a resource away from the module, which the ownership
-  // statistics count.
-  bool ownership_can_be_lost = true;
+  // Whether the writer notices when another source takes a resource away from the module, which
+  // the ownership statistics count.
+  bool notices_ownership_loss = true;
 };
 
 struct WriterStats {
@@ -90,7 +90,7 @@ struct WriterStats {
   Stats::Counter& update_superseded_;
   Stats::Counter& update_removed_;
   Stats::Counter& update_failed_;
-  // Set only when another source can take a resource away from the module.
+  // Set only for a writer that notices another source taking a resource away from the module.
   OptRef<Stats::Counter> update_ownership_lost_;
   OptRef<Stats::Counter> ownership_lost_;
   Stats::Gauge& owned_;
@@ -334,8 +334,8 @@ protected:
       stats_.update_failed_.inc();
       break;
     case WriteOutcome::OwnershipLost:
-      // Only a writer whose resources another source can take reports this outcome, and such a
-      // writer has the ownership statistics.
+      // Only a writer that notices another source taking a resource reports this outcome, and such
+      // a writer has the ownership statistics.
       stats_.update_ownership_lost_->inc();
       break;
     }

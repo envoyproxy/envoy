@@ -25,7 +25,7 @@ WriterStats generateWriterStats(Stats::Scope& scope, absl::string_view config_na
                                              Stats::Gauge::ImportMode::NeverImport, tags);
   };
   const auto ownership_counter = [&](absl::string_view name) {
-    return names.ownership_can_be_lost ? makeOptRef(counter(name)) : OptRef<Stats::Counter>();
+    return names.notices_ownership_loss ? makeOptRef(counter(name)) : OptRef<Stats::Counter>();
   };
   return WriterStats{counter("update_submitted"),
                      counter("update_rejected"),

@@ -9761,7 +9761,8 @@ typedef enum envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_remo
 /**
  * envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status is the outcome of a
  * write that envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done
- * reports.
+ * reports. Unlike the cluster and listener writer statuses, it has no OwnershipLost, since Envoy
+ * does not notice when another extension writes or removes the same filter chain.
  */
 typedef enum envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status {
   // The filter chain finished warming with this configuration or an identical one. Every worker
