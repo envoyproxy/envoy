@@ -826,6 +826,12 @@ ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cluster
     if (!cluster_data.blockUpdate(*new_hash)) {
       return false;
     }
+    // MessageUtil::hash() unpacks Any payloads and skips unknown fields, so it finds a config
+    // unchanged whose bytes differ because the management server encoded an Any payload
+    // differently, such as with its map entries in another order, or sent fields this Envoy doesn't
+    // know. Keeping the new bytes lets later pushes of them skip MessageUtil::hash(), so a server
+    // that re-encodes once, such as after a restart or an upgrade, doesn't pay for both hashes on
+    // every push.
     cluster_data.serialized_config_hash_ = serialized_hash;
     return true;
   };
