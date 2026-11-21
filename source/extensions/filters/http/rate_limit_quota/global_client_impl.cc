@@ -350,8 +350,13 @@ void GlobalRateLimitClientImpl::onQuotaResponseImpl(const RateLimitQuotaResponse
         // Only create a new TokenBucket if the configuration is new or
         // different from the cache.)
         if (shouldReplaceTokenBucket(cached_bucket.get(), rate_limit_strategy)) {
-          bucket->token_bucket_limiter = createTokenBucketFromAction(
-              rate_limit_strategy, time_source_, cached_bucket->token_bucket_limiter.get());
+          // Only a previous assignment's token bucket carries its fill level over; the default
+          // action's token bucket doesn't reduce what the server assigns.
+          bucket->token_bucket_limiter =
+              createTokenBucketFromAction(rate_limit_strategy, time_source_,
+                                          actionHasTokenBucket(cached_bucket->cached_action.get())
+                                              ? cached_bucket->token_bucket_limiter.get()
+                                              : nullptr);
           ENVOY_LOG(info,
                     "A new TokenBucket has been configured by the RLQS "
                     "filter for id: {}",
