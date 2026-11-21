@@ -110,6 +110,7 @@ protected:
   struct Manipulations {
     std::optional<BlanketRule> no_assignment_blanket_rule = std::nullopt;
     bool unsupported_no_assignment_strategy = false;
+    std::optional<RateLimitStrategy> no_assignment_strategy = std::nullopt;
     std::optional<BucketId> custom_bucket_id = std::nullopt;
     std::optional<RateLimitStrategy> fallback_rate_limit_strategy = std::nullopt;
     int fallback_ttl_sec = kFallbackTtlSecDefault;
@@ -148,6 +149,9 @@ protected:
                                          ->mutable_requests_per_time_unit();
       requests_per_time_unit->set_requests_per_time_unit(100);
       requests_per_time_unit->set_time_unit(envoy::type::v3::RateLimitUnit::SECOND);
+    } else if (config_option.no_assignment_strategy.has_value()) {
+      *mutable_bucket_settings.mutable_no_assignment_behavior()->mutable_fallback_rate_limit() =
+          *config_option.no_assignment_strategy;
     }
 
     if (config_option.fallback_rate_limit_strategy.has_value()) {
@@ -696,6 +700,46 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentDenyAll) {
   // The request is denied by no_assignment_behavior.
   EXPECT_EQ(usage.num_requests_allowed(), 0);
   EXPECT_EQ(usage.num_requests_denied(), 2);
+}
+
+// A token bucket no_assignment_behavior limits the requests into a bucket while the RLQS server
+// hasn't sent an assignment. The first request is allowed when the bucket is created; later ones
+// consume from the token bucket.
+TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentTokenBucket) {
+  RateLimitStrategy token_bucket_strategy;
+  auto* token_bucket = token_bucket_strategy.mutable_token_bucket();
+  token_bucket->set_max_tokens(2);
+  token_bucket->mutable_tokens_per_fill()->set_value(2);
+  token_bucket->mutable_fill_interval()->set_seconds(60);
+  Matcher matcher = default_matcher_;
+  manipulateOnMatch({.no_assignment_strategy = token_bucket_strategy},
+                    matcher.mutable_matcher_list()->mutable_matchers(0)->mutable_on_match());
+
+  initializeConfig(matcher);
+  HttpIntegrationTest::initialize();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+
+  // The first request creates the bucket and is allowed. Wait for the bucket to reach the
+  // workers so that the next requests find it.
+  WAIT_FOR_LOG_CONTAINS("debug", "RLQS buckets cache written to TLS.",
+                        { sendClientRequest(&custom_headers); });
+  ASSERT_TRUE(rlqs_upstream_->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+  ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+  rlqs_stream_->startGrpcStream();
+  RateLimitQuotaUsageReports reports;
+  ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+  ASSERT_TRUE(expectAllowedRequest());
+
+  // No assignment is ever sent, so the next requests consume the fallback's two tokens.
+  for (int i = 0; i < 3; ++i) {
+    sendClientRequest(&custom_headers);
+    if (i < 2) {
+      ASSERT_TRUE(expectAllowedRequest());
+    } else {
+      ASSERT_TRUE(expectDeniedRequest(429));
+    }
+  }
 }
 
 TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentDenyAllWithSettings) {

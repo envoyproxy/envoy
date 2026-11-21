@@ -760,6 +760,64 @@ TEST_F(GlobalClientTest, TestDuplicateTokenBucket) {
   EXPECT_FALSE(token_bucket->cached_action);
 }
 
+// A bucket whose default action (no_assignment_behavior) is a token bucket needs a token bucket
+// limiter while no assignment is in effect: when it's created, and again when an assignment
+// expires and the bucket reverts to its default action.
+TEST_F(GlobalClientTest, TestTokenBucketDefaultAction) {
+  mock_stream_client->expectStreamCreation(1);
+  mock_stream_client->expectTimerCreations(reporting_interval_, action_ttl, 1);
+
+  RateLimitQuotaUsageReports expected_reports = buildReports(
+      std::vector<ReportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
+  EXPECT_CALL(
+      mock_stream_client->stream_,
+      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false))
+      .Times(2);
+
+  const int max_tokens = 10;
+  BucketAction default_token_bucket_action =
+      buildTokenBucketAction(sample_bucket_id_, max_tokens, 10, std::chrono::seconds(60));
+  cb_ptr_->expectBuckets({sample_id_hash_});
+  global_client_->createBucket(
+      /*bucket_id=*/sample_bucket_id_,
+      /*id=*/sample_id_hash_,
+      /*default_bucket_action=*/default_token_bucket_action,
+      /*fallback_action=*/nullptr,
+      /*fallback_ttl=*/std::chrono::milliseconds::zero(),
+      /*initial_request_allowed=*/true);
+  cb_ptr_->waitForExpectedBuckets();
+
+  std::shared_ptr<CachedBucket> bucket = getBucket(*buckets_tls_, sample_id_hash_);
+  EXPECT_FALSE(bucket->cached_action);
+  ASSERT_TRUE(bucket->token_bucket_limiter);
+  EXPECT_EQ(bucket->token_bucket_limiter->consume(max_tokens, false), max_tokens);
+
+  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
+  mock_stream_client->timer_->invokeCallback();
+  waitForNotification(cb_ptr_->report_sent);
+
+  // An ALLOW_ALL assignment replaces the default action, then expires.
+  BucketAction allow_all_action = buildBlanketAction(sample_bucket_id_, false);
+  RateLimitQuotaResponsePtr response = std::make_unique<RateLimitQuotaResponse>();
+  response->add_bucket_action()->CopyFrom(allow_all_action);
+  global_client_->onReceiveMessage(std::move(response));
+  waitForNotification(cb_ptr_->response_processed);
+
+  bucket = getBucket(*buckets_tls_, sample_id_hash_);
+  ASSERT_TRUE(bucket->cached_action);
+  EXPECT_FALSE(bucket->token_bucket_limiter);
+  Event::MockTimer* expiration_timer =
+      RateLimitTestClient::assertMockTimer(bucket->action_expiration_timer.get());
+  ASSERT_TRUE(expiration_timer && expiration_timer->enabled_);
+  expiration_timer->invokeCallback();
+  waitForNotification(cb_ptr_->action_expired);
+
+  bucket = getBucket(*buckets_tls_, sample_id_hash_);
+  EXPECT_FALSE(bucket->cached_action);
+  ASSERT_TRUE(bucket->token_bucket_limiter);
+  EXPECT_EQ(bucket->token_bucket_limiter->maxTokens(), max_tokens);
+}
+
 // Expect assignments that don't match to any cached buckets to be dropped from
 // assignments without damaging the envoy.
 TEST_F(GlobalClientTest, TestResponseProcessingForNonExistentBucket) {
