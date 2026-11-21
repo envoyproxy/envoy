@@ -148,6 +148,7 @@ RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_shadow_mode_no_short_cir
 RUNTIME_GUARD(envoy_reloadable_features_match_headers_individually);
 RUNTIME_GUARD(envoy_reloadable_features_metadata_formatter_only_truncate_string);
 RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
+RUNTIME_GUARD(envoy_reloadable_features_network_ext_proc_enforce_processing_mode);
 // When enabled, a non-graceful admin drain (/drain_listeners without `graceful`) also starts a
 // drain sequence and notifies the connections of the covered listeners that a drain has begun,
 // instead of only stopping the listeners, and accepts `skip_exit` to drain without stopping them.
