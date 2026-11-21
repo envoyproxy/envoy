@@ -121,5 +121,37 @@ TEST_F(HistogramSettingsImplTest, ScaledPercent) {
   EXPECT_EQ(settings_->buckets("abcd"), ConstSupportedBuckets({0.1, 2}));
 }
 
+TEST(HistogramImplTest, OutOfBoundCount) {
+  struct {
+    char const* name;
+    std::vector<double> bounds;
+    std::vector<uint64_t> samples;
+    uint64_t expected_out_of_bound_count;
+  } cases[] = {
+      {
+          "at_final_bound",
+          {100},
+          {100},
+          0,
+      },
+      {
+          "at_bound_and_not_at_bound",
+          {100},
+          {50, 100, 110},
+          1,
+      },
+  };
+  for (const auto& c : cases) {
+    SCOPED_TRACE(c.name);
+    std::unique_ptr<histogram_t, decltype(&hist_free)> histogram(hist_alloc(), hist_free);
+    for (const auto& sample : c.samples) {
+      hist_insert(histogram.get(), sample, 1);
+    }
+    HistogramStatisticsImpl histogram_stats(histogram.get(), Histogram::Unit::Bytes, c.bounds);
+
+    EXPECT_EQ(c.expected_out_of_bound_count, histogram_stats.outOfBoundCount());
+  }
+}
+
 } // namespace Stats
 } // namespace Envoy

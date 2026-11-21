@@ -24,6 +24,7 @@
 
 using testing::_;
 using testing::ByMove;
+using testing::ElementsAreArray;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -2804,6 +2805,44 @@ TEST_F(RequestStreamerTests, TestAddAggregationResultsByResource) {
   EXPECT_EQ(podOf(requests_[1]->resource_metrics(1).resource()), "b");
   ASSERT_EQ(requests_[2]->resource_metrics_size(), 1);
   EXPECT_EQ(podOf(requests_[2]->resource_metrics(0).resource()), "b");
+}
+
+TEST_F(RequestStreamerTests, AddHistogram) {
+  struct {
+    const char* name;
+    std::vector<double> bounds;
+    std::vector<double> samples;
+    std::vector<uint64_t> expected_buckets;
+  } cases[] = {
+      {
+          "at_final_bound",
+          {100},
+          {100},
+          {1, 0},
+      },
+      {"at_bound_and_not_at_bound", {100}, {50, 100, 110}, {2, 1}},
+  };
+
+  setupStreamer(/*max_data_point=*/0);
+  for (const auto& c : cases) {
+    SCOPED_TRACE(c.name);
+    requests_.clear();
+
+    std::unique_ptr<histogram_t, decltype(&hist_free)> histogram(hist_alloc(), hist_free);
+    for (double sample : c.samples) {
+      hist_insert(histogram.get(), sample, 1);
+    }
+    Stats::HistogramStatisticsImpl stats(histogram.get(), Stats::Histogram::Unit::Bytes, c.bounds);
+    streamer_->addHistogram("test_histogram", stats, {});
+    streamer_->send();
+
+    ASSERT_EQ(1, requests_.size());
+    const auto& data_point =
+        requests_[0]->resource_metrics(0).scope_metrics(0).metrics(0).histogram().data_points(0);
+    EXPECT_EQ(c.samples.size(), data_point.count());
+    EXPECT_THAT(data_point.explicit_bounds(), ElementsAreArray(c.bounds));
+    EXPECT_THAT(data_point.bucket_counts(), ElementsAreArray(c.expected_buckets));
+  }
 }
 
 TEST_F(MetricAggregatorTests, AggregationByResource) {
