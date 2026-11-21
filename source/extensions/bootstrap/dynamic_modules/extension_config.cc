@@ -12,6 +12,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/common/regex.h"
 #include "source/common/common/thread.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/str_cat.h"
@@ -46,6 +47,7 @@ DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
 }
 
 DynamicModuleBootstrapExtensionConfig::~DynamicModuleBootstrapExtensionConfig() {
+  extension_config_subscription_.reset();
   // Cancel any pending HTTP callouts before destroying the config.
   for (auto& callout : http_callouts_) {
     if (callout.second->request_ != nullptr) {
@@ -103,6 +105,65 @@ bool DynamicModuleBootstrapExtensionConfig::enableClusterLifecycle() {
       Server::ServerLifecycleNotifier::Stage::ShutdownExit,
       [this]() { cluster_update_callbacks_handle_.reset(); });
   return true;
+}
+
+bool DynamicModuleBootstrapExtensionConfig::subscribeEcds(absl::string_view name,
+                                                          absl::string_view source_json) {
+  if (!server_initialized_) {
+    ENVOY_LOG(error, "cannot subscribe to bootstrap ECDS before server is initialized");
+    return false;
+  }
+  if (extension_destroyed_ || !shutdownNotificationExpected()) {
+    ENVOY_LOG(error, "cannot subscribe to bootstrap ECDS after shutdown or in init only mode");
+    return false;
+  }
+  if (extension_config_subscription_ != nullptr) {
+    ENVOY_LOG(error, "bootstrap extension {} is already subscribed to ECDS", extension_name_);
+    return false;
+  }
+  if (on_bootstrap_extension_ecds_update_ == nullptr) {
+    ENVOY_LOG(error, "bootstrap extension {} has no ECDS update hook", extension_name_);
+    return false;
+  }
+  envoy::config::core::v3::ExtensionConfigSource source;
+  bool has_unknown_field = false;
+  auto status = MessageUtil::loadFromJsonNoThrow(source_json, source, has_unknown_field);
+  if (!status.ok()) {
+    ENVOY_LOG(warn, "bootstrap ECDS config source for {} is invalid: {}", name, status.message());
+    return false;
+  }
+  TRY_ASSERT_MAIN_THREAD {
+    auto subscription = ExtensionConfigSubscription::create(
+        name, source, extension_name_, context_,
+        [this](absl::string_view resource_name, absl::string_view version,
+               absl::string_view type_url,
+               envoy_dynamic_module_type_bootstrap_ecds_config_encoding encoding,
+               std::optional<absl::string_view> config) {
+          const bool previous = std::exchange(in_resource_lifecycle_callback, true);
+          Cleanup cleanup([previous]() { in_resource_lifecycle_callback = previous; });
+          return on_bootstrap_extension_ecds_update_(
+              thisAsVoidPtr(), in_module_config_, {resource_name.data(), resource_name.size()},
+              {version.data(), version.size()}, {type_url.data(), type_url.size()}, encoding,
+              config.has_value(),
+              config.has_value()
+                  ? envoy_dynamic_module_type_envoy_buffer{config->data(), config->size()}
+                  : envoy_dynamic_module_type_envoy_buffer{nullptr, 0});
+        });
+    if (!subscription.ok()) {
+      ENVOY_LOG(warn, "cannot subscribe to bootstrap ECDS config {}: {}", name,
+                subscription.status().message());
+      return false;
+    }
+    extension_config_subscription_ = std::move(subscription.value());
+    extension_config_subscription_->start();
+    return true;
+  }
+  END_TRY
+  CATCH(const EnvoyException& exception, {
+    ENVOY_LOG(warn, "cannot subscribe to bootstrap ECDS config {}: {}", name, exception.what());
+    extension_config_subscription_.reset();
+    return false;
+  });
 }
 
 absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
@@ -370,6 +431,7 @@ void DynamicModuleBootstrapExtensionConfig::onPostInit() {
 
 void DynamicModuleBootstrapExtensionConfig::onShutdown() {
   shutdown_started_ = true;
+  extension_config_subscription_.reset();
   if (cluster_writer_ != nullptr) {
     cluster_writer_->onShutdown();
   }
@@ -644,6 +706,11 @@ newDynamicModuleBootstrapExtensionConfig(
 
   // The module constructor can enable the writers, which capture their done hooks, so the optional
   // hooks are resolved first.
+  auto on_ecds_update =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionEcdsUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_ecds_update");
+  config->on_bootstrap_extension_ecds_update_ =
+      on_ecds_update.ok() ? on_ecds_update.value() : nullptr;
   auto on_worker_event =
       config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionWorkerEventType>(
           "envoy_dynamic_module_on_bootstrap_extension_worker_event");

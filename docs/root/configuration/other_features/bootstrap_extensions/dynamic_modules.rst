@@ -215,6 +215,67 @@ prefix, tagged with ``config_name`` set to the extension name, or ``default`` if
   listeners_owned, Gauge, Listeners that the module owns
   updates_pending, Gauge, Writes that are queued or warming or that wait for the workers to start
 
+.. _config_bootstrap_extensions_dynamic_modules_ecds:
+
+ECDS Configuration
+------------------
+
+A module calls ``envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds`` after server
+initialization to subscribe to one named
+:ref:`TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>` resource. It
+passes a JSON-encoded :ref:`ExtensionConfigSource
+<envoy_v3_api_msg_config.core.v3.ExtensionConfigSource>` with its configuration source and allowed
+``type_urls``. Default configurations and wildcard names are not supported. Another bootstrap
+extension cannot use the same ADS or xDS-TP name. Filter ECDS subscriptions conflict only on ADS.
+The first subscriber keeps the name until its subscription ends. The bootstrap subscription ends
+when shutdown begins.
+
+``envoy_dynamic_module_on_bootstrap_extension_ecds_update`` receives the resource name, version,
+payload type, encoding and configuration on the main thread. ``Struct`` and ``TypedStruct.value``
+arrive as JSON, ``StringValue`` and ``BytesValue`` as unwrapped bytes, and other messages as
+protobuf bytes. xDS-TP names have sorted context parameters. Filesystem updates without
+``version_info`` have an empty version.
+
+For types that Envoy does not link, use ``TypedStruct``, or send binary payloads as ``BytesValue``;
+an accepted payload that Envoy cannot render fails the whole unfiltered config dump. Identical
+resends and empty state-of-the-world updates do not invoke the hook.
+
+The hook must not block. Rejecting an update keeps the previous configuration and NACKs the
+response, which may contain other ECDS resources and may have been partly applied. Explicit
+removals and TTL expiry invoke the hook without a configuration. Delta can report a missing
+resource as a removal before any configuration arrives. A rejected removal is only logged and
+keeps the previous configuration. A connection failure keeps the last configuration unless its
+TTL expires.
+
+Filesystem sources can invoke the hook before the subscription call returns, so do not hold a
+lock across the call that the hook takes. Initial fetch failures do not invoke the hook. A module
+that waits for its first configuration before signaling initialization complete must set its own
+startup timeout.
+
+The ``ecds_modules`` config dump key lists accepted bootstrap configurations with their version
+and update time. Subscription statistics use the
+``extension_config_discovery.bootstrap.<resource_name>.<extension_name>.`` prefix, tagged with
+``config_name`` set to the extension name, or ``default`` if it is empty, when explicit stats tags
+are enabled.
+
+A refused removal still increments ``update_success`` and updates the subscription version.
+On TTL expiry, ``version_text`` becomes empty. The module and config dump keep their previous
+configuration.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  init_fetch_timeout, Counter, Initial configuration fetches that timed out
+  update_attempt, Counter, Configuration fetch attempts
+  update_failure, Counter, Configuration fetch failures
+  update_rejected, Counter, Rejected configuration updates
+  update_success, Counter, Successful subscription updates including unchanged resends and refused removals
+  update_time, Gauge, Time of the last successful subscription update in milliseconds since the epoch
+  update_duration, Histogram, Time spent processing updates in milliseconds
+  version, Gauge, Hash of the last successful subscription version
+  version_text, TextReadout, Last successful subscription version
+
 .. _config_bootstrap_extensions_dynamic_modules_config_snapshots:
 
 Configuration Snapshots

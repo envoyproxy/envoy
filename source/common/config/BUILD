@@ -9,6 +9,21 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "ecds_subscription_registry_lib",
+    srcs = ["ecds_subscription_registry.cc"],
+    hdrs = ["ecds_subscription_registry.h"],
+    deps = [
+        ":xds_resource_lib",
+        "//envoy/singleton:instance_interface",
+        "//envoy/singleton:manager_interface",
+        "//source/common/common:cleanup_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "api_version_lib",
     hdrs = ["api_version.h"],
 )

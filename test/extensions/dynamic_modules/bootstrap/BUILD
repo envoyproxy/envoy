@@ -13,6 +13,27 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "extension_config_subscription_test",
+    srcs = ["extension_config_subscription_test.cc"],
+    extension_names = ["envoy.bootstrap.dynamic_modules"],
+    deps = [
+        "//source/common/common:matchers_lib",
+        "//source/common/config:ecds_subscription_registry_lib",
+        "//source/extensions/bootstrap/dynamic_modules:extension_config_subscription_lib",
+        "//source/server/admin:config_tracker_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@xds//udpa/type/v1:pkg_cc_proto",
+        "@xds//xds/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "config_snapshot_test",
     srcs = ["config_snapshot_test.cc"],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
@@ -150,6 +171,7 @@ envoy_extension_cc_dyn_module_test(
     },
     deps = [
         "//envoy/common:regex_interface",
+        "//source/common/config:ecds_subscription_registry_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/dynamic_modules:abi_impl",
@@ -252,6 +274,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_cluster_writer_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_config_names_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_config_snapshot_test",
+        "//test/extensions/dynamic_modules/test_data/rust:bootstrap_ecds_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_file_watcher_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_function_registry_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_http_combined_test",
@@ -274,11 +297,13 @@ envoy_extension_cc_dyn_module_test(
     },
     deps = [
         "//source/common/common:base64_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/extensions/bootstrap/dynamic_modules:config",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//test/integration:http_integration_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

@@ -667,6 +667,9 @@ WEAK_STUB(BootstrapExtensionFileWatcherAddWatch,
                                                                                    {nullptr, 0}, 0))
 WEAK_STUB(BootstrapExtensionEnableClusterLifecycle,
           envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(nullptr))
+WEAK_STUB(BootstrapExtensionSubscribeEcds,
+          envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(nullptr, {nullptr, 0},
+                                                                           {nullptr, 0}))
 WEAK_STUB(BootstrapExtensionConfigSnapshotNew,
           envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(nullptr, nullptr, 0,
                                                                                 {nullptr, 0},

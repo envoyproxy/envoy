@@ -10150,6 +10150,46 @@ pub enum envoy_dynamic_module_type_bootstrap_listener_writer_update_status {
     Failed = 3,
     OwnershipLost = 4,
 }
+#[repr(u32)]
+/// The encoding of an ECDS configuration payload delivered to a bootstrap extension.
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum envoy_dynamic_module_type_bootstrap_ecds_config_encoding {
+    Protobuf = 0,
+    Json = 1,
+    Bytes = 2,
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** Called on the main thread when an ECDS resource changes or is removed, including TTL expiry.
+ This hook must not block. Rejecting an update NACKs the response, which may contain other ECDS
+ resources and may have been partly applied. A rejected removal is only logged and retains
+ the previous configuration. Delta can report a missing resource as a removal before any config.
+
+ A module that waits for its first configuration before completing initialization must set its
+ own startup timeout. Initial fetch failures do not invoke this hook.
+
+ @param config_envoy_ptr is the pointer to the bootstrap extension configuration.
+ @param config_module_ptr is the pointer to the in-module bootstrap extension configuration.
+ @param name is the resource name, with xDS-TP context parameters sorted.
+ @param version is the SotW response version or Delta resource version. It is empty for removals
+ and may be empty for filesystem updates without version_info.
+ @param type_url is the payload type URL, using the inner type for TypedStruct, empty for
+ removals.
+ @param encoding describes the config bytes and is ignored for removals.
+ @param has_config is false when the resource was removed.
+ @param config is the payload. All buffers are owned by Envoy and valid only during this call.
+ @return true if accepted, false if rejected without changing the module's current settings.*/
+    pub fn envoy_dynamic_module_on_bootstrap_extension_ecds_update(
+        config_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+        config_module_ptr: envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+        name: envoy_dynamic_module_type_envoy_buffer,
+        version: envoy_dynamic_module_type_envoy_buffer,
+        type_url: envoy_dynamic_module_type_envoy_buffer,
+        encoding: envoy_dynamic_module_type_bootstrap_ecds_config_encoding,
+        has_config: bool,
+        config: envoy_dynamic_module_type_envoy_buffer,
+    ) -> bool;
+}
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
     /** envoy_dynamic_module_on_bootstrap_extension_config_new is called by the main thread when the
@@ -11054,6 +11094,29 @@ unsafe extern "C" {
     pub fn envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
         extension_config_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
         path_prefix: envoy_dynamic_module_type_module_buffer,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** Subscribes to one named ECDS resource on the main thread until shutdown. Filesystem sources can
+ invoke envoy_dynamic_module_on_bootstrap_extension_ecds_update before this call returns;
+ do not hold a lock across this call that the hook takes.
+
+ @param config_envoy_ptr is the pointer to the bootstrap extension configuration.
+ @param name is the resource name. Wildcards are not supported. Another bootstrap extension
+ cannot use the same ADS or xDS-TP name. Filter ECDS subscriptions conflict only on ADS.
+ @param source_json is a JSON-encoded envoy.config.core.v3.ExtensionConfigSource. Its type_urls
+ lists permitted payload types, using the inner type for TypedStruct. Default configurations
+ are not supported. For types not linked into Envoy, use TypedStruct, or BytesValue for binary
+ payloads; an accepted payload that Envoy cannot render fails the whole unfiltered config dump.
+ Both input buffers are owned by the module and only need to last this call.
+ @return true if started; false before server initialization, after shutdown, in init_only mode,
+ without the ECDS update hook, if already subscribed, or if the name or source is invalid or in
+ use.*/
+    pub fn envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+        config_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+        name: envoy_dynamic_module_type_module_buffer,
+        source_json: envoy_dynamic_module_type_module_buffer,
     ) -> bool;
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]

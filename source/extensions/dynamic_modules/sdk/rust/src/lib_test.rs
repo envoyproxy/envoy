@@ -15918,3 +15918,46 @@ fn noop_scheduler_as_boxed_trait_object() {
   cluster::EnvoyClusterScheduler::commit(&NoopScheduler, 2);
   stats_sink::EnvoyStatSinkConfigScheduler::commit(&NoopScheduler, 3);
 }
+
+#[cfg(test)]
+mod ecds_tests {
+  use crate::abi;
+  use crate::bootstrap::*;
+
+  #[derive(Default)]
+  struct TestHost {
+    subscription: Option<(String, String)>,
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+    host: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_module_buffer,
+    source: abi::envoy_dynamic_module_type_module_buffer,
+  ) -> bool {
+    let host = unsafe { &mut *host.cast::<TestHost>() };
+    let read = |buffer: abi::envoy_dynamic_module_type_module_buffer| {
+      let bytes = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(buffer.ptr.cast::<u8>(), buffer.length)
+      };
+      std::str::from_utf8(bytes).unwrap().to_owned()
+    };
+    host.subscription = Some((read(name), read(source)));
+    true
+  }
+
+  #[test]
+  fn subscribes_with_borrowed_config_source() {
+    let mut host = TestHost::default();
+    let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
+    let source = r#"{"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["type.googleapis.com/test.Config"]}"#;
+    assert!(envoy.subscribe_ecds(EcdsSubscription {
+      name: "test-config",
+      source_json: source,
+    }));
+    assert_eq!(
+      host.subscription,
+      Some(("test-config".to_owned(), source.to_owned()))
+    );
+  }
+}
