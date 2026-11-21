@@ -94,6 +94,10 @@ DownstreamReverseConnectionIOHandle::~DownstreamReverseConnectionIOHandle() {
   SET_SOCKET_INVALID(fd_);
 }
 
+bool DownstreamReverseConnectionIOHandle::canInitiateConnections() const {
+  return parent_ != nullptr && parent_->canInitiateConnections();
+}
+
 void DownstreamReverseConnectionIOHandle::onPingMessage() {
   auto echo_rc = ReverseConnectionUtility::sendPingResponse(*this);
 

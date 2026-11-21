@@ -246,6 +246,9 @@ RUNTIME_GUARD(envoy_restart_features_defer_worker_routing_init);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
 
+// Opt in to reverse-tunnel listener drain handling and responder exclusion of draining nodes.
+// TODO: flip to true after operators have validated the new drain behavior.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_reverse_tunnel_listener_drain);
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_srds_partial_acceptance);

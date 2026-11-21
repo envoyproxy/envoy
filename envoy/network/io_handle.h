@@ -365,6 +365,15 @@ public:
   virtual void resetFileEvents() PURE;
 
   /**
+   * Notify a running stream listener's handle on its worker thread that the whole listener started
+   * draining, before accepted connections are notified. Handles can stop initiating connections
+   * while accepted connections complete their drain. Other listener types and listeners already
+   * stopped use resetFileEvents() instead; temporary disabling and individual filter-chain drains
+   * do not invoke this hook.
+   */
+  virtual void onListenerDrain() {}
+
+  /**
    * Shut down part of a full-duplex connection (see man 2 shutdown)
    */
   virtual Api::SysCallIntResult shutdown(int how) PURE;

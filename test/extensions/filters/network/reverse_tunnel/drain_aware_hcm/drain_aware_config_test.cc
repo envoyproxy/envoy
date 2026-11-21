@@ -1,7 +1,11 @@
+#include <tuple>
+
+#include "source/common/http/conn_manager_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/filters/network/reverse_tunnel/drain_aware_hcm/drain_aware_config.h"
+#include "source/extensions/filters/network/reverse_tunnel/drain_aware_hcm/drain_aware_read_filter.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -107,13 +111,42 @@ TEST_F(DrainAwareConfigTest, CreateFilterFactoryFromValidConfig) {
   ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
 }
 
-TEST_F(DrainAwareConfigTest, FilterFactoryCallbackIsNonNull) {
+class DrainAwareFilterFactoryTest : public DrainAwareConfigTest,
+                                    public testing::WithParamInterface<std::tuple<bool, bool>> {};
+
+INSTANTIATE_TEST_SUITE_P(DrainEnabled, DrainAwareFilterFactoryTest,
+                         testing::Combine(testing::Bool(), testing::Bool()));
+
+TEST_P(DrainAwareFilterFactoryTest, InstallsIdleFilterBeforeHcmOnlyWhenOptionAndRuntimeEnabled) {
+  const auto [enable_drain, enable_listener_drain] = GetParam();
+  TestScopedStaticReloadableFeaturesRuntime runtime(
+      {{"reverse_tunnel_listener_drain", enable_listener_drain}});
   DrainAwareHttpConnectionManagerFilterConfigFactory factory;
   auto proto_config = parseConfig(kMinimalConfig);
+  proto_config.set_enable_drain_with_goaway(enable_drain);
+  proto_config.mutable_hcm_config()
+      ->mutable_common_http_protocol_options()
+      ->mutable_idle_timeout()
+      ->set_seconds(0);
   auto result = factory.createFilterFactoryFromProto(proto_config, context_);
-  // Verify a callable callback was produced. The actual ConnectionManagerImpl
-  // installation path is exercised end-to-end in integration_test.cc.
   ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
+  testing::StrictMock<Network::MockFilterManager> filter_manager;
+  NiceMock<Network::MockReadFilterCallbacks> callbacks;
+  Network::ReadFilterSharedPtr hcm;
+  testing::InSequence sequence;
+  if (enable_drain && enable_listener_drain) {
+    EXPECT_CALL(filter_manager, addReadFilter(_)).WillOnce([](Network::ReadFilterSharedPtr filter) {
+      EXPECT_NE(nullptr, dynamic_cast<DrainAwareReadFilter*>(filter.get()));
+    });
+  }
+  EXPECT_CALL(filter_manager, addReadFilter(_))
+      .WillOnce([&hcm](Network::ReadFilterSharedPtr filter) {
+        EXPECT_NE(nullptr, dynamic_cast<Http::ConnectionManagerImpl*>(filter.get()));
+        hcm = std::move(filter);
+      });
+  result.value()(filter_manager);
+  ASSERT_NE(nullptr, hcm);
+  hcm->initializeReadFilterCallbacks(callbacks);
 }
 
 // Subclass that overrides createBaseCodec to return nullptr, exercising the defensive
@@ -210,6 +243,39 @@ public:
 
   Http::ServerConnectionCallbacks* last_callbacks_{nullptr};
 };
+
+class DrainAwareCodecDrainScopeTest : public DrainAwareConfigTest,
+                                      public testing::WithParamInterface<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(ListenerDrainEnabled, DrainAwareCodecDrainScopeTest, testing::Bool());
+
+TEST_P(DrainAwareCodecDrainScopeTest, LegacyCodecUsesInboundScopeOnlyWhenListenerDrainEnabled) {
+  TestScopedStaticReloadableFeaturesRuntime runtime(
+      {{"use_connection_event_drain", false}, {"reverse_tunnel_listener_drain", GetParam()}});
+  ON_CALL(context_, direction()).WillByDefault(Return(envoy::config::core::v3::INBOUND));
+  auto proto_config = parseConfig(kMinimalConfig);
+  proto_config.set_enable_drain_with_goaway(true);
+  auto config = makeConfig<FakeCodecDrainAwareConfig>(proto_config);
+  NiceMock<Network::MockConnection> connection;
+  Network::ConnectionSocketPtr socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  ON_CALL(connection, getSocket()).WillByDefault(ReturnRef(socket));
+  NiceMock<Http::MockServerConnectionCallbacks> callbacks;
+  NiceMock<Server::MockOverloadManager> overload_manager;
+  // Register in reverse creation order: the drain-check timer is created before the GOAWAY timer.
+  auto* goaway_timer = new NiceMock<Event::MockTimer>(&connection.dispatcher_);
+  auto* drain_check_timer = new NiceMock<Event::MockTimer>(&connection.dispatcher_);
+  Buffer::OwnedImpl data;
+  auto codec = config->createCodec(connection, data, callbacks, overload_manager);
+  ASSERT_NE(nullptr, codec);
+  const auto expected_scope =
+      GetParam() ? Network::DrainDirection::InboundOnly : Network::DrainDirection::All;
+  const auto unused_scope =
+      GetParam() ? Network::DrainDirection::All : Network::DrainDirection::InboundOnly;
+  EXPECT_CALL(context_.drain_manager_, drainClose(unused_scope)).Times(0);
+  EXPECT_CALL(context_.drain_manager_, drainClose(expected_scope)).WillOnce(Return(true));
+  EXPECT_CALL(*goaway_timer, enableTimer(std::chrono::milliseconds(5000), _));
+  drain_check_timer->invokeCallback();
+}
 
 // With drain_with_goaway enabled but a plain (non reverse-tunnel) socket, the typed cast yields no
 // initiator handle, so no re-dial wiring is installed; the drain-aware wrapper is still produced
@@ -418,8 +484,7 @@ TEST_F(DrainAwareConfigTest, DelayBelowUnjitteredDrainTimeoutIsAccepted) {
 // final GOAWAY with it when it detects a listener drain. 2s with 50% jitter gives up to 1000ms of
 // jitter; a random value of 500 gives exactly 2500ms.
 TEST_F(DrainAwareConfigTest, CreateCodecArmsFinalGoAwayWithJitteredDrainTimeout) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"use_connection_event_drain", false}});
   ON_CALL(context_.server_factory_context_.api_.random_, random()).WillByDefault(Return(500));
   ON_CALL(context_.drain_manager_, drainClose(_)).WillByDefault(Return(true));
 

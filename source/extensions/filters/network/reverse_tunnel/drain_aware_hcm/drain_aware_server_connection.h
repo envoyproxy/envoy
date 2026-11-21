@@ -90,18 +90,20 @@ class DrainAwareServerConnection : public Http::ServerConnection,
                                    public Network::ConnectionCallbacks,
                                    public Logger::Loggable<Logger::Id::filter> {
 public:
-  // `on_local_drain` is set for reverse tunnels and dials a replacement tunnel when the drain
-  // starts.
+  // `on_local_drain` is set for reverse tunnels and dials a replacement on connection rotation.
+  // A listener drain stops the initiator first, so the same callback cannot replenish it.
   DrainAwareServerConnection(
       Http::ServerConnectionPtr inner, Network::Connection& connection,
       const Network::DrainDecision& drain_decision,
       Server::Configuration::ServerFactoryContext& server_context,
       const DrainDelayConfig drain_delay_config, std::function<void()> on_local_drain = nullptr,
-      std::unique_ptr<DrainAwareServerConnectionCallbacks> callbacks_wrapper = nullptr)
+      std::unique_ptr<DrainAwareServerConnectionCallbacks> callbacks_wrapper = nullptr,
+      Network::DrainDirection drain_direction = Network::DrainDirection::All)
       : callbacks_wrapper_(std::move(callbacks_wrapper)), inner_(std::move(inner)),
         connection_(connection), drain_decision_(drain_decision), server_context_(server_context),
         drain_type_(Network::listenerDrainType(connection)),
-        on_local_drain_(std::move(on_local_drain)), drain_delay_config_(drain_delay_config) {
+        on_local_drain_(std::move(on_local_drain)), drain_direction_(drain_direction),
+        drain_delay_config_(drain_delay_config) {
     ENVOY_LOG(debug, "drain_aware_hcm: created server connection wrapper, protocol={}",
               static_cast<int>(inner_->protocol()));
     // Observe connection-level drain notifications so onDrainCheckTimer() can react to them.
@@ -169,9 +171,19 @@ public:
   }
 
   // Network::ConnectionCallbacks
-  // Only the drain notification is of interest here; the other events are handled by the
-  // connection manager through its own connection callbacks.
-  void onEvent(Network::ConnectionEvent) override {}
+  void onEvent(Network::ConnectionEvent event) override {
+    if (event == Network::ConnectionEvent::LocalClose ||
+        event == Network::ConnectionEvent::RemoteClose) {
+      drain_check_timer_->disableTimer();
+      if (drain_connection_metadata_timer_ != nullptr) {
+        drain_connection_metadata_timer_->disableTimer();
+      }
+      if (drain_shutdown_notice_timer_ != nullptr) {
+        drain_shutdown_notice_timer_->disableTimer();
+      }
+      drain_goaway_timer_->disableTimer();
+    }
+  }
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
   void onDrain(Network::ConnectionDrainEvent drain_event) override {
@@ -184,14 +196,18 @@ private:
   // Returns true if the connection should begin draining (send GOAWAY).
   bool shouldDrainClose() {
     if (!use_connection_event_drain_) {
-      return drain_decision_.drainClose(Network::DrainDirection::All);
+      const auto direction =
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reverse_tunnel_listener_drain")
+              ? drain_direction_
+              : Network::DrainDirection::All;
+      return drain_decision_.drainClose(direction);
     }
 
     return Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_);
   }
 
   void onDrainCheckTimer() {
-    if (local_drain_notified_) {
+    if (local_drain_notified_ || connection_.state() != Network::Connection::State::Open) {
       return;
     }
     if (shouldDrainClose()) {
@@ -246,6 +262,7 @@ private:
   const bool use_connection_event_drain_{
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")};
   std::function<void()> on_local_drain_;
+  const Network::DrainDirection drain_direction_;
   Event::TimerPtr drain_check_timer_;
   bool drain_goaway_sent_{false};
   bool local_drain_notified_{false};

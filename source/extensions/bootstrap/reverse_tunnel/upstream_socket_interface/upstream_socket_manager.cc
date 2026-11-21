@@ -8,6 +8,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/random_generator.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 
@@ -195,6 +196,7 @@ void UpstreamSocketManager::addConnectionSocket(
                                  .initiator_connection_id = std::string(initiator_connection_id),
                                  .fd = fd};
   node_to_active_fd_count_[scoped_node_id]++;
+  node_to_selectable_fd_count_[scoped_node_id]++;
 
   // Create per-connection timeout timer for ping responses.
   fd_to_timer_map_[fd] = dispatcher_.createTimer([this, fd]() { onPingTimeout(fd); });
@@ -318,33 +320,46 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
 
 std::string UpstreamSocketManager::getNodeWithSocket(const std::string& key) {
   ENVOY_LOG(trace, "reverse_tunnel: getNodeWithSocket() called with key: {}.", key);
+  const bool exclude_draining =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reverse_tunnel_listener_drain");
 
   // Check if key exists as a cluster ID by looking at cluster_to_node_info_map_.
   auto cluster_it = cluster_to_node_info_map_.find(key);
   if (cluster_it != cluster_to_node_info_map_.end() && !cluster_it->second.nodes.empty()) {
-    // Key is a cluster ID, use round-robin to select a node. A node stays in the cluster while
-    // any of its sockets is in use, so prefer the next node that still has an idle socket: a node
-    // whose sockets are all handed out, such as a draining initiator whose connections got GOAWAY
-    // but still carry long requests, cannot take a new connection. Without any idle socket in the
-    // cluster, fall back to plain round-robin.
+    // Preserve the existing preference for idle sockets in either mode. With the guard disabled,
+    // fall back to plain round-robin when every socket is in use, including draining nodes.
+    // With it enabled, only non-draining connections make a node eligible.
     auto& cluster_info = cluster_it->second;
     const auto& nodes = cluster_info.nodes;
     const size_t start = cluster_info.round_robin_index % nodes.size();
-    size_t selected = start;
+    size_t selected = nodes.size();
     for (size_t i = 0; i < nodes.size(); ++i) {
       const size_t candidate = (start + i) % nodes.size();
+      if (exclude_draining && !hasSelectableSocketsForNode(nodes[candidate])) {
+        continue;
+      }
+      if (selected == nodes.size()) {
+        selected = candidate;
+      }
       const auto sockets_it = accepted_reverse_connections_.find(nodes[candidate]);
       if (sockets_it != accepted_reverse_connections_.end() && !sockets_it->second.empty()) {
         selected = candidate;
         break;
       }
     }
-    const std::string& selected_node = nodes[selected];
+    if (selected == nodes.size()) {
+      return {};
+    }
     cluster_info.round_robin_index = (selected + 1) % nodes.size();
-
     ENVOY_LOG(debug, "reverse_tunnel: key '{}' is a cluster ID; returning node {} via round-robin.",
-              key, selected_node);
-    return selected_node;
+              key, nodes[selected]);
+    return nodes[selected];
+  }
+
+  if (exclude_draining &&
+      (cluster_it != cluster_to_node_info_map_.end() ||
+       (!hasSelectableSocketsForNode(key) && node_to_cluster_map_.contains(key)))) {
+    return {};
   }
 
   // Key not found in cluster map, treat it as a node ID and return it directly.
@@ -413,6 +428,25 @@ bool UpstreamSocketManager::hasAnySocketsForNode(const std::string& node_id) {
   return it != node_to_active_fd_count_.end() && it->second > 0;
 }
 
+bool UpstreamSocketManager::hasSelectableSocketsForNode(const std::string& node_id) const {
+  const auto it = node_to_selectable_fd_count_.find(node_id);
+  return it != node_to_selectable_fd_count_.end() && it->second > 0;
+}
+
+void UpstreamSocketManager::markSocketDraining(int fd) {
+  // Track the lifecycle in either mode so a runtime toggle can change selection immediately.
+  const auto node_it = fd_to_node_map_.find(fd);
+  if (node_it == fd_to_node_map_.end() || !draining_fds_.insert(fd).second) {
+    return;
+  }
+
+  auto count_it = node_to_selectable_fd_count_.find(node_it->second);
+  ASSERT(count_it != node_to_selectable_fd_count_.end() && count_it->second > 0);
+  if (--count_it->second == 0) {
+    node_to_selectable_fd_count_.erase(count_it);
+  }
+}
+
 void UpstreamSocketManager::markSocketDead(const int fd) {
   ENVOY_LOG(trace, "reverse_tunnel: markSocketDead called for fd {}.", fd);
 
@@ -457,6 +491,8 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
   }
 
   // Remove FD from tracking maps before checking remaining sockets.
+  markSocketDraining(fd);
+  draining_fds_.erase(fd);
   fd_to_node_map_.erase(fd);
   fd_to_cluster_map_.erase(fd);
   fd_to_miss_count_.erase(fd);
