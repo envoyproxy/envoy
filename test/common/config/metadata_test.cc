@@ -1,10 +1,13 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/singleton/manager_impl.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -241,6 +244,61 @@ TEST(MetadataTest, MetadataLabelMatch) {
     labels.push_back({"key1", ValueUtil::stringValue("val1")});
     EXPECT_FALSE(Metadata::metadataLabelMatch(labels, &metadata, "non_existent", false));
   }
+}
+
+TEST(MetadataTest, ConstMetadataSharedPoolSharesMetadataWithEqualBytes) {
+  Singleton::ManagerImpl singleton_manager;
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  ConstMetadataSharedPoolSharedPtr pool =
+      Metadata::getConstMetadataSharedPool(singleton_manager, dispatcher);
+
+  // Two maps with only a few entries can iterate in the same order by chance, which would hide a
+  // serialization that does not sort them, so this inserts many entries in opposite orders.
+  constexpr int num_entries = 16;
+  envoy::config::core::v3::Metadata metadata;
+  envoy::config::core::v3::Metadata reordered_metadata;
+  for (int i = 0; i < num_entries; ++i) {
+    const int reversed = num_entries - 1 - i;
+    Metadata::mutableMetadataValue(metadata, "namespace", "key_" + std::to_string(i))
+        .set_string_value(std::to_string(i));
+    Metadata::mutableMetadataValue(reordered_metadata, "namespace",
+                                   "key_" + std::to_string(reversed))
+        .set_string_value(std::to_string(reversed));
+  }
+  const std::shared_ptr<const envoy::config::core::v3::Metadata> shared_metadata =
+      pool->getObject(metadata);
+  EXPECT_EQ(shared_metadata, pool->getObject(reordered_metadata));
+  // In an optimized build a pool with a single entry compares without hashing, so this checks the
+  // functors directly too.
+  EXPECT_EQ(SerializedMetadataHash{}(metadata), SerializedMetadataHash{}(reordered_metadata));
+  EXPECT_TRUE(SerializedMetadataEqual{}(metadata, reordered_metadata));
+
+  // A changed value of the same size still gets its own object.
+  Metadata::mutableMetadataValue(reordered_metadata, "namespace", "key_0").set_string_value("9");
+  EXPECT_NE(shared_metadata, pool->getObject(reordered_metadata));
+  EXPECT_FALSE(SerializedMetadataEqual{}(metadata, reordered_metadata));
+}
+
+TEST(MetadataTest, ConstMetadataSharedPoolKeepsReserializedAnyPayloadsApart) {
+  Singleton::ManagerImpl singleton_manager;
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  ConstMetadataSharedPoolSharedPtr pool =
+      Metadata::getConstMetadataSharedPool(singleton_manager, dispatcher);
+
+  // The same struct with its two fields serialized in two orders.
+  envoy::config::core::v3::Metadata metadata;
+  Protobuf::Any& any = (*metadata.mutable_typed_filter_metadata())["custom_namespace"];
+  any.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+  envoy::config::core::v3::Metadata reserialized_metadata = metadata;
+  (*reserialized_metadata.mutable_typed_filter_metadata())["custom_namespace"].set_value(
+      Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+
+  const std::shared_ptr<const envoy::config::core::v3::Metadata> shared_metadata =
+      pool->getObject(metadata);
+  EXPECT_NE(shared_metadata, pool->getObject(reserialized_metadata));
+  // Host updates fall back to this hash when two hosts hold distinct objects.
+  EXPECT_EQ(MessageUtil::hash(metadata), MessageUtil::hash(reserialized_metadata));
 }
 
 class TypedMetadataTest : public testing::Test {

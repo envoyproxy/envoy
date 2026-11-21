@@ -137,9 +137,12 @@ envoy_cc_test(
     srcs = ["metadata_test.cc"],
     deps = [
         "//envoy/common:base_includes",
+        "//source/common/common:base64_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
         "//source/common/protobuf:utility_lib",
+        "//source/common/singleton:manager_impl_lib",
+        "//test/mocks/event:event_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
