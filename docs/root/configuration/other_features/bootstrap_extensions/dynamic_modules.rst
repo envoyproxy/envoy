@@ -236,7 +236,7 @@ initialization of Envoy until then. A name is either discovered through FCDS or 
 extension. Envoy rejects a listener that requests a name of the other kind, and a write of a name
 that a listener requests through FCDS completes as ``Failed``. A listener keeps its names until it
 is removed and has finished draining. Envoy does not notice when another extension writes or removes
-the same filter chain, so the module should only write filter chains that no other extension writes.
+the same filter chain, so the module must only write filter chains that no other extension writes.
 
 A written filter chain has the same authority as a filter chain delivered by FCDS, so build filter
 chains from a schema that the module owns. A write that changes a filter chain drains the

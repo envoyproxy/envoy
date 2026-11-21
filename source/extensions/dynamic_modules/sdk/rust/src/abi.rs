@@ -11756,7 +11756,7 @@ unsafe extern "C" {
  extension. Envoy rejects a listener that requests a name of the other kind, and a write of a name
  that a listener requests through FCDS completes as Failed. A listener keeps its names until it is
  removed and has finished draining. Envoy does not notice when another extension writes or removes
- the same filter chain, so the module should only write filter chains that no other extension
+ the same filter chain, so the module must only write filter chains that no other extension
  writes. Writes submitted before Envoy finishes initializing its static and CDS clusters are
  applied once it has. When the module writes a filter chain again before its previous write is
  applied, Envoy applies only the latest write and the previous one completes as Superseded. The
