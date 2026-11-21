@@ -1166,3 +1166,37 @@ envoy_proto_library(
     name = "metadata_writer_lb_proto",
     srcs = ["metadata_writer_lb.proto"],
 )
+
+envoy_cc_benchmark_binary(
+    name = "load_stats_reporter_benchmark",
+    srcs = ["load_stats_reporter_benchmark.cc"],
+    deps = [
+        "//envoy/common:optref_lib",
+        "//envoy/event:timer_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/upstream:load_stats_reporter_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/mocks/upstream:host_set_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:string_view",
+        "@benchmark",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/load_stats/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "load_stats_reporter_benchmark_test",
+    benchmark_binary = "load_stats_reporter_benchmark",
+)

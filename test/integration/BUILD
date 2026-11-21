@@ -2323,6 +2323,7 @@ envoy_cc_test(
         "coverage": {"link": "linux_x64_large"},
         "tsan": {"link": "linux_x64_small"},
     },
+    shard_count = 2,
     deps = [
         ":http_integration_lib",
         "//test/config:utility_lib",

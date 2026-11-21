@@ -76,11 +76,13 @@ public:
   }
 
   void deliverLoadStatsResponse(const std::vector<std::string>& cluster_names,
-                                bool report_endpoint_granularity = false) {
+                                bool report_endpoint_granularity = false,
+                                bool send_all_clusters = false) {
     std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse> response(
         new envoy::service::load_stats::v3::LoadStatsResponse());
     response->mutable_load_reporting_interval()->set_seconds(42);
     response->set_report_endpoint_granularity(report_endpoint_granularity);
+    response->set_send_all_clusters(send_all_clusters);
     std::copy(cluster_names.begin(), cluster_names.end(),
               Protobuf::RepeatedPtrFieldBackInserter(response->mutable_clusters()));
 
@@ -104,8 +106,47 @@ public:
     dropped_request->set_dropped_count(count);
   }
 
+  // Returns the ClusterStats that are expected to be reported for a cluster without hosts that
+  // dropped the given number of requests during the given measurement interval.
+  envoy::config::endpoint::v3::ClusterStats
+  makeClusterStats(const std::string& cluster_name, uint64_t total_dropped_requests,
+                   std::chrono::microseconds load_report_interval) {
+    envoy::config::endpoint::v3::ClusterStats cluster_stats;
+    cluster_stats.set_cluster_name(cluster_name);
+    cluster_stats.set_total_dropped_requests(total_dropped_requests);
+    cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(load_report_interval.count()));
+    return cluster_stats;
+  }
+
+  // Adds cluster to the active clusters of cm_ under the given name. Unlike stubbing
+  // getActiveCluster() on its own, this keeps clusters(), forEachActiveCluster(),
+  // getActiveCluster() and the name of the cluster consistent with each other, as they are for a
+  // real cluster manager.
+  void addActiveCluster(const std::string& name, MockClusterMockPrioritySet& cluster) {
+    cluster.info_->name_ = name;
+    cluster_info_maps_.active_clusters_.emplace(name, cluster);
+    ON_CALL(cm_, clusters()).WillByDefault([this]() { return cluster_info_maps_; });
+    ON_CALL(cm_, getActiveCluster(_))
+        .WillByDefault([this](absl::string_view cluster_name) -> OptRef<const Upstream::Cluster> {
+          const auto it = cluster_info_maps_.active_clusters_.find(cluster_name);
+          if (it == cluster_info_maps_.active_clusters_.end()) {
+            return std::nullopt;
+          }
+          return it->second.get();
+        });
+  }
+
+  // Removes a cluster that was added with addActiveCluster() from the active clusters of cm_.
+  void removeActiveCluster(const std::string& name) {
+    cluster_info_maps_.active_clusters_.erase(name);
+  }
+
+  TestScopedRuntime scoped_runtime_;
   Event::SimulatedTimeSystem time_system_;
   NiceMock<Upstream::MockClusterManager> cm_;
+  // The active clusters of cm_, see addActiveCluster().
+  ClusterManager::ClusterInfoMaps cluster_info_maps_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   Event::MockTimer* retry_timer_;
@@ -157,10 +198,8 @@ TEST_F(LoadStatsReporterImplTest, ExistingClusters) {
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(2);
   foo_cluster.info_->eds_service_name_ = "bar";
   NiceMock<MockClusterMockPrioritySet> bar_cluster;
-  ON_CALL(cm_, getActiveCluster("foo"))
-      .WillByDefault(Return(OptRef<const Upstream::Cluster>(foo_cluster)));
-  ON_CALL(cm_, getActiveCluster("bar"))
-      .WillByDefault(Return(OptRef<const Upstream::Cluster>(bar_cluster)));
+  addActiveCluster("foo", foo_cluster);
+  addActiveCluster("bar", bar_cluster);
   deliverLoadStatsResponse({"foo"});
   // Initial stats report for foo on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
@@ -170,7 +209,8 @@ TEST_F(LoadStatsReporterImplTest, ExistingClusters) {
     envoy::config::endpoint::v3::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
     foo_cluster_stats.set_cluster_service_name("bar");
-    foo_cluster_stats.set_total_dropped_requests(7);
+    // The requests dropped before foo was tracked are not reported.
+    foo_cluster_stats.set_total_dropped_requests(5);
     setDropOverload(foo_cluster_stats, 7);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
@@ -201,8 +241,9 @@ TEST_F(LoadStatsReporterImplTest, ExistingClusters) {
         Protobuf::util::TimeUtil::MicrosecondsToDuration(24));
     envoy::config::endpoint::v3::ClusterStats bar_cluster_stats;
     bar_cluster_stats.set_cluster_name("bar");
-    bar_cluster_stats.set_total_dropped_requests(2);
-    setDropOverload(bar_cluster_stats, 8);
+    // The requests dropped before bar was tracked are not reported.
+    bar_cluster_stats.set_total_dropped_requests(1);
+    setDropOverload(bar_cluster_stats, 3);
     bar_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(22));
     expectSendMessage({bar_cluster_stats, foo_cluster_stats});
@@ -253,8 +294,9 @@ TEST_F(LoadStatsReporterImplTest, ExistingClusters) {
     envoy::config::endpoint::v3::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
     foo_cluster_stats.set_cluster_service_name("bar");
-    foo_cluster_stats.set_total_dropped_requests(8);
-    setDropOverload(foo_cluster_stats, 17);
+    // The requests dropped before foo was tracked again are not reported.
+    foo_cluster_stats.set_total_dropped_requests(1);
+    setDropOverload(foo_cluster_stats, 9);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(4));
     envoy::config::endpoint::v3::ClusterStats bar_cluster_stats;
@@ -556,8 +598,7 @@ TEST_F(LoadStatsReporterImplTest, RemoteStreamGracefulClose) {
 
 // Validate that when rq_active is non-zero, a load report is sent even if rq_issued is 0.
 TEST_F(LoadStatsReporterImplTest, ReportLoadWhenRqActiveIsNonZero) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
+  scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.report_load_for_non_zero_stats", "false"}});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
@@ -611,8 +652,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadWhenRqActiveIsNonZero) {
 // Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is true, a load
 // report is sent if only rq_success is non-zero.
 TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqSuccess) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
+  scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
@@ -665,8 +705,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqSuccess) {
 // Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is true, a load
 // report is sent if only rq_error is non-zero.
 TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqError) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
+  scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
@@ -719,8 +758,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqError) {
 // Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is true, a load
 // report is sent if only custom metrics are present.
 TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsCustomMetric) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
+  scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
@@ -774,8 +812,7 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsCustomMetric) {
 // Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is false, a load
 // report is NOT sent if only rq_success is non-zero.
 TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
+  scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.report_load_for_non_zero_stats", "false"}});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
@@ -885,6 +922,369 @@ TEST_F(LoadStatsReporterImplTest, EmptyLocalityGroupDoesNotCrash) {
 
     expectSendMessage({expected_cluster_stats});
   }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+}
+
+// Validate that the request and drop stats that a cluster accumulated before it was tracked are
+// discarded when tracking starts. The custom load metrics of its hosts are not discarded: with
+// envoy.reloadable_features.report_load_for_non_zero_stats they are sent on their own with the
+// first report.
+TEST_F(LoadStatsReporterImplTest, NewlyTrackedClusterStatsAreLatched) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter();
+  time_system_.advanceTimeWait(std::chrono::microseconds(3));
+
+  NiceMock<MockClusterMockPrioritySet> cluster;
+  MockHostSet& host_set = *cluster.prioritySet().getMockHostSet(0);
+  ::envoy::config::core::v3::Locality locality;
+  locality.set_region("test_region");
+  HostSharedPtr host = makeTestHost("host", locality);
+  // The host is also listed in hosts(), which is what is walked to discard the stats of a newly
+  // tracked cluster.
+  host_set.hosts_ = {host};
+  host_set.hosts_per_locality_ = makeHostsPerLocality({{host}});
+  addActiveCluster("foo", cluster);
+
+  // Load from before foo is tracked: a successful and a failed request, and some drops.
+  addStats(host, 10.0);
+  host->stats().rq_total_.inc();
+  host->stats().rq_error_.inc();
+  cluster.info_->load_report_stats_.upstream_rq_dropped_.add(2);
+  cluster.info_->load_report_stats_.upstream_rq_drop_overload_.add(3);
+
+  deliverLoadStatsResponse({"foo"});
+  time_system_.advanceTimeWait(std::chrono::microseconds(1));
+  {
+    // Of the load from before foo was tracked, only the custom metric is reported.
+    envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
+    expected_cluster_stats.set_cluster_name("foo");
+    expected_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
+
+    auto* expected_locality_stats = expected_cluster_stats.add_upstream_locality_stats();
+    expected_locality_stats->mutable_locality()->MergeFrom(locality);
+    addStatExpectation(expected_locality_stats, "metric_a", 1, 10.0);
+
+    expectSendMessage({expected_cluster_stats});
+  }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // Load from after foo is tracked is reported in full.
+  addStats(host, 20.0);
+  host->stats().rq_total_.inc();
+  host->stats().rq_error_.inc();
+  cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
+  cluster.info_->load_report_stats_.upstream_rq_drop_overload_.add(7);
+  time_system_.advanceTimeWait(std::chrono::microseconds(2));
+  {
+    envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
+    expected_cluster_stats.set_cluster_name("foo");
+    expected_cluster_stats.set_total_dropped_requests(5);
+    setDropOverload(expected_cluster_stats, 7);
+    expected_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(2));
+
+    auto* expected_locality_stats = expected_cluster_stats.add_upstream_locality_stats();
+    expected_locality_stats->mutable_locality()->MergeFrom(locality);
+    expected_locality_stats->set_total_successful_requests(1);
+    expected_locality_stats->set_total_error_requests(1);
+    expected_locality_stats->set_total_issued_requests(2);
+    addStatExpectation(expected_locality_stats, "metric_a", 1, 20.0);
+
+    expectSendMessage({expected_cluster_stats});
+  }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+}
+
+// Validate that without envoy.reloadable_features.report_load_for_non_zero_stats, the custom load
+// metrics that the hosts of a newly tracked cluster accumulated before it was tracked are held
+// back until the hosts have requests to report, and are then sent together with them. The request
+// and drop stats from before the cluster was tracked are discarded just the same.
+TEST_F(LoadStatsReporterImplTest,
+       NewlyTrackedClusterStatsAreLatchedReportLoadForNonZeroStatsDisabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.report_load_for_non_zero_stats", "false"}});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter();
+  time_system_.advanceTimeWait(std::chrono::microseconds(3));
+
+  NiceMock<MockClusterMockPrioritySet> cluster;
+  MockHostSet& host_set = *cluster.prioritySet().getMockHostSet(0);
+  ::envoy::config::core::v3::Locality locality;
+  locality.set_region("test_region");
+  HostSharedPtr host = makeTestHost("host", locality);
+  // The host is also listed in hosts(), which is what is walked to discard the stats of a newly
+  // tracked cluster.
+  host_set.hosts_ = {host};
+  host_set.hosts_per_locality_ = makeHostsPerLocality({{host}});
+  addActiveCluster("foo", cluster);
+
+  // Load from before foo is tracked: a successful and a failed request, and some drops.
+  addStats(host, 10.0);
+  host->stats().rq_total_.inc();
+  host->stats().rq_error_.inc();
+  cluster.info_->load_report_stats_.upstream_rq_dropped_.add(2);
+  cluster.info_->load_report_stats_.upstream_rq_drop_overload_.add(3);
+
+  deliverLoadStatsResponse({"foo"});
+  time_system_.advanceTimeWait(std::chrono::microseconds(1));
+  {
+    // Nothing of the load from before foo was tracked is reported.
+    envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
+    expected_cluster_stats.set_cluster_name("foo");
+    expected_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
+
+    expectSendMessage({expected_cluster_stats});
+  }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // Load from after foo is tracked.
+  addStats(host, 20.0);
+  host->stats().rq_total_.inc();
+  host->stats().rq_error_.inc();
+  cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
+  cluster.info_->load_report_stats_.upstream_rq_drop_overload_.add(7);
+  time_system_.advanceTimeWait(std::chrono::microseconds(2));
+  {
+    envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
+    expected_cluster_stats.set_cluster_name("foo");
+    expected_cluster_stats.set_total_dropped_requests(5);
+    setDropOverload(expected_cluster_stats, 7);
+    expected_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(2));
+
+    auto* expected_locality_stats = expected_cluster_stats.add_upstream_locality_stats();
+    expected_locality_stats->mutable_locality()->MergeFrom(locality);
+    expected_locality_stats->set_total_successful_requests(1);
+    expected_locality_stats->set_total_error_requests(1);
+    expected_locality_stats->set_total_issued_requests(2);
+    // The custom metric also covers the request from before foo was tracked.
+    addStatExpectation(expected_locality_stats, "metric_a", 2, 30.0);
+
+    expectSendMessage({expected_cluster_stats});
+  }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+}
+
+// Validate that with send_all_clusters, the request and drop stats that a cluster accumulated
+// before it was tracked are discarded when tracking starts, both for a cluster that is active
+// when the response arrives and for a cluster that becomes active later.
+TEST_F(LoadStatsReporterImplTest, NewlyTrackedClusterStatsAreLatchedSendAllClusters) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter();
+  time_system_.advanceTimeWait(std::chrono::microseconds(3));
+
+  ::envoy::config::core::v3::Locality locality;
+  locality.set_region("test_region");
+
+  // The hosts are also listed in hosts(), which is what is walked to discard the stats of a newly
+  // tracked cluster.
+  NiceMock<MockClusterMockPrioritySet> foo_cluster;
+  MockHostSet& foo_host_set = *foo_cluster.prioritySet().getMockHostSet(0);
+  HostSharedPtr foo_host = makeTestHost("foo_host", locality);
+  foo_host_set.hosts_ = {foo_host};
+  foo_host_set.hosts_per_locality_ = makeHostsPerLocality({{foo_host}});
+
+  NiceMock<MockClusterMockPrioritySet> bar_cluster;
+  MockHostSet& bar_host_set = *bar_cluster.prioritySet().getMockHostSet(0);
+  HostSharedPtr bar_host = makeTestHost("bar_host", locality);
+  bar_host_set.hosts_ = {bar_host};
+  bar_host_set.hosts_per_locality_ = makeHostsPerLocality({{bar_host}});
+
+  // Only foo is active when the response arrives. Its load so far is discarded.
+  addActiveCluster("foo", foo_cluster);
+  foo_host->stats().rq_total_.inc();
+  foo_host->stats().rq_success_.inc();
+  foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(2);
+  deliverLoadStatsResponse({}, /*report_endpoint_granularity=*/false, /*send_all_clusters=*/true);
+
+  // bar becomes active. It is not tracked until the next load report period starts, which is
+  // right after the next report. That report therefore only has the load of foo.
+  addActiveCluster("bar", bar_cluster);
+  bar_host->stats().rq_total_.inc();
+  bar_host->stats().rq_success_.inc();
+  bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(3);
+  foo_host->stats().rq_total_.inc();
+  foo_host->stats().rq_success_.inc();
+  foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
+  time_system_.advanceTimeWait(std::chrono::microseconds(1));
+  {
+    envoy::config::endpoint::v3::ClusterStats foo_cluster_stats;
+    foo_cluster_stats.set_cluster_name("foo");
+    foo_cluster_stats.set_total_dropped_requests(5);
+    foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
+
+    auto* foo_locality_stats = foo_cluster_stats.add_upstream_locality_stats();
+    foo_locality_stats->mutable_locality()->MergeFrom(locality);
+    foo_locality_stats->set_total_successful_requests(1);
+    foo_locality_stats->set_total_issued_requests(1);
+
+    expectSendMessage({foo_cluster_stats});
+  }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // bar is tracked now, and its load so far has been discarded as well.
+  bar_host->stats().rq_total_.inc();
+  bar_host->stats().rq_success_.inc();
+  bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(7);
+  time_system_.advanceTimeWait(std::chrono::microseconds(2));
+  {
+    // There was no load on foo since the previous report.
+    envoy::config::endpoint::v3::ClusterStats foo_cluster_stats;
+    foo_cluster_stats.set_cluster_name("foo");
+    foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(2));
+
+    envoy::config::endpoint::v3::ClusterStats bar_cluster_stats;
+    bar_cluster_stats.set_cluster_name("bar");
+    bar_cluster_stats.set_total_dropped_requests(7);
+    bar_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(2));
+
+    auto* bar_locality_stats = bar_cluster_stats.add_upstream_locality_stats();
+    bar_locality_stats->mutable_locality()->MergeFrom(locality);
+    bar_locality_stats->set_total_successful_requests(1);
+    bar_locality_stats->set_total_issued_requests(1);
+
+    expectSendMessage({foo_cluster_stats, bar_cluster_stats});
+  }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+}
+
+// Validate that with send_all_clusters, a cluster that is removed from the cluster manager is no
+// longer reported or tracked, and that it is tracked as a new cluster when it is added again: it
+// is missing from the first report after that, and the load from before it was tracked again is
+// discarded. A cluster that is replaced under the same name between two reports, as happens when
+// a cluster is updated, stays tracked instead.
+TEST_F(LoadStatsReporterImplTest, ClusterRemovedAndReAddedSendAllClusters) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter();
+
+  // foo and bar are active when the response arrives. The load of foo so far is discarded.
+  auto foo_cluster = std::make_unique<NiceMock<MockClusterMockPrioritySet>>();
+  NiceMock<MockClusterMockPrioritySet> bar_cluster;
+  foo_cluster->info_->load_report_stats_.upstream_rq_dropped_.add(2);
+  addActiveCluster("foo", *foo_cluster);
+  addActiveCluster("bar", bar_cluster);
+  deliverLoadStatsResponse({}, /*report_endpoint_granularity=*/false, /*send_all_clusters=*/true);
+
+  // Both clusters are reported.
+  foo_cluster->info_->load_report_stats_.upstream_rq_dropped_.add(3);
+  bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
+  time_system_.advanceTimeWait(std::chrono::microseconds(1));
+  expectSendMessage({makeClusterStats("foo", 3, std::chrono::microseconds(1)),
+                     makeClusterStats("bar", 1, std::chrono::microseconds(1))});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // foo is removed and destroyed. Its load since the previous report is lost with it, and the
+  // next report does not have it. The load report period that starts after that report stops
+  // tracking it.
+  foo_cluster->info_->load_report_stats_.upstream_rq_dropped_.add(4);
+  removeActiveCluster("foo");
+  foo_cluster.reset();
+  bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
+  time_system_.advanceTimeWait(std::chrono::microseconds(2));
+  expectSendMessage({makeClusterStats("bar", 1, std::chrono::microseconds(2))});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // foo is added again, as a new cluster. It is not tracked until the next load report period
+  // starts, which is right after the next report, so that report does not have it either. Its
+  // load so far is discarded when it is tracked.
+  NiceMock<MockClusterMockPrioritySet> readded_foo_cluster;
+  readded_foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
+  addActiveCluster("foo", readded_foo_cluster);
+  bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
+  time_system_.advanceTimeWait(std::chrono::microseconds(3));
+  expectSendMessage({makeClusterStats("bar", 1, std::chrono::microseconds(3))});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // foo is reported again, for a measurement interval that started when it was tracked again.
+  readded_foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(6);
+  bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
+  time_system_.advanceTimeWait(std::chrono::microseconds(4));
+  expectSendMessage({makeClusterStats("foo", 6, std::chrono::microseconds(4)),
+                     makeClusterStats("bar", 1, std::chrono::microseconds(4))});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // foo is replaced by another cluster with the same name between two reports, which is what
+  // happens when a cluster is updated. foo was never found to be missing, so it stays tracked:
+  // the load of its replacement is reported in full, and its measurement interval continues.
+  NiceMock<MockClusterMockPrioritySet> replaced_foo_cluster;
+  replaced_foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(7);
+  removeActiveCluster("foo");
+  addActiveCluster("foo", replaced_foo_cluster);
+  bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
+  time_system_.advanceTimeWait(std::chrono::microseconds(5));
+  expectSendMessage({makeClusterStats("foo", 7, std::chrono::microseconds(5)),
+                     makeClusterStats("bar", 1, std::chrono::microseconds(5))});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+}
+
+// Validate that with an explicit list of clusters, a cluster stays tracked while it does not
+// exist: nothing is reported for it then, and once it is added, or removed and added again, its
+// load is reported in full for a measurement interval that includes the time during which it did
+// not exist.
+TEST_F(LoadStatsReporterImplTest, ClusterRemovedAndReAddedExplicitList) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter();
+
+  // foo is selected before it exists. Nothing is reported for it.
+  deliverLoadStatsResponse({"foo"});
+  time_system_.advanceTimeWait(std::chrono::microseconds(1));
+  expectSendMessage({});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // foo is added. All of its load is reported, for a measurement interval that started when foo
+  // was selected.
+  auto foo_cluster = std::make_unique<NiceMock<MockClusterMockPrioritySet>>();
+  foo_cluster->info_->load_report_stats_.upstream_rq_dropped_.add(2);
+  addActiveCluster("foo", *foo_cluster);
+  time_system_.advanceTimeWait(std::chrono::microseconds(2));
+  expectSendMessage({makeClusterStats("foo", 2, std::chrono::microseconds(3))});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // foo is removed and destroyed. Its load since the previous report is lost with it, and nothing
+  // is reported for it, but it stays tracked.
+  foo_cluster->info_->load_report_stats_.upstream_rq_dropped_.add(3);
+  removeActiveCluster("foo");
+  foo_cluster.reset();
+  time_system_.advanceTimeWait(std::chrono::microseconds(4));
+  expectSendMessage({});
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // foo is added again, as a new cluster. All of its load is reported, for a measurement interval
+  // that started with the last report that had foo.
+  NiceMock<MockClusterMockPrioritySet> readded_foo_cluster;
+  readded_foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
+  addActiveCluster("foo", readded_foo_cluster);
+  time_system_.advanceTimeWait(std::chrono::microseconds(8));
+  expectSendMessage({makeClusterStats("foo", 5, std::chrono::microseconds(12))});
   EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
   response_timer_cb_();
 }
