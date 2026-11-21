@@ -7,10 +7,13 @@
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.h"
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.validate.h"
 #include "envoy/http/filter.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/cluster_manager.h"
+
+#include "source/common/upstream/od_cds_context.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_cat.h"
@@ -152,9 +155,8 @@ public:
   // The returned object will perform route discovery if it's missing,
   // then after route is successfully discovered, it will proceed to
   // on-demand cluster discovery if the cluster is missing. The latter
-  // discovery will be done with the passed OdCdsApi and timeout.
-  static DecodeHeadersBehaviorPtr cdsRds(Upstream::OdCdsApiHandlePtr odcds,
-                                         std::chrono::milliseconds timeout);
+  // discovery will use the passed context's API, timeout and pending budget.
+  static DecodeHeadersBehaviorPtr cdsRds(Upstream::OdCdsContextSharedPtr context);
 
   virtual ~DecodeHeadersBehavior() = default;
 
@@ -174,20 +176,24 @@ public:
   // Constructs config from extension's proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
-      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-      absl::Status& creation_status);
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validation_visitor, absl::Status& creation_status);
   // Also creates the stats as "<stats_prefix>on_demand.<name>" in scope.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
-      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-      absl::Status& creation_status, Stats::Scope& scope, const std::string& stats_prefix);
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validation_visitor, absl::Status& creation_status,
+      Stats::Scope& scope, const std::string& stats_prefix);
   // Constructs config from extension's per-route proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
-      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-      absl::Status& creation_status);
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validation_visitor, absl::Status& creation_status);
 
   DecodeHeadersBehavior& decodeHeadersBehavior() const { return *behavior_; }
+  Upstream::OdCdsContextSharedPtr mirrorDiscoveryContextSharedPtr() const {
+    return mirror_discovery_context_;
+  }
 
   // Only the filter-level config has stats; per-route configs only override the behavior.
   OptRef<OnDemandFilterStats> stats() {
@@ -199,13 +205,14 @@ private:
 
   DecodeHeadersBehaviorPtr behavior_;
   std::optional<OnDemandFilterStats> stats_;
+  Upstream::OdCdsContextSharedPtr mirror_discovery_context_;
 };
 
 using OnDemandFilterConfigSharedPtr = std::shared_ptr<OnDemandFilterConfig>;
 
 class OnDemandRouteUpdate : public Http::StreamDecoderFilter {
 public:
-  OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config);
+  explicit OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config);
 
   // Callback invoked when route config update is finished.
   void onRouteConfigUpdateCompletion(bool route_exists);
@@ -215,8 +222,7 @@ public:
   OptRef<const Router::Route> handleMissingRoute();
   // Do on-demand cluster discovery if the cluster used by the route
   // is missing.
-  void handleOnDemandCds(const Router::Route& route, Upstream::OdCdsApiHandle& odcds,
-                         std::chrono::milliseconds timeout);
+  void handleOnDemandCds(const Router::Route& route, Upstream::OdCdsContextSharedPtr context);
   // Get the per-route config if it's available, otherwise the
   // extension's config.
   const OnDemandFilterConfig* getConfig();
@@ -249,10 +255,13 @@ private:
   void startClusterDiscovery(MonotonicTime start, absl::string_view cluster_name);
   void finishClusterDiscovery(Upstream::ClusterDiscoveryStatus cluster_status);
 
+  void handleOnDemandUpdate();
+  void releasePendingDiscovery();
   OnDemandFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_callback_;
   Upstream::ClusterDiscoveryCallbackHandlePtr cluster_discovery_handle_;
+  Upstream::OdCdsContextSharedPtr primary_discovery_context_;
   Envoy::Http::FilterHeadersStatus filter_iteration_state_{Http::FilterHeadersStatus::Continue};
   bool decode_headers_active_{false};
   bool downstream_end_stream_{false};

@@ -8,6 +8,7 @@ import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.on_demand.v3";
 option java_outer_classname = "OnDemandProto";
@@ -37,6 +38,29 @@ message OnDemandCds {
   google.protobuf.Duration timeout = 3;
 }
 
+// Configuration for on-demand discovery of mirror clusters. These settings apply to all
+// request mirror policies for the request.
+//
+// While cluster discovery is pending, each mirrored request is buffered up to the router's
+// request body buffer limit. If the limit is exceeded, the mirrored request is discarded without
+// applying backpressure to the downstream request. Normal upstream backpressure applies after
+// discovery succeeds. See :ref:`on-demand mirror clusters <config_http_filters_router_mirror_odcds>`
+// for details.
+message MirrorOnDemandCds {
+  oneof default_policy {
+    option (validate.required) = true;
+
+    // If true, use the ``odcds`` configuration from the same filter configuration for mirror
+    // cluster discovery, including its discovery timeout. If ``odcds`` is not specified, mirror cluster
+    // discovery is disabled.
+    bool inherit_primary = 1 [(validate.rules).bool = {const: true}];
+
+    // Configuration for on-demand discovery of mirror clusters, independent of ``odcds``.
+    // If the discovery timeout is not specified, the default is 5 seconds.
+    OnDemandCds config = 2;
+  }
+}
+
 // On Demand Discovery filter config.
 message OnDemand {
   option (udpa.annotations.versioning).previous_message_type =
@@ -49,9 +73,17 @@ message OnDemand {
   // process. When the discovery is finished (successfully or not), the
   // request will be resumed for further processing.
   OnDemandCds odcds = 1;
+
+  // An optional configuration for on-demand discovery of mirror clusters. If not specified,
+  // mirror cluster discovery is disabled. The on-demand filter must be enabled and placed before
+  // the router filter, including when ``odcds`` is not specified.
+  MirrorOnDemandCds mirror_odcds = 2;
 }
 
 // Per-route configuration for On Demand Discovery.
+// The most specific per-filter configuration replaces the entire filter configuration. Fields
+// are not merged. To enable cluster discovery for both the original request and its mirrors,
+// specify both ``odcds`` and ``mirror_odcds``.
 message PerRouteConfig {
   // An optional configuration for on-demand cluster discovery
   // service. If not specified, the on-demand cluster discovery will
@@ -60,4 +92,9 @@ message PerRouteConfig {
   // process. When the discovery is finished (successfully or not), the
   // request will be resumed for further processing.
   OnDemandCds odcds = 1;
+
+  // An optional configuration for on-demand discovery of mirror clusters. If not specified,
+  // mirror cluster discovery is disabled. The on-demand filter must be enabled and placed before
+  // the router filter, including when ``odcds`` is not specified.
+  MirrorOnDemandCds mirror_odcds = 2;
 }

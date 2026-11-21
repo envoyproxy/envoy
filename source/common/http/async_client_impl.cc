@@ -57,17 +57,18 @@ AsyncClientImpl::internalStartRequest<AsyncOngoingRequestImpl>(AsyncOngoingReque
 
 AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request,
                                             AsyncClient::Callbacks& callbacks,
-                                            const AsyncClient::RequestOptions& options) {
+                                            const AsyncClient::RequestOptions& options,
+                                            Tracing::SpanPtr span) {
   AsyncRequestImpl* async_request =
-      AsyncRequestImpl::create(std::move(request), *this, callbacks, options);
+      AsyncRequestImpl::create(std::move(request), *this, callbacks, options, std::move(span));
   return internalStartRequest(async_request);
 }
 
 AsyncClient::OngoingRequest*
 AsyncClientImpl::startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
-                              const AsyncClient::RequestOptions& options) {
-  AsyncOngoingRequestImpl* async_request =
-      AsyncOngoingRequestImpl::create(std::move(request_headers), *this, callbacks, options);
+                              const AsyncClient::RequestOptions& options, Tracing::SpanPtr span) {
+  AsyncOngoingRequestImpl* async_request = AsyncOngoingRequestImpl::create(
+      std::move(request_headers), *this, callbacks, options, std::move(span));
   return internalStartRequest(async_request);
 }
 
@@ -351,12 +352,12 @@ void AsyncStreamImpl::resetStream(Http::StreamResetReason, absl::string_view) {
 AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
                                                AsyncClient::Callbacks& callbacks,
                                                const AsyncClient::RequestOptions& options,
-                                               absl::Status& creation_status)
+                                               absl::Status& creation_status, Tracing::SpanPtr span)
     : AsyncStreamImpl(parent, *this, options, creation_status), callbacks_(callbacks),
-      context_(options.context_),
+      context_(options.context_), child_span_(std::move(span)),
       response_buffer_limit_(parent.config_->runtime_.snapshot().getInteger(
           AsyncClientImpl::ResponseBufferLimit, kBufferLimitForResponse)) {
-  if (!creation_status.ok()) {
+  if (!creation_status.ok() || child_span_ != nullptr) {
     return;
   }
   if (options.parent_span_ != nullptr) {
@@ -373,6 +374,17 @@ AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
   // If caller overrides sampled_ with empty value, sampling status of the parent is kept.
   if (options.sampled_.has_value()) {
     child_span_->setSampled(options.sampled_.value());
+  }
+}
+
+void AsyncRequestSharedImpl::onCreationFailure() {
+  // An adopted span belongs to this request even when stream construction fails.
+  if (child_span_ != nullptr) {
+    child_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    child_span_->setTag(Tracing::Tags::get().ErrorReason, "request_creation_failed");
+    callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_, nullptr);
+    child_span_->finishSpan();
+    callbacks_.onFailure(*this, AsyncClient::FailureReason::Reset);
   }
 }
 

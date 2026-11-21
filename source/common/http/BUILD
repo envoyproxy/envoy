@@ -16,6 +16,29 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "on_demand_async_client_lib",
+    srcs = ["on_demand_async_client.cc"],
+    hdrs = ["on_demand_async_client.h"],
+    deps = [
+        ":message_lib",
+        "//envoy/event:deferred_deletable",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/http:async_client_interface",
+        "//envoy/singleton:instance_interface",
+        "//envoy/singleton:manager_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:linked_object",
+        "//source/common/http:header_map_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/common/tracing:http_tracer_lib",
+        "//source/common/upstream:od_cds_context_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "async_client_lib",
     srcs = [
         "async_client_impl.cc",

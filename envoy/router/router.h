@@ -249,19 +249,27 @@ public:
 /**
  * All mirror policy stats. @see stats_macro.h
  */
-#define ALL_SHADOW_POLICY_STATS(COUNTER)                                                           \
+#define ALL_SHADOW_POLICY_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
+  COUNTER(discovery_attempt)                                                                       \
+  COUNTER(discovery_success)                                                                       \
+  COUNTER(discovery_missing)                                                                       \
+  COUNTER(discovery_timeout)                                                                       \
+  COUNTER(discovery_cancelled)                                                                     \
+  COUNTER(discovery_overflow)                                                                      \
   COUNTER(rq_cancelled)                                                                            \
   COUNTER(rq_failure)                                                                              \
   COUNTER(rq_no_cluster)                                                                           \
   COUNTER(rq_sampled)                                                                              \
   COUNTER(rq_started)                                                                              \
-  COUNTER(rq_success)
+  COUNTER(rq_success)                                                                              \
+  GAUGE(discovery_pending, Accumulate)                                                             \
+  HISTOGRAM(discovery_time, Milliseconds)
 
 /**
  * Struct definition for all mirror policy stats. @see stats_macro.h
  */
 struct ShadowPolicyStats {
-  ALL_SHADOW_POLICY_STATS(GENERATE_COUNTER_STRUCT)
+  ALL_SHADOW_POLICY_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 using ShadowPolicyStatsSharedPtr = std::shared_ptr<const ShadowPolicyStats>;

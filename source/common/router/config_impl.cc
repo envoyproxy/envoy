@@ -425,7 +425,9 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
 }
 
 ShadowPolicyImpl::ShadowPolicyStatsHolder::ShadowPolicyStatsHolder(Stats::ScopeSharedPtr scope)
-    : scope_(std::move(scope)), stats_{ALL_SHADOW_POLICY_STATS(POOL_COUNTER(*scope_))} {}
+    : scope_(std::move(scope)),
+      stats_{ALL_SHADOW_POLICY_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_),
+                                     POOL_HISTOGRAM(*scope_))} {}
 
 const Http::HeaderEvaluator& ShadowPolicyImpl::headerEvaluator() const {
   if (request_headers_mutations_) {

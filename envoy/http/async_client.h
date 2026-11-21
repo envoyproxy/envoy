@@ -510,13 +510,16 @@ public:
    * @param request the request to send.
    * @param callbacks the callbacks to be notified of request status.
    * @param options the data struct to control the request sending.
+   * @param span optional owned request span to use instead of creating a child of parent_span_.
+   *        Its name and sampling decision are preserved. The client finalizes it on completion,
+   *        cancellation, or failure, including failure to create the request.
    * @return a request handle or nullptr if no request could be created. NOTE: In this case
    *         onFailure() has already been called inline. The client owns the request and the
    *         handle should just be used to cancel.
    */
 
   virtual Request* send(RequestMessagePtr&& request, Callbacks& callbacks,
-                        const RequestOptions& options) PURE;
+                        const RequestOptions& options, Tracing::SpanPtr span = nullptr) PURE;
 
   /**
    * Starts a new OngoingRequest asynchronously with the given headers.
@@ -524,12 +527,14 @@ public:
    * @param request_headers headers to send.
    * @param callbacks the callbacks to be notified of request status.
    * @param options the data struct to control the request sending.
+   * @param span optional owned request span, with the same ownership contract as send().
    * @return a request handle or nullptr if no request could be created. See note attached to
    * `send`. Calling startRequest will not trigger end stream. For header-only requests, `send`
    * should be called instead.
    */
   virtual OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
-                                       const RequestOptions& options) PURE;
+                                       const RequestOptions& options,
+                                       Tracing::SpanPtr span = nullptr) PURE;
 
   /**
    * Start an HTTP stream asynchronously, without an associated HTTP request.

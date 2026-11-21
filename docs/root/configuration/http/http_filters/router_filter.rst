@@ -493,11 +493,19 @@ statistics in the ``mirror.<stat_prefix>.`` namespace:
   :widths: 1, 1, 2
 
   rq_sampled, Counter, Total requests selected for mirroring by the policy runtime fraction
-  rq_no_cluster, Counter, Total selected requests not mirrored because the mirror cluster did not exist or the cluster header was missing
-  rq_started, Counter, Total mirror requests started
+  rq_no_cluster, Counter, "Total selected requests skipped because the cluster or cluster header was missing, including discovery failures and timeouts"
+  rq_started, Counter, Total mirror HTTP requests started
   rq_success, Counter, Total mirror requests that received a 2xx response
   rq_failure, Counter, Total mirror requests that received a non-2xx response or failed without a response
-  rq_cancelled, Counter, Total mirror requests cancelled because the primary request was destroyed before the request was fully sent
+  rq_cancelled, Counter, Total started mirror requests cancelled because the primary request was destroyed before the request was fully sent
+  discovery_attempt, Counter, Mirror discovery attempts
+  discovery_pending, Gauge, Mirror requests currently waiting for cluster discovery
+  discovery_success, Counter, Total mirror requests whose cluster became available
+  discovery_missing, Counter, Total mirror requests whose cluster was reported missing or removed during discovery
+  discovery_timeout, Counter, Total mirror requests whose cluster discovery timed out
+  discovery_cancelled, Counter, Total mirror requests cancelled while waiting for discovery
+  discovery_overflow, Counter, Total mirror requests discarded because the pending body exceeded its buffer limit
+  discovery_time, Histogram, Time spent waiting for discovery in milliseconds
 
 The statistics are emitted in the server's root scope and tagged with the policy ``stat_prefix``.
 Policies that use the same ``stat_prefix`` share the same counters, including policies of different
@@ -509,11 +517,20 @@ policies, so only the statistics of the cluster-level policies are updated.
 Mirror policies are evaluated once the router has selected an upstream host for the primary
 request. Requests answered locally before that point, for example because the cluster has no
 healthy upstream or because the request is load shed, are not counted in ``rq_sampled``, and
-neither are CONNECT requests, which are never mirrored. ``rq_sampled`` minus ``rq_no_cluster``
-minus ``rq_started`` counts the selected requests that were not mirrored because an upstream HTTP
-filter answered the primary request locally after the policies were evaluated.
-``rq_started`` minus ``rq_success``, ``rq_failure`` and ``rq_cancelled`` counts the mirror requests
-still in flight.
+neither are CONNECT requests, which are never mirrored.
+
+The ``discovery_*`` statistics apply when :ref:`mirror discovery
+<config_http_filters_on_demand_mirrors>` is enabled. They count individual mirror requests,
+including when requests share the same cluster lookup. ``rq_started`` counts HTTP starts;
+cancellation or buffer overflow during discovery increments ``discovery_cancelled`` or
+``discovery_overflow`` respectively.
+
+``rq_started`` minus ``rq_success``, ``rq_failure`` and ``rq_cancelled`` counts mirror HTTP
+requests still in flight. ``discovery_pending`` counts mirrors that are still waiting for a cluster.
+
+To count selected requests not mirrored because an upstream HTTP filter answered the primary
+request locally, subtract ``rq_no_cluster``, ``rq_started``, ``discovery_pending``,
+``discovery_cancelled`` and ``discovery_overflow`` from ``rq_sampled``.
 
 Runtime
 -------
@@ -535,3 +552,50 @@ upstream.maintenance_mode.<cluster name>
 upstream.use_retry
   % of requests that are eligible for retry. This configuration is checked before any other retry
   configuration and can be used to fully disable retries across all Envoys if needed.
+
+.. _config_http_filters_router_mirror_odcds:
+
+On-demand mirror clusters
+-------------------------
+
+The :ref:`on-demand HTTP filter <config_http_filters_on_demand_mirrors>` can discover missing
+clusters for sampled request mirrors. The primary request proceeds while discovery is pending.
+Discovery failure, timeout or buffer overflow discards only the affected mirror. Discovery
+failures are not retried for that mirror.
+
+Each pending mirror waits at most its configured :ref:`discovery timeout
+<envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemandCds.timeout>`, including when
+requests share discovery of the same cluster. Cancelling one mirror does not cancel discovery
+for other requests. After discovery succeeds, the mirror uses the route's :ref:`HTTP timeout
+<envoy_v3_api_field_config.route.v3.RouteAction.timeout>`. The HTTP timeout starts when the
+mirrored request has been sent.
+
+Buffering
+^^^^^^^^^
+
+Each pending mirror retains a separate copy of the request, using the router's effective
+:ref:`request body buffer limit <envoy_v3_api_field_config.route.v3.Route.request_body_buffer_limit>`.
+Exceeding the limit discards that mirror and releases its buffered data.
+
+Pending mirrors do not apply downstream backpressure. Normal upstream backpressure applies
+after discovery succeeds.
+
+A fully buffered mirror can complete after its primary request ends. A mirror whose request
+is still incomplete is cancelled when the primary request is destroyed.
+
+Tracing
+^^^^^^^
+
+The ``mirror`` span is a child of the downstream request span. Its duration covers cluster
+discovery and the HTTP exchange, or the wait until the mirror is discarded if HTTP never starts.
+Sampling follows the mirror policy's :ref:`trace_sampled
+<envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.trace_sampled>` setting.
+
+Mirrors that require discovery add a ``discovery.result`` tag to the ``mirror`` span:
+``available``, ``missing``, ``timeout``, ``cancelled`` or ``buffer_overflow``. Missing clusters
+and discovery timeouts mark the span as an error; cancellation marks it as cancelled.
+The ``upstream_cluster`` tag identifies the mirror target even if discovery fails before HTTP starts.
+
+When the mirror policy configures a ``stat_prefix``, the ``discovery_time`` histogram records
+time spent waiting for discovery, including cluster warming, in milliseconds. These statistics
+are independent of trace sampling.
