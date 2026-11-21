@@ -2055,5 +2055,62 @@ typed_config:
       {{"envoy.http_conn_manager_prefix", "config_test"}, {"envoy.rbac_policy_name", "foo"}});
 }
 
+TEST_P(RBACIntegrationTest, PathMatcherStripsParametersWhenEnabled) {
+  // 1. POLICY: RBAC DENY on `/admin` or `/admin/*`.
+  config_helper_.prependFilter(R"EOF(
+name: envoy.filters.http.rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  rules:
+    action: DENY
+    policies:
+      block-admin:
+        permissions:
+        - or_rules:
+            rules:
+            - url_path: { path: { exact: "/admin" } }
+            - url_path: { path: { prefix: "/admin/" } }
+        principals:
+        - any: true
+)EOF");
+
+  // ROUTES: `/admin` → cluster_0 (the protected upstream); everything else
+  // → direct_response 200. So reaching cluster_0 proves the request
+  // matched the admin route past RBAC.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_normalize_path()->set_value(true);
+        hcm.set_merge_slashes(true);
+
+        auto* rc = hcm.mutable_route_config();
+        // The flag under test
+        rc->set_ignore_path_parameters_in_path_matching(true);
+
+        auto* vh = rc->mutable_virtual_hosts(0);
+        vh->clear_routes();
+
+        // Route 0: the admin route — ONLY way to reach cluster_0.
+        auto* admin = vh->add_routes();
+        admin->mutable_match()->set_path_separated_prefix("/admin");
+        admin->mutable_route()->set_cluster("cluster_0");
+
+        // Route 1: catch-all → direct 200 (never touches an upstream).
+        auto* catchall = vh->add_routes();
+        catchall->mutable_match()->set_prefix("/");
+        catchall->mutable_direct_response()->set_status(200);
+        catchall->mutable_direct_response()->mutable_body()->set_inline_string("public");
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto resp = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/admin;x/secret"}, {":scheme", "http"}, {":authority", "h"}});
+
+  ASSERT_TRUE(resp->waitForEndStream());
+  ASSERT_EQ("403", resp->headers().getStatusValue());
+}
+
 } // namespace
 } // namespace Envoy
