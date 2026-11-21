@@ -1683,6 +1683,21 @@ TEST_F(ScopedRdsTest, ConfigUpdateFailure) {
             time);
 }
 
+TEST_F(ScopedRdsTest, ConfigDumpDuringSubscriptionDestruction) {
+  setup();
+  context_init_manager_.initialize(init_watcher_);
+
+  init_watcher_.expectReady().WillOnce([this]() {
+    UniversalStringMatcher name_matcher;
+    const auto message = config_provider_manager_->dumpConfigs(name_matcher);
+    const auto& config_dump =
+        TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(*message);
+    EXPECT_TRUE(config_dump.dynamic_scoped_route_configs().empty());
+  });
+
+  provider_.reset();
+}
+
 // Tests that the /config_dump handler returns the corresponding scoped routing
 // config.
 TEST_F(ScopedRdsTest, ConfigDump) {

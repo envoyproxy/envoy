@@ -1,4 +1,4 @@
-load("@envoy_repo//:containers.bzl", "image_mobile")
+load("@envoy_repo//:containers.bzl", "image_worker")
 
 licenses(["notice"])  # Apache 2
 
@@ -7,7 +7,7 @@ package(default_visibility = ["//visibility:public"])
 platform(
     name = "linux_x64",
     exec_properties = {
-        "container-image": "docker://%s" % image_mobile(),
+        "container-image": "docker://%s" % image_worker(),
         "Pool": "linux",
     },
     parents = ["@envoy//bazel/platforms:linux_x64"],
@@ -16,7 +16,7 @@ platform(
 platform(
     name = "linux_arm64",
     exec_properties = {
-        "container-image": "docker://%s" % image_mobile(),
+        "container-image": "docker://%s" % image_worker(),
         "Pool": "linux",
     },
     parents = ["@envoy//bazel/platforms:linux_arm64"],

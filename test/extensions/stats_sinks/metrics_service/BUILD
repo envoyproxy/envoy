@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "metrics_service_test",
     srcs = ["grpc_metrics_service_impl_test.cc"],
     extension_names = ["envoy.stat_sinks.metrics_service"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/upstream:upstream_includes",
@@ -35,8 +38,10 @@ envoy_extension_cc_test(
     srcs = ["metrics_service_integration_test.cc"],
     extension_names = ["envoy.stat_sinks.metrics_service"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",

@@ -33,7 +33,10 @@ envoy_extension_cc_test(
     name = "tls_inspector_test",
     srcs = ["tls_inspector_test.cc"],
     extension_names = ["envoy.filters.listener.tls_inspector"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":tls_utility_lib",
         "//source/common/http:utility_lib",
@@ -54,7 +57,11 @@ envoy_extension_cc_test(
     name = "tls_inspector_ja4_test",
     srcs = ["tls_inspector_ja4_test.cc"],
     extension_names = ["envoy.filters.listener.tls_inspector"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    external_deps = ["ssl"],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":tls_utility_lib",
         "//source/common/common:hex_lib",
@@ -62,6 +69,7 @@ envoy_extension_cc_test(
         "//source/common/network:listener_filter_buffer_lib",
         "//source/common/ssl:ssl_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
+        "//source/extensions/filters/listener/tls_inspector:ja4_fingerprint_lib",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/api:api_mocks",
@@ -86,7 +94,10 @@ envoy_extension_cc_fuzz_test(
     srcs = ["tls_inspector_fuzz_test.cc"],
     corpus = "tls_inspector_corpus",
     extension_names = ["envoy.filters.listener.tls_inspector"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":tls_inspector_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
@@ -141,8 +152,9 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.listener.tls_inspector"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/config:api_version_lib",

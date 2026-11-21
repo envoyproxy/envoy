@@ -107,6 +107,7 @@ envoy_cc_library(
     name = "quota_bucket_cache",
     hdrs = ["quota_bucket_cache.h"],
     deps = [
+        "//source/common/common:hash_lib",
         "//source/common/common:token_bucket_impl_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",

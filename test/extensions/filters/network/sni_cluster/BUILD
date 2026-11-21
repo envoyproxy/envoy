@@ -15,7 +15,13 @@ envoy_extension_cc_test(
     name = "sni_cluster_test",
     srcs = ["sni_cluster_test.cc"],
     extension_names = ["envoy.filters.network.sni_cluster"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/network/sni_cluster",
         "//source/extensions/filters/network/sni_cluster:config",

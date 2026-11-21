@@ -1,12 +1,18 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 
 #include <algorithm>
+#include <utility>
 #include <vector>
 
+#include "envoy/server/admin.h"
 #include "envoy/server/options.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/matchers.h"
+#include "source/common/common/regex.h"
 #include "source/common/common/thread.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/str_cat.h"
@@ -15,6 +21,15 @@ namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace DynamicModules {
+namespace {
+
+// cluster/listener lifecycle hooks must set this flag; other bootstrap hooks must also set it
+// when run inside xDS updates or resource destruction
+thread_local bool in_resource_lifecycle_callback = false;
+// both flags are shared across configs because callbacks can reenter another config on this thread
+thread_local bool collecting_config_snapshot = false;
+
+} // namespace
 
 DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
     const absl::string_view extension_name, const absl::string_view extension_config,
@@ -32,6 +47,7 @@ DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
 }
 
 DynamicModuleBootstrapExtensionConfig::~DynamicModuleBootstrapExtensionConfig() {
+  extension_config_subscription_.reset();
   // Cancel any pending HTTP callouts before destroying the config.
   for (auto& callout : http_callouts_) {
     if (callout.second->request_ != nullptr) {
@@ -91,9 +107,95 @@ bool DynamicModuleBootstrapExtensionConfig::enableClusterLifecycle() {
   return true;
 }
 
+bool DynamicModuleBootstrapExtensionConfig::subscribeEcds(absl::string_view name,
+                                                          absl::string_view source_json) {
+  if (!server_initialized_) {
+    ENVOY_LOG(error, "cannot subscribe to bootstrap ECDS before server is initialized");
+    return false;
+  }
+  if (extension_destroyed_ || !shutdownNotificationExpected()) {
+    ENVOY_LOG(error, "cannot subscribe to bootstrap ECDS after shutdown or in init only mode");
+    return false;
+  }
+  if (extension_config_subscription_ != nullptr) {
+    ENVOY_LOG(error, "bootstrap extension {} is already subscribed to ECDS", extension_name_);
+    return false;
+  }
+  if (on_bootstrap_extension_ecds_update_ == nullptr) {
+    ENVOY_LOG(error, "bootstrap extension {} has no ECDS update hook", extension_name_);
+    return false;
+  }
+  envoy::config::core::v3::ExtensionConfigSource source;
+  bool has_unknown_field = false;
+  auto status = MessageUtil::loadFromJsonNoThrow(source_json, source, has_unknown_field);
+  if (!status.ok()) {
+    ENVOY_LOG(warn, "bootstrap ECDS config source for {} is invalid: {}", name, status.message());
+    return false;
+  }
+  TRY_ASSERT_MAIN_THREAD {
+    auto subscription = ExtensionConfigSubscription::create(
+        name, source, extension_name_, context_,
+        [this](absl::string_view resource_name, absl::string_view version,
+               absl::string_view type_url,
+               envoy_dynamic_module_type_bootstrap_ecds_config_encoding encoding,
+               std::optional<absl::string_view> config) {
+          const bool previous = std::exchange(in_resource_lifecycle_callback, true);
+          Cleanup cleanup([previous]() { in_resource_lifecycle_callback = previous; });
+          return on_bootstrap_extension_ecds_update_(
+              thisAsVoidPtr(), in_module_config_, {resource_name.data(), resource_name.size()},
+              {version.data(), version.size()}, {type_url.data(), type_url.size()}, encoding,
+              config.has_value(),
+              config.has_value()
+                  ? envoy_dynamic_module_type_envoy_buffer{config->data(), config->size()}
+                  : envoy_dynamic_module_type_envoy_buffer{nullptr, 0});
+        });
+    if (!subscription.ok()) {
+      ENVOY_LOG(warn, "cannot subscribe to bootstrap ECDS config {}: {}", name,
+                subscription.status().message());
+      return false;
+    }
+    extension_config_subscription_ = std::move(subscription.value());
+    extension_config_subscription_->start();
+    return true;
+  }
+  END_TRY
+  CATCH(const EnvoyException& exception, {
+    ENVOY_LOG(warn, "cannot subscribe to bootstrap ECDS config {}: {}", name, exception.what());
+    extension_config_subscription_.reset();
+    return false;
+  });
+}
+
+absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
+DynamicModuleBootstrapExtensionConfig::getConfigSnapshot(
+    absl::Span<const absl::string_view> providers, absl::string_view name_regex) {
+  if (!server_initialized_ || shutdown_started_ || extension_destroyed_) {
+    return absl::FailedPreconditionError("config providers are unavailable");
+  }
+  if (in_resource_lifecycle_callback || collecting_config_snapshot) {
+    return absl::FailedPreconditionError(
+        "config snapshot requested during a resource lifecycle hook or snapshot collection");
+  }
+  collecting_config_snapshot = true;
+  Cleanup cleanup([]() { collecting_config_snapshot = false; });
+  auto server_admin = admin();
+  if (!server_admin.has_value()) {
+    return absl::UnavailableError("admin config tracker is unavailable");
+  }
+  if (!name_regex.empty()) {
+    auto matcher = Regex::CompiledGoogleReMatcher::createAndSizeCheck(std::string(name_regex));
+    RETURN_IF_NOT_OK(matcher.status());
+    return ConfigSnapshot::collect(server_admin->getConfigTracker(), providers, **matcher);
+  }
+  return ConfigSnapshot::collect(server_admin->getConfigTracker(), providers,
+                                 Matchers::UniversalStringMatcher{});
+}
+
 void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(
     absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand&) {
   if (in_module_config_ != nullptr && on_bootstrap_extension_cluster_add_or_update_ != nullptr) {
+    const bool previous = std::exchange(in_resource_lifecycle_callback, true);
+    Cleanup cleanup([previous]() { in_resource_lifecycle_callback = previous; });
     on_bootstrap_extension_cluster_add_or_update_(thisAsVoidPtr(), in_module_config_,
                                                   {cluster_name.data(), cluster_name.size()});
   }
@@ -101,6 +203,8 @@ void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(
 
 void DynamicModuleBootstrapExtensionConfig::onClusterRemoval(absl::string_view cluster_name) {
   if (in_module_config_ != nullptr && on_bootstrap_extension_cluster_removal_ != nullptr) {
+    const bool previous = std::exchange(in_resource_lifecycle_callback, true);
+    Cleanup cleanup([previous]() { in_resource_lifecycle_callback = previous; });
     on_bootstrap_extension_cluster_removal_(thisAsVoidPtr(), in_module_config_,
                                             {cluster_name.data(), cluster_name.size()});
   }
@@ -130,6 +234,8 @@ bool DynamicModuleBootstrapExtensionConfig::enableListenerLifecycle() {
 void DynamicModuleBootstrapExtensionConfig::onListenerAddOrUpdate(absl::string_view listener_name,
                                                                   const Network::ListenerConfig&) {
   if (in_module_config_ != nullptr && on_bootstrap_extension_listener_add_or_update_ != nullptr) {
+    const bool previous = std::exchange(in_resource_lifecycle_callback, true);
+    Cleanup cleanup([previous]() { in_resource_lifecycle_callback = previous; });
     on_bootstrap_extension_listener_add_or_update_(thisAsVoidPtr(), in_module_config_,
                                                    {listener_name.data(), listener_name.size()});
   }
@@ -137,6 +243,8 @@ void DynamicModuleBootstrapExtensionConfig::onListenerAddOrUpdate(absl::string_v
 
 void DynamicModuleBootstrapExtensionConfig::onListenerRemoval(const std::string& listener_name) {
   if (in_module_config_ != nullptr && on_bootstrap_extension_listener_removal_ != nullptr) {
+    const bool previous = std::exchange(in_resource_lifecycle_callback, true);
+    Cleanup cleanup([previous]() { in_resource_lifecycle_callback = previous; });
     on_bootstrap_extension_listener_removal_(thisAsVoidPtr(), in_module_config_,
                                              {listener_name.data(), listener_name.size()});
   }
@@ -315,6 +423,30 @@ bool DynamicModuleBootstrapExtensionConfig::enableListenerWriter() {
   return true;
 }
 
+bool DynamicModuleBootstrapExtensionConfig::enableFilterChainConfigWriter() {
+  if (filter_chain_config_writer_ != nullptr || shutdown_started_) {
+    return false;
+  }
+  DynamicModuleFilterChainConfigWriter::UpdateDoneCallback update_done;
+  if (on_bootstrap_extension_filter_chain_config_writer_update_done_ != nullptr) {
+    update_done =
+        [this](uint64_t update_id, absl::string_view filter_chain_name,
+               envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status status,
+               absl::string_view error_details) {
+          on_bootstrap_extension_filter_chain_config_writer_update_done_(
+              thisAsVoidPtr(), in_module_config_, update_id,
+              {filter_chain_name.data(), filter_chain_name.size()}, status,
+              {error_details.data(), error_details.size()});
+        };
+  }
+  filter_chain_config_writer_ = std::make_unique<DynamicModuleFilterChainConfigWriter>(
+      extension_name_, context_, std::move(update_done));
+  if (listener_manager_ != nullptr) {
+    filter_chain_config_writer_->onServerInitialized(*listener_manager_);
+  }
+  return true;
+}
+
 void DynamicModuleBootstrapExtensionConfig::onPostInit() {
   if (listener_writer_ != nullptr) {
     listener_writer_->onPostInit();
@@ -323,11 +455,15 @@ void DynamicModuleBootstrapExtensionConfig::onPostInit() {
 
 void DynamicModuleBootstrapExtensionConfig::onShutdown() {
   shutdown_started_ = true;
+  extension_config_subscription_.reset();
   if (cluster_writer_ != nullptr) {
     cluster_writer_->onShutdown();
   }
   if (listener_writer_ != nullptr) {
     listener_writer_->onShutdown();
+  }
+  if (filter_chain_config_writer_ != nullptr) {
+    filter_chain_config_writer_->onShutdown();
   }
 }
 
@@ -597,6 +733,11 @@ newDynamicModuleBootstrapExtensionConfig(
 
   // The module constructor can enable the writers, which capture their done hooks, so the optional
   // hooks are resolved first.
+  auto on_ecds_update =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionEcdsUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_ecds_update");
+  config->on_bootstrap_extension_ecds_update_ =
+      on_ecds_update.ok() ? on_ecds_update.value() : nullptr;
   auto on_worker_event =
       config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionWorkerEventType>(
           "envoy_dynamic_module_on_bootstrap_extension_worker_event");
@@ -617,6 +758,29 @@ newDynamicModuleBootstrapExtensionConfig(
           "envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done");
   config->on_bootstrap_extension_listener_writer_update_done_ =
       on_listener_writer_update_done.ok() ? on_listener_writer_update_done.value() : nullptr;
+  auto on_filter_chain_config_writer_update_done =
+      config->dynamic_module_
+          ->getFunctionPointer<OnBootstrapExtensionFilterChainConfigWriterUpdateDoneType>(
+              "envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done");
+  config->on_bootstrap_extension_filter_chain_config_writer_update_done_ =
+      on_filter_chain_config_writer_update_done.ok()
+          ? on_filter_chain_config_writer_update_done.value()
+          : nullptr;
+  auto on_runtime_bool_update =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionRuntimeBoolUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update");
+  config->on_bootstrap_extension_runtime_bool_update_ =
+      on_runtime_bool_update.ok() ? on_runtime_bool_update.value() : nullptr;
+  auto on_runtime_int_update =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionRuntimeIntUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_runtime_int_update");
+  config->on_bootstrap_extension_runtime_int_update_ =
+      on_runtime_int_update.ok() ? on_runtime_int_update.value() : nullptr;
+  auto on_runtime_number_update =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionRuntimeNumberUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_runtime_number_update");
+  config->on_bootstrap_extension_runtime_number_update_ =
+      on_runtime_number_update.ok() ? on_runtime_number_update.value() : nullptr;
 
   // Always register an init target so that Envoy blocks traffic until the module signals readiness.
   // This must happen before calling the module constructor so the module can call

@@ -172,6 +172,8 @@ public:
   bool encodeComplete() const { return router_sent_end_stream_; }
   // Exposes streamInfo for the upstream stream.
   StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
+  // Exposes streamInfo for the downstream stream.
+  StreamInfo::StreamInfo& downstreamStreamInfo();
   bool hadUpstream() const { return had_upstream_; }
   // Disable per-try timeouts for websocket upgrades after successful handshake
   void disablePerTryTimeoutForWebsocketUpgrade();
@@ -365,6 +367,9 @@ public:
 
   // Http::UpstreamStreamFilterCallbacks
   StreamInfo::StreamInfo& upstreamStreamInfo() override { return upstream_request_.streamInfo(); }
+  StreamInfo::StreamInfo& downstreamStreamInfo() override {
+    return upstream_request_.downstreamStreamInfo();
+  }
   OptRef<Http::WebTransportSession> downstreamWebTransportSession() override;
   OptRef<GenericUpstream> upstream() override {
     return makeOptRefFromPtr(upstream_request_.upstream_.get());

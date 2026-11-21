@@ -95,15 +95,26 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
 void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
   updateCapacity(num_streams);
   if (state() == ActiveClient::State::Busy && currentUnusedCapacity() != 0) {
-    ENVOY_BUG(hasHandshakeCompleted(), "Received MAX_STREAM frame before handshake completed.");
-    parent_.transitionActiveClientState(*this, ActiveClient::State::Ready);
-    // If there's waiting streams, make sure the pool will now serve them.
-    parent_.onUpstreamReady();
+    if (!hasHandshakeCompleted()) {
+      // Handshake transport parameters increased stream capacity in FinishHandshake() before
+      // OnTlsHandshakeComplete() raises Connected. Move out of Busy so Connected transitions
+      // the client to Ready and dispatches pending streams via onUpstreamReady(), and suppress
+      // early-data dispatch on the follow-up onMaxStreamsChanged() in OnTlsHandshakeComplete().
+      early_data_capacity_initialized_ = true;
+      parent_.transitionActiveClientState(*this, ActiveClient::State::ReadyForEarlyData);
+    } else {
+      parent_.transitionActiveClientState(*this, ActiveClient::State::Ready);
+      // If there's waiting streams, make sure the pool will now serve them.
+      parent_.onUpstreamReady();
+    }
   } else if (state() == ActiveClient::State::ReadyForEarlyData) {
+    const bool should_dispatch_early_data = !early_data_capacity_initialized_;
+    early_data_capacity_initialized_ = true;
     if (currentUnusedCapacity() == 0) {
       // With HTTP/3 this can only happen during a rejected 0-RTT handshake.
       parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);
-    } else if (Runtime::runtimeFeatureEnabled(
+    } else if (should_dispatch_early_data &&
+               Runtime::runtimeFeatureEnabled(
                    "envoy.reloadable_features.fix_http3_early_data_timing")) {
       parent_.onUpstreamReadyForEarlyData(*this);
     }

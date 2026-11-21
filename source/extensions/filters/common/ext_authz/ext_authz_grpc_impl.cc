@@ -16,48 +16,59 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
+namespace {
+
+const std::string& getHeaderValue(const envoy::config::core::v3::HeaderValue& header,
+                                  bool read_raw_value) {
+  // Prefer raw_value when populated so non-UTF-8 bytes are preserved, and fall back to value for
+  // backwards compatibility with authorization servers that only populate value.
+  if (read_raw_value && !header.raw_value().empty()) {
+    return header.raw_value();
+  }
+  return header.value();
+}
+
 void copyHeaderFieldIntoResponse(
     ResponsePtr& response,
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers) {
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers,
+    bool read_raw_value) {
   for (const auto& header : headers) {
+    const std::string& value = getHeaderValue(header.header(), read_raw_value);
     if (header.append().value()) {
-      response->headers_to_append.emplace_back(header.header().key(), header.header().value());
+      response->headers_to_append.emplace_back(header.header().key(), value);
     } else {
-      response->headers_to_set.emplace_back(header.header().key(), header.header().value());
+      response->headers_to_set.emplace_back(header.header().key(), value);
     }
   }
 }
 
 void copyOkResponseMutations(ResponsePtr& response,
-                             const envoy::service::auth::v3::OkHttpResponse& ok_response) {
-  copyHeaderFieldIntoResponse(response, ok_response.headers());
+                             const envoy::service::auth::v3::OkHttpResponse& ok_response,
+                             bool read_raw_value) {
+  copyHeaderFieldIntoResponse(response, ok_response.headers(), read_raw_value);
 
   for (const auto& header : ok_response.response_headers_to_add()) {
+    const std::string& value = getHeaderValue(header.header(), read_raw_value);
     if (header.has_append()) {
       if (header.append().value()) {
-        response->response_headers_to_add.emplace_back(header.header().key(),
-                                                       header.header().value());
+        response->response_headers_to_add.emplace_back(header.header().key(), value);
       } else {
-        response->response_headers_to_set.emplace_back(header.header().key(),
-                                                       header.header().value());
+        response->response_headers_to_set.emplace_back(header.header().key(), value);
       }
     } else {
       switch (header.append_action()) {
       case Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-        response->response_headers_to_add.emplace_back(header.header().key(),
-                                                       header.header().value());
+        response->response_headers_to_add.emplace_back(header.header().key(), value);
         break;
       case Router::HeaderValueOption::ADD_IF_ABSENT:
-        response->response_headers_to_add_if_absent.emplace_back(header.header().key(),
-                                                                 header.header().value());
+        response->response_headers_to_add_if_absent.emplace_back(header.header().key(), value);
         break;
       case Router::HeaderValueOption::OVERWRITE_IF_EXISTS:
         response->response_headers_to_overwrite_if_exists.emplace_back(header.header().key(),
-                                                                       header.header().value());
+                                                                       value);
         break;
       case Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-        response->response_headers_to_set.emplace_back(header.header().key(),
-                                                       header.header().value());
+        response->response_headers_to_set.emplace_back(header.header().key(), value);
         break;
       default:
         response->saw_invalid_append_actions = true;
@@ -78,12 +89,15 @@ void copyOkResponseMutations(ResponsePtr& response,
                                ok_response.query_parameters_to_remove().end()};
 }
 
+} // namespace
+
 GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
                                const std::optional<std::chrono::milliseconds>& timeout,
-                               bool emit_client_span)
+                               bool emit_client_span, bool read_raw_header_value)
     : async_client_(async_client), timeout_(timeout),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.auth.v3.Authorization.Check")) {
+          "envoy.service.auth.v3.Authorization.Check")),
+      read_raw_header_value_(read_raw_header_value) {
   emit_client_span_ = emit_client_span;
 }
 
@@ -119,7 +133,7 @@ void GrpcClientImpl::onSuccess(
     authz_response->status = CheckStatus::OK;
     if (response->has_ok_response()) {
       const auto& ok_response = response->ok_response();
-      copyOkResponseMutations(authz_response, ok_response);
+      copyOkResponseMutations(authz_response, ok_response, read_raw_header_value_);
     }
   } else if (response->has_error_response()) {
     // If error_response is present, treat it as an error and not denial.
@@ -129,7 +143,7 @@ void GrpcClientImpl::onSuccess(
     // For error responses, don't set a default status_code.
     // Let the filter use status_on_error configuration.
     const auto& error_response = response->error_response();
-    copyHeaderFieldIntoResponse(authz_response, error_response.headers());
+    copyHeaderFieldIntoResponse(authz_response, error_response.headers(), read_raw_header_value_);
 
     const uint32_t status_code = error_response.status().code();
     if (status_code > 0) {
@@ -143,7 +157,8 @@ void GrpcClientImpl::onSuccess(
     // The default HTTP status code for denied response is 403 Forbidden.
     authz_response->status_code = Http::Code::Forbidden;
     if (response->has_denied_response()) {
-      copyHeaderFieldIntoResponse(authz_response, response->denied_response().headers());
+      copyHeaderFieldIntoResponse(authz_response, response->denied_response().headers(),
+                                  read_raw_header_value_);
 
       const uint32_t status_code = response->denied_response().status().code();
       if (status_code > 0) {

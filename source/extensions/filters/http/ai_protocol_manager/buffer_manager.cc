@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 #include "source/common/buffer/buffer_impl.h"
@@ -39,7 +40,13 @@ void FilterChainBridge::updateIngestBackpressure() {
   if (!source_paused_ && unacked_ > high_watermark_) {
     source_paused_ = true;
     ENVOY_LOG(debug, "ai_protocol_manager: ingest high watermark ({} bytes not durable)", unacked_);
+    // Expect at most one synchronous self-echo while pauseSource() is on the stack, then clear any
+    // unconsumed expectation on return (e.g. for non-echoing mocks, AsyncStream, or teardown) so a
+    // later genuine watermark is never swallowed.
+    const uint32_t prev_expected_echoes = expected_high_watermark_echoes_++;
     pauseSource();
+    expected_high_watermark_echoes_ =
+        std::min(expected_high_watermark_echoes_, prev_expected_echoes);
     // Snapshot registered_managers_ in case a synchronous write completion/error unregisters a
     // manager while iterating.
     const std::vector<BufferManager*> managers(registered_managers_.begin(),
@@ -54,7 +61,9 @@ void FilterChainBridge::updateIngestBackpressure() {
   if (source_paused_ && unacked_ <= low_watermark_) {
     source_paused_ = false;
     ENVOY_LOG(debug, "ai_protocol_manager: ingest low watermark ({} bytes not durable)", unacked_);
+    const uint32_t prev_expected_echoes = expected_low_watermark_echoes_++;
     resumeSource();
+    expected_low_watermark_echoes_ = std::min(expected_low_watermark_echoes_, prev_expected_echoes);
   }
 }
 
@@ -73,12 +82,20 @@ void FilterChainBridge::detachFromFilterChain() {
 }
 
 void FilterChainBridge::onAboveReplayWatermark() {
+  if (expected_high_watermark_echoes_ > 0) {
+    --expected_high_watermark_echoes_;
+    return;
+  }
   ++replay_high_watermark_count_;
   ENVOY_LOG(debug, "ai_protocol_manager: replay high watermark (depth={})",
             replay_high_watermark_count_);
 }
 
 void FilterChainBridge::onBelowReplayWatermark() {
+  if (expected_low_watermark_echoes_ > 0) {
+    --expected_low_watermark_echoes_;
+    return;
+  }
   ASSERT(replay_high_watermark_count_ > 0);
   --replay_high_watermark_count_;
   ENVOY_LOG(debug, "ai_protocol_manager: replay low watermark (depth={})",

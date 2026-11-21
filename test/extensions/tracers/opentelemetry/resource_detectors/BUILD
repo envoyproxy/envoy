@@ -11,7 +11,13 @@ envoy_package()
 envoy_cc_test(
     name = "resource_provider_test",
     srcs = ["resource_provider_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/common/version:version_lib",

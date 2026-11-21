@@ -17,6 +17,7 @@
 #include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 #include "absl/strings/ascii.h"
+#include "utf8_validity.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -190,6 +191,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       pack_as_bytes_(config.has_http_service() || config.with_request_body().pack_as_bytes()),
 
       encode_raw_headers_(config.encode_raw_headers()),
+      read_raw_header_value_(config.read_raw_header_value()),
 
       status_on_error_(toErrorCode(config.status_on_error().code())),
       validate_mutations_(config.validate_mutations()), scope_(scope),
@@ -314,7 +316,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
 }
 
 Filters::Common::ExtAuthz::ClientPtr
-Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service) {
+Filter::createPerRouteGrpcClient(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key) {
   if (server_context_ == nullptr) {
     ENVOY_STREAM_LOG(
         debug, "ext_authz filter: server context not available for per-route gRPC client creation.",
@@ -322,6 +324,7 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
     return nullptr;
   }
 
+  const envoy::config::core::v3::GrpcService& grpc_service = config_with_hash_key.config();
   // Use the timeout from the gRPC service configuration, use default if not specified.
   // A timeout of 0 means infinite (no timeout). Convert to nullopt in that case.
   const uint32_t timeout_ms =
@@ -333,9 +336,6 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
 
   // We can skip transport version check for per-route gRPC service here.
   // The transport version is already validated at the main configuration level.
-  Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
-      Envoy::Grpc::GrpcServiceConfigWithHashKey(grpc_service);
-
   auto client_or_error = server_context_->clusterManager()
                              .grpcAsyncClientManager()
                              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key,
@@ -353,8 +353,8 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
                    grpc_service.has_envoy_grpc() ? grpc_service.envoy_grpc().cluster_name()
                                                  : "google_grpc");
 
-  return std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(client_or_error.value(),
-                                                                     timeout);
+  return std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
+      client_or_error.value(), timeout, config_->emitClientSpan(), config_->readRawHeaderValue());
 }
 
 Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteHttpClient(
@@ -408,32 +408,32 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     }
   }
 
-  std::optional<FilterConfigPerRoute> maybe_merged_per_route_config;
+  // Merge the per-route configs, which come from the least to the most specific. The service
+  // overrides come only from the most specific config.
+  const FilterConfigPerRoute* most_specific_per_route_config = nullptr;
+  Protobuf::Map<std::string, std::string> context_extensions;
+  std::optional<bool> per_route_emit_client_span;
   for (const FilterConfigPerRoute& cfg :
        Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_)) {
-    if (maybe_merged_per_route_config.has_value()) {
-      FilterConfigPerRoute current_config = maybe_merged_per_route_config.value();
-      maybe_merged_per_route_config.emplace(current_config, cfg);
-    } else {
-      maybe_merged_per_route_config.emplace(cfg);
+    for (const auto& extension : cfg.contextExtensions()) {
+      context_extensions[extension.first] = extension.second;
     }
-  }
-
-  Protobuf::Map<std::string, std::string> context_extensions;
-  if (maybe_merged_per_route_config) {
-    context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
+    if (cfg.emitClientSpan().has_value()) {
+      per_route_emit_client_span = cfg.emitClientSpan();
+    }
+    most_specific_per_route_config = &cfg;
   }
 
   // Check if we need to use a per-route service override (gRPC or HTTP).
   Filters::Common::ExtAuthz::Client* client_to_use = client_.get();
-  if (maybe_merged_per_route_config) {
-    if (maybe_merged_per_route_config->grpcService().has_value()) {
-      const auto& grpc_service = maybe_merged_per_route_config->grpcService().value();
+  if (most_specific_per_route_config != nullptr) {
+    if (most_specific_per_route_config->grpcService().has_value()) {
+      const auto& config_with_hash_key = most_specific_per_route_config->grpcService().value();
       ENVOY_STREAM_LOG(debug, "ext_authz filter: using per-route gRPC service configuration.",
                        *decoder_callbacks_);
 
       // Create a new gRPC client for this route.
-      per_route_client_ = createPerRouteGrpcClient(grpc_service);
+      per_route_client_ = createPerRouteGrpcClient(config_with_hash_key);
       if (per_route_client_ != nullptr) {
         client_to_use = per_route_client_.get();
         ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route gRPC client.",
@@ -444,8 +444,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
             "ext_authz filter: failed to create per-route gRPC client, falling back to default.",
             *decoder_callbacks_);
       }
-    } else if (maybe_merged_per_route_config->httpService().has_value()) {
-      const auto& http_service = maybe_merged_per_route_config->httpService().value();
+    } else if (most_specific_per_route_config->httpService().has_value()) {
+      const auto& http_service = most_specific_per_route_config->httpService().value();
       ENVOY_STREAM_LOG(debug, "ext_authz filter: using per-route HTTP service configuration.",
                        *decoder_callbacks_);
 
@@ -495,12 +495,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   // Store start time of ext_authz filter call
   start_time_ = decoder_callbacks_->dispatcher().timeSource().monotonicTime();
 
-  bool emit_client_span = config_->emitClientSpan();
-  if (maybe_merged_per_route_config &&
-      maybe_merged_per_route_config->emitClientSpan().has_value()) {
-    emit_client_span = maybe_merged_per_route_config->emitClientSpan().value();
-  }
-  client_to_use->setEmitClientSpan(emit_client_span);
+  client_to_use->setEmitClientSpan(per_route_emit_client_span.value_or(config_->emitClientSpan()));
 
   state_ = State::Calling;
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
@@ -1392,7 +1387,13 @@ void ShadowDecisionObject::populateProto(ShadowDecisionProto& msg) const {
   for (const auto& [key, value] : response_headers_) {
     auto* hv = msg.add_response_headers();
     hv->set_key(key);
-    hv->set_value(value);
+    // Proto3 string fields reject non-UTF-8 bytes during JSON serialization, so encode
+    // non-UTF-8 header values in raw_value instead.
+    if (utf8_range::IsStructurallyValid(value)) {
+      hv->set_value(value);
+    } else {
+      hv->set_raw_value(value);
+    }
   }
 }
 

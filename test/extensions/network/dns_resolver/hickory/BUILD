@@ -44,7 +44,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op",
     ],
     extension_names = ["envoy.network.dns_resolver.hickory"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     tags = [
         # It is a known issue that TSAN detects a false positive in uninstrumented Rust code:
         # https://github.com/rust-lang/rust/issues/39608
@@ -71,8 +71,11 @@ envoy_extension_cc_dyn_module_test(
     srcs = ["hickory_dns_integration_test.cc"],
     extension_names = ["envoy.network.dns_resolver.hickory"],
     rbe_pool = {
-        "asan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "cto": {"link": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "asan": {"link": "linux_x64_small"},
     },
     tags = [
         # See comment on hickory_dns_impl_test above.
