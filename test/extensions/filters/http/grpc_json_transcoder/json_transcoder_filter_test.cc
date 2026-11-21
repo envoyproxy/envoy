@@ -1749,6 +1749,95 @@ TEST_F(GrpcJsonTranscoderFilterReportCollisionTest, CreateShelfBodyWildcard) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(request_data, true));
 }
 
+TEST_F(GrpcJsonTranscoderFilterReportCollisionTest, RejectQueryParamPathBindingCollision) {
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/json"},
+                                                 {":method", "GET"},
+                                                 {":path", "/shelves/100?shelf=999"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(request_headers, true));
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, QueryParamDoesNotOverridePathBindingByDefault) {
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/json"},
+                                                 {":method", "GET"},
+                                                 {":path", "/shelves/100?shelf=999"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  Buffer::OwnedImpl transcoded_data;
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+      .WillOnce([&transcoded_data](Buffer::Instance& data, bool) { transcoded_data.move(data); });
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  std::ignore = decoder.decode(transcoded_data, frames);
+  ASSERT_EQ(1, frames.size());
+
+  bookstore::GetShelfRequest request;
+  ASSERT_TRUE(request.ParseFromString(frames[0].data_->toString()));
+  EXPECT_EQ(100, request.shelf());
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, OverwritesExistingEnvoyOriginalMethodHeader) {
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/json"},
+                                                 {":method", "DELETE"},
+                                                 {":path", "/shelves/456/books/123"},
+                                                 {"x-envoy-original-method", "GET"},
+                                                 {"x-envoy-original-path", "/spoofed"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
+  const auto original_method_headers =
+      request_headers.get(Http::Headers::get().EnvoyOriginalMethod);
+  ASSERT_EQ(1, original_method_headers.size());
+  EXPECT_EQ("DELETE", original_method_headers[0]->value().getStringView());
+  EXPECT_EQ("/shelves/456/books/123", request_headers.get_("x-envoy-original-path"));
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, IgnoreRequestBodyWhenHttpRuleBodyOmitted) {
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/json"},
+                                                 {":method", "DELETE"},
+                                                 {":path", "/shelves/456/books/123"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl chunk1{R"({"shelf": 999, )"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(chunk1, false));
+  EXPECT_EQ(0, chunk1.length());
+
+  Buffer::OwnedImpl chunk2{R"("book": 888})"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(chunk2, true));
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  std::ignore = decoder.decode(chunk2, frames);
+  ASSERT_EQ(1, frames.size());
+
+  bookstore::DeleteBookRequest request;
+  ASSERT_TRUE(request.ParseFromString(frames[0].data_->toString()));
+  EXPECT_EQ(456, request.shelf());
+  EXPECT_EQ(123, request.book());
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, RejectDeepDottedQueryParameterOnRecursiveStruct) {
+  std::string deep_query_param = "content";
+  for (int i = 0; i < 200; ++i) {
+    absl::StrAppend(&deep_query_param, ".fields.value.struct_value");
+  }
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"},
+      {":method", "POST"},
+      {":path", absl::StrCat("/echoStruct?", deep_query_param, "=1")}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(request_headers, true));
+}
+
 bookstore::EchoStructReqResp createDeepStruct(int level) {
   bookstore::EchoStructReqResp msg;
   auto* field_map = msg.mutable_content()->mutable_fields();

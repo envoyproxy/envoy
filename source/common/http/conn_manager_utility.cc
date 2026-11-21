@@ -362,6 +362,7 @@ void ConnectionManagerUtility::cleanInternalHeaders(
     // these headers are hop by hop headers and should not be sent to upstream.
     request_headers.removeEnvoyOriginalPath();
     request_headers.removeEnvoyOriginalHost();
+    request_headers.remove(Headers::get().EnvoyOriginalMethod);
   }
 
   // Headers to be stripped from edge *and* intermediate-hop external requests.

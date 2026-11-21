@@ -31,6 +31,7 @@ struct MethodInfo {
   std::vector<const Protobuf::Field*> response_body_field_path;
   bool request_type_is_http_body_ = false;
   bool response_type_is_http_body_ = false;
+  bool request_body_omitted_ = false;
 };
 using MethodInfoSharedPtr = std::shared_ptr<MethodInfo>;
 
