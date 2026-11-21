@@ -105,6 +105,7 @@ envoy_extension_cc_test(
     },
     deps = [
         ":jwt_test_data_lib",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
@@ -123,6 +124,7 @@ envoy_extension_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",

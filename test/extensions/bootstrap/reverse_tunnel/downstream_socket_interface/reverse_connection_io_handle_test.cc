@@ -1,6 +1,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <utility>
 #include <vector>
 
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
@@ -29,6 +30,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
@@ -60,6 +62,14 @@ constexpr char kTunnelSetupTimeHistogram[] = "test_scope.reverse_connections.tun
 
 class ReverseConnectionIOHandleTest : public Event::TestUsingSimulatedTime, public testing::Test {
 protected:
+  std::unique_ptr<TestScopedStaticReloadableFeaturesRuntime> listener_drain_runtime_;
+
+  void setListenerDrainGuard(bool enabled) {
+    listener_drain_runtime_.reset();
+    listener_drain_runtime_ = std::make_unique<TestScopedStaticReloadableFeaturesRuntime>(
+        std::vector<std::pair<std::string, bool>>{{"reverse_tunnel_listener_drain", enabled}});
+  }
+
   ReverseConnectionIOHandleTest() {
     // Set up the stats scope.
     stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
@@ -3615,7 +3625,9 @@ TEST_F(ReverseConnectionIOHandleTest, ChildMarkTunnelDrainingAfterDetachIsNoOp) 
       connection_key, /*connection_id=*/77);
 
   EXPECT_CALL(*access_log, log(_, _)).Times(0);
+  EXPECT_TRUE(child->canInitiateConnections());
   io_handle_.reset();
+  EXPECT_FALSE(child->canInitiateConnections());
   child->markTunnelDrainingAndDialReplacement();
 }
 
@@ -3695,7 +3707,45 @@ TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsShutsDownHandshakeWrappers)
   EXPECT_EQ(dispatcher_.to_delete_.size(), deferred_before + 2);
 }
 
+TEST_F(ReverseConnectionIOHandleTest, ListenerDrainKeepsInitiatingWhenGuardDisabled) {
+  setListenerDrainGuard(false);
+  setupThreadLocalSlot();
+  io_handle_ = createTestIOHandle(createDefaultTestConfig());
+  bool timer_destroyed = false;
+  auto* timer = new StrictMock<Event::MockTimer>();
+  timer->timer_destroyed_ = &timer_destroyed;
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(timer));
+  EXPECT_CALL(*timer, enableTimer(_, _));
+  io_handle_->initializeFileEvent(
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::FileTriggerType::Level,
+      Event::FileReadyType::Read);
+
+  const std::string host = "192.168.1.1";
+  const std::string connection_key = "192.168.1.1:12345";
+  addHostConnectionInfo(host, "remote-cluster", 1);
+  getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+  io_handle_->updateConnectionState(host, "remote-cluster", connection_key,
+                                    ReverseConnectionState::Connected);
+
+  io_handle_->onListenerDrain();
+  EXPECT_FALSE(timer_destroyed);
+  EXPECT_TRUE(io_handle_->canInitiateConnections());
+  EXPECT_TRUE(listenerWantRead());
+  EXPECT_TRUE(getHostConnectionInfo(host).connection_keys.contains(connection_key));
+
+  // The existing peer-GOAWAY path can still request a replacement during an admin drain.
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(0), _));
+  io_handle_->markTunnelDrainingAndDialReplacement(connection_key, 42);
+  EXPECT_FALSE(getHostConnectionInfo(host).connection_keys.contains(connection_key));
+
+  // Actual listener teardown must still stop initiation with the new behavior disabled.
+  io_handle_->resetFileEvents();
+  EXPECT_TRUE(timer_destroyed);
+  EXPECT_FALSE(io_handle_->canInitiateConnections());
+}
+
 TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsReplacementDialsBeforeListenerStops) {
+  setListenerDrainGuard(true);
   setupThreadLocalSlot();
   io_handle_ = createTestIOHandle(createDefaultTestConfig());
 
@@ -3731,6 +3781,7 @@ TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsReplacementDialsBeforeLi
   auto child = std::make_unique<DownstreamReverseConnectionIOHandle>(
       std::move(socket), io_handle_.get(), connection_key, 42);
   EXPECT_FALSE(child->listenerStopped());
+  EXPECT_TRUE(child->canInitiateConnections());
 
   // Whole-listener drain reaches the parent directly and leaves accepted sockets alone.
   EXPECT_CALL(*child_io_handle_raw, close()).Times(0);
@@ -3745,6 +3796,7 @@ TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsReplacementDialsBeforeLi
       });
   EXPECT_TRUE(listenerWantRead());
   EXPECT_FALSE(child->listenerStopped());
+  EXPECT_FALSE(child->canInitiateConnections());
   EXPECT_TRUE(getHostConnectionInfo(host).connection_keys.contains(connection_key));
   EXPECT_EQ(getHostConnectionInfo(host).connection_states.at(connection_key),
             ReverseConnectionState::Connected);
@@ -3760,6 +3812,10 @@ TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsReplacementDialsBeforeLi
   stats = extension_->getCrossWorkerStatMap();
   EXPECT_EQ(stats[host_connected_gauge], 0);
   EXPECT_EQ(stats[cluster_connected_gauge], 0);
+  // A runtime rollback affects future drain decisions; it cannot restart a drained listener.
+  setListenerDrainGuard(false);
+  EXPECT_FALSE(child->canInitiateConnections());
+  maintainReverseConnections();
   EXPECT_LOG_NOT_CONTAINS("info", "stopping tunnel initiation",
                           listener_io_handle.onListenerDrain());
 
@@ -3771,6 +3827,7 @@ TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsReplacementDialsBeforeLi
 }
 
 TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsPendingWorkWithoutAcceptedConnections) {
+  setListenerDrainGuard(true);
   setupThreadLocalSlot();
   io_handle_ = createTestIOHandle(createDefaultTestConfig());
   bool timer_destroyed = false;

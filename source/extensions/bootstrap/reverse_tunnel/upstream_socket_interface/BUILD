@@ -86,6 +86,7 @@ envoy_cc_extension(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:random_generator_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
     ],
 )

@@ -1,3 +1,6 @@
+#include <utility>
+#include <vector>
+
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/router/string_accessor.h"
 #include "envoy/stream_info/stream_info.h"
@@ -19,6 +22,7 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/struct_matchers.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -38,6 +42,14 @@ namespace ReverseConnection {
 
 class TestUpstreamSocketManager : public testing::Test {
 protected:
+  std::unique_ptr<TestScopedStaticReloadableFeaturesRuntime> listener_drain_runtime_;
+
+  void setListenerDrainGuard(bool enabled) {
+    listener_drain_runtime_.reset();
+    listener_drain_runtime_ = std::make_unique<TestScopedStaticReloadableFeaturesRuntime>(
+        std::vector<std::pair<std::string, bool>>{{"reverse_tunnel_listener_drain", enabled}});
+  }
+
   TestUpstreamSocketManager() {
     // Set up the stats scope.
     stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
@@ -1199,6 +1211,7 @@ TEST_F(TestUpstreamSocketManager, GetNodeWithSocketSkipsNodesWithoutIdleSockets)
 }
 
 TEST_F(TestUpstreamSocketManager, IdlePreferenceAndFallbackExcludeDrainingNodes) {
+  setListenerDrainGuard(true);
   const std::string cluster_id = "test-cluster";
   auto draining_socket = addActiveSocket("draining-node", cluster_id, 123);
   auto busy_socket = addActiveSocket("busy-node", cluster_id, 456);
@@ -1223,6 +1236,37 @@ TEST_F(TestUpstreamSocketManager, IdlePreferenceAndFallbackExcludeDrainingNodes)
   socket_manager_->markSocketDraining(789);
   EXPECT_TRUE(socket_manager_->getNodeWithSocket(cluster_id).empty());
   EXPECT_EQ(getClusterToNodeMapping(cluster_id).size(), 3);
+}
+
+TEST_F(TestUpstreamSocketManager, GuardDisabledPreservesIdlePreferenceAndDrainingNodeFallback) {
+  setListenerDrainGuard(false);
+  const std::string cluster_id = "test-cluster";
+  auto draining_socket = addActiveSocket("draining-node", cluster_id, 123);
+  auto busy_socket = addActiveSocket("busy-node", cluster_id, 456);
+  socket_manager_->addConnectionSocket("idle-node", cluster_id, createMockSocket(789),
+                                       std::chrono::seconds(30));
+  socket_manager_->markSocketDraining(123);
+
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "idle-node");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "idle-node");
+  auto idle_socket = socket_manager_->getConnectionSocket("idle-node");
+  ASSERT_NE(idle_socket, nullptr);
+
+  // Preserve the original round-robin fallback, including the node whose tunnel got GOAWAY.
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "draining-node");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "busy-node");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "idle-node");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("draining-node"), "draining-node");
+  socket_manager_->markSocketDraining(456);
+  socket_manager_->markSocketDraining(789);
+
+  // Drain state is retained while disabled, so live toggles work in both directions.
+  setListenerDrainGuard(true);
+  EXPECT_TRUE(socket_manager_->getNodeWithSocket(cluster_id).empty());
+  EXPECT_TRUE(socket_manager_->getNodeWithSocket("draining-node").empty());
+  setListenerDrainGuard(false);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), "draining-node");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("draining-node"), "draining-node");
 }
 
 TEST_F(TestUpstreamSocketManager, GetNodeWithSocketClusterRoundRobin) {
@@ -1327,6 +1371,7 @@ TEST_F(TestUpstreamSocketManager, GetNodeWithSocketNodeIdLookup) {
 }
 
 TEST_F(TestUpstreamSocketManager, RoundRobinSkipsDrainingNodeWithActiveTunnel) {
+  setListenerDrainGuard(true);
   const std::string cluster_id = "test-cluster";
   std::vector<Network::ConnectionSocketPtr> active_sockets;
   for (int i = 0; i < 3; ++i) {
@@ -1361,6 +1406,7 @@ TEST_F(TestUpstreamSocketManager, RoundRobinSkipsDrainingNodeWithActiveTunnel) {
 }
 
 TEST_F(TestUpstreamSocketManager, DrainEligibilityTracksTunnelLifecycle) {
+  setListenerDrainGuard(true);
   const std::string node_id = "test-node";
   const std::string cluster_id = "test-cluster";
   socket_manager_->markSocketDraining(123);
@@ -1415,6 +1461,7 @@ TEST_F(TestUpstreamSocketManager, DrainEligibilityTracksTunnelLifecycle) {
 }
 
 TEST_F(TestUpstreamSocketManager, DrainingNodeEligibilityIsTenantScoped) {
+  setListenerDrainGuard(true);
   socket_manager_->setTenantIsolationEnabled(true);
   socket_manager_->addConnectionSocket("node", "cluster", createMockSocket(123),
                                        std::chrono::seconds(30), true, "tenant-a");

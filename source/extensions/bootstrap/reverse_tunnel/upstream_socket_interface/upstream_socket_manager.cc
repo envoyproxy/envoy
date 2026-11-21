@@ -8,6 +8,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/random_generator.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 
@@ -319,19 +320,22 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
 
 std::string UpstreamSocketManager::getNodeWithSocket(const std::string& key) {
   ENVOY_LOG(trace, "reverse_tunnel: getNodeWithSocket() called with key: {}.", key);
+  const bool exclude_draining =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reverse_tunnel_listener_drain");
 
   // Check if key exists as a cluster ID by looking at cluster_to_node_info_map_.
   auto cluster_it = cluster_to_node_info_map_.find(key);
-  if (cluster_it != cluster_to_node_info_map_.end()) {
-    // Round-robin over nodes with a non-draining tunnel, preferring one with an idle socket.
-    // When no idle sockets remain, a non-draining upstream connection can still accept streams.
-    // Return no node when every node is draining.
+  if (cluster_it != cluster_to_node_info_map_.end() && !cluster_it->second.nodes.empty()) {
+    // Preserve the existing preference for idle sockets in either mode. With the guard disabled,
+    // fall back to plain round-robin when every socket is in use, including draining nodes.
+    // With it enabled, only non-draining connections make a node eligible.
     auto& cluster_info = cluster_it->second;
     const auto& nodes = cluster_info.nodes;
+    const size_t start = cluster_info.round_robin_index % nodes.size();
     size_t selected = nodes.size();
     for (size_t i = 0; i < nodes.size(); ++i) {
-      const size_t candidate = (cluster_info.round_robin_index + i) % nodes.size();
-      if (!hasSelectableSocketsForNode(nodes[candidate])) {
+      const size_t candidate = (start + i) % nodes.size();
+      if (exclude_draining && !hasSelectableSocketsForNode(nodes[candidate])) {
         continue;
       }
       if (selected == nodes.size()) {
@@ -352,7 +356,9 @@ std::string UpstreamSocketManager::getNodeWithSocket(const std::string& key) {
     return nodes[selected];
   }
 
-  if (!hasSelectableSocketsForNode(key) && node_to_cluster_map_.contains(key)) {
+  if (exclude_draining &&
+      (cluster_it != cluster_to_node_info_map_.end() ||
+       (!hasSelectableSocketsForNode(key) && node_to_cluster_map_.contains(key)))) {
     return {};
   }
 
@@ -428,6 +434,7 @@ bool UpstreamSocketManager::hasSelectableSocketsForNode(const std::string& node_
 }
 
 void UpstreamSocketManager::markSocketDraining(int fd) {
+  // Track the lifecycle in either mode so a runtime toggle can change selection immediately.
   const auto node_it = fd_to_node_map_.find(fd);
   if (node_it == fd_to_node_map_.end() || !draining_fds_.insert(fd).second) {
     return;

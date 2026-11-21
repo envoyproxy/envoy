@@ -9,6 +9,7 @@
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.h"
 #include "envoy/http/codec.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/protobuf/protobuf.h"
@@ -25,6 +26,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -233,6 +235,8 @@ typed_config:
 
   void runEndToEndReverseConnectionHandshakeScenario(bool drain_at_end = true);
   void drainReverseTunnelListenersAndAwaitStop();
+  static envoy::config::listener::v3::Listener
+  makeInitiatorListener(uint32_t reverse_connection_count);
   void addDrainingAwareReverseConnectionHcmListener(uint32_t reverse_connection_count = 1);
   void
   addDrainingAwareReverseConnectionHcmListenerWithMetadata(uint32_t reverse_connection_count = 1);
@@ -263,13 +267,9 @@ typed_config:
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::trace);
 };
 
-void ReverseTunnelFilterIntegrationTest::addDrainingAwareReverseConnectionHcmListener(
-    uint32_t reverse_connection_count) {
-  config_helper_.addConfigModifier(
-      [reverse_connection_count](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-        bootstrap.mutable_static_resources()->clear_listeners();
-
-        const std::string listener_yaml = fmt::format(R"EOF(
+envoy::config::listener::v3::Listener
+ReverseTunnelFilterIntegrationTest::makeInitiatorListener(uint32_t reverse_connection_count) {
+  const std::string listener_yaml = fmt::format(R"EOF(
 name: reverse_connection_listener
 stat_prefix: reverse_conn_listener
 address:
@@ -301,10 +301,19 @@ filter_chains:
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 )EOF",
-                                                      reverse_connection_count);
+                                                reverse_connection_count);
+  envoy::config::listener::v3::Listener listener;
+  TestUtility::loadFromYaml(listener_yaml, listener);
+  return listener;
+}
 
-        auto* listener = bootstrap.mutable_static_resources()->add_listeners();
-        TestUtility::loadFromYaml(listener_yaml, *listener);
+void ReverseTunnelFilterIntegrationTest::addDrainingAwareReverseConnectionHcmListener(
+    uint32_t reverse_connection_count) {
+  config_helper_.addConfigModifier(
+      [reverse_connection_count](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        bootstrap.mutable_static_resources()->clear_listeners();
+        *bootstrap.mutable_static_resources()->add_listeners() =
+            makeInitiatorListener(reverse_connection_count);
       });
 }
 
@@ -1040,9 +1049,22 @@ TEST_P(ReverseTunnelFilterIntegrationTest, AdminTunnelsEndpointCountDropsAsDrain
 
 class ReverseTunnelDrainIntegrationTest : public Event::TestUsingSimulatedTime,
                                           public ReverseTunnelFilterIntegrationTest {
+public:
+  ReverseTunnelDrainIntegrationTest() {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.reverse_tunnel_listener_drain",
+                                      "true");
+  }
+
 protected:
-  void verifyIdleTunnelReplacement(Server::DrainStrategy strategy);
+  void verifyIdleTunnelReplacement(Server::DrainStrategy strategy,
+                                   bool use_connection_events = true);
   void initializeIdleTunnelGrace();
+  void initializeResponder(bool enable_drain_with_goaway = true, bool tenant_isolation = false);
+  static std::optional<uint32_t> readUpstreamHeaders(IntegrationTcpClient& peer);
+  std::optional<uint32_t> waitForUpstreamHeaders(IntegrationTcpClient& peer);
+  static void acceptHttp2Session(IntegrationTcpClient& peer);
+  void verifyLegacyResponderSelection(bool enable_drain_with_goaway);
+  void verifyListenerDrainWithoutCodecOption(bool listener_drain_enabled);
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseTunnelDrainIntegrationTest,
@@ -1100,18 +1122,72 @@ TEST_P(ReverseTunnelDrainIntegrationTest, HealthCheckFailureAndRecoveryKeepIdleT
   ASSERT_TRUE(second_tunnel->waitForDisconnect());
 }
 
-void ReverseTunnelDrainIntegrationTest::verifyIdleTunnelReplacement(
-    Server::DrainStrategy strategy) {
+void ReverseTunnelDrainIntegrationTest::verifyListenerDrainWithoutCodecOption(
+    bool listener_drain_enabled) {
+  DISABLE_IF_ADMIN_DISABLED;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.reverse_tunnel_listener_drain",
+                                    listener_drain_enabled ? "true" : "false");
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(600);
+  setDeterministicValue();
+  // enable_drain_with_goaway is unset (false); the peer is an ordinary HTTP/1 handshake server.
+  addDrainingAwareReverseConnectionHcmListener(/*reverse_connection_count=*/2);
+  initialize();
+  FakeRawConnectionPtr tunnel;
+  FakeRawConnectionPtr retained_tunnel;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(tunnel));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(retained_tunnel));
+  completeReverseTunnelHandshake(*tunnel);
+  completeReverseTunnelHandshake(*retained_tunnel);
+  test_server_->waitForGauge("http.reverse_connection_hcm.downstream_cx_active", Eq(2));
+  auto response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
+                                                     "/drain_listeners?graceful&skip_exit", "",
+                                                     Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(response->complete());
+  ASSERT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForWorkerThreads();
+  ASSERT_TRUE(tunnel->close());
+  ASSERT_TRUE(tunnel->waitForDisconnect());
+  // Wait for EOF cleanup and keep another socket registered while advancing maintenance.
+  test_server_->waitForGauge("http.reverse_connection_hcm.downstream_cx_active", Eq(1));
+  EXPECT_TRUE(retained_tunnel->connected());
+  timeSystem().advanceTimeWait(std::chrono::seconds(15));
+  FakeRawConnectionPtr replacement;
+  if (listener_drain_enabled) {
+    EXPECT_FALSE(
+        fake_upstreams_[0]->waitForRawConnection(replacement, std::chrono::milliseconds(10)));
+  } else {
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(replacement));
+    completeReverseTunnelHandshake(*replacement);
+    test_server_->waitForCounter("http.reverse_connection_hcm.downstream_cx_total", Eq(3));
+  }
+  EXPECT_EQ(0, test_server_->counter("listener_manager.listener_stopped")->value());
+  test_server_.reset();
+  ASSERT_TRUE(retained_tunnel->waitForDisconnect());
+  if (replacement != nullptr) {
+    ASSERT_TRUE(replacement->waitForDisconnect());
+  }
+}
+
+TEST_P(ReverseTunnelDrainIntegrationTest, ListenerDrainStopsRedialsWithCodecOptionDisabled) {
+  verifyListenerDrainWithoutCodecOption(/*listener_drain_enabled=*/true);
+}
+
+TEST_P(ReverseTunnelDrainIntegrationTest, DisabledListenerDrainGuardKeepsLegacyRedials) {
+  verifyListenerDrainWithoutCodecOption(/*listener_drain_enabled=*/false);
+}
+
+void ReverseTunnelDrainIntegrationTest::verifyIdleTunnelReplacement(Server::DrainStrategy strategy,
+                                                                    bool use_connection_events) {
+  using Http2Frame = Http::Http2::Http2Frame;
   drain_strategy_ = strategy;
   drain_time_ = std::chrono::seconds(9);
-  if (strategy == Server::DrainStrategy::Immediate) {
-    // Keep coverage of connection events when HCM uses the legacy drain decision.
+  if (!use_connection_events) {
     config_helper_.addRuntimeOverride("envoy.reloadable_features.use_connection_event_drain",
                                       "false");
   }
-  // Maintenance runs at 11.499s. With gradual drain, HCM would close at 6.999s and a
-  // full-window idle timer at 8.999s, losing the replacement callback to HCM.
-  setDeterministicValue(8999);
+  // Maintenance runs at 11.499s; HCM's proactive idle close is at 7.499s.
+  setDeterministicValue(1499);
   addDrainingAwareReverseConnectionHcmListener(/*reverse_connection_count=*/2);
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* filter = bootstrap.mutable_static_resources()
@@ -1121,7 +1197,14 @@ void ReverseTunnelDrainIntegrationTest::verifyIdleTunnelReplacement(
     envoy::extensions::filters::network::reverse_tunnel::v3::DrainAwareHttpConnectionManager config;
     ASSERT_TRUE(filter->typed_config().UnpackTo(&config));
     config.set_enable_drain_with_goaway(true);
-    config.mutable_hcm_config()->mutable_drain_timeout()->set_seconds(1);
+    auto* hcm = config.mutable_hcm_config();
+    hcm->mutable_drain_timeout()->set_seconds(1);
+    hcm->mutable_route_config()
+        ->mutable_virtual_hosts(0)
+        ->mutable_routes(0)
+        ->mutable_direct_response()
+        ->mutable_body()
+        ->set_inline_string("in-place response");
     ASSERT_TRUE(filter->mutable_typed_config()->PackFrom(config));
   });
   initialize();
@@ -1139,8 +1222,7 @@ void ReverseTunnelDrainIntegrationTest::verifyIdleTunnelReplacement(
   ConfigHelper updated_config(GetParam(), config_helper_.bootstrap());
   updated_config.addConfigModifier([original_listener](
                                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    // ConfigHelper resets socket addresses to loopback. Restore the original listener so only
-    // its filter chain changes and the rc:// address remains valid for an in-place update.
+    // Restore the rc:// address so only the filter chain changes.
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     *listener = original_listener;
     auto* filter = listener->mutable_filter_chains(0)->mutable_filters(0);
@@ -1152,23 +1234,36 @@ void ReverseTunnelDrainIntegrationTest::verifyIdleTunnelReplacement(
   updated_config.setLds("2");
   test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
   test_server_->waitForWorkerThreads();
-  if (strategy == Server::DrainStrategy::Gradual) {
-    timeSystem().advanceTimeWait(std::chrono::seconds(7));
-  }
-  ASSERT_TRUE(first_tunnel->waitForDisconnect());
-  ASSERT_TRUE(second_tunnel->waitForDisconnect());
 
   FakeRawConnectionPtr first_replacement;
   FakeRawConnectionPtr second_replacement;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(first_replacement, std::chrono::seconds(1)));
   ASSERT_TRUE(
       fake_upstreams_[0]->waitForRawConnection(second_replacement, std::chrono::seconds(1)));
-  EXPECT_LT(timeSystem().monotonicTime() - update_start, std::chrono::seconds(10));
+  EXPECT_LT(timeSystem().monotonicTime() - update_start, std::chrono::seconds(1));
+  // Keep both replacement handshakes pending while a request uses an old idle tunnel.
+  ASSERT_FALSE(first_tunnel->waitForDisconnect(std::chrono::milliseconds(10)));
+  ASSERT_TRUE(second_tunnel->connected());
+  EXPECT_EQ(
+      0, test_server_->counter("http.reverse_connection_hcm.downstream_cx_drain_close")->value());
+  startHttp2Session(*first_tunnel);
+  ASSERT_TRUE(first_tunnel->write(std::string(Http2Frame::makeRequest(1, "host", "/"))));
+  ASSERT_TRUE(
+      first_tunnel->waitForData(FakeRawConnection::waitForInexactMatch("in-place response")));
+  test_server_->waitForCounter("http.reverse_connection_hcm.downstream_rq_total", Eq(1));
+
   completeReverseTunnelHandshake(*first_replacement);
   completeReverseTunnelHandshake(*second_replacement);
   test_server_->waitForGauge("http.replacement_hcm.downstream_cx_active", Eq(2));
-  EXPECT_EQ(
-      2, test_server_->counter("http.reverse_connection_hcm.downstream_cx_drain_close")->value());
+  startHttp2Session(*first_replacement);
+  ASSERT_TRUE(first_replacement->write(std::string(Http2Frame::makeRequest(1, "host", "/"))));
+  ASSERT_TRUE(
+      first_replacement->waitForData(FakeRawConnection::waitForInexactMatch("in-place response")));
+
+  // Idle tunnels still close within the existing filter-chain drain window.
+  timeSystem().advanceTimeWait(std::chrono::seconds(9));
+  ASSERT_TRUE(first_tunnel->waitForDisconnect());
+  ASSERT_TRUE(second_tunnel->waitForDisconnect());
   EXPECT_EQ(0, test_server_->counter("listener_manager.listener_stopped")->value());
   test_server_.reset();
   ASSERT_TRUE(first_replacement->waitForDisconnect());
@@ -1181,6 +1276,11 @@ TEST_P(ReverseTunnelDrainIntegrationTest, InPlaceUpdateReplacesIdleTunnelsBefore
 
 TEST_P(ReverseTunnelDrainIntegrationTest, GradualInPlaceUpdateReplacesIdleTunnelsBeforeHcmClose) {
   verifyIdleTunnelReplacement(Server::DrainStrategy::Gradual);
+}
+
+TEST_P(ReverseTunnelDrainIntegrationTest,
+       LegacyInPlaceUpdatePreservesIdleTunnelsDuringReplacement) {
+  verifyIdleTunnelReplacement(Server::DrainStrategy::Immediate, /*use_connection_events=*/false);
 }
 
 void ReverseTunnelDrainIntegrationTest::initializeIdleTunnelGrace() {
@@ -1452,11 +1552,23 @@ TEST_P(ReverseTunnelDrainIntegrationTest, DrainClosesIdleTunnelsAndPreservesActi
   EXPECT_TRUE(backend_connection->waitForDisconnect());
 }
 
-TEST_P(ReverseTunnelDrainIntegrationTest, ResponderSkipsDrainingInitiatorForNewConnectStreams) {
-  using Http2Frame = Http::Http2::Http2Frame;
+void ReverseTunnelDrainIntegrationTest::initializeResponder(bool enable_drain_with_goaway,
+                                                            bool tenant_isolation) {
   setDeterministicValue();
   addReverseTunnelFilter();
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([enable_drain_with_goaway, tenant_isolation](
+                                       envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    if (tenant_isolation) {
+      for (auto& extension : *bootstrap.mutable_bootstrap_extensions()) {
+        if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
+          envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+              UpstreamReverseConnectionSocketInterface config;
+          ASSERT_TRUE(extension.typed_config().UnpackTo(&config));
+          config.mutable_enable_tenant_isolation()->set_value(true);
+          ASSERT_TRUE(extension.mutable_typed_config()->PackFrom(config));
+        }
+      }
+    }
     const std::string listener_yaml =
         fmt::format(R"EOF(
 name: connect_listener
@@ -1494,7 +1606,8 @@ filter_chains:
                     Network::Test::getLoopbackAddressString(GetParam()));
     TestUtility::loadFromYaml(listener_yaml,
                               *bootstrap.mutable_static_resources()->add_listeners());
-    TestUtility::loadFromYaml(R"EOF(
+    TestUtility::loadFromYaml(
+        absl::StrCat(R"EOF(
 name: reverse_connection_cluster
 connect_timeout: 1s
 lb_policy: CLUSTER_PROVIDED
@@ -1503,6 +1616,9 @@ cluster_type:
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
     host_id_format: "%REQ(x-tunnel-id)%"
+)EOF",
+                     tenant_isolation ? "    tenant_id_format: \"%REQ(x-tenant-id)%\"\n" : "",
+                     R"EOF(
 typed_extension_protocol_options:
   envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
     "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -1510,12 +1626,56 @@ typed_extension_protocol_options:
       http2_protocol_options: {}
   envoy.extensions.upstreams.http.reverse_tunnel.v3.ReverseTunnelUpstreamCodecOptions:
     "@type": type.googleapis.com/envoy.extensions.upstreams.http.reverse_tunnel.v3.ReverseTunnelUpstreamCodecOptions
-    enable_drain_with_goaway: true
-)EOF",
-                              *bootstrap.mutable_static_resources()->add_clusters());
+    enable_drain_with_goaway: )EOF",
+                     enable_drain_with_goaway ? "true\n" : "false\n"),
+        *bootstrap.mutable_static_resources()->add_clusters());
   });
   initialize();
   registerTestServerPorts({"listener_0", "connect_listener"});
+}
+
+std::optional<uint32_t>
+ReverseTunnelDrainIntegrationTest::readUpstreamHeaders(IntegrationTcpClient& peer) {
+  using Http2Frame = Http::Http2::Http2Frame;
+  while (peer.data().size() >= Http2Frame::HeaderSize) {
+    Http2Frame frame;
+    frame.setHeader(absl::string_view(peer.data()).substr(0, Http2Frame::HeaderSize));
+    const size_t frame_size = Http2Frame::HeaderSize + frame.payloadSize();
+    if (peer.data().size() < frame_size) {
+      break;
+    }
+    peer.clearData(frame_size);
+    if (frame.type() == Http2Frame::Type::Headers) {
+      return frame.streamId();
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<uint32_t>
+ReverseTunnelDrainIntegrationTest::waitForUpstreamHeaders(IntegrationTcpClient& peer) {
+  Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+  do {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    if (auto stream = readUpstreamHeaders(peer); stream.has_value()) {
+      return stream;
+    }
+  } while (bound.withinBound());
+  return std::nullopt;
+}
+
+void ReverseTunnelDrainIntegrationTest::acceptHttp2Session(IntegrationTcpClient& peer) {
+  using Http2Frame = Http::Http2::Http2Frame;
+  ASSERT_TRUE(peer.waitForTcpResponse(testing::StartsWith(Http2Frame::Preamble)));
+  peer.clearData(sizeof(Http2Frame::Preamble) - 1);
+  ASSERT_TRUE(peer.write(absl::StrCat(
+      std::string(Http2Frame::makeEmptySettingsFrame()),
+      std::string(Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack)))));
+}
+
+TEST_P(ReverseTunnelDrainIntegrationTest, ResponderSkipsDrainingInitiatorForNewConnectStreams) {
+  using Http2Frame = Http::Http2::Http2Frame;
+  initializeResponder();
 
   std::array<IntegrationTcpClientPtr, 3> peers;
   std::array<IntegrationTcpClientPtr, 3> held_clients;
@@ -1524,21 +1684,6 @@ typed_extension_protocol_options:
     return fmt::format("CONNECT backend:443 HTTP/1.1\r\nHost: backend:443\r\n"
                        "x-tunnel-id: {}\r\n\r\n",
                        host_id);
-  };
-  const auto next_headers = [](IntegrationTcpClient& peer) -> std::optional<uint32_t> {
-    while (peer.data().size() >= Http2Frame::HeaderSize) {
-      Http2Frame frame;
-      frame.setHeader(absl::string_view(peer.data()).substr(0, Http2Frame::HeaderSize));
-      const size_t frame_size = Http2Frame::HeaderSize + frame.payloadSize();
-      if (peer.data().size() < frame_size) {
-        return std::nullopt;
-      }
-      peer.clearData(frame_size);
-      if (frame.type() == Http2Frame::Type::Headers) {
-        return frame.streamId();
-      }
-    }
-    return std::nullopt;
   };
 
   // Each peer models one initiator, with one active reverse tunnel and no idle spare socket.
@@ -1551,17 +1696,8 @@ typed_extension_protocol_options:
     peers[i]->clearData();
     held_clients[i] = makeTcpConnection(lookupPort("connect_listener"));
     ASSERT_TRUE(held_clients[i]->write(connect_request(fmt::format("node-{}", i))));
-    ASSERT_TRUE(peers[i]->waitForTcpResponse(testing::StartsWith(Http2Frame::Preamble)));
-    peers[i]->clearData(sizeof(Http2Frame::Preamble) - 1);
-    ASSERT_TRUE(peers[i]->write(absl::StrCat(
-        std::string(Http2Frame::makeEmptySettingsFrame()),
-        std::string(Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack)))));
-    std::optional<uint32_t> stream;
-    Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
-    do {
-      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-      stream = next_headers(*peers[i]);
-    } while (!stream.has_value() && bound.withinBound());
+    ASSERT_NO_FATAL_FAILURE(acceptHttp2Session(*peers[i]));
+    const auto stream = waitForUpstreamHeaders(*peers[i]);
     ASSERT_TRUE(stream.has_value());
     held_streams[i] = *stream;
     ASSERT_TRUE(peers[i]->write(std::string(Http2Frame::makeHeadersFrameWithStatus(
@@ -1585,7 +1721,7 @@ typed_extension_protocol_options:
     do {
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
       for (size_t j = 0; j < peers.size(); ++j) {
-        stream = next_headers(*peers[j]);
+        stream = readUpstreamHeaders(*peers[j]);
         if (stream.has_value()) {
           selected_peer = j;
           break;
@@ -1621,6 +1757,237 @@ typed_extension_protocol_options:
   for (auto& peer : peers) {
     peer->close();
   }
+}
+
+TEST_P(ReverseTunnelDrainIntegrationTest,
+       ResponderAdminDrainReplacesTunnelAndPreservesActiveConnect) {
+  DISABLE_IF_ADMIN_DISABLED;
+#ifdef ENVOY_ENABLE_UHV
+  // UHV builds normalize CONNECT pseudo-headers in the header validator.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                    "true");
+#endif
+  initializeResponder();
+
+  envoy::config::cluster::v3::Cluster transport_cluster;
+  TestUtility::loadFromYaml(fmt::format(R"YAML(
+name: responder_transport
+connect_timeout: 5s
+load_assignment:
+  cluster_name: responder_transport
+  endpoints:
+  - lb_endpoints:
+    - endpoint:
+        address:
+          socket_address:
+            address: "{}"
+            port_value: {}
+)YAML",
+                                        Network::Test::getLoopbackAddressString(GetParam()),
+                                        lookupPort("listener_0")),
+                            transport_cluster);
+  absl::Notification cluster_added;
+  test_server_->server().dispatcher().post([this, &transport_cluster, &cluster_added]() {
+    const auto result =
+        test_server_->server().clusterManager().addOrUpdateCluster(transport_cluster, "1");
+    EXPECT_TRUE(result.ok()) << result.status();
+    if (result.ok()) {
+      EXPECT_TRUE(*result);
+    }
+    cluster_added.Notify();
+  });
+  cluster_added.WaitForNotification();
+  test_server_->waitForWorkerThreads();
+
+  ConfigHelper initiator_config(GetParam(), config_helper_.bootstrap());
+  initiator_config.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->add_listeners();
+    *listener = makeInitiatorListener(/*reverse_connection_count=*/1);
+    listener->set_name("real_initiator");
+    listener->set_stat_prefix("real_initiator");
+    listener->mutable_address()->mutable_socket_address()->set_address(
+        "rc://e2e-node:e2e-cluster:e2e-tenant@responder_transport:1");
+    auto* filter = listener->mutable_filter_chains(0)->mutable_filters(0);
+    envoy::extensions::filters::network::reverse_tunnel::v3::DrainAwareHttpConnectionManager config;
+    ASSERT_TRUE(filter->typed_config().UnpackTo(&config));
+    config.set_enable_drain_with_goaway(true);
+    auto* hcm = config.mutable_hcm_config();
+    hcm->set_stat_prefix("real_initiator");
+    hcm->mutable_stream_idle_timeout()->set_seconds(0);
+    ConfigHelper::setConnectConfig(*hcm, /*terminate_connect=*/true, /*allow_post=*/false);
+    auto* route = hcm->mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+    route->mutable_route()->set_cluster("cluster_0");
+    route->mutable_route()->mutable_timeout()->set_seconds(0);
+    ASSERT_TRUE(filter->mutable_typed_config()->PackFrom(config));
+  });
+  initiator_config.setLds("2");
+  test_server_->waitForCounter("listener_manager.listener_create_success", Eq(3));
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Eq(1));
+  test_server_->waitForGauge("http.real_initiator.downstream_cx_active", Eq(1));
+
+  const std::string connect_request = "CONNECT backend:443 HTTP/1.1\r\nHost: backend:443\r\n"
+                                      "x-tunnel-id: e2e-node\r\n\r\n";
+  auto old_client = makeTcpConnection(lookupPort("connect_listener"));
+  ASSERT_TRUE(old_client->write(connect_request));
+  FakeRawConnectionPtr old_backend;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(old_backend));
+  ASSERT_TRUE(old_client->waitForTcpResponse(HasSubstr("200")));
+  old_client->clearData();
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_cx_total", Eq(1));
+
+  const auto response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST",
+      "/reverse_tunnel/drain_clusters?cluster=reverse_connection_cluster&drain_time_ms=1000", "",
+      Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(response->complete());
+  ASSERT_EQ("200", response->headers().getStatusValue());
+  // The actual initiator receives the responder's first GOAWAY and establishes a replacement.
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Eq(2));
+  test_server_->waitForGauge("http.real_initiator.downstream_cx_active", Eq(2));
+  timeSystem().advanceTimeWait(std::chrono::seconds(2));
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_cx_close_notify",
+                               Eq(1));
+
+  auto new_client = makeTcpConnection(lookupPort("connect_listener"));
+  ASSERT_TRUE(new_client->write(connect_request));
+  FakeRawConnectionPtr new_backend;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(new_backend));
+  ASSERT_TRUE(new_client->waitForTcpResponse(HasSubstr("200")));
+  new_client->clearData();
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_cx_total", Eq(2));
+  test_server_->waitForCounter("http.real_initiator.downstream_rq_total", Eq(2));
+  EXPECT_EQ(0, test_server_->counter("listener_manager.listener_stopped")->value());
+
+  // Both CONNECT streams carry bytes after the responder's drain deadline. The original upstream
+  // connection stays occupied while a second upstream connection carries the fresh stream.
+  timeSystem().advanceTimeWait(std::chrono::seconds(60));
+  ASSERT_TRUE(old_client->write("old request"));
+  ASSERT_TRUE(old_backend->waitForData(FakeRawConnection::waitForInexactMatch("old request")));
+  ASSERT_TRUE(old_backend->write("old response"));
+  ASSERT_TRUE(old_client->waitForTcpResponse(HasSubstr("old response")));
+  ASSERT_TRUE(new_client->write("new request"));
+  ASSERT_TRUE(new_backend->waitForData(FakeRawConnection::waitForInexactMatch("new request")));
+  ASSERT_TRUE(new_backend->write("new response"));
+  ASSERT_TRUE(new_client->waitForTcpResponse(HasSubstr("new response")));
+  EXPECT_EQ(2, test_server_->counter("reverse_tunnel.handshake.accepted")->value());
+  old_client->close();
+  new_client->close();
+  test_server_.reset();
+  EXPECT_TRUE(old_backend->waitForDisconnect());
+  EXPECT_TRUE(new_backend->waitForDisconnect());
+}
+
+TEST_P(ReverseTunnelDrainIntegrationTest, DrainingNodeIdKeepsTenantsIsolated) {
+  using Http2Frame = Http::Http2::Http2Frame;
+  initializeResponder(/*enable_drain_with_goaway=*/true, /*tenant_isolation=*/true);
+  const auto request = [](absl::string_view tenant) {
+    return fmt::format("CONNECT backend:443 HTTP/1.1\r\nHost: backend:443\r\n"
+                       "x-tunnel-id: shared-node\r\nx-tenant-id: {}\r\n\r\n",
+                       tenant);
+  };
+  std::array<IntegrationTcpClientPtr, 2> peers;
+  std::array<IntegrationTcpClientPtr, 2> held_clients;
+  std::array<uint32_t, 2> held_streams;
+  for (size_t i = 0; i < peers.size(); ++i) {
+    const std::string tenant = fmt::format("tenant-{}", i);
+    peers[i] = makeTcpConnection(lookupPort("listener_0"));
+    ASSERT_TRUE(peers[i]->write(createHttpRequestWithRtHeaders(
+        "GET", "/reverse_connections/request", "shared-node", "shared-cluster", tenant)));
+    ASSERT_TRUE(peers[i]->waitForTcpResponse(HasSubstr("200 OK")));
+    peers[i]->clearData();
+    held_clients[i] = makeTcpConnection(lookupPort("connect_listener"));
+    ASSERT_TRUE(held_clients[i]->write(request(tenant)));
+    ASSERT_NO_FATAL_FAILURE(acceptHttp2Session(*peers[i]));
+    const auto stream = waitForUpstreamHeaders(*peers[i]);
+    ASSERT_TRUE(stream.has_value());
+    held_streams[i] = *stream;
+    ASSERT_TRUE(peers[i]->write(std::string(Http2Frame::makeHeadersFrameWithStatus(
+        "200", *stream, Http2Frame::HeadersFlags::EndHeaders))));
+    ASSERT_TRUE(held_clients[i]->waitForTcpResponse(HasSubstr("200")));
+    held_clients[i]->clearData();
+  }
+
+  ASSERT_TRUE(peers[0]->write(std::string(
+      Http2Frame::makeEmptyGoAwayFrame(held_streams[0], Http2Frame::ErrorCode::NoError))));
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_cx_close_notify",
+                               Eq(1));
+  auto rejected = makeTcpConnection(lookupPort("connect_listener"));
+  ASSERT_TRUE(rejected->write(request("tenant-0")));
+  ASSERT_TRUE(rejected->waitForTcpResponse(HasSubstr("503")));
+  test_server_->waitForCounter(
+      "cluster.reverse_connection_cluster.upstream_rq_all_tunnels_draining", Eq(1));
+  const auto fallback = test_server_->counter("reverse_tunnel_acceptor.fallback_no_reverse_socket");
+  EXPECT_TRUE(fallback == nullptr || fallback->value() == 0);
+
+  // The same node ID in another tenant remains eligible.
+  auto accepted = makeTcpConnection(lookupPort("connect_listener"));
+  ASSERT_TRUE(accepted->write(request("tenant-1")));
+  const auto fresh_stream = waitForUpstreamHeaders(*peers[1]);
+  ASSERT_TRUE(fresh_stream.has_value());
+  ASSERT_TRUE(peers[1]->write(
+      absl::StrCat(std::string(Http2Frame::makeHeadersFrameWithStatus(
+                       "200", *fresh_stream, Http2Frame::HeadersFlags::EndHeaders)),
+                   std::string(Http2Frame::makeDataFrame(*fresh_stream, "isolated",
+                                                         Http2Frame::DataFlags::EndStream)))));
+  ASSERT_TRUE(accepted->waitForTcpResponse(HasSubstr("isolated")));
+
+  ASSERT_TRUE(held_clients[0]->write("existing stream"));
+  ASSERT_TRUE(peers[0]->waitForTcpResponse(HasSubstr("existing stream")));
+  rejected->close();
+  accepted->close();
+  for (auto& client : held_clients) {
+    client->close();
+  }
+  for (auto& peer : peers) {
+    peer->close();
+  }
+}
+
+void ReverseTunnelDrainIntegrationTest::verifyLegacyResponderSelection(
+    bool enable_drain_with_goaway) {
+  using Http2Frame = Http::Http2::Http2Frame;
+  initializeResponder(enable_drain_with_goaway);
+  const std::string request = "CONNECT backend:443 HTTP/1.1\r\nHost: backend:443\r\n"
+                              "x-tunnel-id: legacy-node\r\n\r\n";
+  auto peer = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(peer->write(createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "legacy-node", "legacy-cluster", "tenant")));
+  ASSERT_TRUE(peer->waitForTcpResponse(HasSubstr("200 OK")));
+  peer->clearData();
+  auto held_client = makeTcpConnection(lookupPort("connect_listener"));
+  ASSERT_TRUE(held_client->write(request));
+  ASSERT_NO_FATAL_FAILURE(acceptHttp2Session(*peer));
+  const auto stream = waitForUpstreamHeaders(*peer);
+  ASSERT_TRUE(stream.has_value());
+  ASSERT_TRUE(peer->write(std::string(Http2Frame::makeHeadersFrameWithStatus(
+      "200", *stream, Http2Frame::HeadersFlags::EndHeaders))));
+  ASSERT_TRUE(held_client->waitForTcpResponse(HasSubstr("200")));
+  ASSERT_TRUE(peer->write(
+      std::string(Http2Frame::makeEmptyGoAwayFrame(*stream, Http2Frame::ErrorCode::NoError))));
+  test_server_->waitForCounter("cluster.reverse_connection_cluster.upstream_cx_close_notify",
+                               Eq(1));
+
+  // The node is still selected. Opening another connection reaches the legacy fallback path.
+  auto client = makeTcpConnection(lookupPort("connect_listener"));
+  ASSERT_TRUE(client->write(request));
+  ASSERT_TRUE(client->waitForTcpResponse(HasSubstr("503")));
+  test_server_->waitForCounter("reverse_tunnel_acceptor.fallback_no_reverse_socket", Eq(1));
+  EXPECT_EQ(0, test_server_
+                   ->counter("cluster.reverse_connection_cluster.upstream_rq_all_tunnels_draining")
+                   ->value());
+  client->close();
+  held_client->close();
+  peer->close();
+}
+
+TEST_P(ReverseTunnelDrainIntegrationTest, DisabledCodecOptionKeepsDrainingNodeSelectable) {
+  verifyLegacyResponderSelection(/*enable_drain_with_goaway=*/false);
+}
+
+TEST_P(ReverseTunnelDrainIntegrationTest, DisabledListenerDrainGuardKeepsDrainingNodeSelectable) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.reverse_tunnel_listener_drain",
+                                    "false");
+  verifyLegacyResponderSelection(/*enable_drain_with_goaway=*/true);
 }
 
 // Test validation with static expected values.

@@ -1,10 +1,14 @@
-reverse_tunnel: fixed listener draining so initiators stop pending handshakes and replacement dials when
-the listener begins draining, without stopping replacement tunnels during in-place filter-chain updates.
-With ``enable_drain_with_goaway``, unused tunnels close while accepted tunnels follow the configured drain schedule.
-Full listener replacement and hot restart retain unused tunnels' existing drain grace while the successor connects.
-When the responder's reverse connection cluster enables ``ReverseTunnelUpstreamCodecOptions.enable_drain_with_goaway``,
-responders exclude initiators whose remaining tunnels have received GOAWAY when selecting a node for new streams,
-while retaining those tunnels for existing streams. Node selection prefers idle sockets; when none are available,
-it falls back to round-robin among nodes with a tunnel that has not received GOAWAY. A request with no eligible
-initiator fails with HTTP 503 (no healthy upstream) and increments ``cluster.<name>.upstream_rq_all_tunnels_draining``.
-Early drain METADATA still only notifies the reporter.
+reverse_tunnel: added listener draining behavior behind the runtime guard
+``envoy.reloadable_features.reverse_tunnel_listener_drain``, which defaults to false. When enabled,
+initiators stop pending handshakes and replacement dials when the whole listener begins draining,
+independently of ``enable_drain_with_goaway``. With that option enabled, admin drains close unused tunnels,
+while in-place filter-chain updates request replacements and preserve HCM's existing idle drain grace.
+Full listener replacement and hot restart also retain unused tunnels' existing drain grace.
+With the guard enabled, the drain-aware HCM's legacy drain decision follows the listener direction,
+so an ``INBOUND`` listener participates in ``drain_listeners?inboundonly``.
+When the responder also enables ``ReverseTunnelUpstreamCodecOptions.enable_drain_with_goaway``,
+node selection excludes initiators whose remaining tunnels have received GOAWAY. Existing streams
+continue on those tunnels. Requests with no eligible initiator fail with HTTP 503 and response flag
+``UH`` (no healthy upstream), instead of the previous fallback connection failure with ``UF``.
+These requests increment ``cluster.<name>.upstream_rq_all_tunnels_draining`` instead of
+``fallback_no_reverse_socket``. Early drain METADATA still only notifies the reporter.

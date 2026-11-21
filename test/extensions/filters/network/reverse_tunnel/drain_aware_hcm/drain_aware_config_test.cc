@@ -1,3 +1,5 @@
+#include <tuple>
+
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
@@ -110,14 +112,18 @@ TEST_F(DrainAwareConfigTest, CreateFilterFactoryFromValidConfig) {
 }
 
 class DrainAwareFilterFactoryTest : public DrainAwareConfigTest,
-                                    public testing::WithParamInterface<bool> {};
+                                    public testing::WithParamInterface<std::tuple<bool, bool>> {};
 
-INSTANTIATE_TEST_SUITE_P(DrainEnabled, DrainAwareFilterFactoryTest, testing::Bool());
+INSTANTIATE_TEST_SUITE_P(DrainEnabled, DrainAwareFilterFactoryTest,
+                         testing::Combine(testing::Bool(), testing::Bool()));
 
-TEST_P(DrainAwareFilterFactoryTest, InstallsIdleFilterBeforeHcmOnlyWhenEnabled) {
+TEST_P(DrainAwareFilterFactoryTest, InstallsIdleFilterBeforeHcmOnlyWhenOptionAndRuntimeEnabled) {
+  const auto [enable_drain, enable_listener_drain] = GetParam();
+  TestScopedStaticReloadableFeaturesRuntime runtime(
+      {{"reverse_tunnel_listener_drain", enable_listener_drain}});
   DrainAwareHttpConnectionManagerFilterConfigFactory factory;
   auto proto_config = parseConfig(kMinimalConfig);
-  proto_config.set_enable_drain_with_goaway(GetParam());
+  proto_config.set_enable_drain_with_goaway(enable_drain);
   proto_config.mutable_hcm_config()
       ->mutable_common_http_protocol_options()
       ->mutable_idle_timeout()
@@ -128,7 +134,7 @@ TEST_P(DrainAwareFilterFactoryTest, InstallsIdleFilterBeforeHcmOnlyWhenEnabled) 
   NiceMock<Network::MockReadFilterCallbacks> callbacks;
   Network::ReadFilterSharedPtr hcm;
   testing::InSequence sequence;
-  if (GetParam()) {
+  if (enable_drain && enable_listener_drain) {
     EXPECT_CALL(filter_manager, addReadFilter(_)).WillOnce([](Network::ReadFilterSharedPtr filter) {
       EXPECT_NE(nullptr, dynamic_cast<DrainAwareReadFilter*>(filter.get()));
     });
@@ -238,9 +244,14 @@ public:
   Http::ServerConnectionCallbacks* last_callbacks_{nullptr};
 };
 
-TEST_F(DrainAwareConfigTest, LegacyCodecDrainUsesInboundListenerScope) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
+class DrainAwareCodecDrainScopeTest : public DrainAwareConfigTest,
+                                      public testing::WithParamInterface<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(ListenerDrainEnabled, DrainAwareCodecDrainScopeTest, testing::Bool());
+
+TEST_P(DrainAwareCodecDrainScopeTest, LegacyCodecUsesInboundScopeOnlyWhenListenerDrainEnabled) {
+  TestScopedStaticReloadableFeaturesRuntime runtime(
+      {{"use_connection_event_drain", false}, {"reverse_tunnel_listener_drain", GetParam()}});
   ON_CALL(context_, direction()).WillByDefault(Return(envoy::config::core::v3::INBOUND));
   auto proto_config = parseConfig(kMinimalConfig);
   proto_config.set_enable_drain_with_goaway(true);
@@ -256,9 +267,12 @@ TEST_F(DrainAwareConfigTest, LegacyCodecDrainUsesInboundListenerScope) {
   Buffer::OwnedImpl data;
   auto codec = config->createCodec(connection, data, callbacks, overload_manager);
   ASSERT_NE(nullptr, codec);
-  EXPECT_CALL(context_.drain_manager_, drainClose(Network::DrainDirection::All)).Times(0);
-  EXPECT_CALL(context_.drain_manager_, drainClose(Network::DrainDirection::InboundOnly))
-      .WillOnce(Return(true));
+  const auto expected_scope =
+      GetParam() ? Network::DrainDirection::InboundOnly : Network::DrainDirection::All;
+  const auto unused_scope =
+      GetParam() ? Network::DrainDirection::All : Network::DrainDirection::InboundOnly;
+  EXPECT_CALL(context_.drain_manager_, drainClose(unused_scope)).Times(0);
+  EXPECT_CALL(context_.drain_manager_, drainClose(expected_scope)).WillOnce(Return(true));
   EXPECT_CALL(*goaway_timer, enableTimer(std::chrono::milliseconds(5000), _));
   drain_check_timer->invokeCallback();
 }
@@ -470,8 +484,7 @@ TEST_F(DrainAwareConfigTest, DelayBelowUnjitteredDrainTimeoutIsAccepted) {
 // final GOAWAY with it when it detects a listener drain. 2s with 50% jitter gives up to 1000ms of
 // jitter; a random value of 500 gives exactly 2500ms.
 TEST_F(DrainAwareConfigTest, CreateCodecArmsFinalGoAwayWithJitteredDrainTimeout) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"use_connection_event_drain", false}});
   ON_CALL(context_.server_factory_context_.api_.random_, random()).WillByDefault(Return(500));
   ON_CALL(context_.drain_manager_, drainClose(_)).WillByDefault(Return(true));
 

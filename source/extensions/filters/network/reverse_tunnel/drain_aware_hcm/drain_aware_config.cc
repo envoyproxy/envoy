@@ -9,6 +9,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/filters/network/reverse_tunnel/drain_aware_hcm/drain_aware_read_filter.h"
@@ -170,7 +171,8 @@ DrainAwareHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto
           enable_drain_with_goaway = proto_config.enable_drain_with_goaway()](
              Network::FilterManager& filter_manager) -> void {
     auto& server_context = context.serverFactoryContext();
-    if (enable_drain_with_goaway) {
+    if (enable_drain_with_goaway &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reverse_tunnel_listener_drain")) {
       filter_manager.addReadFilter(std::make_shared<DrainAwareReadFilter>(
           server_context, filter_config->stats().named_.downstream_cx_drain_close_));
     }

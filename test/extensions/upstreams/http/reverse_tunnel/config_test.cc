@@ -1,5 +1,6 @@
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/upstreams/http/reverse_tunnel/v3/reverse_tunnel_codec.pb.h"
@@ -32,6 +33,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -74,6 +76,14 @@ constexpr int kTestSocketFd = 42;
 
 class ReverseTunnelUpstreamCodecTest : public testing::Test {
 protected:
+  std::unique_ptr<TestScopedStaticReloadableFeaturesRuntime> listener_drain_runtime_;
+
+  void setListenerDrainGuard(bool enabled) {
+    listener_drain_runtime_.reset();
+    listener_drain_runtime_ = std::make_unique<TestScopedStaticReloadableFeaturesRuntime>(
+        std::vector<std::pair<std::string, bool>>{{"reverse_tunnel_listener_drain", enabled}});
+  }
+
   ReverseTunnelUpstreamCodecTest() : dispatcher_("worker_0") {
     tls_.setDispatcher(&dispatcher_);
     EXPECT_CALL(dispatcher_, createTimer_(_))
@@ -219,6 +229,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, CallbacksObserveAndForwardGoaway) {
 // Peer GOAWAY on the drain-aware callbacks reaches the socket manager and reports to the
 // configured reverse-tunnel reporter with the node, cluster, and fd for the seeded socket.
 TEST_F(ReverseTunnelUpstreamCodecTest, PeerGoAwayReportsToReporter) {
+  setListenerDrainGuard(false);
   NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
 
   const std::string node_id = "node-1";
@@ -235,12 +246,21 @@ TEST_F(ReverseTunnelUpstreamCodecTest, PeerGoAwayReportsToReporter) {
   EXPECT_CALL(*reporter, reportGoAwayEvent(Eq(node_id), Eq(cluster_id), Eq(kTestSocketFd)));
   EXPECT_CALL(inner, onGoAway(Envoy::Http::GoAwayErrorCode::NoError))
       .WillOnce(Invoke([&](Envoy::Http::GoAwayErrorCode) {
-        EXPECT_TRUE(socket_manager_->getNodeWithSocket(cluster_id).empty());
-        EXPECT_TRUE(socket_manager_->getNodeWithSocket(node_id).empty());
+        EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), node_id);
+        EXPECT_EQ(socket_manager_->getNodeWithSocket(node_id), node_id);
         EXPECT_EQ(socket_manager_->getClusterForNode(node_id), cluster_id);
         EXPECT_FALSE(socket_manager_->canAcceptConnection(node_id, ""));
+        // Drain state is recorded before forwarding, even when the guard was disabled at GOAWAY.
+        setListenerDrainGuard(true);
+        EXPECT_TRUE(socket_manager_->getNodeWithSocket(cluster_id).empty());
+        EXPECT_TRUE(socket_manager_->getNodeWithSocket(node_id).empty());
       }));
   wrapper.onGoAway(Envoy::Http::GoAwayErrorCode::NoError);
+
+  // A runtime rollback restores legacy selection for the same live, draining tunnel.
+  setListenerDrainGuard(false);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), node_id);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(node_id), node_id);
 }
 
 TEST_F(ReverseTunnelUpstreamCodecTest, PeerGoAwayNoReportWithoutTls) {
@@ -265,6 +285,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, PeerGoAwayNoReportWithoutTls) {
 }
 
 TEST_F(ReverseTunnelUpstreamCodecTest, CreateClientCodecPeerGoAwayReportsToReporter) {
+  setListenerDrainGuard(true);
   NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
 
   const std::string node_id = "node-1";
@@ -381,6 +402,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, CreateClientCodecConnectionMetadataWithou
 }
 
 TEST_F(ReverseTunnelUpstreamCodecTest, LocalGracefulDrainDoesNotReportGoAway) {
+  setListenerDrainGuard(false);
   NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
   extension_ = makeExtension("node-1", "cluster-1", kTestSocketFd);
   auto socket = socket_manager_->getConnectionSocket("node-1");
@@ -402,10 +424,20 @@ TEST_F(ReverseTunnelUpstreamCodecTest, LocalGracefulDrainDoesNotReportGoAway) {
   EXPECT_CALL(*inner_raw, goAway());
   EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError))
       .WillOnce(Invoke([&](Envoy::Http::GoAwayErrorCode) {
-        EXPECT_TRUE(socket_manager_->getNodeWithSocket("cluster-1").empty());
+        EXPECT_EQ(socket_manager_->getNodeWithSocket("cluster-1"), "node-1");
+        EXPECT_EQ(socket_manager_->getNodeWithSocket("node-1"), "node-1");
         EXPECT_EQ(socket_manager_->getClusterForNode("node-1"), "cluster-1");
+        // The local path also records drain state before forwarding while the guard is disabled.
+        setListenerDrainGuard(true);
+        EXPECT_TRUE(socket_manager_->getNodeWithSocket("cluster-1").empty());
+        EXPECT_TRUE(socket_manager_->getNodeWithSocket("node-1").empty());
       }));
   drain_timer->invokeCallback();
+
+  // Local drain has the same selection rollback, without notifying the reporter.
+  setListenerDrainGuard(false);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("cluster-1"), "node-1");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("node-1"), "node-1");
 }
 
 // The decorator forwards ClientConnection calls and counts a sent GOAWAY.
@@ -673,6 +705,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, OnMetadataWrongValueForwardsNoReport) {
 // subsequent peer GOAWAY on the same connection does NOT report again (the once-guard suppresses
 // it). The GOAWAY is still forwarded to the inner callbacks.
 TEST_F(ReverseTunnelUpstreamCodecTest, NotifyReporterFiresAtMostOnce) {
+  setListenerDrainGuard(true);
   NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
   const std::string node_id = "node-1";
   const std::string cluster_id = "cluster-1";
@@ -705,6 +738,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, NotifyReporterFiresAtMostOnce) {
 // matching metadata frame on the same connection does NOT report again (it still forwards the
 // map, with the drain key erased, to the inner callbacks).
 TEST_F(ReverseTunnelUpstreamCodecTest, NotifyReporterFiresAtMostOnceGoAwayFirst) {
+  setListenerDrainGuard(true);
   NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
   extension_ = makeExtension("node-1", "cluster-1", kTestSocketFd);
   auto socket = socket_manager_->getConnectionSocket("node-1");

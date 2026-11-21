@@ -196,7 +196,11 @@ private:
   // Returns true if the connection should begin draining (send GOAWAY).
   bool shouldDrainClose() {
     if (!use_connection_event_drain_) {
-      return drain_decision_.drainClose(drain_direction_);
+      const auto direction =
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reverse_tunnel_listener_drain")
+              ? drain_direction_
+              : Network::DrainDirection::All;
+      return drain_decision_.drainClose(direction);
     }
 
     return Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_);

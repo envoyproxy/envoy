@@ -19,6 +19,7 @@
 #include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/ssl_handshaker.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.h"
@@ -324,6 +325,12 @@ void ReverseConnectionIOHandle::resetFileEvents() {
   }
 
   IoSocketHandleImpl::resetFileEvents();
+}
+
+void ReverseConnectionIOHandle::onListenerDrain() {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reverse_tunnel_listener_drain")) {
+    stopInitiatingConnections();
+  }
 }
 
 void ReverseConnectionIOHandle::stopInitiatingConnections() {

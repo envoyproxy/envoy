@@ -174,8 +174,7 @@ TEST_F(DrainAwareServerConnectionTest, TimerFiresNoDrain) {
 // Timer fires when the listener is draining: sends the shutdown notice, then the GOAWAY after
 // drain_timeout, and stops re-arming. Legacy path: drain is detected by polling the DrainDecision.
 TEST_F(DrainAwareServerConnectionTest, TimerFiresDrainDetected) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"use_connection_event_drain", false}});
   auto conn = makeConnection();
   ON_CALL(drain_decision_, drainClose(_)).WillByDefault(Return(true));
   EXPECT_CALL(*inner_ptr_, shutdownNotice());
@@ -192,6 +191,7 @@ TEST_F(DrainAwareServerConnectionTest, TimerFiresDrainDetected) {
 // Equivalent using the connection-level drain path: the connection is notified via onDrain() and
 // the timer detects the drain from that event (not by polling the DrainDecision).
 TEST_F(DrainAwareServerConnectionTest, TimerFiresDrainDetectedViaConnectionDrain) {
+  TestScopedStaticReloadableFeaturesRuntime runtime({{"reverse_tunnel_listener_drain", true}});
   auto conn = makeConnection();
   // Notify the connection it is draining (Immediate strategy => drain right away). The
   // DrainDecision must not be consulted on this path.
@@ -207,10 +207,19 @@ TEST_F(DrainAwareServerConnectionTest, TimerFiresDrainDetectedViaConnectionDrain
   destroyConnection(conn);
 }
 
+TEST_F(DrainAwareServerConnectionTest, ListenerDrainDisabledPreservesConnectionEvents) {
+  auto conn = makeConnection(nullptr, defaultConfig(), Network::DrainDirection::InboundOnly);
+  EXPECT_CALL(drain_decision_, drainClose(_)).Times(0);
+  raiseConnectionDrain();
+  EXPECT_CALL(*inner_ptr_, shutdownNotice());
+  EXPECT_CALL(*goaway_timer_, enableTimer(std::chrono::milliseconds(5000), _));
+  timer_->invokeCallback();
+  destroyConnection(conn);
+}
+
 // Once the drain has started, subsequent timer fires are complete no-ops.
 TEST_F(DrainAwareServerConnectionTest, TimerFiresAfterDrainStartedIsNoop) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"use_connection_event_drain", false}});
   auto conn = makeConnection();
   ON_CALL(drain_decision_, drainClose(_)).WillByDefault(Return(true));
   EXPECT_CALL(*goaway_timer_, enableTimer(std::chrono::milliseconds(5000), _));
@@ -249,8 +258,7 @@ TEST_F(DrainAwareServerConnectionTest,
 
 // on_local_drain fires at most once across shutdownNotice() and the drain timer.
 TEST_F(DrainAwareServerConnectionTest, LocalDrainFiresAtMostOnce) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"use_connection_event_drain", false}});
   int fired = 0;
   auto conn = makeConnection([&fired]() { ++fired; });
   conn->shutdownNotice();
@@ -269,8 +277,7 @@ TEST_F(DrainAwareServerConnectionTest, LocalDrainFiresAtMostOnce) {
 // call shutdownNotice() after the wrapper has already started the drain. That second notice must
 // not redial again, re-arm the drain timers or send the soft GOAWAY early.
 TEST_F(DrainAwareServerConnectionTest, HcmShutdownNoticeAfterListenerDrainIsNoop) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"use_connection_event_drain", false}});
   int redials = 0;
   auto conn = makeConnection([&redials]() { ++redials; }, delayConfig());
 
@@ -292,8 +299,7 @@ TEST_F(DrainAwareServerConnectionTest, HcmShutdownNoticeAfterListenerDrainIsNoop
 // Drain with delays: redial immediately, then the metadata frame, the soft GOAWAY and the final
 // GOAWAY fire in order.
 TEST_F(DrainAwareServerConnectionTest, DrainSendsMetadataThenShutdownNoticeThenGoAway) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"use_connection_event_drain", false}});
   bool redialed = false;
   auto conn = makeConnection([&redialed]() { redialed = true; }, delayConfig());
 
@@ -363,6 +369,7 @@ TEST_F(DrainAwareServerConnectionTest, MetadataOnlySkipsShutdownNotice) {
 // A listener drain preserves the configured grace interval, including when registration
 // replays the event before the wrapper has created its timers.
 TEST_F(DrainAwareServerConnectionTest, ReplayedDrainPreservesGoAwayDelay) {
+  TestScopedStaticReloadableFeaturesRuntime runtime({{"reverse_tunnel_listener_drain", true}});
   EXPECT_CALL(connection_, addConnectionCallbacks(_))
       .WillOnce([this](Network::ConnectionCallbacks& observer) {
         connection_.callbacks_.push_back(&observer);
@@ -384,6 +391,7 @@ TEST_F(DrainAwareServerConnectionTest, ReplayedDrainPreservesGoAwayDelay) {
 }
 
 TEST_F(DrainAwareServerConnectionTest, GradualDrainRetainsOriginalDeadline) {
+  TestScopedStaticReloadableFeaturesRuntime runtime({{"reverse_tunnel_listener_drain", true}});
   ON_CALL(server_context_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(10)));
   ON_CALL(server_context_.api_.random_, random()).WillByDefault(Return(9));
   auto conn = makeConnection([]() {});
@@ -414,8 +422,8 @@ TEST_F(DrainAwareServerConnectionTest, ClosedConnectionStopsDrainTimers) {
 }
 
 TEST_F(DrainAwareServerConnectionTest, LegacyDrainRespectsInboundDirection) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
+  TestScopedStaticReloadableFeaturesRuntime runtime(
+      {{"use_connection_event_drain", false}, {"reverse_tunnel_listener_drain", true}});
   auto conn = makeConnection(nullptr, defaultConfig(), Network::DrainDirection::InboundOnly);
   EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::InboundOnly))
       .WillOnce(Return(true));

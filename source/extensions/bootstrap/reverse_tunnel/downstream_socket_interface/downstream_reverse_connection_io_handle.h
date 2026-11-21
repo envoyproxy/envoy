@@ -72,6 +72,9 @@ public:
   void onListenerStopped() { listener_stopped_ = true; }
   bool listenerStopped() const { return listener_stopped_; }
 
+  // Whether the parent can still dial a replacement, including during an in-place update.
+  bool canInitiateConnections() const;
+
   /**
    * Called by the parent ReverseConnectionIOHandle when it is destroyed, so a surviving tunnel
    * clears its back-pointer instead of retaining a dangling parent pointer.

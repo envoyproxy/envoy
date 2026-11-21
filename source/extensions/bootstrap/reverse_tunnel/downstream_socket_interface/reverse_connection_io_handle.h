@@ -207,8 +207,8 @@ public:
    */
   void resetFileEvents() override;
 
-  // Stop the listener's dial loop even when it has no accepted connections to notify.
-  void onListenerDrain() override { stopInitiatingConnections(); }
+  // When enabled, stop the dial loop even when the listener has no accepted connections to notify.
+  void onListenerDrain() override;
 
   /**
    * Triggers the reverse connection workflow.
@@ -364,6 +364,10 @@ public:
    * are harmless; restarting tunnel initiation requires replacing the listener.
    */
   void stopInitiatingConnections();
+
+  // Admin drain can stop initiation while the listener still accepts queued events. Once stopped,
+  // disabling the runtime guard cannot restart this listener; it must be replaced.
+  bool canInitiateConnections() const { return !connections_stopped_; }
 
   /**
    * Remove a connection key from per-host tracking (the key set and its state gauge). Shared by the

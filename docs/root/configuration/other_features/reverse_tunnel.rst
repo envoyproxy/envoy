@@ -494,24 +494,33 @@ The header priority order is:
 Listener draining
 -----------------
 
+The runtime guard ``envoy.reloadable_features.reverse_tunnel_listener_drain`` enables the behavior
+below and defaults to false. Existing deployments retain their listener-drain and node-selection
+behavior until they enable it; ``enable_drain_with_goaway`` alone does not opt into these changes.
+
 When a reverse listener begins draining, the initiator stops pending handshakes and replacement dials
 before notifying accepted tunnels. This stop is independent of ``enable_drain_with_goaway`` and is
 permanent for that listener. An admin drain with ``skip_exit`` keeps the listener running but does not
-resume tunnel initiation; a full listener replacement is required to initiate tunnels again.
+resume tunnel initiation. Disabling the guard does not restart a listener that has already stopped
+dialing; a full listener replacement is required to initiate tunnels again.
 
-With the drain-aware HCM's ``enable_drain_with_goaway`` enabled, unused reverse tunnels close when
-selected to drain. In-place filter-chain updates schedule replacement tunnels before closing unused
-ones, while whole-listener drains suppress replacements. Full listener replacement and hot restart
-retain unused tunnels' existing drain grace so the successor has time to establish its tunnels; this
-does not wait indefinitely for successor readiness. A first request that arrives before the idle
-close is handled by the HTTP codec and follows its normal GOAWAY sequence.
+With the drain-aware HCM's ``enable_drain_with_goaway`` also enabled, in-place filter-chain updates
+request replacement tunnels while leaving existing unused tunnels open until HCM's normal drain
+closure. This preserves the grace period for requests while replacement handshakes complete. Admin
+listener drains close unused tunnels without replacements. Full listener replacement and hot restart
+retain unused tunnels' existing drain grace for the successor; this does not wait indefinitely for
+successor readiness. A first request before idle closure is handled by the HTTP codec and follows
+its normal GOAWAY sequence. With the guard enabled, the legacy HCM drain decision also respects the
+listener direction, including ``INBOUND`` listeners during ``drain_listeners?inboundonly``.
 
-Responder exclusion requires ``enable_drain_with_goaway`` in the reverse connection cluster's
-``ReverseTunnelUpstreamCodecOptions``. After GOAWAY, a tunnel remains available to existing streams but
-is no longer eligible for new streams. An initiator with no eligible tunnels is skipped during node
-selection. If the requested node or cluster has only draining tunnels, requests fail with HTTP 503
-(no healthy upstream), and ``cluster.<name>.upstream_rq_all_tunnels_draining`` is incremented. Early drain
-METADATA only notifies the reporter and does not exclude the tunnel.
+Responder exclusion additionally requires ``enable_drain_with_goaway`` in the reverse connection
+cluster's ``ReverseTunnelUpstreamCodecOptions``. After GOAWAY, a tunnel remains available to existing
+streams but is no longer eligible for new streams. An initiator with no eligible tunnels is skipped
+during node selection. If the requested node or cluster has only draining tunnels, requests fail
+with HTTP 503 and response flag ``UH`` (no healthy upstream), instead of ``UF`` from the previous
+fallback connection failure. The counter ``cluster.<name>.upstream_rq_all_tunnels_draining`` records
+these requests instead of ``fallback_no_reverse_socket``. Early drain METADATA only notifies the
+reporter and does not exclude the tunnel.
 
 .. _config_reverse_tunnel_access_logging:
 

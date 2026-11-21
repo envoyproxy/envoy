@@ -1,6 +1,7 @@
 #include <chrono>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "envoy/common/callback.h"
@@ -33,6 +34,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -78,6 +80,14 @@ public:
 
 class ReverseConnectionClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
+  std::unique_ptr<TestScopedStaticReloadableFeaturesRuntime> listener_drain_runtime_;
+
+  void setListenerDrainGuard(bool enabled) {
+    listener_drain_runtime_.reset();
+    listener_drain_runtime_ = std::make_unique<TestScopedStaticReloadableFeaturesRuntime>(
+        std::vector<std::pair<std::string, bool>>{{"reverse_tunnel_listener_drain", enabled}});
+  }
+
   ReverseConnectionClusterTest() {
     // Set up the stats scope.
     stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
@@ -813,6 +823,7 @@ TEST_F(ReverseConnectionClusterTest, HostReuse) {
 }
 
 TEST_F(ReverseConnectionClusterTest, DrainingNodeCannotReuseCachedHost) {
+  setListenerDrainGuard(true);
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -851,6 +862,15 @@ TEST_F(ReverseConnectionClusterTest, DrainingNodeCannotReuseCachedHost) {
   EXPECT_EQ(lb.chooseHost(&lb_context).host, nullptr);
   EXPECT_EQ(all_tunnels_draining.value(), 2);
   EXPECT_NE(socket_manager->getLifecycleInfo(123), nullptr);
+
+  // Disabling the guard restores cached-host selection, without counting a draining-node miss.
+  setListenerDrainGuard(false);
+  EXPECT_EQ(lb.chooseHost(&lb_context).host, original_host);
+  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "test-cluster"}}};
+  EXPECT_EQ(lb.chooseHost(&lb_context).host, original_host);
+  EXPECT_EQ(all_tunnels_draining.value(), 2);
+  setListenerDrainGuard(true);
 
   // A healthy replacement may reuse the host while the original tunnel is still draining.
   addTestSocket("test-node", "test-cluster", 124);

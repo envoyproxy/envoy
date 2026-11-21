@@ -4,8 +4,10 @@ immediate GOAWAY, whether or not the new fields are set: a soft GOAWAY at drain 
 after ``hcm_config.drain_timeout``, extended by ``hcm_config.drain_timeout_jitter`` if set. When
 :ref:`enable_drain_with_goaway
 <envoy_v3_api_field_extensions.filters.network.reverse_tunnel.v3.DrainAwareHttpConnectionManager.enable_drain_with_goaway>`
-is set, per-connection rotation and in-place filter-chain updates redial a replacement at drain start;
-whole-listener draining instead stops pending handshakes and replacement dials. Such a tunnel sends,
+is set, draining established HTTP/2 tunnels redial a replacement at drain start. Enabling the
+runtime guard ``envoy.reloadable_features.reverse_tunnel_listener_drain`` (default false) also replaces
+unused tunnels during in-place filter-chain updates and instead stops pending handshakes and replacement
+dials during whole-listener draining. Such an HTTP/2 tunnel sends,
 at offsets from drain start: a connection-level METADATA frame carrying ``envoy.reverse_tunnel.drain: true`` at
 :ref:`metadata_delay
 <envoy_v3_api_field_extensions.filters.network.reverse_tunnel.v3.DrainAwareHttpConnectionManager.metadata_delay>`,
