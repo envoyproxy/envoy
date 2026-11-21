@@ -722,6 +722,17 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
               ? more_specific.processing_request_modifier_factory_cb_
               : less_specific.processing_request_modifier_factory_cb_) {}
 
+void Filter::updateDownstreamWatermarkPushback() {
+  // Only enable downstream watermark push back on the side-stream for
+  // FULL_DUPLEX_STREAMED mode, also when the complete downstream request
+  // has arrived. So pausing the side-stream won't cause deadlocks.
+  // For STREAMED mode, the flow control is done by the chunk_queue size check.
+  const bool should_enable = decoding_state_.completeBodyAvailable() &&
+                             (decoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
+                             (encoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED);
+  watermark_callbacks_.setDownstreamWatermarkPushbackEnabled(should_enable);
+}
+
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
   filter_callbacks_ = &callbacks;
@@ -1953,6 +1964,7 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
       const auto old_decoding_body_mode = decoding_state_.bodyMode();
       decoding_state_.setProcessingMode(mode_override);
       encoding_state_.setProcessingMode(mode_override);
+      updateDownstreamWatermarkPushback();
 
       // If the response case is not set, this response message is for overriding the
       // processing mode only.

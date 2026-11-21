@@ -118,7 +118,7 @@ public:
   void setPaused(bool paused) { paused_ = paused; }
 
   bool completeBodyAvailable() const { return complete_body_available_; }
-  void setCompleteBodyAvailable(bool d) { complete_body_available_ = d; }
+  virtual void setCompleteBodyAvailable(bool d) { complete_body_available_ = d; }
   bool hasNoBody() const { return no_body_; }
   void setHasNoBody(bool b) { no_body_ = b; }
   bool bodyReplaced() const { return body_replaced_; }
@@ -615,6 +615,8 @@ public:
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode) override {
     setProcessingModeInternal(mode);
   }
+
+  void setCompleteBodyAvailable(bool d) override;
 
   void requestWatermark() override;
   void clearWatermark() override;

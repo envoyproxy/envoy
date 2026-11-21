@@ -76,6 +76,7 @@ envoy_cc_library(
     hdrs = ["sidestream_watermark.h"],
     deps = [
         "//envoy/http:async_client_interface",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
