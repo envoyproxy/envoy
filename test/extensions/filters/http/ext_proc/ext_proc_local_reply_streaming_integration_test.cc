@@ -342,6 +342,11 @@ TEST_P(ExtProcLocalReplyStreamingIntegrationTest, RequestWithBodyDuplexAndLocalR
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_EQ(response->body(), "bbbbcccccccc");
   verifyDownstreamResponse(*response, 200);
+  // ext_proc is the terminal filter of a local response: the request does not go upstream.
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  // Nor did the router see it (a request it had started, and then reset, would not be counted
+  // by the cluster).
+  EXPECT_EQ(0, test_server_->counter("http.config_test.rq_total")->value());
 }
 
 TEST_P(ExtProcLocalReplyStreamingIntegrationTest,
@@ -430,6 +435,117 @@ TEST_P(ExtProcLocalReplyStreamingIntegrationTest, SpuriousResponse) {
   EXPECT_EQ(response->headers().getStatusValue(), "200");
 }
 
+// The processor closes its stream before it has finished the local response it started. The
+// response headers have been sent downstream, so the stream is reset.
+TEST_P(ExtProcLocalReplyStreamingIntegrationTest, ProcessorClosesBeforeLocalResponseEnds) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(std::nullopt);
+
+  processGenericMessage(*grpc_upstreams_[0], true,
+                        [](const ProcessingRequest&, ProcessingResponse& resp) {
+                          makeLocalResponseHeaders(resp, false);
+                          return true;
+                        });
+
+  response->waitForHeaders();
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+}
+
+// As above, but an encoder filter is still holding the local response headers when the processor
+// closes its stream: the error response is sent in their place.
+TEST_P(ExtProcLocalReplyStreamingIntegrationTest,
+       ProcessorClosesBeforeLocalResponseEndsWithHeadersHeld) {
+  config_helper_.prependFilter(R"EOF(
+name: encode-headers-return-stop-iteration-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.EncodeHeadersReturnStopIterationFilterConfig
+)EOF");
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(std::nullopt);
+
+  processGenericMessage(*grpc_upstreams_[0], true,
+                        [](const ProcessingRequest&, ProcessingResponse& resp) {
+                          makeLocalResponseHeaders(resp, false);
+                          return true;
+                        });
+
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  // The configured `status_on_error` (default 500), not the processor's 200.
+  verifyDownstreamResponse(*response, 500);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+}
+
+// A headers-only streamed local response (STREAMED body mode) for a request whose body is still
+// arriving: the request is not sent on to the upstream. Covers the handleHeaderContinue() path.
+TEST_P(ExtProcLocalReplyStreamingIntegrationTest, StreamedHeadersOnlyLocalResponseWithRequestBody) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("POST");
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  auto response = std::move(encoder_decoder.second);
+  request_encoder_ = &encoder_decoder.first;
+  codec_client_->sendData(*request_encoder_, 10, false);
+
+  // The processor answers the request headers with a headers-only local response.
+  processGenericMessage(*grpc_upstreams_[0], true,
+                        [](const ProcessingRequest&, ProcessingResponse& resp) {
+                          makeLocalResponseHeaders(resp, true);
+                          return true;
+                        });
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+}
+
+// The request has a body and trailers; the processor closes its stream after non-final local
+// response headers, and the client then sends the trailers. The request is not sent on.
+TEST_P(ExtProcLocalReplyStreamingIntegrationTest,
+       RequestTrailersAfterProcessorClosesLocalResponse) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(
+      ProcessingMode::FULL_DUPLEX_STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  auto response = std::move(encoder_decoder.second);
+  request_encoder_ = &encoder_decoder.first;
+  codec_client_->sendData(*request_encoder_, 10, false);
+
+  processGenericMessage(*grpc_upstreams_[0], true,
+                        [](const ProcessingRequest&, ProcessingResponse& resp) {
+                          makeLocalResponseHeaders(resp, false);
+                          return true;
+                        });
+
+  response->waitForHeaders();
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  // The processor closes its stream with the local response unfinished, then the client sends the
+  // request trailers.
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+  codec_client_->sendTrailers(*request_encoder_,
+                              Http::TestRequestTrailerMapImpl{{"x-trailer-foo", "yes"}});
+
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+}
 TEST_P(ExtProcLocalReplyStreamingIntegrationTest, TimeoutWaitingForLocalResponseEndStream) {
   // Set HCM stream_idle_timeout to be 10s. Note one can also set the
   // RouteAction:idle_timeout under the route configuration to override it.

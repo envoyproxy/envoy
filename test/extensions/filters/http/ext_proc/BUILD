@@ -790,6 +790,7 @@ envoy_extension_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
+        "//test/integration/filters:encode_headers_return_stop_iteration_filter_config_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
