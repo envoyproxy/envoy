@@ -46,11 +46,8 @@ private:
         : options_(options), serialized_options_(std::move(serialized_options)), cache_(cache) {}
 
     const envoy::config::core::v3::AlternateProtocolsCacheOptions options_;
-    // Equivalent options can serialize differently, so options_ decides when neither encoding
-    // matches.
+    // Equivalent options can serialize differently, so options_ decides when the bytes differ.
     const std::string serialized_options_;
-    // The bytes of the last equivalent options that serialized differently.
-    std::string equivalent_serialized_options_;
     HttpServerPropertiesCacheSharedPtr cache_;
   };
 

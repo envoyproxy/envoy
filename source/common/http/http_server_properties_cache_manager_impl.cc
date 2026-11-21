@@ -27,19 +27,14 @@ HttpServerPropertiesCacheSharedPtr HttpServerPropertiesCacheManagerImpl::getCach
   std::string serialized_options = MessageUtil::serializeDeterministically(options);
   const auto& existing_cache = (*slot_).caches_.find(options.name());
   if (existing_cache != (*slot_).caches_.end()) {
-    CacheWithOptions& cache_with_options = existing_cache->second;
-    if (serialized_options != cache_with_options.serialized_options_ &&
-        serialized_options != cache_with_options.equivalent_serialized_options_) {
-      if (Protobuf::util::MessageDifferencer::Equivalent(options, cache_with_options.options_)) {
-        cache_with_options.equivalent_serialized_options_ = std::move(serialized_options);
-      } else {
-        IS_ENVOY_BUG(fmt::format(
-            "options specified alternate protocols cache '{}' with different settings"
-            " first '{}' second '{}'",
-            options.name(), cache_with_options.options_.DebugString(), options.DebugString()));
-      }
+    if (serialized_options != existing_cache->second.serialized_options_ &&
+        !Protobuf::util::MessageDifferencer::Equivalent(options, existing_cache->second.options_)) {
+      IS_ENVOY_BUG(fmt::format(
+          "options specified alternate protocols cache '{}' with different settings"
+          " first '{}' second '{}'",
+          options.name(), existing_cache->second.options_.DebugString(), options.DebugString()));
     }
-    return cache_with_options.cache_;
+    return existing_cache->second.cache_;
   }
 
   std::unique_ptr<KeyValueStore> store;
