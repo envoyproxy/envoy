@@ -59,8 +59,8 @@ absl::StatusOr<Http::FilterFactoryCb> FilterFactory::createHttpFilterFactoryFrom
                                                secret_reader, extra_context.statsPrefixOr(),
                                                extra_context.statsPrefixScopeOr(server_context));
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    const EncoderPtr encoder = std::make_unique<EncoderImpl>(config);
-    callbacks.addStreamFilter(std::make_shared<Filter>(config, encoder));
+    callbacks.addStreamFilter(
+        std::make_shared<Filter>(config, std::make_unique<EncoderImpl>(config)));
   };
 }
 
