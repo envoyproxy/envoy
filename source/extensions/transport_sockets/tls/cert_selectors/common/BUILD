@@ -15,8 +15,10 @@ envoy_cc_library(
     deps = [
         "//envoy/server:factory_context_interface",
         "//envoy/ssl:context_config_interface",
+        "//envoy/ssl:handshaker_interface",
         "//envoy/ssl:tls_certificate_config_interface",
         "//envoy/stats:stats_interface",
+        "//source/common/common:assert_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:server_context_lib",
         "@abseil-cpp//absl/functional:any_invocable",
