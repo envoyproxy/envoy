@@ -337,11 +337,15 @@ public:
   bool blockLdsUpdate(uint64_t new_hash) {
     return (new_hash == maybe_stale_hash_) || !added_via_api_;
   }
+  bool blockRemove() { return !added_via_api_; }
+
+  /**
+   * The hash of the deterministic serialization that the duplicate check compares first.
+   */
   uint64_t serializedConfigHash() const { return serialized_config_hash_; }
   void setSerializedConfigHash(uint64_t serialized_config_hash) {
     serialized_config_hash_ = serialized_config_hash;
   }
-  bool blockRemove() { return !added_via_api_; }
 
   const std::vector<Network::Address::InstanceConstSharedPtr>& addresses() const {
     return addresses_;

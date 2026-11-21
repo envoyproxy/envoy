@@ -815,7 +815,7 @@ ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cluster
   const auto existing_active_cluster = active_clusters_.find(cluster_name);
   const auto existing_warming_cluster = warming_clusters_.find(cluster_name);
   // A cluster whose serialized config is unchanged blocks the update without MessageUtil::hash(),
-  // which only runs for the configs that change or serialize differently.
+  // which only runs for a new config or one whose bytes differ.
   const uint64_t serialized_hash =
       HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster));
   std::optional<uint64_t> new_hash;
@@ -833,8 +833,9 @@ ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cluster
     // MessageUtil::hash(). A blocked update brings new bytes when the cluster is static, or when
     // MessageUtil::hash() finds a config with other bytes equal, for example on a full-proto build
     // when the sender re-encodes an Any payload with its map entries in another order after a
-    // restart or an upgrade. A sender that re-encodes on every push pays for the serialization on
-    // top of MessageUtil::hash().
+    // restart or an upgrade. Without this, every later push of these bytes would pay for both
+    // hashes, which costs more than MessageUtil::hash() alone. A sender that re-encodes on every
+    // push pays for both anyway.
     cluster_data.serialized_config_hash_ = serialized_hash;
     return true;
   };

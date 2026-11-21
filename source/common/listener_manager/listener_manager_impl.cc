@@ -740,7 +740,7 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   }
 
   // A listener whose serialized config is unchanged blocks the update without MessageUtil::hash(),
-  // which only runs for the configs that change or serialize differently.
+  // which only runs for a new config or one whose bytes differ.
   const uint64_t serialized_hash =
       HashUtil::xxHash64(MessageUtil::serializeDeterministically(config));
   ENVOY_LOG(debug, "begin add/update listener: name={} serialized_hash={}", name, serialized_hash);
@@ -759,8 +759,9 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     // MessageUtil::hash(). A blocked update brings new bytes when the listener is static, or when
     // MessageUtil::hash() finds a config with other bytes equal, for example on a full-proto build
     // when the sender re-encodes an Any payload with its map entries in another order after a
-    // restart or an upgrade. A sender that re-encodes on every push pays for the serialization on
-    // top of MessageUtil::hash().
+    // restart or an upgrade. Without this, every later push of these bytes would pay for both
+    // hashes, which costs more than MessageUtil::hash() alone. A sender that re-encodes on every
+    // push pays for both anyway.
     listener.setSerializedConfigHash(serialized_hash);
     return true;
   };

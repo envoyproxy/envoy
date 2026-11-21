@@ -123,8 +123,9 @@ RouteConfigUpdateReceiverImpl::changedConfigHashes(const Protobuf::Message& rc) 
     // Storing the hash of these bytes lets the next push of the same bytes skip
     // MessageUtil::hash(). MessageUtil::hash() can find a route configuration with other bytes
     // equal, for example on a full-proto build when the sender re-encodes an Any payload with its
-    // map entries in another order after a restart or an upgrade. A sender that re-encodes on every
-    // push pays for the serialization on top of MessageUtil::hash().
+    // map entries in another order after a restart or an upgrade. Without this, every later push of
+    // these bytes would pay for both hashes, which costs more than MessageUtil::hash() alone. A
+    // sender that re-encodes on every push pays for both anyway.
     last_config_hashes.serialized_hash = serialized_hash;
     return std::nullopt;
   }
