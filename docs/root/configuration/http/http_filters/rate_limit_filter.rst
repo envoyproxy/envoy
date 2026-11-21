@@ -10,7 +10,8 @@ Rate limit
 The HTTP rate limit filter will call the rate limit service when the request's route or virtual host
 has one or more :ref:`rate limit configurations<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>`
 that match the filter stage setting. More than one configuration can
-apply to a request. Each configuration results in a descriptor being sent to the rate limit service.
+apply to a request. Each configuration results in a descriptor being sent to the rate limit service,
+unless an earlier configuration :ref:`stopped the search <config_http_filters_rate_limit_stop_on_match>`.
 
 Whether the virtual host rate limit configurations apply to a route is set by
 :ref:`vh_rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`
@@ -128,6 +129,56 @@ the following descriptor is generated:
   ("generic_key", "some_value1")
   ("remote_address", "<trusted address from x-forwarded-for>")
   ("source_cluster", "from_cluster")
+
+.. _config_http_filters_rate_limit_stop_on_match:
+
+Stopping at the first match
+---------------------------
+
+By default, every rate limit configuration that produces a descriptor is sent to the rate limit
+service. A request that matches several configurations is counted against all of them, so the
+strictest limit effectively wins. That makes tiered limits, such as a higher limit for one client
+and a per-client default for everyone else, awkward to express: each later configuration has to
+negate all of the earlier ones.
+
+Setting :ref:`stop_on_match <envoy_v3_api_field_config.route.v3.RateLimit.stop_on_match>` on a
+configuration makes the filter skip all later configurations once that configuration has produced a
+descriptor. Earlier configurations still apply, so configurations that should always count must be
+placed before the first one with the flag. Route configurations are evaluated before virtual host
+configurations, so a match on a route configuration with the flag also skips the virtual host
+configurations. Configurations that
+:ref:`apply on stream done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` are
+evaluated separately, so a stop at request time does not affect them. Only later configurations of
+the same :ref:`stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>` are skipped.
+
+A configuration matches when all of its actions populate and the resulting descriptor has at least
+one entry. If an action cannot populate, for example because a required header is missing, the
+configuration does not stop the search. The same holds when every action is skipped through
+``skip_if_absent``, because the resulting descriptor is empty. A configuration whose
+:ref:`hits_addend <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` fails to evaluate,
+for example because the header it reads is missing or not a number, does not match either, so the
+request falls through to later configurations.
+
+With the following configuration, a request with ``x-user-id: client-a`` only produces the
+``("tier", "client-a")`` descriptor, and a request with any other ``x-user-id`` value produces
+``("user", "<x-user-id>")``. A request without the ``x-user-id`` header produces no descriptor:
+
+.. code-block:: yaml
+
+  rate_limits:
+  - actions:
+    - header_value_match:
+        descriptor_key: tier
+        descriptor_value: client-a
+        headers:
+        - name: x-user-id
+          string_match:
+            exact: client-a
+    stop_on_match: true
+  - actions:
+    - request_headers:
+        header_name: x-user-id
+        descriptor_key: user
 
 .. _config_http_filters_rate_limit_rate_limit_override:
 
