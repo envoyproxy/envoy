@@ -92,6 +92,78 @@ void testHttpConfigStreamReset(envoy_dynamic_module_type_http_filter_config_envo
   recordTestHookCall(stream_id, reason);
 }
 
+// The statuses the headers, body and trailers test hooks below return, so a test chooses what the
+// module answers. resetTestHookStatuses() puts every one back to Continue.
+envoy_dynamic_module_type_on_http_filter_request_headers_status test_request_headers_status =
+    envoy_dynamic_module_type_on_http_filter_request_headers_status_Continue;
+envoy_dynamic_module_type_on_http_filter_request_body_status test_request_body_status =
+    envoy_dynamic_module_type_on_http_filter_request_body_status_Continue;
+envoy_dynamic_module_type_on_http_filter_request_trailers_status test_request_trailers_status =
+    envoy_dynamic_module_type_on_http_filter_request_trailers_status_Continue;
+envoy_dynamic_module_type_on_http_filter_response_headers_status test_response_headers_status =
+    envoy_dynamic_module_type_on_http_filter_response_headers_status_Continue;
+envoy_dynamic_module_type_on_http_filter_response_body_status test_response_body_status =
+    envoy_dynamic_module_type_on_http_filter_response_body_status_Continue;
+envoy_dynamic_module_type_on_http_filter_response_trailers_status test_response_trailers_status =
+    envoy_dynamic_module_type_on_http_filter_response_trailers_status_Continue;
+
+void resetTestHookStatuses();
+
+// Resets the hook statuses when a test that sets them ends, however it ends.
+struct ScopedTestHookStatuses {
+  ~ScopedTestHookStatuses() { resetTestHookStatuses(); }
+};
+
+void resetTestHookStatuses() {
+  test_request_headers_status =
+      envoy_dynamic_module_type_on_http_filter_request_headers_status_Continue;
+  test_request_body_status = envoy_dynamic_module_type_on_http_filter_request_body_status_Continue;
+  test_request_trailers_status =
+      envoy_dynamic_module_type_on_http_filter_request_trailers_status_Continue;
+  test_response_headers_status =
+      envoy_dynamic_module_type_on_http_filter_response_headers_status_Continue;
+  test_response_body_status =
+      envoy_dynamic_module_type_on_http_filter_response_body_status_Continue;
+  test_response_trailers_status =
+      envoy_dynamic_module_type_on_http_filter_response_trailers_status_Continue;
+}
+
+envoy_dynamic_module_type_on_http_filter_request_headers_status
+testRequestHeaders(envoy_dynamic_module_type_http_filter_envoy_ptr,
+                   envoy_dynamic_module_type_http_filter_module_ptr, bool) {
+  return test_request_headers_status;
+}
+
+envoy_dynamic_module_type_on_http_filter_request_body_status
+testRequestBody(envoy_dynamic_module_type_http_filter_envoy_ptr,
+                envoy_dynamic_module_type_http_filter_module_ptr, bool) {
+  return test_request_body_status;
+}
+
+envoy_dynamic_module_type_on_http_filter_request_trailers_status
+testRequestTrailers(envoy_dynamic_module_type_http_filter_envoy_ptr,
+                    envoy_dynamic_module_type_http_filter_module_ptr) {
+  return test_request_trailers_status;
+}
+
+envoy_dynamic_module_type_on_http_filter_response_headers_status
+testResponseHeaders(envoy_dynamic_module_type_http_filter_envoy_ptr,
+                    envoy_dynamic_module_type_http_filter_module_ptr, bool) {
+  return test_response_headers_status;
+}
+
+envoy_dynamic_module_type_on_http_filter_response_body_status
+testResponseBody(envoy_dynamic_module_type_http_filter_envoy_ptr,
+                 envoy_dynamic_module_type_http_filter_module_ptr, bool) {
+  return test_response_body_status;
+}
+
+envoy_dynamic_module_type_on_http_filter_response_trailers_status
+testResponseTrailers(envoy_dynamic_module_type_http_filter_envoy_ptr,
+                     envoy_dynamic_module_type_http_filter_module_ptr) {
+  return test_response_trailers_status;
+}
+
 } // namespace
 
 INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages, testing::Values("c", "rust"),
@@ -3715,10 +3787,11 @@ TEST(DynamicModulesTest, StartHttpStreamCannotCreateRequest) {
   filter->onDestroy();
 }
 
-// Verifies that the decode and encode continue states are tracked independently. A request body
-// that returns Continue marks only the decode direction as continued, so a paused encode phase can
-// still be resumed via continueEncoding(). A single shared flag used to suppress this resume.
+// Verifies that the decode and encode continue states are tracked independently, so a request
+// body that returns Continue leaves a response held at encodeHeaders resumable via
+// continueEncoding(). A single shared flag used to suppress this resume.
 TEST(DynamicModulesTest, PerDirectionContinueDecodeDoesNotBlockEncode) {
+  ScopedTestHookStatuses reset_statuses;
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_OK(dynamic_module);
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
@@ -3738,23 +3811,33 @@ TEST(DynamicModulesTest, PerDirectionContinueDecodeDoesNotBlockEncode) {
   filter->setDecoderFilterCallbacks(decoder_callbacks);
   filter->setEncoderFilterCallbacks(encoder_callbacks);
 
-  // A request body chunk returns Continue, marking only the decode direction as continued.
+  // The encode direction is stopped, so it must stay resumable. A repeat continueDecoding() stays
+  // a no-op because the decode direction is continued.
+  EXPECT_CALL(decoder_callbacks, continueDecoding()).Times(0);
+  EXPECT_CALL(encoder_callbacks, continueEncoding());
+
+  // The module holds the response at encodeHeaders.
+  filter_config_or_status.value()->on_http_filter_response_headers_ = testResponseHeaders;
+  test_response_headers_status =
+      envoy_dynamic_module_type_on_http_filter_response_headers_status_StopIteration;
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->encodeHeaders(response_headers, false));
+
+  // A request body chunk returns Continue, which a single shared flag would also have read as a
+  // continue of the response.
   Buffer::OwnedImpl data;
   EXPECT_EQ(FilterDataStatus::Continue, filter->decodeData(data, false));
 
-  // The encode direction was never continued, so it must still be resumable. A repeat
-  // continueDecoding() stays a no-op because the decode direction is already continued.
-  EXPECT_CALL(decoder_callbacks, continueDecoding()).Times(0);
-  EXPECT_CALL(encoder_callbacks, continueEncoding());
   filter->continueDecoding();
   filter->continueEncoding();
 
   filter->onDestroy();
 }
 
-// The symmetric case. A response body that returns Continue marks only the encode direction as
-// continued, so a paused decode phase can still be resumed via continueDecoding().
+// The symmetric case. A response body that returns Continue leaves a request held at decodeHeaders
+// resumable via continueDecoding().
 TEST(DynamicModulesTest, PerDirectionContinueEncodeDoesNotBlockDecode) {
+  ScopedTestHookStatuses reset_statuses;
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_OK(dynamic_module);
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
@@ -3774,18 +3857,289 @@ TEST(DynamicModulesTest, PerDirectionContinueEncodeDoesNotBlockDecode) {
   filter->setDecoderFilterCallbacks(decoder_callbacks);
   filter->setEncoderFilterCallbacks(encoder_callbacks);
 
-  // A response body chunk returns Continue, marking only the encode direction as continued.
+  // The decode direction is stopped, so it must stay resumable. A repeat continueEncoding() stays
+  // a no-op because the encode direction is continued.
+  EXPECT_CALL(encoder_callbacks, continueEncoding()).Times(0);
+  EXPECT_CALL(decoder_callbacks, continueDecoding());
+
+  // The module holds the request at decodeHeaders.
+  filter_config_or_status.value()->on_http_filter_request_headers_ = testRequestHeaders;
+  test_request_headers_status =
+      envoy_dynamic_module_type_on_http_filter_request_headers_status_StopIteration;
+  TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, false));
+
+  // A response body chunk returns Continue, which a single shared flag would also have read as a
+  // continue of the request.
   Buffer::OwnedImpl data;
   EXPECT_EQ(FilterDataStatus::Continue, filter->encodeData(data, false));
 
-  // The decode direction was never continued, so it must still be resumable. A repeat
-  // continueEncoding() stays a no-op because the encode direction is already continued.
-  EXPECT_CALL(encoder_callbacks, continueEncoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks, continueDecoding());
   filter->continueEncoding();
   filter->continueDecoding();
 
   filter->onDestroy();
+}
+
+// Drives the continue state through test hooks that return the statuses each test sets. The mock
+// callbacks stand in for the filter manager, whose continue can replay a buffered body into the
+// filter before it returns.
+class DynamicModuleHttpFilterContinueTest : public testing::Test {
+public:
+  void SetUp() override {
+    resetTestHookStatuses();
+    auto config_or = makeNoOpConfig(context_, *stats_scope_);
+    ASSERT_OK(config_or);
+    auto config = config_or.value();
+    config->on_http_filter_request_headers_ = testRequestHeaders;
+    config->on_http_filter_request_body_ = testRequestBody;
+    config->on_http_filter_request_trailers_ = testRequestTrailers;
+    config->on_http_filter_response_headers_ = testResponseHeaders;
+    config->on_http_filter_response_body_ = testResponseBody;
+    config->on_http_filter_response_trailers_ = testResponseTrailers;
+
+    filter_ = std::make_shared<DynamicModuleHttpFilter>(config, stats_scope_->symbolTable(), 0);
+    filter_->initializeInModuleFilter();
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  }
+
+  void TearDown() override {
+    if (filter_ != nullptr) {
+      filter_->onDestroy();
+    }
+    resetTestHookStatuses();
+  }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopeSharedPtr stats_scope_ = stats_store_.createScope("");
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  std::shared_ptr<DynamicModuleHttpFilter> filter_;
+  TestRequestHeaderMapImpl request_headers_{{":path", "/"}};
+  TestResponseHeaderMapImpl response_headers_{{":status", "200"}};
+  TestRequestTrailerMapImpl request_trailers_{{"trailer", "value"}};
+  TestResponseTrailerMapImpl response_trailers_{{"trailer", "value"}};
+};
+
+// A continue before the response headers reach the filter must not reach the filter manager, which
+// would resume response headers that do not exist yet.
+TEST_F(DynamicModuleHttpFilterContinueTest, ContinueEncodingBeforeEncodeHeadersIsDropped) {
+  EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(0);
+  EXPECT_LOG_CONTAINS("debug",
+                      "continue_encoding ignored, the response is iterating, filter_name=filter",
+                      filter_->continueEncoding());
+  testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
+
+  // Once a hook stops the direction, the module can resume it.
+  test_response_headers_status =
+      envoy_dynamic_module_type_on_http_filter_response_headers_status_StopIteration;
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_CALL(encoder_callbacks_, continueEncoding());
+  EXPECT_LOG_NOT_CONTAINS("debug", "continue_encoding ignored", filter_->continueEncoding());
+}
+
+// The same for the request. A continue before the filter's request headers hook has run must not
+// resume the request past an earlier filter that still holds it.
+TEST_F(DynamicModuleHttpFilterContinueTest, ContinueDecodingBeforeDecodeHeadersIsDropped) {
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  EXPECT_LOG_CONTAINS("debug",
+                      "continue_decoding ignored, the request is iterating, filter_name=filter",
+                      filter_->continueDecoding());
+  testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+  test_request_headers_status =
+      envoy_dynamic_module_type_on_http_filter_request_headers_status_StopIteration;
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_LOG_NOT_CONTAINS("debug", "continue_decoding ignored", filter_->continueDecoding());
+}
+
+// After a ``StopAllIterationAndBuffer`` from the headers hook, the filter manager replays the
+// buffered body into the filter from inside continueDecoding(). A body hook that stops again keeps
+// its stop, so the module's next continue still resumes the request.
+TEST_F(DynamicModuleHttpFilterContinueTest, ReplayedRequestBodyThatStopsKeepsItsStop) {
+  Buffer::OwnedImpl body("body");
+  EXPECT_CALL(decoder_callbacks_, continueDecoding())
+      .WillOnce([&]() {
+        EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(body, true));
+      })
+      .WillOnce(testing::Return());
+
+  test_request_headers_status =
+      envoy_dynamic_module_type_on_http_filter_request_headers_status_StopAllIterationAndBuffer;
+  EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers_, false));
+
+  test_request_body_status =
+      envoy_dynamic_module_type_on_http_filter_request_body_status_StopIterationAndBuffer;
+  filter_->continueDecoding();
+  filter_->continueDecoding();
+}
+
+// The same for the response.
+TEST_F(DynamicModuleHttpFilterContinueTest, ReplayedResponseBodyThatStopsKeepsItsStop) {
+  Buffer::OwnedImpl body("body");
+  EXPECT_CALL(encoder_callbacks_, continueEncoding())
+      .WillOnce([&]() {
+        EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(body, true));
+      })
+      .WillOnce(testing::Return());
+
+  test_response_headers_status =
+      envoy_dynamic_module_type_on_http_filter_response_headers_status_StopAllIterationAndBuffer;
+  EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->encodeHeaders(response_headers_, false));
+
+  test_response_body_status =
+      envoy_dynamic_module_type_on_http_filter_response_body_status_StopIterationAndBuffer;
+  filter_->continueEncoding();
+  filter_->continueEncoding();
+}
+
+// The filter manager keeps iterating after ``ContinueAndDontEndStream``, so a later continue from
+// the module would be a repeat continue.
+TEST_F(DynamicModuleHttpFilterContinueTest, ContinueAndDontEndStreamCountsAsContinued) {
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(0);
+
+  test_request_headers_status =
+      envoy_dynamic_module_type_on_http_filter_request_headers_status_ContinueAndDontEndStream;
+  EXPECT_EQ(FilterHeadersStatus::ContinueAndDontEndStream,
+            filter_->decodeHeaders(request_headers_, true));
+  test_response_headers_status =
+      envoy_dynamic_module_type_on_http_filter_response_headers_status_ContinueAndDontEndStream;
+  EXPECT_EQ(FilterHeadersStatus::ContinueAndDontEndStream,
+            filter_->encodeHeaders(response_headers_, true));
+
+  filter_->continueDecoding();
+  filter_->continueEncoding();
+}
+
+// A metadata frame passes a filter that stopped on headers without resuming it, so the module's
+// later continue must still reach the filter manager.
+TEST_F(DynamicModuleHttpFilterContinueTest, MetadataDoesNotClearAStop) {
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(encoder_callbacks_, continueEncoding());
+
+  MetadataMap metadata;
+  test_request_headers_status =
+      envoy_dynamic_module_type_on_http_filter_request_headers_status_StopIteration;
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata));
+  test_response_headers_status =
+      envoy_dynamic_module_type_on_http_filter_response_headers_status_StopIteration;
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata));
+
+  filter_->continueDecoding();
+  filter_->continueEncoding();
+}
+
+// A body hook that returns Continue resumes a filter that stopped on headers, so the filter manager
+// is iterating again and a later continue from the module would be a repeat continue.
+TEST_F(DynamicModuleHttpFilterContinueTest, RequestBodyContinueAfterAStopIsAContinue) {
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  test_request_headers_status =
+      envoy_dynamic_module_type_on_http_filter_request_headers_status_StopIteration;
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  Buffer::OwnedImpl body("body");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(body, true));
+  filter_->continueDecoding();
+}
+
+// The same for the response.
+TEST_F(DynamicModuleHttpFilterContinueTest, ResponseBodyContinueAfterAStopIsAContinue) {
+  EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(0);
+  test_response_headers_status =
+      envoy_dynamic_module_type_on_http_filter_response_headers_status_StopIteration;
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  Buffer::OwnedImpl body("body");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(body, true));
+  filter_->continueEncoding();
+}
+
+// A trailers hook that stops holds the request, so the module's continue must reach the filter
+// manager.
+TEST_F(DynamicModuleHttpFilterContinueTest, RequestTrailersStopIsAStop) {
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  test_request_trailers_status =
+      envoy_dynamic_module_type_on_http_filter_request_trailers_status_StopIteration;
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+  filter_->continueDecoding();
+}
+
+// A trailers hook that returns Continue resumes a filter that stopped on headers, so a later
+// continue from the module would be a repeat continue.
+TEST_F(DynamicModuleHttpFilterContinueTest, RequestTrailersContinueAfterAStopIsAContinue) {
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  test_request_headers_status =
+      envoy_dynamic_module_type_on_http_filter_request_headers_status_StopIteration;
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  filter_->continueDecoding();
+}
+
+// The same two cases for the response trailers.
+TEST_F(DynamicModuleHttpFilterContinueTest, ResponseTrailersStopIsAStop) {
+  EXPECT_CALL(encoder_callbacks_, continueEncoding());
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  test_response_trailers_status =
+      envoy_dynamic_module_type_on_http_filter_response_trailers_status_StopIteration;
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
+  filter_->continueEncoding();
+}
+
+TEST_F(DynamicModuleHttpFilterContinueTest, ResponseTrailersContinueAfterAStopIsAContinue) {
+  EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(0);
+  test_response_headers_status =
+      envoy_dynamic_module_type_on_http_filter_response_headers_status_StopIteration;
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->continueEncoding();
+}
+
+// The module's own continue marks its direction continued, so a second continue before the next
+// stop is ignored rather than repeated.
+TEST_F(DynamicModuleHttpFilterContinueTest, SecondContinueAfterAStopIsIgnored) {
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(encoder_callbacks_, continueEncoding());
+  test_request_headers_status =
+      envoy_dynamic_module_type_on_http_filter_request_headers_status_StopIteration;
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  test_response_headers_status =
+      envoy_dynamic_module_type_on_http_filter_response_headers_status_StopIteration;
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  filter_->continueDecoding();
+  filter_->continueDecoding();
+  filter_->continueEncoding();
+  filter_->continueEncoding();
+}
+
+// After the module sends its own response, the response body and trailers return Continue without
+// calling the module. That resumes a filter that stopped on its response headers, so a later
+// continue from the module would be a repeat continue.
+TEST_F(DynamicModuleHttpFilterContinueTest, ResponseDataAfterALocalResponseIsAContinue) {
+  EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(0);
+  test_response_headers_status =
+      envoy_dynamic_module_type_on_http_filter_response_headers_status_StopIteration;
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  filter_->sendResponseHeaders(Http::ResponseHeaderMapImpl::create(), false);
+  Buffer::OwnedImpl body("body");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(body, false));
+  filter_->continueEncoding();
+}
+
+TEST_F(DynamicModuleHttpFilterContinueTest, ResponseTrailersAfterALocalResponseIsAContinue) {
+  EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(0);
+  test_response_headers_status =
+      envoy_dynamic_module_type_on_http_filter_response_headers_status_StopIteration;
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  filter_->sendResponseHeaders(Http::ResponseHeaderMapImpl::create(), false);
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->continueEncoding();
 }
 
 } // namespace HttpFilters

@@ -183,6 +183,9 @@ public:
   Extensions::DynamicModules::MetricRegistry& metrics() { return metrics_; }
   const Extensions::DynamicModules::MetricRegistry& metrics() const { return metrics_; }
 
+  // The name of the filter passed in the constructor.
+  const std::string& filterName() const { return filter_name_; }
+
   /**
    * Subscribes to a generic secret so that the module can read its value by the returned ID.
    *
