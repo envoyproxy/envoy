@@ -32,7 +32,8 @@ pub enum ConfigSnapshotProvider<'a> {
   Bootstrap,
   /// Cluster configurations.
   Clusters,
-  /// Endpoint assignments for active clusters.
+  /// Endpoint assignments for active clusters. The name filter and each assignment's
+  /// `cluster_name` use the EDS service name, or the cluster name when none is set.
   Endpoints,
   /// Listener configurations.
   Listeners,

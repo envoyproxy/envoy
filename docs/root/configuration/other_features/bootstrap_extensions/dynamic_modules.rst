@@ -233,6 +233,9 @@ Selecting ``endpoint`` includes endpoint assignments for active clusters, as wit
 for providers that support it. A missing or empty expression disables filtering. For endpoints,
 the filter matches the EDS service name, or the cluster name if no service name is set.
 
+Cluster lifecycle hooks do not fire when only a cluster's hosts or their health change, so a
+snapshot shows endpoint changes only when the module collects again.
+
 Collection and sensitive-field redaction run synchronously on the main thread after server
 initialization and before shutdown begins. Their cost grows with the selected resources. Combine
 frequent notifications into one collection.

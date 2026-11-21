@@ -10610,6 +10610,8 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
  * Collects and redacts selected providers synchronously on the main thread. Missing providers are
  * omitted, duplicates are collected once, and results are sorted by provider key. An empty
  * selection collects nothing. Selecting "endpoint" includes active cluster endpoint assignments.
+ * The endpoint name filter and each assignment's cluster_name use the EDS service name, or the
+ * cluster name when no service name is set.
  * Cost grows with the selected resources, so combine frequent notifications into one collection.
  *
  * Collection is refused in cluster or listener lifecycle hooks, whatever triggered them, and in
