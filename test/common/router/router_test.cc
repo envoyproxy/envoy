@@ -1420,7 +1420,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
   expectResponseTimerCreate();
 
@@ -1455,7 +1455,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -1602,7 +1602,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
   expectResponseTimerCreate();
 
@@ -1627,7 +1627,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -1692,7 +1692,7 @@ TEST_F(RouterTest, NoRetriesOverflow) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
   expectResponseTimerCreate();
 
@@ -1716,7 +1716,7 @@ TEST_F(RouterTest, NoRetriesOverflow) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -1764,7 +1764,7 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   HttpTestUtility::addDefaultHeaders(headers);
   // First connection is successful and reset happens later on.
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _))
@@ -2049,7 +2049,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
   Http::ResponseDecoder* response_decoder1 = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder1, Http::Protocol::Http10);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -2091,7 +2091,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
   Http::ResponseDecoder* response_decoder2 = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder2, Http::Protocol::Http10);
 
   expectPerTryTimerCreate();
@@ -2138,7 +2138,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringGlobalTimeout) {
   Http::ResponseDecoder* response_decoder1 = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder1, Http::Protocol::Http10);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -2180,7 +2180,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringGlobalTimeout) {
   Http::ResponseDecoder* response_decoder2 = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder2, Http::Protocol::Http10);
   expectPerTryTimerCreate();
   router_->retry_state_->callback_();
@@ -2748,7 +2748,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
         return nullptr;
       });
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
@@ -2823,7 +2823,7 @@ TEST_F(RouterTest, RetryUpstream5xxRefreshesClusterOnRetry) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   expectResponseTimerCreate();
@@ -2850,7 +2850,7 @@ TEST_F(RouterTest, RetryUpstream5xxRefreshesClusterOnRetry) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   router_->retry_state_->callback_();
@@ -2887,7 +2887,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
         return nullptr;
       });
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
@@ -2977,7 +2977,7 @@ TEST_F(RouterTest, HedgedRetryDoesNotRefreshClusterOnRetry) {
         return nullptr;
       });
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
@@ -3082,7 +3082,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
       new Http::TestResponseHeaderMapImpl{{":status", "500"}});
   // Local origin connect success happens for first and third try.
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)))
       .Times(2);
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
@@ -3184,7 +3184,7 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
         return nullptr;
       });
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
@@ -3256,7 +3256,7 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
         return nullptr;
       });
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
@@ -3912,7 +3912,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
         return nullptr;
       });
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
@@ -3986,7 +3986,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
         return nullptr;
       });
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)));
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -4018,7 +4018,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
         return nullptr;
       });
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)));
   expectPerTryTimerCreate();
   router_->retry_state_->callback_();
@@ -4082,7 +4082,7 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
@@ -4325,7 +4325,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
         EXPECT_TRUE(options.can_use_http3_);
         response_decoder = &decoder;
         EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-                    putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+                    putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                               std::optional<uint64_t>(std::nullopt)));
         callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
                               upstream_stream_info_, Http::Protocol::Http10);
@@ -4398,7 +4398,7 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
         EXPECT_FALSE(options.can_use_http3_);
         response_decoder = &decoder;
         EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-                    putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+                    putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                               std::optional<uint64_t>(std::nullopt)));
         callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
                               upstream_stream_info_, Http::Protocol::Http10);
@@ -4527,7 +4527,7 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
                     -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-                    putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+                    putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                               std::optional<uint64_t>(std::nullopt)));
         callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
                               upstream_stream_info_, Http::Protocol::Http10);
@@ -4738,7 +4738,7 @@ TEST_F(RouterTest, RetryUpstream5xx) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   expectResponseTimerCreate();
@@ -4763,7 +4763,7 @@ TEST_F(RouterTest, RetryUpstream5xx) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   router_->retry_state_->callback_();
@@ -4801,7 +4801,7 @@ TEST_F(RouterTest, RetryUpstreamExponentialBackoff) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   expectResponseTimerCreate();
@@ -4823,7 +4823,7 @@ TEST_F(RouterTest, RetryUpstreamExponentialBackoff) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
   EXPECT_CALL(*router_->retry_state_, doRetryType())
       .WillOnce(Return(RetryState::DoRetryType::Exponential));
@@ -4852,7 +4852,7 @@ TEST_F(RouterTest, RetryUpstreamRateLimitedBackoff) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   expectResponseTimerCreate();
@@ -4875,7 +4875,7 @@ TEST_F(RouterTest, RetryUpstreamRateLimitedBackoff) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
   EXPECT_CALL(*router_->retry_state_, doRetryType())
       .WillOnce(Return(RetryState::DoRetryType::Ratelimited));
@@ -5145,7 +5145,7 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
   expectResponseTimerCreate();
 
@@ -5180,7 +5180,7 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
@@ -5240,7 +5240,7 @@ TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
   expectResponseTimerCreate();
 
@@ -5272,7 +5272,7 @@ TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
@@ -5297,7 +5297,7 @@ TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
   NiceMock<Http::MockRequestEncoder> encoder3;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder3, &response_decoder, Http::Protocol::Http10);
 
   EXPECT_CALL(encoder3, encodeHeaders(_, false));
@@ -5354,7 +5354,7 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
@@ -5382,7 +5382,7 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
@@ -5410,7 +5410,7 @@ TEST_F(RouterTest, RetryRespectsMaxHostSelectionCount) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   expectResponseTimerCreate();
@@ -5447,7 +5447,7 @@ TEST_F(RouterTest, RetryRespectsMaxHostSelectionCount) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
@@ -5483,7 +5483,7 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   expectResponseTimerCreate();
@@ -5520,7 +5520,7 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
@@ -8434,7 +8434,7 @@ TEST_F(RouterTest, ExpectedUpstreamTimeoutUpdatedDuringRetries) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   expectResponseTimerCreate();
@@ -8475,7 +8475,7 @@ TEST_F(RouterTest, ExpectedUpstreamTimeoutUpdatedDuringRetries) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   router_->retry_state_->callback_();
@@ -9033,7 +9033,7 @@ TEST_F(RouterTest, RemoteResetNoErrorAfterResponseStarted) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)));
   router_->decodeHeaders(headers, false);
 
@@ -9068,7 +9068,7 @@ TEST_F(RouterTest, RemoteResetNoErrorBeforeResponseStarted) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)));
   router_->decodeHeaders(headers, true);
 
@@ -9113,7 +9113,7 @@ TEST_F(RouterTest, ProdFilterDelegatesToRetryPolicyCreateRetryState) {
   EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_));
   EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+              putResult(Upstream::Outlier::Result::LocalOriginStreamReady,
                         std::optional<uint64_t>(std::nullopt)));
 
   Http::TestRequestHeaderMapImpl headers;

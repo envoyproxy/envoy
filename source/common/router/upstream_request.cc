@@ -666,7 +666,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
 
-  host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
+  host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginStreamReady);
 
   if (protocol) {
     stream_info_.protocol(protocol.value());
