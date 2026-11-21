@@ -221,6 +221,7 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
                             {/*can_send_early_data_=*/false,
                              /*can_use_http3_=*/true}),
             nullptr);
+  EXPECT_EQ(callbacks.host_, host_);
 }
 
 void Http3ConnPoolImplTest::createNewStream() {
