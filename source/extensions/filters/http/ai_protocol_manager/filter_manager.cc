@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
 
+#include <algorithm>
 #include <utility>
 #include <vector>
 
@@ -50,6 +51,27 @@ void FilterManager::startUnaryResponse(ExternalBufferFactory& buffer_factory,
   response_manager_ =
       std::make_unique<ResponseFilterManager>(std::move(reversed), buffer_factory, bridge,
                                               out_buffer_manager, std::move(on_complete), config);
+  response_manager_->start();
+}
+
+ResponseMode FilterManager::onResponseHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
+  ResponseMode mode = ResponseMode::Parsed;
+  for (auto filter = filters_.rbegin(); filter != filters_.rend(); ++filter) {
+    mode = std::max(mode, (*filter)->onResponseHeaders(headers, end_stream));
+  }
+  return mode;
+}
+
+void FilterManager::startRawResponse(ExternalBufferFactory& buffer_factory,
+                                     FilterChainBridge& bridge, BufferManager& out_buffer_manager,
+                                     OnCompleteFn on_complete, LocalReplyFn local_reply_fn) {
+  ASSERT(response_manager_ == nullptr);
+  std::vector<AiFilterSharedPtr> reversed(filters_.rbegin(), filters_.rend());
+  ResponseFilterManager::Config config;
+  config.mode = ResponseFilterManager::Mode::Raw;
+  response_manager_ = std::make_unique<ResponseFilterManager>(
+      std::move(reversed), buffer_factory, bridge, out_buffer_manager, std::move(on_complete),
+      config, std::move(local_reply_fn));
   response_manager_->start();
 }
 

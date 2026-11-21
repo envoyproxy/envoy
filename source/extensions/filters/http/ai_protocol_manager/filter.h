@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
 #include "envoy/router/router.h"
@@ -23,8 +24,10 @@
 #include "source/extensions/filters/http/ai_protocol_manager/stats.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,10 +42,13 @@ using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
 
 class FilterConfig {
 public:
+  // `min_inline_string_threshold_bytes` is what the AI filters need inline, and raises the
+  // configured threshold.
   FilterConfig(
       const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
       Stats::Scope& scope, AiFilterFactories ai_filter_factories,
-      ExternalBufferFactorySharedPtr buffer_factory);
+      ExternalBufferFactorySharedPtr buffer_factory,
+      uint32_t min_inline_string_threshold_bytes = 0);
 
   static absl::StatusOr<FilterConfigSharedPtr>
   create(const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
@@ -51,6 +57,12 @@ public:
 
   bool requestHandlingEnabled() const { return request_handling_enabled_; }
   const AiFilterFactories& aiFilterFactories() const { return ai_filter_factories_; }
+  // The name the configuration gives the AI filter aiFilterFactories()[index] creates; empty
+  // when it names none.
+  absl::string_view aiFilterName(size_t index) const {
+    return index < ai_filter_names_.size() ? absl::string_view(ai_filter_names_[index])
+                                           : absl::string_view();
+  }
   bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
   bool alwaysSerializeRequest() const { return always_serialize_request_; }
   uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }
@@ -82,8 +94,14 @@ private:
   const uint32_t max_json_body_size_ = 0;
   const uint32_t max_parsed_sse_events_ = 0;
   const AiFilterFactories ai_filter_factories_;
+  const std::vector<std::string> ai_filter_names_;
   const ExternalBufferFactorySharedPtr buffer_factory_;
 };
+
+// A route's AI filter configurations, keyed by AI filter name.
+using AiFilterRouteConfigs =
+    absl::flat_hash_map<std::string, Router::RouteSpecificFilterConfigConstSharedPtr>;
+using AiFilterRouteConfigsConstSharedPtr = std::shared_ptr<const AiFilterRouteConfigs>;
 
 // Per-route configuration. Its presence declares the route an AI endpoint.
 // The request and response wire APIs are declared separately (protocol
@@ -91,8 +109,10 @@ private:
 // route left it undeclared.
 class RouteConfig : public Router::RouteSpecificFilterConfig {
 public:
-  // Fails on a binding that does not parse, or one on a side that names no API.
-  static absl::StatusOr<std::unique_ptr<RouteConfig>> create(const PerRouteProto& proto);
+  // Fails on a binding that does not parse, or one on a side that names no API. `filter_configs`
+  // are the AI filter configurations built from proto.typed_per_filter_config.
+  static absl::StatusOr<std::unique_ptr<RouteConfig>>
+  create(const PerRouteProto& proto, AiFilterRouteConfigsConstSharedPtr filter_configs = nullptr);
 
   // Whether the route hands its request payload to the filter to hold and
   // validate.
@@ -103,6 +123,8 @@ public:
   // when the route names none.
   const LlmBindingConstSharedPtr& requestBinding() const { return request_binding_; }
   const LlmBindingConstSharedPtr& responseBinding() const { return response_binding_; }
+  // The route's AI filter configurations; null when it has none.
+  const AiFilterRouteConfigsConstSharedPtr& filterConfigs() const { return filter_configs_; }
 
   // The wire API for response extraction on this route: the declared response
   // API, falling back to the declared request API.
@@ -112,18 +134,21 @@ public:
 
 private:
   RouteConfig(const PerRouteProto& proto, LlmBindingConstSharedPtr&& request_binding,
-              LlmBindingConstSharedPtr&& response_binding)
+              LlmBindingConstSharedPtr&& response_binding,
+              AiFilterRouteConfigsConstSharedPtr&& filter_configs)
       : has_request_(proto.has_request()),
         request_protocol_(protocolFromProto(proto.request().llm_protocol())),
         response_protocol_(protocolFromProto(proto.response().llm_protocol())),
         request_binding_(std::move(request_binding)),
-        response_binding_(std::move(response_binding)) {}
+        response_binding_(std::move(response_binding)), filter_configs_(std::move(filter_configs)) {
+  }
 
   const bool has_request_ = false;
   const LLMProtocol request_protocol_ = LLMProtocol::Unspecified;
   const LLMProtocol response_protocol_ = LLMProtocol::Unspecified;
   const LlmBindingConstSharedPtr request_binding_;
   const LlmBindingConstSharedPtr response_binding_;
+  const AiFilterRouteConfigsConstSharedPtr filter_configs_;
 };
 
 // AI Protocol Manager HTTP filter (alpha).
@@ -213,8 +238,16 @@ private:
   // it; a best-effort parse that fails abandons parsing and returns true.
   bool feedParser(const Buffer::Instance& data, bool end_stream);
 
-  // Terminates the stream with a 400 for a payload that failed to parse.
+  // Terminates the stream for a payload that failed to parse: with an AI filter's answer, else a
+  // 400.
   void rejectInvalidPayload(const absl::Status& status);
+
+  // Creates the stream's AI filters.
+  std::vector<AiFilterSharedPtr> createAiFilters();
+
+  // Offers a declared endpoint's request that has no document to the AI filters. Returns whether
+  // one answered it.
+  bool answerUnparsedRequest(UnparsedRequest reason);
 
   // Whether the request payload was handed to the filter -- by the route's
   // declaration or by filter state naming the client's API -- which is also
@@ -234,7 +267,13 @@ private:
   // Sets endStream on decode_manager_ and executes the AI filter chain or replays the body.
   void finalizeDecode(bool has_trailers);
 
-  // Invoked when the SSE response filter pipeline completes or fails.
+  // Creates the encode path's bridge and buffer manager.
+  void createEncodeManager();
+
+  // Hands the response body to the AI filters as bytes.
+  Http::FilterHeadersStatus startRawResponse(bool hold_headers, bool end_stream);
+
+  // Invoked when the response filter pipeline completes or fails.
   void onEncodeComplete(absl::Status status);
 
   FilterConfigSharedPtr config_;
@@ -259,6 +298,7 @@ private:
   LLMProtocol route_response_protocol_{LLMProtocol::Unspecified};
   LlmBindingConstSharedPtr route_request_binding_;
   LlmBindingConstSharedPtr route_response_binding_;
+  AiFilterRouteConfigsConstSharedPtr route_filter_configs_;
 
   JsonWithExtBuf request_json_;
   // Cleared once parsing is done with, whether it completed, was abandoned, or

@@ -126,9 +126,9 @@ TEST_F(SyncAiFilterTest, LocalReply) {
         completed = true;
       },
       /*request_headers=*/nullptr,
-      [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
-        local_reply_code = code;
-        local_reply_details = std::move(details);
+      [&local_reply_code, &local_reply_details](HttpFilters::AiProtocolManager::LocalReply reply) {
+        local_reply_code = reply.code;
+        local_reply_details = std::move(reply.body);
       });
 
   drain();
@@ -166,9 +166,9 @@ TEST_F(SyncAiFilterTest, ErrorStatusTriggersLocalReply) {
         completed = true;
       },
       /*request_headers=*/nullptr,
-      [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
-        local_reply_code = code;
-        local_reply_details = std::move(details);
+      [&local_reply_code, &local_reply_details](HttpFilters::AiProtocolManager::LocalReply reply) {
+        local_reply_code = reply.code;
+        local_reply_details = std::move(reply.body);
       });
 
   drain();

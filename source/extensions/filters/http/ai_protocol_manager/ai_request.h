@@ -43,12 +43,18 @@ public:
   LLMProtocol protocol() const { return protocol_; }
   void setProtocol(LLMProtocol protocol) { protocol_ = protocol; }
 
+  // Whether the request leaves with a body. A filter that maps it onto a request without one
+  // drops the body, and the document with it.
+  bool hasBody() const { return has_body_; }
+  void dropBody() { has_body_ = false; }
+
   // TODO(penguingao): Implement field streaming (AiRequest::stream, FieldStreamingSpec,
   // and FieldStreamingSession).
 
 private:
   JsonWithExtBuf request_index_;
   LLMProtocol protocol_;
+  bool has_body_{true};
 };
 
 using AiRequestPtr = std::unique_ptr<AiRequest>;

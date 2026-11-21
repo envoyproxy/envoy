@@ -13,6 +13,7 @@
 #include "source/common/coroutine/leaf_awaitable.h"
 #include "source/common/coroutine/status_macros.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_pipeline.h"
+#include "source/extensions/filters/http/ai_protocol_manager/replay_awaitable.h"
 #include "source/extensions/filters/http/ai_protocol_manager/task_group.h"
 
 #include "absl/status/statusor.h"
@@ -135,6 +136,7 @@ public:
     }
     auto self = weak_from_this().lock();
     on_complete_ = nullptr;
+    local_reply_fn_ = nullptr;
     cancelHandles();
     cleanupInput();
     pipeline_.closeAndDrain();
@@ -149,6 +151,21 @@ public:
   }
 
   void closeNextStage(size_t index) { pipeline_.stage(index + 1)->close(); }
+
+  // Ends the pipeline with a filter's local reply in place of the response.
+  void replyLocally(LocalReply reply) {
+    if (terminated()) {
+      return;
+    }
+    auto self = shared_from_this();
+    LocalReplyFn reply_fn = std::move(local_reply_fn_);
+    cancel();
+    if (reply_fn != nullptr) {
+      reply_fn(std::move(reply));
+    }
+  }
+
+  void setLocalReplyFn(LocalReplyFn local_reply_fn) { local_reply_fn_ = std::move(local_reply_fn); }
 
 protected:
   using std::enable_shared_from_this<ResponseAsyncState<Item>>::shared_from_this;
@@ -165,8 +182,8 @@ protected:
   // Returns the estimated byte size of `item` for watermark accounting when buffered in
   // pending_items_.
   virtual uint64_t itemSize(const Item& item) const = 0;
-  // Decodes `data`, appending completed items to `out`.
-  virtual absl::Status decode(const Buffer::Instance& data, std::vector<Item>& out) = 0;
+  // Decodes `data`, appending completed items to `out`. Whatever it leaves in `data` is dropped.
+  virtual absl::Status decode(Buffer::Instance& data, std::vector<Item>& out) = 0;
   // Finishes decoding at end of stream, appending any trailing item to `out`.
   virtual absl::Status finishDecode(std::vector<Item>& out) = 0;
   // Writes one item back out through the buffer manager.
@@ -304,6 +321,7 @@ private:
   }
 
   ResponseFilterManager::OnCompleteFn on_complete_;
+  LocalReplyFn local_reply_fn_;
   std::deque<PendingItem> pending_items_;
   Coroutine::AsyncQueue<bool> stages_done_{/*max_size=*/1};
   size_t remaining_stages_{0};
@@ -332,7 +350,7 @@ protected:
     return item != nullptr ? item->byteSize() : 0;
   }
 
-  absl::Status decode(const Buffer::Instance& data, std::vector<SseEventPtr>& out) override {
+  absl::Status decode(Buffer::Instance& data, std::vector<SseEventPtr>& out) override {
     return decoder_.onData(data, out);
   }
 
@@ -410,7 +428,7 @@ protected:
     return total;
   }
 
-  absl::Status decode(const Buffer::Instance& data,
+  absl::Status decode(Buffer::Instance& data,
                       std::vector<std::vector<FlattenJsonField>>& out) override {
     absl::StatusOr<std::vector<FlattenJsonField>> fields =
         decoder_.onData(data, /*end_stream=*/false);
@@ -492,20 +510,98 @@ private:
   FlatteningJsonSerializer serializer_;
 };
 
+// Raw response pipeline implementation (`Item = Buffer::InstancePtr`).
+//
+// The body is handed to `AiFilter::encodeRaw()` chunk by chunk as it arrives, and what the
+// filters propagate is written out unchanged.
+class RawAsyncState : public ResponseAsyncState<Buffer::InstancePtr> {
+public:
+  using ResponseAsyncState::ResponseAsyncState;
+
+  ~RawAsyncState() override { cancel(); }
+
+protected:
+  uint64_t itemSize(const Buffer::InstancePtr& item) const override { return item->length(); }
+
+  absl::Status decode(Buffer::Instance& data, std::vector<Buffer::InstancePtr>& out) override {
+    auto chunk = std::make_unique<Buffer::OwnedImpl>();
+    chunk->move(data);
+    out.push_back(std::move(chunk));
+    return absl::OkStatus();
+  }
+
+  absl::Status finishDecode(std::vector<Buffer::InstancePtr>&) override { return absl::OkStatus(); }
+
+  Coroutine::Task<absl::Status> serializeItem(Buffer::InstancePtr item) override {
+    co_return co_await ReplayAwaitable(out_buffer_manager_, *item);
+  }
+
+  Coroutine::Task<absl::Status> finishSerialize() override { co_return absl::OkStatus(); }
+
+  static Coroutine::Task<absl::StatusOr<std::optional<Buffer::InstancePtr>>>
+  receiveRawTask(std::weak_ptr<ResponseAsyncState<Buffer::InstancePtr>> weak, size_t index) {
+    auto self = weak.lock();
+    if (self == nullptr || self->terminated()) {
+      co_return absl::CancelledError("response pipeline cancelled or destroyed");
+    }
+    co_return co_await self->receive(index);
+  }
+
+  static Coroutine::Task<absl::Status>
+  propagateRawTask(std::weak_ptr<ResponseAsyncState<Buffer::InstancePtr>> weak, size_t index,
+                   Buffer::InstancePtr chunk) {
+    auto self = weak.lock();
+    if (self == nullptr || self->terminated()) {
+      co_return absl::CancelledError("response pipeline cancelled or destroyed");
+    }
+    if (chunk == nullptr) {
+      IS_ENVOY_BUG("cannot propagate a null Buffer::InstancePtr");
+      co_return absl::InvalidArgumentError("cannot propagate a null Buffer::InstancePtr");
+    }
+    co_return co_await self->propagate(index, std::move(chunk));
+  }
+
+  Coroutine::Task<absl::Status> runFilter(size_t index) override {
+    std::weak_ptr<ResponseAsyncState<Buffer::InstancePtr>> weak = weak_from_this();
+    RawResponseReceiver receiver([weak, index]() { return receiveRawTask(weak, index); });
+    RawResponsePropagator propagator([weak, index](Buffer::InstancePtr chunk) {
+      return propagateRawTask(weak, index, std::move(chunk));
+    });
+    LocalReplier replier([weak](LocalReply reply) {
+      if (auto self = weak.lock()) {
+        self->replyLocally(std::move(reply));
+      }
+    });
+    co_return co_await filters_[index]->encodeRaw(std::move(receiver), std::move(propagator),
+                                                  std::move(replier));
+  }
+};
+
 } // namespace
 
 ResponseFilterManager::ResponseFilterManager(std::vector<AiFilterSharedPtr> filters,
                                              ExternalBufferFactory& buffer_factory,
                                              FilterChainBridge& bridge,
                                              BufferManager& out_buffer_manager,
-                                             OnCompleteFn on_complete, Config config) {
-  if (config.mode == Mode::Unary) {
-    async_state_ = std::make_shared<UnaryAsyncState>(std::move(filters), bridge, out_buffer_manager,
-                                                     std::move(on_complete));
-  } else {
+                                             OnCompleteFn on_complete, Config config,
+                                             LocalReplyFn local_reply_fn) {
+  switch (config.mode) {
+  case Mode::Sse:
     async_state_ =
         std::make_shared<SseAsyncState>(std::move(filters), buffer_factory, bridge,
                                         out_buffer_manager, std::move(on_complete), config.sse);
+    break;
+  case Mode::Unary:
+    async_state_ = std::make_shared<UnaryAsyncState>(std::move(filters), bridge, out_buffer_manager,
+                                                     std::move(on_complete));
+    break;
+  case Mode::Raw: {
+    auto state = std::make_shared<RawAsyncState>(std::move(filters), bridge, out_buffer_manager,
+                                                 std::move(on_complete));
+    state->setLocalReplyFn(std::move(local_reply_fn));
+    async_state_ = std::move(state);
+    break;
+  }
   }
 }
 

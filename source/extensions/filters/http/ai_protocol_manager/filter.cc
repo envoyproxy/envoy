@@ -1,6 +1,8 @@
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
 
+#include <algorithm>
 #include <memory>
+#include <optional>
 
 #include "envoy/common/exception.h"
 #include "envoy/data/ai/v3/token_usage.pb.h"
@@ -41,6 +43,10 @@ constexpr uint32_t DefaultMaxJsonBodySize = 4 * 1024 * 1024;
 // Far above ordinary streams (hundreds to low thousands of events) while
 // bounding the parse work a lifetime event flood can extract; see the proto.
 constexpr uint32_t DefaultMaxParsedSseEvents = 65536;
+// The largest threshold RequestParsingLimits accepts, which also bounds what an AI filter can
+// ask to have inline.
+constexpr uint32_t MaxInlineStringThresholdBytes = 1024 * 1024;
+constexpr absl::string_view FilterRejectedDetails{"ai_protocol_manager_filter_rejected"};
 
 // HTTP Content-Type is case-insensitive and may carry parameters
 // (`application/json; charset=utf-8`).
@@ -144,6 +150,26 @@ envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degrade
   return typed;
 }
 
+// Sends the local reply an AI filter answers the stream with, through the decoder or the encoder
+// filter callbacks.
+template <class StreamFilterCallbacks>
+void sendFilterLocalReply(StreamFilterCallbacks& callbacks, LocalReply reply) {
+  callbacks.sendLocalReply(
+      reply.code, reply.body, std::move(reply.modify_headers), reply.grpc_status,
+      reply.details.empty() ? FilterRejectedDetails : absl::string_view(reply.details));
+}
+
+// The names `proto` gives its AI filters, in order.
+std::vector<std::string> aiFilterNames(
+    const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto) {
+  std::vector<std::string> names;
+  names.reserve(proto.filters_size());
+  for (const auto& entry : proto.filters()) {
+    names.push_back(entry.name());
+  }
+  return names;
+}
+
 // The bindings some filter of `filters` applies.
 BindingUse bindingsApplied(const std::vector<AiFilterSharedPtr>& filters) {
   BindingUse applied;
@@ -175,7 +201,8 @@ absl::StatusOr<LlmBindingConstSharedPtr> routeBinding(absl::string_view side,
 
 } // namespace
 
-absl::StatusOr<std::unique_ptr<RouteConfig>> RouteConfig::create(const PerRouteProto& proto) {
+absl::StatusOr<std::unique_ptr<RouteConfig>>
+RouteConfig::create(const PerRouteProto& proto, AiFilterRouteConfigsConstSharedPtr filter_configs) {
   absl::StatusOr<LlmBindingConstSharedPtr> request_binding =
       routeBinding("request", proto.request());
   if (!request_binding.ok()) {
@@ -186,14 +213,14 @@ absl::StatusOr<std::unique_ptr<RouteConfig>> RouteConfig::create(const PerRouteP
   if (!response_binding.ok()) {
     return response_binding.status();
   }
-  return std::unique_ptr<RouteConfig>(
-      new RouteConfig(proto, *std::move(request_binding), *std::move(response_binding)));
+  return std::unique_ptr<RouteConfig>(new RouteConfig(
+      proto, *std::move(request_binding), *std::move(response_binding), std::move(filter_configs)));
 }
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
     Stats::Scope& scope, AiFilterFactories ai_filter_factories,
-    ExternalBufferFactorySharedPtr buffer_factory)
+    ExternalBufferFactorySharedPtr buffer_factory, uint32_t min_inline_string_threshold_bytes)
     : stats_(AiProtocolManagerStats{
           ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "ai_protocol_manager."))}),
       request_handling_enabled_(proto.has_request_handling()),
@@ -201,9 +228,11 @@ FilterConfig::FilterConfig(
       always_serialize_request_(
           proto.request_handling().reserialize_body() ==
           envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS),
-      inline_string_threshold_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          proto.request_handling().limits(), inline_string_threshold_bytes,
-          JsonWithExtBufParser::kDefaultInlineStringThresholdBytes)),
+      inline_string_threshold_bytes_(std::max(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto.request_handling().limits(),
+                                          inline_string_threshold_bytes,
+                                          JsonWithExtBufParser::kDefaultInlineStringThresholdBytes),
+          std::min(min_inline_string_threshold_bytes, MaxInlineStringThresholdBytes))),
       token_usage_enabled_(proto.response_handling().has_token_usage()),
       include_unconfigured_routes_(
           proto.response_handling().token_usage().include_unconfigured_routes()),
@@ -224,7 +253,7 @@ FilterConfig::FilterConfig(
       max_parsed_sse_events_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto.response_handling().token_usage().limits(),
                                           max_parsed_sse_events, DefaultMaxParsedSseEvents)),
-      ai_filter_factories_(std::move(ai_filter_factories)),
+      ai_filter_factories_(std::move(ai_filter_factories)), ai_filter_names_(aiFilterNames(proto)),
       buffer_factory_(std::move(buffer_factory)) {
   ASSERT(buffer_factory_ != nullptr);
 }
@@ -237,6 +266,7 @@ absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
     return absl::InvalidArgumentError("ai_protocol_manager: filters require request_handling");
   }
   AiFilterFactories factories;
+  uint32_t min_inline_string_threshold_bytes = 0;
   for (const auto& entry : proto.filters()) {
     auto* factory =
         Config::Utility::getAndCheckFactory<AiFilterConfigFactory>(entry, /*is_optional=*/true);
@@ -251,9 +281,12 @@ absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
     absl::StatusOr<AiFilterFactoryCb> cb = factory->createAiFilterFactory(*config, context, scope);
     RETURN_IF_NOT_OK_REF(cb.status());
     factories.push_back(std::move(cb.value()));
+    min_inline_string_threshold_bytes = std::max(
+        min_inline_string_threshold_bytes, factory->requestInlineStringBytes(*config).value_or(0));
   }
   return std::make_shared<const FilterConfig>(proto, scope, std::move(factories),
-                                              std::move(buffer_factory));
+                                              std::move(buffer_factory),
+                                              min_inline_string_threshold_bytes);
 }
 
 void AiProtocolManagerFilter::onDestroy() {
@@ -285,13 +318,6 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // A headers-only request carries no payload to inspect, so there is nothing to
-  // hold the chain for: let the headers flow. (Pausing here would also deadlock,
-  // since no body would ever arrive to drive the replay that releases them.)
-  if (end_stream) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
   // Copy what the route declared; see the note on route_has_request_ for why the
   // config is not held by pointer.
   const RouteConfig* route_config =
@@ -302,6 +328,16 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     route_response_protocol_ = route_config->responseProtocol();
     route_request_binding_ = route_config->requestBinding();
     route_response_binding_ = route_config->responseBinding();
+    route_filter_configs_ = route_config->filterConfigs();
+  }
+
+  // A headers-only request carries no payload to inspect, so there is nothing to
+  // hold the chain for: let the headers flow unless an AI filter answers the
+  // request. (Pausing here would also deadlock, since no body would ever arrive
+  // to drive the replay that releases them.)
+  if (end_stream) {
+    return answerUnparsedRequest(UnparsedRequest::NoBody) ? Http::FilterHeadersStatus::StopIteration
+                                                          : Http::FilterHeadersStatus::Continue;
   }
 
   // Check if an earlier filter set the request API in filter state. It overrides a
@@ -425,10 +461,63 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
 
 void AiProtocolManagerFilter::rejectInvalidPayload(const absl::Status& status) {
   ENVOY_LOG(debug, "ai_protocol_manager: rejecting request: {}", status.message());
-  payload_rejected_ = true;
   request_parser_.reset();
+  if (answerUnparsedRequest(UnparsedRequest::InvalidJson)) {
+    return;
+  }
+  payload_rejected_ = true;
   decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, status.message(), nullptr,
                                      std::nullopt, "ai_protocol_manager_invalid_json");
+}
+
+std::vector<AiFilterSharedPtr> AiProtocolManagerFilter::createAiFilters() {
+  ASSERT(request_headers_ != nullptr);
+  AiFilterContext context{.stream_info = decoder_callbacks_->streamInfo(),
+                          .request_headers = *request_headers_,
+                          .request_protocol = request_protocol_,
+                          .request_payload_bytes =
+                              decode_manager_ != nullptr ? decode_manager_->length() : 0,
+                          .response_protocol = route_response_protocol_,
+                          .request_binding = route_request_binding_,
+                          .response_binding = route_response_binding_,
+                          .clear_route_cache = [this] {
+                            if (decoder_callbacks_->downstreamCallbacks().has_value()) {
+                              decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+                            }
+                          }};
+  const AiFilterFactories& factories = config_->aiFilterFactories();
+  std::vector<AiFilterSharedPtr> filters;
+  filters.reserve(factories.size());
+  for (size_t i = 0; i < factories.size(); ++i) {
+    context.filter_name = config_->aiFilterName(i);
+    context.route_config = nullptr;
+    if (route_filter_configs_ != nullptr) {
+      if (const auto it = route_filter_configs_->find(context.filter_name);
+          it != route_filter_configs_->end()) {
+        context.route_config = it->second;
+      }
+    }
+    if (AiFilterSharedPtr filter = factories[i](context); filter != nullptr) {
+      filters.push_back(std::move(filter));
+    }
+  }
+  return filters;
+}
+
+bool AiProtocolManagerFilter::answerUnparsedRequest(UnparsedRequest reason) {
+  if (!isAiEndpoint()) {
+    return false;
+  }
+  for (const AiFilterSharedPtr& filter : createAiFilters()) {
+    if (std::optional<LocalReply> reply = filter->onUnparsedRequest(reason); reply.has_value()) {
+      ENVOY_LOG(debug, "ai_protocol_manager: AI filter answers the unparsed request: {} {}",
+                static_cast<uint32_t>(reply->code), reply->body);
+      payload_rejected_ = true;
+      sendFilterLocalReply(*decoder_callbacks_, std::move(*reply));
+      return true;
+    }
+  }
+  return false;
 }
 
 Http::FilterDataStatus AiProtocolManagerFilter::decodeData(Buffer::Instance& data,
@@ -450,6 +539,9 @@ Http::FilterDataStatus AiProtocolManagerFilter::decodeData(Buffer::Instance& dat
     // manager has been given nothing, since every frame reaches both.
     if (end_stream && data.length() == 0 && decode_manager_->empty()) {
       request_parser_.reset();
+      if (answerUnparsedRequest(UnparsedRequest::NoBody)) {
+        return Http::FilterDataStatus::StopIterationNoBuffer;
+      }
     } else if (!feedParser(data, end_stream)) {
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
@@ -470,9 +562,12 @@ Http::FilterTrailersStatus AiProtocolManagerFilter::decodeTrailers(Http::Request
   if (payload_rejected_) {
     return Http::FilterTrailersStatus::StopIteration;
   }
-  // A trailer-only request (no body) has nothing to replay; let the trailers flow.
+  // A trailer-only request (no body) has nothing to replay; let the trailers flow unless an AI
+  // filter answers the request.
   if (decode_manager_->empty()) {
-    return Http::FilterTrailersStatus::Continue;
+    return answerUnparsedRequest(UnparsedRequest::NoBody)
+               ? Http::FilterTrailersStatus::StopIteration
+               : Http::FilterTrailersStatus::Continue;
   }
 
   // No data frame carried end_stream, so the document is still open. Closing it
@@ -515,21 +610,7 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
   };
 
   if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
-    ASSERT(request_headers_ != nullptr);
-    const AiFilterContext context{.stream_info = decoder_callbacks_->streamInfo(),
-                                  .request_headers = *request_headers_,
-                                  .request_protocol = request_protocol_,
-                                  .request_payload_bytes = decode_manager_->length(),
-                                  .response_protocol = route_response_protocol_,
-                                  .request_binding = route_request_binding_,
-                                  .response_binding = route_response_binding_};
-    std::vector<AiFilterSharedPtr> filters;
-    filters.reserve(config_->aiFilterFactories().size());
-    for (const AiFilterFactoryCb& factory : config_->aiFilterFactories()) {
-      if (AiFilterSharedPtr filter = factory(context); filter != nullptr) {
-        filters.push_back(std::move(filter));
-      }
-    }
+    std::vector<AiFilterSharedPtr> filters = createAiFilters();
     // The route and the chain are configured apart, so only a request shows that the chain
     // leaves a binding the route declares unapplied.
     const BindingUse applied = bindingsApplied(filters);
@@ -549,12 +630,9 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
     filter_manager_->startRequest(
         std::move(request_json_), decode_manager_.get(), decoder_callbacks_->dispatcher(),
         decoder_callbacks_->streamInfo(), std::move(on_complete), request_headers_,
-        [this](Http::Code code, std::string details) {
-          ENVOY_LOG(debug, "ai_protocol_manager: rejecting request via local reply: {} {}",
-                    static_cast<uint32_t>(code), details);
+        [this](LocalReply reply) {
           payload_rejected_ = true;
-          decoder_callbacks_->sendLocalReply(code, details, nullptr, std::nullopt,
-                                             "ai_protocol_manager_filter_rejected");
+          sendFilterLocalReply(*decoder_callbacks_, std::move(reply));
         },
         config_->alwaysSerializeRequest(), request_protocol_);
   } else {
@@ -572,6 +650,12 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
   // when there is a need. Currently, all AI filters handle both request and
   // response.
   const bool can_filter_response = filter_manager_ != nullptr && !payload_rejected_;
+  if (can_filter_response) {
+    if (const ResponseMode mode = filter_manager_->onResponseHeaders(headers, end_stream);
+        mode != ResponseMode::Parsed) {
+      return startRawResponse(mode == ResponseMode::RawHoldHeaders, end_stream);
+    }
+  }
 
   // Route scoping: only declared AI endpoints are inspected unless the filter
   // opted into unconfigured routes, so enabling token usage on a mixed
@@ -643,11 +727,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
 
   if (can_filter_response && (is_sse || is_json)) {
     headers.removeContentLength();
-    encode_bridge_ = std::make_unique<EncoderFilterChainBridge>(
-        *encoder_callbacks_, *decoder_callbacks_, config_->stats());
-    encode_manager_ = std::make_shared<BufferManager>(
-        BufferManager::Config{encoder_callbacks_->encoderBufferLimit()}, config_->bufferFactory(),
-        *encode_bridge_);
+    createEncodeManager();
     if (is_sse) {
       filter_manager_->startSseResponse(
           config_->bufferFactory(), *encode_bridge_, *encode_manager_,
@@ -759,6 +839,35 @@ Http::FilterTrailersStatus AiProtocolManagerFilter::encodeTrailers(Http::Respons
   }
 
   return Http::FilterTrailersStatus::Continue;
+}
+
+void AiProtocolManagerFilter::createEncodeManager() {
+  encode_bridge_ = std::make_unique<EncoderFilterChainBridge>(
+      *encoder_callbacks_, *decoder_callbacks_, config_->stats());
+  encode_manager_ = std::make_shared<BufferManager>(
+      BufferManager::Config{encoder_callbacks_->encoderBufferLimit()}, config_->bufferFactory(),
+      *encode_bridge_);
+}
+
+Http::FilterHeadersStatus AiProtocolManagerFilter::startRawResponse(bool hold_headers,
+                                                                    bool end_stream) {
+  createEncodeManager();
+  filter_manager_->startRawResponse(
+      config_->bufferFactory(), *encode_bridge_, *encode_manager_,
+      [this](absl::Status status) { onEncodeComplete(std::move(status)); },
+      [this](LocalReply reply) {
+        encode_rejected_ = true;
+        sendFilterLocalReply(*encoder_callbacks_, std::move(reply));
+      });
+  if (!end_stream) {
+    return hold_headers ? Http::FilterHeadersStatus::StopIteration
+                        : Http::FilterHeadersStatus::Continue;
+  }
+  // The headers are held either way: the filters may yet give the response a body.
+  encode_input_ended_ = true;
+  Buffer::OwnedImpl empty;
+  filter_manager_->onResponseData(empty, /*end_stream=*/true);
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 void AiProtocolManagerFilter::onEncodeComplete(absl::Status status) {

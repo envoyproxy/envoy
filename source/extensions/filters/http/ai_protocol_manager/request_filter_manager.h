@@ -31,7 +31,7 @@ namespace AiProtocolManager {
 // false.
 class RequestFilterManager : public Logger::Loggable<Logger::Id::ai_protocol_manager> {
 public:
-  using LocalReplyFn = absl::AnyInvocable<void(Http::Code code, std::string details)>;
+  using LocalReplyFn = AiProtocolManager::LocalReplyFn;
   using OnCompleteFn = absl::AnyInvocable<void(absl::Status)>;
 
   RequestFilterManager(std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,

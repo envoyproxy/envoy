@@ -182,8 +182,20 @@ the filter runs the configured :ref:`AI filters
 in order over the parsed document; they require ``request_handling``. An AI
 filter (category ``envoy.http.ai_filters``)
 may read or modify the document, or reject the request with a local reply.
-Routes without a per-route request declaration, and requests without a body,
-run no AI filters.
+Routes without a per-route request declaration run no AI filters.
+
+A declared endpoint's request that has no body, or whose body is not JSON, has
+no document to run the AI filters over. Each AI filter may answer such a request
+with a local reply of its own; when none does, the request without a body is
+forwarded and the one that is not JSON is rejected with a 400.
+
+An AI filter is handed a 2xx SSE or JSON response as the manager parses it. It
+may instead take a response as bytes, whatever its status and content type, and
+rewrite its headers; token usage is not extracted from such a response.
+
+A route configures an AI filter with :ref:`typed_per_filter_config
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.typed_per_filter_config>`,
+keyed by the filter's name in ``filters``.
 
 Once the AI filters finish, the parsed document is re-serialized as the
 request body by default. With :ref:`reserialize_body
@@ -564,6 +576,72 @@ client's path variables are replaced.
 
 Use header mutations only for non-secret API headers; pass credentials via
 ``request_headers_to_add`` or :ref:`credential_injector <config_http_filters_credential_injector>`.
+
+.. _config_http_filters_ai_protocol_manager_mcp_json_rest_bridge:
+.. _extension_envoy.http.ai_filters.mcp_json_rest_bridge:
+
+MCP JSON REST bridge
+~~~~~~~~~~~~~~~~~~~~
+
+The MCP JSON REST bridge filter (``envoy.http.ai_filters.mcp_json_rest_bridge``)
+lets a JSON REST backend serve Model Context Protocol clients: it answers the MCP
+handshake itself, maps a ``tools/call`` request onto the REST request of the tool,
+and returns the backend's response as the JSON-RPC result.
+
+It runs the bridge of the ``envoy.filters.http.mcp_json_rest_bridge`` HTTP filter
+and takes its configuration, :ref:`McpJsonRestBridge
+<envoy_v3_api_msg_extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge>`,
+so the two behave alike and a feature of one is a feature of the other. Declare
+the routes that carry MCP requests as AI endpoints; they need no ``llm_protocol``.
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.ai_protocol_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+      request_handling: {}
+      filters:
+      - name: envoy.http.ai_filters.mcp_json_rest_bridge
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+          tool_config:
+            tools:
+            - name: get_api_key
+              http_rule:
+                get: "/v1/{name=apiKeys/*}"
+
+  routes:
+  - match:
+      path: /mcp
+    route:
+      cluster: rest_backend
+    typed_per_filter_config:
+      envoy.filters.http.ai_protocol_manager:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute
+        request: {}
+
+What differs from the HTTP filter is where the bridge is hosted:
+
+* A route's :ref:`McpJsonRestBridgePerRoute
+  <envoy_v3_api_msg_extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridgePerRoute>`
+  goes in the manager's :ref:`typed_per_filter_config
+  <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.typed_per_filter_config>`
+  under the filter's name.
+* Dynamic metadata is stored under the filter's name in ``filters``.
+* The request is re-serialized, so :ref:`reserialize_body
+  <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.reserialize_body>`
+  has to stay ``ALWAYS``.
+* The bridge reads argument values, so it raises the manager's
+  :ref:`inline_string_threshold_bytes
+  <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestParsingLimits.inline_string_threshold_bytes>`
+  to its own :ref:`max_request_body_size
+  <envoy_v3_api_field_extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge.max_request_body_size>`,
+  at most 1MiB, on every route of the filter. A request with a longer string
+  value is rejected as too large.
+* A request the bridge does not handle is still a declared endpoint's: the
+  manager parses and re-serializes its JSON body, where the HTTP filter forwards
+  it byte for byte. Declare only the routes MCP clients use.
 
 Response token-usage extraction
 -------------------------------
