@@ -144,6 +144,7 @@ envoy_cc_test_library(
         ":listener_manager_impl_test_lib",
         "//envoy/network:socket_interface",
         "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:base64_lib",
         "//source/common/common:cpu_affinity_lib",
         "//source/common/config:metadata_lib",
         "//source/common/listener_manager:active_raw_udp_listener_config",

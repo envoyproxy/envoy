@@ -219,7 +219,7 @@ public:
   }
 
   // Measures in place updates of a manager with the origin filter chains to the updated ones, and
-  // returns how many origin filter chains the updates drained.
+  // returns how many drains of origin filter chains the updates recorded in all.
   size_t updateFilterChains(
       ::benchmark::State& state,
       absl::Span<const envoy::config::listener::v3::FilterChain* const> origin_filter_chains,
@@ -342,7 +342,9 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateChangedT
   for (const auto* filter_chain : filter_chains_) {
     updated_messages.emplace_back(*filter_chain).set_name("changed");
   }
-  updateFilterChains(state, filter_chains_, pointersTo(updated_messages));
+  RELEASE_ASSERT(updateFilterChains(state, filter_chains_, pointersTo(updated_messages)) ==
+                     state.iterations() * filter_chains_.size(),
+                 "a changed filter chain was reused");
 }
 
 BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)

@@ -21,6 +21,7 @@
 #ifdef __linux__
 #include "source/common/api/os_sys_calls_impl_linux.h"
 #endif
+#include "source/common/common/base64.h"
 #include "source/common/common/cpu_affinity.h"
 #include "source/common/config/metadata.h"
 #include "source/common/init/manager_impl.h"
@@ -9440,6 +9441,25 @@ filter_chains:
     return listener_handle;
   }
 
+  // The listener handle expects one filter chain build, so each further build loads its filters.
+  void expectFilterChainBuild() {
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+        .WillOnce(testing::DoDefault())
+        .RetiresOnSaturation();
+  }
+
+  // Adds an active listener with one inline filter chain and a default filter chain, which is the
+  // filter chain the returned listener handle follows.
+  ListenerHandle* addActiveListenerWithDefaultFilterChain(
+      const envoy::config::listener::v3::Listener& listener_proto) {
+    ListenerHandle* listener_handle = expectListenerCreate(false, true);
+    expectFilterChainBuild();
+    EXPECT_CALL(*worker_, addListener(Eq(std::nullopt), _, _, _, _));
+    EXPECT_TRUE(addOrUpdateListener(listener_proto));
+    worker_->callAddCompletion();
+    return listener_handle;
+  }
+
   // Applies the update in place and returns the drain timer of the replaced listener.
   Event::MockTimer* updateInPlace(const envoy::config::listener::v3::Listener& listener_proto) {
     EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
@@ -9539,35 +9559,25 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, AddAddressWithoutReusePort) 
 // An in place update drains the default filter chain only when it rebuilds or removes it.
 TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, DrainDefaultFilterChainOnlyWhenNotReused) {
   startWorkers();
-  // The listener handle expects one filter chain build, so each further build loads its filters.
-  const auto expect_filter_chain_build = [this]() {
-    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
-        .WillOnce(testing::DoDefault())
-        .RetiresOnSaturation();
-  };
   auto listener_proto = listenerProto({"127.0.0.1"});
   listener_proto.mutable_default_filter_chain()->set_name("default");
-  // A default filter chain holding a NaN is never equal to itself, so only its identity shows that
-  // the new listener reuses it.
+  // A message comparison never finds a default filter chain holding a NaN equal to itself, so a
+  // drain that compared messages would drain the default filter chain this update reuses.
   Config::Metadata::mutableMetadataValue(
       *listener_proto.mutable_default_filter_chain()->mutable_metadata(), "test", "nan")
       .set_number_value(std::numeric_limits<double>::quiet_NaN());
   auto socket = expectListenSocket("127.0.0.1:1234");
-  ListenerHandle* listener_foo = expectListenerCreate(false, true);
-  expect_filter_chain_build();
-  EXPECT_CALL(*worker_, addListener(Eq(std::nullopt), _, _, _, _));
-  EXPECT_TRUE(addOrUpdateListener(listener_proto));
-  worker_->callAddCompletion();
+  ListenerHandle* listener_foo = addActiveListenerWithDefaultFilterChain(listener_proto);
 
   listener_proto.mutable_filter_chains(0)->set_name("bar");
-  expect_filter_chain_build();
+  expectFilterChainBuild();
   EXPECT_CALL(
       *worker_,
       onFilterChainDrain(_, ElementsAre(Pointee(Property(&Network::FilterChain::name, "foo"))), _));
   updateInPlace(listener_proto);
 
   listener_proto.mutable_default_filter_chain()->set_name("new_default");
-  expect_filter_chain_build();
+  expectFilterChainBuild();
   EXPECT_CALL(*worker_,
               onFilterChainDrain(
                   _, ElementsAre(Pointee(Property(&Network::FilterChain::name, "default"))), _));
@@ -9579,6 +9589,40 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, DrainDefaultFilterChainOnlyW
       onFilterChainDrain(
           _, ElementsAre(Pointee(Property(&Network::FilterChain::name, "new_default"))), _));
   updateInPlace(listener_proto);
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+// An in place update keeps a default filter chain whose Any payload it encodes again.
+TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, KeepDefaultFilterChainWithReserializedAny) {
+  startWorkers();
+  auto listener_proto = listenerProto({"127.0.0.1"});
+  listener_proto.mutable_default_filter_chain()->set_name("default");
+  auto& typed_metadata = (*listener_proto.mutable_default_filter_chain()
+                               ->mutable_metadata()
+                               ->mutable_typed_filter_metadata())["test"];
+  typed_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  // The same struct with its two fields serialized in two orders.
+  typed_metadata.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+  auto socket = expectListenSocket("127.0.0.1:1234");
+  ListenerHandle* listener_foo = addActiveListenerWithDefaultFilterChain(listener_proto);
+
+  auto reserialized_listener_proto = listener_proto;
+  reserialized_listener_proto.mutable_filter_chains(0)->set_name("bar");
+  (*reserialized_listener_proto.mutable_default_filter_chain()
+        ->mutable_metadata()
+        ->mutable_typed_filter_metadata())["test"]
+      .set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  ASSERT_NE(
+      MessageUtil::serializeDeterministically(listener_proto.default_filter_chain()),
+      MessageUtil::serializeDeterministically(reserialized_listener_proto.default_filter_chain()));
+  ASSERT_TRUE(Protobuf::util::MessageDifferencer::Equals(
+      listener_proto.default_filter_chain(), reserialized_listener_proto.default_filter_chain()));
+  expectFilterChainBuild();
+  EXPECT_CALL(
+      *worker_,
+      onFilterChainDrain(_, ElementsAre(Pointee(Property(&Network::FilterChain::name, "foo"))), _));
+  updateInPlace(reserialized_listener_proto);
 
   EXPECT_CALL(*listener_foo, onDestroy());
 }
