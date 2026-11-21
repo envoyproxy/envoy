@@ -1,3 +1,6 @@
+#include <algorithm>
+#include <array>
+
 #include "source/common/common/hex.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listener_filter_buffer_impl.h"
@@ -13,6 +16,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
+#include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
@@ -386,26 +390,24 @@ TEST_P(TlsInspectorJA4Test, JA4FingerprintFromCapturedClientHello) {
   }
 }
 
+// ``SSL_parse_client_hello`` is BoringSSL-only, so this suite is skipped on OpenSSL
+// builds. The ``protocol`` parameter is still covered there by the
+// ``ProtocolParameterControlsFirstCharacter`` test in ``ja4_fingerprint_test.cc``.
+#ifndef ENVOY_SSL_OPENSSL
+// ``JA4_TEST_VECTORS`` entries whose captured hex does not decode to a ClientHello
+// that ``SSL_parse_client_hello`` accepts. The ``JA4FingerprintFromCapturedClientHello``
+// suite tolerates these via ``Times(AtMost(1))`` on ``setJA4Hash``.
+constexpr std::array<absl::string_view, 3> UNPARSEABLE_JA4_TEST_VECTORS = {
+    "TLS-SNI-Facebook",
+    "Apple-Connection",
+    "Microsoft-Connection",
+};
+
 // Replays each captured ClientHello from ``JA4_TEST_VECTORS`` against
 // ``JA4Fingerprinter::create`` with every value of the ``Protocol`` enum and
-// asserts the parameter's contract holds for every capture in the corpus:
-//   - the no-arg overload is byte-identical to ``Protocol::TLS`` (backward
-//     compatibility for callers, including the built-in listener filter),
-//   - ``Protocol::TLS`` -> ``t``, ``QUIC`` -> ``q``, ``DTLS`` -> ``d`` at the
-//     first character, and
-//   - only the first character changes across protocol choices; every other
-//     byte of the fingerprint is identical.
-//
-// This complements the primary ``JA4FingerprintFromCapturedClientHello`` suite
-// above: that one drives captured bytes end-to-end through the listener filter
-// (which always calls ``create`` with the default ``Protocol::TLS``); this one
-// reuses the same corpus but exercises the caller-visible overload directly,
-// so downstream callers that pass ``Protocol::QUIC`` (or a hypothetical
-// future in-tree QUIC listener filter) get coverage against the same real
-// captures the filter suite already trusts. Assertions are deliberately
-// relative to the fingerprint each capture actually produces, not to a pinned
-// string -- this test's job is to prove the new parameter's behavior, not to
-// re-verify the corpus's pinned hashes.
+// asserts that the no-arg overload and ``Protocol::TLS`` both produce the pinned
+// fingerprint, and that ``Protocol::QUIC`` produces the pinned fingerprint with
+// its first character swapped to ``q``.
 class TlsInspectorJA4ProtocolArgTest
     : public testing::TestWithParam<std::tuple<std::string, std::string, std::string>> {};
 
@@ -414,28 +416,15 @@ INSTANTIATE_TEST_SUITE_P(JA4TestVectors, TlsInspectorJA4ProtocolArgTest,
 
 TEST_P(TlsInspectorJA4ProtocolArgTest, ProtocolArgSelectsFirstCharacter) {
   const auto& [client_name, client_hello_hex, expected_ja4] = GetParam();
-  // `expected_ja4` is not asserted directly: this test proves the Protocol
-  // parameter's contract holds relative to what each capture actually produces,
-  // not that the corpus's pinned hashes are individually correct.
-  (void)expected_ja4;
-
-  // Decode the captured bytes and hand the ClientHello body (past the 5-byte
-  // TLS record header and 4-byte handshake header) to BoringSSL's parser -- the
-  // same parse path the listener filter uses via its ssl-early callback.
-  //
-  // A few entries in ``JA4_TEST_VECTORS`` have malformed hex (odd length) or
-  // produce ClientHello bodies that BoringSSL's SSL_parse_client_hello
-  // rejects; the pre-existing ``JA4FingerprintFromCapturedClientHello`` suite
-  // tolerates that silently via ``EXPECT_CALL(...).Times(AtMost(1))`` on
-  // ``setJA4Hash``, so those broken vectors have never actually been checked.
-  // Skip them here rather than fail, since the Protocol parameter's contract
-  // only applies to inputs that actually reach the ``JA4`` code path.
-  const std::vector<uint8_t> wire = Hex::decode(client_hello_hex);
-  if (wire.size() <= 9) {
-    GTEST_SKIP() << client_name
-                 << ": captured hex did not decode to a parseable TLS record (likely a "
-                    "corpus data bug in JA4_TEST_VECTORS)";
+  if (std::find(UNPARSEABLE_JA4_TEST_VECTORS.begin(), UNPARSEABLE_JA4_TEST_VECTORS.end(),
+                client_name) != UNPARSEABLE_JA4_TEST_VECTORS.end()) {
+    GTEST_SKIP() << client_name << ": captured hex is not a parseable ClientHello";
   }
+
+  // Hand the ClientHello body (past the 5-byte TLS record header and 4-byte
+  // handshake header) to BoringSSL's parser.
+  const std::vector<uint8_t> wire = Hex::decode(client_hello_hex);
+  ASSERT_GT(wire.size(), 9u) << client_name;
   const uint8_t* body = wire.data() + 9;
   const size_t body_len = wire.size() - 9;
 
@@ -445,37 +434,16 @@ TEST_P(TlsInspectorJA4ProtocolArgTest, ProtocolArgSelectsFirstCharacter) {
   ASSERT_TRUE(ssl != nullptr);
 
   SSL_CLIENT_HELLO client_hello;
-  if (SSL_parse_client_hello(ssl.get(), &client_hello, body, body_len) != 1) {
-    GTEST_SKIP() << client_name
-                 << ": SSL_parse_client_hello rejected the captured body (likely a corpus "
-                    "data bug in JA4_TEST_VECTORS)";
-  }
+  ASSERT_EQ(1, SSL_parse_client_hello(ssl.get(), &client_hello, body, body_len)) << client_name;
 
-  const std::string default_fp = JA4Fingerprinter::create(&client_hello);
-  const std::string tls_fp =
-      JA4Fingerprinter::create(&client_hello, JA4Fingerprinter::Protocol::TLS);
-  const std::string quic_fp =
-      JA4Fingerprinter::create(&client_hello, JA4Fingerprinter::Protocol::QUIC);
-  const std::string dtls_fp =
-      JA4Fingerprinter::create(&client_hello, JA4Fingerprinter::Protocol::DTLS);
-
-  // The no-arg overload is byte-identical to Protocol::TLS -- the default
-  // preserves prior behavior for every caller, including the listener filter.
-  EXPECT_EQ(default_fp, tls_fp) << client_name;
-
-  // Protocol arg drives the first character deterministically.
-  ASSERT_FALSE(tls_fp.empty()) << client_name;
-  ASSERT_FALSE(quic_fp.empty()) << client_name;
-  ASSERT_FALSE(dtls_fp.empty()) << client_name;
-  EXPECT_EQ(tls_fp[0], 't') << client_name;
-  EXPECT_EQ(quic_fp[0], 'q') << client_name;
-  EXPECT_EQ(dtls_fp[0], 'd') << client_name;
-
-  // Only the first character changes across protocol choices.
-  const std::string tls_tail = tls_fp.substr(1);
-  EXPECT_EQ(quic_fp.substr(1), tls_tail) << client_name;
-  EXPECT_EQ(dtls_fp.substr(1), tls_tail) << client_name;
+  EXPECT_EQ(JA4Fingerprinter::create(&client_hello), expected_ja4) << client_name;
+  EXPECT_EQ(JA4Fingerprinter::create(&client_hello, JA4Fingerprinter::Protocol::TLS), expected_ja4)
+      << client_name;
+  EXPECT_EQ(JA4Fingerprinter::create(&client_hello, JA4Fingerprinter::Protocol::QUIC),
+            "q" + expected_ja4.substr(1))
+      << client_name;
 }
+#endif
 
 TEST_F(TlsInspectorJA4Test, AlpnNonAlphanumericOldBehavior) {
   TestScopedRuntime scoped_runtime;

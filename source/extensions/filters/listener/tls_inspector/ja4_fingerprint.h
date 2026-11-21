@@ -19,7 +19,7 @@ namespace TlsInspector {
  * Format: `pXXdYYZZ_CIPHERHASH_EXTENSIONHASH`
  *
  * Where:
- * - ``p`` = protocol type (``t`` for TLS, ``q`` for QUIC, ``d`` for DTLS)
+ * - ``p`` = protocol type (``t`` for TLS, ``q`` for QUIC)
  * - ``XX`` = TLS version (13, 12, etc.)
  * - ``d/i`` = SNI presence (d = domain present, i = no SNI)
  * - ``YY`` = number of cipher suites (2 digits)
@@ -35,10 +35,9 @@ public:
    * Transport protocol carrying the handshake. Determines the first character
    * of the ``JA4`` fingerprint per the spec.
    */
-  enum class Protocol : char {
-    TLS = 't',
-    QUIC = 'q',
-    DTLS = 'd',
+  enum class Protocol {
+    TLS,
+    QUIC,
   };
 
   /**

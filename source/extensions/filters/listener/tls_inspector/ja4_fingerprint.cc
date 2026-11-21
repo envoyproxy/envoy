@@ -29,8 +29,6 @@ absl::string_view protocolChar(JA4Fingerprinter::Protocol protocol) {
   switch (protocol) {
   case JA4Fingerprinter::Protocol::QUIC:
     return "q";
-  case JA4Fingerprinter::Protocol::DTLS:
-    return "d";
   case JA4Fingerprinter::Protocol::TLS:
     return "t";
   }
@@ -311,8 +309,8 @@ std::string JA4Fingerprinter::getJA4ExtensionHash(const SSL_CLIENT_HELLO* ssl_cl
 
 std::string JA4Fingerprinter::create(const SSL_CLIENT_HELLO* ssl_client_hello, Protocol protocol) {
   return absl::StrCat(
-      // Protocol type: ``t`` for TLS, ``q`` for QUIC, ``d`` for DTLS. Chosen by
-      // the caller based on the transport carrying the handshake.
+      // Protocol type: ``t`` for TLS, ``q`` for QUIC. Chosen by the caller based
+      // on the transport carrying the handshake.
       protocolChar(protocol),
 
       // TLS Version
