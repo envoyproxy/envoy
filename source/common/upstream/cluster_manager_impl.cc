@@ -1009,20 +1009,23 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
       }
     });
   }
+  Protobuf::Any cluster_any;
+  MessageUtil::packFrom(cluster_any, cluster);
   ClusterDataPtr result;
   auto cluster_entry_it = cluster_map.find(cluster_info->name());
   if (cluster_entry_it != cluster_map.end()) {
     result = std::exchange(cluster_entry_it->second,
-                           std::make_unique<ClusterData>(
-                               cluster, cluster_hash, version_info, added_via_api, required_for_ads,
-                               std::move(new_cluster), time_source_, avoid_cds_removal));
+                           std::make_unique<ClusterData>(std::move(cluster_any), cluster_hash,
+                                                         version_info, added_via_api,
+                                                         required_for_ads, std::move(new_cluster),
+                                                         time_source_, avoid_cds_removal));
   } else {
     bool inserted = false;
     std::tie(cluster_entry_it, inserted) = cluster_map.emplace(
         cluster_info->name(),
-        std::make_unique<ClusterData>(cluster, cluster_hash, version_info, added_via_api,
-                                      required_for_ads, std::move(new_cluster), time_source_,
-                                      avoid_cds_removal));
+        std::make_unique<ClusterData>(std::move(cluster_any), cluster_hash, version_info,
+                                      added_via_api, required_for_ads, std::move(new_cluster),
+                                      time_source_, avoid_cds_removal));
     ASSERT(inserted);
   }
 
@@ -1923,18 +1926,18 @@ ClusterManagerImpl::dumpClusterConfigs(const Matchers::StringMatcher& name_match
   config_dump->set_version_info(cds_api_ != nullptr ? cds_api_->versionInfo() : "");
   for (const auto& active_cluster_pair : active_clusters_) {
     const auto& cluster = *active_cluster_pair.second;
-    if (!name_matcher.match(cluster.cluster_config_.name())) {
+    if (!name_matcher.match(cluster.cluster_->info()->name())) {
       continue;
     }
     if (!cluster.added_via_api_) {
       auto& static_cluster = *config_dump->mutable_static_clusters()->Add();
-      std::ignore = static_cluster.mutable_cluster()->PackFrom(cluster.cluster_config_);
+      *static_cluster.mutable_cluster() = cluster.clusterConfigAny();
       TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
                                             *(static_cluster.mutable_last_updated()));
     } else {
       auto& dynamic_cluster = *config_dump->mutable_dynamic_active_clusters()->Add();
       dynamic_cluster.set_version_info(cluster.version_info_);
-      std::ignore = dynamic_cluster.mutable_cluster()->PackFrom(cluster.cluster_config_);
+      *dynamic_cluster.mutable_cluster() = cluster.clusterConfigAny();
       TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
                                             *(dynamic_cluster.mutable_last_updated()));
     }
@@ -1942,12 +1945,12 @@ ClusterManagerImpl::dumpClusterConfigs(const Matchers::StringMatcher& name_match
 
   for (const auto& warming_cluster_pair : warming_clusters_) {
     const auto& cluster = *warming_cluster_pair.second;
-    if (!name_matcher.match(cluster.cluster_config_.name())) {
+    if (!name_matcher.match(cluster.cluster_->info()->name())) {
       continue;
     }
     auto& dynamic_cluster = *config_dump->mutable_dynamic_warming_clusters()->Add();
     dynamic_cluster.set_version_info(cluster.version_info_);
-    std::ignore = dynamic_cluster.mutable_cluster()->PackFrom(cluster.cluster_config_);
+    *dynamic_cluster.mutable_cluster() = cluster.clusterConfigAny();
     TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
                                           *(dynamic_cluster.mutable_last_updated()));
   }
