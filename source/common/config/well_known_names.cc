@@ -209,6 +209,13 @@ TagNameValues::TagNameValues() {
   // redis.(<stat_prefix>.)*
   addTokenized(REDIS_PREFIX, "redis.$.**");
 
+  // Module commands such as "json.set" may contain dots. When either the stat prefix or the
+  // command could contain another ".command." separator, leave the removal capture empty.
+  addRe2(REDIS_COMMAND,
+         R"(^redis\..+?\.command\.(?:(?:.*\.)?command\..+\.|((.+)\.)))"
+         R"((?:total|success|error|error_fault|delay_fault|latency)$)",
+         ".command.");
+
   // (<stat_prefix>.).http_local_rate_limit.**
   addTokenized(LOCAL_HTTP_RATELIMIT_PREFIX, "$.http_local_rate_limit.**");
 

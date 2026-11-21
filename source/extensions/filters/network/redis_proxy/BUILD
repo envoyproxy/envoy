@@ -80,6 +80,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:radix_tree_lib",
+        "//source/common/config:well_known_names",
         "//source/common/stats:prefix_utility_lib",
         "//source/common/stats:timespan_lib",
         "//source/extensions/filters/network/common/redis:client_lib",
