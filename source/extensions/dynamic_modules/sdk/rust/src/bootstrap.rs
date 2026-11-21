@@ -1,5 +1,6 @@
 pub use crate::abi::envoy_dynamic_module_type_bootstrap_ecds_config_encoding as EcdsConfigEncoding;
 use crate::abi::{
+  envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update,
   envoy_dynamic_module_type_bootstrap_config_snapshot_result as ConfigSnapshotResult,
   envoy_dynamic_module_type_metrics_result,
 };
@@ -511,10 +512,10 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// [`BootstrapExtensionConfig::on_run_on_all_workers_done`] on the main thread. The main thread
   /// does not run the worker event.
   ///
-  /// A worker runs the event after it applied every cluster, host and listener change that Envoy
-  /// posted to it before this call. Host health, weight and metadata changes merged by the
-  /// `update_merge_window` of a cluster may reach the workers later. The workers start only after
-  /// initialization completes, so do not wait for the done hook before calling
+  /// A worker runs the event after it applied every cluster, host, listener and filter chain change
+  /// that Envoy posted to it before this call. Host health, weight and metadata changes merged by
+  /// the `update_merge_window` of a cluster may reach the workers later. The workers start only
+  /// after initialization completes, so do not wait for the done hook before calling
   /// [`EnvoyBootstrapExtensionConfig::signal_init_complete`]. That call can wait for the workers to
   /// run these events, so do not hold a lock across it that the worker event hook takes.
   ///
@@ -614,13 +615,14 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// it has. When the listener is written again before Envoy applied the previous write, Envoy
   /// applies only the latest write and the previous one completes as `Superseded`. The cluster and
   /// listener writers apply their writes independently, so write a listener whose inline routes
-  /// name a written cluster only after that cluster write completed as active. The writes queued
-  /// before [`EnvoyBootstrapExtensionConfig::signal_init_complete`] are applied before Envoy
-  /// finishes initializing, and Envoy starts its workers once their listeners warmed. Their writes
-  /// complete as active once the workers started, so do not wait for them before signaling. A
-  /// written listener has the same authority as a listener delivered by LDS, so build listeners
-  /// from a schema that the module owns. While Envoy applies a burst of writes, it holds back the
-  /// RDS, SRDS, VHDS, FCDS and SDS requests on the ADS stream and the xDS-TP authority streams,
+  /// name a written cluster only after that cluster write completed as active. A listener can be
+  /// written before the filter chains that it finds by name. The writes queued before
+  /// [`EnvoyBootstrapExtensionConfig::signal_init_complete`] are applied before Envoy finishes
+  /// initializing, and Envoy starts its workers once their listeners warmed. Their writes complete
+  /// as active once the workers started, so do not wait for them before signaling. A written
+  /// listener has the same authority as a listener delivered by LDS, so build listeners from a
+  /// schema that the module owns. While Envoy applies a burst of writes, it holds back the RDS,
+  /// SRDS, VHDS, FCDS and SDS requests on the ADS stream and the xDS-TP authority streams,
   /// including their ACKs, for about one second. A burst of the cluster writer extends this hold.
   ///
   /// This must be called on the main thread after the server is initialized, for example from
@@ -649,6 +651,74 @@ pub trait EnvoyBootstrapExtensionConfig {
     &self,
     listener_name: &str,
   ) -> abi::envoy_dynamic_module_type_bootstrap_listener_writer_removal_result;
+
+  /// Enable the filter chain config writer. Until this is called,
+  /// [`EnvoyBootstrapExtensionConfig::filter_chain_config_writer_add_or_update`] and
+  /// [`EnvoyBootstrapExtensionConfig::filter_chain_config_writer_remove`] return `NotAllowed`.
+  ///
+  /// This must be called on the main thread. It can be called before the server is initialized,
+  /// for example from the config creation function.
+  ///
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`. This
+  /// also returns `false` once the server began to shut down.
+  fn enable_filter_chain_config_writer(&self) -> bool;
+
+  /// Queue a write of a filter chain that the listeners with `fcds_config` find by name, as FCDS
+  /// would deliver it. This needs
+  /// [`EnvoyBootstrapExtensionConfig::enable_filter_chain_config_writer`] first.
+  ///
+  /// * `filter_chain_name` is the name of the filter chain, which must not be empty. Only write
+  ///   filter chains that no other extension writes, since Envoy does not notice when another
+  ///   extension writes or removes the same filter chain.
+  /// * `filter_chain` is the serialized `envoy.config.listener.v3.FilterChain`, whose name must
+  ///   equal `filter_chain_name`.
+  ///
+  /// This returns a tuple of (result, update_id). When the result is `Success`, the update ID is
+  /// nonzero and increases with every accepted write, and the outcome arrives in
+  /// [`BootstrapExtensionConfig::on_filter_chain_config_writer_update_done`] with the same update
+  /// ID. The result is `NotAllowed` and the update ID is 0 before the writer is enabled, before
+  /// [`BootstrapExtension::on_server_initialized`], after shutdown began, or off the main thread. A
+  /// call off the main thread also reports an Envoy bug.
+  ///
+  /// A listener whose `fcds_config` has no `config_source` waits, without a timeout, until the
+  /// filter chains that it finds by name are written and finished warming, so such a listener that
+  /// Envoy creates before it starts its workers holds back the initialization of Envoy until then.
+  /// A name is either discovered through FCDS or written by an extension. Envoy rejects a listener
+  /// that requests a name of the other kind, and a write of a name that a listener requests through
+  /// FCDS completes as `Failed`. A listener keeps its names until it is removed and has finished
+  /// draining. Writes queued before Envoy finishes initializing its static and CDS clusters are
+  /// applied once it has. When the filter chain is written again before Envoy applied the previous
+  /// write, Envoy applies only the latest write and the previous one completes as `Superseded`. The
+  /// cluster and filter chain config writers apply their writes independently, so write a filter
+  /// chain whose inline routes name a written cluster only after that cluster write completed as
+  /// active. A written filter chain has the same authority as a filter chain delivered by FCDS, so
+  /// build filter chains from a schema that the module owns. A write that changes a filter chain
+  /// drains the connections of its previous version on the listeners that use it.
+  ///
+  /// This must be called on the main thread after the server is initialized, for example from
+  /// [`BootstrapExtensionConfig::on_scheduled`].
+  fn filter_chain_config_writer_add_or_update(
+    &self,
+    filter_chain_name: &str,
+    filter_chain: &[u8],
+  ) -> (
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result,
+    u64,
+  );
+
+  /// Queue the removal of a filter chain that this extension owns. A write of the filter chain that
+  /// is queued or warming completes as `Removed`, unless it becomes active before Envoy applies the
+  /// removal. Returns `NotFound` when the extension neither owns nor has queued a filter chain with
+  /// this name, and `NotAllowed` for the same reasons as a write. A removal has no outcome of its
+  /// own. Once Envoy applies it, the listeners that use the filter chain drain its connections, and
+  /// the listeners that wait for it stop waiting and can become active without it.
+  ///
+  /// This must be called on the main thread after the server is initialized, for example from
+  /// [`BootstrapExtensionConfig::on_scheduled`].
+  fn filter_chain_config_writer_remove(
+    &self,
+    filter_chain_name: &str,
+  ) -> abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result;
 }
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
@@ -971,6 +1041,36 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     _error_details: &str,
   ) {
   }
+
+  /// This is called on the main thread with the outcome of a write accepted by
+  /// [`EnvoyBootstrapExtensionConfig::filter_chain_config_writer_add_or_update`]. Envoy calls it at
+  /// most once per update ID, never from inside a call into Envoy, and not after shutdown began. It
+  /// is called exactly once unless shutdown began first, the filter chain never finishes warming,
+  /// or Envoy never finishes initializing its clusters. To end a write that stays warming, write
+  /// the filter chain again or remove it. Outcomes can arrive out of update ID order. When Envoy
+  /// fails to build the filter chain of a write, it logs the error at most once every 10 seconds,
+  /// and the extension keeps owning the filter chain if it exists.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `update_id` is the ID returned by the write.
+  /// * `filter_chain_name` is the name of the filter chain.
+  /// * `status` is the outcome of the write. `Active` means that the filter chain finished warming
+  ///   with this configuration or an identical one and that Envoy posted it to the workers.
+  ///   `Superseded` and `Removed` mean that a later write or a removal ended this write before it
+  ///   became active. `Failed` means that Envoy rejected the write because the filter chain failed
+  ///   to parse or validate, its name differs from `filter_chain_name`, a listener requests the
+  ///   name through FCDS, or Envoy failed to build it. The listeners then keep using the previous
+  ///   configuration, if any.
+  /// * `error_details` describes the problem when the status is `Failed`, and is empty otherwise.
+  fn on_filter_chain_config_writer_update_done(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _update_id: u64,
+    _filter_chain_name: &str,
+    _status: abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status,
+    _error_details: &str,
+  ) {
+  }
 }
 
 /// A completion callback that must be invoked exactly once to signal that an asynchronous
@@ -1075,8 +1175,8 @@ pub trait BootstrapExtension: Send + Sync {
   ///
   /// Shutdown has begun when Envoy calls this, so
   /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`] and the writer enable calls return
-  /// false, the other cluster and listener writer calls return `NotAllowed`, and Envoy drops the
-  /// done hooks of pending worker events and the pending cluster and listener writer outcomes. A
+  /// false, the other cluster, listener and filter chain config writer calls return `NotAllowed`,
+  /// and Envoy drops the done hooks of pending worker events and the pending writer outcomes. A
   /// worker can still run the worker event hook of an event posted before shutdown began, until the
   /// workers stop.
   fn on_shutdown(
@@ -1896,6 +1996,46 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
       )
     }
   }
+
+  fn enable_filter_chain_config_writer(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
+        self.raw,
+      )
+    }
+  }
+
+  fn filter_chain_config_writer_add_or_update(
+    &self,
+    filter_chain_name: &str,
+    filter_chain: &[u8],
+  ) -> (
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result,
+    u64,
+  ) {
+    let mut update_id: u64 = 0;
+    let result = unsafe {
+      envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+        self.raw,
+        str_to_module_buffer(filter_chain_name),
+        bytes_to_module_buffer(filter_chain),
+        &mut update_id,
+      )
+    };
+    (result, update_id)
+  }
+
+  fn filter_chain_config_writer_remove(
+    &self,
+    filter_chain_name: &str,
+  ) -> abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
+        self.raw,
+        str_to_module_buffer(filter_chain_name),
+      )
+    }
+  }
 }
 
 // Implementation of EnvoyBootstrapExtension
@@ -2658,6 +2798,39 @@ ffi_export! {
       &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
       update_id,
       listener_name_str.as_ref(),
+      status,
+      error_details_str.as_ref(),
+    );
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy with the outcome of a filter chain write by a bootstrap extension.
+  fn envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    update_id: u64,
+    filter_chain_name: abi::envoy_dynamic_module_type_envoy_buffer,
+    status: abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status,
+    error_details: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+
+    let filter_chain_name_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(
+        filter_chain_name.ptr as *const u8,
+        filter_chain_name.length,
+      )
+    };
+    let error_details_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(error_details.ptr as *const u8, error_details.length)
+    };
+
+    extension_config.on_filter_chain_config_writer_update_done(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      update_id,
+      filter_chain_name_str.as_ref(),
       status,
       error_details_str.as_ref(),
     );

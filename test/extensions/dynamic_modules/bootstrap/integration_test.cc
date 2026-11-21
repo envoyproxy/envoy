@@ -111,14 +111,10 @@ public:
     return writerModuleRequest("/writer", action, body);
   }
 
-  // Builds a listener that responds to every request with a 200.
-  envoy::config::listener::v3::Listener directResponseListener(const std::string& name) {
-    envoy::config::listener::v3::Listener listener;
-    listener.set_name(name);
-    envoy::config::core::v3::SocketAddress* socket_address =
-        listener.mutable_address()->mutable_socket_address();
-    socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
-    socket_address->set_port_value(0);
+  // Builds a filter chain that responds to every request with the status.
+  envoy::config::listener::v3::FilterChain directResponseFilterChain(const std::string& name,
+                                                                     uint32_t status = 200) {
+    envoy::config::listener::v3::FilterChain filter_chain;
     TestUtility::loadFromYaml(fmt::format(R"EOF(
 name: {}
 filters:
@@ -132,14 +128,51 @@ filters:
         domains: ["*"]
         routes:
         - match: {{ prefix: "/" }}
-          direct_response: {{ status: 200 }}
+          direct_response: {{ status: {} }}
     http_filters:
     - name: envoy.filters.http.router
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 )EOF",
-                                          name, name),
-                              *listener.add_filter_chains());
+                                          name, name, status),
+                              filter_chain);
+    return filter_chain;
+  }
+
+  // Builds a listener that finds its filter chain by name without an FCDS config source.
+  envoy::config::listener::v3::Listener fcdsListener(const std::string& name,
+                                                     const std::string& filter_chain_name) {
+    envoy::config::listener::v3::Listener listener;
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
+name: {}
+address:
+  socket_address:
+    address: {}
+    port_value: 0
+fcds_config: {{}}
+filter_chain_matcher:
+  on_no_match:
+    action:
+      name: filter-chain-name
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: {}
+)EOF",
+                                          name, Network::Test::getLoopbackAddressString(version_),
+                                          filter_chain_name),
+                              listener);
+    return listener;
+  }
+
+  // Builds a listener that responds to every request with a 200.
+  envoy::config::listener::v3::Listener directResponseListener(const std::string& name) {
+    envoy::config::listener::v3::Listener listener;
+    listener.set_name(name);
+    envoy::config::core::v3::SocketAddress* socket_address =
+        listener.mutable_address()->mutable_socket_address();
+    socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
+    socket_address->set_port_value(0);
+    *listener.add_filter_chains() = directResponseFilterChain(name);
     return listener;
   }
 
@@ -151,13 +184,13 @@ filters:
     test_server_->waitForGauge("dynamicmodulescustom.last_done_event_id", testing::Eq(event_id));
   }
 
-  // Sends a request to the listener that was registered as the port and checks that it succeeds.
-  void expectDirectResponse(const std::string& port_name) {
+  // Sends a request to the listener that was registered as the port and checks its status.
+  void expectDirectResponse(const std::string& port_name, absl::string_view status = "200") {
     codec_client_ = makeHttpConnection(lookupPort(port_name));
     IntegrationStreamDecoderPtr response =
         codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ(status, response->headers().getStatusValue());
     codec_client_->close();
   }
 };
@@ -1420,6 +1453,54 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ListenerWriterWithLdsRust) {
       testing::HasSubstr("2 writer.a Failed listener writer.a exists and is not owned by this "
                          "extension"));
   EXPECT_EQ("NotFound", writerRequest("remove=writer.a", ""));
+}
+
+// Verifies that a listener waits for the filter chain that a module writes, serves its updates, and
+// stops serving it once the module removes it.
+TEST_P(DynamicModulesBootstrapIntegrationTest, FilterChainConfigWriterRust) {
+  DISABLE_IF_ADMIN_DISABLED;
+  initializeWithWriter("");
+
+  std::string serialized;
+  ASSERT_TRUE(fcdsListener("writer.fcds", "chain.a").SerializeToString(&serialized));
+  EXPECT_EQ("Success 1", writerRequest("add=writer.fcds", serialized));
+  test_server_->waitForGauge("dynamic_modules.listener_writer.listeners_owned.config_name.writer",
+                             testing::Eq(1));
+  test_server_->waitForGauge("listener_manager.total_listeners_warming", testing::Eq(1));
+  EXPECT_EQ(
+      0, test_server_->counter("dynamic_modules.listener_writer.update_active.config_name.writer")
+             ->value());
+  ASSERT_TRUE(directResponseFilterChain("chain.a").SerializeToString(&serialized));
+  EXPECT_EQ("Success 1", writerRequest("add_filter_chain=chain.a", serialized));
+  test_server_->waitForCounter(
+      "dynamic_modules.filter_chain_config_writer.update_active.config_name.writer",
+      testing::Eq(1));
+  test_server_->waitForCounter("dynamic_modules.listener_writer.update_active.config_name.writer",
+                               testing::Eq(1));
+  runOnAllWorkers(1);
+  registerTestServerPorts({"http", "writer"});
+  expectDirectResponse("writer");
+
+  ASSERT_TRUE(directResponseFilterChain("chain.a", 404).SerializeToString(&serialized));
+  EXPECT_EQ("Success 2", writerRequest("add_filter_chain=chain.a", serialized));
+  test_server_->waitForCounter(
+      "dynamic_modules.filter_chain_config_writer.update_active.config_name.writer",
+      testing::Eq(2));
+  runOnAllWorkers(2);
+  expectDirectResponse("writer", "404");
+  // The done hook ran for the listener write and the two filter chain writes.
+  test_server_->waitForCounter("dynamicmodulescustom.update_done_total", testing::Eq(3));
+  const std::string outcomes = writerRequest("outcomes", "");
+  EXPECT_THAT(outcomes, testing::HasSubstr("1 chain.a Active"));
+  EXPECT_THAT(outcomes, testing::HasSubstr("2 chain.a Active"));
+
+  EXPECT_EQ("Success", writerRequest("remove_filter_chain=chain.a", ""));
+  test_server_->waitForGauge(
+      "dynamic_modules.filter_chain_config_writer.filter_chains_owned.config_name.writer",
+      testing::Eq(0));
+  runOnAllWorkers(3);
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("writer"));
+  tcp_client->waitForDisconnect();
 }
 
 } // namespace DynamicModules

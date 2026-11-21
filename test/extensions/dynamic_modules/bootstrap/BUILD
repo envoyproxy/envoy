@@ -124,6 +124,25 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "filter_chain_config_writer_test",
+    srcs = ["filter_chain_config_writer_test.cc"],
+    extension_names = ["envoy.bootstrap.dynamic_modules"],
+    deps = [
+        "//source/common/stats:utility_lib",
+        "//source/extensions/bootstrap/dynamic_modules:filter_chain_config_writer_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:listener_manager_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "listener_writer_test",
     srcs = ["listener_writer_test.cc"],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
