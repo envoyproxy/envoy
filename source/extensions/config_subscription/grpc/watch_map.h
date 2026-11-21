@@ -38,12 +38,15 @@ struct Watch {
   // If true, a new update that also contains no resources can skip this watch.
   bool state_of_the_world_empty_{true};
   // Whether onConfigUpdate() has ever been called on this watch, by a server response or a
-  // replay. Only a watch that has never been notified receives a cached resource replay.
+  // replay. Only a watch that has never been notified receives a cached resource replay, or an
+  // initial empty delta update when all resources on the wire were filtered out by accept().
   bool notified_{false};
   // Glob patterns this watch accepts via accept() (the "*" wildcard and/or
-  // "<prefix>/*" suffix globs). These affect routing only and never the subscription; a watch that
-  // holds any of them is never treated as a catch-all (empty-interest) wildcard watch. This is the
-  // forward index; the WatchMap keeps the reverse index in accept_wildcard_watches_ and
+  // "<prefix>/*" suffix globs). These affect non-empty resource routing only and never the
+  // subscription; a watch that holds any of them is excluded from wildcard_watches_ (so unrelated
+  // resources are filtered out), though empty delta updates and an initial filtered-to-empty delta
+  // update are still delivered when the watch's wire subscription is wildcard. This is the forward
+  // index; the WatchMap keeps the reverse index in accept_wildcard_watches_ and
   // accept_prefix_watches_ (mirroring resource_names_ <-> watch_interest_).
   absl::flat_hash_set<std::string> accept_patterns_;
 };
@@ -131,10 +134,13 @@ public:
   // Declares the routing-acceptance patterns for the given watch (replacing any previously declared
   // patterns). These are evaluated FIRST and take precedence: a watch that has declared any accept
   // pattern is routed only the resources matching 'patterns' (plus the concrete names it watches),
-  // and is never treated as a catch-all wildcard watch -- even if its resource_names_ is empty or
-  // contains "*". This lets a watch subscribe to the wildcard on the wire while routing only a
-  // subset (e.g. VHDS virtual hosts under a route configuration). To keep wildcard routing, include
-  // "*" in the patterns.
+  // and is excluded from wildcard_watches_ so unrelated resources are filtered out, even if its
+  // resource_names_ is empty or contains "*". When the watch's wire subscription is wildcard
+  // (resource_names_ empty or containing "*"), empty delta updates and an initial delta update
+  // whose resources were all filtered out by accept() are still delivered so the watch learns its
+  // initial resource set is empty. This lets a watch subscribe to the wildcard on the wire while
+  // routing only a subset (e.g. VHDS virtual hosts under a route configuration). To keep wildcard
+  // routing for non-empty updates, include "*" in the patterns.
   //
   // Each pattern must be the wildcard "*" (accept every resource) or a "<prefix>/*" glob (accept
   // every resource named "<prefix>/..."). Unlike updateWatchInterest(), this
