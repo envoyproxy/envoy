@@ -727,6 +727,13 @@ envoy.filters.http.on_demand:
   type_urls:
   - envoy.extensions.filters.http.on_demand.v3.OnDemand
   - envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
+envoy.filters.http.orca_reporter:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.http.orca_reporter.v3.OrcaReporter
 envoy.filters.http.original_src:
   categories:
   - envoy.filters.http

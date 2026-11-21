@@ -469,6 +469,8 @@
 /*/extensions/http/ai_filters/transcoder @botengyao @penguingao @ginama18
 # HTTP body size limit filter
 /*/extensions/filters/http/body_size_limit @wbpcode @ivaradi
+# HTTP ORCA reporter filter
+/*/extensions/filters/http/orca_reporter @wbpcode @UNOWNED
 
 # HTTP credential injector
 /*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov

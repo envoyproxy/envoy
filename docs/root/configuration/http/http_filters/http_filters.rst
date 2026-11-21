@@ -63,6 +63,7 @@ HTTP filters
   mcp_router_filter
   oauth2_filter
   on_demand_updates_filter
+  orca_reporter_filter
   original_src_filter
   priority_load_shed_filter
   proto_api_scrubber_filter
