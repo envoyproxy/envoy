@@ -25,6 +25,8 @@ public:
                                    Network::DnsLookupFamily /*dns_lookup_family*/,
                                    ResolveCb callback) override;
 
+  Network::ActiveDnsQuery* resolveSrv(const std::string& dns_name, ResolveCb callback) override;
+
   void resetNetworking() override {}
 
 private:
