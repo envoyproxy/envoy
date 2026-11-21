@@ -181,8 +181,7 @@ void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name) {
             secret_name, notify_count);
 }
 
-void SecretManager::failCertificateConfig(absl::string_view secret_name,
-                                          absl::string_view error) {
+void SecretManager::failCertificateConfig(absl::string_view secret_name, absl::string_view error) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   ENVOY_LOG(warn, "Failed to create a certificate subscription for '{}': {}", secret_name, error);
   auto it = cache_.find(secret_name);
