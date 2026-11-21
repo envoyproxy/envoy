@@ -11,6 +11,7 @@
 #include "source/common/grpc/status.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -95,7 +96,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // If this is a gRPC request we:
   //  - mark this request as being gRPC
   //  - change the content-type to application/x-protobuf
-  if (Envoy::Grpc::Common::isGrpcRequestHeaders(headers)) {
+  // Only a POST request can be a gRPC request. This matches the connection manager's local reply
+  // classification (see the grpc_local_reply_requires_post runtime guard): a non-POST request with
+  // a gRPC content type and a body is passed through unbridged instead of being bridged and then
+  // answered with a reply that the connection manager formats as plain HTTP.
+  const bool grpc_request =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_local_reply_requires_post")
+          ? Envoy::Grpc::Common::isGrpcPostRequestHeaders(headers)
+          : Envoy::Grpc::Common::isGrpcRequestHeaders(headers);
+  if (grpc_request) {
     enabled_ = true;
 
     // We keep track of the original content-type to ensure that we handle
