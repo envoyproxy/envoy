@@ -23,8 +23,8 @@ namespace SXG {
  */
 class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(const FilterConfigSharedPtr& config, const EncoderPtr& encoder)
-      : config_(config), encoder_(encoder) {}
+  Filter(const FilterConfigSharedPtr& config, EncoderPtr encoder)
+      : config_(config), encoder_(std::move(encoder)) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
@@ -45,7 +45,7 @@ private:
   Http::ResponseHeaderMap* response_headers_;
   uint64_t data_total_{0};
   bool finished_{false};
-  const EncoderPtr& encoder_;
+  const EncoderPtr encoder_;
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_;

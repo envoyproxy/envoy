@@ -8,6 +8,7 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
 #include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
 #include "contrib/sxg/filters/http/source/config.h"
@@ -54,8 +55,19 @@ void expectCreateFilter(std::string yaml, bool is_sds_config) {
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  Http::StreamFilterSharedPtr filter;
+  EXPECT_CALL(filter_callback, addStreamFilter(_)).WillOnce(testing::SaveArg<0>(&filter));
   cb(filter_callback);
+  ASSERT_NE(filter, nullptr);
+
+  // A request that accepts SXG makes the filter use its encoder, which must outlive the factory
+  // callback that created it.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/hello.html"},
+      {"host", "example.org"},
+      {"accept", "application/signed-exchange;v=b3;q=0.9,text/html;q=0.8"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, true));
+  EXPECT_EQ("true", request_headers.get_("x-client-can-accept-sxg"));
 }
 
 // This loads one of the secrets in credentials, and fails the other one.
