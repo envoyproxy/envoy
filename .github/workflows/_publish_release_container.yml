@@ -50,6 +50,11 @@ concurrency:
   cancel-in-progress: true
 
 
+env:
+  _TS_0: &ts-diskspace envoyproxy/toolshed/actions/diskspace@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_1: &ts-jq envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_2: &ts-oci-collector envoyproxy/toolshed/actions/oci/collector@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+
 jobs:
   push-manifests:
     name: Create manifests (${{ (! inputs.trusted || (inputs.target-branch != 'main' && inputs.dev)) && 'dry run' || 'push' }})
@@ -58,11 +63,11 @@ jobs:
       contents: read
       packages: read
     steps:
-    - uses: envoyproxy/toolshed/actions/diskspace@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-diskspace
     - name: Generate manifest configuration (dev)
       id: dev-config
       if: inputs.dev && inputs.target-branch == 'main'
-      uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-jq
       with:
         input-format: yaml
         filter: >-
@@ -133,7 +138,7 @@ jobs:
             - tools-dev-${{ github.sha }}
 
     - name: Generate manifest configuration (release)
-      uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-jq
       id: release-config
       if: >-
         ! inputs.dev
@@ -218,7 +223,7 @@ jobs:
 
     - name: Collect and push OCI artifacts
       # Extract the images concurrently, and push their manifests 8 at a time.
-      uses: envoyproxy/toolshed/actions/oci/collector@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-oci-collector
       with:
         artifacts-pattern: oci.*
         push-jobs: 8

@@ -47,6 +47,11 @@ on:
 
 
 env:
+  _TS_0: &ts-appauth envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_1: &ts-checks envoyproxy/toolshed/actions/github/checks@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_2: &ts-env-save envoyproxy/toolshed/actions/github/env/save@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_3: &ts-jq envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e
+  _TS_4: &ts-json-table envoyproxy/toolshed/actions/json/table@e8ab1b7c39d474eadc1b9340055df55407d2c77e
   CI_DEBUG: ${{ (vars.CI_DEBUG || vars.RUNNER_DEBUG) && true || false }}
 
 
@@ -55,7 +60,7 @@ jobs:
     runs-on: ${{ fromJSON(inputs.env).config.ci.agent-ubuntu }}
     name: Start checks
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-jq
       id: check-config
       name: Prepare check data
       with:
@@ -78,13 +83,13 @@ jobs:
           | .skipped.output.summary = "${{ inputs.skipped-summary }}"
           | .skipped.output.text = ""
 
-    - uses: envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-appauth
       name: Appauth
       id: appauth
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/actions/github/checks@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-checks
       name: Start checks
       id: checks
       with:
@@ -95,7 +100,7 @@ jobs:
 
           ${{ fromJSON(inputs.env).summary.summary }}
         token: ${{ steps.appauth.outputs.token }}
-    - uses: envoyproxy/toolshed/actions/json/table@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-json-table
       name: Summary
       with:
         collapse-open: true
@@ -119,7 +124,7 @@ jobs:
         output-path: GITHUB_STEP_SUMMARY
         title: Checks started/skipped
 
-    - uses: envoyproxy/toolshed/actions/github/env/save@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-env-save
       name: Save env
       id: data
       with:
