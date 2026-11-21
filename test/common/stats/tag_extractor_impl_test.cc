@@ -636,6 +636,42 @@ TEST(TagExtractorTest, ExtAuthzTagExtractors) {
                          {grpc_cluster, ext_authz_prefix});
 }
 
+TEST(TagExtractorTest, GoogleGrpcClientPrefixTagExtractors) {
+  DefaultTagRegexTester tester;
+  const auto& names = Config::TagNames::get();
+  const Tag client{names.GOOGLE_GRPC_CLIENT_PREFIX, "control.example"};
+  const Tag secret{names.XDS_RESOURCE_NAME, "cert"};
+
+  tester.testRegex("grpc.accesslog.streams_closed_14", "grpc.streams_closed_14",
+                   {{names.GOOGLE_GRPC_CLIENT_PREFIX, "accesslog"}});
+  tester.testRegex("listener_manager.lds.grpc.control.example.streams_total",
+                   "listener_manager.lds.grpc.streams_total", {client});
+  tester.testRegex("sds.cert.grpc.control.example.streams_closed_12", "sds.grpc.streams_closed_12",
+                   {secret, client});
+  tester.testRegex(
+      "extension_config_discovery.http_filter.payments.v1.grpc.control.example.streams_total",
+      "extension_config_discovery.http_filter.payments.v1.grpc.streams_total", {client});
+
+  tester.testRegex("listener_manager.lds.grpc.control.example.google_grpc_client_creation",
+                   "listener_manager.lds.grpc.google_grpc_client_creation", {client});
+
+  // A resource can contain ".grpc." even when the metric is unrelated to the gRPC client.
+  tester.testRegex("sds.cert.grpc.prod.key_rotation_failed", "sds.grpc.prod.key_rotation_failed",
+                   {secret});
+  tester.testRegex("extension_config_discovery.http_filter.payments.grpc.prod.config_reload",
+                   "extension_config_discovery.http_filter.payments.grpc.prod.config_reload", {});
+  tester.testRegex("listener_manager.lds.grpc.control.example.streams_closed_invalid",
+                   "listener_manager.lds.grpc.control.example.streams_closed_invalid", {});
+
+  // The flat name cannot distinguish resource "cert" / client "prod.grpc.control" from
+  // resource "cert.grpc.prod" / client "control".
+  tester.testRegex("sds.cert.grpc.prod.grpc.control.streams_total",
+                   "sds.grpc.prod.grpc.control.streams_total", {secret});
+  tester.testRegex(
+      "extension_config_discovery.http_filter.payments.grpc.grpc.control.streams_closed_0",
+      "extension_config_discovery.http_filter.payments.grpc.grpc.control.streams_closed_0", {});
+}
+
 TEST(TagExtractorTest, ExtractRegexPrefix) {
   TagExtractorPtr tag_extractor; // Keep tag_extractor in this scope to prolong prefix lifetime.
   auto extractRegexPrefix = [&tag_extractor](const std::string& regex) -> absl::string_view {
