@@ -657,7 +657,7 @@ protected:
   bool use_lds_{true}; // Use the integration framework's LDS set up.
   bool upstream_tls_{false};
 
-  Network::DownstreamTransportSocketFactoryPtr
+  virtual Network::DownstreamTransportSocketFactoryPtr
   createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
   // The scope for fake upstream TLS contexts, creating upstream_stats_store_ on first use. Call
   // from the test thread (upstream creation); the store itself is safe to use from any thread.
