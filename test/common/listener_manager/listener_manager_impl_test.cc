@@ -9535,8 +9535,8 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, AddAddressWithoutReusePort) 
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
-// An in place update drains the default filter chain only when it rebuilds it.
-TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, DrainDefaultFilterChainOnlyWhenRebuilt) {
+// An in place update drains the default filter chain only when it rebuilds or removes it.
+TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, DrainDefaultFilterChainOnlyWhenNotReused) {
   startWorkers();
   // The listener handle expects one filter chain build, so every other build loads its filters.
   const auto expect_filter_chain_build = [this]() {
@@ -9565,6 +9565,13 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, DrainDefaultFilterChainOnlyW
   EXPECT_CALL(*worker_,
               onFilterChainDrain(
                   _, ElementsAre(Pointee(Property(&Network::FilterChain::name, "default"))), _));
+  updateInPlace(listener_proto);
+
+  listener_proto.clear_default_filter_chain();
+  EXPECT_CALL(
+      *worker_,
+      onFilterChainDrain(
+          _, ElementsAre(Pointee(Property(&Network::FilterChain::name, "new_default"))), _));
   updateInPlace(listener_proto);
 
   EXPECT_CALL(*listener_foo, onDestroy());
