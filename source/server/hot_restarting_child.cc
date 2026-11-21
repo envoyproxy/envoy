@@ -135,7 +135,10 @@ void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index,
     // We send to the worker index from the parent instance.
     // In the case that the number of workers changes between instances,
     // or the quic connection id generator changes how it selects worker
-    // ids, the hot restart packet transfer will fail.
+    // ids, packets may reach a different worker than the one this instance
+    // would have picked. A parent index this instance does not have (the
+    // parent ran more workers) is mapped by the router onto index % concurrency
+    // rather than read past its workers.
     //
     // One option would be to dispatch an onData call to have the receiving
     // worker forward the packet if the calculated destination differs from

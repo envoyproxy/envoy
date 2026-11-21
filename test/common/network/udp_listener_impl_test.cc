@@ -963,6 +963,50 @@ TEST_P(UdpListenerImplTest, UdpGroReadLimit) {
 
 #endif
 
+// A hot restart parent forwards the datagrams it cannot dispatch tagged with ITS worker index. When
+// the worker count shrank across the restart that index names a worker this instance does not
+// have: the router maps it onto one of its own workers (index modulo the worker count) instead of
+// reading past the end of its worker table.
+TEST(UdpListenerWorkerRouterImplTest, DeliverMapsAWorkerIndexItDoesNotHaveOntoItsOwnWorkers) {
+  UdpListenerWorkerRouterImpl router(2);
+  testing::NiceMock<MockUdpListenerCallbacks> worker0;
+  testing::NiceMock<MockUdpListenerCallbacks> worker1;
+  ON_CALL(worker0, workerIndex()).WillByDefault(Return(0));
+  ON_CALL(worker1, workerIndex()).WillByDefault(Return(1));
+  router.registerWorkerForListener(worker0);
+  router.registerWorkerForListener(worker1);
+
+  auto datagram = [](absl::string_view payload) {
+    UdpRecvData data;
+    data.buffer_ = std::make_unique<Buffer::OwnedImpl>(payload);
+    return data;
+  };
+  std::vector<std::string> on_worker0;
+  std::vector<std::string> on_worker1;
+  EXPECT_CALL(worker0, post(_)).WillRepeatedly(Invoke([&](UdpRecvData&& data) {
+    on_worker0.push_back(data.buffer_->toString());
+  }));
+  EXPECT_CALL(worker1, post(_)).WillRepeatedly(Invoke([&](UdpRecvData&& data) {
+    on_worker1.push_back(data.buffer_->toString());
+  }));
+
+  // In range: delivered as addressed.
+  router.deliver(0, datagram("w0"));
+  router.deliver(1, datagram("w1"));
+  // A four-worker parent's workers 2 and 3.
+  router.deliver(2, datagram("w2"));
+  router.deliver(3, datagram("w3"));
+  EXPECT_THAT(on_worker0, testing::ElementsAre("w0", "w2"));
+  EXPECT_THAT(on_worker1, testing::ElementsAre("w1", "w3"));
+
+  router.unregisterWorkerForListener(worker0);
+  router.unregisterWorkerForListener(worker1);
+  // No worker registered for the mapped index (listener being removed): dropped, as for an
+  // in-range index.
+  router.deliver(3, datagram("dropped"));
+  EXPECT_THAT(on_worker1, testing::ElementsAre("w1", "w3"));
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy
