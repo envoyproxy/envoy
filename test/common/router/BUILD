@@ -776,6 +776,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "upstream_filter_state_test",
+    srcs = ["upstream_filter_state_test.cc"],
+    deps = [
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/common/router:upstream_filter_state_lib",
+        "//source/common/stream_info:filter_state_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
     rbe_pool = {

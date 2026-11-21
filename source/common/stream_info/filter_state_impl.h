@@ -57,6 +57,10 @@ public:
   FilterState::LifeSpan lifeSpan() const override { return life_span_; }
   FilterStateSharedPtr parent() const override { return parent_; }
 
+  // Merges entries from this hierarchy with life_span_ <= max_life_span (parent tiers first)
+  // into target via standard target.setData() and target.setIndexedData().
+  void mergeInto(FilterState& target, FilterState::LifeSpan max_life_span) const;
+
 private:
   // This only checks the local data_storage_ for data_name existence.
   bool hasDataWithNameInternally(absl::string_view data_name) const;
