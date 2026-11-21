@@ -375,7 +375,7 @@ public:
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_;
   bool add_proxy_protocol_connection_state_ = true;
 
-  const LocalReply::LocalReplyPtr local_reply_;
+  LocalReply::LocalReplyPtr local_reply_;
 
   NiceMock<MockResponseEncoder> response_encoder_;
   std::vector<MockStreamDecoderFilter*> decoder_filters_;

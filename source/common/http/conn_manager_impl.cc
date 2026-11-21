@@ -419,6 +419,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
+  stream.state_.deferred_to_next_io_iteration_ = false;
   if (!stream.state_.is_internally_destroyed_) {
     ++closed_non_internally_destroyed_requests_;
     if (isPrematureRstStream(stream)) {
@@ -1801,6 +1802,23 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
             cached_route_.value().get()));
   }
 
+  if (!createFilterChainAndTraceRequest()) {
+    return;
+  }
+
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
+  if (!connection_manager_.shouldDeferRequestProxyingToNextIoCycle()) {
+    filter_manager_.decodeHeaders(*request_headers_, end_stream);
+  } else {
+    state_.deferred_to_next_io_iteration_ = true;
+    state_.deferred_end_stream_ = end_stream;
+  }
+
+  // Reset it here for both global and overridden cases.
+  resetIdleTimer();
+}
+
+bool ConnectionManagerImpl::ActiveStream::createFilterChainAndTraceRequest() {
   filter_manager_.streamInfo().setRequestHeaders(*request_headers_);
   const FilterManager::CreateChainResult create_chain_result =
       filter_manager_.createDownstreamFilterChain();
@@ -1825,9 +1843,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
       // contains a smuggled HTTP request.
       filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
+      filter_manager_.abortDecoderFilterChain();
       sendLocalReply(Code::Forbidden, "", nullptr, std::nullopt,
                      StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
-      return;
+      return false;
     }
     // Allow non websocket requests to go through websocket enabled routes.
   }
@@ -1836,17 +1855,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   if (connection_manager_tracing_config_.has_value()) {
     traceRequest();
   }
-
-  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
-  if (!connection_manager_.shouldDeferRequestProxyingToNextIoCycle()) {
-    filter_manager_.decodeHeaders(*request_headers_, end_stream);
-  } else {
-    state_.deferred_to_next_io_iteration_ = true;
-    state_.deferred_end_stream_ = end_stream;
-  }
-
-  // Reset it here for both global and overridden cases.
-  resetIdleTimer();
+  return true;
 }
 
 void ConnectionManagerImpl::ActiveStream::traceRequest() {
@@ -2127,6 +2136,10 @@ std::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream:
 }
 
 void ConnectionManagerImpl::ActiveStream::onLocalReply(Code code) {
+  if (state_.deferred_to_next_io_iteration_) {
+    filter_manager_.abortDecoderFilterChain();
+    state_.deferred_to_next_io_iteration_ = false;
+  }
   // The BadRequest error code indicates there has been a messaging error.
   if (code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2 &&
       !response_encoder_->streamErrorOnInvalidHttpMessage()) {
@@ -2847,6 +2860,7 @@ void ConnectionManagerImpl::ActiveStream::onResponseDataTooLarge() {
 }
 
 void ConnectionManagerImpl::ActiveStream::resetStream(Http::StreamResetReason, absl::string_view) {
+  state_.deferred_to_next_io_iteration_ = false;
   connection_manager_.stats_.named_.downstream_rq_tx_reset_.inc();
   connection_manager_.doEndStream(*this);
 }
