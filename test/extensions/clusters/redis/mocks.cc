@@ -14,7 +14,7 @@ namespace Clusters {
 namespace Redis {
 
 MockClusterSlotUpdateCallBack::MockClusterSlotUpdateCallBack() {
-  ON_CALL(*this, onClusterSlotUpdate(_, _)).WillByDefault(Return(true));
+  ON_CALL(*this, onClusterSlotUpdate(_, _, _)).WillByDefault(Return(true));
 }
 
 } // namespace Redis
