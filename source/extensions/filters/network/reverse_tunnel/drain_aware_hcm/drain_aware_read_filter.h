@@ -4,6 +4,7 @@
 #include <optional>
 
 #include "envoy/network/filter.h"
+#include "envoy/stats/stats.h"
 
 #include "source/common/network/drain_close_util.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
@@ -14,11 +15,13 @@ namespace NetworkFilters {
 namespace ReverseTunnel {
 
 // HCM creates its HTTP/2 codec on the first request. Until then, a reverse tunnel speaks RPING
-// and must be closed without creating a codec or emitting HTTP/2 frames when drain starts.
+// and drains without creating a codec or emitting HTTP/2 frames. Stopped listeners retain HCM's
+// idle drain grace so successor listeners have time to establish their tunnels.
 class DrainAwareReadFilter : public Network::ReadFilter, public Network::ConnectionCallbacks {
 public:
-  explicit DrainAwareReadFilter(Server::Configuration::ServerFactoryContext& server_context)
-      : server_context_(server_context) {}
+  DrainAwareReadFilter(Server::Configuration::ServerFactoryContext& server_context,
+                       Stats::Counter& drain_close_counter)
+      : server_context_(server_context), drain_close_counter_(drain_close_counter) {}
 
   ~DrainAwareReadFilter() override {
     if (tunnel_iohandle_ != nullptr) {
@@ -73,6 +76,10 @@ public:
       return;
     }
     connection_drain_event_ = drain_event;
+    // A replacement listener or hot-restart successor needs time to establish its own tunnels.
+    // Admin drain notifies before stopping the listener, so capture this distinction now rather
+    // than changing a scheduled close if the listener stops later.
+    listener_stopped_at_drain_ = tunnel_iohandle_ != nullptr && tunnel_iohandle_->listenerStopped();
     scheduleDrain();
   }
   void onEvent(Network::ConnectionEvent event) override {
@@ -87,7 +94,7 @@ public:
 private:
   void scheduleDrain() {
     if (!initialized_ || tunnel_iohandle_ == nullptr || http_started_ || drain_scheduled_ ||
-        !connection_drain_event_.has_value() ||
+        listener_stopped_at_drain_ || !connection_drain_event_.has_value() ||
         connection_->state() != Network::Connection::State::Open) {
       return;
     }
@@ -96,12 +103,17 @@ private:
     const bool health_failed = drain_type_ == envoy::config::listener::v3::Listener::DEFAULT &&
                                server_context_.healthCheckFailed();
     const std::chrono::milliseconds drain_time = server_context_.options().drainTime();
+    // Match HCM's earliest proactive-drain deadline, including millisecond rounding. Closing
+    // strictly before it ensures this filter requests a replacement before HCM closes an idle
+    // tunnel without a codec.
+    const auto close_window =
+        std::chrono::duration_cast<std::chrono::milliseconds>(drain_time * (2.0 / 3.0));
     if (!health_failed && connection_drain_event_->strategy == Server::DrainStrategy::Gradual &&
-        drain_time.count() > 0) {
-      // Sample once over the original drain window. Repeated probabilistic polling would close
-      // almost every idle tunnel near the start of a gradual drain.
+        close_window.count() > 0) {
+      // Sample once over the first part of the original drain window. Repeated probabilistic
+      // polling would close almost every idle tunnel near the start of a gradual drain.
       const std::chrono::milliseconds close_after{server_context_.api().randomGenerator().random() %
-                                                  drain_time.count()};
+                                                  close_window.count()};
       const MonotonicTime now = server_context_.timeSource().monotonicTime();
       const auto elapsed = now <= connection_drain_event_->start_time
                                ? std::chrono::milliseconds{0}
@@ -120,10 +132,12 @@ private:
     // In-place filter-chain updates must refill the idle pool before the maintenance tick. A
     // whole-listener drain has already stopped the parent, so the callback cannot replenish it.
     tunnel_iohandle_->markTunnelDrainingAndDialReplacement();
+    drain_close_counter_.inc();
     connection_->close(Network::ConnectionCloseType::NoFlush, "reverse_tunnel_listener_draining");
   }
 
   Server::Configuration::ServerFactoryContext& server_context_;
+  Stats::Counter& drain_close_counter_;
   Network::Connection* connection_{nullptr};
   Bootstrap::ReverseConnection::DownstreamReverseConnectionIOHandle* tunnel_iohandle_{nullptr};
   Event::TimerPtr drain_check_timer_;
@@ -133,6 +147,7 @@ private:
   bool initialized_{false};
   bool http_started_{false};
   bool drain_scheduled_{false};
+  bool listener_stopped_at_drain_{false};
 };
 
 } // namespace ReverseTunnel

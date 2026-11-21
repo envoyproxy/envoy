@@ -34,7 +34,7 @@ protected:
     }
     socket_ = std::move(socket);
     ON_CALL(callbacks_.connection_, getSocket()).WillByDefault(ReturnRef(socket_));
-    auto filter = std::make_unique<DrainAwareReadFilter>(context_);
+    auto filter = std::make_unique<DrainAwareReadFilter>(context_, drain_close_counter_);
     EXPECT_CALL(callbacks_, connection()).WillOnce(ReturnRef(callbacks_.connection_));
     filter->initializeReadFilterCallbacks(callbacks_);
     return filter;
@@ -46,6 +46,7 @@ protected:
 
   StrictMock<Network::MockReadFilterCallbacks> callbacks_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  Stats::Counter& drain_close_counter_{context_.store_.counterFromString("drain_close")};
   std::unique_ptr<Bootstrap::ReverseConnection::DownstreamReverseConnectionIOHandle>
       tunnel_iohandle_;
   Network::ConnectionSocketPtr socket_;
@@ -53,7 +54,7 @@ protected:
 };
 
 TEST_F(DrainAwareReadFilterTest, DestroyBeforeInitialization) {
-  DrainAwareReadFilter filter(context_);
+  DrainAwareReadFilter filter(context_, drain_close_counter_);
 }
 
 TEST_F(DrainAwareReadFilterTest, IdleTimerStartsOnlyWhenDrainArrives) {
@@ -74,10 +75,12 @@ TEST_F(DrainAwareReadFilterTest, IdleTimerStartsOnlyWhenDrainArrives) {
               close(Network::ConnectionCloseType::NoFlush, "reverse_tunnel_listener_draining"));
   timer_->invokeCallback();
   EXPECT_EQ(Network::Connection::State::Closed, callbacks_.connection_.state());
+  EXPECT_EQ(1, drain_close_counter_.value());
   Buffer::OwnedImpl data("first request");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter->onData(data, false));
   EXPECT_EQ("first request", data.toString());
   timer_->callback_();
+  EXPECT_EQ(1, drain_close_counter_.value());
 }
 
 TEST_F(DrainAwareReadFilterTest, FirstRequestDuringPendingDrainReachesHttpCodec) {
@@ -98,6 +101,36 @@ TEST_F(DrainAwareReadFilterTest, FirstRequestDuringPendingDrainReachesHttpCodec)
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onData(data, false));
   EXPECT_CALL(*timer_, disableTimer());
   filter.reset();
+  EXPECT_EQ(0, drain_close_counter_.value());
+}
+
+TEST_F(DrainAwareReadFilterTest, StoppedListenerLeavesIdleTunnelToHcm) {
+  auto filter = makeFilter();
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+  tunnel_iohandle_->onListenerStopped();
+  EXPECT_CALL(*timer_, enableTimer(_, _)).Times(0);
+  EXPECT_CALL(callbacks_.connection_, close(_, _)).Times(0);
+  drain();
+  EXPECT_FALSE(timer_->enabled());
+  EXPECT_EQ(Network::Connection::State::Open, callbacks_.connection_.state());
+  EXPECT_EQ(0, drain_close_counter_.value());
+  Buffer::OwnedImpl data("first request");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onData(data, false));
+  EXPECT_EQ("first request", data.toString());
+  EXPECT_EQ(0, drain_close_counter_.value());
+}
+
+TEST_F(DrainAwareReadFilterTest, ListenerStoppedAfterDrainKeepsScheduledClose) {
+  auto filter = makeFilter();
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds::zero(), _));
+  drain();
+  tunnel_iohandle_->onListenerStopped();
+  EXPECT_CALL(callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush, "reverse_tunnel_listener_draining"));
+  timer_->invokeCallback();
+  EXPECT_EQ(Network::Connection::State::Closed, callbacks_.connection_.state());
+  EXPECT_EQ(1, drain_close_counter_.value());
 }
 
 TEST_F(DrainAwareReadFilterTest, FirstRequestDuringGradualDrainDoesNotRedrawOrClose) {
@@ -105,7 +138,7 @@ TEST_F(DrainAwareReadFilterTest, FirstRequestDuringGradualDrainDoesNotRedrawOrCl
   auto filter = makeFilter();
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
   EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(9000));
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(9000), _));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(2334), _));
   drain(Server::DrainStrategy::Gradual);
   EXPECT_CALL(callbacks_.connection_, close(_, _)).Times(0);
   Buffer::OwnedImpl data("first request");
@@ -113,6 +146,7 @@ TEST_F(DrainAwareReadFilterTest, FirstRequestDuringGradualDrainDoesNotRedrawOrCl
   EXPECT_EQ("first request", data.toString());
   EXPECT_FALSE(timer_->enabled());
   timer_->callback_();
+  EXPECT_EQ(0, drain_close_counter_.value());
 }
 
 TEST_F(DrainAwareReadFilterTest, DestructionCancelsPendingDrain) {
@@ -158,10 +192,10 @@ TEST_F(DrainAwareReadFilterTest, GradualDrainSamplesOnceAndRetainsOriginalDeadli
   ON_CALL(context_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(10)));
   auto filter = makeFilter();
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
-  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(9000));
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(9000), _));
+  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(6000));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(6000), _));
   drain(Server::DrainStrategy::Gradual);
-  simTime().advanceTimeWait(std::chrono::seconds(8));
+  simTime().advanceTimeWait(std::chrono::seconds(5));
   drain(Server::DrainStrategy::Gradual);
   drain(Server::DrainStrategy::Immediate);
   EXPECT_EQ(Network::Connection::State::Open, callbacks_.connection_.state());
@@ -169,6 +203,7 @@ TEST_F(DrainAwareReadFilterTest, GradualDrainSamplesOnceAndRetainsOriginalDeadli
   EXPECT_CALL(callbacks_.connection_,
               close(Network::ConnectionCloseType::NoFlush, "reverse_tunnel_listener_draining"));
   timer_->invokeCallback();
+  EXPECT_EQ(1, drain_close_counter_.value());
 }
 
 TEST_F(DrainAwareReadFilterTest, DelayedNotificationUsesOriginalStartTime) {
@@ -178,8 +213,8 @@ TEST_F(DrainAwareReadFilterTest, DelayedNotificationUsesOriginalStartTime) {
   const Network::ConnectionDrainEvent event{simTime().monotonicTime(),
                                             Server::DrainStrategy::Gradual};
   simTime().advanceTimeWait(std::chrono::seconds(3));
-  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(9000));
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(6000), _));
+  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(6000));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(3000), _));
   filter->onDrain(event);
 }
 
@@ -204,6 +239,24 @@ TEST_F(DrainAwareReadFilterTest, ZeroDrainTimeDoesNotSample) {
   drain(Server::DrainStrategy::Gradual);
 }
 
+TEST_F(DrainAwareReadFilterTest, OneSecondGradualDrainUsesMillisecondsBeforeScaling) {
+  ON_CALL(context_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
+  auto filter = makeFilter();
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(999));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(333), _));
+  drain(Server::DrainStrategy::Gradual);
+}
+
+TEST_F(DrainAwareReadFilterTest, GradualDrainExcludesHcmProactiveWindowBoundary) {
+  ON_CALL(context_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
+  auto filter = makeFilter();
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(666));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds::zero(), _));
+  drain(Server::DrainStrategy::Gradual);
+}
+
 TEST_F(DrainAwareReadFilterTest, NonReverseSocketIsUnchanged) {
   EXPECT_CALL(callbacks_.connection_, addConnectionCallbacks(_)).Times(0);
   EXPECT_CALL(callbacks_.connection_.dispatcher_, createTimer_(_)).Times(0);
@@ -214,6 +267,7 @@ TEST_F(DrainAwareReadFilterTest, NonReverseSocketIsUnchanged) {
   Buffer::OwnedImpl data("first request");
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onData(data, false));
   EXPECT_EQ("first request", data.toString());
+  EXPECT_EQ(0, drain_close_counter_.value());
 }
 
 TEST_F(DrainAwareReadFilterTest, ConnectionWithoutSocketIsUnchanged) {
@@ -221,12 +275,13 @@ TEST_F(DrainAwareReadFilterTest, ConnectionWithoutSocketIsUnchanged) {
   EXPECT_CALL(callbacks_.connection_, addConnectionCallbacks(_)).Times(0);
   EXPECT_CALL(callbacks_.connection_.dispatcher_, createTimer_(_)).Times(0);
   EXPECT_CALL(callbacks_, connection()).WillOnce(ReturnRef(callbacks_.connection_));
-  DrainAwareReadFilter filter(context_);
+  DrainAwareReadFilter filter(context_, drain_close_counter_);
   filter.initializeReadFilterCallbacks(callbacks_);
   EXPECT_EQ(Network::FilterStatus::Continue, filter.onNewConnection());
   Buffer::OwnedImpl data("first request");
   EXPECT_EQ(Network::FilterStatus::Continue, filter.onData(data, false));
   EXPECT_EQ("first request", data.toString());
+  EXPECT_EQ(0, drain_close_counter_.value());
 }
 
 class DrainAwareReadFilterHealthCheckTest : public DrainAwareReadFilterTest,
@@ -286,11 +341,11 @@ TEST_P(DrainAwareReadFilterHealthCheckTest, FailedModifyOnlyListenerKeepsGradual
   ON_CALL(context_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(10)));
   auto filter = makeFilter();
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
-  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(9000));
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(9000), _));
+  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(6000));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(6000), _));
   EXPECT_CALL(callbacks_.connection_, close(_, _)).Times(0);
   drain(Server::DrainStrategy::Gradual);
-  simTime().advanceTimeWait(std::chrono::seconds(8));
+  simTime().advanceTimeWait(std::chrono::seconds(5));
   EXPECT_EQ(Network::Connection::State::Open, callbacks_.connection_.state());
   testing::Mock::VerifyAndClearExpectations(&callbacks_.connection_);
   simTime().advanceTimeWait(std::chrono::seconds(1));
@@ -316,6 +371,7 @@ TEST_F(DrainAwareReadFilterTest, CloseCancelsTimerAndDestructionRemovesObserver)
   EXPECT_CALL(callbacks_.connection_, removeConnectionCallbacks(testing::Ref(*filter)));
   filter.reset();
   drain();
+  EXPECT_EQ(0, drain_close_counter_.value());
 }
 
 } // namespace

@@ -3645,7 +3645,11 @@ TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsStopsReplacementDialOnListe
   getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
 
   // Simulate worker-thread listener teardown.
-  io_handle_->resetFileEvents();
+  EXPECT_LOG_CONTAINS(
+      "info",
+      "reverse_tunnel: stopping tunnel initiation for source node 'test-node' and cluster "
+      "'test-cluster'",
+      io_handle_->resetFileEvents());
 
   // Drop tracking without dialing a replacement.
   io_handle_->markTunnelDrainingAndDialReplacement(connection_key, 10);
@@ -3706,6 +3710,17 @@ TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsReplacementDialsBeforeLi
   const std::string connection_key = "192.168.1.1:12345";
   addHostConnectionInfo(host, "remote-cluster", 1);
   getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+  io_handle_->updateConnectionState(host, "remote-cluster", connection_key,
+                                    ReverseConnectionState::Connected);
+  const std::string host_connected_gauge =
+      "test_scope.reverse_connections.host.192.168.1.1.connected";
+  const std::string cluster_connected_gauge =
+      "test_scope.reverse_connections.cluster.remote-cluster.connected";
+  ASSERT_EQ(getHostConnectionInfo(host).connection_states.at(connection_key),
+            ReverseConnectionState::Connected);
+  auto stats = extension_->getCrossWorkerStatMap();
+  ASSERT_EQ(stats[host_connected_gauge], 1);
+  ASSERT_EQ(stats[cluster_connected_gauge], 1);
 
   auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
   auto child_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
@@ -3715,18 +3730,43 @@ TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsReplacementDialsBeforeLi
   socket->io_handle_ = std::move(child_io_handle);
   auto child = std::make_unique<DownstreamReverseConnectionIOHandle>(
       std::move(socket), io_handle_.get(), connection_key, 42);
+  EXPECT_FALSE(child->listenerStopped());
 
   // Whole-listener drain reaches the parent directly and leaves accepted sockets alone.
   EXPECT_CALL(*child_io_handle_raw, close()).Times(0);
   Network::IoHandle& listener_io_handle = *io_handle_;
-  listener_io_handle.onListenerDrain();
+  EXPECT_LOG_CONTAINS_N_TIMES(
+      "info",
+      "reverse_tunnel: stopping tunnel initiation for source node 'test-node' and cluster "
+      "'test-cluster'",
+      1, {
+        listener_io_handle.onListenerDrain();
+        listener_io_handle.onListenerDrain();
+      });
   EXPECT_TRUE(listenerWantRead());
+  EXPECT_FALSE(child->listenerStopped());
   EXPECT_TRUE(getHostConnectionInfo(host).connection_keys.contains(connection_key));
+  EXPECT_EQ(getHostConnectionInfo(host).connection_states.at(connection_key),
+            ReverseConnectionState::Connected);
+  stats = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(stats[host_connected_gauge], 1);
+  EXPECT_EQ(stats[cluster_connected_gauge], 1);
+
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
   child->markTunnelDrainingAndDialReplacement();
   maintainReverseConnections();
   EXPECT_FALSE(getHostConnectionInfo(host).connection_keys.contains(connection_key));
-  listener_io_handle.onListenerDrain();
+  EXPECT_FALSE(getHostConnectionInfo(host).connection_states.contains(connection_key));
+  stats = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(stats[host_connected_gauge], 0);
+  EXPECT_EQ(stats[cluster_connected_gauge], 0);
+  EXPECT_LOG_NOT_CONTAINS("info", "stopping tunnel initiation",
+                          listener_io_handle.onListenerDrain());
+
+  // Listener teardown is distinct from admin drain even when initiation has already stopped.
+  EXPECT_FALSE(child->listenerStopped());
+  io_handle_->resetFileEvents();
+  EXPECT_TRUE(child->listenerStopped());
   testing::Mock::VerifyAndClearExpectations(child_io_handle_raw);
 }
 

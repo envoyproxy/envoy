@@ -28,13 +28,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // the fields below are set: a soft GOAWAY (shutdown notice) is sent when the
 // drain starts, and the final GOAWAY follows after ``hcm_config.drain_timeout``,
 // extended by ``hcm_config.drain_timeout_jitter`` if set. With
-// ``enable_drain_with_goaway``, a reverse tunnel sends the soft GOAWAY and an optional
+// ``enable_drain_with_goaway``, a reverse tunnel instead sends the soft GOAWAY and an optional
 // METADATA frame at the configured delays before the final GOAWAY. Without
-// ``shutdown_notice_delay``, such a tunnel receives no GOAWAY until the final one.
-// Per-connection rotation dials a replacement before the old tunnel closes. Whole-listener draining
-// instead stops pending handshakes and replacement dials regardless of ``enable_drain_with_goaway``.
-// With that option enabled, unused reverse tunnels close when selected to drain, while tunnels
-// already carrying HTTP/2 follow the configured drain schedule.
+// ``shutdown_notice_delay``, such a tunnel receives no GOAWAY until the final one. On
+// per-connection rotation, such a tunnel also dials a replacement before the old one closes.
+// Whole-listener draining instead stops pending handshakes and replacement dials regardless of
+// ``enable_drain_with_goaway``. With that option enabled, unused reverse tunnels close when
+// selected to drain, while tunnels already carrying HTTP/2 follow the configured drain schedule.
+// Full listener replacement and hot restart retain the existing grace for unused tunnels so
+// the successor can establish its tunnels.
 message DrainAwareHttpConnectionManager {
   // The underlying HCM configuration to apply.
   http_connection_manager.v3.HttpConnectionManager hcm_config = 1;

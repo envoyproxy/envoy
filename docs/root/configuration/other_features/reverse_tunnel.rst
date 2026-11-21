@@ -501,7 +501,9 @@ resume tunnel initiation; a full listener replacement is required to initiate tu
 
 With the drain-aware HCM's ``enable_drain_with_goaway`` enabled, unused reverse tunnels close when
 selected to drain. In-place filter-chain updates schedule replacement tunnels before closing unused
-ones, while whole-listener drains suppress replacements. A first request that arrives before the idle
+ones, while whole-listener drains suppress replacements. Full listener replacement and hot restart
+retain unused tunnels' existing drain grace so the successor has time to establish its tunnels; this
+does not wait indefinitely for successor readiness. A first request that arrives before the idle
 close is handled by the HTTP codec and follows its normal GOAWAY sequence.
 
 Responder exclusion requires ``enable_drain_with_goaway`` in the reverse connection cluster's

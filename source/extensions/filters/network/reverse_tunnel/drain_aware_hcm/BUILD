@@ -24,6 +24,7 @@ envoy_cc_extension(
         "//envoy/network:drain_decision_interface",
         "//envoy/network:filter_interface",
         "//envoy/server:factory_context_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/http:conn_manager_lib",
         "//source/common/network:drain_close_util_lib",
         "//source/common/protobuf:utility_lib",

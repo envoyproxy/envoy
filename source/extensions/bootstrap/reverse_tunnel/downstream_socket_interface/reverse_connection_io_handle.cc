@@ -315,6 +315,11 @@ void ReverseConnectionIOHandle::resetFileEvents() {
   if (worker_dispatcher_ == nullptr) {
     rev_conn_retry_timer_.reset();
   } else if (worker_dispatcher_->isThreadSafe()) {
+    // Listener handoff stops accepting before notifying existing connections to drain. Preserve
+    // that distinction from an admin drain, which stops dials while leaving the listener running.
+    for (auto* child : child_io_handles_) {
+      child->onListenerStopped();
+    }
     stopInitiatingConnections();
   }
 
@@ -326,7 +331,9 @@ void ReverseConnectionIOHandle::stopInitiatingConnections() {
   if (connections_stopped_) {
     return;
   }
-  ENVOY_LOG(info, "reverse_tunnel: listener draining; stopping pending and replacement dials");
+  ENVOY_LOG(info,
+            "reverse_tunnel: stopping tunnel initiation for source node '{}' and cluster '{}'",
+            config_.src_node_id, config_.src_cluster_id);
   // Disable replacement dials before shutting down sockets, whose callbacks can request one.
   connections_stopped_ = true;
   rev_conn_retry_timer_.reset();

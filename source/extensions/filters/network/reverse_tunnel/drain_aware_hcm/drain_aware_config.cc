@@ -171,7 +171,8 @@ DrainAwareHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto
              Network::FilterManager& filter_manager) -> void {
     auto& server_context = context.serverFactoryContext();
     if (enable_drain_with_goaway) {
-      filter_manager.addReadFilter(std::make_shared<DrainAwareReadFilter>(server_context));
+      filter_manager.addReadFilter(std::make_shared<DrainAwareReadFilter>(
+          server_context, filter_config->stats().named_.downstream_cx_drain_close_));
     }
     Server::OverloadManager& overload_manager = context.shouldBypassOverloadManager()
                                                     ? server_context.nullOverloadManager()
