@@ -17,6 +17,7 @@ filters.
   echo_filter
   ext_authz_filter
   ext_proc_filter
+  fault_filter
   generic_proxy_filter
   geoip_filter
   golang_filter

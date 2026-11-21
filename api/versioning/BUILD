@@ -221,6 +221,7 @@ proto_library(
         "//envoy/extensions/filters/network/echo/v3:pkg",
         "//envoy/extensions/filters/network/ext_authz/v3:pkg",
         "//envoy/extensions/filters/network/ext_proc/v3:pkg",
+        "//envoy/extensions/filters/network/fault/v3:pkg",
         "//envoy/extensions/filters/network/generic_proxy/action/v3:pkg",
         "//envoy/extensions/filters/network/generic_proxy/codecs/dubbo/v3:pkg",
         "//envoy/extensions/filters/network/generic_proxy/codecs/http1/v3:pkg",

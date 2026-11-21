@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.fault.v3;
+
+import "envoy/type/v3/percent.proto";
+
+import "google/protobuf/struct.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.fault.v3";
+option java_outer_classname = "FaultProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/fault/v3;faultv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Network Fault Injection]
+// Network Fault Injection :ref:`configuration overview <config_network_filters_fault_injection>`.
+// [#extension: envoy.filters.network.fault]
+
+// Describes the connection abort fault configuration.
+message FaultAbort {
+  // The percentage of connections that will be aborted. Defaults to 0% if not specified.
+  type.v3.FractionalPercent percentage = 1;
+
+  // If set to ``true``, the filter evaluates the abort percentage and records matching dry-run
+  // statistics (``aborts_dry_run``) and ``filter_metadata`` without closing the connection or
+  // setting the ``FI`` (``FaultInjected``) response flag. Defaults to ``false``.
+  bool dry_run = 2;
+}
+
+// Configuration for the network fault injection filter.
+message NetworkFault {
+  // If specified, the filter will abort incoming connections based on the values in the object.
+  FaultAbort abort = 1;
+
+  // Optional prefix to use when emitting statistics. If specified, statistics are emitted with the
+  // prefix ``fault.<stat_prefix>.``; otherwise they are emitted with the prefix ``fault.``.
+  string stat_prefix = 2;
+
+  // The runtime key to override the abort percentage. The default is
+  // ``fault.network.abort.abort_percent``.
+  string abort_percent_runtime = 3;
+
+  // When an abort fault is executed (or matched in ``dry_run`` mode), the metadata struct provided
+  // here will be added to the connection's dynamic metadata under the namespace
+  // ``envoy.filters.network.fault``. This data can be logged as part of Access Logs using the
+  // :ref:`command operator <config_access_log_command_operators>`
+  // ``%DYNAMIC_METADATA(envoy.filters.network.fault)%``.
+  google.protobuf.Struct filter_metadata = 4;
+}

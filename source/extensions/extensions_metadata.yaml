@@ -970,6 +970,13 @@ envoy.filters.network.ext_proc:
   status: wip
   type_urls:
   - envoy.extensions.filters.network.ext_proc.v3.NetworkExternalProcessor
+envoy.filters.network.fault:
+  categories:
+  - envoy.filters.network
+  security_posture: robust_to_untrusted_downstream
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.network.fault.v3.NetworkFault
 envoy.filters.network.reverse_tunnel:
   categories:
   - envoy.filters.network
