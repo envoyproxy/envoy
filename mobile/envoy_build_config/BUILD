@@ -104,6 +104,7 @@ envoy_cc_library(
         "@envoy//source/extensions/clusters/static:static_cluster_lib",
         "@envoy//source/extensions/filters/http/buffer:config",
         "@envoy//source/extensions/load_balancing_policies/round_robin:config",
+        "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto_descriptor",
         "@envoy_mobile//test/common/http/filters/assertion:config",
         "@envoy_mobile//test/common/http/filters/assertion:filter_cc_proto_descriptor",
         "@envoy_mobile//test/common/http/filters/route_cache_reset:config",

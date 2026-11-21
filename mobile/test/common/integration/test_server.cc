@@ -27,6 +27,15 @@
 #include "extension_registry.h"
 #include "library/common/engine_common.h"
 
+#if !defined(ENVOY_ENABLE_FULL_PROTOS)
+#include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
+#include "envoy/extensions/quic/connection_id_generator/v3/envoy_deterministic_connection_id_generator_descriptor.pb.h"
+#include "envoy/extensions/quic/crypto_stream/v3/crypto_stream_descriptor.pb.h"
+#include "envoy/extensions/quic/proof_source/v3/proof_source_descriptor.pb.h"
+#include "envoy/extensions/udp_packet_writer/v3/udp_default_writer_factory_descriptor.pb.h"
+#include "envoy/extensions/udp_packet_writer/v3/udp_gso_batch_writer_factory_descriptor.pb.h"
+#endif
+
 namespace Envoy {
 namespace {
 
@@ -142,6 +151,26 @@ TestServer::TestServer()
       .WillByDefault(testing::ReturnRef(context_manager_));
 
   Envoy::ExtensionRegistry::registerFactories();
+
+#if !defined(ENVOY_ENABLE_FULL_PROTOS)
+  // Envoy Mobile only embeds descriptors for the extensions that it registers itself. Add the ones
+  // for the server-side QUIC and UDP writer extensions that the test server and its users register.
+  std::vector<FileDescriptorInfo> file_descriptors = {
+      protobuf::reflection::
+          envoy_extensions_quic_connection_id_generator_v3_envoy_deterministic_connection_id_generator::
+              kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_quic_crypto_stream_v3_crypto_stream::
+          kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_quic_proof_source_v3_proof_source::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_udp_packet_writer_v3_udp_default_writer_factory::
+          kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_udp_packet_writer_v3_udp_gso_batch_writer_factory::
+          kFileDescriptorInfo,
+  };
+  for (const FileDescriptorInfo& descriptor : file_descriptors) {
+    loadFileDescriptors(descriptor);
+  }
+#endif
 }
 
 void TestServer::start(TestServerType type, int port) {
