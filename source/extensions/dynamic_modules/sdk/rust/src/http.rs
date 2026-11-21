@@ -1149,6 +1149,10 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
 ///
 /// The Envoy filter object is inherently not thread-safe, and it is always recommended to
 /// access it from the same thread as the one that [`HttpFilter`] event hooks are called.
+///
+/// Envoy does not check the header and trailer names and values given to the setters. Check any
+/// that come from request data or other untrusted input with [`crate::is_valid_header_name`] and
+/// [`crate::is_valid_header_value`] first.
 #[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyHttpFilter {

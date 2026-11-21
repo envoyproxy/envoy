@@ -140,6 +140,34 @@ pub fn read_whole_response_body<EHF: EnvoyHttpFilter>(envoy_filter: &mut EHF) ->
   get_body_content(envoy_filter, false)
 }
 
+/// Returns whether `name` is a header name that Envoy accepts: a non-empty HTTP token, optionally
+/// prefixed with `:` for a pseudo-header. Upper case letters are allowed.
+///
+/// Envoy does not check the header names that a module passes, so a module that builds a name
+/// from request data or other untrusted input should check it with this first.
+pub fn is_valid_header_name(name: impl AsRef<[u8]>) -> bool {
+  let name = name.as_ref();
+  let token = name.strip_prefix(b":").unwrap_or(name);
+  !token.is_empty() && token.iter().all(|&c| is_token_char(c))
+}
+
+/// Returns whether `value` is a header value that Envoy accepts: one without a control character
+/// other than horizontal tab. Bytes above 0x7f are allowed.
+///
+/// Envoy does not check the header values that a module passes. A CR or LF in a value can end the
+/// header and start another on an HTTP/1 connection, so a module that copies request data or
+/// other untrusted input into a header should check it with this first.
+pub fn is_valid_header_value(value: impl AsRef<[u8]>) -> bool {
+  value
+    .as_ref()
+    .iter()
+    .all(|&c| c == b'\t' || (c >= b' ' && c != 0x7f))
+}
+
+fn is_token_char(c: u8) -> bool {
+  c.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&c)
+}
+
 pub(crate) struct HeaderPairSlice(
   pub(crate) *const crate::abi::envoy_dynamic_module_type_module_http_header,
   pub(crate) usize,
@@ -393,5 +421,43 @@ mod tests {
       });
 
     assert_eq!(read_whole_response_body(&mut mock), b"hello world");
+  }
+
+  #[test]
+  fn test_is_valid_header_name() {
+    for name in ["x-custom", "X-Mixed-Case", ":path", "a!#$%&'*+-.^_`|~0"] {
+      assert!(is_valid_header_name(name), "{name:?}");
+    }
+    assert!(is_valid_header_name(b"x-bytes".as_slice()));
+    for name in [
+      "",
+      ":",
+      "::path",
+      "x:y",
+      "bad name",
+      "x-bad\r",
+      "x-bad\n",
+      "x-bad\0",
+      "caf\u{e9}",
+    ] {
+      assert!(!is_valid_header_name(name), "{name:?}");
+    }
+  }
+
+  #[test]
+  fn test_is_valid_header_value() {
+    for value in [&b""[..], b"value", b"a\tb c", b"\x80\xff"] {
+      assert!(is_valid_header_value(value), "{value:?}");
+    }
+    for value in [
+      &b"a\rb"[..],
+      b"a\nb",
+      b"a\0b",
+      b"bell\x07",
+      b"del\x7f",
+      b"value\r\nx-injected: 1",
+    ] {
+      assert!(!is_valid_header_value(value), "{value:?}");
+    }
   }
 }

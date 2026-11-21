@@ -28,6 +28,9 @@ type BodyBuffer interface {
 
 // HeaderMap is an interface that provides access to the request and response headers.
 // This should be implemented by the SDK or runtime.
+//
+// Envoy does not check the names and values given to Set and Add. Check any that come from
+// request data or other untrusted input with IsValidHeaderName and IsValidHeaderValue first.
 type HeaderMap interface {
 	// Get retrieves the header values for a given key. If the key does not exist,
 	// nil will be returned.

@@ -70,7 +70,8 @@ const _: () = {
     ][::std::mem::offset_of!(envoy_dynamic_module_type_module_buffer, length) - 8usize];
 };
 /** envoy_dynamic_module_type_module_http_header represents a key-value pair of an HTTP header owned
- by the module.*/
+ by the module. Envoy does not check the key or the value; see the note on header names and values
+ at the top of this file.*/
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct envoy_dynamic_module_type_module_http_header {
@@ -2391,17 +2392,17 @@ unsafe extern "C" {
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
-    /** envoy_dynamic_module_callback_http_add_header is called by the module to add
- the value of the header with the given key. If the header does not exist, it will be
- created. If the header already exists, all existing values will be removed and the new value will
- be set. When the given value is null, the header will be removed if the key exists.
+    /** envoy_dynamic_module_callback_http_add_header is called by the module to add a value to the
+ header with the given key, keeping any existing values. If the header does not exist, it will be
+ created. Use envoy_dynamic_module_callback_http_set_header to replace or remove a header.
 
  @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  corresponding HTTP filter.
  @param header_type is the type of the header map to add the header to (request/response
  headers/trailers).
- @param key is the key of the header.
- @param value is the pointer to the buffer of the value. It can be null to remove the header.
+ @param key is the key of the header. It must be a valid header name; Envoy does not check it.
+ @param value is the pointer to the buffer of the value. A null or empty value is rejected.
+ Otherwise it must be a valid header value; Envoy does not check it.
  @return true if the operation is successful, false otherwise.
 
  Note that this only adds the header to the underlying Envoy object. Whether or not the header is
@@ -2426,8 +2427,9 @@ unsafe extern "C" {
  corresponding HTTP filter.
  @param header_type is the type of the header map to set the header to (request/response
  headers/trailers).
- @param key is the key of the header.
+ @param key is the key of the header. It must be a valid header name; Envoy does not check it.
  @param value is the pointer to the buffer of the value. It can be null to remove the header.
+ Otherwise it must be a valid header value; Envoy does not check it.
  @return true if the operation is successful, false otherwise.
 
  Note that this only sets the header to the underlying Envoy object. Whether or not the header is

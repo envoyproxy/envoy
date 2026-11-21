@@ -128,7 +128,13 @@ public:
   virtual void append(std::string_view data) = 0;
 };
 
-/** HeaderMap interface */
+/**
+ * HeaderMap interface.
+ *
+ * Envoy does not check the keys and values given to set() and add(). Check any that come from
+ * request data or other untrusted input with Utility::isValidHeaderName() and
+ * Utility::isValidHeaderValue() first.
+ */
 class HeaderMap {
 public:
   virtual ~HeaderMap();
@@ -1538,6 +1544,29 @@ std::string readWholeRequestBody(HttpFilterHandle& handle);
  * @return The combined response body as a string.
  */
 std::string readWholeResponseBody(HttpFilterHandle& handle);
+
+/**
+ * Returns whether a name is a header name that Envoy accepts: a non-empty HTTP token, optionally
+ * prefixed with ':' for a pseudo-header. Upper case letters are allowed.
+ *
+ * Envoy does not check the header names that a module passes, so a module that builds a name from
+ * request data or other untrusted input should check it with this first.
+ * @param name The header name.
+ * @return Whether Envoy accepts the name.
+ */
+bool isValidHeaderName(std::string_view name);
+
+/**
+ * Returns whether a value is a header value that Envoy accepts: one without a control character
+ * other than horizontal tab. Bytes above 0x7f are allowed.
+ *
+ * Envoy does not check the header values that a module passes. A CR or LF in a value can end the
+ * header and start another on an HTTP/1 connection, so a module that copies request data or other
+ * untrusted input into a header should check it with this first.
+ * @param value The header value.
+ * @return Whether Envoy accepts the value.
+ */
+bool isValidHeaderValue(std::string_view value);
 
 } // namespace Utility
 
