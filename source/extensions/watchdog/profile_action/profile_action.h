@@ -3,6 +3,7 @@
 #include <chrono>
 #include <optional>
 
+#include "envoy/api/api.h"
 #include "envoy/extensions/watchdog/profile_action/v3/profile_action.pb.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/thread/thread.h"
@@ -33,7 +34,7 @@ private:
   Stats::Counter& profiles_attempted_;
   Stats::Counter& profiles_successfully_captured_;
   uint64_t profiles_started_ = 0;
-  Server::Configuration::GuardDogActionFactoryContext& context_;
+  Api::Api& api_;
   Event::TimerPtr timer_cb_;
 };
 

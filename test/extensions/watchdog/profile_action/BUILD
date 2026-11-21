@@ -24,6 +24,7 @@ envoy_extension_cc_test(
         "//source/extensions/watchdog/profile_action:config",
         "//source/extensions/watchdog/profile_action:profile_action_lib",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
