@@ -4,4 +4,4 @@ was followed by a smaller data frame; bodies split across several data frames co
 filter now parses each data frame as it arrives and applies flow control instead of buffering the whole body.
 As a result, a body whose MCP message is not complete within ``max_request_body_size`` is rejected with 400
 (counted in ``body_too_large``) rather than 413, and with ``max_request_body_size`` set to 0 a large body is no
-longer rejected with 413; it is flow-controlled until the filter sees the MCP fields or the end of the body.
+longer rejected with 413; the filter applies flow control while it waits for the MCP fields.
