@@ -158,6 +158,7 @@ typed_config:
     }
   }
 
+  // Waits for the next connection first, so a request that reuses the current one fails the wait.
   void switchFakeUpstreamConnection(FakeUpstream& upstream) {
     FakeHttpConnectionPtr next_connection;
     ASSERT_TRUE(upstream.waitForHttpConnection(*dispatcher_, next_connection));
@@ -354,7 +355,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsAndEndpoints) {
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   // The request should be sent to fake upstream 2, due to the connect-proxy header.
-  switchFakeUpstreamConnection(*fake_upstreams_[2]);
+  ASSERT_NO_FATAL_FAILURE(switchFakeUpstreamConnection(*fake_upstreams_[2]));
   stripConnectUpgradeAndRespond();
 
   ASSERT_TRUE(fake_upstream_connection_->readDisable(false));
@@ -413,7 +414,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsSingleEndpoint) {
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   // The request should be sent to fake upstream 0.
-  switchFakeUpstreamConnection(*fake_upstreams_[0]);
+  ASSERT_NO_FATAL_FAILURE(switchFakeUpstreamConnection(*fake_upstreams_[0]));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   // No encapsulation.
