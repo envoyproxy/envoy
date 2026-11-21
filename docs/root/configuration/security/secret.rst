@@ -322,6 +322,7 @@ is *cluster.<stat_prefix>.on_demand_secret.*.
      :widths: 1, 1, 2
 
      cert_requested, Counter, Total number of new SDS subscriptions created
+     cert_subscription_failed, Counter, Total number of SDS subscriptions that could not be created; the connections waiting on them fail
      cert_updated, Counter, Total number of certificate updates
      cert_active, Gauge, Number of active certificate subscriptions and certificates
 
