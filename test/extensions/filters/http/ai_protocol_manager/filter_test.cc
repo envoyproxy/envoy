@@ -186,7 +186,7 @@ public:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  // Parses unconfigured routes too, so a test can show the chain is not run there.
+  // Parses unconfigured routes too, so a test can show the chain runs there.
   void createFilterWithAiFilters(
       AiFilterFactories ai_filter_factories,
       envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::
@@ -1711,11 +1711,11 @@ TEST_F(AiProtocolManagerFilterStateTest, FilterStateDoesNotDeclareARequestThatCa
   }
 }
 
-TEST_F(AiProtocolManagerFilterTest, DoesNotRunAiFiltersOnUnconfiguredRoute) {
+// A dynamic forward proxy's catch-all route declares no API, but its parsed payload still runs the
+// AI filters.
+TEST_F(AiProtocolManagerFilterTest, RunsAiFiltersOnUnconfiguredRoute) {
   std::vector<ContextRecordingAiFilter::Seen> seen;
-  int built = 0;
   createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
-    ++built;
     return std::make_unique<ContextRecordingAiFilter>(context, seen);
   }});
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1725,9 +1725,72 @@ TEST_F(AiProtocolManagerFilterTest, DoesNotRunAiFiltersOnUnconfiguredRoute) {
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_EQ(seen[0].protocol, LLMProtocol::Unspecified);
+  EXPECT_EQ(seen[0].request_protocol, LLMProtocol::Unspecified);
+  EXPECT_EQ(seen[0].request_binding, nullptr);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "rewritten");
+  EXPECT_TRUE(injected_end_stream_);
+}
+
+TEST_F(AiProtocolManagerFilterTest, RunsAiFiltersOnUnconfiguredRouteEndedByTrailers) {
+  std::vector<ContextRecordingAiFilter::Seen> seen;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+    return std::make_unique<ContextRecordingAiFilter>(context, seen);
+  }});
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
+  EXPECT_EQ(filter_->decodeData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Http::TestRequestTrailerMapImpl trailers{{"x-trailer", "1"}};
+  EXPECT_EQ(filter_->decodeTrailers(trailers), Http::FilterTrailersStatus::StopIteration);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(seen.size(), 1);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "rewritten");
+  EXPECT_EQ(continue_calls_, 1);
+}
+
+// DISABLE means the same on an unconfigured route: the AI filters run, and the received bytes are
+// what is forwarded.
+TEST_F(AiProtocolManagerFilterTest, ForwardsTheReceivedBodyOnUnconfiguredRouteWhenDisabled) {
+  std::vector<ContextRecordingAiFilter::Seen> seen;
+  createFilterWithAiFilters(
+      {[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+        return std::make_unique<ContextRecordingAiFilter>(context, seen);
+      }},
+      envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::DISABLE);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  const std::string payload = "{ \"stream\": true,  \"model\": \"gpt-4\" }";
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(seen.size(), 1);
+  EXPECT_EQ(injected_.toString(), payload);
+  EXPECT_TRUE(injected_end_stream_);
+}
+
+TEST_F(AiProtocolManagerFilterTest, UnparsedPayloadOnUnconfiguredRouteRunsNoAiFilters) {
+  int built = 0;
+  createFilterWithAiFilters({[&](const AiFilterContext&) -> AiFilterSharedPtr {
+    ++built;
+    return std::make_shared<PassThroughAiFilter>();
+  }});
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  const std::string payload = R"({"model":)";
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_EQ(built, 0);
-  EXPECT_TRUE(seen.empty());
-  EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "gpt-4");
+  EXPECT_EQ(counterValue("request_passthrough"), 1);
+  EXPECT_EQ(injected_.toString(), payload);
   EXPECT_TRUE(injected_end_stream_);
 }
 
@@ -2356,6 +2419,74 @@ TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverSseResponse) {
   EXPECT_TRUE(encoded_injected_end_stream_);
   EXPECT_EQ(encoded_injected_.toString(),
             "data: {\"a\":1,\"first\":true,\"second\":true}\n\ndata: [DONE]\n\n");
+}
+
+// A request no filter named an API for is not an AI call, so its response passes through, even one
+// the AI filters could not parse.
+TEST_F(AiProtocolManagerFilterTest, ResponseToUndetectedRequestPassesThrough) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<SseTaggingAiFilter>("tagged");
+  }});
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4"})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{
+      {":status", "200"}, {"content-type", "application/json"}, {"content-length", "8"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(resp_headers.getContentLengthValue(), "8");
+
+  Buffer::OwnedImpl resp_body("not json");
+  EXPECT_EQ(filter_->encodeData(resp_body, true), Http::FilterDataStatus::Continue);
+  EXPECT_EQ(resp_body.toString(), "not json");
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+}
+
+// Names the request's API, as schema validation does on detecting it.
+class ApiNamingAiFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    request->setProtocol(LLMProtocol::AnthropicMessages);
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
+};
+
+// An API a filter detects on an unconfigured route makes the request an AI call: the API is
+// published, and the response runs the AI filters.
+TEST_F(AiProtocolManagerFilterTest, ResponseToDetectedRequestRunsAiFilters) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+                               return std::make_shared<ApiNamingAiFilter>();
+                             },
+                             [](const AiFilterContext&) -> AiFilterSharedPtr {
+                               return std::make_shared<SseTaggingAiFilter>("tagged");
+                             }});
+  // A stream has one StreamInfo; the mocks carry one each.
+  ON_CALL(encoder_callbacks_, streamInfo())
+      .WillByDefault(testing::ReturnRef(callbacks_.stream_info_));
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"claude"})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+  EXPECT_EQ(RequestLlmProtocol::fromFilterState(*callbacks_.stream_info_.filterState()),
+            LLMProtocol::AnthropicMessages);
+
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "text/event-stream"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+  Buffer::OwnedImpl sse_chunk("data: {\"a\":1}\n\n");
+  EXPECT_EQ(filter_->encodeData(sse_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+  EXPECT_EQ(encoded_injected_.toString(), "data: {\"a\":1,\"tagged\":true}\n\n");
 }
 
 TEST_F(AiProtocolManagerFilterTest, SseResponseEndedByTrailersContinuesEncoding) {
