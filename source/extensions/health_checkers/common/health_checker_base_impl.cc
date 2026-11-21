@@ -429,6 +429,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(
   // not ship a stale code from the last successful response.
   if (type == envoy::data::core::v3::NETWORK || type == envoy::data::core::v3::NETWORK_TIMEOUT) {
     host_->setLastHealthCheckHttpStatus(0);
+    onNetworkFailure();
   }
   // It's possible that the previous call caused this session to be deferred deleted.
   if (timeout_timer_ != nullptr) {

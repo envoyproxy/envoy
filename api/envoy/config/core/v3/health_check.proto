@@ -83,7 +83,7 @@ message HealthCheck {
     }
   }
 
-  // [#next-free-field: 16]
+  // [#next-free-field: 17]
   message HttpHealthCheck {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.HttpHealthCheck";
@@ -132,6 +132,21 @@ message HealthCheck {
     // health checked cluster.
     repeated string request_headers_to_remove = 8 [(validate.rules).repeated = {
       items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+    }];
+
+    // Specifies a list of HTTP response headers whose values are attached to the host after each
+    // complete health check response, and reported to the management server by HDS as string
+    // entries of :ref:`health_metadata
+    // <envoy_v3_api_field_service.health.v3.EndpointHealth.health_metadata>` keyed by the
+    // lower-cased header name. A header missing from the response has no entry, and the values of
+    // a header that appears more than once are joined with ``,``. The entries are replaced on
+    // every complete response, whatever its status, and removed when the health check fails
+    // without a complete response, such as on a connection failure or a timeout.
+    //
+    // The ``http_status_code`` name is reserved for the response status code that HDS reports
+    // and is rejected.
+    repeated string response_headers_to_metadata = 16 [(validate.rules).repeated = {
+      items {string {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
     }];
 
     // Specifies a list of HTTP response statuses considered healthy. If provided, replaces default

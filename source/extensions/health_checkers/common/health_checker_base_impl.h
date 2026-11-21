@@ -83,6 +83,10 @@ protected:
     virtual void onTimeout() PURE;
     void onTimeoutBase();
     virtual void onDeferredDelete() PURE;
+    // Called by handleFailure() on NETWORK and NETWORK_TIMEOUT failures, next to clearing the
+    // host's last HTTP status, so that a checker can also clear other details of the last response
+    // that it attached to the host.
+    virtual void onNetworkFailure() {}
     void onInitialInterval();
 
     HealthCheckerImplBase& parent_;

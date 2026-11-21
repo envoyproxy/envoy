@@ -734,6 +734,23 @@ public:
     addCompletionCallback();
   }
 
+  void setupResponseHeadersToMetadataHC() {
+    const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      response_headers_to_metadata: ["X-Probe-Status", "x-probe-zone", "x-probe-missing"]
+    )EOF";
+
+    allocHealthChecker(yaml);
+    addCompletionCallback();
+  }
+
   void expectSessionCreate(const HostWithHealthCheckMap& health_check_map) {
     // Expectations are in LIFO order.
     TestSessionPtr new_test_session(new TestSession());
@@ -842,6 +859,13 @@ public:
     }
     test_sessions_[index]->stream_response_callbacks_->decodeTrailers(
         Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"some", "trailer"}}});
+  }
+
+  // Completes the in-flight request of session `index` with a headers-only response.
+  void respondHeaders(size_t index,
+                      const std::initializer_list<std::pair<std::string, std::string>>& headers) {
+    test_sessions_[index]->stream_response_callbacks_->decodeHeaders(
+        std::make_unique<Http::TestResponseHeaderMapImpl>(headers), true);
   }
 
   void expectSessionCreate() { expectSessionCreate(health_checker_map_); }
@@ -1059,6 +1083,210 @@ TEST_F(HttpHealthCheckerImplTest, LastHealthCheckHttpStatusClearedOnNetworkFailu
                    ->hosts_[0]
                    ->lastHealthCheckHttpStatus()
                    .has_value());
+}
+
+// The configured response headers are attached to the host as health check metadata keyed by the
+// lower-cased header name. A header missing from the response has no entry, the values of a
+// repeated header are joined, and headers that are not configured are ignored.
+TEST_F(HttpHealthCheckerImplTest, ResponseHeadersToMetadataRecorded) {
+  setupResponseHeadersToMetadataHC();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondHeaders(0, {{":status", "200"},
+                     {"x-probe-status", "ok"},
+                     {"x-probe-zone", "a"},
+                     {"x-probe-zone", "b"},
+                     {"x-not-configured", "ignored"}});
+  EXPECT_THAT(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthCheckMetadata(),
+              testing::UnorderedElementsAre(testing::Pair("x-probe-status", "ok"),
+                                            testing::Pair("x-probe-zone", "a,b")));
+}
+
+// Every complete response replaces the whole metadata map, including an unhealthy one, so a header
+// that disappears from the response disappears from the metadata.
+TEST_F(HttpHealthCheckerImplTest, ResponseHeadersToMetadataReplacedOnEveryResponse) {
+  setupResponseHeadersToMetadataHC();
+  EXPECT_CALL(*this, onHostStatus(_, _)).Times(2);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillRepeatedly(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondHeaders(0, {{":status", "200"}, {"x-probe-status", "ok"}, {"x-probe-zone", "a"}});
+  EXPECT_THAT(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthCheckMetadata(),
+              testing::UnorderedElementsAre(testing::Pair("x-probe-status", "ok"),
+                                            testing::Pair("x-probe-zone", "a")));
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _, _));
+  respondHeaders(0, {{":status", "503"}, {"x-probe-status", "draining"}});
+  EXPECT_THAT(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthCheckMetadata(),
+              testing::UnorderedElementsAre(testing::Pair("x-probe-status", "draining")));
+}
+
+// A timeout clears the metadata so that HDS does not report the headers of an earlier response.
+TEST_F(HttpHealthCheckerImplTest, ResponseHeadersToMetadataClearedOnTimeout) {
+  setupResponseHeadersToMetadataHC();
+  EXPECT_CALL(*this, onHostStatus(_, _)).Times(2);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).Times(2);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillRepeatedly(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondHeaders(0, {{":status", "200"}, {"x-probe-status", "ok"}});
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthCheckMetadata().empty());
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+  EXPECT_CALL(*test_sessions_[0]->client_connection_,
+              close(Network::ConnectionCloseType::Abort, _));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  test_sessions_[0]->timeout_timer_->invokeCallback();
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthCheckMetadata().empty());
+}
+
+// A connection failure while the request is in flight clears the metadata too. Unlike a timeout,
+// it is reported by the session itself rather than by the timeout handling of the base class.
+TEST_F(HttpHealthCheckerImplTest, ResponseHeadersToMetadataClearedOnDisconnect) {
+  setupResponseHeadersToMetadataHC();
+  EXPECT_CALL(*this, onHostStatus(_, _)).Times(2);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).Times(2);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillRepeatedly(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondHeaders(0, {{":status", "200"}, {"x-probe-status", "ok"}});
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthCheckMetadata().empty());
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthCheckMetadata().empty());
+}
+
+// Without response_headers_to_metadata the checker never writes the host's health check metadata,
+// neither on a response nor on a network failure, so metadata set by anything else is preserved.
+TEST_F(HttpHealthCheckerImplTest, ResponseHeadersToMetadataUnsetLeavesMetadataUntouched) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, _)).Times(2);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  const HostSharedPtr& host = cluster_->prioritySet().getMockHostSet(0)->hosts_[0];
+  host->setHealthCheckMetadata({{"owned-elsewhere", "x"}});
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).Times(2);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillRepeatedly(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondHeaders(0, {{":status", "200"}, {"x-probe-status", "ok"}});
+  EXPECT_EQ(200U, host->lastHealthCheckHttpStatus());
+  EXPECT_THAT(host->healthCheckMetadata(),
+              testing::UnorderedElementsAre(testing::Pair("owned-elsewhere", "x")));
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+  EXPECT_CALL(*test_sessions_[0]->client_connection_,
+              close(Network::ConnectionCloseType::Abort, _));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  test_sessions_[0]->timeout_timer_->invokeCallback();
+  EXPECT_FALSE(host->lastHealthCheckHttpStatus().has_value());
+  EXPECT_THAT(host->healthCheckMetadata(),
+              testing::UnorderedElementsAre(testing::Pair("owned-elsewhere", "x")));
+}
+
+// HDS reports the response status code under ``http_status_code``, so a header of that name, in any
+// case, is rejected rather than allowed to overwrite it.
+TEST_F(HttpHealthCheckerImplTest, ResponseHeadersToMetadataRejectsReservedName) {
+  for (const std::string name : {"http_status_code", "HTTP_Status_Code"}) {
+    SCOPED_TRACE(name);
+    const std::string yaml = fmt::format(R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      response_headers_to_metadata: ["x-probe-status", "{}"]
+    )EOF",
+                                         name);
+    EXPECT_THROW_WITH_MESSAGE(allocHealthChecker(yaml), EnvoyException,
+                              "response_headers_to_metadata of the health check of cluster "
+                              "fake_cluster cannot contain the reserved name 'http_status_code'");
+  }
+}
+
+// An empty header name could never match a response header, so it is rejected.
+TEST_F(HttpHealthCheckerImplTest, ResponseHeadersToMetadataRejectsEmptyName) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      response_headers_to_metadata: [""]
+    )EOF";
+  EXPECT_THROW(allocHealthChecker(yaml), ProtoValidationException);
 }
 
 // Tests that a failure to create the health check connection (e.g. a network namespace binding
