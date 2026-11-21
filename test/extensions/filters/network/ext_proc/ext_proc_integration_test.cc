@@ -1156,6 +1156,225 @@ TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusRSTHandling) {
   tcp_client->waitForDisconnect();
 }
 
+// Test onNewConnection SEND followed by normal read and write streaming.
+TEST_P(NetworkExtProcFilterIntegrationTest, OnNewConnectionContinueAndStreamData) {
+  initializeWithModifier([](auto& config) {
+    config.mutable_processing_mode()->set_process_new_connection(
+        envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
+  });
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  // Write client data immediately while onNewConnection is still pending to verify it does not
+  // bypass ext_proc once onNewConnection resumes.
+  ASSERT_TRUE(tcp_client->write("client_data", false));
+
+  ProcessingRequest new_conn_request;
+  waitForFirstGrpcMessage(new_conn_request);
+  EXPECT_TRUE(new_conn_request.has_new_connection());
+  EXPECT_FALSE(new_conn_request.has_read_data());
+  EXPECT_FALSE(new_conn_request.has_write_data());
+  EXPECT_TRUE(new_conn_request.new_connection().has_downstream_remote_address());
+  EXPECT_TRUE(new_conn_request.new_connection().has_downstream_local_address());
+
+  ProcessingResponse new_conn_response;
+  new_conn_response.set_connection_status(ProcessingResponse::CONTINUE);
+  processor_stream_->startGrpcStream();
+  processor_stream_->sendGrpcMessage(new_conn_response);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Client payload must be routed through ext_proc rather than bypassing it.
+  ProcessingRequest read_request;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, read_request));
+  EXPECT_TRUE(read_request.has_read_data());
+  EXPECT_EQ("client_data", read_request.read_data().data());
+
+  sendReadGrpcMessage("client_data_inspected", false);
+  ASSERT_TRUE(fake_upstream_connection->waitForData(21));
+
+  // Upstream response is also processed by ext_proc.
+  ASSERT_TRUE(fake_upstream_connection->write("server_response", false));
+  ProcessingRequest write_request;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, write_request));
+  EXPECT_TRUE(write_request.has_write_data());
+  EXPECT_EQ("server_response", write_request.write_data().data());
+
+  sendWriteGrpcMessage("server_data_inspected", false);
+  tcp_client->waitForData("server_data_inspected");
+
+  verifyCounters({{"streams_started", 1},
+                  {"new_connection_sent", 1},
+                  {"read_data_sent", 1},
+                  {"write_data_sent", 1},
+                  {"stream_msgs_sent", 3},
+                  {"stream_msgs_received", 3}});
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
+}
+
+// Test onNewConnection with forwarded metadata and close_stream_to_ext_proc_server bypass.
+TEST_P(NetworkExtProcFilterIntegrationTest, OnNewConnectionMetadataAndCloseStream) {
+  setConnectionMetadata("untyped-ns", {{"key1", "value1"}});
+  setConnectionMetadata("typed-ns", {}, "typed-test-value");
+  initializeWithModifier([](auto& config) {
+    config.mutable_processing_mode()->set_process_new_connection(
+        envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
+    auto* forwarding = config.mutable_metadata_options()->mutable_forwarding_namespaces();
+    forwarding->add_untyped("untyped-ns");
+    forwarding->add_typed("typed-ns");
+    config.mutable_metadata_options()->mutable_send_once()->set_value(true);
+    config.mutable_metadata_options()->mutable_receiving_namespaces()->add_untyped("ext-proc-ns");
+  });
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  ASSERT_TRUE(tcp_client->write("raw_payload", false));
+
+  ProcessingRequest new_conn_request;
+  waitForFirstGrpcMessage(new_conn_request);
+  EXPECT_TRUE(new_conn_request.has_new_connection());
+  EXPECT_TRUE(new_conn_request.has_metadata());
+  EXPECT_THAT(
+      new_conn_request.metadata().filter_metadata(),
+      Contains(Pair("untyped-ns", HasStructFields(Contains(IsStructString("key1", "value1"))))));
+  EXPECT_THAT(new_conn_request.metadata().typed_filter_metadata(), Contains(Key("typed-ns")));
+
+  ProcessingResponse new_conn_response;
+  new_conn_response.set_connection_status(ProcessingResponse::CONTINUE);
+  new_conn_response.set_close_stream_to_ext_proc_server(true);
+  Protobuf::Struct struct_obj;
+  (*struct_obj.mutable_fields())["verdict"].set_string_value("allow");
+  *(*new_conn_response.mutable_dynamic_metadata()->mutable_fields())["ext-proc-ns"]
+       .mutable_struct_value() = struct_obj;
+
+  processor_stream_->startGrpcStream();
+  processor_stream_->sendGrpcMessage(new_conn_response);
+  ASSERT_TRUE(processor_stream_->waitForReset());
+
+  // Subsequent TCP payload bypasses ext_proc and reaches upstream directly.
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(11));
+
+  ASSERT_TRUE(fake_upstream_connection->write("raw_reply", false));
+  tcp_client->waitForData("raw_reply");
+
+  verifyCounters({{"new_connection_sent", 1}, {"streams_closed", 1}});
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
+}
+
+// Test onNewConnection closing the connection with FIN before upstream connection is established.
+TEST_P(NetworkExtProcFilterIntegrationTest, OnNewConnectionCloseConnection) {
+  initializeWithModifier([](auto& config) {
+    config.mutable_processing_mode()->set_process_new_connection(
+        envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
+  });
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+
+  ProcessingRequest new_conn_request;
+  waitForFirstGrpcMessage(new_conn_request);
+  EXPECT_TRUE(new_conn_request.has_new_connection());
+
+  ProcessingResponse response;
+  response.set_connection_status(ProcessingResponse::CLOSE);
+  processor_stream_->startGrpcStream();
+  processor_stream_->sendGrpcMessage(response);
+
+  verifyCounters({{"new_connection_sent", 1}, {"connections_closed", 1}});
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+}
+
+// Test onNewConnection resetting the connection with RST.
+TEST_P(NetworkExtProcFilterIntegrationTest, OnNewConnectionResetConnection) {
+  initializeWithModifier([](auto& config) {
+    config.mutable_processing_mode()->set_process_new_connection(
+        envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
+  });
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+
+  ProcessingRequest new_conn_request;
+  waitForFirstGrpcMessage(new_conn_request);
+  EXPECT_TRUE(new_conn_request.has_new_connection());
+
+  ProcessingResponse response;
+  response.set_connection_status(ProcessingResponse::CLOSE_RST);
+  processor_stream_->startGrpcStream();
+  processor_stream_->sendGrpcMessage(response);
+
+  verifyCounters({{"new_connection_sent", 1}, {"connections_closed", 1}, {"connections_reset", 1}});
+  tcp_client->waitForDisconnect();
+}
+
+// Test onNewConnection fail-open on gRPC error allows connection and payload to proceed.
+TEST_P(NetworkExtProcFilterIntegrationTest, OnNewConnectionGrpcErrorFailOpen) {
+  initializeWithModifier([](auto& config) {
+    config.set_failure_mode_allow(true);
+    config.mutable_processing_mode()->set_process_new_connection(
+        envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
+  });
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  ASSERT_TRUE(tcp_client->write("client_data", false));
+
+  ProcessingRequest new_conn_request;
+  waitForFirstGrpcMessage(new_conn_request);
+  EXPECT_TRUE(new_conn_request.has_new_connection());
+
+  closeGrpcStream();
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(11));
+
+  verifyCounters(
+      {{"new_connection_sent", 1}, {"streams_grpc_error", 1}, {"failure_mode_allowed", 1}});
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
+}
+
+// Test process_new_connection=SEND with process_read=SKIP and process_write=SKIP.
+TEST_P(NetworkExtProcFilterIntegrationTest, OnNewConnectionOnlyMode) {
+  initializeWithModifier([](auto& config) {
+    auto* mode = config.mutable_processing_mode();
+    mode->set_process_new_connection(
+        envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SEND);
+    mode->set_process_read(envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+    mode->set_process_write(
+        envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+  });
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  ASSERT_TRUE(tcp_client->write("hello", false));
+
+  ProcessingRequest new_conn_request;
+  waitForFirstGrpcMessage(new_conn_request);
+  EXPECT_TRUE(new_conn_request.has_new_connection());
+
+  ProcessingResponse response;
+  response.set_connection_status(ProcessingResponse::CONTINUE);
+  processor_stream_->startGrpcStream();
+  processor_stream_->sendGrpcMessage(response);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  ASSERT_TRUE(fake_upstream_connection->write("world", false));
+  tcp_client->waitForData("world");
+
+  verifyCounters({{"new_connection_sent", 1}, {"stream_msgs_sent", 1}});
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
+}
+
 } // namespace ExtProc
 } // namespace NetworkFilters
 } // namespace Extensions

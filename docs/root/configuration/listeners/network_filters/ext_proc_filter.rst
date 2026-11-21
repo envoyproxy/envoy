@@ -20,12 +20,15 @@ messages.
 Processing model
 ----------------
 
-The filter can independently process read and write directions via
+The filter can independently process connection establishment, read, and write directions via
 :ref:`processing_mode <envoy_v3_api_field_extensions.filters.network.ext_proc.v3.NetworkExternalProcessor.processing_mode>`:
 
+* ``process_new_connection: SEND`` sends connection attributes (downstream remote/local addresses,
+  SNI, ALPN), forwarded dynamic metadata, and connection attributes to the processor upon
+  connection establishment before payload forwarding begins. ``NONE`` (default) skips this event.
 * ``process_read: STREAMED`` sends downstream->upstream data to the processor.
 * ``process_write: STREAMED`` sends upstream->downstream data to the processor.
-* ``SKIP`` bypasses processing for that direction.
+* ``SKIP`` bypasses read or write data processing for that direction.
 
 For each message:
 
@@ -79,6 +82,7 @@ Example
           envoy_grpc:
             cluster_name: network-ext-proc
         processing_mode:
+          process_new_connection: SEND
           process_read: STREAMED
           process_write: STREAMED
         message_timeout: 0.2s
@@ -120,6 +124,7 @@ This filter outputs counters in the ``network_ext_proc.<stat_prefix>.`` namespac
   stream_msgs_received, Counter, Total number of messages received from the external processor.
   read_data_sent, Counter, Number of read-direction data frames sent for processing.
   write_data_sent, Counter, Number of write-direction data frames sent for processing.
+  new_connection_sent, Counter, Number of new connection events sent for processing.
   read_data_injected, Counter, Number of read-direction frames replaced with modified data.
   write_data_injected, Counter, Number of write-direction frames replaced with modified data.
   empty_response_received, Counter, Number of empty responses received.
