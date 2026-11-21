@@ -456,6 +456,30 @@ TEST_P(HttpInspectorTest, HighBitBinaryPayload) {
   testHttpInspectNotFound(header);
 }
 
+TEST_P(HttpInspectorTest, LdapAnonymousBindPayload) {
+  // LDAP anonymous simple bind (12 bytes, length byte 0x0c / \f).
+  const absl::string_view header("\x30\x0c\x02\x01\x01\x60\x07\x02\x01\x03\x04\x00\x80\x00", 14);
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, LdapBindWithSpaceLengthAndBinaryBody) {
+  // LDAP payload with length 32 (0x20 = ' ') followed by binary tag 0x02.
+  const absl::string_view header("\x30\x20\x02\x01\x01\x60\x1b\x02\x01\x03\x04\x00", 12);
+  testHttpInspectNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, TabMethodSeparator) {
+  testHttpInspectNotFound("GET\t/ HTTP/1.1\r\n");
+}
+
+TEST_P(HttpInspectorTest, FormFeedMethodSeparator) {
+  testHttpInspectNotFound("GET\f/ HTTP/1.1\r\n");
+}
+
+TEST_P(HttpInspectorTest, LeadingSpaceBeforeMethod) {
+  testHttpInspectNotFound(" GET / HTTP/1.1\r\n");
+}
+
 TEST_P(HttpInspectorTest, ShortRequestLineFollowedByHeaderWithNonTokenChars) {
   const absl::string_view header = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
   testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http11);
