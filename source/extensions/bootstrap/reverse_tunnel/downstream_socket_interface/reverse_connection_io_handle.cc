@@ -1119,11 +1119,11 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
 }
 
 void ReverseConnectionIOHandle::onConnectionDone(
-    const std::string& error, RCConnectionWrapper* wrapper, bool closed,
+    const HandshakeOutcome& outcome, RCConnectionWrapper* wrapper, bool closed,
     std::optional<std::chrono::milliseconds> retry_after) {
   ENVOY_LOG(info,
             "reverse_tunnel: Connection wrapper done - error: '{}', closed: {}, for node_id: {}",
-            error, closed, config_.src_node_id);
+            outcome.message, closed, config_.src_node_id);
 
   // Validate wrapper pointer before any access.
   if (!wrapper) {
@@ -1177,13 +1177,10 @@ void ReverseConnectionIOHandle::onConnectionDone(
   }
 
   // Process connection result safely.
-  bool is_success = (error == "reverse connection accepted" || error == "success" ||
-                     error == "handshake successful" || error == "connection established");
-
-  if (closed || (!error.empty() && !is_success)) {
+  if (closed || !outcome.accepted) {
     // Handle connection failure.
-    ENVOY_LOG(error, "reverse_tunnel: Connection failed - error '{}', cleaning up host {}", error,
-              host_address);
+    ENVOY_LOG(error, "reverse_tunnel: Connection failed - error '{}', cleaning up host {}",
+              outcome.message, host_address);
 
     updateConnectionState(host_address, cluster_name, connection_key,
                           ReverseConnectionState::Failed);
@@ -1197,7 +1194,8 @@ void ReverseConnectionIOHandle::onConnectionDone(
     trackConnectionFailure(host_address, cluster_name, retry_after);
 
     emitAccessLog("handshake_failure", host_address, cluster_name, connection_key,
-                  connection ? std::make_optional(connection->id()) : std::nullopt, error);
+                  connection ? std::make_optional(connection->id()) : std::nullopt,
+                  outcome.message);
 
   } else {
     // Handle connection success.

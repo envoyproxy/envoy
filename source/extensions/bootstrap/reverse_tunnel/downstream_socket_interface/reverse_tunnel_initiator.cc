@@ -139,6 +139,7 @@ ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
       socket_config.additional_headers = extension_->handshakeAdditionalHeaders();
       socket_config.use_http_upgrade = extension_->handshakeUsesHttpUpgrade();
       socket_config.handshake_headers = extension_->handshakeHeaders();
+      socket_config.handshake_configurator = extension_->handshakeConfigurator();
       socket_config.maintain_interval_ms = extension_->maintainIntervalMs();
       socket_config.handshake_timeout_ms = extension_->handshakeTimeoutMs();
     }

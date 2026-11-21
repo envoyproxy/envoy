@@ -308,6 +308,26 @@ validation:
   ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to parse node_id_format")));
 }
 
+TEST_F(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithInvalidClusterIdFormatter) {
+  ReverseTunnelFilterConfigFactory factory;
+
+  const std::string yaml_string = R"EOF(
+request_path: "/reverse_connections/request"
+request_method: GET
+validation:
+  node_id_format: "valid-node"
+  cluster_id_format: "%INVALID_FORMATTER_COMMAND()%"
+)EOF";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to parse cluster_id_format")));
+}
+
 TEST_F(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithOnlyNodeIdValidation) {
   ReverseTunnelFilterConfigFactory factory;
 
