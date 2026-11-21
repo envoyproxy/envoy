@@ -106,7 +106,8 @@ void ActiveStreamFilterBase::commonContinue() {
   // future.
   if (!headers_continued_) {
     headers_continued_ = true;
-    doHeaders(observedEndStream() && !bufferedData() && !hasTrailers());
+    doHeaders(observedEndStream() && !bufferedData() && !hasTrailers() &&
+              !headersInjectedWithoutEndStream());
   }
 
   if (!canContinue()) {
@@ -443,6 +444,9 @@ Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
 }
 
 bool ActiveStreamDecoderFilter::observedEndStream() { return parent_.decoderObservedEndStream(); }
+bool ActiveStreamDecoderFilter::headersInjectedWithoutEndStream() {
+  return parent_.state().decode_headers_injected_without_end_stream_;
+}
 
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
   parent_.decodeHeaders(this, *parent_.filter_manager_callbacks_.requestHeaders(), end_stream);
@@ -521,6 +525,10 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
 void ActiveStreamDecoderFilter::injectDecodedHeadersToFilterChain(bool end_stream) {
   if (!headers_continued_) {
     headers_continued_ = true;
+    // The last injection is the one that says whether these headers end the stream.
+    const bool guard_enabled = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.http_inject_headers_without_end_stream");
+    parent_.state().decode_headers_injected_without_end_stream_ = guard_enabled && !end_stream;
     doHeaders(end_stream);
   }
 }
@@ -2086,6 +2094,9 @@ Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
 bool ActiveStreamEncoderFilter::observedEndStream() {
   return parent_.state_.observed_encode_end_stream_;
 }
+bool ActiveStreamEncoderFilter::headersInjectedWithoutEndStream() {
+  return parent_.state_.encode_headers_injected_without_end_stream_;
+}
 bool ActiveStreamEncoderFilter::has1xxHeaders() {
   return parent_.state_.has_1xx_headers_ && !continued_1xx_headers_;
 }
@@ -2164,6 +2175,10 @@ void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance&
 void ActiveStreamEncoderFilter::injectEncodedHeadersToFilterChain(bool end_stream) {
   if (!headers_continued_) {
     headers_continued_ = true;
+    // The last injection is the one that says whether these headers end the stream.
+    const bool guard_enabled = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.http_inject_headers_without_end_stream");
+    parent_.state_.encode_headers_injected_without_end_stream_ = guard_enabled && !end_stream;
     doHeaders(end_stream);
   }
 }

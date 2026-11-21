@@ -138,6 +138,9 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual Buffer::InstancePtr createBuffer() PURE;
   virtual Buffer::InstancePtr& bufferedData() PURE;
   virtual bool observedEndStream() PURE;
+  // Whether a filter has injected the headers without `end_stream`: what follows them ends the
+  // stream, so no later filter continues them as the end of it.
+  virtual bool headersInjectedWithoutEndStream() PURE;
   virtual bool has1xxHeaders() PURE;
   virtual void do1xxHeaders() PURE;
   virtual void doHeaders(bool end_stream) PURE;
@@ -260,6 +263,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
   bool observedEndStream() override;
+  bool headersInjectedWithoutEndStream() override;
   bool has1xxHeaders() override { return false; }
   void do1xxHeaders() override { IS_ENVOY_BUG("unexpected 1xx headers"); }
   void doHeaders(bool end_stream) override;
@@ -352,6 +356,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
   bool observedEndStream() override;
+  bool headersInjectedWithoutEndStream() override;
   bool has1xxHeaders() override;
   void do1xxHeaders() override;
   void doHeaders(bool end_stream) override;
@@ -982,6 +987,13 @@ protected:
     // server or Envoy's local reply) before iteration of the encoder filter chain begins. This flag
     // is used for setting end_stream value when resuming encoder filter chain iteration.
     bool observed_encode_end_stream_{};
+
+    // Set `true` when a filter injects the headers without `end_stream`
+    // (`injectDecodedHeadersToFilterChain()`, `injectEncodedHeadersToFilterChain()`): the filter
+    // has more to send, whatever end of stream was observed, so a later filter that stopped the
+    // headers does not continue them as the end of the stream.
+    bool decode_headers_injected_without_end_stream_{};
+    bool encode_headers_injected_without_end_stream_{};
 
     // By default, we will assume there are no 1xx. If encode1xxHeaders
     // is ever called, this is set to true so commonContinue resumes processing the 1xx.
