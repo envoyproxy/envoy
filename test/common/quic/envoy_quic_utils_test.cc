@@ -317,6 +317,8 @@ TEST(EnvoyQuicUtilsTest, EnvoyResetReasonToQuicResetErrorCode) {
             quic::QUIC_STREAM_REQUEST_REJECTED);
   EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::ProtocolError),
             quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::LocalResetNoError),
+            quic::QUIC_STREAM_NO_ERROR);
 }
 
 TEST(EnvoyQuicUtilsTest, EnvoyResetReasonToQuicResetErrorCodeImpossibleCases) {

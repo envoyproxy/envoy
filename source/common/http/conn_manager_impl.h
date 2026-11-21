@@ -110,6 +110,7 @@ public:
   // Http::ServerConnectionCallbacks
   RequestDecoder& newStream(ResponseEncoder& response_encoder,
                             bool is_internally_created = false) override;
+  void onWantsToWriteCleared() override;
 
   RequestDecoderHandlePtr newStreamHandle(ResponseEncoder& response_encoder,
                                           bool is_internally_created = false) override;
@@ -746,6 +747,8 @@ private:
   // Latched when the connection manager is created so it is not re-read on every response. See
   // shouldDrainClose().
   const bool use_connection_event_drain_ = false;
+  // Latched value of the `http2_hold_reset_until_response_sent` runtime feature. See doEndStream().
+  const bool hold_reset_until_response_sent_ = false;
 
   // Whether the connection manager is drained due to premature resets.
   bool drained_due_to_premature_resets_{false};

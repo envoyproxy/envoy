@@ -1188,6 +1188,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "HTTP/1 premature upstream half close";
   case Http::StreamResetReason::RemoteResetNoError:
     return "remote reset (no error)";
+  case Http::StreamResetReason::LocalResetNoError:
+    return "local reset (no error)";
   }
 
   return "";

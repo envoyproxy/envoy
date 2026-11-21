@@ -5957,7 +5957,13 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithErrorAndBufferedR
       request_encoder_->getStream().readDisable(false);
       ASSERT_TRUE(codec_client_->waitForDisconnect());
     } else if (downstreamProtocol() == Http::CodecType::HTTP2) {
+      // The downstream reset is held until the rest of the response has been sent, so resume
+      // reading. The client receives the complete response, followed by RST_STREAM(NO_ERROR).
+      request_encoder_->getStream().readDisable(false);
+      ASSERT_TRUE(response->waitForEndStream());
       ASSERT_TRUE(response->waitForReset());
+      EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());
+      EXPECT_EQ(80 * 1024, response->body().length());
     } else if (downstreamProtocol() == Http::CodecType::HTTP3) {
       // Unlike H/2, H/3 client codec only stops sending request upon STOP_SENDING frame but still
       // attempts to finish receiving response. Resume reading so the response can complete.

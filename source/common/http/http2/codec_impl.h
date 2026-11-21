@@ -166,7 +166,11 @@ public:
   Protocol protocol() override { return Protocol::Http2; }
   void shutdownNotice() override;
   Status protocolErrorForTest(); // Used in tests to simulate errors.
-  bool wantsToWrite() override { return adapter_->want_write(); }
+  bool wantsToWrite() override {
+    // A stream whose reset is held until its response is sent still has data to write, even
+    // while flow control prevents the adapter from sending it.
+    return adapter_->want_write() || !pending_deferred_reset_streams_.empty();
+  }
   // Propagate network connection watermark events to each stream on the connection.
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
     // Snapshot the streams before invoking callbacks. A callback may encode on its stream and
@@ -342,6 +346,17 @@ protected:
     // sendPendingFrames so pending outbound frames have one final chance to be flushed. If we
     // submit a reset, nghttp2 will cancel outbound frames that have not yet been sent.
     virtual bool useDeferredReset() const PURE;
+    // Returns true if a deferred reset for `reason` should wait until the response's END_STREAM
+    // has been sent, instead of being sent at the end of the next sendPendingFrames() even if flow
+    // control is still holding back response data. The connection manager uses LocalResetNoError
+    // for the reset that ends an open request after a complete response; dropping the response
+    // there would truncate it. Other resets abort the stream and are not held.
+    bool shouldHoldReset(StreamResetReason reason) const {
+      return useDeferredReset() && reason == StreamResetReason::LocalResetNoError &&
+             local_end_stream_ && !local_end_stream_sent_;
+    }
+    // Returns true while a held deferred reset is still waiting for END_STREAM to be sent.
+    bool holdingDeferredReset() const { return hold_deferred_reset_ && !local_end_stream_sent_; }
     virtual StreamDecoder* decoder() PURE;
     virtual HeaderMap& headers() PURE;
     virtual void allocTrailers() PURE;
@@ -471,6 +486,8 @@ protected:
     bool pending_receive_buffer_high_watermark_called_ : 1 = false;
     bool pending_send_buffer_high_watermark_called_ : 1 = false;
     bool reset_due_to_messaging_error_ : 1 = false;
+    // Set if deferred_reset_ waits for END_STREAM to be sent. See shouldHoldReset().
+    bool hold_deferred_reset_ : 1 = false;
     // Latch whether this stream is operating with this flag.
     bool extend_stream_lifetime_flag_ : 1 = false;
     bool histograms_recorded_ : 1 = false;
@@ -528,6 +545,9 @@ protected:
     // Marks data consumed by the stream, granting the peer additional stream
     // window.
     void grantPeerAdditionalStreamWindow();
+    // Drops buffered request data and returns its flow-control window, for a stream whose reset is
+    // held until the response has been sent.
+    void dropRequestData();
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;
@@ -839,6 +859,12 @@ private:
   void onKeepaliveResponseTimeout();
   bool slowContainsStreamId(int32_t stream_id) const;
   virtual StreamResetReason getMessagingErrorResetReason() const PURE;
+  // Called when a held deferred reset (see StreamImpl::shouldHoldReset()) is sent or abandoned
+  // outside of the normal sendPendingFrames() path.
+  void onHeldStreamResetFinished();
+  // Tells the connection callbacks that no held deferred resets remain, so wantsToWrite() may now
+  // return false.
+  virtual void notifyWantsToWriteCleared() {}
 
   // Callback function for MetadataDecoder.
   void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
@@ -852,6 +878,8 @@ private:
   // case where there are multiple streams waiting for deferred reset. The stream id is also used to
   // remove streams from the map when they are closed in order to avoid calls to resetStreamWorker
   // after the stream has been removed from the active list.
+  // Streams whose reset is held until their response is sent can stay in the map across calls to
+  // sendPendingFrames().
   std::map<int32_t, StreamImpl*> pending_deferred_reset_streams_;
   bool dispatching_ : 1 = false;
   bool raised_goaway_ : 1 = false;
@@ -918,6 +946,7 @@ private:
   StreamResetReason getMessagingErrorResetReason() const override {
     return StreamResetReason::LocalReset;
   }
+  void notifyWantsToWriteCleared() override { callbacks_.onWantsToWriteCleared(); }
 
   // Http::Connection
   // The reason for overriding the dispatch method is to do flood mitigation only when
