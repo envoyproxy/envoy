@@ -42,16 +42,15 @@ struct LookupResult {
 // leaves alpha, any improvements to stableHashKey that would change its output
 // for existing callers is a breaking change.
 //
-// For non-persistent storage, use SerializedKey, which has no long-term
-// stability guarantees.
+// For non-persistent storage, key by serializeKey(), whose bytes are stable
+// only within one binary.
 //
 // When providing a cached response, Caches must ensure that the keys (and not
 // just their hashes) match.
 size_t stableHashKey(const Key& key);
 
 // The deterministic serialization of a Key, which in-memory maps and sets of
-// Keys use as their key, since for a typical Key serializing it and hashing the
-// bytes costs less than hashing and comparing the message.
+// Keys use as their key.
 using SerializedKey = std::string;
 SerializedKey serializeKey(const Key& key);
 

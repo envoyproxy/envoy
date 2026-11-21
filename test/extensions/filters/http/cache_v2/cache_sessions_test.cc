@@ -349,6 +349,29 @@ TEST_F(CacheSessionsTest, CacheSessionsEntryExpiresOnLookupsOfOtherResources) {
   }
 }
 
+TEST_F(CacheSessionsTest, CacheSessionsEntryExpiresOnLookupOfNewResource) {
+  constexpr size_t lookups = 9;
+  for (size_t i = 0; i < lookups; i++) {
+    const std::string path = absl::StrCat("/", i);
+    EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath(path), _));
+    EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath(path), _));
+  }
+  auto entries = mock_factory_context_.server_factory_context_.store_.findGaugeByString(
+      "cache.cache_sessions_entries.cache_label.mock_cache");
+  ASSERT_TRUE(entries.has_value());
+  cache_sessions_->lookup(testLookupRequest("/0"), [](ActiveLookupResultPtr) {});
+  // Each request creates a new entry after the previous one expired. In a table of two entries
+  // the entry after the new one is always the old one, so each request removes it.
+  for (size_t i = 1; i < lookups; i++) {
+    SCOPED_TRACE(i);
+    advanceTime(std::chrono::minutes(6));
+    cache_sessions_->lookup(testLookupRequest(absl::StrCat("/", i)), [](ActiveLookupResultPtr) {});
+    EXPECT_EQ(entries.value().get().value(), 1U);
+  }
+  pumpDispatcher();
+  EXPECT_THAT(captured_lookup_callbacks_.size(), Eq(lookups));
+}
+
 TEST_F(CacheSessionsTest, CacheDeletionDuringLookupStillCompletesLookup) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));

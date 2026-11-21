@@ -979,7 +979,8 @@ std::shared_ptr<CacheSession> CacheSessionsImpl::getEntry(const Key& key) {
   // if the adjacent entry hasn't been touched in a while.
   // This should do a decent job of expiring them simply, with a low cost, and
   // without taking any long-lived locks as would be required for periodic
-  // scanning. Advancing the iterator that try_emplace() returns always yields end().
+  // scanning. Advancing the iterator that try_emplace() returns always yields end(),
+  // so look the entry up again.
   it = entries_.find(it->first);
   if (++it == entries_.end()) {
     it = entries_.begin();
