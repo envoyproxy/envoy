@@ -32,8 +32,6 @@ class AsyncContext {
 public:
   virtual ~AsyncContext() = default;
 
-  explicit AsyncContext(Stats::Scope& scope) : scope_(scope.createScope("")) {}
-
   /**
    * @return OCSP policy for the certificate, only needed by the server TLS context.
    */
@@ -43,14 +41,6 @@ public:
    * @return the low-level TLS context stored in this context.
    */
   virtual const Ssl::TlsContext& tlsContext() const PURE;
-
-  /**
-   * @return certificate-specific stats scope.
-   */
-  Stats::Scope& certScope() const { return *scope_; }
-
-private:
-  Stats::ScopeSharedPtr scope_;
 };
 
 class ServerAsyncContext : public AsyncContext,
@@ -60,9 +50,8 @@ public:
                      Server::Configuration::ServerFactoryContext& factory_context,
                      const Ssl::ServerContextConfig& tls_config,
                      const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status)
-      : AsyncContext(scope),
-        ServerContextImpl(
-            certScope(), tls_config,
+      : ServerContextImpl(
+            scope, tls_config,
             std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config},
             false, factory_context, /** used by quic */ nullptr, creation_status) {}
 
@@ -79,9 +68,8 @@ public:
                      Server::Configuration::ServerFactoryContext& factory_context,
                      const Ssl::ClientContextConfig& tls_config,
                      const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status)
-      : AsyncContext(scope),
-        ClientContextImpl(
-            certScope(), tls_config,
+      : ClientContextImpl(
+            scope, tls_config,
             std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config},
             false, factory_context, creation_status) {}
 
