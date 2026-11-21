@@ -751,6 +751,13 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
       ASSERT((!s.empty() && s.back() == 'x') || (s.size() > 1 && s[s.size() - 2] == 'x'));
       s.push_back(buffer[0]);
       if (s.size() >= 3 && s[s.size() - 3] == 'x') {
+        // The 'x' may be a literal from earlier in the token rather than the
+        // escape introducer (e.g. "xx\x41"), in which case stoul would throw
+        // std::invalid_argument, which is not caught by the callers (they only
+        // catch ProtocolError), crashing the process. Validate first.
+        if (!std::isxdigit(s[s.size() - 2]) || !std::isxdigit(s[s.size() - 1])) {
+          throw ProtocolError("invalid hex escape in request");
+        }
         char c = static_cast<char>(std::stoul(&s[s.size() - 2], nullptr, 16));
         s.resize(s.size() - 3);
         s.push_back(c);
