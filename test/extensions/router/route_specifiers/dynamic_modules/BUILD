@@ -33,7 +33,10 @@ envoy_extension_cc_dyn_module_test(
     extension_names = ["envoy.router.route_specifiers.dynamic_modules"],
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/config:metadata_lib",
@@ -72,8 +75,10 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.router.route_specifiers.dynamic_modules"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/runtime:runtime_features_lib",

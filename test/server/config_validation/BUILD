@@ -9,7 +9,17 @@ envoy_package()
 envoy_cc_test(
     name = "cluster_manager_test",
     srcs = ["cluster_manager_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:upstream_interface",
@@ -43,8 +53,19 @@ envoy_cc_test(
     ],
     env = {"CONFIGS_TAR_PATH": "$(location //configs)"},
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_small"},
+        "default": {"build": "linux_x64_small"},
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/common:logger",
@@ -100,9 +121,14 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["config_fuzz_test.cc"],
     corpus = "//test/server:server_fuzz_test_corpus",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 22009MB,
+    # over linux_x64_large (12288MiB) with headroom.
     rbe_pool = {
-        "default": {"build": "linux_x64_small"},
-        "tsan": {"build": "linux_x64_large"},
+        "default": {"link": "linux_x64_small"},
+        "gcc": {"link": "default"},
+        "cto": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_large"},
+        "fuzz_coverage": {"link": "linux_x64_xlarge"},
     },
     deps = [
         "//source/common/common:thread_lib",
@@ -179,8 +205,10 @@ envoy_cc_fuzz_test(
     srcs = ["xds_fuzz_test.cc"],
     corpus = "xds_corpus",
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_large"},
     },
     deps = [
         ":xds_fuzz_lib",

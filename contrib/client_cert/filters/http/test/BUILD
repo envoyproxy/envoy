@@ -11,7 +11,6 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "client_cert_filter_test",
     srcs = ["client_cert_filter_test.cc"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//contrib/client_cert/filters/http/source:client_cert_filter_lib",
         "//test/mocks/http:http_mocks",
@@ -24,7 +23,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/client_cert/filters/http/source:config",
         "//test/mocks/http:http_mocks",

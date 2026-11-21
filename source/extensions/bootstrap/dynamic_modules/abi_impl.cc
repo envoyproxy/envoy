@@ -14,8 +14,10 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/str_cat.h"
 
+using Envoy::Extensions::Bootstrap::DynamicModules::ConfigSnapshot;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtension;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfig;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfigScheduler;
@@ -736,6 +738,76 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
   return admin->removeHandler(prefix_str);
 }
 
+bool envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer source_json) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
+  return config->subscribeEcds({name.ptr, name.length}, {source_json.ptr, source_json.length});
+}
+
+envoy_dynamic_module_type_bootstrap_config_snapshot_result
+envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    const envoy_dynamic_module_type_module_buffer* providers, size_t providers_count,
+    envoy_dynamic_module_type_module_buffer name_regex,
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr* snapshot_out) {
+  *snapshot_out = nullptr;
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
+  absl::InlinedVector<absl::string_view, 4> names;
+  names.reserve(providers_count);
+  for (size_t i = 0; i < providers_count; ++i) {
+    names.emplace_back(providers[i].ptr, providers[i].length);
+  }
+  auto snapshot = config->getConfigSnapshot(
+      names, name_regex.ptr != nullptr ? absl::string_view(name_regex.ptr, name_regex.length)
+                                       : absl::string_view{});
+  if (!snapshot.ok()) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "dynamic modules: config snapshot collection failed: {}",
+                        snapshot.status());
+    switch (snapshot.status().code()) {
+    case absl::StatusCode::kFailedPrecondition:
+      return envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed;
+    case absl::StatusCode::kInvalidArgument:
+      return envoy_dynamic_module_type_bootstrap_config_snapshot_result_InvalidRegex;
+    case absl::StatusCode::kUnavailable:
+      return envoy_dynamic_module_type_bootstrap_config_snapshot_result_Unavailable;
+    default:
+      return envoy_dynamic_module_type_bootstrap_config_snapshot_result_CollectionFailed;
+    }
+  }
+  *snapshot_out = snapshot.value().release();
+  return envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success;
+}
+
+bool envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot,
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn json_fn,
+    void* user_data) {
+  auto json = static_cast<ConfigSnapshot*>(snapshot)->serialize();
+  if (!json.ok()) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "dynamic modules: config snapshot encoding failed: {}", json.status());
+    return false;
+  }
+  json_fn({json->data(), json->size()}, user_data);
+  return true;
+}
+
+void envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot) {
+  delete static_cast<ConfigSnapshot*>(snapshot);
+}
+
 // -------------------- Cluster Lifecycle Callbacks --------------------
 
 bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
@@ -758,6 +830,19 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle
   }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
   return config->enableListenerLifecycle();
+}
+
+// -------------------- Runtime Update Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  auto* extension = static_cast<DynamicModuleBootstrapExtension*>(extension_envoy_ptr);
+  return extension->enableRuntimeUpdate(absl::string_view(key.ptr, key.length));
 }
 
 // -------------------- Run On All Workers Callbacks --------------------

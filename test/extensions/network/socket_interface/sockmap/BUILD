@@ -41,7 +41,13 @@ envoy_extension_cc_test(
     name = "socket_interface_test",
     srcs = ["socket_interface_test.cc"],
     extension_names = ["envoy.extensions.network.socket_interface.sockmap"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/common:base_includes",
         "//envoy/common:exception_lib",
@@ -59,8 +65,9 @@ envoy_extension_cc_test(
     srcs = ["sockmap_integration_test.cc"],
     extension_names = ["envoy.extensions.network.socket_interface.sockmap"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/buffer:buffer_lib",

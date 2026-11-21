@@ -2898,6 +2898,130 @@ bool envoy_dynamic_module_callback_http_get_metadata_list_bool(
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     size_t index, bool* result);
 
+/**
+ * The kind of selector used by a metadata path component.
+ */
+typedef enum envoy_dynamic_module_type_metadata_path_component_kind {
+  envoy_dynamic_module_type_metadata_path_component_kind_Key,
+  envoy_dynamic_module_type_metadata_path_component_kind_Index,
+  // Reserved for ABI compatibility. Keeps the type 32 bits wide and lets older C++ consumers
+  // reject future kinds safely.
+  envoy_dynamic_module_type_metadata_path_component_kind_Sentinel = 0x7FFFFFFF,
+} envoy_dynamic_module_type_metadata_path_component_kind;
+
+/**
+ * A component of a metadata path. The kind selects either a literal struct key or a zero-based
+ * list index. The other field is ignored. A key of length zero selects an empty key and may have a
+ * null pointer. The callbacks reject unknown component kinds.
+ */
+typedef struct envoy_dynamic_module_type_module_metadata_path_component {
+  envoy_dynamic_module_type_metadata_path_component_kind kind;
+  envoy_dynamic_module_type_module_buffer key;
+  size_t index;
+} envoy_dynamic_module_type_module_metadata_path_component;
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_nested_string gets the
+ * nested string metadata value.
+ *
+ * The path contains struct keys and list indices relative to the namespace, starting with a key.
+ * Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ * metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ * returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the metadata namespace.
+ * @param path is an array of path components, borrowed for this call. May be null only when
+ * path_length is zero.
+ * @param path_length is the number of path components.
+ * @param result receives the value on success and is unchanged on failure.
+ * The returned buffer is owned by Envoy and valid until the end of the current event hook
+ * unless a metadata setter is called.
+ * @return true on success, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_nested_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_nested_number gets the
+ * nested number metadata value.
+ *
+ * The path contains struct keys and list indices relative to the namespace, starting with a key.
+ * Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ * metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ * returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the metadata namespace.
+ * @param path is an array of path components, borrowed for this call. May be null only when
+ * path_length is zero.
+ * @param path_length is the number of path components.
+ * @param result receives the value on success and is unchanged on failure.
+ * @return true on success, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_nested_number(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
+    double* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_nested_bool gets the
+ * nested bool metadata value.
+ *
+ * The path contains struct keys and list indices relative to the namespace, starting with a key.
+ * Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ * metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ * returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the metadata namespace.
+ * @param path is an array of path components, borrowed for this call. May be null only when
+ * path_length is zero.
+ * @param path_length is the number of path components.
+ * @param result receives the value on success and is unchanged on failure.
+ * @return true on success, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
+    bool* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_nested_list_size gets the
+ * number of elements in a nested metadata list.
+ *
+ * The path contains struct keys and list indices relative to the namespace, starting with a key.
+ * Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ * metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ * returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the metadata namespace.
+ * @param path is an array of path components, borrowed for this call. May be null only when
+ * path_length is zero.
+ * @param path_length is the number of path components.
+ * @param result receives the value on success and is unchanged on failure.
+ * @return true on success, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
+    size_t* result);
+
 // -------------------------- Filter State Callbacks ---------------------------
 
 /**
@@ -9454,6 +9578,42 @@ typedef enum {
 } envoy_dynamic_module_type_bootstrap_active_resource_kind;
 
 /**
+ * A configuration snapshot owned by the module. Release it with
+ * envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete before
+ * envoy_dynamic_module_on_bootstrap_extension_config_destroy returns for its owning config.
+ * It may move between threads, but must not be used concurrently.
+ */
+typedef void* envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr;
+
+/**
+ * Receives JSON owned by Envoy and valid only during this invocation.
+ *
+ * @param json is the encoded snapshot. Its pointer is non-null.
+ * @param user_data is the opaque pointer supplied to the serialize callback and may be null.
+ */
+typedef void (*envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn)(
+    envoy_dynamic_module_type_envoy_buffer json, void* user_data);
+
+/**
+ * The result of envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new.
+ */
+typedef enum envoy_dynamic_module_type_bootstrap_config_snapshot_result {
+  // the snapshot was collected and redacted
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success = 0,
+  // called off the main thread, before
+  // envoy_dynamic_module_on_bootstrap_extension_server_initialized, during shutdown, from a
+  // cluster or listener lifecycle hook, whatever triggered it, from another bootstrap hook Envoy
+  // runs inside an xDS update or a resource's destruction, or while another collection runs
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed = 1,
+  // the name regex is invalid or its RE2 program size exceeds re2.max_program_size.error_level
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_InvalidRegex = 2,
+  // admin support is unavailable
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_Unavailable = 3,
+  // collection failed for any other reason, such as a provider that throws or returns no message
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_CollectionFailed = 4,
+} envoy_dynamic_module_type_bootstrap_config_snapshot_result;
+
+/**
  * The callback type invoked once per active resource name during enumeration.
  *
  * @param name is the name of the resource. The buffer is owned by Envoy and is valid only for the
@@ -9616,9 +9776,50 @@ typedef enum envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_stat
   envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status_Failed = 3,
 } envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status;
 
+/**
+ * The encoding of an ECDS configuration payload delivered to a bootstrap extension.
+ */
+typedef enum {
+  // A protobuf message in its native wire format.
+  envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Protobuf = 0,
+  // JSON from Struct or the inner value of TypedStruct.
+  envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Json = 1,
+  // The unwrapped contents of StringValue or BytesValue.
+  envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Bytes = 2,
+} envoy_dynamic_module_type_bootstrap_ecds_config_encoding;
+
 // =============================================================================
 // Bootstrap Extension Event Hooks
 // =============================================================================
+
+/**
+ * Called on the main thread when an ECDS resource changes or is removed, including TTL expiry.
+ * This hook must not block. Rejecting an update NACKs the response, which may contain other ECDS
+ * resources and may have been partly applied. A rejected removal is only logged and retains
+ * the previous configuration. Delta can report a missing resource as a removal before any config.
+ *
+ * A module that waits for its first configuration before completing initialization must set its
+ * own startup timeout. Initial fetch failures do not invoke this hook.
+ *
+ * @param config_envoy_ptr is the pointer to the bootstrap extension configuration.
+ * @param config_module_ptr is the pointer to the in-module bootstrap extension configuration.
+ * @param name is the resource name, with xDS-TP context parameters sorted.
+ * @param version is the SotW response version or Delta resource version. It is empty for removals
+ * and may be empty for filesystem updates without version_info.
+ * @param type_url is the payload type URL, using the inner type for TypedStruct, empty for
+ * removals.
+ * @param encoding describes the config bytes and is ignored for removals.
+ * @param has_config is false when the resource was removed.
+ * @param config is the payload. All buffers are owned by Envoy and valid only during this call.
+ * @return true if accepted, false if rejected without changing the module's current settings.
+ */
+bool envoy_dynamic_module_on_bootstrap_extension_ecds_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer version,
+    envoy_dynamic_module_type_envoy_buffer type_url,
+    envoy_dynamic_module_type_bootstrap_ecds_config_encoding encoding, bool has_config,
+    envoy_dynamic_module_type_envoy_buffer config);
 
 /**
  * envoy_dynamic_module_on_bootstrap_extension_config_new is called by the main thread when the
@@ -10491,6 +10692,87 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer path_prefix);
 
+// -------------------- Bootstrap Extension Callbacks - ECDS --------------------
+
+/**
+ * Subscribes to one named ECDS resource on the main thread until shutdown. Filesystem sources can
+ * invoke envoy_dynamic_module_on_bootstrap_extension_ecds_update before this call returns;
+ * do not hold a lock across this call that the hook takes.
+ *
+ * @param config_envoy_ptr is the pointer to the bootstrap extension configuration.
+ * @param name is the resource name. Wildcards are not supported. Another bootstrap extension
+ * cannot use the same ADS or xDS-TP name. Filter ECDS subscriptions conflict only on ADS.
+ * @param source_json is a JSON-encoded envoy.config.core.v3.ExtensionConfigSource. Its type_urls
+ * lists permitted payload types, using the inner type for TypedStruct. Default configurations
+ * are not supported. For types not linked into Envoy, use TypedStruct, or BytesValue for binary
+ * payloads; an accepted payload that Envoy cannot render fails the whole unfiltered config dump.
+ * Both input buffers are owned by the module and only need to last this call.
+ * @return true if started; false before server initialization, after shutdown, in init_only mode,
+ * without the ECDS update hook, if already subscribed, or if the name or source is invalid or in
+ * use.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer source_json);
+
+// -------------------- Bootstrap Extension Callbacks - Configuration Snapshots --------------------
+
+/**
+ * Collects and redacts selected providers synchronously on the main thread. Missing providers are
+ * omitted, duplicates are collected once, and results are sorted by provider key. An empty
+ * selection collects nothing. Endpoint dumps are not included. Cost grows with the selected
+ * resources, so combine frequent notifications into one collection.
+ *
+ * Collection is refused in cluster or listener lifecycle hooks, whatever triggered them, and in
+ * other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction. Providers can
+ * contain partial changes under the previous version. Defer collection with the bootstrap config
+ * scheduler. Callout failures during cluster removal are already reported from a posted callback.
+ *
+ * Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
+ * configuration may retain sensitive data. No admin listener is needed, and admin allow_paths does
+ * not restrict access.
+ *
+ * @param config_envoy_ptr is the non-null pointer to the bootstrap extension configuration.
+ * @param providers is an array of provider keys, borrowed for this call. May be null only when
+ * providers_count is zero. Each key's pointer must be non-null when its length is nonzero.
+ * @param providers_count is the number of entries in providers.
+ * @param name_regex is a full-match RE2 resource name filter, ignored by providers without name
+ * filtering. A null pointer or zero length disables filtering. The buffer is borrowed for this
+ * call.
+ * @param snapshot_out is a non-null output pointer. Receives the module-owned snapshot on success,
+ * or null on failure. Release it with the snapshot delete callback before its config is destroyed.
+ * @return the collection result. A call off the main thread also reports an Envoy bug.
+ */
+envoy_dynamic_module_type_bootstrap_config_snapshot_result
+envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    const envoy_dynamic_module_type_module_buffer* providers, size_t providers_count,
+    envoy_dynamic_module_type_module_buffer name_regex,
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr* snapshot_out);
+
+/**
+ * Encodes the snapshot as envoy.admin.v3.ConfigDump JSON on any thread without consuming it.
+ * Encoding can be expensive; use a module-owned thread to avoid blocking Envoy's main thread or
+ * workers.
+ *
+ * @param snapshot is a non-null snapshot handle. Must not be used concurrently.
+ * @param json_fn is a non-null callback invoked synchronously once on success, and not on failure.
+ * @param user_data is an opaque pointer passed to json_fn and may be null.
+ * @return true on success, false if encoding fails, including for unknown or unlinked Any types.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot,
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn json_fn, void* user_data);
+
+/**
+ * Deletes a snapshot on any thread.
+ *
+ * @param snapshot is the snapshot to release, or null. Must not be in use by another call.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot);
+
 // -------------------- Bootstrap Extension Callbacks - Cluster Lifecycle --------------------
 
 /**
@@ -10565,6 +10847,99 @@ void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_active_resource_kind kind,
     envoy_dynamic_module_type_bootstrap_active_resource_name_fn name_fn, void* user_data);
+
+// -------------------- Bootstrap Extension - Runtime Update --------------------
+
+// The runtime update hooks below report the changes of the runtime keys that a bootstrap extension
+// watches with envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update. They are
+// all optional. A watched key is reported through the hook of the type of its value, the way the
+// runtime getters read it:
+//  * A number that is a non-negative integer, so that envoy_dynamic_module_callback_get_runtime_int
+//    reads it exactly, is reported through
+//    envoy_dynamic_module_on_bootstrap_extension_runtime_int_update.
+//  * Any other number is reported through
+//    envoy_dynamic_module_on_bootstrap_extension_runtime_number_update. An integer is not reported
+//    as a boolean, though envoy_dynamic_module_callback_get_runtime_bool also reads it as one.
+//  * A boolean is reported through envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update.
+//  * Any other value, such as a string, counts as unset.
+//
+// Envoy loads a new runtime snapshot whenever a layer of the `layered_runtime` bootstrap option
+// changes, for example on an RTDS update, a disk layer update or a request to the admin
+// `/runtime_modify` endpoint. For every watched key, Envoy compares its value in the new snapshot,
+// that is the value of the topmost layer that sets the key, with its value at the previous update,
+// and calls one hook for every watched key whose type or value changed, in lexicographic order of
+// the keys. A snapshot that changes no watched value calls nothing. NaN is equal to itself. The
+// first comparison is against the value when the extension started watching the key, so that value
+// is not reported.
+//
+// When a key becomes unset, Envoy calls the hook of the type of its previous value with that value
+// and removed set to true. For a runtime guard such as "envoy.reloadable_features.some_flag", the
+// guard then returns to its value before any layer set it, normally its compiled default, while
+// envoy_dynamic_module_callback_get_runtime_bool returns the default given by the caller.
+//
+// When a hook is called, the runtime getters already return the new value on the main thread. The
+// worker threads observe the new snapshot shortly after. The hooks are called on the main thread,
+// never once the server began to shut down, and they cannot watch more keys. When the module does
+// not implement the hook of a type, the changes of that type are not reported.
+//
+// For all of them:
+//  * extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+//  * extension_module_ptr is the pointer to the in-module bootstrap extension.
+//  * key is the watched runtime key whose value changed. It is owned by Envoy and valid only for
+//    the duration of the call.
+//  * value is the new value of the key, or its previous value when removed is true.
+//  * removed is true when the key became unset.
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update is called when a watched runtime
+ * key gets a new boolean value, or becomes unset after having one.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, bool value, bool removed);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_runtime_int_update is called when a watched runtime
+ * key gets a new non-negative integer value, or becomes unset after having one.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_runtime_int_update(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, uint64_t value, bool removed);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_runtime_number_update is called when a watched
+ * runtime key gets a new number that is not a non-negative integer, or becomes unset after having
+ * one.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_runtime_number_update(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, double value, bool removed);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update is called by the module
+ * to watch a runtime key, so that the runtime update hooks above are called on the bootstrap
+ * extension when its value changes. Call it once for each key to watch. The key does not need to
+ * have a value yet.
+ *
+ * This can only be called during envoy_dynamic_module_on_bootstrap_extension_server_initialized.
+ * RTDS may or may not have delivered its layers by then, so the module should read the current
+ * value with the runtime getters such as envoy_dynamic_module_callback_get_runtime_bool when it
+ * starts watching the key, and then rely on the hooks for the later changes.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param key is the runtime key to watch, for example "envoy.reloadable_features.some_flag". It is
+ * only read during the call.
+ * @return true if the module now watches the key. Returns false when the key is empty or already
+ * watched, when the module implements none of the runtime update hooks, outside of
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized, once the server began to shut
+ * down, or when called off the main thread. A call off the main thread also reports an Envoy bug.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
 
 // -------------------- Bootstrap Extension - Run On All Workers --------------------
 

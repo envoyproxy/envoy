@@ -256,6 +256,15 @@ public:
    */
   static std::size_t hash(const Protobuf::Message& message);
 
+  /**
+   * Serializes a message deterministically. Equal bytes mean equal messages within a binary, but
+   * some equal messages give different bytes, such as ones whose google.protobuf.Any payloads were
+   * serialized differently.
+   * @param message the message to serialize.
+   * @return std::string the serialized message.
+   */
+  static std::string serializeDeterministically(const Protobuf::Message& message);
+
 #ifdef ENVOY_ENABLE_YAML
   static void loadFromJson(absl::string_view json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);

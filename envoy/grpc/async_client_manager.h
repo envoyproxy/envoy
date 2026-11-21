@@ -5,6 +5,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/hash.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -69,15 +70,7 @@ private:
 
   // Serializes the config deterministically and hashes the bytes. Equal bytes mean equal configs.
   void updateKey() {
-    serialized_config_.resize(config_.ByteSizeLong());
-    {
-      // The coded stream writes its last bytes when it goes out of scope.
-      Protobuf::io::ArrayOutputStream stream(serialized_config_.data(),
-                                             static_cast<int>(serialized_config_.size()));
-      Protobuf::io::CodedOutputStream coded_stream(&stream);
-      coded_stream.SetSerializationDeterministic(true);
-      config_.SerializeWithCachedSizes(&coded_stream);
-    }
+    serialized_config_ = MessageUtil::serializeDeterministically(config_);
     pre_computed_hash_ = HashUtil::xxHash64(serialized_config_);
   }
 

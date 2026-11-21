@@ -1,11 +1,14 @@
 #include "source/server/admin/admin_filter.h"
 
+#include "source/common/runtime/runtime_features.h"
 #include "source/server/admin/utils.h"
 
 namespace Envoy {
 namespace Server {
 
-AdminFilter::AdminFilter(const Admin& admin) : admin_(admin) {}
+AdminFilter::AdminFilter(const Admin& admin)
+    : admin_(admin), yield_between_chunks_(Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.admin_filter_yield_between_chunks")) {}
 
 Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                      bool end_stream) {
@@ -37,9 +40,12 @@ Http::FilterTrailersStatus AdminFilter::decodeTrailers(Http::RequestTrailerMap&)
 }
 
 void AdminFilter::onDestroy() {
+  destroyed_ = true;
+  next_chunk_cb_.reset();
   for (const auto& callback : on_destroy_callbacks_) {
     callback();
   }
+  request_.reset();
 }
 
 void AdminFilter::addOnDestroyCallback(std::function<void()> cb) {
@@ -93,17 +99,52 @@ void AdminFilter::onComplete() {
                                     StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
 
   // TODO(#31087): use high/lower watermarks to apply flow-control to the admin http port.
-  bool more_data;
-  do {
-    Buffer::OwnedImpl response;
-    more_data = handler->nextChunk(response);
-    bool end_stream = end_stream_on_complete_ && !more_data;
-    ENVOY_LOG_MISC(debug, "nextChunk: response.length={} more_data={} end_stream={}",
-                   response.length(), more_data, end_stream);
-    if (response.length() > 0 || end_stream) {
-      decoder_callbacks_->encodeData(response, end_stream);
+  if (destroyed_) {
+    return;
+  }
+  request_ = std::move(handler);
+  if (!yield_between_chunks_) {
+    while (encodeNextChunk()) {
     }
-  } while (more_data);
+    return;
+  }
+  if (encodeNextChunk()) {
+    scheduleNextChunk();
+  }
+}
+
+bool AdminFilter::encodeNextChunk() {
+  ASSERT(request_ != nullptr);
+  Buffer::OwnedImpl response;
+  const bool more_data = request_->nextChunk(response);
+  const bool end_stream = end_stream_on_complete_ && !more_data;
+  ENVOY_LOG_MISC(debug, "nextChunk: response.length={} more_data={} end_stream={}",
+                 response.length(), more_data, end_stream);
+  if (response.length() > 0 || end_stream) {
+    // This may complete or reset the stream, which calls onDestroy().
+    decoder_callbacks_->encodeData(response, end_stream);
+  }
+  if (destroyed_) {
+    return false;
+  }
+  if (!more_data) {
+    request_.reset();
+    return false;
+  }
+  return true;
+}
+
+void AdminFilter::scheduleNextChunk() {
+  if (next_chunk_cb_ == nullptr) {
+    next_chunk_cb_ = decoder_callbacks_->dispatcher().createSchedulableCallback([this]() {
+      if (encodeNextChunk()) {
+        scheduleNextChunk();
+      }
+    });
+  }
+  // Yield to the event loop before the next chunk, so other main thread work like health checks
+  // and xDS updates can run in between.
+  next_chunk_cb_->scheduleCallbackNextIteration();
 }
 
 } // namespace Server

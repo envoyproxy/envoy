@@ -67,6 +67,8 @@ private:
   std::function<void()> destroy_filters_ = []() {};
 
   Buffer::InstancePtr decoding_buffer_;
+  // The request headers that the decoder callbacks return.
+  Http::TestRequestHeaderMapImpl callbacks_request_headers_;
 };
 
 } // namespace HttpFilters

@@ -29,6 +29,14 @@ envoy_extension_cc_dyn_module_test(
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/config:metadata_lib",
@@ -71,7 +79,7 @@ envoy_extension_cc_test(
     name = "persistent_host_set_test",
     srcs = ["persistent_host_set_test.cc"],
     extension_names = ["envoy.clusters.dynamic_modules"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters/dynamic_modules:persistent_host_set_lib",
@@ -93,8 +101,10 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.clusters.dynamic_modules"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/common:cleanup_lib",

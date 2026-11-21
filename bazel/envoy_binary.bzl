@@ -40,7 +40,7 @@ def envoy_cc_binary(
         tags = [],
         features = [],
         linkstatic = True):
-    exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False)
+    exec_properties = envoy_exec_properties(rbe_pool, exec_properties, test = False, link = True)
     linker_inputs = envoy_exported_symbols_input()
 
     if not linkopts:

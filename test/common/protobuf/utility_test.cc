@@ -213,6 +213,36 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1));
 }
 
+TEST_F(ProtobufUtilityTest, MessageUtilSerializeDeterministically) {
+  Protobuf::Struct ascending;
+  Protobuf::Struct descending;
+  for (int i = 0; i < 16; i++) {
+    (*ascending.mutable_fields())[absl::StrCat("key", i)].set_number_value(i);
+    (*descending.mutable_fields())[absl::StrCat("key", 15 - i)].set_number_value(15 - i);
+  }
+  const std::string bytes = MessageUtil::serializeDeterministically(ascending);
+  EXPECT_EQ(bytes, MessageUtil::serializeDeterministically(descending));
+  Protobuf::Struct parsed;
+  ASSERT_TRUE(parsed.ParseFromString(bytes));
+  EXPECT_TRUE(TestUtility::protoEqual(parsed, ascending));
+
+  (*descending.mutable_fields())["key0"].set_number_value(16);
+  EXPECT_NE(bytes, MessageUtil::serializeDeterministically(descending));
+  EXPECT_EQ("", MessageUtil::serializeDeterministically(Protobuf::Struct()));
+}
+
+TEST_F(ProtobufUtilityTest, MessageUtilSerializeDeterministicallyKeepsAnyPayloadBytes) {
+  // An Any payload keeps its bytes, so the same struct serialized in two orders differs.
+  Protobuf::Any a1;
+  a1.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  a1.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+  Protobuf::Any a2 = a1;
+  a2.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  EXPECT_NE(MessageUtil::serializeDeterministically(a1),
+            MessageUtil::serializeDeterministically(a2));
+  EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2));
+}
+
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   Protobuf::RepeatedPtrField<Protobuf::UInt32Value> repeated;
   EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));

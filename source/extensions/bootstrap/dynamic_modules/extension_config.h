@@ -18,6 +18,8 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/init/target_impl.h"
 #include "source/extensions/bootstrap/dynamic_modules/cluster_writer.h"
+#include "source/extensions/bootstrap/dynamic_modules/config_snapshot.h"
+#include "source/extensions/bootstrap/dynamic_modules/extension_config_subscription.h"
 #include "source/extensions/bootstrap/dynamic_modules/filter_chain_writer.h"
 #include "source/extensions/bootstrap/dynamic_modules/listener_writer.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -77,6 +79,14 @@ using OnBootstrapExtensionListenerWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done);
 using OnBootstrapExtensionFilterChainWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_filter_chain_writer_update_done);
+using OnBootstrapExtensionEcdsUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_ecds_update);
+using OnBootstrapExtensionRuntimeBoolUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update);
+using OnBootstrapExtensionRuntimeIntUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_int_update);
+using OnBootstrapExtensionRuntimeNumberUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_number_update);
 
 class DynamicModuleBootstrapExtension;
 
@@ -158,6 +168,17 @@ public:
    * @return true if the callbacks were successfully registered, false if already registered.
    */
   bool enableClusterLifecycle();
+
+  /**
+   * Subscribes once to a named ECDS configuration after server initialization.
+   */
+  bool subscribeEcds(absl::string_view name, absl::string_view source_json);
+
+  /**
+   * Collects and redacts the selected configuration providers on the main thread.
+   */
+  absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
+  getConfigSnapshot(absl::Span<const absl::string_view> providers, absl::string_view name_regex);
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
@@ -268,6 +289,11 @@ public:
   void onExtensionDestroyed();
 
   /**
+   * Whether the server began to shut down or the extension was destroyed.
+   */
+  bool shutdownStarted() const { return shutdown_started_; }
+
+  /**
    * Returns the admin server, or nothing once the extension is destroyed.
    */
   OptRef<Server::Admin> admin();
@@ -299,6 +325,7 @@ public:
   OnBootstrapExtensionListenerRemovalType on_bootstrap_extension_listener_removal_ = nullptr;
 
   // The following hooks are optional and stay nullptr when the module does not implement them.
+  OnBootstrapExtensionEcdsUpdateType on_bootstrap_extension_ecds_update_ = nullptr;
   OnBootstrapExtensionWorkerEventType on_bootstrap_extension_worker_event_ = nullptr;
   OnBootstrapExtensionRunOnAllWorkersDoneType on_bootstrap_extension_run_on_all_workers_done_ =
       nullptr;
@@ -308,6 +335,10 @@ public:
       on_bootstrap_extension_listener_writer_update_done_ = nullptr;
   OnBootstrapExtensionFilterChainWriterUpdateDoneType
       on_bootstrap_extension_filter_chain_writer_update_done_ = nullptr;
+  OnBootstrapExtensionRuntimeBoolUpdateType on_bootstrap_extension_runtime_bool_update_ = nullptr;
+  OnBootstrapExtensionRuntimeIntUpdateType on_bootstrap_extension_runtime_int_update_ = nullptr;
+  OnBootstrapExtensionRuntimeNumberUpdateType on_bootstrap_extension_runtime_number_update_ =
+      nullptr;
 
   // The name of the extension.
   const std::string extension_name_;
@@ -409,6 +440,8 @@ private:
   // Handle for the shutdown lifecycle callback that cleans up cluster_update_callbacks_handle_.
   Server::ServerLifecycleNotifier::HandlePtr cluster_lifecycle_shutdown_handle_;
   bool cluster_lifecycle_enabled_ = false;
+
+  std::unique_ptr<ExtensionConfigSubscription> extension_config_subscription_;
 
   // True once the server is initialized, set when the listener manager is provided during
   // onServerInitialized. The cluster manager is only safe to access after this point.

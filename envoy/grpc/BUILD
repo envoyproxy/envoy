@@ -30,6 +30,7 @@ envoy_cc_library(
         ":async_client_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:hash_lib",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
