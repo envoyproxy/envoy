@@ -17,7 +17,9 @@ envoy_cc_library(
         "//envoy/runtime:runtime_interface",
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
