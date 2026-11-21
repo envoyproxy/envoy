@@ -398,11 +398,13 @@ envoy_cc_test(
     deps = [
         "//envoy/registry",
         "//envoy/router:retry_interface",
+        "//envoy/upstream:retry_interface",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/router:retry_policy_lib",
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/upstream:retry_priority_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",

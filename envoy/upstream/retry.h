@@ -6,6 +6,8 @@
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -143,14 +145,22 @@ public:
 };
 
 /**
+ * Callback that instantiates a per-request RetryPriority from an already-validated config.
+ */
+using RetryPriorityFactoryCb = std::function<RetryPrioritySharedPtr(uint32_t retry_count)>;
+
+/**
  * Factory for RetryPriority.
  */
 class RetryPriorityFactory : public Config::TypedFactory {
 public:
-  virtual RetryPrioritySharedPtr
-  createRetryPriority(const Protobuf::Message& config,
-                      ProtobufMessage::ValidationVisitor& validation_visitor,
-                      uint32_t retry_count) PURE;
+  /**
+   * Validates `config` at config-load time and returns a factory callback that creates
+   * per-request RetryPriority instances on the data path.
+   */
+  virtual absl::StatusOr<RetryPriorityFactoryCb>
+  createRetryPriorityFactory(const Protobuf::Message& config,
+                             ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.retry_priorities"; }
 };

@@ -73,7 +73,6 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
           retry_policy.retriable_headers(), common_context)),
       retriable_request_headers_(Http::HeaderUtility::buildHeaderMatcherVector(
           retry_policy.retriable_request_headers(), common_context)),
-      validation_visitor_(&validation_visitor),
       refresh_cluster_on_retry_(retry_policy.refresh_cluster_on_retry()) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
@@ -102,9 +101,11 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
   if (!retry_priority.name().empty()) {
     auto& factory =
         Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(retry_priority);
-    retry_priority_config_ =
-        std::make_pair(&factory, Envoy::Config::Utility::translateToFactoryConfig(
-                                     retry_priority, validation_visitor, factory));
+    auto config = Envoy::Config::Utility::translateToFactoryConfig(retry_priority,
+                                                                   validation_visitor, factory);
+    auto factory_cb_or_error = factory.createRetryPriorityFactory(*config, validation_visitor);
+    SET_AND_RETURN_IF_NOT_OK(factory_cb_or_error.status(), creation_status);
+    retry_priority_factory_ = std::move(*factory_cb_or_error);
   }
 
   Upstream::RetryExtensionFactoryContextImpl factory_context(common_context.singletonManager());
@@ -176,12 +177,11 @@ std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPre
 }
 
 Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
-  if (retry_priority_config_.first == nullptr) {
+  if (retry_priority_factory_ == nullptr) {
     return nullptr;
   }
 
-  return retry_priority_config_.first->createRetryPriority(*retry_priority_config_.second,
-                                                           *validation_visitor_, num_retries_);
+  return retry_priority_factory_(num_retries_);
 }
 
 RetryStatePtr RetryPolicyImpl::createRetryState(
