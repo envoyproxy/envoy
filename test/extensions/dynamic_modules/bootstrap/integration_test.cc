@@ -1490,6 +1490,9 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, FilterChainConfigWriterRust) {
   expectDirectResponse("writer", "404");
   // The done hook ran for the listener write and the two filter chain writes.
   test_server_->waitForCounter("dynamicmodulescustom.update_done_total", testing::Eq(3));
+  const std::string outcomes = writerRequest("outcomes", "");
+  EXPECT_THAT(outcomes, testing::HasSubstr("1 chain.a Active"));
+  EXPECT_THAT(outcomes, testing::HasSubstr("2 chain.a Active"));
 
   EXPECT_EQ("Success", writerRequest("remove_filter_chain=chain.a", ""));
   test_server_->waitForGauge(

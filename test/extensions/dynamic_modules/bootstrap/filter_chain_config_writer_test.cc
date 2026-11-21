@@ -163,6 +163,16 @@ MATCHER_P2(IsOutcome, update_id, status, "") {
   return arg.update_id == update_id && arg.status == status;
 }
 
+TEST_F(FilterChainConfigWriterTest, RejectsWritesBeforeServerInitialized) {
+  createWriter();
+  uint64_t update_id = 1;
+  EXPECT_EQ(NotAllowed, writer_->addOrUpdateFilterChain(
+                            "writer.a", serialize(filterChainProto("writer.a")), update_id));
+  EXPECT_EQ(0, update_id);
+  EXPECT_EQ(RemovalNotAllowed, writer_->removeFilterChain("writer.a"));
+  EXPECT_EQ(1, counter("update_rejected"));
+}
+
 TEST_F(FilterChainConfigWriterTest, ShutdownRefusesWritesAndDropsQueuedWork) {
   int handle_releases = 0;
   EXPECT_CALL(listener_manager_, addListenerUpdateCallbacks_(_))

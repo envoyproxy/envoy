@@ -334,6 +334,8 @@ protected:
       stats_.update_failed_.inc();
       break;
     case WriteOutcome::OwnershipLost:
+      // Only a writer whose resources another source can take reports this outcome, and such a
+      // writer has the ownership statistics.
       stats_.update_ownership_lost_->inc();
       break;
     }
