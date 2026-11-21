@@ -9,6 +9,13 @@ with an error code of 413.
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.body_size_limit.v3.BodySizeLimit``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.body_size_limit.v3.BodySizeLimit>`
 
+For CONNECT requests, and for upgrade requests of any type such as WebSocket, the filter stops
+counting once the upstream accepts the CONNECT or upgrade. Bytes sent after that are tunneled
+traffic rather than a request body. Bytes sent before it, and the ``Content-Length`` check, still
+apply. The filter decides from the request headers the router forwards, so a later filter that
+removes the upgrade headers keeps the body limited. CONNECT-UDP that Envoy terminates itself is
+answered without an upgrade and is still counted, so disable the filter on that route.
+
 Route-Based Filter Control
 --------------------------
 

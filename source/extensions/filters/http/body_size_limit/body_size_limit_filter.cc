@@ -3,7 +3,10 @@
 #include "envoy/extensions/filters/http/body_size_limit/v3/body_size_limit.pb.h"
 #include "envoy/http/codes.h"
 
+#include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,6 +29,7 @@ Http::FilterHeadersStatus BodySizeLimitFilter::decodeHeaders(Http::RequestHeader
                                                              bool end_stream) {
   if (end_stream) {
     // Header-only request, nothing to limit.
+    request_complete_ = true;
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -47,8 +51,9 @@ Http::FilterHeadersStatus BodySizeLimitFilter::decodeHeaders(Http::RequestHeader
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterDataStatus BodySizeLimitFilter::decodeData(Buffer::Instance& data, bool) {
-  if (config_->maxRequestBytes() == 0) {
+Http::FilterDataStatus BodySizeLimitFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  request_complete_ = end_stream;
+  if (tunnel_established_ || config_->maxRequestBytes() == 0) {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -60,6 +65,32 @@ Http::FilterDataStatus BodySizeLimitFilter::decodeData(Buffer::Instance& data, b
   }
 
   return Http::FilterDataStatus::Continue;
+}
+
+Http::FilterHeadersStatus BodySizeLimitFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
+                                                             bool) {
+  // Nothing is left to count once the request has ended, so most requests skip the checks below.
+  if (tunnel_established_ || request_complete_ || config_->maxRequestBytes() == 0) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  // Read the request headers the router forwarded rather than the ones this filter saw, so a
+  // later filter that strips the upgrade headers also keeps the body limited.
+  const auto request_headers = decoder_callbacks_->requestHeaders();
+  if (!request_headers.has_value()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  // Follow the connection manager's rule for when a stream becomes a tunnel: a CONNECT answered
+  // with a 200, or an upgrade answered with a 101 that carries upgrade headers. The codecs turn an
+  // HTTP/2 or HTTP/3 upstream's 200 into such a 101, and local replies carry no upgrade headers.
+  const bool connect_accepted =
+      Http::HeaderUtility::isConnectResponse(request_headers.ptr(), headers);
+  const bool upgrade_accepted =
+      Http::Utility::isUpgrade(*request_headers) &&
+      Http::Utility::getResponseStatus(headers) == enumToInt(Http::Code::SwitchingProtocols) &&
+      Http::Utility::isUpgrade(headers);
+  tunnel_established_ = connect_accepted || upgrade_accepted;
+  return Http::FilterHeadersStatus::Continue;
 }
 
 void BodySizeLimitFilter::sizeExceeded(uint64_t length, const char* log_message,
