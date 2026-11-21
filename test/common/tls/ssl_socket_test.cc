@@ -8682,6 +8682,12 @@ protected:
   void initialize() {
     TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml_),
                               downstream_tls_context_);
+    if (max_send_fragment_.has_value()) {
+      downstream_tls_context_.mutable_common_tls_context()
+          ->mutable_tls_params()
+          ->mutable_max_send_fragment()
+          ->set_value(max_send_fragment_.value());
+    }
     auto server_cfg =
         *ServerContextConfigImpl::create(downstream_tls_context_, factory_context_, {}, false);
     manager_ = std::make_unique<ContextManagerImpl>(factory_context_.serverFactoryContext());
@@ -8696,6 +8702,12 @@ protected:
                                overload_state, *dispatcher_);
 
     TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml_), upstream_tls_context_);
+    if (max_send_fragment_.has_value()) {
+      upstream_tls_context_.mutable_common_tls_context()
+          ->mutable_tls_params()
+          ->mutable_max_send_fragment()
+          ->set_value(max_send_fragment_.value());
+    }
     auto client_cfg = *ClientContextConfigImpl::create(upstream_tls_context_, factory_context_);
 
     client_ssl_socket_factory_ = *ClientSslSocketFactory::create(std::move(client_cfg), *manager_,
@@ -8858,6 +8870,84 @@ protected:
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
+  // The length of every TLS record the client sent and received.
+  struct TlsRecordLengths {
+    std::vector<uint16_t> sent;
+    std::vector<uint16_t> received;
+  };
+
+  // Connects, sends payload from the client to the server, and returns the length of every TLS
+  // record the client sent and received, starting with the first handshake record.
+  TlsRecordLengths sendAndRecordTlsRecordLengths(const std::string& payload) {
+    initialize();
+
+    TlsRecordLengths record_lengths;
+#ifndef ENVOY_SSL_OPENSSL
+    SSL* client_ssl = dynamic_cast<SslSocket*>(client_transport_socket_)->rawSslForTest();
+    SSL_set_msg_callback(client_ssl, [](int is_write, int, int content_type, const void* buf,
+                                        size_t len, SSL*, void* arg) {
+      if (content_type != SSL3_RT_HEADER || len != SSL3_RT_HEADER_LENGTH) {
+        return;
+      }
+      const auto* header = static_cast<const uint8_t*>(buf);
+      auto* lengths = static_cast<TlsRecordLengths*>(arg);
+      (is_write ? lengths->sent : lengths->received).push_back((header[3] << 8) | header[4]);
+    });
+    SSL_set_msg_callback_arg(client_ssl, &record_lengths);
+#endif
+
+    EXPECT_CALL(listener_callbacks_, onAccept_(_))
+        .WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
+          server_connection_ = dispatcher_->createServerConnection(
+              std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket(),
+              stream_info_);
+          server_connection_->addConnectionCallbacks(server_callbacks_);
+          server_connection_->addReadFilter(read_filter_);
+        });
+    EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
+
+    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    std::string received;
+    EXPECT_CALL(*read_filter_, onNewConnection());
+    EXPECT_CALL(*read_filter_, onData(_, _))
+        .WillRepeatedly([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
+          received.append(data.toString());
+          data.drain(data.length());
+          if (received.size() == payload.size()) {
+            server_connection_->close(Network::ConnectionCloseType::FlushWrite);
+          }
+          return Network::FilterStatus::StopIteration;
+        });
+    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
+        .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+
+    Buffer::OwnedImpl data(payload);
+    client_connection_->write(data, false);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    EXPECT_EQ(payload, received);
+    EXPECT_EQ(0UL, server_stats_store_.counter("ssl.connection_error").value());
+    EXPECT_EQ(0UL, client_stats_store_.counter("ssl.connection_error").value());
+#ifndef ENVOY_SSL_OPENSSL
+    // record_lengths goes out of scope on return, but the client connection does not.
+    SSL_set_msg_callback(client_ssl, nullptr);
+#endif
+    return record_lengths;
+  }
+
+  static std::string generatePayload(uint32_t size) {
+    std::string payload;
+    payload.reserve(size);
+    for (uint32_t i = 0; i < size; i++) {
+      payload.push_back('a' + i % 26);
+    }
+    return payload;
+  }
+
+  std::optional<uint32_t> max_send_fragment_;
   Stats::TestUtil::TestStore server_stats_store_;
   Stats::TestUtil::TestStore client_stats_store_;
   std::shared_ptr<Network::Test::TcpListenSocketImmediateListen> socket_;
@@ -9011,6 +9101,47 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
   }
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// A record carries at most max_send_fragment bytes of plaintext plus at most 256 bytes of TLS
+// overhead.
+constexpr uint32_t MaxTlsRecordOverhead = 256;
+
+// max_send_fragment caps every TLS record both sides send, handshake records included, and the data
+// still arrives intact.
+BORINGSSL_TEST_P(SslReadBufferLimitTest, MaxSendFragment) {
+  constexpr uint32_t max_send_fragment = 512;
+  constexpr uint32_t write_size = 3 * 16384;
+  max_send_fragment_ = max_send_fragment;
+
+  const TlsRecordLengths record_lengths =
+      sendAndRecordTlsRecordLengths(generatePayload(write_size));
+
+  // The client's records include its handshake messages and the data.
+  EXPECT_GE(record_lengths.sent.size(), write_size / max_send_fragment);
+  for (const uint16_t length : record_lengths.sent) {
+    EXPECT_LE(length, max_send_fragment + MaxTlsRecordOverhead);
+  }
+  // The server's records are its handshake messages, including its certificate.
+  EXPECT_FALSE(record_lengths.received.empty());
+  for (const uint16_t length : record_lengths.received) {
+    EXPECT_LE(length, max_send_fragment + MaxTlsRecordOverhead);
+  }
+}
+
+// Without max_send_fragment, the same exchange sends records larger than MaxSendFragment allows, so
+// that test would catch the setting not being applied.
+BORINGSSL_TEST_P(SslReadBufferLimitTest, NoMaxSendFragmentSendsFullSizeRecords) {
+  constexpr uint32_t write_size = 3 * 16384;
+
+  const TlsRecordLengths record_lengths =
+      sendAndRecordTlsRecordLengths(generatePayload(write_size));
+
+  ASSERT_FALSE(record_lengths.sent.empty());
+  ASSERT_FALSE(record_lengths.received.empty());
+  EXPECT_GT(*std::max_element(record_lengths.sent.begin(), record_lengths.sent.end()), 16384);
+  EXPECT_GT(*std::max_element(record_lengths.received.begin(), record_lengths.received.end()),
+            512 + MaxTlsRecordOverhead);
 }
 
 // Test asynchronous signing (ECDHE) using a private key provider.
