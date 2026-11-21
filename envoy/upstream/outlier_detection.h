@@ -38,6 +38,11 @@ enum class Result {
                                   // protocol used by a filter. For example tcp_proxy filter
                                   // serves only tcp level. There is no other protocol on top of
                                   // tcp which the tcp_proxy filter is aware of.
+  LocalOriginStreamReady,         // An upstream stream was obtained and a request is about to be
+                                  // sent. Counts as a local origin success for success rate, but
+                                  // does not reset the consecutive local origin failure counter in
+                                  // split mode: the request may still time out. That counter is
+                                  // reset by ExtOriginRequestSuccess/Degraded instead.
 
   // The entries below only make sense when Envoy understands requests/responses for the
   // protocol being proxied. They do not make sense for TcpProxy, for example.

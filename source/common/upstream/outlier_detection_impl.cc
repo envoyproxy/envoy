@@ -18,6 +18,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/http/codes.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -131,6 +132,7 @@ std::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result resul
     // HTTP code indicating error. In order not to intervene with result of
     // higher layer protocol, this code is not mapped to HTTP code.
   case Result::LocalOriginConnectSuccess:
+  case Result::LocalOriginStreamReady:
     return std::nullopt;
   }
 
@@ -167,12 +169,18 @@ void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
 // separate success rate monitor.
 void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
                                                               std::optional<uint64_t> code) {
+  const bool keep_local_origin_failures_on_stream_ready = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.outlier_keep_local_origin_failures_on_stream_ready");
   switch (result) {
   // SUCCESS is used to report success for connection level. Server may still respond with
   // error, but connection to server was OK.
   case Result::LocalOriginConnectSuccess:
   case Result::LocalOriginConnectSuccessFinal:
     return localOriginNoFailure();
+  // A stream was obtained but the request has not completed. Count it for the local origin success
+  // rate, but keep the consecutive failure counter so that repeated timeouts can accumulate.
+  case Result::LocalOriginStreamReady:
+    return localOriginNoFailure(/*reset_consecutive=*/!keep_local_origin_failures_on_stream_ready);
   // Connectivity related errors.
   case Result::LocalOriginTimeout:
   case Result::LocalOriginConnectFailed:
@@ -188,6 +196,9 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
   // completed successfully. This means that connection and server level transactions were
   // successful. Map it to http code 200 OK if HTTP code is not provided.
   case Result::ExtOriginRequestSuccess:
+    if (keep_local_origin_failures_on_stream_ready) {
+      resetConsecutiveLocalOriginFailure();
+    }
     putHttpResponseCode(code.value_or(enumToInt(Http::Code::OK)));
     break;
   case Result::ExtOriginRequestDegraded:
@@ -195,6 +206,9 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
     if (detector) {
       detector->setHostDegraded(host_.lock());
+    }
+    if (keep_local_origin_failures_on_stream_ready) {
+      resetConsecutiveLocalOriginFailure();
     }
     putHttpResponseCode(code.value_or(enumToInt(Http::Code::OK)));
     break;
@@ -224,7 +238,7 @@ void DetectorHostMonitorImpl::localOriginFailure() {
   }
 }
 
-void DetectorHostMonitorImpl::localOriginNoFailure() {
+void DetectorHostMonitorImpl::localOriginNoFailure(bool reset_consecutive) {
   std::shared_ptr<DetectorImpl> detector = detector_.lock();
   if (!detector) {
     // It's possible for the cluster/detector to go away while we still have a host in use.
@@ -234,7 +248,9 @@ void DetectorHostMonitorImpl::localOriginNoFailure() {
   local_origin_sr_monitor_.incTotalReqCounter();
   local_origin_sr_monitor_.incSuccessReqCounter();
 
-  resetConsecutiveLocalOriginFailure();
+  if (reset_consecutive) {
+    resetConsecutiveLocalOriginFailure();
+  }
 }
 
 DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetection& config)

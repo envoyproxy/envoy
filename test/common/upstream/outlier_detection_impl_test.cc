@@ -25,6 +25,7 @@
 #include "test/mocks/upstream/host_set.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -939,6 +940,116 @@ TEST_F(OutlierDetectorImplTest, LargeNumberOfTimeouts) {
     hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout);
   }
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+}
+
+// In split mode, obtaining an upstream stream must not reset the consecutive local origin failure
+// counter, otherwise repeated request timeouts never reach the threshold.
+TEST_F(OutlierDetectorImplTest, LocalOriginStreamReadyDoesNotResetConsecutiveFailures) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection_split_,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_)
+                                             .value());
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveLocalOriginFailureRuntime, 100))
+      .WillByDefault(Return(true));
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  const uint32_t threshold = runtime_.snapshot_.getInteger(
+      ConsecutiveLocalOriginFailureRuntime, detector->config().consecutiveLocalOriginFailure());
+  ASSERT_GT(threshold, 1);
+
+  // Each attempt obtains a stream and then times out. The failures must accumulate.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+                       envoy::data::cluster::v3::CONSECUTIVE_LOCAL_ORIGIN_FAILURE, true));
+  for (uint32_t i = 0; i < threshold; i++) {
+    EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+    hosts_[0]->outlierDetector().putResult(Result::LocalOriginStreamReady);
+    hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout);
+  }
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+}
+
+// With the runtime guard disabled, obtaining a stream resets the consecutive local origin failure
+// counter as before, so alternating stream ready and timeout never ejects the host.
+TEST_F(OutlierDetectorImplTest, LocalOriginStreamReadyResetsConsecutiveFailuresWithGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.outlier_keep_local_origin_failures_on_stream_ready", "false"}});
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection_split_,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_)
+                                             .value());
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveLocalOriginFailureRuntime, 100))
+      .WillByDefault(Return(true));
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  const uint32_t threshold = runtime_.snapshot_.getInteger(
+      ConsecutiveLocalOriginFailureRuntime, detector->config().consecutiveLocalOriginFailure());
+  ASSERT_GT(threshold, 1);
+
+  for (uint32_t i = 0; i < threshold * 2; i++) {
+    hosts_[0]->outlierDetector().putResult(Result::LocalOriginStreamReady);
+    hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout);
+    EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  }
+
+  // The last timeout above left the counter at 1. A response from the upstream does not reset it
+  // with the guard disabled, so the threshold is reached after the response.
+  for (uint32_t i = 0; i < threshold - 2; i++) {
+    hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout);
+  }
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+                       envoy::data::cluster::v3::CONSECUTIVE_LOCAL_ORIGIN_FAILURE, true));
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestSuccess);
+  hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+}
+
+// A response from the upstream (ExtOriginRequestSuccess) resets the consecutive local origin
+// failure counter in split mode, and so does a connection level success.
+TEST_F(OutlierDetectorImplTest, LocalOriginFailuresResetBySuccess) {
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, outlier_detection_split_,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_)
+                                             .value());
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveLocalOriginFailureRuntime, 100))
+      .WillByDefault(Return(true));
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  const uint32_t threshold = runtime_.snapshot_.getInteger(
+      ConsecutiveLocalOriginFailureRuntime, detector->config().consecutiveLocalOriginFailure());
+  ASSERT_GT(threshold, 1);
+
+  for (const Result success :
+       {Result::ExtOriginRequestSuccess, Result::ExtOriginRequestDegraded,
+        Result::LocalOriginConnectSuccess, Result::LocalOriginConnectSuccessFinal}) {
+    for (uint32_t i = 0; i < threshold - 1; i++) {
+      hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout);
+    }
+    hosts_[0]->outlierDetector().putResult(success);
+    hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout);
+    EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+    // Clear the counter for the next round.
+    hosts_[0]->outlierDetector().putResult(Result::LocalOriginConnectSuccessFinal);
+  }
 }
 
 /**

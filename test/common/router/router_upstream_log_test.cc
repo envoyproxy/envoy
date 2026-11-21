@@ -249,7 +249,7 @@ public:
           response_decoder = &decoder;
           EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                           .conn_pool_.host_->outlier_detector_,
-                      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
+                      putResult(Upstream::Outlier::Result::LocalOriginStreamReady, _));
           EXPECT_CALL(encoder2.stream_, connectionInfoProvider())
               .WillRepeatedly(ReturnRef(connection_info2_));
           callbacks.onPoolReady(encoder2,
