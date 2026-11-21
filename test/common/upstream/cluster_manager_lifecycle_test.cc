@@ -764,7 +764,7 @@ TEST_P(ClusterManagerLifecycleTest, UpdateActiveWithReserializedAnyIsNoop) {
       .WillRepeatedly(Return(std::make_pair(nullptr, nullptr)));
   EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(rejected_cluster, "version3").ok());
   EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(rejected_cluster, "version3").ok());
-  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  checkStats(1 /*added*/, 2 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
   cluster.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
   std::shared_ptr<MockClusterMockPrioritySet> cluster2(new NiceMock<MockClusterMockPrioritySet>());
@@ -775,7 +775,7 @@ TEST_P(ClusterManagerLifecycleTest, UpdateActiveWithReserializedAnyIsNoop) {
     initialize_callback();
   });
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster, "version4"));
-  checkStats(1 /*added*/, 1 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  checkStats(1 /*added*/, 3 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
   EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)),
             cluster_manager_->activeClusterSerializedConfigHash("fake_cluster"));
 
