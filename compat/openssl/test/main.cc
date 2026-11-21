@@ -28,18 +28,7 @@ static OpenSSLConf openssl_conf(R"(
   openssl_conf = openssl_init
 
   [openssl_init]
-  providers = providers_sect
   ssl_conf = ssl_sect
-
-  [providers_sect]
-  default = default_sect
-  legacy = legacy_sect
-
-  [default_sect]
-  activate = 1
-
-  [legacy_sect]
-  activate = 1
 
   [ssl_sect]
   system_default = system_default_sect

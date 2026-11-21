@@ -14,6 +14,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -55,6 +56,7 @@ public:
 TEST_F(TcpConnPoolTest, Basic) {
   NiceMock<Network::MockClientConnection> connection;
 
+  EXPECT_TRUE(conn_pool_->supportsIndependentHalfClose());
   EXPECT_CALL(mock_pool_, newConnection(_)).WillOnce(Return(&cancellable_));
   conn_pool_->newStream(&mock_generic_callbacks_);
 
@@ -95,8 +97,7 @@ class TcpUpstreamTest : public ::testing::Test {
 public:
   TcpUpstreamTest() {
     ON_CALL(*mock_router_filter_.cluster_info_, createFilterChain(_))
-        .WillByDefault(
-            Invoke([&](Envoy::Http::FilterChainFactoryCallbacks&) -> bool { return false; }));
+        .WillByDefault([&](Envoy::Http::FilterChainFactoryCallbacks&) -> bool { return false; });
     EXPECT_CALL(mock_router_filter_, downstreamHeaders())
         .Times(AnyNumber())
         .WillRepeatedly(Return(&request_));
@@ -227,7 +228,65 @@ TEST_F(TcpUpstreamTest, ReadDisable) {
 }
 
 TEST_F(TcpUpstreamTest, UpstreamEvent) {
-  // Make sure upstream disconnects result in stream reset.
+  // Make sure upstream disconnects before end_stream result in ConnectionTermination.
+  EXPECT_CALL(mock_router_filter_,
+              onUpstreamReset(Envoy::Http::StreamResetReason::ConnectionTermination, "", _));
+  tcp_upstream_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(TcpUpstreamTest, NormalRemoteCloseAfterEndStreamEmitsRemoteResetNoError) {
+  EXPECT_CALL(mock_router_filter_, onUpstreamHeaders(200, _, _, false));
+  EXPECT_OK(tcp_upstream_->encodeHeaders(request_, false));
+
+  Buffer::OwnedImpl response("done");
+  EXPECT_CALL(mock_router_filter_, onUpstreamData(BufferString("done"), _, true));
+  tcp_upstream_->onUpstreamData(response, true);
+
+  EXPECT_CALL(connection(), detectedCloseType())
+      .WillOnce(Return(StreamInfo::DetectedCloseType::Normal));
+  EXPECT_CALL(mock_router_filter_,
+              onUpstreamReset(Envoy::Http::StreamResetReason::RemoteResetNoError, "", _));
+  tcp_upstream_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(TcpUpstreamTest, NormalRemoteCloseAfterEndStreamRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tcp_upstream_no_error_reset_after_end_stream", "false"}});
+  EXPECT_CALL(mock_router_filter_, onUpstreamHeaders(200, _, _, false));
+  EXPECT_OK(tcp_upstream_->encodeHeaders(request_, false));
+
+  Buffer::OwnedImpl response("done");
+  EXPECT_CALL(mock_router_filter_, onUpstreamData(BufferString("done"), _, true));
+  tcp_upstream_->onUpstreamData(response, true);
+
+  EXPECT_CALL(connection(), detectedCloseType())
+      .WillOnce(Return(StreamInfo::DetectedCloseType::Normal));
+  EXPECT_CALL(mock_router_filter_,
+              onUpstreamReset(Envoy::Http::StreamResetReason::ConnectionTermination, "", _));
+  tcp_upstream_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(TcpUpstreamTest, RemoteResetAfterEndStreamStillEmitsConnectionTermination) {
+  EXPECT_CALL(mock_router_filter_, onUpstreamHeaders(200, _, _, false));
+  EXPECT_OK(tcp_upstream_->encodeHeaders(request_, false));
+
+  Buffer::OwnedImpl response("done");
+  EXPECT_CALL(mock_router_filter_, onUpstreamData(BufferString("done"), _, true));
+  tcp_upstream_->onUpstreamData(response, true);
+
+  EXPECT_CALL(connection(), detectedCloseType())
+      .WillOnce(Return(StreamInfo::DetectedCloseType::RemoteReset));
+  EXPECT_CALL(mock_router_filter_,
+              onUpstreamReset(Envoy::Http::StreamResetReason::ConnectionTermination, "", _));
+  tcp_upstream_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(TcpUpstreamTest, EndStreamBeforeEncodeHeadersStillEmitsConnectionTermination) {
+  Buffer::OwnedImpl response("");
+  EXPECT_CALL(mock_router_filter_, onUpstreamData(BufferString(""), _, true));
+  tcp_upstream_->onUpstreamData(response, true);
+
   EXPECT_CALL(mock_router_filter_,
               onUpstreamReset(Envoy::Http::StreamResetReason::ConnectionTermination, "", _));
   tcp_upstream_->onEvent(Network::ConnectionEvent::RemoteClose);

@@ -114,10 +114,10 @@ TEST_F(FluentdTracerImplTest, NoWriteOnTraceIfDisconnectedByRemote) {
   EXPECT_CALL(*flush_timer_, disableTimer());
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
-  EXPECT_CALL(*async_client_, connect()).WillOnce(Invoke([this]() -> bool {
+  EXPECT_CALL(*async_client_, connect()).WillOnce([this]() -> bool {
     tracer_->onEvent(Network::ConnectionEvent::RemoteClose);
     return true;
-  }));
+  });
 
   tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
@@ -129,10 +129,10 @@ TEST_F(FluentdTracerImplTest, NoWriteOnTraceIfDisconnectedByLocal) {
   EXPECT_CALL(*flush_timer_, disableTimer());
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
-  EXPECT_CALL(*async_client_, connect()).WillOnce(Invoke([this]() -> bool {
+  EXPECT_CALL(*async_client_, connect()).WillOnce([this]() -> bool {
     tracer_->onEvent(Network::ConnectionEvent::LocalClose);
     return true;
-  }));
+  });
 
   tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
@@ -144,16 +144,15 @@ TEST_F(FluentdTracerImplTest, TraceSingleEntry) {
   EXPECT_CALL(*backoff_strategy_, reset());
   EXPECT_CALL(*retry_timer_, disableTimer());
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false)).WillOnce(Return(true));
-  EXPECT_CALL(*async_client_, connect()).WillOnce(Invoke([this]() -> bool {
+  EXPECT_CALL(*async_client_, connect()).WillOnce([this]() -> bool {
     tracer_->onEvent(Network::ConnectionEvent::Connected);
     return true;
-  }));
-  EXPECT_CALL(*async_client_, write(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool end_stream) {
-        EXPECT_FALSE(end_stream);
-        std::string expected_payload = getExpectedMsgpackPayload(1);
-        EXPECT_EQ(expected_payload, buffer.toString());
-      }));
+  });
+  EXPECT_CALL(*async_client_, write(_, _)).WillOnce([&](Buffer::Instance& buffer, bool end_stream) {
+    EXPECT_FALSE(end_stream);
+    std::string expected_payload = getExpectedMsgpackPayload(1);
+    EXPECT_EQ(expected_payload, buffer.toString());
+  });
 
   tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
@@ -173,16 +172,15 @@ TEST_F(FluentdTracerImplTest, TraceTwoEntries) {
 
   // Expect second entry to cause all entries to flush.
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false)).WillOnce(Return(true));
-  EXPECT_CALL(*async_client_, connect()).WillOnce(Invoke([this]() -> bool {
+  EXPECT_CALL(*async_client_, connect()).WillOnce([this]() -> bool {
     tracer_->onEvent(Network::ConnectionEvent::Connected);
     return true;
-  }));
-  EXPECT_CALL(*async_client_, write(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool end_stream) {
-        EXPECT_FALSE(end_stream);
-        std::string expected_payload = getExpectedMsgpackPayload(2);
-        EXPECT_EQ(expected_payload, buffer.toString());
-      }));
+  });
+  EXPECT_CALL(*async_client_, write(_, _)).WillOnce([&](Buffer::Instance& buffer, bool end_stream) {
+    EXPECT_FALSE(end_stream);
+    std::string expected_payload = getExpectedMsgpackPayload(2);
+    EXPECT_EQ(expected_payload, buffer.toString());
+  });
   tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
 }
@@ -208,26 +206,25 @@ TEST_F(FluentdTracerImplTest, SuccessfulReconnect) {
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false)).WillOnce(Return(true));
   EXPECT_CALL(*async_client_, connect())
-      .WillOnce(Invoke([this]() -> bool {
+      .WillOnce([this]() -> bool {
         EXPECT_CALL(*backoff_strategy_, reset()).Times(0);
         EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1), _));
         EXPECT_CALL(*retry_timer_, disableTimer()).Times(0);
         tracer_->onEvent(Network::ConnectionEvent::LocalClose);
         return true;
-      }))
-      .WillOnce(Invoke([this]() -> bool {
+      })
+      .WillOnce([this]() -> bool {
         EXPECT_CALL(*backoff_strategy_, reset());
         EXPECT_CALL(*retry_timer_, enableTimer(_, _)).Times(0);
         EXPECT_CALL(*retry_timer_, disableTimer());
         tracer_->onEvent(Network::ConnectionEvent::Connected);
         return true;
-      }));
-  EXPECT_CALL(*async_client_, write(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool end_stream) {
-        EXPECT_FALSE(end_stream);
-        std::string expected_payload = getExpectedMsgpackPayload(1);
-        EXPECT_EQ(expected_payload, buffer.toString());
-      }));
+      });
+  EXPECT_CALL(*async_client_, write(_, _)).WillOnce([&](Buffer::Instance& buffer, bool end_stream) {
+    EXPECT_FALSE(end_stream);
+    std::string expected_payload = getExpectedMsgpackPayload(1);
+    EXPECT_EQ(expected_payload, buffer.toString());
+  });
 
   tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
@@ -247,14 +244,14 @@ TEST_F(FluentdTracerImplTest, ReconnectFailure) {
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
   EXPECT_CALL(*async_client_, connect())
-      .WillOnce(Invoke([this]() -> bool {
+      .WillOnce([this]() -> bool {
         tracer_->onEvent(Network::ConnectionEvent::LocalClose);
         return true;
-      }))
-      .WillOnce(Invoke([this]() -> bool {
+      })
+      .WillOnce([this]() -> bool {
         tracer_->onEvent(Network::ConnectionEvent::LocalClose);
         return true;
-      }));
+      });
 
   tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
@@ -274,18 +271,18 @@ TEST_F(FluentdTracerImplTest, TwoReconnects) {
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
   EXPECT_CALL(*async_client_, connect())
-      .WillOnce(Invoke([this]() -> bool {
+      .WillOnce([this]() -> bool {
         tracer_->onEvent(Network::ConnectionEvent::LocalClose);
         return true;
-      }))
-      .WillOnce(Invoke([this]() -> bool {
+      })
+      .WillOnce([this]() -> bool {
         tracer_->onEvent(Network::ConnectionEvent::LocalClose);
         return true;
-      }))
-      .WillOnce(Invoke([this]() -> bool {
+      })
+      .WillOnce([this]() -> bool {
         tracer_->onEvent(Network::ConnectionEvent::LocalClose);
         return true;
-      }));
+      });
 
   tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
@@ -337,16 +334,15 @@ TEST_F(FluentdTracerImplTest, TimerFlush) {
   EXPECT_CALL(*backoff_strategy_, reset());
   EXPECT_CALL(*retry_timer_, disableTimer());
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false)).WillOnce(Return(true));
-  EXPECT_CALL(*async_client_, connect()).WillOnce(Invoke([this]() -> bool {
+  EXPECT_CALL(*async_client_, connect()).WillOnce([this]() -> bool {
     tracer_->onEvent(Network::ConnectionEvent::Connected);
     return true;
-  }));
-  EXPECT_CALL(*async_client_, write(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool end_stream) {
-        EXPECT_FALSE(end_stream);
-        std::string expected_payload = getExpectedMsgpackPayload(1);
-        EXPECT_EQ(expected_payload, buffer.toString());
-      }));
+  });
+  EXPECT_CALL(*async_client_, write(_, _)).WillOnce([&](Buffer::Instance& buffer, bool end_stream) {
+    EXPECT_FALSE(end_stream);
+    std::string expected_payload = getExpectedMsgpackPayload(1);
+    EXPECT_EQ(expected_payload, buffer.toString());
+  });
 
   tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));

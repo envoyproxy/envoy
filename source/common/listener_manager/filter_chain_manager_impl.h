@@ -4,9 +4,11 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/event/dispatcher_thread_deletable.h"
 #include "envoy/event/schedulable_cb.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/drain_decision.h"
@@ -251,6 +253,8 @@ public:
     return default_filter_chain_;
   }
 
+  const std::vector<FcdsSubscriptionHandleSharedPtr>& fcdsHandles() const { return fcds_handles_; }
+
 private:
   absl::Status convertIPsToTries();
   const Network::FilterChain* findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
@@ -472,6 +476,15 @@ public:
   virtual void drainFilterChain(Network::DrainableFilterChainSharedPtr draining) PURE;
 };
 
+// The listener manager that the FcdsSharedFilterChainManager reports its filter chains to.
+class FcdsListenerManagerCallbacks {
+public:
+  virtual ~FcdsListenerManagerCallbacks() = default;
+  // Called with the name of a filter chain that was added or updated, once it is posted to the
+  // workers.
+  virtual void notifyFilterChainUpdateCallbacks(absl::string_view filter_chain_name) PURE;
+};
+
 class FcdsSubscriptionHandle {
 public:
   virtual ~FcdsSubscriptionHandle() = default;
@@ -482,8 +495,23 @@ public:
   // True when the subscribed chain is committed (active) in the shared manager, using the same
   // active-state test that publishes the worker TLS set.
   virtual bool isActive() const PURE;
+  // The committed chain that this handle subscribes to, or nullptr.
+  virtual Network::DrainableFilterChainSharedPtr activeFilterChain() const PURE;
 };
 using FcdsSubscriptionHandleSharedPtr = std::shared_ptr<FcdsSubscriptionHandle>;
+
+// The subscription of a local caller that provides the filter chain of a name instead of FCDS. Like
+// the subscription of a listener, it keeps the name until it is destroyed.
+class FcdsLocalSubscriptionHandle {
+public:
+  virtual ~FcdsLocalSubscriptionHandle() = default;
+  // Adds or updates the filter chain, which has the name of the subscription, as an FCDS update
+  // does. Returns false when it equals the version added last, or an error when it cannot be built.
+  virtual absl::StatusOr<bool> update(const FilterChainProto& filter_chain) PURE;
+  // Removes the filter chain as an FCDS update does.
+  virtual void remove() PURE;
+};
+using FcdsLocalSubscriptionHandleSharedPtr = std::shared_ptr<FcdsLocalSubscriptionHandle>;
 
 class FcdsContextCreator : public FilterChainFactoryContextCreator {
 public:
@@ -495,6 +523,10 @@ public:
       const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
 
   void initialize(std::function<void()> completion);
+
+  Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() {
+    return saved_context_->transportSocketFactoryContext();
+  }
 
 private:
   std::unique_ptr<FcdsFilterChainFactoryContextImpl> context_;
@@ -508,14 +540,22 @@ class FcdsSharedFilterChainManager
       public Logger::Loggable<Logger::Id::config> {
 public:
   FcdsSharedFilterChainManager(Server::Configuration::ServerFactoryContext& server_context,
-                               ListenerComponentFactory& listener_component_factory);
+                               ListenerComponentFactory& listener_component_factory,
+                               FcdsListenerManagerCallbacks& listener_manager);
   const Network::FilterChain* findThreadLocalFilterChain(const std::string& name) const;
 
-  // Subscribes a listener callback for a filter chain name FCDS distribution.
+  // Subscribes a listener to a filter chain name, through FCDS when the config source is set and to
+  // a local filter chain otherwise. A name of the other kind is rejected. The init manager, if
+  // any, waits for the filter chain.
   absl::StatusOr<FcdsSubscriptionHandleSharedPtr>
   subscribe(const envoy::config::core::v3::ConfigSource& config_source,
             const std::string& filter_chain_name, FcdsClientCallbacks& callbacks,
-            Init::Manager& init_manager);
+            OptRef<Init::Manager> init_manager);
+
+  // Subscribes a local caller that provides the filter chain of the name. A name that FCDS
+  // discovers is rejected. Main-thread only.
+  absl::StatusOr<FcdsLocalSubscriptionHandleSharedPtr>
+  subscribeLocal(const std::string& filter_chain_name);
 
   // Unsubscribes a listener from FCDS distribution.
   void unsubscribe(const std::string& filter_chain_name, FcdsSubscriptionHandle& handle);
@@ -524,20 +564,30 @@ public:
   // active-state test that updateTlsState() publishes to workers. Main-thread only.
   bool isFilterChainActive(const std::string& filter_chain_name) const;
 
+  // The committed filter chain of the named subscription, or nullptr. Main-thread only.
+  Network::DrainableFilterChainSharedPtr
+  activeFilterChain(const std::string& filter_chain_name) const;
+
   // FilterChainUpdateCallbacks
   absl::Status onFilterChainUpdated(const FilterChainProto& proto) override;
   void onFilterChainRemoved(Network::DrainableFilterChainSharedPtr&& draining) override;
 
 private:
   friend class FcdsSharedFilterChainManagerPeer;
+  friend class FcdsLocalSubscriptionHandleImpl;
 
-  struct ThreadLocalState : public ThreadLocal::ThreadLocalObject {
+  // The subscriptions of local callers drain nothing, since a local caller has no connections.
+  struct LocalCallerCallbacks : public FcdsClientCallbacks {
+    void drainFilterChain(Network::DrainableFilterChainSharedPtr) override {}
+  };
+
+  struct ThreadLocalState : public ThreadLocal::ThreadLocalObject,
+                            public Event::DispatcherThreadDeletable {
     absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr> filter_chains_;
   };
   Server::Configuration::ServerFactoryContext& server_context_;
   ListenerComponentFactory& listener_component_factory_;
   ThreadLocal::TypedSlotPtr<ThreadLocalState> tls_slot_;
-  Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_;
   Stats::ScopeSharedPtr scope_;
   // Shared by all FCDS subscriptions so the resource decoder is built once.
   const Config::ResourceTypeHelper<FilterChainProto> resource_type_helper_;
@@ -551,6 +601,14 @@ private:
   void onFilterChainWarmed(Network::DrainableFilterChainSharedPtr filter_chain);
   void updateTlsState();
   void scheduleTlsUpdate();
+  // Called by the handle of a local caller, whose subscription keeps the state of the name.
+  absl::StatusOr<bool> updateLocalFilterChain(const FilterChainProto& filter_chain);
+  void removeLocalFilterChain(absl::string_view filter_chain_name);
+
+  FcdsListenerManagerCallbacks& listener_manager_;
+  LocalCallerCallbacks local_caller_callbacks_;
+  // The filter chains committed since the last thread local publish.
+  absl::flat_hash_set<std::string> committed_filter_chain_names_;
 
   // Coalesces thread local filter chain updates within a single event loop iteration.
   Event::SchedulableCallbackPtr tls_update_cb_;

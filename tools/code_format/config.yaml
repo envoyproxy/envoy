@@ -36,11 +36,9 @@ paths:
   - bazel/external/c-ares/
   - bazel/external/cargo/remote/
   - bazel/external/http_parser/
-  - bazel/rbe/toolchains/configs/
   - bazel/tests/codeql/
   - bazel/tests/external/
   - bazel-
-  - compat/openssl/
   - build
   - contrib/contrib_build_config.bzl
   - examples/wasm-cc
@@ -228,6 +226,7 @@ paths:
   namespace_check:
     exclude:
     - tools/api_boost/testdata/
+    - compat/openssl/
 
   # Files that should not raise an error for using memcpy
   memcpy:
@@ -316,7 +315,7 @@ paths:
     - test/extensions/filters/http/common/fuzz/uber_filter.h
     - test/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util_test.cc
     - test/extensions/http/cache_v2/file_system_http_cache/cache_file_header_proto_util_test.cc
-    - test/tools/router_check/router_check.cc
+    - tools/router_check/router_check.cc
     - source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.cc
     - test/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper_test.cc
     - test/extensions/router/cluster_specifiers/dynamic_modules/cluster_specifier_test.cc

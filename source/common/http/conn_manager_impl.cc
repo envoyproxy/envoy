@@ -231,9 +231,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(
           runtime_.snapshot().getInteger(ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)),
       direction_(direction), server_context_(server_context),
       use_connection_event_drain_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")),
-      allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")) {
   ENVOY_LOG_ONCE_IF(
       trace, accept_new_http_stream_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
@@ -2790,12 +2788,8 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   ResponseEncoder* response_encoder = response_encoder_;
 
-  Buffer::InstancePtr request_data = std::make_unique<Buffer::OwnedImpl>();
-  const auto& buffered_request_data = filter_manager_.bufferedRequestData();
-  const bool proxy_body = buffered_request_data != nullptr && buffered_request_data->length() > 0;
-  if (proxy_body) {
-    request_data->move(*buffered_request_data);
-  }
+  Buffer::InstancePtr request_data = filter_manager_.takeBufferedRequestData();
+  const bool proxy_body = request_data != nullptr && request_data->length() > 0;
 
   // Null after move(): draining the WatermarkBuffer may synchronously fire
   // onDecoderFilterBelowWriteBufferLowWatermark which needs a valid encoder.

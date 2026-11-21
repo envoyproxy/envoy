@@ -42,10 +42,11 @@ envoy_cc_test_library(
         "uber_per_filter.cc",
     ],
     hdrs = ["uber_filter.h"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         ":filter_fuzz_proto_cc_proto",
         ":http_filter_fuzzer_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
@@ -70,7 +71,31 @@ envoy_cc_fuzz_test(
     name = "filter_fuzz_test",
     srcs = ["filter_fuzz_test.cc"],
     corpus = "filter_corpus",
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 11621MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_xlarge",
+        },
+    },
     # All Envoy extensions must be linked to the test in order for the fuzzer to pick
     # these up via the NamedHttpFilterConfigFactory.
     deps = [

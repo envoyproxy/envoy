@@ -93,6 +93,8 @@ areas:
     title: decompression
   dns:
     title: dns
+  dns_cluster:
+    title: dns_cluster
   dns_resolver:
     title: dns_resolver
   drain:
@@ -109,6 +111,8 @@ areas:
   ext_proc:
     title: ext_proc
 
+  fault:
+    title: fault
   filter_chain:
     title: filter_chain
   formatter:
@@ -126,9 +130,15 @@ areas:
     title: grpc_field_extraction
   grpc_http1_reverse_bridge:
     title: grpc_http1_reverse_bridge
+  grpc_sidestream:
+    title: grpc_sidestream
+  grpc_web:
+    title: grpc_web
 
   happy_eyeballs:
     title: happy_eyeballs
+  header_mutation:
+    title: header_mutation
   health_check:
     title: health_check
   http:
@@ -216,6 +226,8 @@ areas:
     title: reverse_tunnel
   router:
     title: router
+  runtime_features:
+    title: runtime_features
 
   safe_regex:
     title: safe_regex

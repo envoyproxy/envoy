@@ -170,12 +170,9 @@ protected:
   // Register a tunnel key on the parent so terminal cleanup has something to drop.
   void registerParentHostKey(const std::string& host, const std::string& cluster,
                              const std::string& key) {
-    ReverseConnectionIOHandle::HostConnectionInfo info;
-    info.host_address = host;
-    info.cluster_name = cluster;
-    info.target_connection_count = 1;
+    ReverseConnectionIOHandle::HostConnectionInfo info(host, cluster, 1, dispatcher_);
     info.connection_keys.insert(key);
-    io_handle_->host_to_conn_info_map_[host] = std::move(info);
+    io_handle_->host_to_conn_info_map_.insert_or_assign(host, std::move(info));
   }
 
   bool parentHostHasKey(const std::string& host, const std::string& key) const {

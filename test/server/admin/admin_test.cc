@@ -68,9 +68,9 @@ TEST_P(AdminInstanceTest, GracefulDrainNotifiesListeners) {
       .WillByDefault(testing::Return(Server::DrainStrategy::Gradual));
   Network::ConnectionDrainEvent captured;
   EXPECT_CALL(server_.listener_manager_, onServerDrainStart(Network::DrainDirection::All, _))
-      .WillOnce(
-          testing::Invoke([&captured](Network::DrainDirection,
-                                      Network::ConnectionDrainEvent event) { captured = event; }));
+      .WillOnce([&captured](Network::DrainDirection, Network::ConnectionDrainEvent event) {
+        captured = event;
+      });
   EXPECT_EQ(Http::Code::OK, postCallback("/drain_listeners?graceful", header_map, data));
   EXPECT_EQ(Server::DrainStrategy::Gradual, captured.strategy);
 

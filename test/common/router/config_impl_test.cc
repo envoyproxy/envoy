@@ -2769,6 +2769,114 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, VirtualHostExists) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: exact_vhost
+  domains: ["example.com", "foo.bar.com"]
+  routes:
+  - match:
+      prefix: ""
+    route:
+      cluster: dummy
+- name: wildcard_suffix_vhost
+  domains: ["*.wildcard-suffix.com"]
+  routes:
+  - match:
+      prefix: ""
+    route:
+      cluster: dummy
+- name: wildcard_prefix_vhost
+  domains: ["wildcard-prefix.*"]
+  routes:
+  - match:
+      prefix: ""
+    route:
+      cluster: dummy
+  )EOF";
+  auto route_configuration = parseRouteConfigurationFromYaml(yaml);
+  factory_context_.cluster_manager_.initializeClusters({"dummy"}, {});
+
+  // Without default virtual host and with ignore_port_in_host_matching = false
+  {
+    TestConfigImpl config(route_configuration, factory_context_, true, creation_status_);
+
+    // Exact domain match (returns true)
+    EXPECT_TRUE(config.virtualHostExists("example.com"));
+    EXPECT_TRUE(config.virtualHostExists("foo.bar.com"));
+
+    // Case-insensitive match (returns true)
+    EXPECT_TRUE(config.virtualHostExists("EXAMPLE.COM"));
+    EXPECT_TRUE(config.virtualHostExists("Foo.Bar.Com"));
+
+    // Non-existent domain (returns false when no default virtual host is configured)
+    EXPECT_FALSE(config.virtualHostExists("nonexistent.com"));
+    EXPECT_FALSE(config.virtualHostExists("example.org"));
+
+    // Wildcard domain match (suffix and prefix)
+    EXPECT_TRUE(config.virtualHostExists("sub.wildcard-suffix.com"));
+    EXPECT_TRUE(config.virtualHostExists("wildcard-prefix.net"));
+    EXPECT_FALSE(config.virtualHostExists("wildcard-suffix.com"));
+    EXPECT_FALSE(config.virtualHostExists("other-prefix.com"));
+
+    // Port in domain with ignore_port_in_host_matching = false (returns false)
+    EXPECT_FALSE(config.virtualHostExists("example.com:8080"));
+    EXPECT_FALSE(config.virtualHostExists("sub.wildcard-suffix.com:443"));
+  }
+
+  // Set ignore_port_in_host_matching to true
+  route_configuration.set_ignore_port_in_host_matching(true);
+  {
+    TestConfigImpl config(route_configuration, factory_context_, true, creation_status_);
+
+    // Port in domain with ignore_port_in_host_matching = true (returns true)
+    EXPECT_TRUE(config.virtualHostExists("example.com:8080"));
+    EXPECT_TRUE(config.virtualHostExists("EXAMPLE.COM:8080"));
+    EXPECT_TRUE(config.virtualHostExists("sub.wildcard-suffix.com:443"));
+    EXPECT_FALSE(config.virtualHostExists("nonexistent.com:8080"));
+  }
+
+  // Default virtual host ("*") returns true for arbitrary domains
+  const std::string default_vhost_yaml = R"EOF(
+virtual_hosts:
+- name: default_vhost
+  domains: ["*"]
+  routes:
+  - match:
+      prefix: ""
+    route:
+      cluster: dummy
+  )EOF";
+  auto default_route_configuration = parseRouteConfigurationFromYaml(default_vhost_yaml);
+  {
+    TestConfigImpl config(default_route_configuration, factory_context_, true, creation_status_);
+
+    EXPECT_TRUE(config.virtualHostExists("example.com"));
+    EXPECT_TRUE(config.virtualHostExists("any.random.domain.org"));
+    EXPECT_TRUE(config.virtualHostExists(""));
+  }
+
+  // Empty virtual_hosts returns false for all domains
+  {
+    envoy::config::route::v3::RouteConfiguration empty_route_configuration;
+    TestConfigImpl config(empty_route_configuration, factory_context_, true, creation_status_);
+
+    EXPECT_FALSE(config.virtualHostExists("example.com"));
+    EXPECT_FALSE(config.virtualHostExists(""));
+  }
+
+  // Alternate vhost_header does not affect direct domain matching in virtualHostExists
+  {
+    auto vhost_header_route_configuration = route_configuration;
+    vhost_header_route_configuration.set_vhost_header("alternate");
+    TestConfigImpl config(vhost_header_route_configuration, factory_context_, true,
+                          creation_status_);
+
+    EXPECT_TRUE(config.virtualHostExists("example.com"));
+    EXPECT_FALSE(config.virtualHostExists("nonexistent.com"));
+  }
+}
+
 TEST_F(RouteMatcherTest, Priority) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -4172,7 +4280,7 @@ virtual_hosts:
   auto mock_cluster_specifier_plugin_3 = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
 
   EXPECT_CALL(factory, createClusterSpecifierPlugin(_, _))
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [mock_cluster_specifier_plugin_1, mock_cluster_specifier_plugin_2,
            mock_cluster_specifier_plugin_3](
               const Protobuf::Message& config,
@@ -4189,7 +4297,7 @@ virtual_hosts:
               return mock_cluster_specifier_plugin_3;
             }
             return nullptr;
-          }));
+          });
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
@@ -4251,7 +4359,7 @@ virtual_hosts:
   auto mock_cluster_specifier_plugin_3 = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
 
   EXPECT_CALL(factory, createClusterSpecifierPlugin(_, _))
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [mock_cluster_specifier_plugin_1, mock_cluster_specifier_plugin_2,
            mock_cluster_specifier_plugin_3](
               const Protobuf::Message& config,
@@ -4268,7 +4376,7 @@ virtual_hosts:
               return mock_cluster_specifier_plugin_3;
             }
             return nullptr;
-          }));
+          });
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl give_me_a_name(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
@@ -4902,6 +5010,50 @@ virtual_hosts:
   EXPECT_EQ("foo", bar_shadow_policies[0]->runtimeKey());
 }
 
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesStatPrefix) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+        - cluster: some_cluster
+          stat_prefix: foo_mirror
+        - cluster: some_cluster
+      cluster: www2
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2", "some_cluster"}, {});
+  ShadowPolicyStatsSharedPtr stats;
+  {
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                          creation_status_);
+    const auto& shadow_policies =
+        config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->shadowPolicies();
+    ASSERT_EQ(2, shadow_policies.size());
+    EXPECT_EQ(nullptr, shadow_policies[1]->stats());
+    stats = shadow_policies[0]->stats();
+    ASSERT_NE(nullptr, stats);
+  }
+
+  // The stats outlive the route configuration so that in-flight mirrors can still record them.
+  stats->rq_sampled_.inc();
+  stats->rq_no_cluster_.inc();
+  stats->rq_started_.inc();
+  stats->rq_success_.inc();
+  stats->rq_failure_.inc();
+  stats->rq_cancelled_.inc();
+  for (const std::string name :
+       {"rq_sampled", "rq_no_cluster", "rq_started", "rq_success", "rq_failure", "rq_cancelled"}) {
+    EXPECT_EQ(1U, factory_context_.store_.counterFromString("mirror.foo_mirror." + name).value())
+        << name;
+  }
+}
+
 // Test for request mirror policies with headers - verifies header mutations are applied correctly.
 TEST_F(RouteMatcherTest, RequestMirrorPoliciesWithHeaders) {
   const std::string yaml = R"EOF(
@@ -5330,6 +5482,350 @@ virtual_hosts:
                     ->retryPolicy()
                     ->retryOptionsPredicates()
                     .size());
+}
+
+class CustomTestRetryPolicy : public RetryPolicyImpl {
+public:
+  static absl::StatusOr<std::shared_ptr<CustomTestRetryPolicy>>
+  create(const envoy::config::route::v3::RetryPolicy& retry_policy,
+         ProtobufMessage::ValidationVisitor& validation_visitor,
+         Server::Configuration::CommonFactoryContext& common_context) {
+    absl::Status creation_status = absl::OkStatus();
+    auto ret = std::shared_ptr<CustomTestRetryPolicy>(new CustomTestRetryPolicy(
+        retry_policy, validation_visitor, common_context, creation_status));
+    RETURN_IF_NOT_OK(creation_status);
+    return ret;
+  }
+
+  RetryStatePtr createRetryState(Http::RequestHeaderMap&, const Upstream::ClusterInfo&,
+                                 Server::Configuration::CommonFactoryContext&, Event::Dispatcher&,
+                                 Upstream::ResourcePriority,
+                                 OptRef<StreamInfo::StreamInfo> stream_info) const override {
+    last_stream_info_present_ = stream_info.has_value();
+    auto state = std::make_unique<NiceMock<MockRetryState>>();
+    ON_CALL(*state, enabled()).WillByDefault(Return(true));
+    return state;
+  }
+
+  mutable bool last_stream_info_present_{false};
+
+private:
+  using RetryPolicyImpl::RetryPolicyImpl;
+};
+
+class CustomTestRetryPolicyFactory : public RetryPolicyFactory {
+public:
+  absl::StatusOr<RetryPolicyConstSharedPtr>
+  createRetryPolicy(const Protobuf::Message& config,
+                    ProtobufMessage::ValidationVisitor& validation_visitor,
+                    Server::Configuration::CommonFactoryContext& context) override {
+    envoy::config::route::v3::RetryPolicy retry_policy;
+    retry_policy.mutable_num_retries()->set_value(7);
+    retry_policy.set_retry_on("5xx");
+    // Ensure config was unpacked as expected.
+    EXPECT_EQ(config.GetTypeName(), "google.protobuf.Struct");
+    return CustomTestRetryPolicy::create(retry_policy, validation_visitor, context);
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Envoy::Protobuf::Struct>();
+  }
+
+  std::string name() const override { return "envoy.router.retry_policy.custom_test"; }
+};
+
+TEST_F(RouteMatcherTest, RetryPolicyTypedConfigDefaultFactory) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- domains: [www.lyft.com]
+  name: www
+  retry_policy_typed_config:
+    "@type": type.googleapis.com/envoy.config.route.v3.RetryPolicy
+    num_retries: 3
+    per_try_timeout: 1s
+    retry_on: '5xx,gateway-error'
+  routes:
+  - match: {prefix: /typed_override}
+    route:
+      cluster: www
+      retry_policy_typed_config:
+        "@type": type.googleapis.com/envoy.config.route.v3.RetryPolicy
+        num_retries: 5
+        per_try_timeout: 2s
+        retry_on: connect-failure
+  - match: {prefix: /regular_override}
+    route:
+      cluster: www
+      retry_policy:
+        num_retries: 2
+        retry_on: reset
+  - match: {prefix: /inherit_vhost}
+    route: {cluster: www}
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  // Route-level retry_policy_typed_config overrides vhost retry_policy_typed_config.
+  const auto typed_override_policy =
+      config.route(genHeaders("www.lyft.com", "/typed_override", "GET"), 0)
+          ->routeEntry()
+          ->retryPolicy();
+  EXPECT_EQ(std::chrono::milliseconds(2000), typed_override_policy->perTryTimeout());
+  EXPECT_EQ(5U, typed_override_policy->numRetries());
+  EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE, typed_override_policy->retryOn());
+
+  // Route-level retry_policy overrides vhost retry_policy_typed_config.
+  const auto regular_override_policy =
+      config.route(genHeaders("www.lyft.com", "/regular_override", "GET"), 0)
+          ->routeEntry()
+          ->retryPolicy();
+  EXPECT_EQ(std::chrono::milliseconds(0), regular_override_policy->perTryTimeout());
+  EXPECT_EQ(2U, regular_override_policy->numRetries());
+  EXPECT_EQ(RetryPolicy::RETRY_ON_RESET, regular_override_policy->retryOn());
+
+  // Route without retry policy inherits vhost retry_policy_typed_config.
+  const auto vhost_policy = config.route(genHeaders("www.lyft.com", "/inherit_vhost", "GET"), 0)
+                                ->routeEntry()
+                                ->retryPolicy();
+  EXPECT_EQ(std::chrono::milliseconds(1000), vhost_policy->perTryTimeout());
+  EXPECT_EQ(3U, vhost_policy->numRetries());
+  EXPECT_EQ(RetryPolicy::RETRY_ON_5XX | RetryPolicy::RETRY_ON_GATEWAY_ERROR,
+            vhost_policy->retryOn());
+}
+
+TEST_F(RouteMatcherTest, RetryPolicyTypedConfigCustomFactoryAndRetryState) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- domains: [www.lyft.com]
+  name: www
+  routes:
+  - match: {prefix: /custom}
+    route:
+      cluster: www
+      retry_policy_typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  CustomTestRetryPolicyFactory factory;
+  Registry::InjectFactory<RetryPolicyFactory> registered(factory);
+
+  factory_context_.cluster_manager_.initializeClusters({"www"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  const auto policy =
+      config.route(genHeaders("www.lyft.com", "/custom", "GET"), 0)->routeEntry()->retryPolicy();
+  EXPECT_EQ(7U, policy->numRetries());
+  EXPECT_EQ(RetryPolicy::RETRY_ON_5XX, policy->retryOn());
+
+  Http::TestRequestHeaderMapImpl headers;
+  NiceMock<Upstream::MockClusterInfo> cluster;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto retry_state = policy->createRetryState(headers, cluster, factory_context_, dispatcher,
+                                              Upstream::ResourcePriority::Default,
+                                              makeOptRef<StreamInfo::StreamInfo>(stream_info));
+  ASSERT_NE(nullptr, retry_state);
+  EXPECT_TRUE(retry_state->enabled());
+  const auto* custom_policy = dynamic_cast<const CustomTestRetryPolicy*>(policy.get());
+  ASSERT_NE(nullptr, custom_policy);
+  EXPECT_TRUE(custom_policy->last_stream_info_present_);
+}
+
+TEST_F(RouteMatcherTest, RetryPolicyTypedConfigValidationErrors) {
+  factory_context_.cluster_manager_.initializeClusters({"www"}, {});
+
+  // Both retry_policy and retry_policy_typed_config on VirtualHost.
+  {
+    const std::string yaml = R"EOF(
+virtual_hosts:
+- domains: [www.lyft.com]
+  name: www
+  retry_policy:
+    num_retries: 2
+  retry_policy_typed_config:
+    "@type": type.googleapis.com/envoy.config.route.v3.RetryPolicy
+    num_retries: 3
+  routes:
+  - match: {prefix: /}
+    route: {cluster: www}
+    )EOF";
+    absl::Status status = absl::OkStatus();
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false, status);
+    EXPECT_EQ(absl::StatusCode::kInvalidArgument, status.code());
+    EXPECT_THAT(status.message(),
+                testing::HasSubstr(
+                    "Cannot set both retry_policy and retry_policy_typed_config in VirtualHost."));
+  }
+
+  // Both retry_policy and retry_policy_typed_config on RouteAction.
+  {
+    const std::string yaml = R"EOF(
+virtual_hosts:
+- domains: [www.lyft.com]
+  name: www
+  routes:
+  - match: {prefix: /}
+    route:
+      cluster: www
+      retry_policy:
+        num_retries: 2
+      retry_policy_typed_config:
+        "@type": type.googleapis.com/envoy.config.route.v3.RetryPolicy
+        num_retries: 3
+    )EOF";
+    absl::Status status = absl::OkStatus();
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false, status);
+    EXPECT_EQ(absl::StatusCode::kInvalidArgument, status.code());
+    EXPECT_THAT(status.message(),
+                testing::HasSubstr(
+                    "Cannot set both retry_policy and retry_policy_typed_config in RouteAction."));
+  }
+
+  // Unregistered type URL in retry_policy_typed_config.
+  {
+    const std::string yaml = R"EOF(
+virtual_hosts:
+- domains: [www.lyft.com]
+  name: www
+  routes:
+  - match: {prefix: /}
+    route:
+      cluster: www
+      retry_policy_typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+    )EOF";
+    absl::Status status = absl::OkStatus();
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false, status);
+    EXPECT_EQ(absl::StatusCode::kInvalidArgument, status.code());
+    EXPECT_THAT(
+        status.message(),
+        testing::HasSubstr("Didn't find a registered RetryPolicyFactory implementation for type:"));
+  }
+
+  // Unregistered type URL in VirtualHost retry_policy_typed_config.
+  {
+    const std::string yaml = R"EOF(
+virtual_hosts:
+- domains: [www.lyft.com]
+  name: www
+  retry_policy_typed_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+  routes:
+  - match: {prefix: /}
+    route: {cluster: www}
+    )EOF";
+    absl::Status status = absl::OkStatus();
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false, status);
+    EXPECT_EQ(absl::StatusCode::kInvalidArgument, status.code());
+    EXPECT_THAT(
+        status.message(),
+        testing::HasSubstr("Didn't find a registered RetryPolicyFactory implementation for type:"));
+  }
+
+  // Malformed TypedStruct wire bytes in retry_policy_typed_config return Status error without
+  // throwing EnvoyException.
+  {
+    envoy::config::route::v3::RouteConfiguration route_config;
+    auto* vhost = route_config.add_virtual_hosts();
+    vhost->set_name("www");
+    vhost->add_domains("www.lyft.com");
+    auto* typed_config = vhost->mutable_retry_policy_typed_config();
+    typed_config->set_type_url("type.googleapis.com/xds.type.v3.TypedStruct");
+    typed_config->set_value(std::string("\x80\xff\xff", 3));
+    auto* route = vhost->add_routes();
+    route->mutable_match()->set_prefix("/");
+    route->mutable_route()->set_cluster("www");
+
+    absl::Status status = absl::OkStatus();
+    TestConfigImpl config(route_config, factory_context_, false, status);
+    EXPECT_FALSE(status.ok());
+  }
+
+  // Null RetryPolicy returned by a factory fails closed with InvalidArgument.
+  {
+    class NullRetryPolicyFactory : public RetryPolicyFactory {
+    public:
+      absl::StatusOr<RetryPolicyConstSharedPtr>
+      createRetryPolicy(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
+                        Server::Configuration::CommonFactoryContext&) override {
+        return RetryPolicyConstSharedPtr{nullptr};
+      }
+      ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+        return std::make_unique<Envoy::Protobuf::Struct>();
+      }
+      std::string name() const override { return "envoy.router.retry_policy.null_test"; }
+    };
+
+    NullRetryPolicyFactory null_factory;
+    Registry::InjectFactory<RetryPolicyFactory> registered(null_factory);
+
+    const std::string yaml = R"EOF(
+virtual_hosts:
+- domains: [www.lyft.com]
+  name: www
+  routes:
+  - match: {prefix: /}
+    route:
+      cluster: www
+      retry_policy_typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+    )EOF";
+    absl::Status status = absl::OkStatus();
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false, status);
+    EXPECT_EQ(absl::StatusCode::kInvalidArgument, status.code());
+    EXPECT_THAT(status.message(),
+                testing::HasSubstr("RetryPolicyFactory returned null policy for type:"));
+  }
+
+  // Invalid RetryPolicy inside retry_policy_typed_config (max_interval < base_interval).
+  {
+    const std::string yaml = R"EOF(
+virtual_hosts:
+- domains: [www.lyft.com]
+  name: www
+  routes:
+  - match: {prefix: /}
+    route:
+      cluster: www
+      retry_policy_typed_config:
+        "@type": type.googleapis.com/envoy.config.route.v3.RetryPolicy
+        retry_back_off:
+          base_interval: 10s
+          max_interval: 1s
+    )EOF";
+    absl::Status status = absl::OkStatus();
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false, status);
+    EXPECT_EQ(absl::StatusCode::kInvalidArgument, status.code());
+    EXPECT_THAT(status.message(),
+                testing::HasSubstr(
+                    "retry_policy.max_interval must greater than or equal to the base_interval"));
+  }
+
+  // PGV constraint violation inside retry_policy_typed_config (base_interval: 0s).
+  {
+    const std::string yaml = R"EOF(
+virtual_hosts:
+- domains: [www.lyft.com]
+  name: www
+  routes:
+  - match: {prefix: /}
+    route:
+      cluster: www
+      retry_policy_typed_config:
+        "@type": type.googleapis.com/envoy.config.route.v3.RetryPolicy
+        retry_back_off:
+          base_interval: 0s
+    )EOF";
+    absl::Status status = absl::OkStatus();
+    EXPECT_THROW_WITH_REGEX(
+        TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true, status),
+        ProtoValidationException, "Proto constraint validation failed");
+  }
 }
 
 TEST_F(RouteMatcherTest, GrpcRetry) {

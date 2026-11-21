@@ -281,6 +281,8 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
                               Event::Dispatcher& client_dispatcher, milliseconds timeout)
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
+  // Measure elapsed I/O time within this wait, excluding gaps between waits on the same stream.
+  Event::GlobalTimeSystem io_time_system;
   while (bound.withinBound()) {
     // Wake up periodically to run the client dispatcher.
     if (time_system.waitFor(lock, absl::Condition(&condition), 5ms * TIMEOUT_FACTOR)) {
@@ -288,6 +290,9 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
     }
 
     // Run the client dispatcher since we may need to process window updates, etc.
+    lock.Unlock();
+    io_time_system.advanceTimeForIo(client_dispatcher);
+    lock.Lock();
     client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
   }
   return false;

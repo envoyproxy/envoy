@@ -15,10 +15,21 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.rbac"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/network/rbac:config",
+        "//test/extensions/filters/common/rbac:extension_input_lib",
         "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/rbac/v3:pkg_cc_proto",
@@ -29,7 +40,17 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.network.rbac"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/common:logger",
@@ -51,10 +72,16 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.filters.network.rbac"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/common:logger",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/extensions/filters/network/echo:config",
         "//source/extensions/filters/network/rbac:config",
         "//source/extensions/filters/network/set_filter_state:config",

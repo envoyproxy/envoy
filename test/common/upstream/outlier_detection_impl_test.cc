@@ -261,7 +261,7 @@ TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   loadRq(hosts_[0], 4, 500);
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
@@ -270,7 +270,7 @@ TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   loadRq(failover_hosts_[0], 4, 500);
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+
   EXPECT_CALL(checker_, check(failover_hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(failover_hosts_[0]), _,
@@ -322,7 +322,6 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodes) {
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(hosts_[0], 4, 500);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
@@ -332,13 +331,13 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodes) {
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that doesn't bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Interval that does bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(30001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(20002));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -351,7 +350,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodes) {
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(hosts_[0], 4, 500);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(40000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
@@ -431,7 +430,6 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHCUnejectHost)
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(hosts_[0], 4, 500);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
@@ -441,7 +439,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHCUnejectHost)
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that doesn't bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
 
@@ -462,7 +460,6 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHCUnejectHost)
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(hosts_[0], 4, 500);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
@@ -472,7 +469,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHCUnejectHost)
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that doesn't bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
+
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
 
@@ -491,7 +488,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHCUnejectHost)
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(hosts_[0], 4, 500);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(40000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(30001));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
@@ -546,7 +543,6 @@ successful_active_health_check_uneject_host: false
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(hosts_[0], 4, 500);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
@@ -556,7 +552,7 @@ successful_active_health_check_uneject_host: false
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that doesn't bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
 
@@ -661,7 +657,6 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaNonHttpCodes) {
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(hosts_[0], 4, Result::LocalOriginConnectFailed);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
@@ -674,13 +669,13 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaNonHttpCodes) {
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that doesn't bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Interval that does bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(30001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(20002));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -693,7 +688,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaNonHttpCodes) {
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(hosts_[0], 4, Result::LocalOriginConnectFailed);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(40000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
@@ -750,7 +745,6 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, false));
   loadRq(hosts_[0], 2, 503);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
@@ -761,13 +755,13 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that doesn't bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Interval that does bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(30001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(20002));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -780,7 +774,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(hosts_[0], 4, 503);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(40000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
@@ -845,7 +839,7 @@ TEST_F(OutlierDetectorImplTest, TimeoutWithHttpCode) {
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
   // Wait until it is unejected
-  time_system_.setMonotonicTime(std::chrono::milliseconds(50001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(50001));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -927,7 +921,7 @@ TEST_F(OutlierDetectorImplTest, LargeNumberOfTimeouts) {
   }
 
   // Wait until the host is unejected.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(50001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(50001));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -969,7 +963,6 @@ TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
                        envoy::data::cluster::v3::CONSECUTIVE_LOCAL_ORIGIN_FAILURE, true));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
   // Get the configured number of failures and simulate than number of connect failures.
   uint32_t n = runtime_.snapshot_.getInteger(ConsecutiveLocalOriginFailureRuntime,
@@ -988,13 +981,13 @@ TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
   }
 
   // Wait short time - not enough to be unejected
-  time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Interval that does bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(30001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(20002));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -1017,11 +1010,11 @@ TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
   }
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(40000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(90002));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(50002));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -1090,7 +1083,6 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(hosts_[0], 4, 503);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
@@ -1101,13 +1093,13 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that doesn't bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Interval that does bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(30001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(20002));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -1122,7 +1114,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   loadRq(hosts_[0], 2, 500);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(40000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
@@ -1191,7 +1183,6 @@ TEST_F(OutlierDetectorImplTest, BasicFlowNonHttpCodesExternalOrigin) {
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
   loadRq(hosts_[0], 3, Result::LocalOriginConnectFailed);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
   EXPECT_CALL(*event_logger_,
@@ -1241,7 +1232,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
   loadRq(hosts_, 200, 200);
   loadRq(hosts_[4], 200, 503);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(10000));
   EXPECT_CALL(checker_, check(hosts_[4]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]),
                                        _, envoy::data::cluster::v3::SUCCESS_RATE, true));
@@ -1266,14 +1257,14 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that doesn't bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(19999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   EXPECT_TRUE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that does bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(50001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(30002));
   EXPECT_CALL(checker_, check(hosts_[4]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[4])));
@@ -1296,7 +1287,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
   loadRq(hosts_, 25, 200);
   loadRq(hosts_[4], 25, 503);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(60001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(10000));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   // The success rate should be *calculated* since the minimum request volume was met for failure
@@ -1371,7 +1362,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
   loadRq(hosts_, 200, Result::LocalOriginConnectSuccess);
   loadRq(hosts_[4], 200, Result::LocalOriginConnectFailed);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(10000));
   EXPECT_CALL(checker_, check(hosts_[4]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]), _,
@@ -1397,14 +1388,14 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that doesn't bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(19999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   EXPECT_TRUE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that does bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(50001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(30002));
   EXPECT_CALL(checker_, check(hosts_[4]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[4])));
@@ -1424,7 +1415,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
   loadRq(hosts_, 25, Result::LocalOriginConnectSuccess);
   loadRq(hosts_[4], 25, Result::LocalOriginConnectFailed);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(60001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(10000));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   // The success rate should be *calculated* since the minimum request volume was met for failure
@@ -1448,7 +1439,7 @@ TEST_F(OutlierDetectorImplTest, EmptySuccessRate) {
                                              .value());
   loadRq(hosts_, 200, 503);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(10000));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   ON_CALL(runtime_.snapshot_, getInteger(SuccessRateMinimumHostsRuntime, 5))
       .WillByDefault(Return(0));
@@ -1507,7 +1498,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
   loadRq(hosts_[3], 250, 503);
   loadRq(hosts_[4], 300, 503);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(10000));
   EXPECT_CALL(checker_, check(hosts_[4]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]),
                                        _, envoy::data::cluster::v3::FAILURE_PERCENTAGE, true));
@@ -1533,14 +1524,14 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that doesn't bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(19999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   EXPECT_TRUE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that does bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(50001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(30002));
   EXPECT_CALL(checker_, check(hosts_[4]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[4])));
@@ -1563,7 +1554,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
   loadRq(hosts_, 25, 200);
   loadRq(hosts_[4], 25, 503);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(60001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(10000));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   // The success rate should be *calculated* since the minimum request volume was met for failure
@@ -1614,7 +1605,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageLocalOrigin) {
   loadRq(hosts_, 200, Result::LocalOriginConnectSuccess);
   loadRq(hosts_[4], 200, Result::LocalOriginConnectFailed);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(10000));
   EXPECT_CALL(checker_, check(hosts_[4]));
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]), _,
@@ -1643,14 +1634,14 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageLocalOrigin) {
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that doesn't bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(19999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   EXPECT_TRUE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Interval that does bring the host back in.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(50001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(30002));
   EXPECT_CALL(checker_, check(hosts_[4]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[4])));
@@ -1670,7 +1661,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageLocalOrigin) {
   loadRq(hosts_, 25, Result::LocalOriginConnectSuccess);
   loadRq(hosts_[4], 25, Result::LocalOriginConnectFailed);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(60001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(10000));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   // The success rate should be *calculated* since the minimum request volume was met for failure
@@ -1697,7 +1688,6 @@ TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
 
   loadRq(hosts_[0], 4, 500);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
@@ -1711,7 +1701,7 @@ TEST_F(OutlierDetectorImplTest, RemoveWhileEjected) {
 
   EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
 }
@@ -1730,7 +1720,6 @@ TEST_F(OutlierDetectorImplTest, Overflow) {
 
   loadRq(hosts_[0], 4, 500);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
@@ -1803,8 +1792,6 @@ TEST_F(OutlierDetectorImplTest, EjectionActiveValueIsAccountedWithoutMetricStora
   ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(50));
 
   loadRq(hosts_[0], 4, 500);
-
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
   // Manually increase the gauge. From metric's perspective it's overflowed.
   outlier_detection_ejections_active_.inc();
@@ -1949,7 +1936,6 @@ TEST_F(OutlierDetectorImplTest, CrossThreadFailRace) {
   });
   loadRq(hosts_[0], 1, 500);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
@@ -1985,7 +1971,6 @@ max_ejection_time_jitter: 13s
 
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   // Expect only one ejection.
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
@@ -2024,7 +2009,6 @@ max_ejection_time_jitter: 13s
 
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   // Expect only one ejection.
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
@@ -2072,7 +2056,6 @@ TEST_F(OutlierDetectorImplTest, Consecutive_5xxAlreadyEjected) {
   // Cause a consecutive 5xx error.
   loadRq(hosts_[0], 4, 500);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
@@ -2110,7 +2093,7 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoff) {
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Eject the node by consecutive 5xx errors.
-  time_system_.setMonotonicTime(std::chrono::seconds(0));
+
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
@@ -2121,7 +2104,7 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoff) {
 
   // Ejection base time is 10 secs. The node has been ejected just once.
   // It should be brought back after 10 secs.
-  time_system_.setMonotonicTime(std::chrono::seconds(10));
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
@@ -2141,13 +2124,13 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoff) {
 
   // This is the second ejection in the row.
   // Node should stay ejected for twice the base_ejection_time: 20 secs.
-  time_system_.setMonotonicTime(std::chrono::seconds(20));
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   // Make sure that node stays ejected.
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
-  time_system_.setMonotonicTime(std::chrono::seconds(30));
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
@@ -2168,21 +2151,21 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoff) {
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Node should stay ejected after 10 secs of ejection time.
-  time_system_.setMonotonicTime(std::chrono::seconds(40));
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Node should stay ejected after 20 secs of ejection time.
-  time_system_.setMonotonicTime(std::chrono::seconds(50));
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Node should be brought back after being ejected for 30 secs.
-  time_system_.setMonotonicTime(std::chrono::seconds(60));
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
@@ -2194,11 +2177,11 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoff) {
 
   // During the next 2 timer intervals, the node is healthy. This should decrease
   // the eject time backoff.
-  time_system_.setMonotonicTime(std::chrono::seconds(70));
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
 
-  time_system_.setMonotonicTime(std::chrono::seconds(80));
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
 
@@ -2212,14 +2195,14 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoff) {
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Node should stay ejected after 10 secs.
-  time_system_.setMonotonicTime(std::chrono::seconds(90));
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Node should be brought back after being ejected for 20 secs.
-  time_system_.setMonotonicTime(std::chrono::seconds(100));
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
@@ -2233,13 +2216,13 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoff) {
   // The node will not be ejected and the eject backoff time should
   // drop to the initial value of 1 * base_ejection_time.
   for (auto i = 1; i <= 50; i++) {
-    time_system_.setMonotonicTime(std::chrono::seconds(100 + i * 10));
+    time_system_.advanceTimeWait(std::chrono::seconds(10));
     EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
     interval_timer_->invokeCallback();
   }
 
   // Trigger ejection.
-  time_system_.setMonotonicTime(std::chrono::seconds(610));
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
@@ -2249,7 +2232,7 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoff) {
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // The node should be brought back after 10 secs.
-  time_system_.setMonotonicTime(std::chrono::seconds(620));
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
@@ -2291,8 +2274,6 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoffTimeBasedDetection) {
   ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingFailurePercentageRuntime, 0))
       .WillByDefault(Return(true));
 
-  time_system_.setMonotonicTime(std::chrono::seconds(0));
-
   // Simulate 100% failure.
   // Expect non-enforcing logging to happen every time the consecutive_5xx_ counter
   // gets saturated (every 5 times).
@@ -2301,9 +2282,8 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoffTimeBasedDetection) {
       .Times(20);
   loadRq(hosts_[0], 100, 500);
 
-  uint32_t tick = 1;
   // Invoke periodic timer. The node should be ejected.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(base_ejection_time * tick));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(base_ejection_time));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(base_ejection_time), _));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
@@ -2313,8 +2293,7 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoffTimeBasedDetection) {
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
   // Advance time to the next periodic timer tick. Node should be unejected.
-  tick++;
-  time_system_.setMonotonicTime(std::chrono::milliseconds(base_ejection_time * tick));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(base_ejection_time));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(base_ejection_time), _));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
@@ -2330,8 +2309,7 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoffTimeBasedDetection) {
   loadRq(hosts_[0], 100, 500);
 
   // Advance time to the next periodic timer tick. Node should be ejected.
-  tick++;
-  time_system_.setMonotonicTime(std::chrono::milliseconds(base_ejection_time * tick));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(base_ejection_time));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(base_ejection_time), _));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
@@ -2343,8 +2321,7 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoffTimeBasedDetection) {
   // The node was ejected the second time in a row. The length of time the node
   // should be ejected should be increased.
   // Advance time to the next periodic timer tick. Node should stay ejected.
-  tick++;
-  time_system_.setMonotonicTime(std::chrono::milliseconds(base_ejection_time * tick));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(base_ejection_time));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(base_ejection_time), _));
   interval_timer_->invokeCallback();
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
@@ -2352,8 +2329,7 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoffTimeBasedDetection) {
 
   // Advance time to next periodic timer tick. This time the node should be unejected
   // (after 2 periods of base_ejection_time).
-  tick++;
-  time_system_.setMonotonicTime(std::chrono::milliseconds(base_ejection_time * tick));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(base_ejection_time));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(base_ejection_time), _));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
@@ -2366,8 +2342,7 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoffTimeBasedDetection) {
   loadRq(hosts_[0], 100, 200);
 
   // Advance time to the next periodic time tick. The node should stay unejected.
-  tick++;
-  time_system_.setMonotonicTime(std::chrono::milliseconds(base_ejection_time * tick));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(base_ejection_time));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(base_ejection_time), _));
   interval_timer_->invokeCallback();
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
@@ -2375,8 +2350,7 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoffTimeBasedDetection) {
 
   loadRq(hosts_[0], 100, 200);
   // Advance time to the next periodic time tick. The node should stay unejected.
-  tick++;
-  time_system_.setMonotonicTime(std::chrono::milliseconds(base_ejection_time * tick));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(base_ejection_time));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(base_ejection_time), _));
   interval_timer_->invokeCallback();
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
@@ -2389,8 +2363,7 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoffTimeBasedDetection) {
   loadRq(hosts_[0], 100, 500);
 
   // Advance time to next periodic timer tick. Node should be ejected.
-  tick++;
-  time_system_.setMonotonicTime(std::chrono::milliseconds(base_ejection_time * tick));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(base_ejection_time));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(base_ejection_time), _));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
@@ -2402,8 +2375,7 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoffTimeBasedDetection) {
   // Advance time to the next periodic timer tick. This time the node should be unejected
   // only after ONE period of base_ejection_time (ejection time was reduced when the node
   // did not fail for two timer periods).
-  tick++;
-  time_system_.setMonotonicTime(std::chrono::milliseconds(base_ejection_time * tick));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(base_ejection_time));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(base_ejection_time), _));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
@@ -2440,8 +2412,7 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTime) {
   // Base ejection time is 10s. Max ejection time is 300s.
   // It will take 30 ejections to reach the maximum, Beyond that, ejection time should stay
   // the same
-  uint32_t eject_tick = 0;
-  time_system_.setMonotonicTime(std::chrono::seconds(0));
+
   // Trigger 30 ejection.
   // For each ejection, time to uneject increases.
   for (auto i = 1; i <= 30; i++) {
@@ -2455,7 +2426,7 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTime) {
 
     // Simulate several check intervals. For each check the node should stay ejected.
     for (auto j = 1; j < i; j++) {
-      time_system_.setMonotonicTime(std::chrono::seconds(++eject_tick * 10));
+      time_system_.advanceTimeWait(std::chrono::seconds(10));
       EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
       interval_timer_->invokeCallback();
       EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
@@ -2463,7 +2434,7 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTime) {
     }
 
     // Wait for unejection.
-    time_system_.setMonotonicTime(std::chrono::seconds(++eject_tick * 10));
+    time_system_.advanceTimeWait(std::chrono::seconds(10));
     EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
     EXPECT_CALL(checker_, check(hosts_[0]));
     EXPECT_CALL(*event_logger_,
@@ -2486,7 +2457,7 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTime) {
 
     // Move the time 290s ahead. The ejection should not happen.
     for (auto j = 1; j <= 29; j++) {
-      time_system_.setMonotonicTime(std::chrono::seconds(++eject_tick * 10));
+      time_system_.advanceTimeWait(std::chrono::seconds(10));
       EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
       interval_timer_->invokeCallback();
       EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
@@ -2494,7 +2465,7 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTime) {
     }
 
     // Node should be brought back after 300 secs.
-    time_system_.setMonotonicTime(std::chrono::seconds(++eject_tick * 10));
+    time_system_.advanceTimeWait(std::chrono::seconds(10));
     EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
     EXPECT_CALL(checker_, check(hosts_[0]));
     EXPECT_CALL(*event_logger_,
@@ -2533,8 +2504,7 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTimeNotAlligned) {
 
   // Verify that maximum_ejection_time caps ejection time.
   // Base ejection time is 10s. Max ejection time is 305s.
-  uint32_t eject_tick = 0;
-  time_system_.setMonotonicTime(std::chrono::seconds(0));
+
   // Trigger 31 ejections in a row.
   // For each ejection, time to uneject increases.
   for (auto i = 1; i <= 31; i++) {
@@ -2548,7 +2518,7 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTimeNotAlligned) {
 
     // Simulate several intervals. For check the node should stay ejected.
     for (auto j = 1; j < i; j++) {
-      time_system_.setMonotonicTime(std::chrono::seconds(++eject_tick * 10));
+      time_system_.advanceTimeWait(std::chrono::seconds(10));
       EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
       interval_timer_->invokeCallback();
       EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
@@ -2556,7 +2526,7 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTimeNotAlligned) {
     }
 
     // Wait for unejection.
-    time_system_.setMonotonicTime(std::chrono::seconds(++eject_tick * 10));
+    time_system_.advanceTimeWait(std::chrono::seconds(10));
     EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
     EXPECT_CALL(checker_, check(hosts_[0]));
     EXPECT_CALL(*event_logger_,
@@ -2579,7 +2549,7 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTimeNotAlligned) {
 
     // Move the time 300s ahead. The node should stay ejected.
     for (auto j = 1; j <= 30; j++) {
-      time_system_.setMonotonicTime(std::chrono::seconds(++eject_tick * 10));
+      time_system_.advanceTimeWait(std::chrono::seconds(10));
       EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
       interval_timer_->invokeCallback();
       EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
@@ -2588,7 +2558,7 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTimeNotAlligned) {
 
     // Move time one base_ejection_time beyond max_ejection_time.
     // Wait for unejection.
-    time_system_.setMonotonicTime(std::chrono::seconds(++eject_tick * 10));
+    time_system_.advanceTimeWait(std::chrono::seconds(10));
     EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
     EXPECT_CALL(checker_, check(hosts_[0]));
     EXPECT_CALL(*event_logger_,
@@ -2883,7 +2853,7 @@ detect_degraded_hosts: true
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
 
   // Timer-based recovery: advance time past base_ejection_time (30s)
-  time_system_.setMonotonicTime(std::chrono::milliseconds(30001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(30001));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -3038,7 +3008,7 @@ detect_degraded_hosts: true
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
 
   // Undegrade after base_ejection_time
-  time_system_.setMonotonicTime(std::chrono::milliseconds(30001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(30001));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -3047,7 +3017,7 @@ detect_degraded_hosts: true
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
 
   // Degrade again
-  time_system_.setMonotonicTime(std::chrono::milliseconds(40000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9999));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::DEGRADED, true));
@@ -3055,7 +3025,7 @@ detect_degraded_hosts: true
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
 
   // Undegrade again - should happen at 2x base_ejection_time (60s) due to backoff = 2
-  time_system_.setMonotonicTime(std::chrono::milliseconds(100001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(60001));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -3064,12 +3034,12 @@ detect_degraded_hosts: true
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
 
   // Wait one more interval (10s) while host is healthy - backoff should decrement from 2 to 1
-  time_system_.setMonotonicTime(std::chrono::milliseconds(110002));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(10001));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
 
   // Degrade again - backoff was 1, will increment to 2, so use 2x base_ejection_time
-  time_system_.setMonotonicTime(std::chrono::milliseconds(120000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(9998));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::DEGRADED, true));
@@ -3077,7 +3047,7 @@ detect_degraded_hosts: true
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
 
   // Should undegrade at 2x base_ejection_time (60s) - backoff went from 1->2 on degrade
-  time_system_.setMonotonicTime(std::chrono::milliseconds(180001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(60001));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -3114,7 +3084,7 @@ detect_degraded_hosts: true
                                        _, envoy::data::cluster::v3::DEGRADED, true));
   hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(10001));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -3123,13 +3093,13 @@ detect_degraded_hosts: true
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
 
   // Second degradation - backoff = 2, undegrade at 2x base (20s)
-  time_system_.setMonotonicTime(std::chrono::milliseconds(11000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(999));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::DEGRADED, true));
   hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(31001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(20001));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -3138,13 +3108,13 @@ detect_degraded_hosts: true
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
 
   // Third degradation - backoff = 3, would be 3x base (30s) which equals max_ejection_time
-  time_system_.setMonotonicTime(std::chrono::milliseconds(32000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(999));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::DEGRADED, true));
   hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
 
-  time_system_.setMonotonicTime(std::chrono::milliseconds(62001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(30001));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -3153,14 +3123,14 @@ detect_degraded_hosts: true
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
 
   // Fourth degradation - backoff should stay at 3 (max) not increment to 4
-  time_system_.setMonotonicTime(std::chrono::milliseconds(63000));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(999));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::DEGRADED, true));
   hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
 
   // Should still undegrade at max (30s), not 4x base (40s)
-  time_system_.setMonotonicTime(std::chrono::milliseconds(93001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(30001));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -3199,13 +3169,13 @@ detect_degraded_hosts: true
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
 
   // Should NOT undegrade at base_ejection_time (30s) without jitter
-  time_system_.setMonotonicTime(std::chrono::milliseconds(30001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(30001));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
 
   // Should undegrade at base_ejection_time + jitter (30s + 3s = 33s)
-  time_system_.setMonotonicTime(std::chrono::milliseconds(33001));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(3000));
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));

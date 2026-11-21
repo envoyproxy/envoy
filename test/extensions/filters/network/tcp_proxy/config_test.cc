@@ -72,9 +72,9 @@ TEST(ConfigTest, ConfigTest) {
   Network::MockConnection connection;
   NiceMock<Network::MockReadFilterCallbacks> readFilterCallback;
   EXPECT_CALL(connection, addReadFilter(_))
-      .WillRepeatedly(Invoke([&readFilterCallback](Network::ReadFilterSharedPtr filter) {
+      .WillRepeatedly([&readFilterCallback](Network::ReadFilterSharedPtr filter) {
         filter->initializeReadFilterCallbacks(readFilterCallback);
-      }));
+      });
   cb(connection);
 }
 

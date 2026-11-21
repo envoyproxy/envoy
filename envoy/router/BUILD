@@ -53,6 +53,8 @@ envoy_cc_library(
     deps = [
         ":rds_interface",
         "//envoy/common:time_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/http:filter_interface",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -92,6 +94,7 @@ envoy_cc_library(
         "//envoy/http:header_evaluator",
         "//envoy/http:header_map_interface",
         "//envoy/rds:rds_config_interface",
+        "//envoy/stats:stats_macros",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/tracing:tracer_interface",
@@ -111,13 +114,16 @@ envoy_cc_library(
     deps = [
         "//envoy/common:optref_lib",
         "//envoy/common:time_interface",
+        "//envoy/config:typed_config_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:codec_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/protobuf:message_validator_interface",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:retry_interface",
         "//envoy/upstream:upstream_interface",
+        "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/types:span",
     ],
 )

@@ -129,9 +129,9 @@ TEST_F(AwsClusterManagerTest, ClusterCallbacksAreDeleted) {
 
 // Checks that aws cluster manager constructor adds an init target and the target is called
 TEST_F(AwsClusterManagerTest, CreateQueuedViaInitManager) {
-  EXPECT_CALL(context_.init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+  EXPECT_CALL(context_.init_manager_, add(_)).WillOnce([this](const Init::Target& target) {
     init_target_ = target.createHandle("test");
-  }));
+  });
   EXPECT_CALL(context_, clusterManager()).WillRepeatedly(ReturnRef(cm_));
   auto aws_cluster_manager = std::make_shared<AwsClusterManagerImpl>(context_);
   auto status = aws_cluster_manager->addManagedCluster(
@@ -146,9 +146,9 @@ TEST_F(AwsClusterManagerTest, CreateQueuedViaInitManager) {
 
 // Checks that aws cluster manager constructor adds an init target and the target is called
 TEST_F(AwsClusterManagerTest, CreateQueuedViaInitManagerWithFailedCluster) {
-  EXPECT_CALL(context_.init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+  EXPECT_CALL(context_.init_manager_, add(_)).WillOnce([this](const Init::Target& target) {
     init_target_ = target.createHandle("test");
-  }));
+  });
   EXPECT_CALL(context_, clusterManager()).WillRepeatedly(ReturnRef(cm_));
   EXPECT_CALL(cm_, addOrUpdateCluster(_, _, _)).WillOnce(Return(absl::InternalError("")));
 

@@ -324,7 +324,7 @@ private:
     OptRef<const Tracing::Config> tracingConfig() const override;
     const ScopeTrackedObject& scope() override;
     OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
-    bool isHalfCloseEnabled() override { return connection_manager_.allow_upstream_half_close_; }
+    bool isHalfCloseEnabled() override { return state_.half_close_enabled_; }
 
     // DownstreamStreamFilterCallbacks
     void setRoute(Router::RouteConstSharedPtr route) override;
@@ -336,6 +336,7 @@ private:
     void recreateClusterInfo() override;
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+    void enableHalfClose() override { state_.half_close_enabled_ = true; }
 
     void setVirtualHostRoute(Router::VirtualHostRoute route);
     // Set cached route. This method should never be called directly. This is only called in the
@@ -408,6 +409,11 @@ private:
       // structure, so it can be atomically created and cleared.
       bool deferred_to_next_io_iteration_ : 1 = false;
       bool deferred_end_stream_ : 1 = false;
+
+      // If true, the stream is destroyed once both request and response are complete and the
+      // response is a success (2xx). Otherwise it is destroyed when the response completes, and
+      // reset if the request is still incomplete.
+      bool half_close_enabled_ : 1 = false;
     };
 
     bool canDestroyStream() const {
@@ -740,18 +746,6 @@ private:
   // Latched when the connection manager is created so it is not re-read on every response. See
   // shouldDrainClose().
   const bool use_connection_event_drain_ = false;
-
-  // If independent half-close is enabled and the upstream protocol is either HTTP/2 or HTTP/3
-  // protocols the stream is destroyed after both request and response are complete i.e. reach their
-  // respective end-of-stream, by receiving trailers or the header/body with end-stream set in both
-  // directions AND response has success (2xx) status code.
-  //
-  // For HTTP/1 upstream protocol or if independent half-close is disabled the stream is destroyed
-  // when the response is complete and reaches its end-of-stream, i.e. when trailers or the response
-  // header/body with end-stream set are received, even if the request has not yet completed. If
-  // request was incomplete at response completion, the stream is reset.
-
-  const bool allow_upstream_half_close_{};
 
   // Whether the connection manager is drained due to premature resets.
   bool drained_due_to_premature_resets_{false};

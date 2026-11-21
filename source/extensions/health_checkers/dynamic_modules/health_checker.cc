@@ -59,6 +59,7 @@ void DynamicModuleHealthChecker::DynamicModuleActiveHealthCheckSession::onInterv
     return;
   }
   awaiting_result_ = true;
+  staged_metadata_.clear();
   config_->on_session_on_interval_(session_module_ptr_, this);
 }
 
@@ -67,6 +68,8 @@ void DynamicModuleHealthChecker::DynamicModuleActiveHealthCheckSession::onTimeou
   if (session_module_ptr_ != nullptr && config_->on_session_on_timeout_ != nullptr) {
     config_->on_session_on_timeout_(session_module_ptr_);
   }
+  host_->setHealthCheckMetadata(std::move(staged_metadata_));
+  staged_metadata_.clear();
 }
 
 void DynamicModuleHealthChecker::DynamicModuleActiveHealthCheckSession::onDeferredDelete() {
@@ -86,6 +89,8 @@ void DynamicModuleHealthChecker::DynamicModuleActiveHealthCheckSession::reportRe
     return;
   }
   awaiting_result_ = false;
+  host_->setHealthCheckMetadata(std::move(staged_metadata_));
+  staged_metadata_.clear();
   switch (health) {
   case envoy_dynamic_module_type_host_health_Healthy:
     handleSuccess(false);

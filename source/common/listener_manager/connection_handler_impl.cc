@@ -17,6 +17,22 @@
 namespace Envoy {
 namespace Server {
 
+namespace {
+// The IPv4 address by which the workers also find a dual stack IPv6 address, if any.
+std::optional<std::string> ipv4AliasAddress(const Network::Address::Instance& address) {
+  if (address.type() != Network::Address::Type::Ip ||
+      address.ip()->version() != Network::Address::IpVersion::v6 ||
+      address.ip()->ipv6()->v6only()) {
+    return std::nullopt;
+  }
+  if (address.ip()->isAnyAddress()) {
+    return Network::Address::Ipv4Instance(address.ip()->port()).asString();
+  }
+  // When `v6only` is false, the address with an invalid IPv4-mapped address is rejected early.
+  return address.ip()->ipv6()->v4CompatibleAddress()->asString();
+}
+} // namespace
+
 ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
                                              std::optional<uint32_t> worker_index)
     : worker_index_(worker_index), dispatcher_(dispatcher),
@@ -67,6 +83,12 @@ void ConnectionHandlerImpl::addListener(std::optional<uint64_t> overridden_liste
         [&config](Network::ConnectionHandler::ActiveListener& listener) {
           listener.updateListenerConfig(config);
         });
+    // The removed addresses are stopped beforehand, so only an update that adds addresses has more
+    // socket factories than listeners. A filter chain only update keeps the listeners even when its
+    // port 0 addresses got new sockets on other ports.
+    if (config.listenSocketFactories().size() > listener_detail->per_address_details_list_.size()) {
+      addActiveTcpListenersForNewAddresses(*listener_detail, config, runtime, random);
+    }
     return;
   }
 
@@ -100,23 +122,9 @@ void ConnectionHandlerImpl::addListener(std::optional<uint64_t> overridden_liste
         disable_listeners_, std::move(internal_listener),
         config.shouldBypassOverloadManager() ? null_overload_manager_ : overload_manager_);
   } else if (config.listenSocketFactories()[0]->socketType() == Network::Socket::Type::Stream) {
-    auto overload_state =
-        config.shouldBypassOverloadManager()
-            ? (null_overload_manager_
-                   ? makeOptRef(null_overload_manager_->getThreadLocalOverloadState())
-                   : std::nullopt)
-            : (overload_manager_ ? makeOptRef(overload_manager_->getThreadLocalOverloadState())
-                                 : std::nullopt);
+    const auto overload_state = overloadState(config);
     for (auto& socket_factory : config.listenSocketFactories()) {
-      auto address = socket_factory->localAddress();
-      // worker_index_ doesn't have a value on the main thread for the admin server.
-      details->addActiveListener(
-          config, address, listener_reject_fraction_, disable_listeners_,
-          std::make_unique<ActiveTcpListener>(
-              *this, config, runtime, random,
-              socket_factory->getListenSocket(worker_index_.has_value() ? *worker_index_ : 0),
-              address, config.connectionBalancer(*address), overload_state),
-          config.shouldBypassOverloadManager() ? null_overload_manager_ : overload_manager_);
+      addActiveTcpListener(*details, config, *socket_factory, runtime, random, overload_state);
     }
   } else {
     ASSERT(config.udpListenerConfig().has_value(), "UDP listener factory is not initialized.");
@@ -138,36 +146,7 @@ void ConnectionHandlerImpl::addListener(std::optional<uint64_t> overridden_liste
     // This map only stores the new listener.
     if (absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
             per_address_details->typed_listener_)) {
-      tcp_listener_map_by_address_.insert_or_assign(per_address_details->address_->asStringView(),
-                                                    per_address_details);
-
-      auto& address = per_address_details->address_;
-      // If the address is Ipv6 and isn't v6only, parse out the ipv4 compatible address from the
-      // Ipv6 address and put an item to the map. Then this allows the `getBalancedHandlerByAddress`
-      // can match the Ipv4 request to Ipv4-mapped address also.
-      if (address->type() == Network::Address::Type::Ip &&
-          address->ip()->version() == Network::Address::IpVersion::v6 &&
-          !address->ip()->ipv6()->v6only()) {
-        if (address->ip()->isAnyAddress()) {
-          // Since both "::" with ipv4_compat and "0.0.0.0" can be supported.
-          // Only override the listener when this is an update of the existing listener by
-          // checking the address, this ensures the Ipv4 address listener won't be override
-          // by the listener which has the same IPv4-mapped address.
-          auto ipv4_any_address = Network::Address::Ipv4Instance(address->ip()->port()).asString();
-          auto ipv4_any_listener = tcp_listener_map_by_address_.find(ipv4_any_address);
-          if (ipv4_any_listener == tcp_listener_map_by_address_.end() ||
-              *ipv4_any_listener->second->address_ == *address) {
-            tcp_listener_map_by_address_.insert_or_assign(ipv4_any_address, per_address_details);
-          }
-        } else {
-          auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
-          // When `v6only` is false, the address with an invalid IPv4-mapped address is rejected
-          // early.
-          ASSERT(v4_compatible_addr != nullptr);
-          tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr->asStringView(),
-                                                        per_address_details);
-        }
-      }
+      addToTcpListenerMap(per_address_details);
     } else if (absl::holds_alternative<std::reference_wrapper<Network::InternalListener>>(
                    per_address_details->typed_listener_)) {
       internal_listener_map_by_address_.insert_or_assign(
@@ -175,6 +154,84 @@ void ConnectionHandlerImpl::addListener(std::optional<uint64_t> overridden_liste
     }
   }
   listener_map_by_tag_.emplace(config.listenerTag(), std::move(details));
+}
+
+Server::ThreadLocalOverloadStateOptRef
+ConnectionHandlerImpl::overloadState(const Network::ListenerConfig& config) const {
+  if (config.shouldBypassOverloadManager()) {
+    return null_overload_manager_
+               ? makeOptRef(null_overload_manager_->getThreadLocalOverloadState())
+               : std::nullopt;
+  }
+  return overload_manager_ ? makeOptRef(overload_manager_->getThreadLocalOverloadState())
+                           : std::nullopt;
+}
+
+void ConnectionHandlerImpl::addActiveTcpListener(
+    ActiveListenerDetails& details, Network::ListenerConfig& config,
+    Network::ListenSocketFactory& socket_factory, Runtime::Loader& runtime,
+    Random::RandomGenerator& random, Server::ThreadLocalOverloadStateOptRef overload_state) {
+  auto address = socket_factory.localAddress();
+  // worker_index_ doesn't have a value on the main thread for the admin server.
+  details.addActiveListener(
+      config, address, listener_reject_fraction_, disable_listeners_,
+      std::make_unique<ActiveTcpListener>(
+          *this, config, runtime, random,
+          socket_factory.getListenSocket(worker_index_.has_value() ? *worker_index_ : 0), address,
+          config.connectionBalancer(*address), overload_state),
+      config.shouldBypassOverloadManager() ? null_overload_manager_ : overload_manager_);
+}
+
+void ConnectionHandlerImpl::addActiveTcpListenersForNewAddresses(ActiveListenerDetails& details,
+                                                                 Network::ListenerConfig& config,
+                                                                 Runtime::Loader& runtime,
+                                                                 Random::RandomGenerator& random) {
+  const auto overload_state = overloadState(config);
+  for (auto& socket_factory : config.listenSocketFactories()) {
+    const Network::Address::Instance& address = *socket_factory->localAddress();
+    if (std::none_of(
+            details.per_address_details_list_.begin(), details.per_address_details_list_.end(),
+            [&address](const std::shared_ptr<PerAddressActiveListenerDetails>& per_address) {
+              return *per_address->address_ == address;
+            })) {
+      addActiveTcpListener(details, config, *socket_factory, runtime, random, overload_state);
+      addToTcpListenerMap(details.per_address_details_list_.back());
+    }
+  }
+}
+
+void ConnectionHandlerImpl::addToTcpListenerMap(
+    const std::shared_ptr<PerAddressActiveListenerDetails>& per_address_details,
+    bool keep_existing_entries) {
+  const auto add = [this, &per_address_details, keep_existing_entries](absl::string_view key) {
+    if (keep_existing_entries) {
+      tcp_listener_map_by_address_.try_emplace(key, per_address_details);
+    } else {
+      tcp_listener_map_by_address_.insert_or_assign(key, per_address_details);
+    }
+  };
+  add(per_address_details->address_->asStringView());
+
+  auto& address = per_address_details->address_;
+  // If the address is Ipv6 and isn't v6only, parse out the ipv4 compatible address from the
+  // Ipv6 address and put an item to the map. Then this allows the `getBalancedHandlerByAddress`
+  // can match the Ipv4 request to Ipv4-mapped address also.
+  const std::optional<std::string> ipv4_address = ipv4AliasAddress(*address);
+  if (!ipv4_address.has_value()) {
+    return;
+  }
+  if (address->ip()->isAnyAddress()) {
+    // Since both "::" with ipv4_compat and "0.0.0.0" can be supported.
+    // Only override the listener when this is an update of the existing listener by
+    // checking the address, this ensures the Ipv4 address listener won't be override
+    // by the listener which has the same IPv4-mapped address.
+    auto ipv4_any_listener = tcp_listener_map_by_address_.find(*ipv4_address);
+    if (ipv4_any_listener != tcp_listener_map_by_address_.end() &&
+        *ipv4_any_listener->second->address_ != *address) {
+      return;
+    }
+  }
+  add(*ipv4_address);
 }
 
 void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
@@ -264,6 +321,10 @@ void ConnectionHandlerImpl::removeFilterChains(
         [&filter_chains](Network::ConnectionHandler::ActiveListener& listener) {
           listener.onFilterChainDraining(filter_chains);
         });
+    // The connections of the stopped addresses may use the removed filter chains too.
+    for (auto& stopped : listener_it->second->stopped_per_address_details_list_) {
+      stopped.details_->listener_->onFilterChainDraining(filter_chains);
+    }
   }
 
   // Reach here if the target listener is found or the target listener was removed by a full
@@ -304,6 +365,74 @@ void ConnectionHandlerImpl::onListenerDrain(uint64_t listener_tag,
         [drain_event](Network::ConnectionHandler::ActiveListener& listener) {
           listener.onListenerDrainStart(drain_event);
         });
+  }
+}
+
+void ConnectionHandlerImpl::stopListenerAddresses(
+    const Network::ListenerConfig& listener,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& addresses) {
+  ActiveListenerDetailsOptRef details = findActiveListenerByTag(listener.listenerTag());
+  if (!details.has_value()) {
+    return;
+  }
+  auto& per_address_details_list = details->per_address_details_list_;
+  const auto stopped_begin = std::stable_partition(
+      per_address_details_list.begin(), per_address_details_list.end(),
+      [&addresses](const std::shared_ptr<PerAddressActiveListenerDetails>& per_address) {
+        return std::none_of(
+            addresses.begin(), addresses.end(),
+            [&per_address](const Network::Address::InstanceConstSharedPtr& address) {
+              return *address == *per_address->address_;
+            });
+      });
+  const auto remove_entry =
+      [this](absl::string_view key,
+             const std::shared_ptr<PerAddressActiveListenerDetails>& stopped) {
+        if (auto entry = tcp_listener_map_by_address_.find(key);
+            entry != tcp_listener_map_by_address_.end() && entry->second == stopped) {
+          tcp_listener_map_by_address_.erase(entry);
+        }
+      };
+  for (auto iter = stopped_begin; iter != per_address_details_list.end(); ++iter) {
+    remove_entry((*iter)->address_->asStringView(), *iter);
+    if (const std::optional<std::string> ipv4_address = ipv4AliasAddress(*(*iter)->address_);
+        ipv4_address.has_value()) {
+      remove_entry(*ipv4_address, *iter);
+    }
+    (*iter)->listener_->shutdownListener({});
+    details->stopped_per_address_details_list_.push_back({&listener, std::move(*iter)});
+  }
+  per_address_details_list.erase(stopped_begin, per_address_details_list.end());
+  // A stopped address may have held an entry that a remaining address is found by. The remaining
+  // address gets it back, unless another listener took over its own entry, since removeListeners()
+  // would then never remove the restored entries.
+  for (const auto& per_address : per_address_details_list) {
+    auto entry = tcp_listener_map_by_address_.find(per_address->address_->asStringView());
+    if (entry == tcp_listener_map_by_address_.end() || entry->second == per_address) {
+      addToTcpListenerMap(per_address, /*keep_existing_entries=*/true);
+    }
+  }
+}
+
+void ConnectionHandlerImpl::onListenerAddressesDrain(const Network::ListenerConfig& listener,
+                                                     Network::ConnectionDrainEvent drain_event) {
+  if (ActiveListenerDetailsOptRef details = findActiveListenerByTag(listener.listenerTag());
+      details.has_value()) {
+    for (StoppedAddressDetails& stopped : details->stopped_per_address_details_list_) {
+      if (stopped.replaced_listener_ == &listener) {
+        stopped.details_->listener_->onListenerDrainStart(drain_event);
+      }
+    }
+  }
+}
+
+void ConnectionHandlerImpl::removeListenerAddresses(const Network::ListenerConfig& listener) {
+  if (ActiveListenerDetailsOptRef details = findActiveListenerByTag(listener.listenerTag());
+      details.has_value()) {
+    std::erase_if(details->stopped_per_address_details_list_,
+                  [&listener](const StoppedAddressDetails& stopped) {
+                    return stopped.replaced_listener_ == &listener;
+                  });
   }
 }
 

@@ -22,7 +22,13 @@ envoy_extension_cc_test(
         "envoy.compression.zstd.compressor",
         "envoy.compression.zstd.decompressor",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/compression/zstd/compressor:config",
         "//source/extensions/compression/zstd/decompressor:config",

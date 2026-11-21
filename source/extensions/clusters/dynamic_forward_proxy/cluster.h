@@ -180,16 +180,15 @@ private:
 
     void
     onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& info) override {
-      Upstream::HostConstSharedPtr host;
-      if (auto cluster = cluster_.lock()) {
-        host = cluster->findHostByName(hostname_);
-      }
-      std::string details = info->details();
+      auto cluster = cluster_.lock();
+      auto result =
+          cluster ? cluster->selectHostFromResolvedEntry(hostname_, info)
+                  : Upstream::HostSelectionResponse{nullptr, info ? info->details() : "no_host"};
       if (pending_host_selection_handles_.has_value()) {
         pending_host_selection_handles_->erase(this);
         pending_host_selection_handles_.reset();
       }
-      context_->onAsyncHostSelection(std::move(host), std::move(details));
+      context_->onAsyncHostSelection(std::move(result.host), std::move(result.details));
     }
 
     void setHandle(Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr&& handle) {
@@ -236,6 +235,10 @@ private:
     std::weak_ptr<const Cluster> cluster_;
   };
 
+  Upstream::HostSelectionResponse selectHostFromResolvedEntry(
+      const std::string& host,
+      const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) const;
+
   absl::Status
   addOrUpdateHost(absl::string_view host,
                   const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
@@ -260,6 +263,8 @@ private:
 
   // True if H2 and H3 connections may be reused across different origins.
   const bool allow_coalesced_connections_;
+  // True if a host address change is applied in place rather than by replacing the host.
+  const bool skip_draining_on_resolution_;
 
   mutable absl::Mutex host_map_lock_;
   HostInfoMap host_map_ ABSL_GUARDED_BY(host_map_lock_);

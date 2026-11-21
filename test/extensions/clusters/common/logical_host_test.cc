@@ -271,11 +271,11 @@ TEST_F(LogicalHostOrcaReportingConnectionTest, CallerOptionsPassThroughUnchanged
 
   Network::TransportSocketOptionsConstSharedPtr seen_options;
   EXPECT_CALL(*factory, createTransportSocket(_, _))
-      .WillOnce(testing::Invoke([&](Network::TransportSocketOptionsConstSharedPtr options,
-                                    std::shared_ptr<const Upstream::HostDescription>) {
+      .WillOnce([&](Network::TransportSocketOptionsConstSharedPtr options,
+                    std::shared_ptr<const Upstream::HostDescription>) {
         seen_options = options;
         return nullptr;
-      }));
+      });
 
   auto caller_options = std::make_shared<const Network::TransportSocketOptionsImpl>(
       "", std::vector<std::string>{}, std::vector<std::string>{"h2"});

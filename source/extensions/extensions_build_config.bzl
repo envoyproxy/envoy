@@ -311,6 +311,7 @@ EXTENSIONS = {
     "envoy.resource_monitors.global_downstream_max_connections":   "//source/extensions/resource_monitors/downstream_connections:config",
     "envoy.resource_monitors.cpu_utilization":          "//source/extensions/resource_monitors/cpu_utilization:config",
     "envoy.resource_monitors.cgroup_memory":          "//source/extensions/resource_monitors/cgroup_memory:config",
+    "envoy.resource_monitors.dynamic_modules":        "//source/extensions/resource_monitors/dynamic_modules:config",
 
     #
     # Stat sinks
@@ -505,7 +506,9 @@ EXTENSIONS = {
     #
     # AI filters
     #
+    "envoy.http.ai_filters.model_router":               "//source/extensions/http/ai_filters/model_router:config",
     "envoy.http.ai_filters.request_info":               "//source/extensions/http/ai_filters/request_info:config",
+    "envoy.http.ai_filters.route_selector":             "//source/extensions/http/ai_filters/route_selector:config",
     "envoy.http.ai_filters.schema_validation":          "//source/extensions/http/ai_filters/schema_validation:config",
     "envoy.http.ai_filters.transcoder":                 "//source/extensions/http/ai_filters/transcoder:config",
 
@@ -633,6 +636,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.cluster_provided":  "//source/extensions/load_balancing_policies/cluster_provided:config",
     "envoy.load_balancing_policies.client_side_weighted_round_robin": "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
     "envoy.load_balancing_policies.override_host":     "//source/extensions/load_balancing_policies/override_host:config",
+    "envoy.load_balancing_policies.host_allowlist":    "//source/extensions/load_balancing_policies/host_allowlist:config",
     "envoy.load_balancing_policies.wrr_locality":      "//source/extensions/load_balancing_policies/wrr_locality:config",
     "envoy.load_balancing_policies.dynamic_modules":   "//source/extensions/load_balancing_policies/dynamic_modules:config",
 
@@ -705,6 +709,7 @@ EXTENSIONS = {
     #
     # Queue policy
     #
+    "envoy.queue_policy.adaptive_lifo": "//source/extensions/queue_policy/adaptive_lifo:adaptive_lifo_queue_policy_impl",
     "envoy.queue_policy.fifo":   "//source/extensions/queue_policy/fifo:fifo_queue_policy_impl",
 }
 

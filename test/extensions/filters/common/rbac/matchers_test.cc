@@ -607,8 +607,7 @@ TEST(MtlsAuthenticatedMatcher, SanMatcher) {
   // Use this invoke to validate that the passed in matcher is correct, instead of just returning
   // true or false directly in an expectation on this mock function.
   EXPECT_CALL(*ssl, peerCertificateSanMatches(_))
-      .WillRepeatedly(
-          Invoke([&](const Ssl::SanMatcher& matcher) -> bool { return matcher.match(&san); }));
+      .WillRepeatedly([&](const Ssl::SanMatcher& matcher) -> bool { return matcher.match(&san); });
 
   envoy::extensions::rbac::principals::mtls_authenticated::v3::Config auth;
   auto* matcher = auth.mutable_san_matcher();
