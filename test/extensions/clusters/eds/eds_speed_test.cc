@@ -115,10 +115,12 @@ public:
   // Set up an EDS config with multiple priorities, localities, weights and make sure
   // they are loaded as expected.
   void priorityAndLocalityWeightedHelper(bool ignore_unknown_dynamic_fields, size_t num_hosts,
-                                         bool healthy, absl::string_view metadata_version = "") {
+                                         bool healthy, absl::string_view metadata_version = "",
+                                         bool distinct_metadata = false) {
     state_.PauseTiming();
 
-    // Every endpoint gets the same metadata, as the endpoints of one workload do.
+    // Every endpoint gets the same metadata, as the endpoints of one workload do, and with
+    // distinct_metadata each endpoint also gets its own pod name.
     envoy::config::core::v3::Metadata metadata;
     if (!metadata_version.empty()) {
       Config::Metadata::mutableMetadataValue(metadata, "envoy.lb", "version")
@@ -151,6 +153,10 @@ public:
       auto* lb_endpoint = endpoints->add_lb_endpoints();
       if (!metadata_version.empty()) {
         *lb_endpoint->mutable_metadata() = metadata;
+        if (distinct_metadata) {
+          Config::Metadata::mutableMetadataValue(*lb_endpoint->mutable_metadata(), "istio", "pod")
+              .set_string_value(fmt::format("reviews-v1-{:06}", i));
+        }
       }
       if (healthy) {
         lb_endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
@@ -257,13 +263,13 @@ static void duplicateUpdateWithEndpointMetadata(State& state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(1));
     uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
-    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true, "v1.2.3");
-    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true, "v1.2.3");
+    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true, "v1.2.3", state.range(2));
+    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true, "v1.2.3", state.range(2));
   }
 }
 
 BENCHMARK(duplicateUpdateWithEndpointMetadata)
-    ->Ranges({{1, 100000}, {false, true}})
+    ->Ranges({{1, 100000}, {false, true}, {false, true}})
     ->Unit(benchmark::kMillisecond);
 
 static void metadataOnlyUpdate(State& state) {
@@ -275,12 +281,14 @@ static void metadataOnlyUpdate(State& state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(1));
     uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
-    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true, "v1.2.3");
-    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true, "v1.2.4");
+    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true, "v1.2.3", state.range(2));
+    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true, "v1.2.4", state.range(2));
   }
 }
 
-BENCHMARK(metadataOnlyUpdate)->Ranges({{1, 100000}, {false, true}})->Unit(benchmark::kMillisecond);
+BENCHMARK(metadataOnlyUpdate)
+    ->Ranges({{1, 100000}, {false, true}, {false, true}})
+    ->Unit(benchmark::kMillisecond);
 
 static void healthOnlyUpdate(State& state) {
   Envoy::Thread::MutexBasicLockable lock;

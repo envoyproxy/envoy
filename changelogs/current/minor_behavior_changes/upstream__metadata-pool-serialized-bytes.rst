@@ -1,5 +1,5 @@
-The shared pool of endpoint and locality metadata now hashes and compares metadata by its
-deterministic serialization instead of by reflection, and a host computes its metadata hash only
-when an update compares it, which makes EDS updates with endpoint metadata cheaper. Metadata whose
-``google.protobuf.Any`` payloads were serialized differently now gets its own pooled copy, while an
-update still treats it as unchanged.
+EDS updates whose endpoints carry metadata now use less main thread CPU. Endpoints whose
+:ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>`
+holds equal messages encoded differently, for example by a control plane that does not serialize
+map fields deterministically, no longer share one in-memory copy of that metadata, while an update
+still treats their endpoint metadata as unchanged.

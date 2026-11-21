@@ -1,6 +1,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/utility.h"
@@ -267,10 +268,36 @@ TEST(MetadataTest, ConstMetadataSharedPoolSharesMetadataWithEqualBytes) {
   const std::shared_ptr<const envoy::config::core::v3::Metadata> shared_metadata =
       pool->getObject(metadata);
   EXPECT_EQ(shared_metadata, pool->getObject(reordered_metadata));
+  // A pool with a single entry compares without hashing, so this checks the functors directly too.
+  EXPECT_EQ(SerializedMetadataHash{}(metadata), SerializedMetadataHash{}(reordered_metadata));
+  EXPECT_TRUE(SerializedMetadataEqual{}(metadata, reordered_metadata));
 
   // A changed value of the same size still gets its own object.
   Metadata::mutableMetadataValue(reordered_metadata, "namespace", "key_0").set_string_value("9");
   EXPECT_NE(shared_metadata, pool->getObject(reordered_metadata));
+  EXPECT_FALSE(SerializedMetadataEqual{}(metadata, reordered_metadata));
+}
+
+TEST(MetadataTest, ConstMetadataSharedPoolKeepsReserializedAnyPayloadsApart) {
+  Singleton::ManagerImpl singleton_manager;
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  ConstMetadataSharedPoolSharedPtr pool =
+      Metadata::getConstMetadataSharedPool(singleton_manager, dispatcher);
+
+  // The same struct with its two fields serialized in two orders.
+  envoy::config::core::v3::Metadata metadata;
+  Protobuf::Any& any = (*metadata.mutable_typed_filter_metadata())["custom_namespace"];
+  any.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+  envoy::config::core::v3::Metadata reserialized_metadata = metadata;
+  (*reserialized_metadata.mutable_typed_filter_metadata())["custom_namespace"].set_value(
+      Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+
+  const std::shared_ptr<const envoy::config::core::v3::Metadata> shared_metadata =
+      pool->getObject(metadata);
+  EXPECT_NE(shared_metadata, pool->getObject(reserialized_metadata));
+  // Host updates fall back to this hash when two hosts hold distinct objects.
+  EXPECT_EQ(MessageUtil::hash(metadata), MessageUtil::hash(reserialized_metadata));
 }
 
 class TypedMetadataTest : public testing::Test {

@@ -2009,6 +2009,7 @@ TEST_F(HostImplTest, MetadataHashFollowsMetadataUpdates) {
       .set_string_value("value");
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", metadata);
   EXPECT_EQ(MessageUtil::hash(metadata), host->metadataHash());
+  // The second call returns the cached hash, which must match.
   EXPECT_EQ(MessageUtil::hash(metadata), host->metadataHash());
 
   Config::Metadata::mutableMetadataValue(metadata, "custom_namespace", "key")
