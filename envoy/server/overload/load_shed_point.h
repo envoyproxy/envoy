@@ -21,6 +21,9 @@ public:
   const std::string HcmDecodeHeaders =
       "envoy.load_shed_points.http_connection_manager_decode_headers";
 
+  // Envoy will reject new HTTP1 streams by sending a local reply before creating the filter chain.
+  const std::string H1ServerDecodeHeaders = "envoy.load_shed_points.http1_server_decode_headers";
+
   // Envoy will reject processing HTTP1 at the codec level.
   const std::string H1ServerAbortDispatch = "envoy.load_shed_points.http1_server_abort_dispatch";
 
