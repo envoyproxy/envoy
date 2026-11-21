@@ -1638,6 +1638,26 @@ TEST_P(TcpProxyTest, IdleTimeoutWithFilterStateOverride) {
   idle_timer->invokeCallback();
 }
 
+TEST_P(TcpProxyTest, IdleTimeoutDisabledWithFilterStateOverride) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(1);
+
+  filter_callbacks_.connection_.streamInfo().filterState()->setData(
+      TcpProxy::PerConnectionIdleTimeoutMs, std::make_unique<StreamInfo::UInt64AccessorImpl>(0),
+      StreamInfo::FilterState::LifeSpan::Connection);
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_(_)).Times(0);
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  filter_->onData(buffer, false);
+  buffer.add("hello2");
+  upstream_callbacks_->onUpstreamData(buffer, false);
+  filter_callbacks_.connection_.raiseBytesSentCallbacks(1);
+  upstream_connections_.at(0)->raiseBytesSentCallbacks(2);
+}
+
 // Tests that the idle timer closes both connections, and gets updated when either
 // connection has activity.
 TEST_P(TcpProxyTest, IdleTimeout) {
