@@ -1,11 +1,16 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 
 #include <algorithm>
+#include <utility>
 #include <vector>
 
+#include "envoy/server/admin.h"
 #include "envoy/server/options.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/matchers.h"
+#include "source/common/common/regex.h"
 #include "source/common/common/thread.h"
 #include "source/common/protobuf/utility.h"
 
@@ -16,6 +21,15 @@ namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace DynamicModules {
+namespace {
+
+// cluster/listener lifecycle hooks must set this flag; other bootstrap hooks must also set it
+// when run inside xDS updates or resource destruction
+thread_local bool in_resource_lifecycle_callback = false;
+// both flags are shared across configs because callbacks can reenter another config on this thread
+thread_local bool collecting_config_snapshot = false;
+
+} // namespace
 
 DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
     const absl::string_view extension_name, const absl::string_view extension_config,
@@ -125,6 +139,8 @@ bool DynamicModuleBootstrapExtensionConfig::subscribeEcds(absl::string_view name
                absl::string_view type_url,
                envoy_dynamic_module_type_bootstrap_ecds_config_encoding encoding,
                std::optional<absl::string_view> config) {
+          const bool previous = std::exchange(in_resource_lifecycle_callback, true);
+          Cleanup cleanup([previous]() { in_resource_lifecycle_callback = previous; });
           return on_bootstrap_extension_ecds_update_(
               thisAsVoidPtr(), in_module_config_, {resource_name.data(), resource_name.size()},
               {version.data(), version.size()}, {type_url.data(), type_url.size()}, encoding,
@@ -150,9 +166,36 @@ bool DynamicModuleBootstrapExtensionConfig::subscribeEcds(absl::string_view name
   });
 }
 
+absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
+DynamicModuleBootstrapExtensionConfig::getConfigSnapshot(
+    absl::Span<const absl::string_view> providers, absl::string_view name_regex) {
+  if (!server_initialized_ || shutdown_started_ || extension_destroyed_) {
+    return absl::FailedPreconditionError("config providers are unavailable");
+  }
+  if (in_resource_lifecycle_callback || collecting_config_snapshot) {
+    return absl::FailedPreconditionError(
+        "config snapshot requested during a resource lifecycle hook or snapshot collection");
+  }
+  collecting_config_snapshot = true;
+  Cleanup cleanup([]() { collecting_config_snapshot = false; });
+  auto server_admin = admin();
+  if (!server_admin.has_value()) {
+    return absl::UnavailableError("admin config tracker is unavailable");
+  }
+  if (!name_regex.empty()) {
+    auto matcher = Regex::CompiledGoogleReMatcher::createAndSizeCheck(std::string(name_regex));
+    RETURN_IF_NOT_OK(matcher.status());
+    return ConfigSnapshot::collect(server_admin->getConfigTracker(), providers, **matcher);
+  }
+  return ConfigSnapshot::collect(server_admin->getConfigTracker(), providers,
+                                 Matchers::UniversalStringMatcher{});
+}
+
 void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(
     absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand&) {
   if (in_module_config_ != nullptr && on_bootstrap_extension_cluster_add_or_update_ != nullptr) {
+    const bool previous = std::exchange(in_resource_lifecycle_callback, true);
+    Cleanup cleanup([previous]() { in_resource_lifecycle_callback = previous; });
     on_bootstrap_extension_cluster_add_or_update_(thisAsVoidPtr(), in_module_config_,
                                                   {cluster_name.data(), cluster_name.size()});
   }
@@ -160,6 +203,8 @@ void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(
 
 void DynamicModuleBootstrapExtensionConfig::onClusterRemoval(absl::string_view cluster_name) {
   if (in_module_config_ != nullptr && on_bootstrap_extension_cluster_removal_ != nullptr) {
+    const bool previous = std::exchange(in_resource_lifecycle_callback, true);
+    Cleanup cleanup([previous]() { in_resource_lifecycle_callback = previous; });
     on_bootstrap_extension_cluster_removal_(thisAsVoidPtr(), in_module_config_,
                                             {cluster_name.data(), cluster_name.size()});
   }
@@ -189,6 +234,8 @@ bool DynamicModuleBootstrapExtensionConfig::enableListenerLifecycle() {
 void DynamicModuleBootstrapExtensionConfig::onListenerAddOrUpdate(absl::string_view listener_name,
                                                                   const Network::ListenerConfig&) {
   if (in_module_config_ != nullptr && on_bootstrap_extension_listener_add_or_update_ != nullptr) {
+    const bool previous = std::exchange(in_resource_lifecycle_callback, true);
+    Cleanup cleanup([previous]() { in_resource_lifecycle_callback = previous; });
     on_bootstrap_extension_listener_add_or_update_(thisAsVoidPtr(), in_module_config_,
                                                    {listener_name.data(), listener_name.size()});
   }
@@ -196,6 +243,8 @@ void DynamicModuleBootstrapExtensionConfig::onListenerAddOrUpdate(absl::string_v
 
 void DynamicModuleBootstrapExtensionConfig::onListenerRemoval(const std::string& listener_name) {
   if (in_module_config_ != nullptr && on_bootstrap_extension_listener_removal_ != nullptr) {
+    const bool previous = std::exchange(in_resource_lifecycle_callback, true);
+    Cleanup cleanup([previous]() { in_resource_lifecycle_callback = previous; });
     on_bootstrap_extension_listener_removal_(thisAsVoidPtr(), in_module_config_,
                                              {listener_name.data(), listener_name.size()});
   }
