@@ -123,7 +123,9 @@ envoy_cc_benchmark_binary(
     srcs = ["utility_speed_test.cc"],
     deps = [
         ":deterministic_hash_test_proto_cc_proto",
+        "//source/common/common:assert_lib",
         "//source/common/protobuf:utility_lib",
+        "//test/proto:sensitive_proto_cc_proto",
         "//test/test_common:test_runtime_lib",
         "@benchmark",
     ],
