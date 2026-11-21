@@ -1627,10 +1627,14 @@ UpstreamDrainManager::~UpstreamDrainManager() {
   // so cancel all pending drains, which causes the connections to be closed.
   if (!drainers_.empty()) {
     auto& dispatcher = drainers_.begin()->second->dispatcher();
+    const auto close_type = Runtime::runtimeFeatureEnabled(
+                                "envoy.reloadable_features.tcp_proxy_send_rst_on_drain_abort")
+                                ? Network::ConnectionCloseType::AbortReset
+                                : Network::ConnectionCloseType::NoFlush;
     while (!drainers_.empty()) {
       auto begin = drainers_.begin();
       Drainer* key = begin->first;
-      begin->second->cancelDrain();
+      begin->second->cancelDrain(close_type);
 
       // cancelDrain() should cause that drainer to be removed from drainers_.
       // ASSERT so that we don't end up in an infinite loop.
@@ -1695,14 +1699,18 @@ void Drainer::onData(Buffer::Instance& data, bool) {
     // There is no downstream connection to send any data to, but the upstream
     // sent some data. Try to behave similar to what the kernel would do
     // when it receives data on a connection where the application has closed
-    // the socket or ::shutdown(fd, SHUT_RD), and close/reset the connection.
-    cancelDrain();
+    // the socket or ::shutdown(fd, SHUT_RD), and reset the connection (see
+    // RFC 9293, section 3.6.1).
+    cancelDrain(Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.tcp_proxy_send_rst_on_drain_abort")
+                    ? Network::ConnectionCloseType::AbortReset
+                    : Network::ConnectionCloseType::NoFlush);
   }
 }
 
 void Drainer::onIdleTimeout() {
   config_->stats().idle_timeout_.inc();
-  cancelDrain();
+  cancelDrain(Network::ConnectionCloseType::NoFlush);
 }
 
 void Drainer::onBytesSent() {
@@ -1711,9 +1719,9 @@ void Drainer::onBytesSent() {
   }
 }
 
-void Drainer::cancelDrain() {
+void Drainer::cancelDrain(Network::ConnectionCloseType close_type) {
   // This sends onEvent(LocalClose).
-  upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+  upstream_conn_data_->connection().close(close_type);
 }
 
 Event::Dispatcher& Drainer::dispatcher() { return upstream_conn_data_->connection().dispatcher(); }
