@@ -21017,6 +21017,456 @@ void envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_fail
 void envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete(
     envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr scheduler_module_ptr);
 
+// =============================================================================
+// ============================ Socket Interface ===============================
+// =============================================================================
+//
+// This extension enables custom socket interfaces via dynamic modules. A socket interface creates
+// the underlying sockets of listeners and clusters. Only the bootstrap's default_socket_interface
+// selects this interface, so Envoy asks the module for every socket of every listener and cluster
+// except the admin listener's, including health checks and Envoy gRPC xDS. For each socket the
+// module either lets Envoy create it through the standard socket interface, or creates the socket
+// itself and hands Envoy its file descriptor. For a socket it creates, the module can also perform
+// the socket's reads, writes and shutdown itself, or, for a listen socket, hand Envoy the
+// connections the listener accepts.
+//
+// Envoy creates and closes listen sockets on the main thread, and creates a client socket on the
+// thread that opens its connection, which is the main thread for health checks and xDS. No hook may
+// block. The extension is supported on POSIX platforms only.
+
+// =============================================================================
+// Socket Interface Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_socket_interface_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleSocketInterfaceConfig class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer. It remains valid until
+ * envoy_dynamic_module_on_socket_interface_config_destroy returns, or until
+ * envoy_dynamic_module_on_socket_interface_config_new returns if that returns nullptr.
+ */
+typedef void* envoy_dynamic_module_type_socket_interface_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_socket_interface_config_module_ptr is a pointer to an in-module socket
+ * interface configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_socket_interface_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_socket_interface_socket_module_ptr is a pointer to the in-module state
+ * of one socket the module created. Envoy passes it back on every per-socket hook and to
+ * envoy_dynamic_module_on_socket_interface_socket_close. It may be null for a socket that sets no
+ * envoy_dynamic_module_type_socket_interface_socket_flag.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_socket_interface_socket_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_socket_interface_io_ready_handle_module_ptr is a handle that reports
+ * readiness events of one socket to Envoy with
+ * envoy_dynamic_module_callback_socket_interface_io_ready. Envoy hands it to the module with
+ * envoy_dynamic_module_on_socket_interface_set_socket_handle.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer, and must delete it with
+ * envoy_dynamic_module_callback_socket_interface_io_ready_delete. Since its lifecycle is owned by
+ * the module, this has the _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_socket_interface_io_ready_handle_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_socket_interface_io_slice is one writable slice of an Envoy read
+ * buffer, passed to envoy_dynamic_module_on_socket_interface_io_read. The module writes the bytes
+ * it read into the slice. The memory is owned by Envoy and valid only during the call.
+ */
+typedef struct envoy_dynamic_module_type_socket_interface_io_slice {
+  char* ptr;
+  size_t length;
+} envoy_dynamic_module_type_socket_interface_io_slice;
+
+/**
+ * envoy_dynamic_module_type_socket_interface_address is an address the module reports for a
+ * connection it hands Envoy with envoy_dynamic_module_on_socket_interface_accept.
+ */
+typedef struct envoy_dynamic_module_type_socket_interface_address {
+  // The IP address or, for an AF_UNIX socket, the path. An empty address means the module does not
+  // report one, and Envoy reads the address from the file descriptor.
+  envoy_dynamic_module_type_module_buffer address;
+  // The port of the address, or 0 for AF_UNIX sockets.
+  uint32_t port;
+} envoy_dynamic_module_type_socket_interface_address;
+
+/**
+ * envoy_dynamic_module_type_socket_interface_socket_type mirrors the type of sockets Envoy
+ * supports.
+ */
+typedef enum envoy_dynamic_module_type_socket_interface_socket_type {
+  envoy_dynamic_module_type_socket_interface_socket_type_Stream = 0,
+  envoy_dynamic_module_type_socket_interface_socket_type_Datagram = 1,
+} envoy_dynamic_module_type_socket_interface_socket_type;
+
+/**
+ * envoy_dynamic_module_type_socket_interface_creation_options mirrors the socket creation options
+ * Envoy carries for a socket. The module decides how to honor them on its own socket.
+ */
+typedef struct envoy_dynamic_module_type_socket_interface_creation_options {
+  // Whether MPTCP is enabled on the socket. Only valid for stream sockets on Linux.
+  bool mptcp_enabled;
+  // The maximum size of the cache of addresses associated with packets received by this socket.
+  // 0 means no cache. Only valid for datagram sockets.
+  uint64_t max_addresses_cache_size;
+} envoy_dynamic_module_type_socket_interface_creation_options;
+
+/**
+ * envoy_dynamic_module_type_socket_interface_creation_result is returned by
+ * envoy_dynamic_module_on_socket_interface_socket.
+ */
+typedef enum envoy_dynamic_module_type_socket_interface_creation_result {
+  // The module does not create this socket, and Envoy creates it through the standard socket
+  // interface.
+  envoy_dynamic_module_type_socket_interface_creation_result_UseDefault = 0,
+  // The module created the socket and wrote its file descriptor.
+  envoy_dynamic_module_type_socket_interface_creation_result_Created = 1,
+  // The module created the socket and established its connection, or started a non-blocking
+  // connect that is still in flight, so Envoy must not connect it. Envoy treats the connection as
+  // established once the socket becomes writable, and reads its SO_ERROR then. A connection
+  // configured with a source address cannot use it, since binding a connected socket fails.
+  envoy_dynamic_module_type_socket_interface_creation_result_AlreadyConnected = 2,
+  // The socket creation failed. Envoy uses a socket of the requested family and type whose bind,
+  // listen, connect and I/O fail, so the operation that requested the socket fails.
+  envoy_dynamic_module_type_socket_interface_creation_result_Error = 3,
+} envoy_dynamic_module_type_socket_interface_creation_result;
+
+/**
+ * envoy_dynamic_module_type_socket_interface_socket_flag is a bitmask the module writes for a
+ * socket it creates or accepts. A socket sets at most one flag, and only while hot restart is
+ * disabled, since a hot-restarted Envoy adopts its parent's listen sockets without their module
+ * state; Envoy rejects a socket that sets a flag while hot restart is enabled.
+ */
+typedef enum envoy_dynamic_module_type_socket_interface_socket_flag {
+  // Envoy delegates the socket's reads, writes and shutdown to the I/O hooks, and the module
+  // reports readiness for data the kernel does not signal. Only valid for stream sockets, and when
+  // the module implements the I/O hooks.
+  envoy_dynamic_module_type_socket_interface_socket_flag_DelegateIo = 0x1,
+  // The socket is a listen socket whose connections the module hands Envoy with
+  // envoy_dynamic_module_on_socket_interface_accept. Envoy never binds the socket or listens on it,
+  // and accepts only when the module reports Read readiness. Only valid for a stream socket created
+  // with the Created result, and when the module implements the accept hook.
+  envoy_dynamic_module_type_socket_interface_socket_flag_HandsOverConnections = 0x2,
+} envoy_dynamic_module_type_socket_interface_socket_flag;
+
+/**
+ * envoy_dynamic_module_type_socket_interface_io_status is returned by the per-socket hooks.
+ */
+typedef enum envoy_dynamic_module_type_socket_interface_io_status {
+  // The operation succeeded, and the module wrote the transferred byte count where the hook takes
+  // one.
+  envoy_dynamic_module_type_socket_interface_io_status_Success = 0,
+  // The operation would block. Envoy retries once the kernel or the module reports readiness.
+  envoy_dynamic_module_type_socket_interface_io_status_Again = 1,
+  // The operation failed. Envoy fails the operation.
+  envoy_dynamic_module_type_socket_interface_io_status_Error = 2,
+  // Only valid from envoy_dynamic_module_on_socket_interface_io_shutdown: the module does not shut
+  // the socket down itself, and Envoy calls shutdown(2) on the file descriptor.
+  envoy_dynamic_module_type_socket_interface_io_status_NotImplemented = 3,
+} envoy_dynamic_module_type_socket_interface_io_status;
+
+/**
+ * envoy_dynamic_module_type_socket_interface_io_event is a bitmask of the readiness events the
+ * module reports with envoy_dynamic_module_callback_socket_interface_io_ready.
+ */
+typedef enum envoy_dynamic_module_type_socket_interface_io_event {
+  envoy_dynamic_module_type_socket_interface_io_event_Read = 0x1,
+  envoy_dynamic_module_type_socket_interface_io_event_Write = 0x2,
+} envoy_dynamic_module_type_socket_interface_io_event;
+
+// =============================================================================
+// Socket Interface Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_socket_interface_config_new is called by the main thread when Envoy
+ * creates the socket interface during server initialization, before clusters, listeners and
+ * worker threads are created.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleSocketInterfaceConfig object in Envoy.
+ * @param name is the socket_interface_name from the configuration. It is owned by Envoy and valid
+ * only for the duration of this call.
+ * @param config is the socket interface configuration bytes owned by Envoy and valid only for the
+ * duration of this call.
+ * @return a pointer to the in-module socket interface configuration. Returning nullptr indicates a
+ * failure to initialize the module, and Envoy fails to start.
+ */
+envoy_dynamic_module_type_socket_interface_config_module_ptr
+envoy_dynamic_module_on_socket_interface_config_new(
+    envoy_dynamic_module_type_socket_interface_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_socket_interface_config_destroy is called once the socket interface and
+ * every socket the module created are gone, on the thread that releases the last of them, or
+ * during startup when Envoy rejects the configuration after the module has created its own. The
+ * module may be unloaded once this returns, so it must stop the threads it started before
+ * returning.
+ *
+ * @param config_module_ptr is the pointer to the in-module socket interface configuration.
+ */
+void envoy_dynamic_module_on_socket_interface_config_destroy(
+    envoy_dynamic_module_type_socket_interface_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_socket_interface_ip_family_supported is called on any thread to ask
+ * whether the module supports the given address family. Envoy treats the interface as supporting
+ * a family the module or the host supports, so a module that declines a family the host supports
+ * leaves that family to the standard socket interface rather than disabling it.
+ *
+ * @param config_module_ptr is the pointer to the in-module socket interface configuration.
+ * @param domain is the address family, such as AF_INET, AF_INET6 or AF_UNIX.
+ * @return true if the module supports the address family.
+ */
+bool envoy_dynamic_module_on_socket_interface_ip_family_supported(
+    envoy_dynamic_module_type_socket_interface_config_module_ptr config_module_ptr, int domain);
+
+/**
+ * envoy_dynamic_module_on_socket_interface_socket is called when Envoy creates a socket, on the
+ * thread that creates it. It runs concurrently on several threads, so implementations must be
+ * thread-safe.
+ *
+ * When the module creates the socket, it hands the file descriptor to Envoy, which owns and closes
+ * it from the point this returns. The file descriptor must be non-blocking and have the requested
+ * address family and socket type; Envoy rejects one that does not, as it does a flag the socket
+ * cannot use, closing the file descriptor and treating the creation as failed.
+ *
+ * @param config_module_ptr is the pointer to the in-module socket interface configuration.
+ * @param socket_type is the type of the socket.
+ * @param address is the address the socket is created for: the IP address or, for AF_UNIX, the
+ * path, which for an abstract socket is "@" followed by the name. It is empty when Envoy creates
+ * the socket without a concrete address.
+ * @param port is the port of the address, or 0 for AF_UNIX sockets and empty addresses.
+ * @param domain is the address family of the socket, such as AF_INET, AF_INET6 or AF_UNIX.
+ * @param socket_v6only is whether the socket must be IPv6-only.
+ * @param options are the socket creation options from Envoy.
+ * @param fd_out is where the module writes the file descriptor of the created socket before it
+ * returns Created or AlreadyConnected.
+ * @param flags_out is where the module writes a bitmask of
+ * envoy_dynamic_module_type_socket_interface_socket_flag values for the created socket. Envoy
+ * initializes it to 0, which leaves the socket's I/O to the kernel.
+ * @param socket_module_ptr_out is where the module writes the per-socket state of the created
+ * socket. It is required when the socket sets a flag, and may be left null otherwise. Envoy calls
+ * envoy_dynamic_module_on_socket_interface_socket_close for a non-null state.
+ * @return the outcome of the creation.
+ */
+envoy_dynamic_module_type_socket_interface_creation_result
+envoy_dynamic_module_on_socket_interface_socket(
+    envoy_dynamic_module_type_socket_interface_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_socket_interface_socket_type socket_type,
+    envoy_dynamic_module_type_envoy_buffer address, uint32_t port, int domain, bool socket_v6only,
+    const envoy_dynamic_module_type_socket_interface_creation_options* options, int64_t* fd_out,
+    uint32_t* flags_out,
+    envoy_dynamic_module_type_socket_interface_socket_module_ptr* socket_module_ptr_out);
+
+/**
+ * envoy_dynamic_module_on_socket_interface_socket_close is called on the thread that closes a
+ * socket with a non-null per-socket state, after Envoy closed its file descriptor. The module
+ * releases its per-socket state here; bytes it took in
+ * envoy_dynamic_module_on_socket_interface_io_write and has not sent yet are its own to flush or
+ * drop. This hook must not block.
+ *
+ * @param config_module_ptr is the pointer to the in-module socket interface configuration.
+ * @param socket_module_ptr is the per-socket state of the socket.
+ */
+void envoy_dynamic_module_on_socket_interface_socket_close(
+    envoy_dynamic_module_type_socket_interface_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_socket_interface_socket_module_ptr socket_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_socket_interface_socket_duplicate is called when Envoy copies a socket
+ * that sets a flag, for example a listen socket for each worker when the listener does not use
+ * reuse_port, or on a listener update. The module creates the copy's file descriptor, for example
+ * with dup(2), and its own per-socket state, and the copy keeps the original's flags. This hook is
+ * required when the module implements the I/O hooks or the accept hook.
+ *
+ * @param config_module_ptr is the pointer to the in-module socket interface configuration.
+ * @param socket_module_ptr is the per-socket state of the socket being copied.
+ * @param fd_out is where the module writes the file descriptor of the copy before it returns
+ * Success.
+ * @param duplicate_socket_module_ptr_out is where the module writes the per-socket state of the
+ * copy before it returns Success.
+ * @return Success when the copy is created, or Error, in which case the copy is a socket whose
+ * operations fail.
+ */
+envoy_dynamic_module_type_socket_interface_io_status
+envoy_dynamic_module_on_socket_interface_socket_duplicate(
+    envoy_dynamic_module_type_socket_interface_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_socket_interface_socket_module_ptr socket_module_ptr, int64_t* fd_out,
+    envoy_dynamic_module_type_socket_interface_socket_module_ptr* duplicate_socket_module_ptr_out);
+
+/**
+ * envoy_dynamic_module_on_socket_interface_set_socket_handle is called for a socket that sets a
+ * flag, on the thread that creates the socket, right after Envoy wraps the socket. The module
+ * stores the handle, reports readiness with
+ * envoy_dynamic_module_callback_socket_interface_io_ready, and deletes it with
+ * envoy_dynamic_module_callback_socket_interface_io_ready_delete. This hook is required when the
+ * module implements the I/O hooks or the accept hook.
+ *
+ * @param config_module_ptr is the pointer to the in-module socket interface configuration.
+ * @param socket_module_ptr is the per-socket state of the socket.
+ * @param io_ready_handle_module_ptr is the readiness handle of the socket.
+ */
+void envoy_dynamic_module_on_socket_interface_set_socket_handle(
+    envoy_dynamic_module_type_socket_interface_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_socket_interface_socket_module_ptr socket_module_ptr,
+    envoy_dynamic_module_type_socket_interface_io_ready_handle_module_ptr
+        io_ready_handle_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_socket_interface_io_read is called by the worker thread of a socket that
+ * sets the DelegateIo flag when Envoy reads from it. The module reads however it chooses and fills
+ * the slices in order, stopping at the first slice it does not fill completely, since Envoy commits
+ * the byte count as one prefix across the slices. The slices are owned by Envoy and valid only
+ * during this call. This hook is required when the module implements the I/O hooks.
+ *
+ * @param config_module_ptr is the pointer to the in-module socket interface configuration.
+ * @param socket_module_ptr is the per-socket state of the socket.
+ * @param slices are the writable slices of the Envoy read buffer.
+ * @param num_slices is the number of slices.
+ * @param peek is whether Envoy only peeks at the data, as listener filters do with MSG_PEEK, in
+ * which case the module copies the bytes without consuming them.
+ * @param bytes_transferred is where the module writes the number of bytes it wrote into the
+ * slices before it returns Success. Success with 0 bytes means the end of the stream.
+ * @return the outcome of the read.
+ */
+envoy_dynamic_module_type_socket_interface_io_status
+envoy_dynamic_module_on_socket_interface_io_read(
+    envoy_dynamic_module_type_socket_interface_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_socket_interface_socket_module_ptr socket_module_ptr,
+    envoy_dynamic_module_type_socket_interface_io_slice* slices, size_t num_slices, bool peek,
+    uint64_t* bytes_transferred);
+
+/**
+ * envoy_dynamic_module_on_socket_interface_io_write is called by the worker thread of a socket that
+ * sets the DelegateIo flag when Envoy writes to it. The module takes a prefix of the bytes, in
+ * order across the buffers, and stops at the first buffer it does not take completely. Envoy
+ * treats Success with 0 bytes as Again. After Again, the module reports Write readiness with
+ * envoy_dynamic_module_callback_socket_interface_io_ready once it can take more bytes, unless the
+ * kernel signals it. The buffers are owned by Envoy and valid only during this call. This hook is
+ * required when the module implements the I/O hooks.
+ *
+ * @param config_module_ptr is the pointer to the in-module socket interface configuration.
+ * @param socket_module_ptr is the per-socket state of the socket.
+ * @param buffers are the buffers of bytes to write.
+ * @param num_buffers is the number of buffers.
+ * @param bytes_transferred is where the module writes the number of bytes it took before it
+ * returns Success. Envoy clamps it to the total length of the buffers.
+ * @return the outcome of the write.
+ */
+envoy_dynamic_module_type_socket_interface_io_status
+envoy_dynamic_module_on_socket_interface_io_write(
+    envoy_dynamic_module_type_socket_interface_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_socket_interface_socket_module_ptr socket_module_ptr,
+    const envoy_dynamic_module_type_envoy_buffer* buffers, size_t num_buffers,
+    uint64_t* bytes_transferred);
+
+/**
+ * envoy_dynamic_module_on_socket_interface_io_shutdown is called by the worker thread of a socket
+ * that sets the DelegateIo flag when Envoy shuts down one side of it. This hook is optional even
+ * when the module implements the I/O hooks; without it, Envoy calls shutdown(2) on the file
+ * descriptor.
+ *
+ * @param config_module_ptr is the pointer to the in-module socket interface configuration.
+ * @param socket_module_ptr is the per-socket state of the socket.
+ * @param how is the shutdown operation, such as SHUT_RD, SHUT_WR or SHUT_RDWR.
+ * @return the outcome of the shutdown, or NotImplemented to have Envoy call shutdown(2) on the
+ * file descriptor.
+ */
+envoy_dynamic_module_type_socket_interface_io_status
+envoy_dynamic_module_on_socket_interface_io_shutdown(
+    envoy_dynamic_module_type_socket_interface_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_socket_interface_socket_module_ptr socket_module_ptr, int how);
+
+/**
+ * envoy_dynamic_module_on_socket_interface_accept is called by the worker thread of a listen
+ * socket that sets the HandsOverConnections flag, in place of accept(2), after the module reported
+ * Read readiness on it and while the listener accepts connections. The module hands Envoy the file
+ * descriptor of an established connection, for example one it received over its own transport,
+ * and Envoy runs it through the listener's filter chains like any accepted connection. Envoy keeps
+ * calling this hook until it returns Again or the listener stops accepting.
+ *
+ * From the point this returns Success, Envoy owns the file descriptor and closes it. It must be a
+ * non-blocking, connected stream socket of the listen socket's address family; for AF_UNIX it must
+ * have a name, which Envoy reports as the peer address. Envoy rejects a file descriptor that does
+ * not, as it does a flag the connection cannot use, closing the file descriptor.
+ *
+ * This hook is optional, and independent of the I/O hooks.
+ *
+ * @param config_module_ptr is the pointer to the in-module socket interface configuration.
+ * @param socket_module_ptr is the per-socket state of the listen socket.
+ * @param fd_out is where the module writes the file descriptor of the accepted connection before
+ * it returns Success.
+ * @param flags_out is where the module writes the flags of the accepted connection, where only
+ * DelegateIo is valid. Envoy initializes it to 0.
+ * @param accepted_socket_module_ptr_out is where the module writes the per-socket state of the
+ * accepted connection, which follows the same rules as the state of a created socket.
+ * @param local_address_out is where the module writes the local address of the connection, for
+ * example the destination of a connection it received over its own transport, which Envoy uses for
+ * filter chain matching. Envoy initializes it to empty.
+ * @param peer_address_out is where the module writes the peer address of the connection. Envoy
+ * initializes it to empty. The memory of both addresses must stay valid until the module's next
+ * hook call for the listen socket.
+ * @return Success when a connection is handed over, Again when no connection is pending, or Error
+ * when the accept failed.
+ */
+envoy_dynamic_module_type_socket_interface_io_status
+envoy_dynamic_module_on_socket_interface_accept(
+    envoy_dynamic_module_type_socket_interface_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_socket_interface_socket_module_ptr socket_module_ptr, int64_t* fd_out,
+    uint32_t* flags_out,
+    envoy_dynamic_module_type_socket_interface_socket_module_ptr* accepted_socket_module_ptr_out,
+    envoy_dynamic_module_type_socket_interface_address* local_address_out,
+    envoy_dynamic_module_type_socket_interface_address* peer_address_out);
+
+// =============================================================================
+// Socket Interface Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_socket_interface_io_ready reports readiness the kernel does not
+ * signal, for example bytes the module read ahead into its own buffers, or a connection pending on
+ * a listen socket that sets HandsOverConnections. Envoy keeps a reported Read until the matching
+ * hook returns Again, and a reported Write until it delivers it, and delivers them on the socket's
+ * worker while Envoy wants those events and once a connecting socket has connected, including
+ * readiness reported before Envoy registered the socket with its worker.
+ *
+ * This can be called from any thread, and is a no-op once the socket is closed.
+ *
+ * @param io_ready_handle_module_ptr is the readiness handle of the socket handed to the module
+ * with envoy_dynamic_module_on_socket_interface_set_socket_handle.
+ * @param events is a bitmask of envoy_dynamic_module_type_socket_interface_io_event values.
+ */
+void envoy_dynamic_module_callback_socket_interface_io_ready(
+    envoy_dynamic_module_type_socket_interface_io_ready_handle_module_ptr
+        io_ready_handle_module_ptr,
+    uint32_t events);
+
+/**
+ * envoy_dynamic_module_callback_socket_interface_io_ready_delete deletes the readiness handle
+ * created by Envoy and handed to the module with
+ * envoy_dynamic_module_on_socket_interface_set_socket_handle.
+ *
+ * This can be called from any thread, at any time. The handle holds no reference to the socket,
+ * so deleting it after the socket closed is harmless, as is reporting readiness on it.
+ *
+ * @param io_ready_handle_module_ptr is the readiness handle of the socket.
+ */
+void envoy_dynamic_module_callback_socket_interface_io_ready_delete(
+    envoy_dynamic_module_type_socket_interface_io_ready_handle_module_ptr
+        io_ready_handle_module_ptr);
+
 #ifdef __cplusplus
 }
 #endif

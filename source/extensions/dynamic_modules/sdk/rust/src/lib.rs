@@ -35,6 +35,7 @@ pub mod matcher_data_input;
 pub mod network;
 pub mod resource_monitor;
 pub mod route_specifier;
+pub mod socket_interface;
 pub mod stats_sink;
 pub mod timing;
 pub mod tls_certificate_selector;
@@ -906,6 +907,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `formatter:` — [`NewFormatterConfigFunction`] for formatters
 /// - `cluster_specifier:` — [`NewClusterSpecifierConfigFunction`] for cluster specifiers
 /// - `route_specifier:` — [`NewRouteSpecifierConfigFunction`] for route specifiers
+/// - `socket_interface:` — [`NewSocketInterfaceConfigFunction`] for socket interfaces
 /// - `stat_sink:` — [`NewStatSinkConfigFunction`] for stats sinks
 /// - `health_checker:` — [`NewHealthCheckerConfigFunction`] for health checkers
 /// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header mutations
@@ -1141,6 +1143,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION,
       $fn,
       "NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION"
+    );
+  };
+  (@register socket_interface : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_SOCKET_INTERFACE_CONFIG_FUNCTION,
+      $fn,
+      "NEW_SOCKET_INTERFACE_CONFIG_FUNCTION"
     );
   };
   (@register stat_sink : $fn:expr) => {
@@ -1666,6 +1675,81 @@ macro_rules! declare_route_specifier_init_functions {
     }
   };
 }
+
+/// Declare the init functions for a socket interface dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewSocketInterfaceConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::socket_interface::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_socket_interface_config(
+///   _name: &str,
+///   _config: &[u8],
+/// ) -> Option<Box<dyn SocketInterfaceConfig>> {
+///   Some(Box::new(MySocketInterfaceConfig {}))
+/// }
+///
+/// struct MySocketInterfaceConfig {}
+///
+/// impl SocketInterfaceConfig for MySocketInterfaceConfig {
+///   fn ip_family_supported(&self, _domain: i32) -> bool {
+///     true
+///   }
+///   fn socket(&self, _creation: &SocketCreation) -> SocketCreationResult {
+///     SocketCreationResult::Error
+///   }
+/// }
+///
+/// declare_socket_interface_init_functions!(program_init, new_socket_interface_config);
+/// ```
+#[macro_export]
+macro_rules! declare_socket_interface_init_functions {
+  ($f:ident, $new_socket_interface_config_fn:expr) => {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_SOCKET_INTERFACE_CONFIG_FUNCTION,
+          $new_socket_interface_config_fn,
+          "NEW_SOCKET_INTERFACE_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      }
+      on_panic = ::std::ptr::null()
+    }
+  };
+}
+
+// =================================================================================================
+// Socket Interface Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new socket interface configuration.
+///
+/// The `name` is the value of `socket_interface_name` from the socket interface configuration,
+/// allowing a single module to dispatch to different implementations. The `config` is the raw
+/// bytes from the `socket_interface_config` field. Returning `None` causes Envoy to fail to
+/// start.
+pub type NewSocketInterfaceConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn socket_interface::SocketInterfaceConfig>>;
+
+/// The global factory function for socket interfaces. This is set via the `socket_interface:` arm
+/// of [`declare_all_init_functions!`] and is not intended to be set directly.
+pub static NEW_SOCKET_INTERFACE_CONFIG_FUNCTION: OnceLock<NewSocketInterfaceConfigFunction> =
+  OnceLock::new();
 
 // =================================================================================================
 // Stats Sink Dynamic Module
