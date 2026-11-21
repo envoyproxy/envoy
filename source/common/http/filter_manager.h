@@ -138,6 +138,13 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual Buffer::InstancePtr createBuffer() PURE;
   virtual Buffer::InstancePtr& bufferedData() PURE;
   virtual bool observedEndStream() PURE;
+  // Record that this filter is holding the terminal data of its direction to inject later.
+  virtual void markTerminalDataHeldHere() PURE;
+  // Release this filter's hold on the terminal data of its direction, if it held it.
+  virtual void releaseTerminalDataHeldHere() PURE;
+  // Whether a filter before this one is holding the terminal data of this direction (see
+  // markTerminalDataHeldHere()), so the end of the stream has not reached this filter.
+  virtual bool terminalDataHeldByEarlierFilter() PURE;
   virtual bool has1xxHeaders() PURE;
   virtual void do1xxHeaders() PURE;
   virtual void doHeaders(bool end_stream) PURE;
@@ -260,6 +267,9 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
   bool observedEndStream() override;
+  void markTerminalDataHeldHere() override;
+  void releaseTerminalDataHeldHere() override;
+  bool terminalDataHeldByEarlierFilter() override;
   bool has1xxHeaders() override { return false; }
   void do1xxHeaders() override { IS_ENVOY_BUG("unexpected 1xx headers"); }
   void doHeaders(bool end_stream) override;
@@ -352,6 +362,9 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
   bool observedEndStream() override;
+  void markTerminalDataHeldHere() override;
+  void releaseTerminalDataHeldHere() override;
+  bool terminalDataHeldByEarlierFilter() override;
   bool has1xxHeaders() override;
   void do1xxHeaders() override;
   void doHeaders(bool end_stream) override;
@@ -1026,6 +1039,10 @@ protected:
     // Used to track which filter is the latest filter that has received data.
     ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
     ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
+    // The filter, if any, holding the terminal data of each direction to inject later (it returned
+    // StopIterationNoBuffer on the end-of-stream frame). Cleared when it injects the data.
+    ActiveStreamEncoderFilter* encode_terminal_data_held_by_filter_{};
+    ActiveStreamDecoderFilter* decode_terminal_data_held_by_filter_{};
   };
 
   State& state() { return state_; }
