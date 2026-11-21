@@ -3,6 +3,7 @@
 #include "envoy/admin/v3/config_dump.pb.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/upstream/endpoint_config_dump.h"
 
 #include "absl/algorithm/container.h"
 #include "absl/strings/str_cat.h"
@@ -12,10 +13,9 @@ namespace Extensions {
 namespace Bootstrap {
 namespace DynamicModules {
 
-absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
-ConfigSnapshot::collect(const Server::ConfigTracker& tracker,
-                        absl::Span<const absl::string_view> providers,
-                        const Matchers::StringMatcher& name_matcher) {
+absl::StatusOr<std::unique_ptr<ConfigSnapshot>> ConfigSnapshot::collect(
+    const Server::ConfigTracker& tracker, const Upstream::ClusterManager& cluster_manager,
+    absl::Span<const absl::string_view> providers, const Matchers::StringMatcher& name_matcher) {
   auto snapshot = std::make_unique<ConfigSnapshot>();
   TRY_ASSERT_MAIN_THREAD {
     std::vector<std::string> selected;
@@ -25,15 +25,27 @@ ConfigSnapshot::collect(const Server::ConfigTracker& tracker,
         selected.push_back(name);
       }
     }
+    const bool include_endpoints = absl::c_linear_search(providers, "endpoint") &&
+                                   !callbacks.contains("endpoint") &&
+                                   cluster_manager.hasActiveClusters();
+    if (include_endpoints) {
+      selected.emplace_back("endpoint");
+      absl::c_sort(selected);
+    }
     for (const auto& name : selected) {
-      // an earlier provider may have unregistered or replaced this callback
-      const auto it = callbacks.find(name);
-      if (it == callbacks.end()) {
-        continue;
+      ProtobufTypes::MessagePtr message;
+      if (include_endpoints && name == "endpoint") {
+        message = Upstream::dumpEndpointConfigs(cluster_manager, name_matcher);
+      } else {
+        // an earlier provider may have unregistered or replaced this callback
+        const auto it = callbacks.find(name);
+        if (it == callbacks.end()) {
+          continue;
+        }
+        // keep the current callback alive if it unregisters itself
+        const auto callback = it->second;
+        message = callback(name_matcher);
       }
-      // keep the current callback alive if it unregisters itself
-      const auto callback = it->second;
-      auto message = callback(name_matcher);
       if (message == nullptr) {
         return absl::InternalError(absl::StrCat("config provider returned no message: ", name));
       }

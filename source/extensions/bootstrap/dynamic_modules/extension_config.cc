@@ -124,10 +124,11 @@ DynamicModuleBootstrapExtensionConfig::getConfigSnapshot(
   if (!name_regex.empty()) {
     auto matcher = Regex::CompiledGoogleReMatcher::createAndSizeCheck(std::string(name_regex));
     RETURN_IF_NOT_OK(matcher.status());
-    return ConfigSnapshot::collect(server_admin->getConfigTracker(), providers, **matcher);
+    return ConfigSnapshot::collect(server_admin->getConfigTracker(), context_.clusterManager(),
+                                   providers, **matcher);
   }
-  return ConfigSnapshot::collect(server_admin->getConfigTracker(), providers,
-                                 Matchers::UniversalStringMatcher{});
+  return ConfigSnapshot::collect(server_admin->getConfigTracker(), context_.clusterManager(),
+                                 providers, Matchers::UniversalStringMatcher{});
 }
 
 void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(

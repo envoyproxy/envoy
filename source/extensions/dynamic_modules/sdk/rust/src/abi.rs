@@ -11060,8 +11060,8 @@ unsafe extern "C" {
 unsafe extern "C" {
     /** Collects and redacts selected providers synchronously on the main thread. Missing providers are
  omitted, duplicates are collected once, and results are sorted by provider key. An empty
- selection collects nothing. Endpoint dumps are not included. Cost grows with the selected
- resources, so combine frequent notifications into one collection.
+ selection collects nothing. Selecting "endpoint" includes active cluster endpoint assignments.
+ Cost grows with the selected resources, so combine frequent notifications into one collection.
 
  Collection is refused in cluster or listener lifecycle hooks, whatever triggered them, and in
  other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction. Providers can

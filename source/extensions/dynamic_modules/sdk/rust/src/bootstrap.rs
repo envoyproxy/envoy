@@ -32,6 +32,8 @@ pub enum ConfigSnapshotProvider<'a> {
   Bootstrap,
   /// Cluster configurations.
   Clusters,
+  /// Endpoint assignments for active clusters.
+  Endpoints,
   /// Listener configurations.
   Listeners,
   /// Route configurations.
@@ -65,6 +67,7 @@ impl ConfigSnapshotProvider<'_> {
     match self {
       Self::Bootstrap => "bootstrap",
       Self::Clusters => "clusters",
+      Self::Endpoints => "endpoint",
       Self::Listeners => "listeners",
       Self::Routes => "routes",
       Self::RouteScopes => "route_scopes",
@@ -435,10 +438,11 @@ pub trait EnvoyBootstrapExtensionConfig {
 
   /// Collects and redacts selected providers synchronously on the main thread after initialization
   /// and before shutdown. Missing providers are omitted, duplicates are collected once, and results
-  /// are sorted by provider key. An empty selection collects nothing. Endpoint dumps are not
-  /// included. `name_regex` applies a full-match RE2 resource name filter where supported; `None`
-  /// or an empty expression selects all names. Cost grows with the selected resources, so combine
-  /// frequent notifications into one collection.
+  /// are sorted by provider key. An empty selection collects nothing.
+  /// [`ConfigSnapshotProvider::Endpoints`] includes active cluster endpoint assignments.
+  /// `name_regex` applies a full-match RE2 resource name filter where supported; `None` or an empty
+  /// expression selects all names. Cost grows with the selected resources, so combine frequent
+  /// notifications into one collection.
   ///
   /// Collection is refused in cluster or listener lifecycle hooks, whatever triggered them, and in
   /// other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction. Providers
@@ -2600,6 +2604,7 @@ mod snapshot_tests {
     let cases = [
       (ConfigSnapshotProvider::Bootstrap, "bootstrap"),
       (ConfigSnapshotProvider::Clusters, "clusters"),
+      (ConfigSnapshotProvider::Endpoints, "endpoint"),
       (ConfigSnapshotProvider::Listeners, "listeners"),
       (ConfigSnapshotProvider::Routes, "routes"),
       (ConfigSnapshotProvider::RouteScopes, "route_scopes"),
