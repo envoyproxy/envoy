@@ -76,6 +76,7 @@ envoy_cc_library(
         ":quota_bucket_cache",
         "//envoy/grpc:async_client_interface",
         "//envoy/grpc:status",
+        "//source/common/common:assert_lib",
         "//source/common/common:statusor_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/tracing:http_tracer_lib",

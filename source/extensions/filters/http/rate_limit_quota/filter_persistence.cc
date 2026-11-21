@@ -32,12 +32,13 @@ initTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
   // kept alive via shared_ptr to a storage struct. The local rate limit client
   // in each filter instance assumes that the slot will outlive them.
   std::shared_ptr<TlsStore> tls_store = std::make_shared<TlsStore>(context, target_address, domain);
-  auto tl_buckets_cache =
-      std::make_shared<ThreadLocalBucketsCache>(std::make_shared<BucketsCache>());
-  tls_store->buckets_tls.set(
-      [tl_buckets_cache]([[maybe_unused]] Envoy::Event::Dispatcher& dispatcher) {
-        return tl_buckets_cache;
-      });
+  // Every thread gets its own BucketsCache:
+  // the global client updates them entry by entry on each worker's own thread
+  // (see GlobalRateLimitClientImpl::applyToTLS),
+  // so no copy of the whole cache is ever needed and the worker-side reads stay lock-free.
+  tls_store->buckets_tls.set([]([[maybe_unused]] Envoy::Event::Dispatcher& dispatcher) {
+    return std::make_shared<ThreadLocalBucketsCache>(std::make_shared<BucketsCache>());
+  });
 
   // TODO(bsurber): Implement report timing & usage aggregation based on each
   // bucket's reporting_interval field. Currently this is not supported and all
