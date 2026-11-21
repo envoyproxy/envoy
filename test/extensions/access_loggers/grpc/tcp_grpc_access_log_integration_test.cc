@@ -50,10 +50,9 @@ class TcpGrpcAccessLogIntegrationTest : public Grpc::GrpcClientIntegrationParamT
 public:
   TcpGrpcAccessLogIntegrationTest()
       : BaseIntegrationTest(ipVersion(), ConfigHelper::tcpProxyConfig()) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat 'grpc.accesslog.streams_closed_14' and stat_prefix
-    // 'accesslog'.
-    skip_tag_extraction_rule_check_ = true;
+    // grpc.accesslog.streams_closed_* is now covered by the grpc.$.** rule (#36673), so the
+    // tag-extraction check can be enabled here. Toward #21595.
+    skip_tag_extraction_rule_check_ = false;
 
     enableHalfClose(true);
   }
@@ -429,7 +428,7 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, RBACAccessLogFlow) {
 name: envoy.filters.network.rbac
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
-  stat_prefix: tcp.
+  stat_prefix: rbac_stats
   rules:
     action: ALLOW
     policies:
