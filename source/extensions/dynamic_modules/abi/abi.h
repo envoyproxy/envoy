@@ -9730,51 +9730,53 @@ typedef enum envoy_dynamic_module_type_bootstrap_listener_writer_update_status {
 } envoy_dynamic_module_type_bootstrap_listener_writer_update_status;
 
 /**
- * envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result is the result of
- * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update.
+ * envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result is the result of
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update.
  */
-typedef enum envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result {
+typedef enum envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result {
   // The write is queued. The done hook reports its outcome with the returned update ID.
-  envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result_Success = 0,
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_Success = 0,
   // The module has not called
-  // envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_writer, or the call was
-  // made off the main thread, before envoy_dynamic_module_on_bootstrap_extension_server_initialized
-  // or after shutdown began. A call off the main thread also reports an Envoy bug.
-  envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result_NotAllowed = 1,
-} envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result;
+  // envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer, or the
+  // call was made off the main thread, before
+  // envoy_dynamic_module_on_bootstrap_extension_server_initialized or after shutdown began. A call
+  // off the main thread also reports an Envoy bug.
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed = 1,
+} envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result;
 
 /**
- * envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result is the result of
- * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_remove.
+ * envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result is the result of
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove.
  */
-typedef enum envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result {
+typedef enum envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result {
   // The removal is queued. A queued write of the filter chain completes as Removed, and the removal
   // of a filter chain that is only queued cancels its write.
-  envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result_Success = 0,
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_Success = 0,
   // The call is not allowed for the same reasons as a write.
-  envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result_NotAllowed = 1,
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotAllowed = 1,
   // The extension neither owns nor has queued a filter chain with this name.
-  envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result_NotFound = 2,
-} envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result;
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotFound = 2,
+} envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result;
 
 /**
- * envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status is the outcome of a write
- * that envoy_dynamic_module_on_bootstrap_extension_filter_chain_writer_update_done reports.
+ * envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status is the outcome of a
+ * write that envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done
+ * reports.
  */
-typedef enum envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status {
+typedef enum envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status {
   // The filter chain finished warming with this configuration or an identical one. Every worker
   // applies the filter chain before it runs any event that the module posts afterwards.
-  envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status_Active = 0,
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status_Active = 0,
   // A later write of the filter chain replaced this one before it became active.
-  envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status_Superseded = 1,
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status_Superseded = 1,
   // A removal of the filter chain ended this write before it became active. A write that becomes
   // active before Envoy applies the removal completes as Active instead.
-  envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status_Removed = 2,
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status_Removed = 2,
   // Envoy rejected the write. The filter chain failed to parse or validate, its name differs from
   // the name passed in, a listener requests the name through FCDS, or Envoy failed to build the
   // filter chain. The listeners keep using the previous configuration, if any.
-  envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status_Failed = 3,
-} envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status;
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status_Failed = 3,
+} envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status;
 
 /**
  * The encoding of an ECDS configuration payload delivered to a bootstrap extension.
@@ -9927,8 +9929,8 @@ typedef void (*envoy_dynamic_module_type_event_cb)(void* context);
  *
  * Shutdown has begun when Envoy calls this, so
  * envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers and the writer enable
- * callbacks return false, the other cluster, listener and filter chain writer callbacks return
- * NotAllowed, and Envoy drops the done hooks of pending worker events and the pending writer
+ * callbacks return false, the other cluster, listener and filter chain config writer callbacks
+ * return NotAllowed, and Envoy drops the done hooks of pending worker events and the pending writer
  * outcomes. A worker can still run the worker event hook of an event posted before shutdown began,
  * until the workers stop.
  *
@@ -11279,12 +11281,12 @@ envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer listener_name);
 
-// -------------------- Bootstrap Extension - Filter Chain Writer --------------------
+// -------------------- Bootstrap Extension - Filter Chain Config Writer --------------------
 
 /**
- * envoy_dynamic_module_on_bootstrap_extension_filter_chain_writer_update_done is called on the main
- * thread with the outcome of a write accepted by
- * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update.
+ * envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done is called on
+ * the main thread with the outcome of a write accepted by
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update.
  *
  * This hook is optional. Without it, Envoy still applies the writes.
  *
@@ -11301,25 +11303,26 @@ envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(
  * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
  * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
  * @param update_id is the ID returned by
- * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update.
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update.
  * @param filter_chain_name is the name of the filter chain. It is owned by Envoy and valid only
  * during this call.
  * @param status is the outcome of the write.
  * @param error_details describes the problem when the status is Failed, and is empty otherwise. It
  * is owned by Envoy and valid only during this call.
  */
-void envoy_dynamic_module_on_bootstrap_extension_filter_chain_writer_update_done(
+void envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
     uint64_t update_id, envoy_dynamic_module_type_envoy_buffer filter_chain_name,
-    envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status status,
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status status,
     envoy_dynamic_module_type_envoy_buffer error_details);
 
 /**
- * envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_writer is called by the
- * module to opt in to adding, updating and removing filter chains. Until it is called,
- * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update and
- * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_remove return NotAllowed.
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer is called by
+ * the module to opt in to adding, updating and removing filter chains. Until it is called,
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update and
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove return
+ * NotAllowed.
  *
  * This must be called on the main thread. It can be called before
  * envoy_dynamic_module_on_bootstrap_extension_server_initialized, for example from
@@ -11330,17 +11333,17 @@ void envoy_dynamic_module_on_bootstrap_extension_filter_chain_writer_update_done
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
- * @return true if the filter chain writer was enabled, false otherwise.
+ * @return true if the filter chain config writer was enabled, false otherwise.
  */
-bool envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_writer(
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
 
 /**
- * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update is called by
- * the module to add or update a filter chain that the listeners with fcds_config find by name, as
- * FCDS would deliver it. Envoy queues the write, applies it asynchronously on the main thread, and
- * reports the outcome through
- * envoy_dynamic_module_on_bootstrap_extension_filter_chain_writer_update_done.
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update is
+ * called by the module to add or update a filter chain that the listeners with fcds_config find by
+ * name, as FCDS would deliver it. Envoy queues the write, applies it asynchronously on the main
+ * thread, and reports the outcome through
+ * envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done.
  *
  * The extension owns the filter chains it writes. A listener whose fcds_config has no config_source
  * waits, without a timeout, until the filter chains that it finds by name are written and finished
@@ -11353,8 +11356,8 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_write
  * writes. Writes submitted before Envoy finishes initializing its static and CDS clusters are
  * applied once it has. When the module writes a filter chain again before its previous write is
  * applied, Envoy applies only the latest write and the previous one completes as Superseded. The
- * cluster and filter chain writers apply their writes independently, so write a filter chain whose
- * inline routes name a written cluster only after that cluster write completed as Active.
+ * cluster and filter chain config writers apply their writes independently, so write a filter chain
+ * whose inline routes name a written cluster only after that cluster write completed as Active.
  *
  * A written filter chain has the same authority as a filter chain delivered by FCDS, so build
  * filter chains from a schema that the module owns. A write that changes a filter chain drains the
@@ -11372,18 +11375,18 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_write
  * filter_chain_name.
  * @param update_id_out receives a nonzero ID that increases with every accepted write, or 0 when
  * the write is rejected. It must not be null.
- * @return envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result is Success when
- * the write is queued.
+ * @return envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result is Success
+ * when the write is queued.
  */
-envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result
-envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update(
+envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result
+envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_chain_name,
     envoy_dynamic_module_type_module_buffer filter_chain, uint64_t* update_id_out);
 
 /**
- * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_remove is called by the
- * module to remove a filter chain that it owns. Envoy queues the removal and applies it
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove is called by
+ * the module to remove a filter chain that it owns. Envoy queues the removal and applies it
  * asynchronously on the main thread. A removal has no outcome of its own. Once Envoy applies it,
  * the listeners that use the filter chain drain its connections, and the listeners that wait for it
  * stop waiting and can become active without it.
@@ -11395,11 +11398,11 @@ envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_upd
  * object.
  * @param filter_chain_name is the name of the filter chain. The buffer is owned by the module and
  * only needs to be valid during this call.
- * @return envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result is Success when
- * the removal is queued.
+ * @return envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result is Success
+ * when the removal is queued.
  */
-envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result
-envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_remove(
+envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result
+envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_chain_name);
 

@@ -583,19 +583,19 @@ WEAK_STUB(envoy_dynamic_module_type_bootstrap_listener_writer_removal_result,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 
-WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_writer, false,
-          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer,
+          false, envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
 
-WEAK_STUB(envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result,
-          envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update,
-          envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result_NotAllowed,
-          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
-          uint64_t*)
+WEAK_STUB(
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result,
+    envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update,
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed,
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, uint64_t*)
 
-WEAK_STUB(envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result,
-          envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_remove,
-          envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result_NotAllowed,
+WEAK_STUB(envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result,
+          envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove,
+          envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotAllowed,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 

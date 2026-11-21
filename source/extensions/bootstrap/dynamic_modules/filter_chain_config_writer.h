@@ -26,9 +26,10 @@ namespace DynamicModules {
  * loop iterations, and the outcome of every accepted write is reported through the done callback.
  * All methods must be called on the main thread.
  */
-class DynamicModuleFilterChainWriter
-    : public ResourceWriter<WriterResourceState,
-                            envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status>,
+class DynamicModuleFilterChainConfigWriter
+    : public ResourceWriter<
+          WriterResourceState,
+          envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status>,
       public Server::ListenerUpdateCallbacks {
 public:
   /**
@@ -37,9 +38,9 @@ public:
    * @param update_done the callback that reports outcomes, or nullptr when the module has no done
    * hook.
    */
-  DynamicModuleFilterChainWriter(absl::string_view extension_name,
-                                 Server::Configuration::ServerFactoryContext& context,
-                                 UpdateDoneCallback update_done);
+  DynamicModuleFilterChainConfigWriter(absl::string_view extension_name,
+                                       Server::Configuration::ServerFactoryContext& context,
+                                       UpdateDoneCallback update_done);
 
   /**
    * Called once the server is initialized. Writes are not allowed before this.
@@ -55,14 +56,14 @@ public:
    * Queues a write of the given serialized filter chain.
    * @param update_id is set to the ID of the write, or to 0 when the write is rejected.
    */
-  envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result
   addOrUpdateFilterChain(absl::string_view filter_chain_name, absl::string_view filter_chain,
                          uint64_t& update_id);
 
   /**
    * Queues the removal of the given filter chain.
    */
-  envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result
   removeFilterChain(absl::string_view filter_chain_name);
 
   // Server::ListenerUpdateCallbacks
@@ -84,7 +85,8 @@ private:
   Server::ListenerUpdateCallbacksHandlePtr listener_update_callbacks_handle_;
 };
 
-using DynamicModuleFilterChainWriterPtr = std::unique_ptr<DynamicModuleFilterChainWriter>;
+using DynamicModuleFilterChainConfigWriterPtr =
+    std::unique_ptr<DynamicModuleFilterChainConfigWriter>;
 
 } // namespace DynamicModules
 } // namespace Bootstrap

@@ -23,7 +23,7 @@ using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtens
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfigScheduler;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionTimer;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleClusterWriter;
-using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleFilterChainWriter;
+using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleFilterChainConfigWriter;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleListenerWriter;
 using Envoy::Extensions::DynamicModules::MetricRegistry;
 
@@ -956,52 +956,55 @@ envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(
   return listener_writer->removeListener({listener_name.ptr, listener_name.length});
 }
 
-// -------------------- Filter Chain Writer Callbacks --------------------
+// -------------------- Filter Chain Config Writer Callbacks --------------------
 
-bool envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_writer(
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
   if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
     IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
     return false;
   }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
-  return config->enableFilterChainWriter();
+  return config->enableFilterChainConfigWriter();
 }
 
-envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result
-envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update(
+envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result
+envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_chain_name,
     envoy_dynamic_module_type_module_buffer filter_chain, uint64_t* update_id_out) {
   *update_id_out = 0;
   if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
     IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
-    return envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result_NotAllowed;
+    return envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed;
   }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
-  DynamicModuleFilterChainWriter* filter_chain_writer = config->filter_chain_writer_.get();
-  if (filter_chain_writer == nullptr) {
-    return envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result_NotAllowed;
+  DynamicModuleFilterChainConfigWriter* filter_chain_config_writer =
+      config->filter_chain_config_writer_.get();
+  if (filter_chain_config_writer == nullptr) {
+    return envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed;
   }
-  return filter_chain_writer->addOrUpdateFilterChain(
+  return filter_chain_config_writer->addOrUpdateFilterChain(
       {filter_chain_name.ptr, filter_chain_name.length}, {filter_chain.ptr, filter_chain.length},
       *update_id_out);
 }
 
-envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result
-envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_remove(
+envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result
+envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_chain_name) {
   if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
     IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
-    return envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result_NotAllowed;
+    return envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotAllowed;
   }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
-  DynamicModuleFilterChainWriter* filter_chain_writer = config->filter_chain_writer_.get();
-  if (filter_chain_writer == nullptr) {
-    return envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result_NotAllowed;
+  DynamicModuleFilterChainConfigWriter* filter_chain_config_writer =
+      config->filter_chain_config_writer_.get();
+  if (filter_chain_config_writer == nullptr) {
+    return envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotAllowed;
   }
-  return filter_chain_writer->removeFilterChain({filter_chain_name.ptr, filter_chain_name.length});
+  return filter_chain_config_writer->removeFilterChain(
+      {filter_chain_name.ptr, filter_chain_name.length});
 }
 
 } // extern "C"

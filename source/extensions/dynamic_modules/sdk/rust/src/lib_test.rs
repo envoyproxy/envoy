@@ -3918,43 +3918,43 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_listener_wri
 }
 
 // Counts its calls, since its result cannot differ from both other writer stubs.
-static FILTER_CHAIN_WRITER_ENABLE_CALLS: AtomicUsize = AtomicUsize::new(0);
+static FILTER_CHAIN_CONFIG_WRITER_ENABLE_CALLS: AtomicUsize = AtomicUsize::new(0);
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_writer(
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
   _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
 ) -> bool {
-  FILTER_CHAIN_WRITER_ENABLE_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  FILTER_CHAIN_CONFIG_WRITER_ENABLE_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
   true
 }
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update(
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
   _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   filter_chain_name: abi::envoy_dynamic_module_type_module_buffer,
   filter_chain: abi::envoy_dynamic_module_type_module_buffer,
   update_id_out: *mut u64,
-) -> abi::envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result {
+) -> abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result {
   // Reports the argument lengths through the update ID so that the test can check them.
   unsafe {
     *update_id_out = (filter_chain_name.length * 100 + filter_chain.length) as u64;
   }
-  abi::envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result::Success
+  abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result::Success
 }
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_remove(
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
   _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   filter_chain_name: abi::envoy_dynamic_module_type_module_buffer,
-) -> abi::envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result {
+) -> abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result {
   // Finds only the filter chain that the test removes, so that the test checks the name.
   let filter_chain_name = unsafe {
     std::slice::from_raw_parts(filter_chain_name.ptr as *const u8, filter_chain_name.length)
   };
   if filter_chain_name == b"writer.chain" {
-    abi::envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result::Success
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result::Success
   } else {
-    abi::envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result::NotFound
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result::NotFound
   }
 }
 
@@ -9094,12 +9094,12 @@ fn test_bootstrap_extension_worker_and_writer_default_noop() {
       length: 0,
     },
   );
-  envoy_dynamic_module_on_bootstrap_extension_filter_chain_writer_update_done(
+  envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done(
     std::ptr::null_mut(),
     config_ptr,
     1,
     cluster_name_buf,
-    abi::envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status::Active,
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status::Active,
     abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -9135,7 +9135,7 @@ fn test_bootstrap_extension_worker_event_and_writer_hooks() {
   type FilterChainUpdateDone = (
     u64,
     String,
-    abi::envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status,
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status,
     String,
   );
   static FILTER_CHAIN_UPDATE_DONE: std::sync::Mutex<Option<FilterChainUpdateDone>> =
@@ -9198,12 +9198,12 @@ fn test_bootstrap_extension_worker_event_and_writer_hooks() {
       ));
     }
 
-    fn on_filter_chain_writer_update_done(
+    fn on_filter_chain_config_writer_update_done(
       &self,
       _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
       update_id: u64,
       filter_chain_name: &str,
-      status: abi::envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status,
+      status: abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status,
       error_details: &str,
     ) {
       *FILTER_CHAIN_UPDATE_DONE.lock().unwrap() = Some((
@@ -9299,7 +9299,7 @@ fn test_bootstrap_extension_worker_event_and_writer_hooks() {
 
   let filter_chain_name = "writer.chain";
   let filter_chain_error_details = "the listener manager rejected filter chain writer.chain";
-  envoy_dynamic_module_on_bootstrap_extension_filter_chain_writer_update_done(
+  envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done(
     std::ptr::null_mut(),
     config_ptr,
     7,
@@ -9307,7 +9307,7 @@ fn test_bootstrap_extension_worker_event_and_writer_hooks() {
       ptr: filter_chain_name.as_ptr() as *const _,
       length: filter_chain_name.len(),
     },
-    abi::envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status::Failed,
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status::Failed,
     abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: filter_chain_error_details.as_ptr() as *const _,
       length: filter_chain_error_details.len(),
@@ -9318,7 +9318,7 @@ fn test_bootstrap_extension_worker_event_and_writer_hooks() {
     Some((
       7,
       "writer.chain".to_string(),
-      abi::envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status::Failed,
+      abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status::Failed,
       "the listener manager rejected filter chain writer.chain".to_string(),
     ))
   );
@@ -9362,22 +9362,22 @@ fn test_bootstrap_extension_config_run_on_all_workers_and_writers() {
     abi::envoy_dynamic_module_type_bootstrap_listener_writer_removal_result::Success
   );
 
-  assert!(envoy_config.enable_filter_chain_writer());
+  assert!(envoy_config.enable_filter_chain_config_writer());
   assert_eq!(
-    FILTER_CHAIN_WRITER_ENABLE_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    FILTER_CHAIN_CONFIG_WRITER_ENABLE_CALLS.load(std::sync::atomic::Ordering::SeqCst),
     1
   );
   // The stub encodes the lengths of the name and the filter chain in the update ID.
   assert_eq!(
-    envoy_config.filter_chain_writer_add_or_update("writer.chain", b"xyz"),
+    envoy_config.filter_chain_config_writer_add_or_update("writer.chain", b"xyz"),
     (
-      abi::envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result::Success,
+      abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result::Success,
       1203
     )
   );
   assert_eq!(
-    envoy_config.filter_chain_writer_remove("writer.chain"),
-    abi::envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result::Success
+    envoy_config.filter_chain_config_writer_remove("writer.chain"),
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result::Success
   );
 }
 

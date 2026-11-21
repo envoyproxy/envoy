@@ -215,20 +215,20 @@ prefix, tagged with ``config_name`` set to the extension name, or ``default`` if
   listeners_owned, Gauge, Listeners that the module owns
   updates_pending, Gauge, Writes that are queued or warming or that wait for the workers to start
 
-.. _config_bootstrap_extensions_dynamic_modules_filter_chain_writer:
+.. _config_bootstrap_extensions_dynamic_modules_filter_chain_config_writer:
 
-Filter Chain Writer
--------------------
+Filter Chain Config Writer
+--------------------------
 
 Once the module calls
-``envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_writer``, it can add, update
-and remove the filter chains that the listeners with ``fcds_config`` find by name, as the Filter
-Chain Discovery Service (FCDS) would deliver them. It passes a serialized :ref:`FilterChain
+``envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer``, it can add,
+update and remove the filter chains that the listeners with ``fcds_config`` find by name, as the
+Filter Chain Discovery Service (FCDS) would deliver them. It passes a serialized :ref:`FilterChain
 <envoy_v3_api_msg_config.listener.v3.FilterChain>` to
-``envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update``, and Envoy
-reports the outcome of each write through
-``envoy_dynamic_module_on_bootstrap_extension_filter_chain_writer_update_done``. A write is active
-once the filter chain finished warming and Envoy posted it to the workers. A listener whose
+``envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update``, and
+Envoy reports the outcome of each write through
+``envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done``. A write is
+active once the filter chain finished warming and Envoy posted it to the workers. A listener whose
 ``fcds_config`` has no ``config_source`` waits, without a timeout, until the filter chains that it
 finds by name are written and finished warming, so the module can write a listener before its filter
 chains. Such a listener that Envoy creates before it starts its workers holds back the
@@ -246,9 +246,9 @@ written filter chains. Envoy does not time out a write that never finishes warmi
 that waits for a filter chain that is never written, so a module that waits for either should bound
 that wait itself.
 
-The filter chain writer emits the following statistics with the
-``dynamic_modules.filter_chain_writer.`` prefix, tagged with ``config_name`` set to the extension
-name, or ``default`` if it is empty.
+The filter chain config writer emits the following statistics with the
+``dynamic_modules.filter_chain_config_writer.`` prefix, tagged with ``config_name`` set to the
+extension name, or ``default`` if it is empty.
 
 .. csv-table::
   :header: Name, Type, Description

@@ -45,9 +45,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "filter_chain_writer_lib",
-    srcs = ["filter_chain_writer.cc"],
-    hdrs = ["filter_chain_writer.h"],
+    name = "filter_chain_config_writer_lib",
+    srcs = ["filter_chain_config_writer.cc"],
+    hdrs = ["filter_chain_config_writer.h"],
     deps = [
         ":resource_writer_lib",
         "//envoy/init:manager_interface",
@@ -170,7 +170,7 @@ envoy_cc_library(
         ":cluster_writer_lib",
         ":config_snapshot_lib",
         ":extension_config_subscription_lib",
-        ":filter_chain_writer_lib",
+        ":filter_chain_config_writer_lib",
         ":listener_writer_lib",
         "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",

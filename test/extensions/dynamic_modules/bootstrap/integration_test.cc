@@ -1457,7 +1457,7 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ListenerWriterWithLdsRust) {
 
 // Verifies that a listener waits for the filter chain that a module writes, serves its updates, and
 // stops serving it once the module removes it.
-TEST_P(DynamicModulesBootstrapIntegrationTest, FilterChainWriterRust) {
+TEST_P(DynamicModulesBootstrapIntegrationTest, FilterChainConfigWriterRust) {
   DISABLE_IF_ADMIN_DISABLED;
   initializeWithWriter("");
 
@@ -1473,7 +1473,8 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, FilterChainWriterRust) {
   ASSERT_TRUE(directResponseFilterChain("chain.a").SerializeToString(&serialized));
   EXPECT_EQ("Success 1", writerRequest("add_filter_chain=chain.a", serialized));
   test_server_->waitForCounter(
-      "dynamic_modules.filter_chain_writer.update_active.config_name.writer", testing::Eq(1));
+      "dynamic_modules.filter_chain_config_writer.update_active.config_name.writer",
+      testing::Eq(1));
   test_server_->waitForCounter("dynamic_modules.listener_writer.update_active.config_name.writer",
                                testing::Eq(1));
   runOnAllWorkers(1);
@@ -1483,7 +1484,8 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, FilterChainWriterRust) {
   ASSERT_TRUE(directResponseFilterChain("chain.a", 404).SerializeToString(&serialized));
   EXPECT_EQ("Success 2", writerRequest("add_filter_chain=chain.a", serialized));
   test_server_->waitForCounter(
-      "dynamic_modules.filter_chain_writer.update_active.config_name.writer", testing::Eq(2));
+      "dynamic_modules.filter_chain_config_writer.update_active.config_name.writer",
+      testing::Eq(2));
   runOnAllWorkers(2);
   expectDirectResponse("writer", "404");
   // The done hook ran for the listener write and the two filter chain writes.
@@ -1491,7 +1493,8 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, FilterChainWriterRust) {
 
   EXPECT_EQ("Success", writerRequest("remove_filter_chain=chain.a", ""));
   test_server_->waitForGauge(
-      "dynamic_modules.filter_chain_writer.filter_chains_owned.config_name.writer", testing::Eq(0));
+      "dynamic_modules.filter_chain_config_writer.filter_chains_owned.config_name.writer",
+      testing::Eq(0));
   runOnAllWorkers(3);
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("writer"));
   tcp_client->waitForDisconnect();

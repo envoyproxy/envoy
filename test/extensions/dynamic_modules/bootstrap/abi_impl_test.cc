@@ -3090,25 +3090,26 @@ TEST_F(BootstrapAbiImplTest, MainThreadCallbacksOffMainThreadFailClosed) {
                    envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(
                        nullptr, {"listener", 8}));
        }},
-      {"envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_writer",
+      {"envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer",
        [] {
          EXPECT_FALSE(
-             envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_writer(nullptr));
+             envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
+                 nullptr));
        }},
-      {"envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update",
+      {"envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update",
        [] {
          uint64_t update_id = 1;
          EXPECT_EQ(
-             envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result_NotAllowed,
-             envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update(
+             envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed,
+             envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
                  nullptr, {"chain", 5}, {nullptr, 0}, &update_id));
          EXPECT_EQ(0, update_id);
        }},
-      {"envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_remove",
+      {"envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove",
        [] {
          EXPECT_EQ(
-             envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result_NotAllowed,
-             envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_remove(
+             envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotAllowed,
+             envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
                  nullptr, {"chain", 5}));
        }},
   };
@@ -3711,26 +3712,28 @@ TEST_F(BootstrapAbiImplTest, ListenerWriterWithoutTheDoneHookKeepsNoOutcomes) {
   config.value()->onShutdown();
 }
 
-// Test that the filter chain writer callbacks are refused until the module enables the filter chain
-// writer.
-TEST_F(BootstrapAbiImplTest, FilterChainWriterNotAllowedUntilEnabled) {
+// Test that the filter chain config writer callbacks are refused until the module enables the
+// filter chain config writer.
+TEST_F(BootstrapAbiImplTest, FilterChainConfigWriterNotAllowedUntilEnabled) {
   auto config = newOptionalHooksConfig();
   testing::NiceMock<Server::MockListenerManager> listener_manager;
   config->setListenerManager(listener_manager);
   uint64_t update_id = 1;
-  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result_NotAllowed,
-            envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update(
-                config->thisAsVoidPtr(), {"writer.a", 8}, {nullptr, 0}, &update_id));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed,
+      envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+          config->thisAsVoidPtr(), {"writer.a", 8}, {nullptr, 0}, &update_id));
   EXPECT_EQ(0, update_id);
-  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result_NotAllowed,
-            envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_remove(
-                config->thisAsVoidPtr(), {"writer.a", 8}));
-  EXPECT_EQ(nullptr, config->filter_chain_writer_);
+  EXPECT_EQ(
+      envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotAllowed,
+      envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
+          config->thisAsVoidPtr(), {"writer.a", 8}));
+  EXPECT_EQ(nullptr, config->filter_chain_config_writer_);
 }
 
-// Test that the module enables the filter chain writer at most once and not once shutdown began,
-// and that a writer enabled before the server is initialized adds its init target then.
-TEST_F(BootstrapAbiImplTest, EnableFilterChainWriter) {
+// Test that the module enables the filter chain config writer at most once and not once shutdown
+// began, and that a writer enabled before the server is initialized adds its init target then.
+TEST_F(BootstrapAbiImplTest, EnableFilterChainConfigWriter) {
   std::vector<std::string> init_target_names;
   ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
     init_target_names.emplace_back(target.name());
@@ -3739,28 +3742,29 @@ TEST_F(BootstrapAbiImplTest, EnableFilterChainWriter) {
   // The writer creates its schedulable callbacks when the module enables it.
   new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
   new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
-  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_writer(
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
       config->thisAsVoidPtr()));
-  EXPECT_NE(nullptr, config->filter_chain_writer_);
-  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_writer(
+  EXPECT_NE(nullptr, config->filter_chain_config_writer_);
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
       config->thisAsVoidPtr()));
   EXPECT_THAT(init_target_names, testing::ElementsAre("target dynamic_modules_bootstrap"));
   testing::NiceMock<Server::MockListenerManager> listener_manager;
   config->setListenerManager(listener_manager);
-  EXPECT_THAT(init_target_names,
-              testing::ElementsAre("target dynamic_modules_bootstrap",
-                                   "target dynamic_modules_bootstrap_filter_chain_writer:test"));
+  EXPECT_THAT(
+      init_target_names,
+      testing::ElementsAre("target dynamic_modules_bootstrap",
+                           "target dynamic_modules_bootstrap_filter_chain_config_writer:test"));
 
   auto shut_down_config = newOptionalHooksConfig();
   shut_down_config->onShutdown();
-  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_writer(
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
       shut_down_config->thisAsVoidPtr()));
-  EXPECT_EQ(nullptr, shut_down_config->filter_chain_writer_);
+  EXPECT_EQ(nullptr, shut_down_config->filter_chain_config_writer_);
 }
 
 // Test that a write through the callbacks is applied once Envoy initialized its clusters, that its
 // outcome reaches the done hook of the module, and that shutdown stops the writer.
-TEST_F(BootstrapAbiImplTest, FilterChainWriterReportsOutcomesToTheModule) {
+TEST_F(BootstrapAbiImplTest, FilterChainConfigWriterReportsOutcomesToTheModule) {
   std::vector<Init::TargetHandlePtr> init_target_handles;
   ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
     init_target_handles.push_back(target.createHandle("test"));
@@ -3773,7 +3777,7 @@ TEST_F(BootstrapAbiImplTest, FilterChainWriterReportsOutcomesToTheModule) {
       new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
   auto* apply_callback =
       new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
-  ASSERT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_writer(
+  ASSERT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
       config->thisAsVoidPtr()));
 
   envoy::config::listener::v3::FilterChain filter_chain;
@@ -3781,10 +3785,11 @@ TEST_F(BootstrapAbiImplTest, FilterChainWriterReportsOutcomesToTheModule) {
   std::string serialized_filter_chain;
   ASSERT_TRUE(filter_chain.SerializeToString(&serialized_filter_chain));
   uint64_t update_id = 0;
-  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result_Success,
-            envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update(
-                config->thisAsVoidPtr(), {"writer.a", 8},
-                {serialized_filter_chain.data(), serialized_filter_chain.size()}, &update_id));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_Success,
+      envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+          config->thisAsVoidPtr(), {"writer.a", 8},
+          {serialized_filter_chain.data(), serialized_filter_chain.size()}, &update_id));
   EXPECT_EQ(1, update_id);
 
   // The writer registers its init target after the one of the extension.
@@ -3799,27 +3804,28 @@ TEST_F(BootstrapAbiImplTest, FilterChainWriterReportsOutcomesToTheModule) {
                    "bootstrap_optional_hooks_test_filter_chain_update_done_count")());
   EXPECT_EQ(1, optionalHooksFunction<uint64_t (*)()>(
                    "bootstrap_optional_hooks_test_last_filter_chain_update_id")());
-  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status_Active,
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status_Active,
             optionalHooksFunction<int (*)()>(
                 "bootstrap_optional_hooks_test_last_filter_chain_update_status")());
   EXPECT_STREQ("writer.a", optionalHooksFunction<const char* (*)()>(
                                "bootstrap_optional_hooks_test_last_filter_chain_update_name")());
   EXPECT_STREQ("", optionalHooksFunction<const char* (*)()>(
                        "bootstrap_optional_hooks_test_last_filter_chain_update_error_details")());
-  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result_Success,
-            envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_remove(
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_Success,
+            envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
                 config->thisAsVoidPtr(), {"writer.a", 8}));
 
   config->onShutdown();
-  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result_NotAllowed,
-            envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update(
-                config->thisAsVoidPtr(), {"writer.a", 8},
-                {serialized_filter_chain.data(), serialized_filter_chain.size()}, &update_id));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed,
+      envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+          config->thisAsVoidPtr(), {"writer.a", 8},
+          {serialized_filter_chain.data(), serialized_filter_chain.size()}, &update_id));
 }
 
-// Test that the filter chain writer of a module without the done hook applies writes and keeps no
-// outcomes.
-TEST_F(BootstrapAbiImplTest, FilterChainWriterWithoutTheDoneHookKeepsNoOutcomes) {
+// Test that the filter chain config writer of a module without the done hook applies writes and
+// keeps no outcomes.
+TEST_F(BootstrapAbiImplTest, FilterChainConfigWriterWithoutTheDoneHookKeepsNoOutcomes) {
   std::vector<Init::TargetHandlePtr> init_target_handles;
   ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
     init_target_handles.push_back(target.createHandle("test"));
@@ -3838,14 +3844,15 @@ TEST_F(BootstrapAbiImplTest, FilterChainWriterWithoutTheDoneHookKeepsNoOutcomes)
       new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
   auto* apply_callback =
       new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
-  ASSERT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_writer(
+  ASSERT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
       config.value()->thisAsVoidPtr()));
 
   // The empty filter chain is not named writer.a, so the write fails when it is applied.
   uint64_t update_id = 0;
-  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result_Success,
-            envoy_dynamic_module_callback_bootstrap_extension_filter_chain_writer_add_or_update(
-                config.value()->thisAsVoidPtr(), {"writer.a", 8}, {nullptr, 0}, &update_id));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_Success,
+      envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+          config.value()->thisAsVoidPtr(), {"writer.a", 8}, {nullptr, 0}, &update_id));
   EXPECT_EQ(1, update_id);
   ASSERT_EQ(2, init_target_handles.size());
   testing::NiceMock<Init::ExpectableWatcherImpl> init_watcher;

@@ -1,7 +1,7 @@
 #include "envoy/config/listener/v3/listener_components.pb.h"
 
 #include "source/common/stats/utility.h"
-#include "source/extensions/bootstrap/dynamic_modules/filter_chain_writer.h"
+#include "source/extensions/bootstrap/dynamic_modules/filter_chain_config_writer.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/init/mocks.h"
@@ -27,30 +27,30 @@ using testing::NiceMock;
 using testing::Return;
 
 constexpr auto Success =
-    envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result_Success;
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_Success;
 constexpr auto NotAllowed =
-    envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_result_NotAllowed;
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed;
 constexpr auto RemovalSuccess =
-    envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result_Success;
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_Success;
 constexpr auto RemovalNotAllowed =
-    envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result_NotAllowed;
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotAllowed;
 constexpr auto RemovalNotFound =
-    envoy_dynamic_module_type_bootstrap_filter_chain_writer_removal_result_NotFound;
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotFound;
 constexpr auto Active =
-    envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status_Active;
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status_Active;
 constexpr auto Superseded =
-    envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status_Superseded;
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status_Superseded;
 constexpr auto Removed =
-    envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status_Removed;
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status_Removed;
 constexpr auto Failed =
-    envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status_Failed;
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status_Failed;
 
 using FilterChainProto = envoy::config::listener::v3::FilterChain;
 
 struct Outcome {
   uint64_t update_id;
   std::string filter_chain_name;
-  envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status status;
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status status;
   std::string error_details;
 };
 
@@ -76,9 +76,9 @@ FilterChainProto filterChainProto(absl::string_view name, uint32_t connect_timeo
   return filter_chain;
 }
 
-class FilterChainWriterTest : public Event::TestUsingSimulatedTime, public testing::Test {
+class FilterChainConfigWriterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  FilterChainWriterTest() {
+  FilterChainConfigWriterTest() {
     ON_CALL(context_.init_manager_, add(_))
         .WillByDefault(Invoke([this](const Init::Target& target) {
           init_target_handle_ = target.createHandle("test");
@@ -91,10 +91,10 @@ public:
     // The writer creates its apply callback first, and the newest expectation matches first.
     deliver_callback_ = new NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
     apply_callback_ = new NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
-    writer_ = std::make_unique<DynamicModuleFilterChainWriter>(
+    writer_ = std::make_unique<DynamicModuleFilterChainConfigWriter>(
         "writer", context_,
         [this](uint64_t update_id, absl::string_view filter_chain_name,
-               envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status status,
+               envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status status,
                absl::string_view error_details) {
           outcomes_.push_back(
               {update_id, std::string(filter_chain_name), status, std::string(error_details)});
@@ -145,7 +145,7 @@ public:
   }
 
   static Stats::ElementVec elements(absl::string_view name) {
-    return {Stats::DynamicName("dynamic_modules"), Stats::DynamicName("filter_chain_writer"),
+    return {Stats::DynamicName("dynamic_modules"), Stats::DynamicName("filter_chain_config_writer"),
             Stats::DynamicName(name)};
   }
 
@@ -155,7 +155,7 @@ public:
   Init::TargetHandlePtr init_target_handle_;
   Event::MockSchedulableCallback* apply_callback_{};
   Event::MockSchedulableCallback* deliver_callback_{};
-  std::unique_ptr<DynamicModuleFilterChainWriter> writer_;
+  std::unique_ptr<DynamicModuleFilterChainConfigWriter> writer_;
   std::vector<Outcome> outcomes_;
 };
 
@@ -163,7 +163,7 @@ MATCHER_P2(IsOutcome, update_id, status, "") {
   return arg.update_id == update_id && arg.status == status;
 }
 
-TEST_F(FilterChainWriterTest, ShutdownRefusesWritesAndDropsQueuedWork) {
+TEST_F(FilterChainConfigWriterTest, ShutdownRefusesWritesAndDropsQueuedWork) {
   int handle_releases = 0;
   EXPECT_CALL(listener_manager_, addListenerUpdateCallbacks_(_))
       .WillOnce(Return(new CountingListenerUpdateCallbacksHandle(handle_releases)));
@@ -195,7 +195,7 @@ TEST_F(FilterChainWriterTest, ShutdownRefusesWritesAndDropsQueuedWork) {
   EXPECT_TRUE(deliveredOutcomes().empty());
 }
 
-TEST_F(FilterChainWriterTest, AddsItsInitTargetWhenTheServerIsInitialized) {
+TEST_F(FilterChainConfigWriterTest, AddsItsInitTargetWhenTheServerIsInitialized) {
   createWriter();
   EXPECT_EQ(nullptr, init_target_handle_);
   writer_->onServerInitialized(listener_manager_);
@@ -205,7 +205,7 @@ TEST_F(FilterChainWriterTest, AddsItsInitTargetWhenTheServerIsInitialized) {
   init_target_handle_->initialize(init_watcher_);
 }
 
-TEST_F(FilterChainWriterTest, StartsWithoutAnInitTargetOnceTheServerInitManagerStarted) {
+TEST_F(FilterChainConfigWriterTest, StartsWithoutAnInitTargetOnceTheServerInitManagerStarted) {
   ON_CALL(context_.init_manager_, state()).WillByDefault(Return(Init::Manager::State::Initialized));
   EXPECT_CALL(context_.init_manager_, add(_)).Times(0);
   createWriter();
@@ -217,7 +217,7 @@ TEST_F(FilterChainWriterTest, StartsWithoutAnInitTargetOnceTheServerInitManagerS
   EXPECT_THAT(deliveredOutcomes(), testing::ElementsAre(IsOutcome(update_id, Active)));
 }
 
-TEST_F(FilterChainWriterTest, ShutdownBeforeClusterInitializationSkipsTheListenerManager) {
+TEST_F(FilterChainConfigWriterTest, ShutdownBeforeClusterInitializationSkipsTheListenerManager) {
   createWriter();
   writer_->onServerInitialized(listener_manager_);
   writer_->onShutdown();
@@ -226,7 +226,7 @@ TEST_F(FilterChainWriterTest, ShutdownBeforeClusterInitializationSkipsTheListene
   init_target_handle_->initialize(init_watcher_);
 }
 
-TEST_F(FilterChainWriterTest, WritesWaitForClusterInitialization) {
+TEST_F(FilterChainConfigWriterTest, WritesWaitForClusterInitialization) {
   createWriter();
   writer_->onServerInitialized(listener_manager_);
   write("writer.a");
@@ -238,7 +238,7 @@ TEST_F(FilterChainWriterTest, WritesWaitForClusterInitialization) {
   runApplyPass();
 }
 
-TEST_F(FilterChainWriterTest, WriteIsActiveOnceEnvoyPostsTheFilterChainToTheWorkers) {
+TEST_F(FilterChainConfigWriterTest, WriteIsActiveOnceEnvoyPostsTheFilterChainToTheWorkers) {
   createInitializedWriter();
   const uint64_t update_id = write("writer.a");
   EXPECT_EQ(1, update_id);
@@ -263,7 +263,7 @@ TEST_F(FilterChainWriterTest, WriteIsActiveOnceEnvoyPostsTheFilterChainToTheWork
   EXPECT_EQ(0, gauge("updates_pending"));
 }
 
-TEST_F(FilterChainWriterTest, ChangesOfOtherFilterChainsAndListenersAreIgnored) {
+TEST_F(FilterChainConfigWriterTest, ChangesOfOtherFilterChainsAndListenersAreIgnored) {
   createInitializedWriter();
   const uint64_t update_id = write("writer.a");
   EXPECT_CALL(listener_manager_, addOrUpdateFilterChain(_)).WillOnce(Return(true));
@@ -278,7 +278,7 @@ TEST_F(FilterChainWriterTest, ChangesOfOtherFilterChainsAndListenersAreIgnored) 
   EXPECT_THAT(deliveredOutcomes(), testing::ElementsAre(IsOutcome(update_id, Active)));
 }
 
-TEST_F(FilterChainWriterTest, UnchangedWriteIsActive) {
+TEST_F(FilterChainConfigWriterTest, UnchangedWriteIsActive) {
   createInitializedWriter();
   const uint64_t update_id = write("writer.a");
   EXPECT_CALL(listener_manager_, addOrUpdateFilterChain(_)).WillOnce(Return(false));
@@ -286,7 +286,7 @@ TEST_F(FilterChainWriterTest, UnchangedWriteIsActive) {
   EXPECT_THAT(deliveredOutcomes(), testing::ElementsAre(IsOutcome(update_id, Active)));
 }
 
-TEST_F(FilterChainWriterTest, UnchangedWriteSupersedesTheWarmingWrite) {
+TEST_F(FilterChainConfigWriterTest, UnchangedWriteSupersedesTheWarmingWrite) {
   createInitializedWriter();
   const uint64_t first_update_id = write("writer.a");
   EXPECT_CALL(listener_manager_, addOrUpdateFilterChain(_))
@@ -302,7 +302,7 @@ TEST_F(FilterChainWriterTest, UnchangedWriteSupersedesTheWarmingWrite) {
   EXPECT_EQ(0, gauge("updates_pending"));
 }
 
-TEST_F(FilterChainWriterTest, WarmingWriteIsSupersededByTheNextWrite) {
+TEST_F(FilterChainConfigWriterTest, WarmingWriteIsSupersededByTheNextWrite) {
   createInitializedWriter();
   const uint64_t first_update_id = write("writer.a");
   EXPECT_CALL(listener_manager_, addOrUpdateFilterChain(_)).WillRepeatedly(Return(true));
@@ -317,7 +317,7 @@ TEST_F(FilterChainWriterTest, WarmingWriteIsSupersededByTheNextWrite) {
 
 // The listener manager publishes the warming version before it applies the next one, so the next
 // write keeps warming.
-TEST_F(FilterChainWriterTest, PublishOfTheWarmingWriteInsideTheNextWriteCompletesIt) {
+TEST_F(FilterChainConfigWriterTest, PublishOfTheWarmingWriteInsideTheNextWriteCompletesIt) {
   createInitializedWriter();
   const uint64_t first_update_id = write("writer.a");
   EXPECT_CALL(listener_manager_, addOrUpdateFilterChain(_))
@@ -337,7 +337,7 @@ TEST_F(FilterChainWriterTest, PublishOfTheWarmingWriteInsideTheNextWriteComplete
 
 // The listener manager publishes the warming version before it finds the next write identical, so
 // both writes are active.
-TEST_F(FilterChainWriterTest, PublishOfTheWarmingWriteInsideAnUnchangedWriteCompletesBoth) {
+TEST_F(FilterChainConfigWriterTest, PublishOfTheWarmingWriteInsideAnUnchangedWriteCompletesBoth) {
   createInitializedWriter();
   const uint64_t first_update_id = write("writer.a");
   EXPECT_CALL(listener_manager_, addOrUpdateFilterChain(_))
@@ -354,7 +354,7 @@ TEST_F(FilterChainWriterTest, PublishOfTheWarmingWriteInsideAnUnchangedWriteComp
   EXPECT_EQ(0, gauge("updates_pending"));
 }
 
-TEST_F(FilterChainWriterTest, InvalidWritesFail) {
+TEST_F(FilterChainConfigWriterTest, InvalidWritesFail) {
   createInitializedWriter();
   EXPECT_CALL(listener_manager_, addOrUpdateFilterChain(_)).Times(0);
   uint64_t update_id = 0;
@@ -382,7 +382,7 @@ TEST_F(FilterChainWriterTest, InvalidWritesFail) {
   EXPECT_EQ(RemovalNotFound, writer_->removeFilterChain("writer.a"));
 }
 
-TEST_F(FilterChainWriterTest, WriteFailsWhenTheListenerManagerRejectsIt) {
+TEST_F(FilterChainConfigWriterTest, WriteFailsWhenTheListenerManagerRejectsIt) {
   createInitializedWriter();
   const uint64_t first_update_id = write("writer.a");
   const uint64_t second_update_id = write("writer.b");
@@ -404,7 +404,7 @@ TEST_F(FilterChainWriterTest, WriteFailsWhenTheListenerManagerRejectsIt) {
   EXPECT_EQ(RemovalNotFound, writer_->removeFilterChain("writer.a"));
 }
 
-TEST_F(FilterChainWriterTest, RejectedWriteKeepsTheWarmingWrite) {
+TEST_F(FilterChainConfigWriterTest, RejectedWriteKeepsTheWarmingWrite) {
   createInitializedWriter();
   const uint64_t first_update_id = write("writer.a");
   EXPECT_CALL(listener_manager_, addOrUpdateFilterChain(_))
@@ -419,7 +419,7 @@ TEST_F(FilterChainWriterTest, RejectedWriteKeepsTheWarmingWrite) {
   EXPECT_THAT(deliveredOutcomes(), testing::ElementsAre(IsOutcome(first_update_id, Active)));
 }
 
-TEST_F(FilterChainWriterTest, RemovesAnOwnedFilterChain) {
+TEST_F(FilterChainConfigWriterTest, RemovesAnOwnedFilterChain) {
   createInitializedWriter();
   write("writer.a");
   EXPECT_CALL(listener_manager_, addOrUpdateFilterChain(_)).WillOnce(Return(false));
@@ -433,7 +433,7 @@ TEST_F(FilterChainWriterTest, RemovesAnOwnedFilterChain) {
   EXPECT_EQ(RemovalNotFound, writer_->removeFilterChain("writer.a"));
 }
 
-TEST_F(FilterChainWriterTest, RemovalCompletesTheWarmingWrite) {
+TEST_F(FilterChainConfigWriterTest, RemovalCompletesTheWarmingWrite) {
   createInitializedWriter();
   const uint64_t update_id = write("writer.a");
   EXPECT_CALL(listener_manager_, addOrUpdateFilterChain(_)).WillOnce(Return(true));
@@ -445,7 +445,7 @@ TEST_F(FilterChainWriterTest, RemovalCompletesTheWarmingWrite) {
   EXPECT_EQ(1, counter("update_removed"));
 }
 
-TEST_F(FilterChainWriterTest, RemovalDuringAFailedFirstApplyRemovesNothing) {
+TEST_F(FilterChainConfigWriterTest, RemovalDuringAFailedFirstApplyRemovesNothing) {
   createInitializedWriter();
   const uint64_t update_id = write("writer.a");
   EXPECT_CALL(listener_manager_, addOrUpdateFilterChain(_))
@@ -460,9 +460,9 @@ TEST_F(FilterChainWriterTest, RemovalDuringAFailedFirstApplyRemovesNothing) {
   EXPECT_EQ(RemovalNotFound, writer_->removeFilterChain("writer.a"));
 }
 
-// Like FCDS updates, the apply passes of the filter chain writer hold back no xDS requests. The
-// writer has no ownership statistics.
-TEST_F(FilterChainWriterTest, HoldsBackNoXdsRequestsAndHasNoOwnershipStatistics) {
+// Like FCDS updates, the apply passes of the filter chain config writer hold back no xDS requests.
+// The writer has no ownership statistics.
+TEST_F(FilterChainConfigWriterTest, HoldsBackNoXdsRequestsAndHasNoOwnershipStatistics) {
   createInitializedWriter();
   write("writer.a");
   EXPECT_CALL(context_.xds_manager_, pause(testing::A<const std::vector<std::string>&>())).Times(0);
@@ -471,16 +471,17 @@ TEST_F(FilterChainWriterTest, HoldsBackNoXdsRequestsAndHasNoOwnershipStatistics)
   EXPECT_NE(nullptr,
             TestUtility::findCounter(
                 context_.store_,
-                "dynamic_modules.filter_chain_writer.update_submitted.config_name.writer"));
+                "dynamic_modules.filter_chain_config_writer.update_submitted.config_name.writer"));
   for (absl::string_view name : {"update_ownership_lost", "ownership_lost"}) {
     SCOPED_TRACE(name);
-    EXPECT_EQ(nullptr, TestUtility::findCounter(context_.store_,
-                                                absl::StrCat("dynamic_modules.filter_chain_writer.",
-                                                             name, ".config_name.writer")));
+    EXPECT_EQ(nullptr,
+              TestUtility::findCounter(context_.store_,
+                                       absl::StrCat("dynamic_modules.filter_chain_config_writer.",
+                                                    name, ".config_name.writer")));
   }
 }
 
-TEST_F(FilterChainWriterTest, RemovalDuringTheFirstApplyRemovesTheFilterChain) {
+TEST_F(FilterChainConfigWriterTest, RemovalDuringTheFirstApplyRemovesTheFilterChain) {
   createInitializedWriter();
   const uint64_t first_update_id = write("writer.a");
   uint64_t second_update_id = 0;

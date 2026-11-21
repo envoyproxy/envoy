@@ -364,11 +364,11 @@ void envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done(
              error_details);
 }
 
-void envoy_dynamic_module_on_bootstrap_extension_filter_chain_writer_update_done(
+void envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
     uint64_t update_id, envoy_dynamic_module_type_envoy_buffer filter_chain_name,
-    envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status status,
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status status,
     envoy_dynamic_module_type_envoy_buffer error_details) {
   (void)extension_config_envoy_ptr;
   (void)extension_config_module_ptr;

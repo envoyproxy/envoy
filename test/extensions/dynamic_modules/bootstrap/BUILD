@@ -124,12 +124,12 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "filter_chain_writer_test",
-    srcs = ["filter_chain_writer_test.cc"],
+    name = "filter_chain_config_writer_test",
+    srcs = ["filter_chain_config_writer_test.cc"],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     deps = [
         "//source/common/stats:utility_lib",
-        "//source/extensions/bootstrap/dynamic_modules:filter_chain_writer_lib",
+        "//source/extensions/bootstrap/dynamic_modules:filter_chain_config_writer_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/network:network_mocks",

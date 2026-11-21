@@ -1,4 +1,4 @@
-//! Test module for the bootstrap extension listener and filter chain writers.
+//! Test module for the bootstrap extension listener and filter chain config writers.
 //!
 //! The integration test drives this module through the `/writer?<action>=<argument>` admin
 //! endpoint. The module enables both writers in config_new, and a write takes the serialized
@@ -29,7 +29,7 @@ fn my_new_bootstrap_extension_config_fn(
     .unwrap();
   envoy_extension_config.register_admin_handler("/writer", "Writer test endpoint.", false, false);
   envoy_extension_config.enable_listener_writer();
-  envoy_extension_config.enable_filter_chain_writer();
+  envoy_extension_config.enable_filter_chain_config_writer();
   if config.is_empty() {
     envoy_extension_config.signal_init_complete();
   } else {
@@ -93,12 +93,12 @@ impl BootstrapExtensionConfig for WriterTestConfig {
       ),
       "add_filter_chain" => {
         let (result, update_id) =
-          envoy_extension_config.filter_chain_writer_add_or_update(argument, body);
+          envoy_extension_config.filter_chain_config_writer_add_or_update(argument, body);
         format!("{result:?} {update_id}")
       },
       "remove_filter_chain" => format!(
         "{:?}",
-        envoy_extension_config.filter_chain_writer_remove(argument)
+        envoy_extension_config.filter_chain_config_writer_remove(argument)
       ),
       "run_on_all_workers" => format!(
         "{}",
@@ -136,12 +136,12 @@ impl BootstrapExtensionConfig for WriterTestConfig {
       .unwrap();
   }
 
-  fn on_filter_chain_writer_update_done(
+  fn on_filter_chain_config_writer_update_done(
     &self,
     envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
     update_id: u64,
     filter_chain_name: &str,
-    status: abi::envoy_dynamic_module_type_bootstrap_filter_chain_writer_update_status,
+    status: abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status,
     error_details: &str,
   ) {
     self.outcomes.lock().unwrap().push(format!(

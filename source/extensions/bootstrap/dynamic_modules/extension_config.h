@@ -20,7 +20,7 @@
 #include "source/extensions/bootstrap/dynamic_modules/cluster_writer.h"
 #include "source/extensions/bootstrap/dynamic_modules/config_snapshot.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension_config_subscription.h"
-#include "source/extensions/bootstrap/dynamic_modules/filter_chain_writer.h"
+#include "source/extensions/bootstrap/dynamic_modules/filter_chain_config_writer.h"
 #include "source/extensions/bootstrap/dynamic_modules/listener_writer.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
@@ -77,8 +77,8 @@ using OnBootstrapExtensionClusterWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done);
 using OnBootstrapExtensionListenerWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done);
-using OnBootstrapExtensionFilterChainWriterUpdateDoneType =
-    decltype(&envoy_dynamic_module_on_bootstrap_extension_filter_chain_writer_update_done);
+using OnBootstrapExtensionFilterChainConfigWriterUpdateDoneType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done);
 using OnBootstrapExtensionEcdsUpdateType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_ecds_update);
 using OnBootstrapExtensionRuntimeBoolUpdateType =
@@ -199,8 +199,8 @@ public:
     if (listener_writer_ != nullptr) {
       listener_writer_->onServerInitialized(listener_manager);
     }
-    if (filter_chain_writer_ != nullptr) {
-      filter_chain_writer_->onServerInitialized(listener_manager);
+    if (filter_chain_config_writer_ != nullptr) {
+      filter_chain_config_writer_->onServerInitialized(listener_manager);
     }
   }
 
@@ -264,11 +264,11 @@ public:
   bool enableListenerWriter();
 
   /**
-   * Creates the filter chain writer, which lets the module add, update and remove filter chains.
-   * Must be called on the main thread.
-   * @return false if the filter chain writer already exists or shutdown began.
+   * Creates the filter chain config writer, which lets the module add, update and remove filter
+   * chains. Must be called on the main thread.
+   * @return false if the filter chain config writer already exists or shutdown began.
    */
-  bool enableFilterChainWriter();
+  bool enableFilterChainConfigWriter();
 
   /**
    * Called on the main thread once Envoy finished initializing, right before it starts its
@@ -333,8 +333,8 @@ public:
       on_bootstrap_extension_cluster_writer_update_done_ = nullptr;
   OnBootstrapExtensionListenerWriterUpdateDoneType
       on_bootstrap_extension_listener_writer_update_done_ = nullptr;
-  OnBootstrapExtensionFilterChainWriterUpdateDoneType
-      on_bootstrap_extension_filter_chain_writer_update_done_ = nullptr;
+  OnBootstrapExtensionFilterChainConfigWriterUpdateDoneType
+      on_bootstrap_extension_filter_chain_config_writer_update_done_ = nullptr;
   OnBootstrapExtensionRuntimeBoolUpdateType on_bootstrap_extension_runtime_bool_update_ = nullptr;
   OnBootstrapExtensionRuntimeIntUpdateType on_bootstrap_extension_runtime_int_update_ = nullptr;
   OnBootstrapExtensionRuntimeNumberUpdateType on_bootstrap_extension_runtime_number_update_ =
@@ -389,8 +389,8 @@ public:
   DynamicModuleClusterWriterPtr cluster_writer_;
   // The listener writer, or nullptr until the module enables it.
   DynamicModuleListenerWriterPtr listener_writer_;
-  // The filter chain writer, or nullptr until the module enables it.
-  DynamicModuleFilterChainWriterPtr filter_chain_writer_;
+  // The filter chain config writer, or nullptr until the module enables it.
+  DynamicModuleFilterChainConfigWriterPtr filter_chain_config_writer_;
 
 private:
   /**
