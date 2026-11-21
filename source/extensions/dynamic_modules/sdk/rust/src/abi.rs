@@ -21646,3 +21646,318 @@ unsafe extern "C" {
         scheduler_module_ptr: envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr,
     );
 }
+/** envoy_dynamic_module_type_ai_filter_config_envoy_ptr is a raw pointer to the
+ DynamicModuleAiFilterConfig class in Envoy. This is passed to the module when creating a new
+ in-module AI filter configuration. No callback takes it today; it is passed so that
+ configuration-scoped callbacks may be added without changing the hook.
+
+ This has 1:1 correspondence with envoy_dynamic_module_type_ai_filter_config_module_ptr in the
+ module.
+
+ OWNERSHIP: Envoy owns the pointer.*/
+pub type envoy_dynamic_module_type_ai_filter_config_envoy_ptr = *mut ::std::os::raw::c_void;
+/** envoy_dynamic_module_type_ai_filter_config_module_ptr is a pointer to an in-module AI filter
+ configuration created by envoy_dynamic_module_on_ai_filter_config_new. It is created on the main
+ thread and shared by every stream on every worker thread, so it is used concurrently and must be
+ treated as read-only after creation.
+
+ OWNERSHIP: The module is responsible for managing the lifetime of the pointer. It can be
+ released when envoy_dynamic_module_on_ai_filter_config_destroy is called for the same pointer.*/
+pub type envoy_dynamic_module_type_ai_filter_config_module_ptr = *const ::std::os::raw::c_void;
+/** envoy_dynamic_module_type_ai_filter_envoy_ptr is a raw pointer to the DynamicModuleAiFilter
+ class in Envoy, the AI filter of a single stream. It is passed to every per-stream hook and to
+ every AI filter callback.
+
+ This has 1:1 correspondence with envoy_dynamic_module_type_ai_filter_module_ptr in the module.
+
+ OWNERSHIP: Envoy owns the pointer. Callbacks may only be called with it from within
+ envoy_dynamic_module_on_ai_filter_new and envoy_dynamic_module_on_ai_filter_request, on the
+ thread running the hook: the request headers and the stream state the callbacks reach are only
+ guaranteed to exist for the duration of those hooks, and the callbacks fail outside them.*/
+pub type envoy_dynamic_module_type_ai_filter_envoy_ptr = *mut ::std::os::raw::c_void;
+/** envoy_dynamic_module_type_ai_filter_module_ptr is a pointer to an in-module AI filter created by
+ envoy_dynamic_module_on_ai_filter_new. One is created per stream, and every hook taking it is
+ called by the worker thread running that stream, so it may hold mutable state without
+ synchronization.
+
+ OWNERSHIP: The module is responsible for managing the lifetime of the pointer. It can be
+ released when envoy_dynamic_module_on_ai_filter_destroy is called for the same pointer.*/
+pub type envoy_dynamic_module_type_ai_filter_module_ptr = *const ::std::os::raw::c_void;
+#[repr(u32)]
+/** envoy_dynamic_module_type_on_ai_filter_new_status is returned by
+ envoy_dynamic_module_on_ai_filter_new.*/
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum envoy_dynamic_module_type_on_ai_filter_new_status {
+    Created = 0,
+    Skip = 1,
+    Error = 2,
+}
+#[repr(u32)]
+/** envoy_dynamic_module_type_on_ai_filter_request_status is returned by
+ envoy_dynamic_module_on_ai_filter_request.*/
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum envoy_dynamic_module_type_on_ai_filter_request_status {
+    Continue = 0,
+    Error = 1,
+}
+#[repr(u32)]
+/** envoy_dynamic_module_type_ai_filter_json_result is returned by the callbacks that access the
+ request payload by JSON pointer.*/
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum envoy_dynamic_module_type_ai_filter_json_result {
+    Ok = 0,
+    NotFound = 1,
+    InvalidArgument = 2,
+    Offloaded = 3,
+    Unavailable = 4,
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_on_ai_filter_config_new is called on the main thread when an AI filter
+ referencing a dynamic module is configured.
+
+ @param config_envoy_ptr is the pointer to the DynamicModuleAiFilterConfig object.
+ @param name is the filter name used to select an implementation within the module. It is owned
+ by Envoy and is only valid for the duration of this call.
+ @param config is the configuration bytes for the filter. It is owned by Envoy and is only valid
+ for the duration of this call.
+ @return envoy_dynamic_module_type_ai_filter_config_module_ptr is the pointer to the in-module AI
+ filter configuration. Returning nullptr causes Envoy to reject the configuration.*/
+    pub fn envoy_dynamic_module_on_ai_filter_config_new(
+        config_envoy_ptr: envoy_dynamic_module_type_ai_filter_config_envoy_ptr,
+        name: envoy_dynamic_module_type_envoy_buffer,
+        config: envoy_dynamic_module_type_envoy_buffer,
+    ) -> envoy_dynamic_module_type_ai_filter_config_module_ptr;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_on_ai_filter_config_destroy is called on the main thread when the AI filter
+ configuration is destroyed. Every AI filter created from it has already been destroyed.
+
+ @param config_module_ptr is the pointer to the in-module AI filter configuration.*/
+    pub fn envoy_dynamic_module_on_ai_filter_config_destroy(
+        config_module_ptr: envoy_dynamic_module_type_ai_filter_config_module_ptr,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_on_ai_filter_new is called on a worker thread to create the AI filter of a
+ stream, before its request is handed to the AI filters. It is called concurrently against the
+ one shared configuration.
+
+ The request headers and filter state callbacks may be called from this hook, so a module can
+ decide from them whether to filter the stream at all.
+
+ @param config_module_ptr is the pointer to the in-module AI filter configuration.
+ @param filter_envoy_ptr is the pointer to the DynamicModuleAiFilter object of the stream.
+ @param filter_module_ptr_out is where the module stores the pointer to the in-module AI filter
+ when it returns Created. It is nullptr on entry.
+ @return envoy_dynamic_module_type_on_ai_filter_new_status is whether the module created the
+ filter, skips the stream, or failed. Created without a filter, Error, and any other value fail
+ the request.*/
+    pub fn envoy_dynamic_module_on_ai_filter_new(
+        config_module_ptr: envoy_dynamic_module_type_ai_filter_config_module_ptr,
+        filter_envoy_ptr: envoy_dynamic_module_type_ai_filter_envoy_ptr,
+        filter_module_ptr_out: *mut envoy_dynamic_module_type_ai_filter_module_ptr,
+    ) -> envoy_dynamic_module_type_on_ai_filter_new_status;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_on_ai_filter_destroy is called on the worker thread of the stream when its
+ AI filter is destroyed. No callback may be called from it.
+
+ @param filter_module_ptr is the pointer to the in-module AI filter.*/
+    pub fn envoy_dynamic_module_on_ai_filter_destroy(
+        filter_module_ptr: envoy_dynamic_module_type_ai_filter_module_ptr,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_on_ai_filter_request is called once per stream when the parsed request
+ reaches the AI filter. The request payload, request headers and filter state callbacks may be
+ called from it.
+
+ To reject the request, the module calls envoy_dynamic_module_callback_ai_filter_send_local_reply
+ and returns; the return value is then ignored.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleAiFilter object of the stream.
+ @param filter_module_ptr is the pointer to the in-module AI filter.
+ @return envoy_dynamic_module_type_on_ai_filter_request_status is the status of the request.*/
+    pub fn envoy_dynamic_module_on_ai_filter_request(
+        filter_envoy_ptr: envoy_dynamic_module_type_ai_filter_envoy_ptr,
+        filter_module_ptr: envoy_dynamic_module_type_ai_filter_module_ptr,
+    ) -> envoy_dynamic_module_type_on_ai_filter_request_status;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_ai_filter_get_request_json is called by the module to read the
+ value a JSON pointer names in the request payload, serialized as JSON.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleAiFilter object of the stream.
+ @param json_pointer is the JSON pointer naming the value.
+ @param result is where Envoy stores the serialized value, e.g. "\"gpt-4o\"" for a string. The
+ buffer is owned by Envoy and is valid until the next call to this callback on the same filter or
+ until the hook returns.
+ @return envoy_dynamic_module_type_ai_filter_json_result is Ok when result was populated.*/
+    pub fn envoy_dynamic_module_callback_ai_filter_get_request_json(
+        filter_envoy_ptr: envoy_dynamic_module_type_ai_filter_envoy_ptr,
+        json_pointer: envoy_dynamic_module_type_module_buffer,
+        result: *mut envoy_dynamic_module_type_envoy_buffer,
+    ) -> envoy_dynamic_module_type_ai_filter_json_result;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_ai_filter_set_request_json is called by the module to write a
+ value at the location a JSON pointer names in the request payload. It replaces an existing value,
+ adds a member to an object, or appends to an array when the last reference token is "-". The
+ empty pointer replaces the whole document, which must stay a JSON object.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleAiFilter object of the stream.
+ @param json_pointer is the JSON pointer naming the location.
+ @param value is the value to write, as JSON text. It is owned by the module and only read during
+ this call.
+ @return envoy_dynamic_module_type_ai_filter_json_result is Ok when the value was written.*/
+    pub fn envoy_dynamic_module_callback_ai_filter_set_request_json(
+        filter_envoy_ptr: envoy_dynamic_module_type_ai_filter_envoy_ptr,
+        json_pointer: envoy_dynamic_module_type_module_buffer,
+        value: envoy_dynamic_module_type_module_buffer,
+    ) -> envoy_dynamic_module_type_ai_filter_json_result;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_ai_filter_remove_request_json is called by the module to remove
+ the object member or array element a JSON pointer names in the request payload. Later elements
+ of an array shift down by one.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleAiFilter object of the stream.
+ @param json_pointer is the JSON pointer naming the member or element. The empty pointer is
+ rejected, since the document root cannot be removed.
+ @return envoy_dynamic_module_type_ai_filter_json_result is Ok when the value was removed.*/
+    pub fn envoy_dynamic_module_callback_ai_filter_remove_request_json(
+        filter_envoy_ptr: envoy_dynamic_module_type_ai_filter_envoy_ptr,
+        json_pointer: envoy_dynamic_module_type_module_buffer,
+    ) -> envoy_dynamic_module_type_ai_filter_json_result;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_ai_filter_get_request_protocol is called by the module to read the
+ wire API of the request payload: the one the request declares, or the one an earlier AI filter
+ identified.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleAiFilter object of the stream.
+ @param result is where Envoy stores the envoy.type.ai.v3.LLMProtocol value name, e.g.
+ "OPENAI_CHAT_COMPLETIONS". The buffer is owned by Envoy and is valid for the lifetime of the
+ process.
+ @return true if result was populated, false when called outside
+ envoy_dynamic_module_on_ai_filter_request or when the wire API is not known.*/
+    pub fn envoy_dynamic_module_callback_ai_filter_get_request_protocol(
+        filter_envoy_ptr: envoy_dynamic_module_type_ai_filter_envoy_ptr,
+        result: *mut envoy_dynamic_module_type_envoy_buffer,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_ai_filter_get_request_header_value is called by the module to get
+ a value of the request header with the given key.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleAiFilter object of the stream.
+ @param key is the key of the header.
+ @param result is where Envoy stores the value. The buffer is owned by Envoy and is invalidated
+ by the request header setter callbacks below.
+ @param index is the index of the value when the header has several, zero for the first.
+ @param total_count_out, when non-null, receives the number of values for the key.
+ @return true if the header exists at the given index, false otherwise.*/
+    pub fn envoy_dynamic_module_callback_ai_filter_get_request_header_value(
+        filter_envoy_ptr: envoy_dynamic_module_type_ai_filter_envoy_ptr,
+        key: envoy_dynamic_module_type_module_buffer,
+        result: *mut envoy_dynamic_module_type_envoy_buffer,
+        index: usize,
+        total_count_out: *mut usize,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_ai_filter_set_request_header is called by the module to set the
+ request header with the given key, replacing any existing values.
+
+ Changing a header the route was selected on does not select another route.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleAiFilter object of the stream.
+ @param key is the key of the header. A key that is not a valid header name, such as an empty
+ one, is rejected.
+ @param value is the value of the header. A value holding a CR, LF or NUL is rejected, so a value
+ copied from the request payload cannot end the header and start another.
+ @return true if the header was set, false otherwise.*/
+    pub fn envoy_dynamic_module_callback_ai_filter_set_request_header(
+        filter_envoy_ptr: envoy_dynamic_module_type_ai_filter_envoy_ptr,
+        key: envoy_dynamic_module_type_module_buffer,
+        value: envoy_dynamic_module_type_module_buffer,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_ai_filter_remove_request_header is called by the module to remove
+ every value of the request header with the given key.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleAiFilter object of the stream.
+ @param key is the key of the header. A key that is not a valid header name, such as an empty
+ one, is rejected.
+ @return true if the operation succeeded, including when the header did not exist.*/
+    pub fn envoy_dynamic_module_callback_ai_filter_remove_request_header(
+        filter_envoy_ptr: envoy_dynamic_module_type_ai_filter_envoy_ptr,
+        key: envoy_dynamic_module_type_module_buffer,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_ai_filter_get_filter_state_bytes is called by the module to get
+ the bytes value of the filter state object with the given key. Only objects stored as string
+ accessors, such as the ones envoy_dynamic_module_callback_ai_filter_set_filter_state_bytes
+ creates, are readable.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleAiFilter object of the stream.
+ @param key is the key of the filter state object.
+ @param result is where Envoy stores the value. The buffer is owned by Envoy and is valid until
+ the hook returns, unless the same key is set again.
+ @return true if the key holds a readable object, false otherwise.*/
+    pub fn envoy_dynamic_module_callback_ai_filter_get_filter_state_bytes(
+        filter_envoy_ptr: envoy_dynamic_module_type_ai_filter_envoy_ptr,
+        key: envoy_dynamic_module_type_module_buffer,
+        result: *mut envoy_dynamic_module_type_envoy_buffer,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_ai_filter_set_filter_state_bytes is called by the module to store
+ a bytes value as a filter state object with the given key, replacing an object stored with the
+ same key. The object lives as long as the filter chain.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleAiFilter object of the stream.
+ @param key is the key of the filter state object. An empty key is rejected.
+ @param value is the bytes value to store.
+ @return true if the value was stored, false otherwise.*/
+    pub fn envoy_dynamic_module_callback_ai_filter_set_filter_state_bytes(
+        filter_envoy_ptr: envoy_dynamic_module_type_ai_filter_envoy_ptr,
+        key: envoy_dynamic_module_type_module_buffer,
+        value: envoy_dynamic_module_type_module_buffer,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_ai_filter_send_local_reply is called by the module to reject the
+ request with a local reply. The module should return from
+ envoy_dynamic_module_on_ai_filter_request right after; no later AI filter runs and the request
+ does not reach the upstream.
+
+ @param filter_envoy_ptr is the pointer to the DynamicModuleAiFilter object of the stream.
+ @param status_code is the HTTP status code of the reply, between 200 and 599.
+ @param body is the body of the reply. It is owned by the module and copied during this call.
+ @return true if the reply was sent. false when called outside
+ envoy_dynamic_module_on_ai_filter_request, when a reply was already sent, or when status_code is
+ out of range.*/
+    pub fn envoy_dynamic_module_callback_ai_filter_send_local_reply(
+        filter_envoy_ptr: envoy_dynamic_module_type_ai_filter_envoy_ptr,
+        status_code: u32,
+        body: envoy_dynamic_module_type_module_buffer,
+    ) -> bool;
+}

@@ -278,6 +278,7 @@ proto_library(
         "//envoy/extensions/health_checkers/redis/v3:pkg",
         "//envoy/extensions/health_checkers/thrift/v3:pkg",
         "//envoy/extensions/health_checkers/udp/v3:pkg",
+        "//envoy/extensions/http/ai_filters/dynamic_modules/v3:pkg",
         "//envoy/extensions/http/ai_filters/model_router/v3:pkg",
         "//envoy/extensions/http/ai_filters/request_info/v3:pkg",
         "//envoy/extensions/http/ai_filters/route_selector/v3:pkg",
