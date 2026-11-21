@@ -163,7 +163,13 @@ public:
     TestUtility::loadFromYaml(on_demand_config, on_demand);
 
     // Configure config source
-    setConfigSource(on_demand.mutable_config_source());
+    if (sds_path_.empty()) {
+      setConfigSource(on_demand.mutable_config_source());
+    } else {
+      on_demand.mutable_config_source()->set_resource_api_version(
+          envoy::config::core::v3::ApiVersion::V3);
+      on_demand.mutable_config_source()->mutable_path_config_source()->set_path(sds_path_);
+    }
     common_tls_context.mutable_custom_tls_certificate_selector()->set_name("on-demand-config");
     std::ignore = common_tls_context.mutable_custom_tls_certificate_selector()
                       ->mutable_typed_config()
@@ -207,6 +213,8 @@ protected:
   bool mtls_{false};
   bool validation_sds_{false};
   std::string filter_state_value_;
+  // When set, the selector subscribes to secrets from this file instead of over gRPC.
+  std::string sds_path_;
   // Certificate-level TLS parameters to attach to every certificate secret sent over SDS.
   std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters> cert_tls_params_;
 
@@ -413,6 +421,22 @@ TEST_P(OnDemandIntegrationTest, BasicFail) {
   waitSendSdsResponse("server", "", true);
   conn->waitForDisconnect();
   test_server_->waitForGauge(onDemandStat("cert_active"), Eq(0));
+}
+
+// A secret whose subscription can't be created, here because the file of a path config source
+// doesn't exist, fails the connections that need it instead of terminating Envoy.
+TEST_P(OnDemandIntegrationTest, SubscriptionCreationFailure) {
+  sds_path_ = TestEnvironment::temporaryPath("on_demand_missing_sds.yaml");
+  setup();
+  for (int i = 0; i < 2; i++) {
+    auto conn = createClientConnection();
+    if (upstream_selector_) {
+      conn->waitForUpstreamConnection();
+    }
+    conn->waitForDisconnect();
+  }
+  EXPECT_EQ(0, test_server_->counter(onDemandStat("cert_requested"))->value());
+  EXPECT_EQ(0, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
 TEST_P(OnDemandIntegrationTest, TwoPendingConnections) {
