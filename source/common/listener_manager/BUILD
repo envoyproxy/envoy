@@ -161,6 +161,7 @@ envoy_cc_library(
         "//source/server:factory_context_lib",
         "//source/server:generic_factory_context_lib",
         "//source/server:transport_socket_config_lib",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",

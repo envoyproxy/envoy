@@ -250,6 +250,32 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
   }
 }
 
+// Measures an in place update that keeps every filter chain.
+BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateTest)
+(::benchmark::State& state) {
+  if (benchmark::skipExpensiveBenchmarks() && state.range(0) > 64) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
+  initialize(state);
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses;
+  addresses.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+  FilterChainManagerImpl origin_filter_chain_manager{addresses, factory_context, init_manager_};
+  THROW_IF_NOT_OK(origin_filter_chain_manager.addFilterChains(
+      nullptr, filter_chains_, nullptr, dummy_builder_, origin_filter_chain_manager, nullptr,
+      empty_config_source_, dummy_fcds_callbacks_));
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_,
+                                                origin_filter_chain_manager};
+    THROW_IF_NOT_OK(filter_chain_manager.addFilterChains(
+        nullptr, filter_chains_, nullptr, dummy_builder_, filter_chain_manager, nullptr,
+        empty_config_source_, dummy_fcds_callbacks_));
+  }
+}
+
 BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
 (::benchmark::State& state) {
   if (benchmark::skipExpensiveBenchmarks() && state.range(0) > 64) {
@@ -281,6 +307,12 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
   }
 }
 BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
+    ->Ranges({
+        // scale of the chains
+        {1, 4096},
+    })
+    ->Unit(::benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateTest)
     ->Ranges({
         // scale of the chains
         {1, 4096},
