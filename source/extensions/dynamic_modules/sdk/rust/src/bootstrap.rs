@@ -528,6 +528,7 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// [`BootstrapExtension::on_server_initialized`]. Calls are idempotent. Disabling returns `true`.
   /// Enabling returns `false` before server initialization, after shutdown begins, or in
   /// `--mode init_only`. Calling off the main thread reports an Envoy bug and returns `false`.
+  /// Notifications stop when shutdown begins.
   fn set_xds_notifications(&self, enabled: bool) -> bool;
 
   /// Returns the names of the currently active resources of the given kind, each at most once. See
@@ -987,6 +988,11 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   /// Unsubscribed is posted once no watch on the stream still names the resource. It can arrive
   /// after later outcomes, such as the CDS Accepted that removed a cluster. Disabling notifications
   /// discards pending unsubscriptions, even if re-enabled before delivery.
+  ///
+  /// [`EnvoyBootstrapExtensionConfig::get_config_snapshot`] returns
+  /// [`ConfigSnapshotError::NotAllowed`] during Accepted and Rejected. Use
+  /// [`EnvoyBootstrapExtensionConfig::new_scheduler`] to defer it. Collection can succeed during
+  /// the posted Unsubscribed callback.
   ///
   /// Resource payloads are not included. Update metadata is borrowed for this call.
   fn on_xds_update(

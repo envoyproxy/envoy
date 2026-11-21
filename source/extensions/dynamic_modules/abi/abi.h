@@ -9567,6 +9567,7 @@ typedef enum envoy_dynamic_module_type_file_watcher_event {
 
 /**
  * The outcome of an xDS response, or a client-initiated unsubscribe.
+ * New outcomes require a new hook to preserve compatibility with existing modules.
  */
 typedef enum {
   envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted = 0,
@@ -10100,6 +10101,10 @@ void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
  * Unsubscribed is posted to the main dispatcher once no watch on the stream still names the
  * resource. It can arrive after later outcomes, such as the CDS Accepted that removed a cluster.
  * Disabling notifications discards pending unsubscriptions, even if re-enabled before delivery.
+ *
+ * Config snapshot collection returns NotAllowed during Accepted and Rejected. Defer collection
+ * with the bootstrap config scheduler. Collection can succeed during the posted Unsubscribed
+ * callback.
  *
  * Implementations must not block. Resource payloads are not included.
  * All buffers are borrowed for this call.

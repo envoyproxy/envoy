@@ -324,6 +324,8 @@ configuration.
   version, Gauge, Hash of the last successful subscription version
   version_text, TextReadout, Last successful subscription version
 
+.. _config_bootstrap_extensions_dynamic_modules_xds_notifications:
+
 xDS Notifications
 -----------------
 
@@ -340,6 +342,10 @@ message and may quote rejected configuration. They are empty for other outcomes.
 The hook runs on the main thread and must not block. Unsubscribed is posted to the dispatcher once
 no watch on the stream still names the resource, avoiding a call during cluster destruction. It
 can arrive after later outcomes, such as the CDS Accepted that removed a cluster.
+
+:ref:`Configuration snapshot <config_bootstrap_extensions_dynamic_modules_config_snapshots>`
+collection returns ``NotAllowed`` during Accepted and Rejected. Defer collection with the bootstrap
+config scheduler. Collection can succeed during the posted Unsubscribed callback.
 
 Disabling notifications discards queued unsubscriptions. Re-enabling does not replay them.
 Delivery stops when shutdown begins.
