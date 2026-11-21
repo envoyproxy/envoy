@@ -137,7 +137,15 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual bool canContinue() PURE;
   virtual Buffer::InstancePtr createBuffer() PURE;
   virtual Buffer::InstancePtr& bufferedData() PURE;
-  virtual bool observedEndStream() PURE;
+  // Whether the end of the stream has been observed, used for the end_stream flag when resuming
+  // iteration. With per-filter observed end stream enabled, this is whether the end-of-stream
+  // marker has reached this filter's position: an end-stream-carrying frame was either delivered
+  // to this filter or parked at this position while iteration is stopped. Otherwise it is the
+  // stream-level observed_[de|en]code_end_stream_ flag.
+  bool observedEndStream() const;
+  // Whether the filter manager has observed the end of the stream in this direction, no matter
+  // which filter positions the end-of-stream marker has reached.
+  virtual bool streamObservedEndStream() const PURE;
   virtual bool has1xxHeaders() PURE;
   virtual void do1xxHeaders() PURE;
   virtual void doHeaders(bool end_stream) PURE;
@@ -242,6 +250,12 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   bool end_stream_{};
   // If true, the filter has processed headers.
   bool processed_headers_{};
+  // True once the end-of-stream marker has reached this filter's position. Unlike end_stream_,
+  // which is set only when the terminal frame is actually delivered to the filter's callback,
+  // this is also set when that frame parks at this position without the filter being invoked.
+  // Frame deliveries latch this flag (|=) and never clear it; only the data injection APIs,
+  // which author the marker rather than record its arrival, may retract it.
+  bool observed_end_stream_{};
 };
 
 /**
@@ -259,7 +273,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
-  bool observedEndStream() override;
+  bool streamObservedEndStream() const override;
   bool has1xxHeaders() override { return false; }
   void do1xxHeaders() override { IS_ENVOY_BUG("unexpected 1xx headers"); }
   void doHeaders(bool end_stream) override;
@@ -351,7 +365,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
-  bool observedEndStream() override;
+  bool streamObservedEndStream() const override;
   bool has1xxHeaders() override;
   void do1xxHeaders() override;
   void doHeaders(bool end_stream) override;
@@ -709,6 +723,10 @@ public:
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
         proxy_100_continue_(proxy_100_continue),
+        per_filter_buffer_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.filter_manager_per_filter_buffer")),
+        inject_data_with_state_update_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.ext_proc_inject_data_with_state_update")),
         forward_held_trailers_(Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.filter_manager_forward_held_trailers")),
         buffer_limit_(buffer_limit) {}
@@ -732,6 +750,7 @@ public:
        << DUMP_MEMBER(state_.decoder_filter_chain_complete_)
        << DUMP_MEMBER(state_.encoder_filter_chain_complete_)
        << DUMP_MEMBER(state_.observed_decode_end_stream_)
+       << DUMP_MEMBER(state_.decoder_injection_pending_)
        << DUMP_MEMBER(state_.observed_encode_end_stream_) << "\n";
 
     DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
@@ -780,6 +799,11 @@ public:
    */
   void decodeData(Buffer::Instance& data, bool end_stream) {
     state_.observed_decode_end_stream_ = end_stream;
+    if (end_stream) {
+      // The client's end of stream overrides an earlier injection, as it does for the stream-level
+      // flag when that flag is rewritten by injection.
+      state_.decoder_injection_pending_ = false;
+    }
     decodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
   }
 
@@ -789,6 +813,8 @@ public:
    */
   void decodeTrailers(RequestTrailerMap& trailers) {
     state_.observed_decode_end_stream_ = true;
+    // See decodeData() above.
+    state_.decoder_injection_pending_ = false;
     decodeTrailers(nullptr, trailers);
   }
 
@@ -880,6 +906,27 @@ public:
    * Whether remote processing has been marked as complete.
    */
   virtual bool decoderObservedEndStream() const { return state_.observed_decode_end_stream_; }
+
+  /**
+   * Whether a decoder filter is expected to inject more request data. The last writer wins, as
+   * for the stream-level end-of-stream flag when it is rewritten by injection: a request data
+   * injection sets this to the inverse of its end_stream, and the client's end of stream (last
+   * data or trailers) clears it. Cases not handled:
+   * - More than one filter injecting: an earlier filter injecting end_stream clears this while a
+   *   later injecting filter may still hold the body.
+   * - The client's end of stream arriving while a filter still holds data to inject clears this
+   *   early.
+   * - A filter that stops injecting without ever injecting end_stream (e.g. it gives up and
+   *   continues decoding instead), or a request with trailers (e.g. ext_proc in STREAMED mode
+   *   injects every chunk without end_stream and forwards the trailers afterwards), when the
+   *   client's end of stream arrived before the last injection. This stays true for the rest of
+   *   the stream.
+   * TODO(wbpcode): handle these cases. They are not introduced by
+   * envoy.reloadable_features.filter_manager_per_filter_buffer: with it disabled and
+   * envoy.reloadable_features.ext_proc_inject_data_with_state_update enabled, the stream-level
+   * end-of-stream flag ends up in the same state in each of them.
+   */
+  bool decoderInjectionPending() const { return state_.decoder_injection_pending_; }
 
   /**
    * Instructs the FilterManager to not create a filter chain. This makes it possible to issue
@@ -978,6 +1025,10 @@ protected:
     // client) before iteration of the decoder filter chain begins. This flag is used for setting
     // end_stream value when resuming decoder filter chain iteration.
     bool observed_decode_end_stream_{};
+    // Set to the inverse of end_stream by a request data injection and cleared by the client's end
+    // of stream. Only set with per-filter buffer, where injection leaves
+    // observed_decode_end_stream_ untouched.
+    bool decoder_injection_pending_{};
     // Set `true` when the filter manager observes end stream on the encoder path (from upstream
     // server or Envoy's local reply) before iteration of the encoder filter chain begins. This flag
     // is used for setting end_stream value when resuming encoder filter chain iteration.
@@ -1164,7 +1215,7 @@ private:
   // filter_streaming is the variable to indicate if stream is streaming, and its value may be
   // changed by the function.
   bool handleDataIfStopAll(ActiveStreamFilterBase& filter, Buffer::Instance& data,
-                           bool& filter_streaming);
+                           bool& filter_streaming, bool end_stream);
 
   MetadataMapVector* getRequestMetadataMapVector() {
     if (request_metadata_map_vector_ == nullptr) {
@@ -1192,6 +1243,10 @@ private:
   const uint64_t stream_id_;
   Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
+  // Runtime flags latched when the filter manager is created, so the end_stream handling stays
+  // consistent for the lifetime of the stream.
+  const bool per_filter_buffer_;
+  const bool inject_data_with_state_update_;
   // Runtime flag latched when the filter manager is created, so the trailers handling stays
   // consistent for the lifetime of the stream.
   const bool forward_held_trailers_;
