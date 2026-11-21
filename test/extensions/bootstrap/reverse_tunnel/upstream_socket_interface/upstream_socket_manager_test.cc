@@ -1893,6 +1893,44 @@ TEST_F(TestUpstreamSocketManagerRebalancing, MainThreadExcludedFromRebalancing) 
   EXPECT_EQ(getNodeConnCount(main_socket_manager.get(), node_id), 0);
 }
 
+TEST_F(TestUpstreamSocketManagerRebalancing, RebalanceToWorkerWithFewestIdleSockets) {
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+  for (auto* dispatcher : {&dispatcher1_, &dispatcher2_, &dispatcher3_}) {
+    EXPECT_CALL(*dispatcher, post(_)).WillRepeatedly(Invoke([](Event::PostCb cb) { cb(); }));
+  }
+
+  // One idle socket per worker.
+  socket_manager1_->addConnectionSocket(node_id, cluster_id, createMockSocket(1001), ping_interval,
+                                        false /* rebalanced */);
+  socket_manager1_->addConnectionSocket(node_id, cluster_id, createMockSocket(1002), ping_interval,
+                                        false /* rebalanced */);
+  socket_manager1_->addConnectionSocket(node_id, cluster_id, createMockSocket(1003), ping_interval,
+                                        false /* rebalanced */);
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(socket_manager1_.get(), node_id), 1);
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(socket_manager2_.get(), node_id), 1);
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(socket_manager3_.get(), node_id), 1);
+
+  // Worker 1 hands its socket to a request; the replacement goes back to worker 1.
+  ASSERT_NE(socket_manager1_->getConnectionSocket(node_id), nullptr);
+  socket_manager2_->addConnectionSocket(node_id, cluster_id, createMockSocket(1004), ping_interval,
+                                        false /* rebalanced */);
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(socket_manager1_.get(), node_id), 1);
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(socket_manager2_.get(), node_id), 1);
+
+  // Worker 3's idle socket dies; the replacement goes back to worker 3.
+  socket_manager3_->markSocketDead(1003);
+  socket_manager2_->addConnectionSocket(node_id, cluster_id, createMockSocket(1005), ping_interval,
+                                        false /* rebalanced */);
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(socket_manager2_.get(), node_id), 1);
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(socket_manager3_.get(), node_id), 1);
+
+  EXPECT_EQ(getNodeConnCount(socket_manager1_.get(), node_id), 1);
+  EXPECT_EQ(getNodeConnCount(socket_manager2_.get(), node_id), 1);
+  EXPECT_EQ(getNodeConnCount(socket_manager3_.get(), node_id), 1);
+}
+
 // --- Start-time map lifecycle tests ---
 
 TEST_F(TestUpstreamSocketManager, StartTimeMapPopulatedOnAdd) {
