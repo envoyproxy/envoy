@@ -206,6 +206,9 @@ public:
   bool isIdleImpl() const;
   void drainConnectionsImpl(DrainBehavior drain_behavior);
   const Upstream::HostConstSharedPtr& host() const { return host_; }
+  // True while a client is being created for a connection that another client of this pool
+  // already accounted for in the connection stats.
+  bool adoptingConnection() const { return adopting_connection_; }
   // Called if this pool is likely to be picked soon, to determine if it's worth preconnecting.
   bool maybePreconnectImpl(float global_preconnect_ratio);
 
@@ -385,6 +388,8 @@ protected:
   // The number of streams that can be immediately dispatched
   // if all Connecting connections become connected.
   uint32_t connecting_stream_capacity_{0};
+
+  bool adopting_connection_{false};
 
 private:
   // Drain all the clients in the given list.

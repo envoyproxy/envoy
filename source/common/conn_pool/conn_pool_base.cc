@@ -739,8 +739,10 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     ENVOY_BUG(connecting_stream_capacity_ >= client.currentUnusedCapacity(), dumpState());
     connecting_stream_capacity_ -= client.currentUnusedCapacity();
     client.has_handshake_completed_ = true;
-    client.conn_connect_ms_->complete();
-    client.conn_connect_ms_.reset();
+    if (client.conn_connect_ms_ != nullptr) {
+      client.conn_connect_ms_->complete();
+      client.conn_connect_ms_.reset();
+    }
     if (client.state() == ActiveClient::State::Connecting ||
         client.state() == ActiveClient::State::ReadyForEarlyData) {
       transitionActiveClientState(client,
@@ -920,16 +922,18 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
       configured_stream_limit_(translateZeroToUnlimited(effective_concurrent_streams)),
       concurrent_stream_limit_(translateZeroToUnlimited(concurrent_stream_limit)),
       connect_timer_(parent_.dispatcher().createTimer([this]() { onConnectTimeout(); })) {
-  conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      parent_.host()->cluster().trafficStats()->upstream_cx_connect_ms_,
-      parent_.dispatcher().timeSource());
-  conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      parent_.host()->cluster().trafficStats()->upstream_cx_length_ms_,
-      parent_.dispatcher().timeSource());
   connect_timer_->enableTimer(parent_.host()->cluster().connectTimeout());
-  parent_.host()->stats().cx_total_.inc();
+  if (!parent_.adoptingConnection()) {
+    conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+        parent_.host()->cluster().trafficStats()->upstream_cx_connect_ms_,
+        parent_.dispatcher().timeSource());
+    conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+        parent_.host()->cluster().trafficStats()->upstream_cx_length_ms_,
+        parent_.dispatcher().timeSource());
+    parent_.host()->stats().cx_total_.inc();
+    parent_.host()->cluster().trafficStats()->upstream_cx_total_.inc();
+  }
   parent_.host()->stats().cx_active_.inc();
-  parent_.host()->cluster().trafficStats()->upstream_cx_total_.inc();
   parent_.host()->cluster().trafficStats()->upstream_cx_active_.inc();
   parent_.host()->cluster().resourceManager(parent_.priority()).connections().inc();
 }
@@ -940,7 +944,9 @@ void ActiveClient::releaseResourcesBase() {
   if (!resources_released_) {
     resources_released_ = true;
 
-    conn_length_->complete();
+    if (conn_length_ != nullptr) {
+      conn_length_->complete();
+    }
 
     parent_.host()->cluster().trafficStats()->upstream_cx_active_.dec();
     parent_.host()->stats().cx_active_.dec();

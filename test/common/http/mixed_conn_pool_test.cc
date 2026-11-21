@@ -20,6 +20,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Property;
 using testing::Return;
 
 namespace Envoy {
@@ -90,6 +91,12 @@ void MixedConnPoolImplTest::testAlpnHandshake(std::optional<Protocol> protocol) 
   NiceMock<MockResponseDecoder> decoder;
   conn_pool_->newStream(decoder, callbacks_, {false, true});
 
+  // Handing the connection from the TCP client to the HTTP client must not record it twice.
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+
   std::string next_protocol = "";
   if (protocol.has_value()) {
     next_protocol = (protocol.value() == Protocol::Http11 ? Http::Utility::AlpnNames::get().Http11
@@ -99,6 +106,7 @@ void MixedConnPoolImplTest::testAlpnHandshake(std::optional<Protocol> protocol) 
   EXPECT_EQ(expected_capacity_, state_.connecting_and_connected_stream_capacity_);
 
   connection->raiseEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_total_.value());
   if (!protocol.has_value()) {
     EXPECT_EQ(Protocol::Http11, conn_pool_->protocol());
   } else {
