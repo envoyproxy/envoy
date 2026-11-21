@@ -21,6 +21,7 @@ namespace OnDemand {
 
 #define ALL_CERT_SELECTION_STATS(COUNTER, GAUGE, HISTOGRAM)                                        \
   COUNTER(cert_requested)                                                                          \
+  COUNTER(cert_subscription_failed)                                                                \
   COUNTER(cert_updated)                                                                            \
   GAUGE(cert_active, Accumulate)
 

@@ -435,6 +435,7 @@ TEST_P(OnDemandIntegrationTest, SubscriptionCreationFailure) {
     }
     conn->waitForDisconnect();
   }
+  EXPECT_EQ(2, test_server_->counter(onDemandStat("cert_subscription_failed"))->value());
   EXPECT_EQ(0, test_server_->counter(onDemandStat("cert_requested"))->value());
   EXPECT_EQ(0, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
