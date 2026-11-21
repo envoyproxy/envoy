@@ -223,6 +223,7 @@ protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
+  bool socket_creation_failure_close_pending_{false};
 
 private:
   friend class MultiConnectionBaseImpl;
@@ -352,6 +353,8 @@ private:
   void onConnected() override;
 
   StreamInfo::StreamInfoImpl stream_info_;
+  // Non-null only when socket creation fails and a deferred close callback is posted.
+  std::shared_ptr<bool> alive_guard_;
 };
 
 } // namespace Network

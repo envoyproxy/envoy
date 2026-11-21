@@ -23,6 +23,7 @@
 #include "source/common/http/http_option_limits.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_socket_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
@@ -233,16 +234,23 @@ Network::ConnectionSocketPtr createConnectionSocket(
   // `recent_received_addresses_` cache in
   // https://github.com/envoyproxy/envoy/blob/main/source/common/network/io_socket_handle_impl.h.
   constexpr size_t max_addresses_cache_size = 4u;
+  auto local_addr_or_loopback = local_addr ? local_addr : getLoopbackAddress(peer_addr);
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
       Network::Socket::Type::Datagram,
       // Use the loopback address if `local_addr` is null, to pass in the socket interface used to
       // create the IoHandle, without having to make the more expensive `getifaddrs` call.
-      local_addr ? local_addr : getLoopbackAddress(peer_addr), peer_addr,
+      local_addr_or_loopback, peer_addr,
       Network::SocketCreationOptions{false, max_addresses_cache_size});
   connection_socket->setDetectedTransportProtocol("quic");
   if (!connection_socket->isOpen()) {
     ENVOY_LOG_MISC(error, "Failed to create quic socket");
-    return connection_socket;
+    // Wrap an unopened IoHandle rather than leaving io_handle_ null so callers can safely
+    // reference ioHandle() before connect() closes the QUIC connection asynchronously, matching
+    // the post-close() state when socket option setup fails below.
+    auto fallback_socket = std::make_unique<Network::ConnectionSocketImpl>(
+        std::make_unique<Network::IoSocketHandleImpl>(), local_addr_or_loopback, peer_addr);
+    fallback_socket->setDetectedTransportProtocol("quic");
+    return fallback_socket;
   }
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.disable_quic_ip_packet_info_socket_options")) {
