@@ -378,10 +378,13 @@ envoy_cc_library(
         ":singleton_subscription_adapter_lib",
         ":subscription_factory_lib",
         ":utility_lib",
+        "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_manager_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:thread_lib",
         "//source/common/upstream:load_stats_reporter_lib",
+        "@abseil-cpp//absl/functional:function_ref",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

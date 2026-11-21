@@ -173,6 +173,8 @@ envoy_cc_library(
         ":filter_chain_config_writer_lib",
         ":listener_writer_lib",
         "//envoy/common:optref_lib",
+        "//envoy/config:xds_config_tracker_interface",
+        "//envoy/config:xds_manager_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:async_client_interface",
         "//envoy/server:admin_interface",

@@ -16081,3 +16081,203 @@ mod ecds_tests {
     );
   }
 }
+
+mod xds_tests {
+  use crate::abi;
+  use crate::abi::envoy_dynamic_module_type_bootstrap_xds_update_status as Status;
+  use crate::bootstrap::*;
+  use std::sync::atomic::{AtomicBool, Ordering};
+  use std::sync::Arc;
+
+  #[derive(Default)]
+  struct TestHost {
+    enabled: bool,
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+    host: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    enabled: bool,
+  ) -> bool {
+    let host = unsafe { &mut *host.cast::<TestHost>() };
+    host.enabled = enabled;
+    true
+  }
+
+  #[test]
+  fn notification_opt_in_crosses_abi() {
+    let mut host = TestHost::default();
+    let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
+    assert!(envoy.set_xds_notifications(true));
+    assert!(host.enabled);
+    assert!(envoy.set_xds_notifications(false));
+    assert!(!host.enabled);
+  }
+
+  #[derive(Clone, Copy, Default)]
+  struct XdsInput<'a> {
+    type_url: &'a [u8],
+    error_details: &'a [u8],
+    version: &'a [u8],
+    nonce: &'a [u8],
+    resource_name: &'a [u8],
+  }
+
+  fn check_xds_update(status: Status, input: XdsInput<'_>, expected: Option<XdsUpdate<'static>>) {
+    struct Observer {
+      expected: Option<XdsUpdate<'static>>,
+      called: Arc<AtomicBool>,
+    }
+    impl BootstrapExtensionConfig for Observer {
+      fn new_bootstrap_extension(
+        &self,
+        _: &mut dyn EnvoyBootstrapExtension,
+      ) -> Box<dyn BootstrapExtension> {
+        panic!("not used by the xDS hook test")
+      }
+      fn on_xds_update(
+        &self,
+        envoy: &mut dyn EnvoyBootstrapExtensionConfig,
+        type_url: &str,
+        update: XdsUpdate<'_>,
+      ) {
+        assert_eq!(type_url, "type");
+        assert_eq!(Some(update), self.expected);
+        assert!(envoy.set_xds_notifications(false));
+        assert!(!self.called.swap(true, Ordering::Relaxed));
+      }
+    }
+    let called = Arc::new(AtomicBool::new(false));
+    let config: Box<dyn BootstrapExtensionConfig> = Box::new(Observer {
+      expected,
+      called: Arc::clone(&called),
+    });
+    let config_ptr = std::ptr::from_ref(&config).cast();
+    let mut host = TestHost { enabled: true };
+    let envoy_ptr = std::ptr::from_mut(&mut host).cast();
+    let buffer = |bytes: &[u8]| abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: if bytes.is_empty() {
+        std::ptr::null()
+      } else {
+        bytes.as_ptr().cast()
+      },
+      length: bytes.len(),
+    };
+    let XdsInput {
+      type_url,
+      error_details,
+      version,
+      nonce,
+      resource_name,
+    } = input;
+    // the boxed config and input buffers remain live for the synchronous hook
+    unsafe {
+      envoy_dynamic_module_on_bootstrap_extension_xds_update(
+        envoy_ptr,
+        config_ptr,
+        buffer(type_url),
+        status,
+        buffer(error_details),
+        buffer(version),
+        buffer(nonce),
+        buffer(resource_name),
+      );
+    }
+    assert_eq!(called.load(Ordering::Relaxed), expected.is_some());
+    assert_eq!(host.enabled, expected.is_none());
+  }
+
+  #[test]
+  fn xds_hook_forwards_response_metadata_and_unsubscribe_names() {
+    let response = XdsInput {
+      type_url: b"type",
+      version: b"version",
+      nonce: b"nonce",
+      ..XdsInput::default()
+    };
+    check_xds_update(
+      Status::Accepted,
+      response,
+      Some(XdsUpdate::Accepted {
+        version: "version",
+        nonce: "nonce",
+      }),
+    );
+    for (error_details, expected) in [
+      (b"rejected".as_slice(), "rejected"),
+      (b"".as_slice(), ""),
+      (b"\xff".as_slice(), "\u{fffd}"),
+    ] {
+      check_xds_update(
+        Status::Rejected,
+        XdsInput {
+          error_details,
+          ..response
+        },
+        Some(XdsUpdate::Rejected {
+          version: "version",
+          nonce: "nonce",
+          error_details: expected,
+        }),
+      );
+    }
+    check_xds_update(
+      Status::Unsubscribed,
+      XdsInput {
+        type_url: b"type",
+        resource_name: b"resource",
+        ..XdsInput::default()
+      },
+      Some(XdsUpdate::Unsubscribed {
+        resource_name: "resource",
+      }),
+    );
+  }
+
+  #[test]
+  fn xds_hook_preserves_empty_response_metadata() {
+    check_xds_update(
+      Status::Accepted,
+      XdsInput {
+        type_url: b"type",
+        ..XdsInput::default()
+      },
+      Some(XdsUpdate::Accepted {
+        version: "",
+        nonce: "",
+      }),
+    );
+  }
+
+  #[test]
+  fn xds_hook_rejects_invalid_utf8_identifiers() {
+    let input = XdsInput {
+      type_url: b"type",
+      ..XdsInput::default()
+    };
+    for invalid in [
+      XdsInput {
+        type_url: b"\xff",
+        ..input
+      },
+      XdsInput {
+        version: b"\xff",
+        ..input
+      },
+      XdsInput {
+        nonce: b"\xff",
+        ..input
+      },
+    ] {
+      check_xds_update(Status::Accepted, invalid, None);
+    }
+    check_xds_update(
+      Status::Unsubscribed,
+      XdsInput {
+        resource_name: b"\xff",
+        ..input
+      },
+      None,
+    );
+  }
+}
