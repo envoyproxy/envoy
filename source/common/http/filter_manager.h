@@ -750,6 +750,7 @@ public:
        << DUMP_MEMBER(state_.decoder_filter_chain_complete_)
        << DUMP_MEMBER(state_.encoder_filter_chain_complete_)
        << DUMP_MEMBER(state_.observed_decode_end_stream_)
+       << DUMP_MEMBER(state_.decoder_injection_pending_)
        << DUMP_MEMBER(state_.observed_encode_end_stream_) << "\n";
 
     DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
@@ -798,6 +799,11 @@ public:
    */
   void decodeData(Buffer::Instance& data, bool end_stream) {
     state_.observed_decode_end_stream_ = end_stream;
+    if (end_stream) {
+      // The client's end of stream overrides an earlier injection, as it does for the stream-level
+      // flag when that flag is rewritten by injection.
+      state_.decoder_injection_pending_ = false;
+    }
     decodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
   }
 
@@ -807,6 +813,8 @@ public:
    */
   void decodeTrailers(RequestTrailerMap& trailers) {
     state_.observed_decode_end_stream_ = true;
+    // See decodeData() above.
+    state_.decoder_injection_pending_ = false;
     decodeTrailers(nullptr, trailers);
   }
 
@@ -900,20 +908,23 @@ public:
   virtual bool decoderObservedEndStream() const { return state_.observed_decode_end_stream_; }
 
   /**
-   * Whether the last request data injection was made without end_stream, i.e. a decoder filter
-   * is expected to inject more. Three cases are not handled:
+   * Whether a decoder filter is expected to inject more request data. The last writer wins, as
+   * for the stream-level end-of-stream flag when it is rewritten by injection: a request data
+   * injection sets this to the inverse of its end_stream, and the client's end of stream (last
+   * data or trailers) clears it. Cases not handled:
    * - More than one filter injecting: an earlier filter injecting end_stream clears this while a
    *   later injecting filter may still hold the body.
+   * - The client's end of stream arriving while a filter still holds data to inject clears this
+   *   early.
    * - A filter that stops injecting without ever injecting end_stream (e.g. it gives up and
-   *   continues decoding instead). This stays true for the rest of the stream.
-   * - A request with trailers. Its body never carries end_stream, so every injection is made
-   *   without it, and the request ends with the trailers passing the filter instead (e.g.
-   *   ext_proc in STREAMED mode forwards held trailers once the last chunk is injected). This
-   *   stays true for the rest of the stream.
+   *   continues decoding instead), or a request with trailers (e.g. ext_proc in STREAMED mode
+   *   injects every chunk without end_stream and forwards the trailers afterwards), when the
+   *   client's end of stream arrived before the last injection. This stays true for the rest of
+   *   the stream.
    * TODO(wbpcode): handle these cases. They are not introduced by
    * envoy.reloadable_features.filter_manager_per_filter_buffer: with it disabled and
-   * envoy.reloadable_features.ext_proc_inject_data_with_state_update enabled, the last injection
-   * leaves the stream-level end-of-stream flag in the same state.
+   * envoy.reloadable_features.ext_proc_inject_data_with_state_update enabled, the stream-level
+   * end-of-stream flag ends up in the same state in each of them.
    */
   bool decoderInjectionPending() const { return state_.decoder_injection_pending_; }
 
@@ -1014,8 +1025,9 @@ protected:
     // client) before iteration of the decoder filter chain begins. This flag is used for setting
     // end_stream value when resuming decoder filter chain iteration.
     bool observed_decode_end_stream_{};
-    // Set to the inverse of end_stream by the last request data injection. Only maintained with
-    // per-filter buffer, where injection leaves observed_decode_end_stream_ untouched.
+    // Set to the inverse of end_stream by a request data injection and cleared by the client's end
+    // of stream. Only set with per-filter buffer, where injection leaves
+    // observed_decode_end_stream_ untouched.
     bool decoder_injection_pending_{};
     // Set `true` when the filter manager observes end stream on the encoder path (from upstream
     // server or Envoy's local reply) before iteration of the encoder filter chain begins. This flag

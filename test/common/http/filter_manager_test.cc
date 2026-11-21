@@ -3656,6 +3656,55 @@ TEST_F(FilterManagerObservedEndStreamTest, ResumedEncoderFilterDoesNotEndStreamB
   filter_manager_->destroyFilters();
 }
 
+TEST_F(FilterManagerObservedEndStreamTest, RecreateStreamRefusedWhileInjectingByDefault) {
+  // Default runtime: the inject guard rewrites the stream-level flag.
+  initializeChain(false);
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+  Buffer::OwnedImpl chunk1("a1");
+  filters_[0]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk1, false);
+
+  EXPECT_FALSE(filter_manager_->decoderObservedEndStream());
+  EXPECT_CALL(filter_manager_callbacks_, recreateStream(_)).Times(0);
+  EXPECT_FALSE(filters_[2]->decoder_callbacks_->recreateStream(nullptr));
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerObservedEndStreamTest, ClientEndStreamAfterInjectionAllowsRecreateStream) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", false);
+  Buffer::OwnedImpl chunk1("a1");
+  filters_[0]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk1, false);
+  EXPECT_TRUE(filter_manager_->decoderInjectionPending());
+
+  // Same as the stream-level flag without per-filter buffer: the client's end of stream wins.
+  decodeData("bbb", true);
+  EXPECT_FALSE(filter_manager_->decoderInjectionPending());
+  EXPECT_CALL(filter_manager_callbacks_, recreateStream(_));
+  EXPECT_TRUE(filters_[2]->decoder_callbacks_->recreateStream(nullptr));
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerObservedEndStreamTest, ClientTrailersAfterInjectionAllowRecreateStream) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", false);
+  Buffer::OwnedImpl chunk1("a1");
+  filters_[0]->decoder_callbacks_->injectDecodedDataToFilterChain(chunk1, false);
+  EXPECT_TRUE(filter_manager_->decoderInjectionPending());
+
+  TestRequestTrailerMapImpl trailers{{"foo", "bar"}};
+  filter_manager_->decodeTrailers(trailers);
+  EXPECT_FALSE(filter_manager_->decoderInjectionPending());
+  EXPECT_CALL(filter_manager_callbacks_, recreateStream(_));
+  EXPECT_TRUE(filters_[2]->decoder_callbacks_->recreateStream(nullptr));
+
+  filter_manager_->destroyFilters();
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy
