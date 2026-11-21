@@ -77,6 +77,11 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onDeferredDelete() {
     expect_close_ = true;
     client_->close(Network::ConnectionCloseType::Abort);
   }
+  // close() does not raise another event when the socket is already going away in this same
+  // callback. Drop the client here so it is not destroyed on that connection's stack.
+  if (client_ != nullptr) {
+    parent_.dispatcher_.deferredDelete(std::move(client_));
+  }
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance& data) {
@@ -99,6 +104,9 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+    if (client_ == nullptr) {
+      return;
+    }
     if (!expect_close_) {
       ENVOY_CONN_LOG(debug, "hc tcp connection unexpected closed, health_check_address={}",
                      *client_, host_->healthCheckAddress()->asString());

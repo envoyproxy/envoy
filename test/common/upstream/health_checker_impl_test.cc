@@ -2911,6 +2911,55 @@ TEST_F(HttpHealthCheckerImplTest, HttpFailRemoveHostInCallbackClose) {
   respond(0, "503", true);
 }
 
+// Regression for https://github.com/envoyproxy/envoy/issues/40443.
+// A health-check failure callback can drop the health checker (HDS removing the cluster) while
+// handleFailure() is still on the stack. The session must stay alive until the callback returns
+// and must not touch the checker after that.
+TEST_F(HttpHealthCheckerImplTest, FailureCallbackDestroysHealthChecker) {
+  setupNoServiceValidationHCOneUnhealthy();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed))
+      .WillOnce([&](HostSharedPtr, HealthTransition) { health_checker_.reset(); });
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _, _));
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true, _));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _)).Times(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer()).Times(0);
+
+  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// The cluster is removed first, then the health-check stream reset from that same I/O iteration
+// is delivered. onResetStream() must not call into the freed checker.
+TEST_F(HttpHealthCheckerImplTest, ClusterRemovedBeforeSameIterationStreamReset) {
+  setupNoServiceValidationHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  ASSERT_FALSE(test_sessions_[0]->request_encoder_.stream_.callbacks_.empty());
+  Http::StreamCallbacks* session_callback =
+      test_sessions_[0]->request_encoder_.stream_.callbacks_.back();
+  ASSERT_FALSE(test_sessions_[0]->client_connection_->callbacks_.empty());
+  Network::ConnectionCallbacks* session_connection_callback =
+      test_sessions_[0]->client_connection_->callbacks_.back();
+
+  // HDS drops the cluster. Teardown closes the health-check connection inline; a socket error
+  // already queued in this iteration has not run yet.
+  health_checker_.reset();
+
+  session_callback->onResetStream(Http::StreamResetReason::RemoteReset, absl::string_view());
+  session_connection_callback->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(HttpHealthCheckerImplTest, HttpFail) {
   setupNoServiceValidationHC();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
