@@ -154,6 +154,11 @@ private:
       if (on_demand_) {
         parent_.stats_.on_demand_scopes_.dec();
       }
+      // A helper going away with requests still paused on it (its scope was
+      // removed, or replaced by one with an inline route configuration) resumes
+      // them: they re-resolve the scope and either route with the new
+      // configuration or get the response for a missing scope.
+      runOnDemandUpdateCallback();
     }
     ConfigConstSharedPtr routeConfig() { return route_provider_->configCast(); }
 
@@ -161,6 +166,13 @@ private:
 
     // Runs all the callback from worker thread to continue filter chain.
     void runOnDemandUpdateCallback();
+
+    // Hands the callbacks still waiting for a route configuration over to the
+    // helper that replaces this one for the same scope, so that a scope update
+    // while a request is paused on it does not strand the request. The
+    // callbacks run right away if the new helper already has a route
+    // configuration, otherwise when its RDS update arrives.
+    void transferOnDemandUpdateCallbacksTo(RdsRouteConfigProviderHelper& successor);
 
     // If route provider has not been initialized, initialize it.
     void maybeInitRdsConfigProvider();

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <memory>
 #include <optional>
+#include <utility>
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
@@ -246,12 +247,26 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::runOnDemandUpdat
   on_demand_update_callbacks_.clear();
 }
 
+void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::transferOnDemandUpdateCallbacksTo(
+    RdsRouteConfigProviderHelper& successor) {
+  if (on_demand_update_callbacks_.empty()) {
+    return;
+  }
+  ENVOY_LOG(debug, "Scope {} replaced with {} on demand update(s) pending", scope_name_,
+            on_demand_update_callbacks_.size());
+  for (auto& callback : on_demand_update_callbacks_) {
+    successor.addOnDemandUpdateCallback(std::move(callback));
+  }
+  on_demand_update_callbacks_.clear();
+}
+
 void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigProvider(
     envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
     Init::Manager& init_manager) {
   route_provider_ = std::dynamic_pointer_cast<RdsRouteConfigProviderImpl>(
       parent_.route_config_provider_manager_.createRdsRouteConfigProvider(
           rds, parent_.factory_context_, parent_.stat_prefix_, init_manager));
+  ASSERT(route_provider_ != nullptr);
 
   rds_update_callback_handle_ = route_provider_->subscription().addUpdateCallback([this]() {
     // Subscribe to RDS update.
@@ -283,6 +298,7 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConf
   ASSERT(scope_info_iter != parent_.scoped_route_map_.end());
   rds.set_route_config_name(scope_info_iter->second->configProto().route_configuration_name());
   initRdsConfigProvider(rds, srds_init_mgr);
+  ASSERT(route_provider_ != nullptr);
   ENVOY_LOG(debug, fmt::format("Scope on demand update: {}", scope_name_));
   // If RouteConfiguration hasn't been initialized, routeConfig() return a shared_ptr to
   // NullConfigImpl. The name of NullConfigImpl is an empty string.
@@ -366,6 +382,13 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
         // loaded.
         scoped_route_info =
             std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config), nullptr);
+      }
+      // A scope updated while requests are paused on it (waiting for its route
+      // configuration) keeps those requests: the old helper would otherwise be
+      // destroyed with them.
+      auto old_helper_iter = route_provider_by_scope_.find(scoped_route_info->scopeName());
+      if (old_helper_iter != route_provider_by_scope_.end() && old_helper_iter->second != nullptr) {
+        old_helper_iter->second->transferOnDemandUpdateCallbacksTo(*rds_config_provider_helper);
       }
       route_provider_by_scope_[scoped_route_info->scopeName()] =
           std::move(rds_config_provider_helper);
