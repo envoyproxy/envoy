@@ -5,6 +5,7 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
@@ -1635,6 +1636,10 @@ protected:
     return (it != manager->node_to_conn_count_map_.end()) ? it->second : 0;
   }
 
+  bool hasNodeConnCount(UpstreamSocketManager* manager, const std::string& node_id) {
+    return manager->node_to_conn_count_map_.contains(node_id);
+  }
+
   size_t verifyAcceptedReverseConnectionsMap(UpstreamSocketManager* manager,
                                              const std::string& node_id) {
     auto it = manager->accepted_reverse_connections_.find(node_id);
@@ -1819,6 +1824,8 @@ TEST_F(TestUpstreamSocketManagerRebalancing, RebalancingWithNewNode) {
   EXPECT_EQ(getNodeConnCount(socket_manager1_.get(), node_id), 1);
   EXPECT_EQ(getNodeConnCount(socket_manager2_.get(), node_id), 0);
   EXPECT_EQ(getNodeConnCount(socket_manager3_.get(), node_id), 0);
+  EXPECT_FALSE(hasNodeConnCount(socket_manager2_.get(), node_id));
+  EXPECT_FALSE(hasNodeConnCount(socket_manager3_.get(), node_id));
 }
 
 TEST_F(TestUpstreamSocketManagerRebalancing, RebalancingSkippedWhenAlreadyRebalanced) {
@@ -1929,6 +1936,82 @@ TEST_F(TestUpstreamSocketManagerRebalancing, RebalanceToWorkerWithFewestIdleSock
   EXPECT_EQ(getNodeConnCount(socket_manager1_.get(), node_id), 1);
   EXPECT_EQ(getNodeConnCount(socket_manager2_.get(), node_id), 1);
   EXPECT_EQ(getNodeConnCount(socket_manager3_.get(), node_id), 1);
+
+  socket_manager1_->markSocketDead(1001);
+  EXPECT_EQ(getNodeConnCount(socket_manager1_.get(), node_id), 1);
+
+  socket_manager1_->addConnectionSocket(node_id, "", createMockSocket(1006), ping_interval,
+                                        false /* rebalanced */);
+  EXPECT_EQ(getNodeConnCount(socket_manager1_.get(), node_id), 1);
+}
+
+TEST_F(TestUpstreamSocketManagerRebalancing, SkippedSocketsDoNotChangeRebalancingCounts) {
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager1_->addConnectionSocket(node_id, cluster_id, createMockSocket(1101), ping_interval,
+                                        true /* rebalanced */);
+  EXPECT_FALSE(hasNodeConnCount(socket_manager1_.get(), node_id));
+
+  ASSERT_NE(socket_manager1_->getConnectionSocket(node_id), nullptr);
+  EXPECT_FALSE(hasNodeConnCount(socket_manager1_.get(), node_id));
+
+  socket_manager1_->addConnectionSocket(node_id, cluster_id, createMockSocket(1102), ping_interval,
+                                        true /* rebalanced */);
+  socket_manager1_->markSocketDead(1102);
+  EXPECT_FALSE(hasNodeConnCount(socket_manager1_.get(), node_id));
+}
+
+TEST_F(TestUpstreamSocketManagerRebalancing, MixedListenersOnlyCountRebalancedSockets) {
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager1_->addConnectionSocket(node_id, cluster_id, createMockSocket(1103), ping_interval,
+                                        false /* rebalanced */);
+  EXPECT_EQ(getNodeConnCount(socket_manager1_.get(), node_id), 1);
+
+  socket_manager1_->addConnectionSocket(node_id, cluster_id, createMockSocket(1104), ping_interval,
+                                        true /* rebalanced */);
+  ASSERT_NE(socket_manager1_->getConnectionSocket(node_id), nullptr);
+  EXPECT_FALSE(hasNodeConnCount(socket_manager1_.get(), node_id));
+  socket_manager1_->markSocketDead(1104);
+  EXPECT_FALSE(hasNodeConnCount(socket_manager1_.get(), node_id));
+}
+
+TEST_F(TestUpstreamSocketManagerRebalancing, TenantCountsRemainIsolatedAfterCheckoutAndDeath) {
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+  const std::string tenant_a_node =
+      ReverseConnectionUtility::buildTenantScopedIdentifier("tenant-a", node_id);
+  const std::string tenant_b_node =
+      ReverseConnectionUtility::buildTenantScopedIdentifier("tenant-b", node_id);
+  for (auto* manager : {socket_manager1_.get(), socket_manager2_.get(), socket_manager3_.get()}) {
+    manager->setTenantIsolationEnabled(true);
+  }
+  EXPECT_CALL(dispatcher2_, post(_)).WillOnce(Invoke([](Event::PostCb callback) { callback(); }));
+
+  socket_manager1_->addConnectionSocket(node_id, cluster_id, createMockSocket(1201), ping_interval,
+                                        false /* rebalanced */, "tenant-a");
+  socket_manager1_->addConnectionSocket(node_id, cluster_id, createMockSocket(1202), ping_interval,
+                                        false /* rebalanced */, "tenant-b");
+  socket_manager1_->addConnectionSocket(node_id, cluster_id, createMockSocket(1203), ping_interval,
+                                        false /* rebalanced */, "tenant-a");
+  EXPECT_EQ(getNodeConnCount(socket_manager1_.get(), tenant_a_node), 1);
+  EXPECT_EQ(getNodeConnCount(socket_manager2_.get(), tenant_a_node), 1);
+  EXPECT_EQ(getNodeConnCount(socket_manager1_.get(), tenant_b_node), 1);
+  EXPECT_FALSE(hasNodeConnCount(socket_manager1_.get(), node_id));
+
+  ASSERT_NE(socket_manager2_->getConnectionSocket(tenant_a_node), nullptr);
+  EXPECT_FALSE(hasNodeConnCount(socket_manager2_.get(), tenant_a_node));
+  socket_manager1_->markSocketDead(1201);
+  EXPECT_FALSE(hasNodeConnCount(socket_manager1_.get(), tenant_a_node));
+  EXPECT_EQ(getNodeConnCount(socket_manager1_.get(), tenant_b_node), 1);
+
+  socket_manager1_->markSocketDead(1202);
+  EXPECT_FALSE(hasNodeConnCount(socket_manager1_.get(), tenant_b_node));
 }
 
 // --- Start-time map lifecycle tests ---

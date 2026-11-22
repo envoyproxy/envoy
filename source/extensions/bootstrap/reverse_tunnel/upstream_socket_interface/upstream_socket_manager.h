@@ -14,6 +14,7 @@
 #include "source/common/common/random_generator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_lifecycle_info.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
 
@@ -50,13 +51,15 @@ public:
    * @param tenant_id tenant identifier supplied by the peer.
    * @param initiator_worker_id the initiator worker (dispatcher name) that opened the tunnel.
    * @param initiator_connection_id the initiator's per-connection identifier.
+   * @param counted_for_rebalancing true if the picker already reserved a count for this socket.
    */
   void addConnectionSocket(const std::string& node_id, const std::string& cluster_id,
                            Network::ConnectionSocketPtr socket,
                            const std::chrono::seconds& ping_interval, bool rebalanced = true,
                            absl::string_view tenant_id = {},
                            absl::string_view initiator_worker_id = {},
-                           absl::string_view initiator_connection_id = {});
+                           absl::string_view initiator_connection_id = {},
+                           bool counted_for_rebalancing = false);
 
   /**
    * Returns true if a new reverse connection can be accepted for the given node, scoped by tenant
@@ -238,6 +241,9 @@ private:
   // Map from FD to its iterator in accepted_reverse_connections_, used to avoid linear scans.
   absl::flat_hash_map<int, std::list<Network::ConnectionSocketPtr>::iterator> fd_to_socket_it_map_;
 
+  // Idle sockets included in node_to_conn_count_map_. Listeners that skip rebalancing bypass it.
+  absl::flat_hash_set<int> counted_idle_fds_;
+
   // Map from file descriptor to cluster ID. An entry is added when a reverse tunnel is accepted
   // from a node and is removed when the socket dies.
   absl::flat_hash_map<int, std::string> fd_to_cluster_map_;
@@ -290,7 +296,7 @@ private:
   // Map of node IDs to the number of idle sockets this worker holds for the node in
   // accepted_reverse_connections_, plus sockets already picked for it and in flight to its
   // dispatcher. Requests only take idle sockets from their own worker, so new sockets go to the
-  // worker with the fewest. Guarded by socket_manager_lock since other workers read it.
+  // worker with the fewest. Guarded by socket_manager_lock since other workers read and write it.
   absl::flat_hash_map<std::string, int> node_to_conn_count_map_;
 
   bool tenant_isolation_enabled_{false};
