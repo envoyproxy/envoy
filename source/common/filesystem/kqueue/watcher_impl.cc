@@ -153,7 +153,9 @@ absl::Status WatcherImpl::onKqueueEvent() {
       }
     } else if (pathname.file_.empty()) {
       if (event.fflags & NOTE_WRITE) {
-        events |= Events::MovedTo;
+        // NOTE_WRITE on a directory means a child was created, deleted or renamed; kqueue
+        // can't distinguish, so report both creation and rename.
+        events |= Events::MovedTo | Events::Created;
       }
     } else {
       // kqueue doesn't seem to work well with NOTE_RENAME and O_SYMLINK, so instead if we
@@ -190,7 +192,9 @@ absl::Status WatcherImpl::onKqueueEvent() {
 
     if (events & file->events_) {
       ENVOY_LOG(debug, "matched callback: file: {}", file->file_);
-      callAndLogOnError(file->callback_, events, file->file_);
+      // Deliver only the requested bits: a directory NOTE_WRITE reports both Created and
+      // MovedTo, and callbacks may compare against a single event.
+      callAndLogOnError(file->callback_, events & file->events_, file->file_);
     }
   }
   return absl::OkStatus();

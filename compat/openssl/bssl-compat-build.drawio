@@ -4,7 +4,7 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="zjDcmAN7GTpwJI0EFBDX-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;gradientColor=#ea6b66;strokeColor=#b85450;" value="@openssl//:include" vertex="1">
+        <mxCell id="zjDcmAN7GTpwJI0EFBDX-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;gradientColor=#ea6b66;strokeColor=#b85450;" value=":openssl_include" vertex="1">
           <mxGeometry height="60" width="120" x="80" y="520" as="geometry" />
         </mxCell>
         <mxCell id="zjDcmAN7GTpwJI0EFBDX-2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE599;gradientColor=#B87700;strokeColor=#d79b00;" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent; color: rgb(0, 0, 0);&quot;&gt;@boringssl//:&lt;/span&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;include/...&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;@boringssl//:crypto/...&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;@boringssl//:ssl/...&lt;/span&gt;&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;/span&gt;&lt;/div&gt;" vertex="1">
@@ -91,7 +91,7 @@
             <mxPoint x="310" y="500" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="zjDcmAN7GTpwJI0EFBDX-25" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;gradientColor=#ea6b66;strokeColor=#b85450;" value="@openssl//:libs" vertex="1">
+        <mxCell id="zjDcmAN7GTpwJI0EFBDX-25" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;gradientColor=#ea6b66;strokeColor=#b85450;" value=":openssl_libs" vertex="1">
           <mxGeometry height="60" width="120" x="450" y="710" as="geometry" />
         </mxCell>
         <mxCell id="zjDcmAN7GTpwJI0EFBDX-28" edge="1" parent="1" source="zjDcmAN7GTpwJI0EFBDX-21" style="endArrow=classic;html=1;rounded=0;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" target="zjDcmAN7GTpwJI0EFBDX-25" value="dlopen()&lt;br&gt;dlsym()">

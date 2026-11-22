@@ -17,7 +17,7 @@ from functools import cached_property
 from typing import Callable, Dict, Iterator, List, Pattern, Tuple, Union
 
 # The way this script is currently used (ie no bazel) it relies on system deps.
-# As `pyyaml` is present in `envoy-build-ubuntu` it should be safe to use here.
+# As `pyyaml` is present in the `envoy-build` image it should be safe to use here.
 import yaml
 
 logger = logging.getLogger(__name__)

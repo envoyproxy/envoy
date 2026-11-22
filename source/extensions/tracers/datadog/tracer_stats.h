@@ -9,6 +9,7 @@ namespace Tracers {
 namespace Datadog {
 
 #define DATADOG_TRACER_STATS(COUNTER)                                                              \
+  COUNTER(extraction_errors)                                                                       \
   COUNTER(reports_skipped_no_cluster)                                                              \
   COUNTER(reports_sent)                                                                            \
   COUNTER(reports_dropped)                                                                         \

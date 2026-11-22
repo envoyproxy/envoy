@@ -2285,25 +2285,30 @@ fn test_http_get_timing_info() {
   };
 
   let timing: access_log::TimingInfo = filter.get_timing_info();
-  assert_eq!(timing.start_time_unix_ns, Some(1_000));
-  assert_eq!(timing.downstream_connection_begin_ns, Some(-4));
-  assert_eq!(timing.downstream_handshake_start_ns, Some(-3));
-  assert_eq!(timing.downstream_handshake_complete_ns, Some(-2));
-  assert_eq!(timing.last_downstream_header_rx_byte_received_ns, Some(0));
-  assert_eq!(timing.last_downstream_rx_byte_received_ns, Some(1));
-  assert_eq!(timing.upstream_connect_start_ns, Some(2));
-  assert_eq!(timing.upstream_connect_complete_ns, Some(3));
-  assert_eq!(timing.upstream_handshake_complete_ns, Some(4));
-  assert_eq!(timing.first_upstream_tx_byte_sent_ns, Some(5));
-  assert_eq!(timing.last_upstream_tx_byte_sent_ns, Some(6));
-  assert_eq!(timing.first_upstream_rx_byte_received_ns, Some(7));
-  assert_eq!(timing.first_upstream_rx_body_byte_received_ns, Some(8));
-  assert_eq!(timing.last_upstream_rx_byte_received_ns, Some(9));
-  assert_eq!(timing.first_downstream_tx_byte_sent_ns, Some(10));
-  assert_eq!(timing.last_downstream_tx_byte_sent_ns, Some(11));
-  assert_eq!(timing.last_downstream_ack_received_ns, Some(12));
-  assert_eq!(timing.request_complete_duration_ns, Some(13));
-  assert_eq!(timing.downstream_connection_end_ns, Some(14));
+  assert_eq!(
+    timing,
+    access_log::TimingInfo {
+      start_time_unix_ns: Some(1_000),
+      downstream_connection_begin_ns: Some(-4),
+      downstream_handshake_start_ns: Some(-3),
+      downstream_handshake_complete_ns: Some(-2),
+      last_downstream_header_rx_byte_received_ns: Some(0),
+      last_downstream_rx_byte_received_ns: Some(1),
+      upstream_connect_start_ns: Some(2),
+      upstream_connect_complete_ns: Some(3),
+      upstream_handshake_complete_ns: Some(4),
+      first_upstream_tx_byte_sent_ns: Some(5),
+      last_upstream_tx_byte_sent_ns: Some(6),
+      first_upstream_rx_byte_received_ns: Some(7),
+      first_upstream_rx_body_byte_received_ns: Some(8),
+      last_upstream_rx_byte_received_ns: Some(9),
+      first_downstream_tx_byte_sent_ns: Some(10),
+      last_downstream_tx_byte_sent_ns: Some(11),
+      last_downstream_ack_received_ns: Some(12),
+      request_complete_duration_ns: Some(13),
+      downstream_connection_end_ns: Some(14),
+    }
+  );
 }
 
 const HTTP_UPSTREAM_ATTEMPTS_AVAILABLE: usize = 1;
@@ -2605,6 +2610,287 @@ fn test_http_get_header_values_fast_path() {
     1
   );
   HTTP_GET_HEADER_VALUES_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+// =============================================================================
+// Stream Info Reporting Tests
+// =============================================================================
+
+// The filter that test_stream_info_reporting reports for. The stubs fail the calls for any other
+// filter, so the test sees that each method passes its filter pointer.
+const REPORTING_FILTER: abi::envoy_dynamic_module_type_network_filter_envoy_ptr = 0x5e7 as *mut _;
+
+// Holds the reporting calls in order. Only test_stream_info_reporting makes them.
+static STUB_NETWORK_REPORTS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+// Records the call and returns whether it was made for REPORTING_FILTER.
+fn record_network_report(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  report: String,
+) -> bool {
+  let reporting_filter = filter_envoy_ptr == REPORTING_FILTER;
+  STUB_NETWORK_REPORTS.lock().unwrap().push(
+    if reporting_filter {
+      report
+    } else {
+      format!("{report} for another filter")
+    },
+  );
+  reporting_filter
+}
+
+// Only the cluster "compute" exists, so a test sees both the arguments and the result.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_upstream_host(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  address: abi::envoy_dynamic_module_type_module_buffer,
+  port: u32,
+) -> bool {
+  let cluster_name = module_buffer_to_string(cluster_name);
+  let cluster_exists = cluster_name == "compute";
+  record_network_report(
+    filter_envoy_ptr,
+    format!(
+      "set_upstream_host {cluster_name} {} {port}",
+      module_buffer_to_string(address)
+    ),
+  ) && cluster_exists
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_upstream_cluster(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let cluster_name = module_buffer_to_string(cluster_name);
+  let cluster_exists = cluster_name == "compute";
+  record_network_report(
+    filter_envoy_ptr,
+    format!("set_upstream_cluster {cluster_name}"),
+  ) && cluster_exists
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_upstream_local_address(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  address: abi::envoy_dynamic_module_type_module_buffer,
+  port: u32,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!(
+      "set_upstream_local_address {} {port}",
+      module_buffer_to_string(address)
+    ),
+  ) && port <= 65535
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  reason: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!(
+      "set_upstream_transport_failure_reason {}",
+      module_buffer_to_string(reason)
+    ),
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  reason: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!(
+      "set_upstream_local_close_reason {}",
+      module_buffer_to_string(reason)
+    ),
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  close_type: abi::envoy_dynamic_module_type_detected_close_type,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!("set_upstream_detected_close_type {close_type:?}"),
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_upstream_request_attempt_count(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  attempt_count: u32,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!("set_upstream_request_attempt_count {attempt_count}"),
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_record_upstream_timing(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  event: abi::envoy_dynamic_module_type_upstream_timing_event,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!("record_upstream_timing {event:?}"),
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  bytes_received: u64,
+  bytes_sent: u64,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!("add_upstream_wire_bytes {bytes_received} {bytes_sent}"),
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  bytes_received: u64,
+  bytes_sent: u64,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!("add_downstream_wire_bytes {bytes_received} {bytes_sent}"),
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_response_flag(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  flag: abi::envoy_dynamic_module_type_response_flag,
+) -> bool {
+  record_network_report(filter_envoy_ptr, format!("set_response_flag {flag:?}"))
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_add_custom_flag(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  flag: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let flag = module_buffer_to_string(flag);
+  let valid = !flag.is_empty();
+  record_network_report(filter_envoy_ptr, format!("add_custom_flag {flag}")) && valid
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_flush_access_log(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  access_log_type: abi::envoy_dynamic_module_type_access_log_type,
+) -> bool {
+  record_network_report(
+    filter_envoy_ptr,
+    format!("flush_access_log {access_log_type:?}"),
+  ) && access_log_type == abi::envoy_dynamic_module_type_access_log_type::TcpUpstreamConnected
+}
+
+#[test]
+fn test_stream_info_reporting() {
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: REPORTING_FILTER,
+  };
+  assert!(filter.set_upstream_host("compute", "10.1.2.3", 5432));
+  assert!(!filter.set_upstream_host("missing", "10.1.2.3", 5432));
+  assert!(filter.set_upstream_cluster("compute"));
+  assert!(!filter.set_upstream_cluster("missing"));
+  assert!(filter.set_upstream_local_address("10.1.2.4", 65535));
+  assert!(!filter.set_upstream_local_address("10.1.2.4", 65536));
+  assert!(filter.set_upstream_transport_failure_reason("connection refused"));
+  assert!(filter.set_upstream_local_close_reason("idle timeout"));
+  assert!(filter.set_upstream_detected_close_type(
+    abi::envoy_dynamic_module_type_detected_close_type::RemoteReset
+  ));
+  assert!(filter.set_upstream_request_attempt_count(2));
+  assert!(filter
+    .record_upstream_timing(abi::envoy_dynamic_module_type_upstream_timing_event::FirstByteSent));
+  assert!(filter.add_upstream_wire_bytes(1, 2));
+  assert!(filter.add_downstream_wire_bytes(3, 4));
+  assert!(filter
+    .set_response_flag(abi::envoy_dynamic_module_type_response_flag::UpstreamConnectionFailure));
+  assert!(filter.add_custom_flag("retried"));
+  assert!(!filter.add_custom_flag(""));
+  assert!(
+    filter.flush_access_log(abi::envoy_dynamic_module_type_access_log_type::TcpUpstreamConnected)
+  );
+  assert!(
+    !filter.flush_access_log(abi::envoy_dynamic_module_type_access_log_type::TcpConnectionEnd)
+  );
+
+  // The stubs fail the calls for another filter, and the methods return what the stubs return.
+  let mut other_filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  assert!(!other_filter.set_upstream_host("compute", "10.1.2.3", 5432));
+  assert!(!other_filter.set_upstream_cluster("compute"));
+  assert!(!other_filter.set_upstream_local_address("10.1.2.4", 65535));
+  assert!(!other_filter.set_upstream_transport_failure_reason("connection refused"));
+  assert!(!other_filter.set_upstream_local_close_reason("idle timeout"));
+  assert!(!other_filter.set_upstream_detected_close_type(
+    abi::envoy_dynamic_module_type_detected_close_type::RemoteReset
+  ));
+  assert!(!other_filter.set_upstream_request_attempt_count(2));
+  assert!(!other_filter
+    .record_upstream_timing(abi::envoy_dynamic_module_type_upstream_timing_event::FirstByteSent));
+  assert!(!other_filter.add_upstream_wire_bytes(1, 2));
+  assert!(!other_filter.add_downstream_wire_bytes(3, 4));
+  assert!(!other_filter
+    .set_response_flag(abi::envoy_dynamic_module_type_response_flag::UpstreamConnectionFailure));
+  assert!(!other_filter.add_custom_flag("retried"));
+  assert!(!other_filter
+    .flush_access_log(abi::envoy_dynamic_module_type_access_log_type::TcpUpstreamConnected));
+
+  assert_eq!(
+    *STUB_NETWORK_REPORTS.lock().unwrap(),
+    [
+      "set_upstream_host compute 10.1.2.3 5432",
+      "set_upstream_host missing 10.1.2.3 5432",
+      "set_upstream_cluster compute",
+      "set_upstream_cluster missing",
+      "set_upstream_local_address 10.1.2.4 65535",
+      "set_upstream_local_address 10.1.2.4 65536",
+      "set_upstream_transport_failure_reason connection refused",
+      "set_upstream_local_close_reason idle timeout",
+      "set_upstream_detected_close_type RemoteReset",
+      "set_upstream_request_attempt_count 2",
+      "record_upstream_timing FirstByteSent",
+      "add_upstream_wire_bytes 1 2",
+      "add_downstream_wire_bytes 3 4",
+      "set_response_flag UpstreamConnectionFailure",
+      "add_custom_flag retried",
+      "add_custom_flag ",
+      "flush_access_log TcpUpstreamConnected",
+      "flush_access_log TcpConnectionEnd",
+      "set_upstream_host compute 10.1.2.3 5432 for another filter",
+      "set_upstream_cluster compute for another filter",
+      "set_upstream_local_address 10.1.2.4 65535 for another filter",
+      "set_upstream_transport_failure_reason connection refused for another filter",
+      "set_upstream_local_close_reason idle timeout for another filter",
+      "set_upstream_detected_close_type RemoteReset for another filter",
+      "set_upstream_request_attempt_count 2 for another filter",
+      "record_upstream_timing FirstByteSent for another filter",
+      "add_upstream_wire_bytes 1 2 for another filter",
+      "add_downstream_wire_bytes 3 4 for another filter",
+      "set_response_flag UpstreamConnectionFailure for another filter",
+      "add_custom_flag retried for another filter",
+      "flush_access_log TcpUpstreamConnected for another filter",
+    ]
+  );
 }
 
 // =============================================================================
@@ -3081,6 +3367,99 @@ fn test_network_filter_watermark_callbacks() {
 // Bootstrap Extension FFI stubs for testing.
 // =============================================================================
 
+pub mod config_snapshot_stubs {
+  use super::*;
+  use crate::abi::envoy_dynamic_module_type_bootstrap_config_snapshot_result as SnapshotResult;
+  use std::sync::atomic::Ordering;
+  use std::sync::Arc;
+
+  #[derive(Default)]
+  pub struct TestHost {
+    pub providers: Vec<String>,
+    pub name_regex: Option<String>,
+    pub snapshot: Option<TestSnapshot>,
+    pub result: Option<SnapshotResult>,
+  }
+
+  pub struct TestSnapshot {
+    pub json: Option<Vec<u8>>,
+    pub drops: Arc<AtomicUsize>,
+  }
+
+  impl Drop for TestSnapshot {
+    fn drop(&mut self) {
+      self.drops.fetch_add(1, Ordering::Relaxed);
+    }
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+    host: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    providers: *const abi::envoy_dynamic_module_type_module_buffer,
+    count: usize,
+    name_regex: abi::envoy_dynamic_module_type_module_buffer,
+    output: *mut abi::envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr,
+  ) -> SnapshotResult {
+    let host = unsafe { &mut *host.cast::<TestHost>() };
+    let providers = unsafe { crate::ffi_helpers::slice_from_raw_or_empty(providers, count) };
+    host.providers = providers
+      .iter()
+      .map(|provider| {
+        let bytes = unsafe {
+          crate::ffi_helpers::slice_from_raw_or_empty(provider.ptr.cast::<u8>(), provider.length)
+        };
+        std::str::from_utf8(bytes).unwrap().to_owned()
+      })
+      .collect();
+    host.name_regex = if name_regex.ptr.is_null() {
+      None
+    } else {
+      let bytes = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(name_regex.ptr.cast::<u8>(), name_regex.length)
+      };
+      Some(std::str::from_utf8(bytes).unwrap().to_owned())
+    };
+    unsafe { *output = std::ptr::null_mut() };
+    if let Some(result) = host.result {
+      return result;
+    }
+    let Some(snapshot) = host.snapshot.take() else {
+      return SnapshotResult::Unavailable;
+    };
+    unsafe { *output = Box::into_raw(Box::new(snapshot)).cast() };
+    SnapshotResult::Success
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+    raw: abi::envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr,
+    callback: abi::envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn,
+    user_data: *mut std::ffi::c_void,
+  ) -> bool {
+    let snapshot = unsafe { &*raw.cast::<TestSnapshot>() };
+    let Some(json) = &snapshot.json else {
+      return false;
+    };
+    unsafe {
+      callback.unwrap()(
+        abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: json.as_ptr().cast(),
+          length: json.len(),
+        },
+        user_data,
+      );
+    }
+    true
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(
+    raw: abi::envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr,
+  ) {
+    drop(unsafe { Box::from_raw(raw.cast::<TestSnapshot>()) });
+  }
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(
   _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
@@ -3453,6 +3832,14 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_liste
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(
   _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   event_id: u64,
@@ -3489,6 +3876,86 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_cluster_writ
   _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
 ) -> abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result {
   abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result::NotFound
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> bool {
+  // Differs from the cluster writer stub, so that the test notices crossed wires.
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  listener_name: abi::envoy_dynamic_module_type_module_buffer,
+  listener: abi::envoy_dynamic_module_type_module_buffer,
+  version_info: abi::envoy_dynamic_module_type_module_buffer,
+  update_id_out: *mut u64,
+) -> abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_result {
+  // Reports the argument lengths through the update ID so that the test can check them.
+  unsafe {
+    *update_id_out =
+      (listener_name.length * 10000 + listener.length * 100 + version_info.length) as u64;
+  }
+  abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  listener_name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_bootstrap_listener_writer_removal_result {
+  // Finds only the listener that the test removes, so that the test checks the name.
+  let listener_name =
+    unsafe { std::slice::from_raw_parts(listener_name.ptr as *const u8, listener_name.length) };
+  if listener_name == b"writer.listener" {
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_removal_result::Success
+  } else {
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_removal_result::NotFound
+  }
+}
+
+// Counts its calls, since its result cannot differ from both other writer stubs.
+static FILTER_CHAIN_CONFIG_WRITER_ENABLE_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> bool {
+  FILTER_CHAIN_CONFIG_WRITER_ENABLE_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  filter_chain_name: abi::envoy_dynamic_module_type_module_buffer,
+  filter_chain: abi::envoy_dynamic_module_type_module_buffer,
+  update_id_out: *mut u64,
+) -> abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result {
+  // Reports the argument lengths through the update ID so that the test can check them.
+  unsafe {
+    *update_id_out = (filter_chain_name.length * 100 + filter_chain.length) as u64;
+  }
+  abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  filter_chain_name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result {
+  // Finds only the filter chain that the test removes, so that the test checks the name.
+  let filter_chain_name = unsafe {
+    std::slice::from_raw_parts(filter_chain_name.ptr as *const u8, filter_chain_name.length)
+  };
+  if filter_chain_name == b"writer.chain" {
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result::Success
+  } else {
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result::NotFound
+  }
 }
 
 // =============================================================================
@@ -8447,7 +8914,121 @@ fn test_bootstrap_extension_cluster_lifecycle_default_noop() {
 }
 
 #[test]
-fn test_bootstrap_extension_worker_and_cluster_writer_default_noop() {
+fn test_bootstrap_extension_runtime_update() {
+  static UPDATES: std::sync::Mutex<Vec<(String, Option<RuntimeValue>)>> =
+    std::sync::Mutex::new(Vec::new());
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {
+    fn on_runtime_update(
+      &mut self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+      key: &str,
+      value: Option<RuntimeValue>,
+    ) {
+      UPDATES.lock().unwrap().push((key.to_string(), value));
+    }
+  }
+
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+  assert!(!extension_ptr.is_null());
+
+  let buffer = |s: &'static str| abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: s.as_ptr() as *const _,
+    length: s.len(),
+  };
+
+  UPDATES.lock().unwrap().clear();
+  envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update(
+    std::ptr::null_mut(),
+    extension_ptr,
+    buffer("some.flag"),
+    true,
+    false,
+  );
+  envoy_dynamic_module_on_bootstrap_extension_runtime_int_update(
+    std::ptr::null_mut(),
+    extension_ptr,
+    buffer("some.int"),
+    42,
+    false,
+  );
+  envoy_dynamic_module_on_bootstrap_extension_runtime_number_update(
+    std::ptr::null_mut(),
+    extension_ptr,
+    buffer("some.number"),
+    1.5,
+    true,
+  );
+  assert_eq!(
+    *UPDATES.lock().unwrap(),
+    vec![
+      ("some.flag".to_string(), Some(RuntimeValue::Bool(true))),
+      ("some.int".to_string(), Some(RuntimeValue::Int(42))),
+      ("some.number".to_string(), None),
+    ]
+  );
+
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+}
+
+#[test]
+fn test_bootstrap_extension_runtime_update_default_noop() {
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+  assert!(!extension_ptr.is_null());
+
+  let key = "some.flag";
+  envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update(
+    std::ptr::null_mut(),
+    extension_ptr,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    },
+    false,
+    true,
+  );
+
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+}
+
+#[test]
+fn test_bootstrap_extension_enable_runtime_update() {
+  let envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  assert!(!envoy_extension.enable_runtime_update("some.flag"));
+}
+
+#[test]
+fn test_bootstrap_extension_worker_and_writer_default_noop() {
   struct TestBootstrapExtensionConfig;
   impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
     fn new_bootstrap_extension(
@@ -8484,7 +9065,7 @@ fn test_bootstrap_extension_worker_and_cluster_writer_default_noop() {
     length: cluster_name.len(),
   };
 
-  // Calling the worker and cluster writer hooks with default implementations should not panic.
+  // Calling the worker and writer hooks with default implementations should not panic.
   envoy_dynamic_module_on_bootstrap_extension_worker_event(std::ptr::null_mut(), config_ptr, 1);
   envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done(
     std::ptr::null_mut(),
@@ -8502,6 +9083,28 @@ fn test_bootstrap_extension_worker_and_cluster_writer_default_noop() {
       length: 0,
     },
   );
+  envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    1,
+    cluster_name_buf,
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_status::Active,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    },
+  );
+  envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    1,
+    cluster_name_buf,
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status::Active,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    },
+  );
 
   // Clean up.
   unsafe {
@@ -8510,7 +9113,7 @@ fn test_bootstrap_extension_worker_and_cluster_writer_default_noop() {
 }
 
 #[test]
-fn test_bootstrap_extension_worker_event_and_cluster_writer_hooks() {
+fn test_bootstrap_extension_worker_event_and_writer_hooks() {
   use std::sync::atomic::{AtomicU64, Ordering};
   static WORKER_EVENT_ID: AtomicU64 = AtomicU64::new(0);
   static DONE_EVENT_ID: AtomicU64 = AtomicU64::new(0);
@@ -8521,6 +9124,22 @@ fn test_bootstrap_extension_worker_event_and_cluster_writer_hooks() {
     String,
   );
   static UPDATE_DONE: std::sync::Mutex<Option<UpdateDone>> = std::sync::Mutex::new(None);
+  type ListenerUpdateDone = (
+    u64,
+    String,
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_status,
+    String,
+  );
+  static LISTENER_UPDATE_DONE: std::sync::Mutex<Option<ListenerUpdateDone>> =
+    std::sync::Mutex::new(None);
+  type FilterChainUpdateDone = (
+    u64,
+    String,
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status,
+    String,
+  );
+  static FILTER_CHAIN_UPDATE_DONE: std::sync::Mutex<Option<FilterChainUpdateDone>> =
+    std::sync::Mutex::new(None);
 
   struct TestBootstrapExtensionConfig;
   impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
@@ -8558,6 +9177,38 @@ fn test_bootstrap_extension_worker_event_and_cluster_writer_hooks() {
       *UPDATE_DONE.lock().unwrap() = Some((
         update_id,
         cluster_name.to_string(),
+        status,
+        error_details.to_string(),
+      ));
+    }
+
+    fn on_listener_writer_update_done(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      update_id: u64,
+      listener_name: &str,
+      status: abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_status,
+      error_details: &str,
+    ) {
+      *LISTENER_UPDATE_DONE.lock().unwrap() = Some((
+        update_id,
+        listener_name.to_string(),
+        status,
+        error_details.to_string(),
+      ));
+    }
+
+    fn on_filter_chain_config_writer_update_done(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      update_id: u64,
+      filter_chain_name: &str,
+      status: abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status,
+      error_details: &str,
+    ) {
+      *FILTER_CHAIN_UPDATE_DONE.lock().unwrap() = Some((
+        update_id,
+        filter_chain_name.to_string(),
         status,
         error_details.to_string(),
       ));
@@ -8620,13 +9271,65 @@ fn test_bootstrap_extension_worker_event_and_cluster_writer_hooks() {
     ))
   );
 
+  let listener_name = "writer.listener";
+  let listener_error_details = "listener writer.listener failed to listen";
+  envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    6,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: listener_name.as_ptr() as *const _,
+      length: listener_name.len(),
+    },
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_status::Failed,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: listener_error_details.as_ptr() as *const _,
+      length: listener_error_details.len(),
+    },
+  );
+  assert_eq!(
+    *LISTENER_UPDATE_DONE.lock().unwrap(),
+    Some((
+      6,
+      "writer.listener".to_string(),
+      abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_status::Failed,
+      "listener writer.listener failed to listen".to_string(),
+    ))
+  );
+
+  let filter_chain_name = "writer.chain";
+  let filter_chain_error_details = "the listener manager rejected filter chain writer.chain";
+  envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    7,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: filter_chain_name.as_ptr() as *const _,
+      length: filter_chain_name.len(),
+    },
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status::Failed,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: filter_chain_error_details.as_ptr() as *const _,
+      length: filter_chain_error_details.len(),
+    },
+  );
+  assert_eq!(
+    *FILTER_CHAIN_UPDATE_DONE.lock().unwrap(),
+    Some((
+      7,
+      "writer.chain".to_string(),
+      abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status::Failed,
+      "the listener manager rejected filter chain writer.chain".to_string(),
+    ))
+  );
+
   unsafe {
     envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
   }
 }
 
 #[test]
-fn test_bootstrap_extension_config_run_on_all_workers_and_cluster_writer() {
+fn test_bootstrap_extension_config_run_on_all_workers_and_writers() {
   let envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
   assert!(envoy_config.run_on_all_workers(7));
   assert!(!envoy_config.run_on_all_workers(8));
@@ -8643,6 +9346,38 @@ fn test_bootstrap_extension_config_run_on_all_workers_and_cluster_writer() {
   assert_eq!(
     envoy_config.cluster_writer_remove("writer.a"),
     abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result::NotFound
+  );
+
+  // The stub encodes the lengths of the name, the listener and the version in the update ID.
+  assert!(!envoy_config.enable_listener_writer());
+  assert_eq!(
+    envoy_config.listener_writer_add_or_update("writer.listener", b"xyz", "v1"),
+    (
+      abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_result::Success,
+      150302
+    )
+  );
+  assert_eq!(
+    envoy_config.listener_writer_remove("writer.listener"),
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_removal_result::Success
+  );
+
+  assert!(envoy_config.enable_filter_chain_config_writer());
+  assert_eq!(
+    FILTER_CHAIN_CONFIG_WRITER_ENABLE_CALLS.load(std::sync::atomic::Ordering::SeqCst),
+    1
+  );
+  // The stub encodes the lengths of the name and the filter chain in the update ID.
+  assert_eq!(
+    envoy_config.filter_chain_config_writer_add_or_update("writer.chain", b"xyz"),
+    (
+      abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result::Success,
+      1203
+    )
+  );
+  assert_eq!(
+    envoy_config.filter_chain_config_writer_remove("writer.chain"),
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result::Success
   );
 }
 
@@ -9049,6 +9784,83 @@ fn test_envoy_dynamic_module_on_access_logger_new_destroy() {
     access_log::envoy_dynamic_module_on_access_logger_config_destroy(config_ptr);
   }
   assert!(LOGGER_DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_response_flag_to_bitmask() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  assert_eq!(Flag::FailedLocalHealthCheck.to_bitmask(), 0x1);
+  assert_eq!(Flag::NoHealthyUpstream.to_bitmask(), 0x2);
+  assert_eq!(Flag::UnconditionalDropOverload.to_bitmask(), 1u64 << 29);
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_empty() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  assert_eq!(Flag::iter_from_bitmask(0).collect::<Vec<_>>(), Vec::new());
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_selected_flags() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  let bitmask = Flag::NoHealthyUpstream.to_bitmask() | Flag::RateLimited.to_bitmask();
+  assert_eq!(
+    Flag::iter_from_bitmask(bitmask).collect::<Vec<_>>(),
+    vec![Flag::NoHealthyUpstream, Flag::RateLimited]
+  );
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_ignores_unknown_bits() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  // Bit 63 doesn't correspond to any known flag (today, this enum only defines bits 0..=29); it
+  // should be silently skipped rather than panicking or producing a bogus value. `bitmask` is a
+  // `u64` specifically so a bit this high is representable at all.
+  let bitmask = Flag::LocalReset.to_bitmask() | (1u64 << 63);
+  assert_eq!(
+    Flag::iter_from_bitmask(bitmask).collect::<Vec<_>>(),
+    vec![Flag::LocalReset]
+  );
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_full_mask_matches_from_repr() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  let all = <Flag as strum::VariantArray>::VARIANTS;
+  let full_bitmask = all.iter().fold(0u64, |acc, &flag| acc | flag.to_bitmask());
+  assert_eq!(
+    Flag::iter_from_bitmask(full_bitmask).collect::<Vec<_>>(),
+    all
+  );
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_is_exact_size_iterator() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  let bitmask = Flag::NoHealthyUpstream.to_bitmask()
+    | Flag::RateLimited.to_bitmask()
+    | Flag::LocalReset.to_bitmask();
+  let mut iter = Flag::iter_from_bitmask(bitmask);
+  assert_eq!(iter.len(), 3);
+  assert_eq!(iter.size_hint(), (3, Some(3)));
+  iter.next();
+  assert_eq!(iter.len(), 2);
+  assert_eq!(iter.size_hint(), (2, Some(2)));
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_exact_size_ignores_unknown_bits() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  // Unknown bits are pruned at construction, so len() doesn't overcount them.
+  let bitmask = Flag::LocalReset.to_bitmask() | (1u64 << 63);
+  assert_eq!(Flag::iter_from_bitmask(bitmask).len(), 1);
 }
 
 // =================================================================================================
@@ -14564,5 +15376,908 @@ fn test_envoy_route_specifier_config_impl() {
 
   unsafe {
     route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
+  }
+}
+
+// =============================================================================
+// Resource Monitor
+// =============================================================================
+
+thread_local! {
+  // The id of the last scheduler created on this thread.
+  static LAST_RESOURCE_MONITOR_SCHEDULER_ID: std::cell::Cell<u64> =
+    const { std::cell::Cell::new(0) };
+}
+
+// A scheduler can be used and dropped on any thread, so its events are kept per scheduler id.
+static NEXT_RESOURCE_MONITOR_SCHEDULER_ID: std::sync::atomic::AtomicU64 =
+  std::sync::atomic::AtomicU64::new(1);
+static RESOURCE_MONITOR_SCHEDULER_EVENTS: std::sync::Mutex<Vec<(u64, String)>> =
+  std::sync::Mutex::new(Vec::new());
+
+// Stands for the Envoy side configuration, so the stubs can check that the SDK passes it on.
+fn resource_monitor_envoy_config(
+) -> abi::envoy_dynamic_module_type_resource_monitor_config_envoy_ptr {
+  static ENVOY_CONFIG: u8 = 0;
+  &ENVOY_CONFIG as *const u8 as *mut _
+}
+
+fn record_resource_monitor_scheduler_event(
+  scheduler: abi::envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr,
+  event: String,
+) {
+  let id = unsafe { *(scheduler as *const u64) };
+  RESOURCE_MONITOR_SCHEDULER_EVENTS
+    .lock()
+    .unwrap_or_else(std::sync::PoisonError::into_inner)
+    .push((id, event));
+}
+
+fn resource_monitor_scheduler_events(id: u64) -> Vec<String> {
+  RESOURCE_MONITOR_SCHEDULER_EVENTS
+    .lock()
+    .unwrap_or_else(std::sync::PoisonError::into_inner)
+    .iter()
+    .filter(|(event_id, _)| *event_id == id)
+    .map(|(_, event)| event.clone())
+    .collect()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_resource_monitor_config_scheduler_new(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_resource_monitor_config_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr {
+  assert_eq!(config_envoy_ptr, resource_monitor_envoy_config());
+  let id = NEXT_RESOURCE_MONITOR_SCHEDULER_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  LAST_RESOURCE_MONITOR_SCHEDULER_ID.set(id);
+  Box::into_raw(Box::new(id)) as *mut std::ffi::c_void
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_resource_usage(
+  scheduler: abi::envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr,
+  resource_pressure: f64,
+) {
+  record_resource_monitor_scheduler_event(scheduler, format!("usage {resource_pressure}"));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_failure(
+  scheduler: abi::envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr,
+) {
+  record_resource_monitor_scheduler_event(scheduler, "failure".to_string());
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete(
+  scheduler: abi::envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr,
+) {
+  record_resource_monitor_scheduler_event(scheduler, "delete".to_string());
+  unsafe { drop(Box::from_raw(scheduler as *mut u64)) };
+}
+
+fn resource_monitor_envoy_config_handle() -> resource_monitor::EnvoyResourceMonitorConfig {
+  unsafe { resource_monitor::EnvoyResourceMonitorConfig::new(resource_monitor_envoy_config()) }
+}
+
+struct TestResourceMonitor(resource_monitor::ResourceMonitorUpdate);
+
+impl resource_monitor::ResourceMonitor for TestResourceMonitor {
+  fn update_resource_usage(&self) -> resource_monitor::ResourceMonitorUpdate {
+    self.0
+  }
+}
+
+fn update_resource_monitor(
+  monitor: Box<dyn resource_monitor::ResourceMonitor>,
+) -> (
+  abi::envoy_dynamic_module_type_resource_monitor_update_status,
+  f64,
+) {
+  let config_ptr = wrap_into_c_void_ptr!(resource_monitor::ModuleResourceMonitor::Refresh(monitor));
+  // Envoy reads the pressure only on Success, so a marker value shows whether the hook wrote it.
+  let mut resource_pressure = -7.0;
+  let status = unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_update_resource_usage(
+      resource_monitor_envoy_config(),
+      config_ptr,
+      &mut resource_pressure,
+    )
+  };
+  unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+  (status, resource_pressure)
+}
+
+#[test]
+fn test_resource_monitor_config_new_and_destroy() {
+  static DROPPED: AtomicUsize = AtomicUsize::new(0);
+
+  struct DroppedMonitor;
+  impl Drop for DroppedMonitor {
+    fn drop(&mut self) {
+      DROPPED.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+  impl resource_monitor::ResourceMonitor for DroppedMonitor {
+    fn update_resource_usage(&self) -> resource_monitor::ResourceMonitorUpdate {
+      resource_monitor::ResourceMonitorUpdate::Failure
+    }
+  }
+
+  let new_fn: NewResourceMonitorConfigFunction = |name, config, _envoy_config| {
+    assert_eq!(config, b"config");
+    (name == "monitor")
+      .then(|| Box::new(DroppedMonitor) as Box<dyn resource_monitor::ResourceMonitor>)
+  };
+  let mut envoy_config = resource_monitor_envoy_config_handle();
+
+  let config_ptr = resource_monitor::envoy_dynamic_module_on_resource_monitor_config_new_impl(
+    "unknown",
+    b"config",
+    &mut envoy_config,
+    Some(&new_fn),
+    None,
+  );
+  assert!(config_ptr.is_null());
+
+  let config_ptr = resource_monitor::envoy_dynamic_module_on_resource_monitor_config_new_impl(
+    "monitor",
+    b"config",
+    &mut envoy_config,
+    Some(&new_fn),
+    None,
+  );
+  assert!(!config_ptr.is_null());
+  unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+  assert_eq!(DROPPED.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+#[test]
+fn test_resource_monitor_update_outcomes() {
+  use abi::envoy_dynamic_module_type_resource_monitor_update_status as Status;
+  use resource_monitor::ResourceMonitorUpdate;
+
+  assert_eq!(
+    update_resource_monitor(Box::new(TestResourceMonitor(
+      ResourceMonitorUpdate::Pressure(0.25)
+    ))),
+    (Status::Success, 0.25)
+  );
+  assert_eq!(
+    update_resource_monitor(Box::new(TestResourceMonitor(
+      ResourceMonitorUpdate::Failure
+    ))),
+    (Status::Failure, -7.0)
+  );
+  assert_eq!(
+    update_resource_monitor(Box::new(TestResourceMonitor(
+      ResourceMonitorUpdate::Pending
+    ))),
+    (Status::Pending, -7.0)
+  );
+}
+
+#[test]
+fn test_resource_monitor_update_recovers_from_panic() {
+  struct PanicMonitor;
+  impl resource_monitor::ResourceMonitor for PanicMonitor {
+    fn update_resource_usage(&self) -> resource_monitor::ResourceMonitorUpdate {
+      panic!("intentional panic in update_resource_usage");
+    }
+  }
+
+  assert_eq!(
+    update_resource_monitor(Box::new(PanicMonitor)),
+    (
+      abi::envoy_dynamic_module_type_resource_monitor_update_status::Failure,
+      -7.0
+    )
+  );
+}
+
+#[test]
+fn test_resource_monitor_scheduler_reports_and_delete() {
+  use resource_monitor::EnvoyResourceMonitorConfigScheduler;
+
+  let scheduler = resource_monitor_envoy_config_handle().new_config_scheduler();
+  let id = LAST_RESOURCE_MONITOR_SCHEDULER_ID.get();
+  scheduler.report_resource_usage(0.5);
+
+  // The scheduler is Send, so a module thread can report and drop it.
+  std::thread::spawn(move || scheduler.report_failure())
+    .join()
+    .unwrap();
+
+  assert_eq!(
+    resource_monitor_scheduler_events(id),
+    ["usage 0.5", "failure", "delete"]
+  );
+}
+
+#[test]
+fn test_resource_monitor_boxed_scheduler_reports() {
+  use resource_monitor::EnvoyResourceMonitorConfigScheduler;
+
+  fn report(scheduler: &impl EnvoyResourceMonitorConfigScheduler) {
+    scheduler.report_resource_usage(0.75);
+    scheduler.report_failure();
+  }
+
+  let scheduler: Box<dyn EnvoyResourceMonitorConfigScheduler> =
+    Box::new(resource_monitor_envoy_config_handle().new_config_scheduler());
+  let id = LAST_RESOURCE_MONITOR_SCHEDULER_ID.get();
+  report(&scheduler);
+  drop(scheduler);
+
+  assert_eq!(
+    resource_monitor_scheduler_events(id),
+    ["usage 0.75", "failure", "delete"]
+  );
+}
+
+#[test]
+fn test_resource_monitor_scheduler_mock() {
+  use resource_monitor::EnvoyResourceMonitorConfigScheduler;
+
+  // The scheduler is a trait so module authors can unit test their off-thread logic with a mock.
+  let mut mock_scheduler = resource_monitor::MockEnvoyResourceMonitorConfigScheduler::new();
+  mock_scheduler
+    .expect_report_resource_usage()
+    .with(mockall::predicate::eq(0.42))
+    .times(1)
+    .return_const(());
+  mock_scheduler.report_resource_usage(0.42);
+}
+
+thread_local! {
+  // What the enable stub returns, how often it was called on this thread, and how often the refresh
+  // factory was asked for a monitor.
+  static RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_RESULT: std::cell::Cell<bool> =
+    const { std::cell::Cell::new(true) };
+  static RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_CALLS: std::cell::Cell<usize> =
+    const { std::cell::Cell::new(0) };
+  static RESOURCE_MONITOR_REFRESH_FACTORY_CALLS: std::cell::Cell<usize> =
+    const { std::cell::Cell::new(0) };
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_feedback(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_resource_monitor_config_envoy_ptr,
+) -> bool {
+  assert_eq!(config_envoy_ptr, resource_monitor_envoy_config());
+  RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_CALLS
+    .set(RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_CALLS.get() + 1);
+  RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_RESULT.get()
+}
+
+struct TestSynchronousFeedbackResourceMonitor(f64);
+
+impl resource_monitor::SynchronousFeedbackResourceMonitor
+  for TestSynchronousFeedbackResourceMonitor
+{
+  fn resource_usage(&self) -> f64 {
+    self.0
+  }
+}
+
+fn new_synchronous_feedback_resource_monitor(
+  name: &str,
+  _config: &[u8],
+) -> Option<Box<dyn resource_monitor::SynchronousFeedbackResourceMonitor>> {
+  matches!(name, "synchronous" | "both").then(|| {
+    Box::new(TestSynchronousFeedbackResourceMonitor(0.7))
+      as Box<dyn resource_monitor::SynchronousFeedbackResourceMonitor>
+  })
+}
+
+fn new_refresh_resource_monitor(
+  name: &str,
+  _config: &[u8],
+  _envoy_config: &mut resource_monitor::EnvoyResourceMonitorConfig,
+) -> Option<Box<dyn resource_monitor::ResourceMonitor>> {
+  RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.set(RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.get() + 1);
+  matches!(name, "refresh" | "both").then(|| {
+    Box::new(TestResourceMonitor(
+      resource_monitor::ResourceMonitorUpdate::Pressure(0.2),
+    )) as Box<dyn resource_monitor::ResourceMonitor>
+  })
+}
+
+// Creates a configuration with both factories registered. Returns the outcome and the pressure of
+// the update hook, the pressure from the synchronous feedback hook, and the number of times the
+// configuration enabled synchronous feedback.
+fn new_resource_monitor_config(
+  name: &str,
+) -> Option<(
+  abi::envoy_dynamic_module_type_resource_monitor_update_status,
+  f64,
+  f64,
+  usize,
+)> {
+  let new_fn: NewResourceMonitorConfigFunction = new_refresh_resource_monitor;
+  let new_synchronous_feedback_fn: NewSynchronousFeedbackResourceMonitorConfigFunction =
+    new_synchronous_feedback_resource_monitor;
+  RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_CALLS.set(0);
+  RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.set(0);
+  let config_ptr = resource_monitor::envoy_dynamic_module_on_resource_monitor_config_new_impl(
+    name,
+    b"",
+    &mut resource_monitor_envoy_config_handle(),
+    Some(&new_fn),
+    Some(&new_synchronous_feedback_fn),
+  );
+  if config_ptr.is_null() {
+    return None;
+  }
+  let mut refresh_pressure = -7.0;
+  let (update_status, synchronous_pressure) = unsafe {
+    (
+      resource_monitor::envoy_dynamic_module_on_resource_monitor_update_resource_usage(
+        resource_monitor_envoy_config(),
+        config_ptr,
+        &mut refresh_pressure,
+      ),
+      resource_monitor::envoy_dynamic_module_on_resource_monitor_get_resource_usage(config_ptr),
+    )
+  };
+  unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+  Some((
+    update_status,
+    refresh_pressure,
+    synchronous_pressure,
+    RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_CALLS.get(),
+  ))
+}
+
+#[test]
+fn test_resource_monitor_synchronous_feedback_factory_comes_first() {
+  use abi::envoy_dynamic_module_type_resource_monitor_update_status as Status;
+
+  // The synchronous feedback monitor answers only the synchronous path, after enabling it, and the
+  // refresh factory is not asked even when it has a monitor for the name too.
+  for name in ["synchronous", "both"] {
+    assert_eq!(
+      new_resource_monitor_config(name),
+      Some((Status::Failure, -7.0, 0.7, 1)),
+      "{name}"
+    );
+    assert_eq!(RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.get(), 0, "{name}");
+  }
+  // The other names fall back to the refresh factory, which answers only the refresh path.
+  assert_eq!(
+    new_resource_monitor_config("refresh"),
+    Some((Status::Success, 0.2, 0.0, 0))
+  );
+  assert_eq!(new_resource_monitor_config("unknown"), None);
+  assert_eq!(RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.get(), 1);
+}
+
+#[test]
+fn test_resource_monitor_synchronous_feedback_fails_when_enable_is_rejected() {
+  RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_RESULT.set(false);
+  // The refresh factory is not asked either, even when it has a monitor for the name.
+  assert_eq!(new_resource_monitor_config("both"), None);
+  assert_eq!(RESOURCE_MONITOR_REFRESH_FACTORY_CALLS.get(), 0);
+  RESOURCE_MONITOR_ENABLE_SYNCHRONOUS_FEEDBACK_RESULT.set(true);
+}
+
+#[test]
+fn test_resource_monitor_refresh_factory_is_optional() {
+  let new_synchronous_feedback_fn: NewSynchronousFeedbackResourceMonitorConfigFunction =
+    new_synchronous_feedback_resource_monitor;
+  let new_config_ptr = |name: &str| {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_new_impl(
+      name,
+      b"",
+      &mut resource_monitor_envoy_config_handle(),
+      None,
+      Some(&new_synchronous_feedback_fn),
+    )
+  };
+  // A module with only a synchronous feedback factory creates those monitors and rejects the other
+  // names.
+  let config_ptr = new_config_ptr("synchronous");
+  assert!(!config_ptr.is_null());
+  unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+  assert!(new_config_ptr("refresh").is_null());
+}
+
+fn new_synchronous_feedback_config_ptr(
+  monitor: Box<dyn resource_monitor::SynchronousFeedbackResourceMonitor>,
+) -> *const std::ffi::c_void {
+  wrap_into_c_void_ptr!(resource_monitor::ModuleResourceMonitor::SynchronousFeedback(monitor))
+}
+
+#[test]
+fn test_resource_monitor_get_resource_usage_recovers_from_panic() {
+  struct PanicMonitor;
+  impl resource_monitor::SynchronousFeedbackResourceMonitor for PanicMonitor {
+    fn resource_usage(&self) -> f64 {
+      panic!("intentional panic in resource_usage");
+    }
+  }
+
+  let config_ptr = new_synchronous_feedback_config_ptr(Box::new(PanicMonitor));
+  unsafe {
+    assert_eq!(
+      resource_monitor::envoy_dynamic_module_on_resource_monitor_get_resource_usage(config_ptr),
+      0.0
+    );
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_resource_monitor_load_accepted_passes_name() {
+  thread_local! {
+    static ACCEPTED: std::cell::RefCell<Vec<String>> =
+      const { std::cell::RefCell::new(Vec::new()) };
+  }
+
+  struct AcceptingMonitor;
+  impl resource_monitor::SynchronousFeedbackResourceMonitor for AcceptingMonitor {
+    fn resource_usage(&self) -> f64 {
+      0.0
+    }
+
+    fn on_load_accepted(&self, load_shed_point_name: EnvoyBuffer<'_>) {
+      ACCEPTED.with(|accepted| {
+        accepted
+          .borrow_mut()
+          .push(String::from_utf8(load_shed_point_name.as_slice().to_vec()).unwrap())
+      });
+    }
+  }
+
+  let name = "point";
+  let name_buffer = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: name.as_ptr() as *const _,
+    length: name.len(),
+  };
+  for config_ptr in [
+    new_synchronous_feedback_config_ptr(Box::new(AcceptingMonitor)),
+    // The default implementation and a refresh monitor ignore accepted load.
+    new_synchronous_feedback_config_ptr(Box::new(TestSynchronousFeedbackResourceMonitor(0.0))),
+    wrap_into_c_void_ptr!(resource_monitor::ModuleResourceMonitor::Refresh(Box::new(
+      TestResourceMonitor(resource_monitor::ResourceMonitorUpdate::Failure)
+    ))),
+  ] {
+    unsafe {
+      resource_monitor::envoy_dynamic_module_on_resource_monitor_load_accepted(
+        config_ptr,
+        name_buffer,
+      );
+      resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+    }
+  }
+  assert_eq!(ACCEPTED.with(|accepted| accepted.take()), ["point"]);
+}
+
+#[test]
+fn test_resource_monitor_load_accepted_recovers_from_panic() {
+  struct PanicMonitor;
+  impl resource_monitor::SynchronousFeedbackResourceMonitor for PanicMonitor {
+    fn resource_usage(&self) -> f64 {
+      0.0
+    }
+
+    fn on_load_accepted(&self, _load_shed_point_name: EnvoyBuffer<'_>) {
+      panic!("intentional panic in on_load_accepted");
+    }
+  }
+
+  let config_ptr = new_synchronous_feedback_config_ptr(Box::new(PanicMonitor));
+  unsafe {
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_load_accepted(
+      config_ptr,
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      },
+    );
+    resource_monitor::envoy_dynamic_module_on_resource_monitor_config_destroy(config_ptr);
+  }
+}
+
+// =============================================================================
+// Load Shed Point FFI stubs and tests.
+// =============================================================================
+
+// The filter types that can get a load shed point. Each one has its own Envoy side configuration,
+// so that a stub can check that the SDK calls the callback of the filter type it wraps.
+#[derive(Clone, Copy)]
+enum LoadShedPointFilter {
+  Http,
+  Network,
+  Listener,
+  UdpListener,
+}
+
+static LOAD_SHED_POINT_FILTER_CONFIGS: [u8; 4] = [0; 4];
+static SHEDDING_LOAD_SHED_POINT: bool = true;
+static ACCEPTING_LOAD_SHED_POINT: bool = false;
+
+fn load_shed_point_filter_config(filter: LoadShedPointFilter) -> *mut std::ffi::c_void {
+  &LOAD_SHED_POINT_FILTER_CONFIGS[filter as usize] as *const u8 as *mut std::ffi::c_void
+}
+
+fn lookup_test_load_shed_point(
+  filter: LoadShedPointFilter,
+  filter_config_envoy_ptr: *mut std::ffi::c_void,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr {
+  assert_eq!(
+    filter_config_envoy_ptr,
+    load_shed_point_filter_config(filter)
+  );
+  let name = unsafe { std::slice::from_raw_parts(name.ptr as *const u8, name.length) };
+  match name {
+    b"shedding" => &SHEDDING_LOAD_SHED_POINT as *const bool as *mut std::ffi::c_void,
+    b"accepting" => &ACCEPTING_LOAD_SHED_POINT as *const bool as *mut std::ffi::c_void,
+    _ => std::ptr::null_mut(),
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_load_shed_point_should_shed_load(
+  load_shed_point_envoy_ptr: abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr,
+) -> bool {
+  unsafe { *(load_shed_point_envoy_ptr as *const bool) }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+  filter_config_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr {
+  lookup_test_load_shed_point(LoadShedPointFilter::Http, filter_config_envoy_ptr, name)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_config_get_load_shed_point(
+  filter_config_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr {
+  lookup_test_load_shed_point(LoadShedPointFilter::Network, filter_config_envoy_ptr, name)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_config_get_load_shed_point(
+  filter_config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr {
+  lookup_test_load_shed_point(LoadShedPointFilter::Listener, filter_config_envoy_ptr, name)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_udp_listener_filter_config_get_load_shed_point(
+  filter_config_envoy_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_load_shed_point_envoy_ptr {
+  lookup_test_load_shed_point(
+    LoadShedPointFilter::UdpListener,
+    filter_config_envoy_ptr,
+    name,
+  )
+}
+
+fn check_load_shed_points(
+  get_load_shed_point: impl Fn(&str) -> Option<Box<dyn EnvoyLoadShedPoint>>,
+) {
+  assert!(get_load_shed_point("shedding").unwrap().should_shed_load());
+  assert!(!get_load_shed_point("accepting").unwrap().should_shed_load());
+  assert!(get_load_shed_point("unknown").is_none());
+}
+
+#[test]
+fn test_http_filter_config_get_load_shed_point() {
+  let config = EnvoyHttpFilterConfigImpl {
+    raw_ptr: load_shed_point_filter_config(LoadShedPointFilter::Http),
+  };
+  check_load_shed_points(|name| config.get_load_shed_point(name));
+}
+
+#[test]
+fn test_network_filter_config_get_load_shed_point() {
+  let config =
+    EnvoyNetworkFilterConfigImpl::new(load_shed_point_filter_config(LoadShedPointFilter::Network));
+  check_load_shed_points(|name| config.get_load_shed_point(name));
+}
+
+#[test]
+fn test_listener_filter_config_get_load_shed_point() {
+  let config = EnvoyListenerFilterConfigImpl::new(load_shed_point_filter_config(
+    LoadShedPointFilter::Listener,
+  ));
+  check_load_shed_points(|name| config.get_load_shed_point(name));
+}
+
+#[test]
+fn test_udp_listener_filter_config_get_load_shed_point() {
+  let config = EnvoyUdpListenerFilterConfigImpl::new(load_shed_point_filter_config(
+    LoadShedPointFilter::UdpListener,
+  ));
+  check_load_shed_points(|name| config.get_load_shed_point(name));
+}
+
+#[test]
+fn test_load_shed_point_mock() {
+  let mut config = network::MockEnvoyNetworkFilterConfig::new();
+  config.expect_get_load_shed_point().returning(|_| {
+    let mut load_shed_point = MockEnvoyLoadShedPoint::new();
+    load_shed_point.expect_should_shed_load().return_const(true);
+    Some(Box::new(load_shed_point))
+  });
+  assert!(config
+    .get_load_shed_point("shedding")
+    .unwrap()
+    .should_shed_load());
+}
+
+#[test]
+fn noop_scheduler_as_boxed_trait_object() {
+  use crate::http::EnvoyHttpFilterConfigScheduler;
+  use crate::NoopScheduler;
+
+  fn use_scheduler(s: &dyn EnvoyHttpFilterConfigScheduler) {
+    s.commit(42);
+  }
+
+  let scheduler: Box<dyn EnvoyHttpFilterConfigScheduler> = Box::new(NoopScheduler);
+  use_scheduler(&*scheduler);
+
+  bootstrap::EnvoyBootstrapExtensionConfigScheduler::commit(&NoopScheduler, 1);
+  cluster::EnvoyClusterScheduler::commit(&NoopScheduler, 2);
+  stats_sink::EnvoyStatSinkConfigScheduler::commit(&NoopScheduler, 3);
+}
+
+#[cfg(test)]
+mod ecds_tests {
+  use crate::abi;
+  use crate::bootstrap::*;
+
+  #[derive(Default)]
+  struct TestHost {
+    subscription: Option<(String, String)>,
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+    host: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_module_buffer,
+    source: abi::envoy_dynamic_module_type_module_buffer,
+  ) -> bool {
+    let host = unsafe { &mut *host.cast::<TestHost>() };
+    let read = |buffer: abi::envoy_dynamic_module_type_module_buffer| {
+      let bytes = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(buffer.ptr.cast::<u8>(), buffer.length)
+      };
+      std::str::from_utf8(bytes).unwrap().to_owned()
+    };
+    host.subscription = Some((read(name), read(source)));
+    true
+  }
+
+  #[test]
+  fn subscribes_with_borrowed_config_source() {
+    let mut host = TestHost::default();
+    let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
+    let source = r#"{"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["type.googleapis.com/test.Config"]}"#;
+    assert!(envoy.subscribe_ecds(EcdsSubscription {
+      name: "test-config",
+      source_json: source,
+    }));
+    assert_eq!(
+      host.subscription,
+      Some(("test-config".to_owned(), source.to_owned()))
+    );
+  }
+}
+
+mod xds_tests {
+  use crate::abi;
+  use crate::abi::envoy_dynamic_module_type_bootstrap_xds_update_status as Status;
+  use crate::bootstrap::*;
+  use std::sync::atomic::{AtomicBool, Ordering};
+  use std::sync::Arc;
+
+  #[derive(Default)]
+  struct TestHost {
+    enabled: bool,
+  }
+
+  #[no_mangle]
+  extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+    host: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    enabled: bool,
+  ) -> bool {
+    let host = unsafe { &mut *host.cast::<TestHost>() };
+    host.enabled = enabled;
+    true
+  }
+
+  #[test]
+  fn notification_opt_in_crosses_abi() {
+    let mut host = TestHost::default();
+    let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
+    assert!(envoy.set_xds_notifications(true));
+    assert!(host.enabled);
+    assert!(envoy.set_xds_notifications(false));
+    assert!(!host.enabled);
+  }
+
+  #[derive(Clone, Copy, Default)]
+  struct XdsInput<'a> {
+    type_url: &'a [u8],
+    error_details: &'a [u8],
+    version: &'a [u8],
+    nonce: &'a [u8],
+    resource_name: &'a [u8],
+  }
+
+  fn check_xds_update(status: Status, input: XdsInput<'_>, expected: Option<XdsUpdate<'static>>) {
+    struct Observer {
+      expected: Option<XdsUpdate<'static>>,
+      called: Arc<AtomicBool>,
+    }
+    impl BootstrapExtensionConfig for Observer {
+      fn new_bootstrap_extension(
+        &self,
+        _: &mut dyn EnvoyBootstrapExtension,
+      ) -> Box<dyn BootstrapExtension> {
+        panic!("not used by the xDS hook test")
+      }
+      fn on_xds_update(
+        &self,
+        envoy: &mut dyn EnvoyBootstrapExtensionConfig,
+        type_url: &str,
+        update: XdsUpdate<'_>,
+      ) {
+        assert_eq!(type_url, "type");
+        assert_eq!(Some(update), self.expected);
+        assert!(envoy.set_xds_notifications(false));
+        assert!(!self.called.swap(true, Ordering::Relaxed));
+      }
+    }
+    let called = Arc::new(AtomicBool::new(false));
+    let config: Box<dyn BootstrapExtensionConfig> = Box::new(Observer {
+      expected,
+      called: Arc::clone(&called),
+    });
+    let config_ptr = std::ptr::from_ref(&config).cast();
+    let mut host = TestHost { enabled: true };
+    let envoy_ptr = std::ptr::from_mut(&mut host).cast();
+    let buffer = |bytes: &[u8]| abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: if bytes.is_empty() {
+        std::ptr::null()
+      } else {
+        bytes.as_ptr().cast()
+      },
+      length: bytes.len(),
+    };
+    let XdsInput {
+      type_url,
+      error_details,
+      version,
+      nonce,
+      resource_name,
+    } = input;
+    // the boxed config and input buffers remain live for the synchronous hook
+    unsafe {
+      envoy_dynamic_module_on_bootstrap_extension_xds_update(
+        envoy_ptr,
+        config_ptr,
+        buffer(type_url),
+        status,
+        buffer(error_details),
+        buffer(version),
+        buffer(nonce),
+        buffer(resource_name),
+      );
+    }
+    assert_eq!(called.load(Ordering::Relaxed), expected.is_some());
+    assert_eq!(host.enabled, expected.is_none());
+  }
+
+  #[test]
+  fn xds_hook_forwards_response_metadata_and_unsubscribe_names() {
+    let response = XdsInput {
+      type_url: b"type",
+      version: b"version",
+      nonce: b"nonce",
+      ..XdsInput::default()
+    };
+    check_xds_update(
+      Status::Accepted,
+      response,
+      Some(XdsUpdate::Accepted {
+        version: "version",
+        nonce: "nonce",
+      }),
+    );
+    for (error_details, expected) in [
+      (b"rejected".as_slice(), "rejected"),
+      (b"".as_slice(), ""),
+      (b"\xff".as_slice(), "\u{fffd}"),
+    ] {
+      check_xds_update(
+        Status::Rejected,
+        XdsInput {
+          error_details,
+          ..response
+        },
+        Some(XdsUpdate::Rejected {
+          version: "version",
+          nonce: "nonce",
+          error_details: expected,
+        }),
+      );
+    }
+    check_xds_update(
+      Status::Unsubscribed,
+      XdsInput {
+        type_url: b"type",
+        resource_name: b"resource",
+        ..XdsInput::default()
+      },
+      Some(XdsUpdate::Unsubscribed {
+        resource_name: "resource",
+      }),
+    );
+  }
+
+  #[test]
+  fn xds_hook_preserves_empty_response_metadata() {
+    check_xds_update(
+      Status::Accepted,
+      XdsInput {
+        type_url: b"type",
+        ..XdsInput::default()
+      },
+      Some(XdsUpdate::Accepted {
+        version: "",
+        nonce: "",
+      }),
+    );
+  }
+
+  #[test]
+  fn xds_hook_rejects_invalid_utf8_identifiers() {
+    let input = XdsInput {
+      type_url: b"type",
+      ..XdsInput::default()
+    };
+    for invalid in [
+      XdsInput {
+        type_url: b"\xff",
+        ..input
+      },
+      XdsInput {
+        version: b"\xff",
+        ..input
+      },
+      XdsInput {
+        nonce: b"\xff",
+        ..input
+      },
+    ] {
+      check_xds_update(Status::Accepted, invalid, None);
+    }
+    check_xds_update(
+      Status::Unsubscribed,
+      XdsInput {
+        resource_name: b"\xff",
+        ..input
+      },
+      None,
+    );
   }
 }

@@ -36,6 +36,7 @@
 #endif
 
 using testing::_;
+using testing::ElementsAre;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
@@ -329,6 +330,16 @@ TEST_F(DiskLoaderImplTest, GetLayers) {
   const auto& new_layers = loader_->snapshot().getLayers();
   EXPECT_EQ("bar", new_layers[3]->values().find("foo")->second.raw_string_value_);
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
+}
+
+TEST_F(DiskLoaderImplTest, UpdateCallbackRunsOnDiskLayerChange) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+  MockFunction<void()> update_cb;
+  Common::CallbackHandlePtr handle = loader_->addUpdateCallback(update_cb.AsStdFunction());
+
+  EXPECT_CALL(update_cb, Call());
+  updateDiskLayer(0);
 }
 
 TEST_F(DiskLoaderImplTest, BadDirectory) {
@@ -899,6 +910,46 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
   EXPECT_EQ(original_thread_snapshot_pointer, original_snapshot_pointer);
 }
 
+// Update callbacks run after every loaded snapshot, including one with no change, and observe the
+// new snapshot from both snapshot() and threadsafeSnapshot().
+TEST_F(StaticLoaderImplTest, UpdateCallbackObservesNewSnapshot) {
+  setup();
+  std::vector<std::string> observed;
+  Common::CallbackHandlePtr handle = loader_->addUpdateCallback([&]() {
+    const auto value = loader_->snapshot().get("foo");
+    const auto threadsafe_value = loader_->threadsafeSnapshot()->get("foo");
+    ASSERT_EQ(value.has_value(), threadsafe_value.has_value());
+    if (value.has_value()) {
+      EXPECT_EQ(value.ref(), threadsafe_value.ref());
+    }
+    observed.push_back(value.has_value() ? value.ref() : "<unset>");
+  });
+  EXPECT_TRUE(observed.empty());
+
+  ASSERT_OK(loader_->mergeValues({{"foo", "bar"}}));
+  ASSERT_OK(loader_->mergeValues({{"foo", ""}}));
+  ASSERT_OK(loader_->onWorkerThreadsRegistered());
+  EXPECT_THAT(observed, ElementsAre("bar", "<unset>", "<unset>"));
+}
+
+// A callback stops running once its handle is destroyed, and a handle can outlive the loader.
+TEST_F(StaticLoaderImplTest, UpdateCallbackRemovedWithItsHandle) {
+  setup();
+  MockFunction<void()> first_cb;
+  MockFunction<void()> second_cb;
+  Common::CallbackHandlePtr first_handle = loader_->addUpdateCallback(first_cb.AsStdFunction());
+  Common::CallbackHandlePtr second_handle = loader_->addUpdateCallback(second_cb.AsStdFunction());
+
+  EXPECT_CALL(first_cb, Call());
+  EXPECT_CALL(second_cb, Call()).Times(2);
+  ASSERT_OK(loader_->mergeValues({{"foo", "bar"}}));
+  first_handle.reset();
+  ASSERT_OK(loader_->mergeValues({{"foo", "baz"}}));
+
+  loader_.reset();
+  second_handle.reset();
+}
+
 class DiskLayerTest : public testing::Test {
 protected:
   DiskLayerTest() : api_(Api::createApiForTest()) {}
@@ -1136,6 +1187,40 @@ TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
   EXPECT_EQ(3, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+TEST_F(RtdsLoaderImplTest, UpdateCallbackRunsOnConfigUpdate) {
+  setup();
+  MockFunction<void()> update_cb;
+  Common::CallbackHandlePtr handle = loader_->addUpdateCallback(update_cb.AsStdFunction());
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      foo: bar
+  )EOF");
+  EXPECT_CALL(rtds_init_callback_, Call());
+  EXPECT_CALL(update_cb, Call()).WillOnce([this]() {
+    EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
+  });
+  doOnConfigUpdateVerifyNoThrow(runtime);
+}
+
+// A snapshot that fails to load does not run the update callbacks.
+TEST_F(RtdsLoaderImplTest, UpdateCallbackSkippedWhenSnapshotFailsToLoad) {
+  setup();
+  MockFunction<void()> update_cb;
+  Common::CallbackHandlePtr handle = loader_->addUpdateCallback(update_cb.AsStdFunction());
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      foo: [bar]
+  )EOF");
+  EXPECT_CALL(update_cb, Call()).Times(0);
+  const auto decoded_resources = TestUtility::decodeResources({runtime});
+  EXPECT_FALSE(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, "").ok());
+  EXPECT_EQ("whatevs", loader_->snapshot().get("foo").value().get());
 }
 
 TEST_F(RtdsLoaderImplTest, RuntimeFeatureRemovalRestoresRuntimeGuardDefault) {
