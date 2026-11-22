@@ -1,9 +1,12 @@
+#include "envoy/common/time.h"
+
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
@@ -449,8 +452,9 @@ TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMultipleTokensPerFill) {
 // share provider is used.
 TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMultipleTokensPerFillWithShareProvider) {
   auto share_provider = std::make_shared<MockShareProvider>();
-  EXPECT_CALL(*share_provider, getTokensShareFactor())
-      .WillRepeatedly(testing::Invoke([]() -> double { return 0.5; }));
+  EXPECT_CALL(*share_provider, getTokensShareFactor()).WillRepeatedly([]() -> double {
+    return 0.5;
+  });
 
   initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 2, 2, share_provider);
 
@@ -473,6 +477,125 @@ TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMultipleTokensPerFillWithShare
   // 2 -> 0 tokens
   EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
   EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+}
+
+// Verify that a request is admitted when the shared cost is larger than the bucket, and that the
+// request still consumes the full shared cost.
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketPreservesRequestWithSmallShare) {
+  auto share_provider = std::make_shared<MockShareProvider>();
+  EXPECT_CALL(*share_provider, getTokensShareFactor())
+      .WillRepeatedly(testing::Invoke([]() -> double { return 0.125; }));
+
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 4, 4, share_provider);
+
+  // Every request costs 1 / factor = 8 tokens. The request is admitted when the bucket holds
+  // max_tokens = 4 tokens. Each member admits one request every 400ms, so 8 members admit 4
+  // requests every 200ms, which is the configured rate.
+
+  // 4 -> -4 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // -4 -> 0 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // 0 -> 4 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  // 4 -> -4 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+}
+
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketPreservesMultiTokenRequestWithSmallShare) {
+  RateLimitTokenBucket token_bucket(4, 4, std::chrono::milliseconds(200), dispatcher_.timeSource(),
+                                    false);
+
+  // Every request costs 2 / factor = 16 tokens.
+
+  // 4 -> -12 tokens
+  EXPECT_TRUE(token_bucket.consume(0.125, 2));
+  EXPECT_FALSE(token_bucket.consume(0.125, 2));
+
+  // -12 -> 0 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(600));
+  EXPECT_FALSE(token_bucket.consume(0.125, 2));
+
+  // 0 -> 4 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  // 4 -> -12 tokens
+  EXPECT_TRUE(token_bucket.consume(0.125, 2));
+}
+
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketRejectsRequestLargerThanUnsharedBucket) {
+  RateLimitTokenBucket token_bucket(4, 4, std::chrono::milliseconds(200), dispatcher_.timeSource(),
+                                    false);
+
+  EXPECT_FALSE(token_bucket.consume(1.0, 5));
+  EXPECT_FALSE(token_bucket.consume(0.125, 5));
+}
+
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketZeroMaxTokensRejectsWithSmallShare) {
+  RateLimitTokenBucket token_bucket(0, 1, std::chrono::milliseconds(200), dispatcher_.timeSource(),
+                                    false);
+
+  EXPECT_FALSE(token_bucket.consume(0.125));
+
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+
+  EXPECT_FALSE(token_bucket.consume(0.125));
+}
+
+// Verify that remaining tokens are reported as 0 when the bucket is below zero.
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketRemainingTokensBelowZero) {
+  RateLimitTokenBucket token_bucket(4, 4, std::chrono::milliseconds(200), dispatcher_.timeSource(),
+                                    false);
+
+  // 4 -> -4 tokens
+  EXPECT_TRUE(token_bucket.consume(0.125));
+  EXPECT_EQ(token_bucket.remainingTokens(), 0);
+}
+
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketRejectsSmallShareWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.local_ratelimit_local_cluster_preserve_one_request", "false"}});
+  auto share_provider = std::make_shared<MockShareProvider>();
+  EXPECT_CALL(*share_provider, getTokensShareFactor())
+      .WillRepeatedly(testing::Invoke([]() -> double { return 0.125; }));
+
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 4, 4, share_provider);
+
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+}
+
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketCachesGuardAtConstruction) {
+  TestScopedRuntime scoped_runtime;
+  const std::string guard =
+      "envoy.reloadable_features.local_ratelimit_local_cluster_preserve_one_request";
+  scoped_runtime.mergeValues({{guard, "true"}});
+  RateLimitTokenBucket enabled_bucket(4, 4, std::chrono::milliseconds(200),
+                                      dispatcher_.timeSource(), false);
+
+  scoped_runtime.mergeValues({{guard, "false"}});
+  RateLimitTokenBucket disabled_bucket(4, 4, std::chrono::milliseconds(200),
+                                       dispatcher_.timeSource(), false);
+
+  EXPECT_TRUE(enabled_bucket.consume(0.125));
+  EXPECT_FALSE(enabled_bucket.consume(0.125));
+  EXPECT_FALSE(disabled_bucket.consume(0.125));
+
+  scoped_runtime.mergeValues({{guard, "true"}});
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(400));
+
+  EXPECT_TRUE(enabled_bucket.consume(0.125));
+  EXPECT_FALSE(disabled_bucket.consume(0.125));
 }
 
 // Verify token bucket functionality with max tokens > tokens per fill.
@@ -604,6 +727,226 @@ TEST_F(LocalRateLimiterDescriptorImplTest, AtomicTokenBucketMultipleTokensPerFil
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+}
+
+class MockRateLimitTimeSource : public TimeSource {
+public:
+  MOCK_METHOD(SystemTime, systemTime, (), (override));
+  MOCK_METHOD(MonotonicTime, monotonicTime, (), (override));
+};
+
+TEST(RateLimitTokenBucketTest, OverdraftChargesFullCostBeyondRemainingTokens) {
+  testing::StrictMock<MockRateLimitTimeSource> time_source;
+  const MonotonicTime start(std::chrono::seconds(10));
+  testing::InSequence sequence;
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start));
+  RateLimitTokenBucket bucket(3, 1, std::chrono::milliseconds(1000), time_source, false);
+
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start));
+  EXPECT_FALSE(bucket.consume(1.0, 5));
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start));
+  EXPECT_TRUE(bucket.consume(1.0, 5, /*overdraft=*/true));
+
+  // Two tokens are owed, so the bucket stays empty until three seconds of refill.
+  EXPECT_CALL(time_source, monotonicTime()).WillRepeatedly(Return(start + std::chrono::seconds(2)));
+  EXPECT_EQ(0, bucket.remainingTokens());
+  EXPECT_FALSE(bucket.consume());
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start + std::chrono::seconds(3)));
+  EXPECT_TRUE(bucket.consume());
+}
+
+TEST(RateLimitTokenBucketTest, OverdraftDebtIsCappedAtMaxTokens) {
+  testing::StrictMock<MockRateLimitTimeSource> time_source;
+  const MonotonicTime start(std::chrono::seconds(10));
+  testing::InSequence sequence;
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start));
+  RateLimitTokenBucket bucket(2, 1, std::chrono::milliseconds(1000), time_source, false);
+
+  // A cost far beyond the bucket overdraws it by only max_tokens.
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start));
+  EXPECT_TRUE(bucket.consume(1.0, 1000, /*overdraft=*/true));
+  // At the cap, further overdrafts add no debt.
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start));
+  EXPECT_FALSE(bucket.consume(1.0, 1, /*overdraft=*/true));
+
+  // Two tokens are owed, so the bucket recovers after three seconds instead of ~1000.
+  EXPECT_CALL(time_source, monotonicTime()).WillRepeatedly(Return(start + std::chrono::seconds(2)));
+  EXPECT_EQ(0, bucket.remainingTokens());
+  EXPECT_FALSE(bucket.consume());
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start + std::chrono::seconds(3)));
+  EXPECT_TRUE(bucket.consume());
+}
+
+TEST(RateLimitTokenBucketTest, OverdraftKeepsFullCostAfterInterleavedDrain) {
+  testing::StrictMock<MockRateLimitTimeSource> time_source;
+  const MonotonicTime earlier(std::chrono::seconds(10));
+  const MonotonicTime later = earlier + std::chrono::seconds(1);
+  testing::InSequence sequence;
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(earlier));
+  RateLimitTokenBucket bucket(2, 1, std::chrono::milliseconds(1000), time_source, false);
+
+  // Drain at a later time before returning this caller's earlier time sample.
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(testing::Invoke([&]() {
+    EXPECT_TRUE(bucket.consume(1.0, 2));
+    return earlier;
+  }));
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(later));
+  EXPECT_TRUE(bucket.consume(1.0, 1, /*overdraft=*/true));
+
+  // The delayed charge is not lost or refunded: the bucket owes one token beyond the drain.
+  EXPECT_CALL(time_source, monotonicTime()).WillRepeatedly(Return(later + std::chrono::seconds(1)));
+  EXPECT_EQ(0, bucket.remainingTokens());
+  EXPECT_FALSE(bucket.consume());
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(later + std::chrono::seconds(2)));
+  EXPECT_TRUE(bucket.consume());
+}
+
+class CompletedUsageTest : public Event::TestUsingSimulatedTime,
+                           public LocalRateLimiterDescriptorImplTest {};
+
+TEST_F(CompletedUsageTest, CompletedUsageConsumesAllMatchingBuckets) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 1, "1000s"),
+                            *descriptors_.Add());
+  TestUtility::loadFromYaml(fmt::format(multiple_descriptor_config_yaml, 5, 1, "1000s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000000), 10, 1);
+  std::vector<RateLimit::Descriptor> descriptors{descriptor_[0], descriptor2_[0]};
+  descriptors[0].hits_addend_ = 3;
+  descriptors[1].hits_addend_ = 3;
+  rate_limiter_->consumeDescriptors(descriptors);
+  // Over-budget usage overdraws the first bucket without skipping the second.
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  auto result = rate_limiter_->requestAllowed(descriptor2_);
+  EXPECT_TRUE(result.allowed);
+  EXPECT_EQ(1, result.token_bucket_context->remainingTokens());
+}
+
+TEST_F(CompletedUsageTest, CompletedUsageDoesNotConsumeDefaultBucket) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 5, 1, "1000s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000000), 1, 1);
+  rate_limiter_->consumeDescriptors({});
+  std::vector<RateLimit::Descriptor> unmatched{{{{"unknown", "value"}}}};
+  rate_limiter_->consumeDescriptors(unmatched);
+  rate_limiter_->consumeDescriptors(descriptor_);
+  EXPECT_TRUE(rate_limiter_->requestAllowed({}).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed({}).allowed);
+}
+
+TEST_F(CompletedUsageTest, CompletedUsageSupportsRefundsAndZeroCost) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 5, 1, "1000s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000000), 10, 1);
+  auto descriptors = descriptor_;
+  descriptors[0].hits_addend_ = 4;
+  rate_limiter_->consumeDescriptors(descriptors);
+  descriptors[0].hits_addend_ = 0;
+  rate_limiter_->consumeDescriptors(descriptors);
+  descriptors[0].hits_addend_ = 2;
+  descriptors[0].is_negative_hits_ = true;
+  rate_limiter_->consumeDescriptors(descriptors);
+  auto result = rate_limiter_->requestAllowed(descriptor_);
+  EXPECT_TRUE(result.allowed);
+  EXPECT_EQ(2, result.token_bucket_context->remainingTokens());
+}
+
+TEST_F(CompletedUsageTest, CompletedUsageSupportsWildcardDescriptorsAndSharing) {
+  TestUtility::loadFromYaml(fmt::format(wildcard_descriptor_config_yaml, 5, 1, "1000s"),
+                            *descriptors_.Add());
+  auto share_provider = std::make_shared<testing::StrictMock<MockShareProvider>>();
+  EXPECT_CALL(*share_provider, getTokensShareFactor()).WillRepeatedly(Return(0.5));
+  rate_limiter_ = std::make_shared<LocalRateLimiterImpl>(
+      std::chrono::milliseconds(1000000), 100, 1, dispatcher_, descriptors_, false, share_provider);
+  std::vector<RateLimit::Descriptor> descriptors{{{{"user", "alice"}}}};
+  descriptors[0].hits_addend_ = 2;
+  rate_limiter_->consumeDescriptors(descriptors);
+  // At share factor 0.5, two usage units consume four tokens.
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors).allowed);
+  descriptors[0].hits_addend_ = 0;
+  descriptors[0].is_negative_hits_ = true;
+  auto result = rate_limiter_->requestAllowed(descriptors);
+  EXPECT_TRUE(result.allowed);
+  EXPECT_EQ(1, result.token_bucket_context->remainingTokens());
+  descriptors[0].entries_[0].value_ = "bob";
+  descriptors[0].is_negative_hits_ = false;
+  descriptors[0].hits_addend_ = 1;
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+}
+
+TEST_F(CompletedUsageTest, CompletionValuesCanEvictRequestBuckets) {
+  TestUtility::loadFromYaml(fmt::format(wildcard_descriptor_config_yaml, 5, 1, "1000s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000000), 100, 1, 1);
+  std::vector<RateLimit::Descriptor> alice{{{{"user", "alice"}}}};
+  const auto original_alice = rate_limiter_->requestAllowed(alice);
+  ASSERT_TRUE(original_alice.allowed);
+  EXPECT_EQ(4, original_alice.token_bucket_context->remainingTokens());
+
+  std::vector<RateLimit::Descriptor> bob{{{{"user", "bob"}}}};
+  bob[0].hits_addend_ = 2;
+  rate_limiter_->consumeDescriptors(bob);
+  // Completion creates Bob's bucket, evicting Alice from the size-one cache.
+  bob[0].hits_addend_ = 0;
+  bob[0].is_negative_hits_ = true;
+  auto bob_result = rate_limiter_->requestAllowed(bob);
+  ASSERT_TRUE(bob_result.allowed);
+  EXPECT_EQ(3, bob_result.token_bucket_context->remainingTokens());
+
+  const auto recreated_alice = rate_limiter_->requestAllowed(alice);
+  ASSERT_TRUE(recreated_alice.allowed);
+  EXPECT_NE(original_alice.token_bucket_context, recreated_alice.token_bucket_context);
+  EXPECT_EQ(4, recreated_alice.token_bucket_context->remainingTokens());
+}
+
+TEST_F(CompletedUsageTest, CompletionRefreshesWildcardLruAndSharesRequestBudget) {
+  TestUtility::loadFromYaml(fmt::format(wildcard_descriptor_config_yaml, 5, 1, "1000s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000000), 100, 1, 2);
+  std::vector<RateLimit::Descriptor> alice{{{{"user", "alice"}}}};
+  std::vector<RateLimit::Descriptor> bob{{{{"user", "bob"}}}};
+  std::vector<RateLimit::Descriptor> charlie{{{{"user", "charlie"}}}};
+  const auto original_alice = rate_limiter_->requestAllowed(alice);
+  const auto original_bob = rate_limiter_->requestAllowed(bob);
+  ASSERT_TRUE(original_alice.allowed);
+  ASSERT_TRUE(original_bob.allowed);
+
+  // The cache is full. Completion charges Alice's existing bucket and makes it most recent.
+  auto completed_alice = alice;
+  completed_alice[0].hits_addend_ = 3;
+  rate_limiter_->consumeDescriptors(completed_alice);
+  EXPECT_EQ(1, original_alice.token_bucket_context->remainingTokens());
+  EXPECT_EQ(4, original_bob.token_bucket_context->remainingTokens());
+
+  EXPECT_TRUE(rate_limiter_->requestAllowed(charlie).allowed);
+  const auto final_alice = rate_limiter_->requestAllowed(alice);
+  ASSERT_TRUE(final_alice.allowed);
+  EXPECT_EQ(original_alice.token_bucket_context, final_alice.token_bucket_context);
+  EXPECT_EQ(0, final_alice.token_bucket_context->remainingTokens());
+  EXPECT_FALSE(rate_limiter_->requestAllowed(alice).allowed);
+
+  // Charlie evicted Bob, so Bob's next request receives a fresh budget.
+  const auto recreated_bob = rate_limiter_->requestAllowed(bob);
+  ASSERT_TRUE(recreated_bob.allowed);
+  EXPECT_NE(original_bob.token_bucket_context, recreated_bob.token_bucket_context);
+  EXPECT_EQ(4, recreated_bob.token_bucket_context->remainingTokens());
+}
+
+TEST_F(CompletedUsageTest, RefundsRetainExistingUnscaledSharingBehavior) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 5, 1, "1000s"),
+                            *descriptors_.Add());
+  auto share_provider = std::make_shared<testing::StrictMock<MockShareProvider>>();
+  EXPECT_CALL(*share_provider, getTokensShareFactor()).WillRepeatedly(Return(0.5));
+  rate_limiter_ = std::make_shared<LocalRateLimiterImpl>(
+      std::chrono::milliseconds(1000000), 100, 1, dispatcher_, descriptors_, false, share_provider);
+  auto descriptors = descriptor_;
+  descriptors[0].hits_addend_ = 2;
+  rate_limiter_->consumeDescriptors(descriptors); // Charge 2 / 0.5 = 4 tokens.
+  descriptors[0].is_negative_hits_ = true;
+  rate_limiter_->consumeDescriptors(descriptors); // Refund 2 unscaled tokens.
+  descriptors[0].hits_addend_ = 0;
+  const auto result = rate_limiter_->requestAllowed(descriptors);
+  ASSERT_TRUE(result.allowed);
+  EXPECT_EQ(3, result.token_bucket_context->remainingTokens());
 }
 
 // Verify token bucket functionality with multiple descriptors.

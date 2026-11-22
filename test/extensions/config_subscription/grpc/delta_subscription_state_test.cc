@@ -89,11 +89,11 @@ protected:
     }
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _))
         .Times(expect_config_update_call ? 1 : 0)
-        .WillRepeatedly(Invoke([updated_resources](const auto& added, const auto&, const auto&) {
+        .WillRepeatedly([updated_resources](const auto& added, const auto&, const auto&) {
           if (updated_resources) {
             EXPECT_EQ(added.size(), *updated_resources);
           }
-        }));
+        });
     return handleResponse(message);
   }
 
@@ -108,14 +108,14 @@ protected:
     message.set_system_version_info(version_info);
     message.set_nonce(nonce);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _))
-        .WillOnce(Invoke([&updated_resources](const auto& added, const auto&, const auto&) {
+        .WillOnce([&updated_resources](const auto& added, const auto&, const auto&) {
           EXPECT_TRUE(std::equal(updated_resources.begin(), updated_resources.end(), added.begin(),
                                  added.end(),
                                  [](const envoy::service::discovery::v3::Resource& a,
                                     const envoy::service::discovery::v3::Resource* const b) {
                                    return TestUtility::protoEqual(a, *b, /*ignore_ordering=*/false);
                                  }));
-        }));
+        });
     return handleResponse(message);
   }
 
@@ -1320,12 +1320,12 @@ TEST_F(DeltaSubscriptionStateTest, TypeUrlMismatch) {
 
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _))
-      .WillOnce(Invoke([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {
+      .WillOnce([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {
         EXPECT_TRUE(IsSubstring("", "",
                                 "type URL foo embedded in an individual Any does not match the "
                                 "message-wide type URL bar",
                                 e->what()));
-      }));
+      });
   handleResponse(message);
 }
 

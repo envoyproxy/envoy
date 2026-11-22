@@ -68,6 +68,7 @@ using Extensions::HttpFilters::ExternalProcessing::TestOnProcessingResponseFacto
 using Http::LowerCaseString;
 using test::integration::filters::LoggingTestFilterConfig;
 using testing::_;
+using testing::Ge;
 using testing::Not;
 
 using namespace std::chrono_literals;
@@ -300,6 +301,9 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
 
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequestAndTimeout) {
   proto_config_.set_observability_mode(true);
+  // Observability mode must not arm the message timer: each handler below advances time past
+  // this timeout and the request must still succeed.
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
   uint32_t deferred_close_timeout_ms = 2000;
   proto_config_.mutable_deferred_close_timeout()->set_seconds(deferred_close_timeout_ms / 1000);
 
@@ -313,18 +317,18 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequestAndTimeout) {
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
                                [this](const HttpHeaders&, HeadersResponse&) {
-                                 // Advance 400 ms. Default timeout is 200ms
+                                 // Advance 400 ms. Timeout is 200ms
                                  timeSystem().advanceTimeWaitImpl(400ms);
                                  return false;
                                });
   processRequestBodyMessage(*grpc_upstreams_[0], false, [this](const HttpBody&, BodyResponse&) {
-    // Advance 400 ms. Default timeout is 200ms
+    // Advance 400 ms. Timeout is 200ms
     timeSystem().advanceTimeWaitImpl(400ms);
     return false;
   });
   processRequestTrailersMessage(*grpc_upstreams_[0], false,
                                 [this](const HttpTrailers&, TrailersResponse&) {
-                                  // Advance 400 ms. Default timeout is 200ms
+                                  // Advance 400 ms. Timeout is 200ms
                                   timeSystem().advanceTimeWaitImpl(400ms);
                                   return false;
                                 });
@@ -346,6 +350,13 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLogging) {
       [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
+  // In observability mode the main stream does not wait for the ext_proc stream, so wait until
+  // Envoy has processed the ext_proc server's response headers before letting the main response
+  // complete and consume the side stream's logging info. upstream_rq_200 is charged in the same
+  // router callback that sets "via_upstream".
+  if (IsEnvoyGrpc()) {
+    test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_200", Ge(1));
+  }
   handleUpstreamRequest();
   processResponseHeadersMessage(*grpc_upstreams_[0], false, std::nullopt);
   verifyDownstreamResponse(*response, 200);

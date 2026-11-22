@@ -140,9 +140,9 @@ public:
     }
     EXPECT_EQ(RetryStatus::Yes,
               state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
-    EXPECT_CALL(callback_ready_, ready()).WillOnce(Invoke([this, expect_disable_early_data]() {
+    EXPECT_CALL(callback_ready_, ready()).WillOnce([this, expect_disable_early_data]() {
       EXPECT_EQ(retry_disable_early_data_, expect_disable_early_data);
-    }));
+    });
     if (expect_disable_early_data) {
       retry_schedulable_callback_->invokeCallback();
       EXPECT_TRUE(retry_disable_early_data_);

@@ -177,6 +177,7 @@ private:
 
   static const unsigned DEFAULT_MIN_VERSION;
   static const unsigned DEFAULT_MAX_VERSION;
+  static const unsigned DEFAULT_MAX_VERSION_LEGACY;
 
   const std::string server_name_indication_;
   const bool auto_host_sni_ : 1;

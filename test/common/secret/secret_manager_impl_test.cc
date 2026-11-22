@@ -284,9 +284,9 @@ TEST_F(SecretManagerImplTest, DeduplicateDynamicTlsCertificateSecretProvider) {
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
   Init::TargetHandlePtr init_target_handle;
   EXPECT_CALL(init_manager, add(_))
-      .WillRepeatedly(Invoke([&init_target_handle](const Init::Target& target) {
+      .WillRepeatedly([&init_target_handle](const Init::Target& target) {
         init_target_handle = target.createHandle("test");
-      }));
+      });
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
@@ -365,10 +365,9 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
   Init::TargetHandlePtr init_target_handle;
-  EXPECT_CALL(init_manager, add(_))
-      .WillOnce(Invoke([&init_target_handle](const Init::Target& target) {
-        init_target_handle = target.createHandle("test");
-      }));
+  EXPECT_CALL(init_manager, add(_)).WillOnce([&init_target_handle](const Init::Target& target) {
+    init_target_handle = target.createHandle("test");
+  });
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(*dispatcher_));
@@ -413,9 +412,9 @@ TEST_F(SecretManagerImplTest, DynamicActiveSecretNames) {
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
   Init::TargetHandlePtr init_target_handle;
   EXPECT_CALL(init_manager, add(_))
-      .WillRepeatedly(Invoke([&init_target_handle](const Init::Target& target) {
+      .WillRepeatedly([&init_target_handle](const Init::Target& target) {
         init_target_handle = target.createHandle("test");
-      }));
+      });
   EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(*dispatcher_));
   EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
@@ -665,10 +664,9 @@ TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(secret_context.server_context_, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
-  EXPECT_CALL(init_manager, add(_))
-      .WillOnce(Invoke([&init_target_handle](const Init::Target& target) {
-        init_target_handle = target.createHandle("test");
-      }));
+  EXPECT_CALL(init_manager, add(_)).WillOnce([&init_target_handle](const Init::Target& target) {
+    init_target_handle = target.createHandle("test");
+  });
 
   auto secret_provider = secret_manager->findOrCreateGenericSecretProvider(
       config_source, "encryption_key", secret_context.server_context_, init_manager, true);
@@ -706,9 +704,9 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandler) {
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
   Init::TargetHandlePtr init_target_handle;
   EXPECT_CALL(init_manager, add(_))
-      .WillRepeatedly(Invoke([&init_target_handle](const Init::Target& target) {
+      .WillRepeatedly([&init_target_handle](const Init::Target& target) {
         init_target_handle = target.createHandle("test");
-      }));
+      });
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
@@ -979,9 +977,9 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerWarmingSecrets) {
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
   Init::TargetHandlePtr init_target_handle;
   EXPECT_CALL(init_manager, add(_))
-      .WillRepeatedly(Invoke([&init_target_handle](const Init::Target& target) {
+      .WillRepeatedly([&init_target_handle](const Init::Target& target) {
         init_target_handle = target.createHandle("test");
-      }));
+      });
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
@@ -1125,9 +1123,9 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSecrets) {
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
   Init::TargetHandlePtr init_target_handle;
   EXPECT_CALL(init_manager, add(_))
-      .WillRepeatedly(Invoke([&init_target_handle](const Init::Target& target) {
+      .WillRepeatedly([&init_target_handle](const Init::Target& target) {
         init_target_handle = target.createHandle("test");
-      }));
+      });
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
@@ -1200,9 +1198,9 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticValidationContext) {
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
   Init::TargetHandlePtr init_target_handle;
   EXPECT_CALL(init_manager, add(_))
-      .WillRepeatedly(Invoke([&init_target_handle](const Init::Target& target) {
+      .WillRepeatedly([&init_target_handle](const Init::Target& target) {
         init_target_handle = target.createHandle("test");
-      }));
+      });
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
@@ -1246,9 +1244,9 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSessionTicketsContext) {
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
   Init::TargetHandlePtr init_target_handle;
   EXPECT_CALL(init_manager, add(_))
-      .WillRepeatedly(Invoke([&init_target_handle](const Init::Target& target) {
+      .WillRepeatedly([&init_target_handle](const Init::Target& target) {
         init_target_handle = target.createHandle("test");
-      }));
+      });
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
@@ -1325,10 +1323,9 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretPrivateKeyProviderUpdateSuccess) {
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
   Init::TargetHandlePtr init_target_handle;
-  EXPECT_CALL(init_manager, add(_))
-      .WillOnce(Invoke([&init_target_handle](const Init::Target& target) {
-        init_target_handle = target.createHandle("test");
-      }));
+  EXPECT_CALL(init_manager, add(_)).WillOnce([&init_target_handle](const Init::Target& target) {
+    init_target_handle = target.createHandle("test");
+  });
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(*dispatcher_));

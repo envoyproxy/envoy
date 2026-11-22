@@ -72,6 +72,8 @@ Cluster::Cluster(
       main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       orig_cluster_config_(cluster),
       allow_coalesced_connections_(config.allow_coalesced_connections()),
+      skip_draining_on_resolution_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, skip_draining_on_resolution, true)),
       time_source_(context.serverFactoryContext().timeSource()),
       cm_(context.serverFactoryContext().clusterManager()),
       max_sub_clusters_(
@@ -284,8 +286,7 @@ absl::Status Cluster::addOrUpdateHost(
     const auto host_map_it = host_map_.find(host);
     if (host_map_it != host_map_.end()) {
       ASSERT(host_info == host_map_it->second.shared_host_info_);
-      if (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.dfp_cluster_replace_host_on_address_change")) {
+      if (skip_draining_on_resolution_) {
         // If we only have an address change, we can do that swap inline without any other updates.
         // The appropriate R/W locking is in place to allow this. The details of this locking are:
         //  - Hosts are not thread local, they are global.
@@ -460,10 +461,8 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   Upstream::HostConstSharedPtr host = findHostByName(hostname);
   bool force_refresh =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reresolve_if_no_connections") &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts") &&
       host && !host->used();
-  if ((host && !force_refresh) ||
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
+  if (host && !force_refresh) {
     return {host};
   }
 
@@ -484,7 +483,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
                                                                        force_refresh, *cancelable);
   switch (result.status_) {
   case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::InCache:
-    return {nullptr, result.host_info_.has_value() ? result.host_info_.value()->details() : ""};
+    return cluster->selectHostFromResolvedEntry(hostname, result.host_info_.value_or(nullptr));
   case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading:
     // Here the DFP kicks off an async lookup. The DFPHostSelectionHandle will
     // call onLoadDnsCacheComplete and onAsyncHostSelection unless the
@@ -506,6 +505,17 @@ Upstream::HostConstSharedPtr Cluster::LoadBalancer::findHostByName(const std::st
     return cluster->findHostByName(host);
   }
   return nullptr;
+}
+
+Upstream::HostSelectionResponse Cluster::selectHostFromResolvedEntry(
+    const std::string& host,
+    const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) const {
+  if (!host_info) {
+    return {nullptr, "no_host"};
+  }
+  // Proxied hosts are published with a null address; failed resolutions are never published.
+  // Use the cluster host map as the sole source of truth rather than checking the address.
+  return {findHostByName(host), host_info->details()};
 }
 
 Upstream::HostConstSharedPtr Cluster::findHostByName(const std::string& host) const {

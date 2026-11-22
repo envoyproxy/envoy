@@ -8,8 +8,10 @@ import (
 
 func init() {
 	sdk.RegisterListenerFilterConfigFactories(map[string]shared.ListenerFilterConfigFactory{
-		"write_to_socket": &writeToSocketConfigFactory{},
-		"buffer_read":     &bufferReadConfigFactory{},
+		"write_to_socket":  &writeToSocketConfigFactory{},
+		"buffer_read":      &bufferReadConfigFactory{},
+		"dynamic_metadata": &dynamicMetadataConfigFactory{},
+		"load_shed_point":  &loadShedPointConfigFactory{},
 	})
 }
 
@@ -91,3 +93,84 @@ func (f *bufferReadFilter) OnData(dataLength uint64) shared.ListenerFilterStatus
 }
 
 func (f *bufferReadFilter) MaxReadBytes() uint64 { return 4 }
+
+type dynamicMetadataConfigFactory struct {
+	shared.EmptyListenerFilterConfigFactory
+}
+
+func (f *dynamicMetadataConfigFactory) Create(shared.ListenerFilterConfigHandle, []byte) (shared.ListenerFilterFactory, error) {
+	return &dynamicMetadataFactory{}, nil
+}
+
+type dynamicMetadataFactory struct {
+	shared.EmptyListenerFilterFactory
+}
+
+func (f *dynamicMetadataFactory) Create(handle shared.ListenerFilterHandle) shared.ListenerFilter {
+	return &dynamicMetadataFilter{handle: handle}
+}
+
+type dynamicMetadataFilter struct {
+	handle shared.ListenerFilterHandle
+	shared.EmptyListenerFilter
+}
+
+func (f *dynamicMetadataFilter) OnAccept() shared.ListenerFilterStatus {
+	// A serialized google.protobuf.Struct with "k" set to "v".
+	if !f.handle.SetDynamicMetadataStruct("dynamic_modules.struct",
+		[]byte{0x0a, 0x08, 0x0a, 0x01, 0x6b, 0x12, 0x03, 0x1a, 0x01, 0x76}) {
+		panic("expected the struct to be merged")
+	}
+	if value, ok := f.handle.GetDynamicMetadataString("dynamic_modules.struct", "k"); !ok || value.ToUnsafeString() != "v" {
+		panic("expected struct metadata")
+	}
+
+	// A serialized google.protobuf.Any with type URL "t/x" and value 0x01 0x02.
+	if !f.handle.SetDynamicTypedMetadata("dynamic_modules.typed",
+		[]byte{0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02}) {
+		panic("expected the typed metadata to be set")
+	}
+
+	// A struct that does not parse and an Any without a type URL are rejected.
+	if f.handle.SetDynamicMetadataStruct("dynamic_modules.struct", []byte{0x0f}) ||
+		f.handle.SetDynamicTypedMetadata("dynamic_modules.typed", nil) {
+		panic("expected the invalid buffers to be rejected")
+	}
+	return shared.ListenerFilterStatusContinue
+}
+
+// loadShedPointConfigFactory creates filters that close an accepted socket when the load shed
+// point named in the filter config sheds it.
+type loadShedPointConfigFactory struct {
+	shared.EmptyListenerFilterConfigFactory
+}
+
+func (f *loadShedPointConfigFactory) Create(handle shared.ListenerFilterConfigHandle, config []byte) (shared.ListenerFilterFactory, error) {
+	return &loadShedPointFactory{loadShedPoint: handle.GetLoadShedPoint(string(config))}, nil
+}
+
+type loadShedPointFactory struct {
+	shared.EmptyListenerFilterFactory
+	loadShedPoint shared.LoadShedPoint
+}
+
+func (f *loadShedPointFactory) Create(handle shared.ListenerFilterHandle) shared.ListenerFilter {
+	return &loadShedPointFilter{
+		handle:   handle,
+		shedLoad: f.loadShedPoint != nil && f.loadShedPoint.ShouldShedLoad(),
+	}
+}
+
+type loadShedPointFilter struct {
+	handle   shared.ListenerFilterHandle
+	shedLoad bool
+	shared.EmptyListenerFilter
+}
+
+func (f *loadShedPointFilter) OnAccept() shared.ListenerFilterStatus {
+	if !f.shedLoad {
+		return shared.ListenerFilterStatusContinue
+	}
+	f.handle.CloseSocket("load_shed")
+	return shared.ListenerFilterStatusStop
+}

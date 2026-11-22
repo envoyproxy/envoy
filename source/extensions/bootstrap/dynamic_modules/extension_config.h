@@ -4,6 +4,8 @@
 #include <vector>
 
 #include "envoy/common/callback.h"
+#include "envoy/common/optref.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/watcher.h"
 #include "envoy/http/async_client.h"
@@ -12,11 +14,17 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/store.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/init/target_impl.h"
+#include "source/extensions/bootstrap/dynamic_modules/cluster_writer.h"
+#include "source/extensions/bootstrap/dynamic_modules/config_snapshot.h"
+#include "source/extensions/bootstrap/dynamic_modules/extension_config_subscription.h"
+#include "source/extensions/bootstrap/dynamic_modules/filter_chain_config_writer.h"
+#include "source/extensions/bootstrap/dynamic_modules/listener_writer.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/dynamic_modules/metric_registry.h"
@@ -68,6 +76,26 @@ using OnBootstrapExtensionSecretAddOrUpdateType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update);
 using OnBootstrapExtensionSecretRemovalType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_secret_removal);
+using OnBootstrapExtensionXdsUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_xds_update);
+using OnBootstrapExtensionWorkerEventType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_worker_event);
+using OnBootstrapExtensionRunOnAllWorkersDoneType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done);
+using OnBootstrapExtensionClusterWriterUpdateDoneType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done);
+using OnBootstrapExtensionListenerWriterUpdateDoneType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done);
+using OnBootstrapExtensionFilterChainConfigWriterUpdateDoneType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done);
+using OnBootstrapExtensionEcdsUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_ecds_update);
+using OnBootstrapExtensionRuntimeBoolUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update);
+using OnBootstrapExtensionRuntimeIntUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_int_update);
+using OnBootstrapExtensionRuntimeNumberUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_number_update);
 
 class DynamicModuleBootstrapExtension;
 
@@ -80,6 +108,7 @@ class DynamicModuleBootstrapExtensionConfig
       public Upstream::ClusterUpdateCallbacks,
       public Server::ListenerUpdateCallbacks,
       public Secret::SecretLifecycleCallbacks,
+      public Config::XdsConfigTracker,
       public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
   /**
@@ -135,6 +164,11 @@ public:
   void signalInitComplete();
 
   /**
+   * Runs signalInitComplete() on the main thread. This can be called from any thread.
+   */
+  void postSignalInitComplete();
+
+  /**
    * Enables cluster lifecycle event notifications. When enabled, the module will receive
    * on_bootstrap_extension_cluster_add_or_update and on_bootstrap_extension_cluster_removal
    * callbacks when clusters are added, updated, or removed.
@@ -146,6 +180,17 @@ public:
    */
   bool enableClusterLifecycle();
 
+  /**
+   * Subscribes once to a named ECDS configuration after server initialization.
+   */
+  bool subscribeEcds(absl::string_view name, absl::string_view source_json);
+
+  /**
+   * Collects and redacts the selected configuration providers on the main thread.
+   */
+  absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
+  getConfigSnapshot(absl::Span<const absl::string_view> providers, absl::string_view name_regex);
+
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
                             Upstream::ThreadLocalClusterCommand& get_cluster) override;
@@ -154,11 +199,20 @@ public:
   /**
    * Sets the listener manager reference. Must be called during onServerInitialized before
    * the module can enable listener lifecycle events. Marks the server as initialized so the
-   * cluster manager can be accessed safely.
+   * cluster manager can be accessed safely and the writers accept writes.
    */
   void setListenerManager(Server::ListenerManager& listener_manager) {
     listener_manager_ = &listener_manager;
     server_initialized_ = true;
+    if (cluster_writer_ != nullptr) {
+      cluster_writer_->onServerInitialized();
+    }
+    if (listener_writer_ != nullptr) {
+      listener_writer_->onServerInitialized(listener_manager);
+    }
+    if (filter_chain_config_writer_ != nullptr) {
+      filter_chain_config_writer_->onServerInitialized(listener_manager);
+    }
   }
 
   /**
@@ -194,10 +248,36 @@ public:
   void onSecretRemoval(absl::string_view secret_name) override;
 
   /**
+   * Registers or unregisters xDS notifications on the main thread.
+   */
+  bool setXdsNotifications(bool enabled);
+
+  // Config::XdsConfigTracker
+  void onConfigAccepted(absl::string_view type_url,
+                        const std::vector<Config::DecodedResourcePtr>& resources) override;
+  void
+  onConfigAccepted(absl::string_view type_url,
+                   absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+                   const Protobuf::RepeatedPtrField<std::string>& removed_resources) override;
+  void
+  onConfigAcceptedWithResponse(const envoy::service::discovery::v3::DiscoveryResponse& message,
+                               const std::vector<Config::DecodedResourcePtr>& resources) override;
+  void onConfigAcceptedWithResponse(
+      const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+      absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources) override;
+  void onConfigRejected(const envoy::service::discovery::v3::DiscoveryResponse& message,
+                        absl::string_view error_detail) override;
+  void onConfigRejected(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+                        absl::string_view error_detail) override;
+  void onResourceUnsubscribed(absl::string_view type_url, absl::string_view resource) override;
+
+  /**
    * Enumerates the names of the currently active resources of a single kind: the active listeners'
    * filter chains (inline, default and routable FCDS chains), the clusters, the transport socket
    * match names present in every cluster that has matches, or the active dynamic secrets. `emit`
-   * is invoked at most once per name. A no-op before the server is initialized. Main thread only.
+   * is invoked at most once per name. A no-op before the server is initialized and once the
+   * extension is destroyed. Main thread only.
    *
    * @param kind selects which kind of active resource to enumerate.
    * @param emit is invoked for each name; the string_view is valid only during that invocation.
@@ -212,6 +292,62 @@ public:
    */
   static std::vector<absl::string_view> transportSocketMatchIntersection(
       const std::vector<std::vector<absl::string_view>>& per_cluster_matches);
+
+  /**
+   * Runs the module's worker event hook on every worker thread, followed by its done hook on the
+   * main thread. Must be called on the main thread.
+   * @return false before the server is initialized or after shutdown began.
+   */
+  bool runOnAllWorkers(uint64_t event_id);
+
+  /**
+   * Creates the cluster writer, which lets the module add, update and remove clusters. Must be
+   * called on the main thread.
+   * @return false if the cluster writer already exists or shutdown began.
+   */
+  bool enableClusterWriter();
+
+  /**
+   * Creates the listener writer, which lets the module add, update and remove listeners. Must be
+   * called on the main thread.
+   * @return false if the listener writer already exists or shutdown began.
+   */
+  bool enableListenerWriter();
+
+  /**
+   * Creates the filter chain config writer, which lets the module add, update and remove filter
+   * chains. Must be called on the main thread.
+   * @return false if the filter chain config writer already exists or shutdown began.
+   */
+  bool enableFilterChainConfigWriter();
+
+  /**
+   * Called on the main thread once Envoy finished initializing, right before it starts its
+   * workers.
+   */
+  void onPostInit();
+
+  /**
+   * Called on the main thread when the server begins to shut down and when the extension is
+   * destroyed.
+   */
+  void onShutdown();
+
+  /**
+   * Called on the main thread when the extension is destroyed. The server destroys its context
+   * before its bootstrap extensions, so the callbacks that use the context stop working.
+   */
+  void onExtensionDestroyed();
+
+  /**
+   * Whether the server began to shut down or the extension was destroyed.
+   */
+  bool shutdownStarted() const { return shutdown_started_; }
+
+  /**
+   * Returns the admin server, or nothing once the extension is destroyed.
+   */
+  OptRef<Server::Admin> admin();
 
   // The corresponding in-module configuration.
   envoy_dynamic_module_type_bootstrap_extension_config_module_ptr in_module_config_ = nullptr;
@@ -240,6 +376,26 @@ public:
   OnBootstrapExtensionListenerRemovalType on_bootstrap_extension_listener_removal_ = nullptr;
   OnBootstrapExtensionSecretAddOrUpdateType on_bootstrap_extension_secret_add_or_update_ = nullptr;
   OnBootstrapExtensionSecretRemovalType on_bootstrap_extension_secret_removal_ = nullptr;
+
+  // The following hooks are optional and stay nullptr when the module does not implement them.
+  OnBootstrapExtensionXdsUpdateType on_bootstrap_extension_xds_update_ = nullptr;
+  OnBootstrapExtensionEcdsUpdateType on_bootstrap_extension_ecds_update_ = nullptr;
+  OnBootstrapExtensionWorkerEventType on_bootstrap_extension_worker_event_ = nullptr;
+  OnBootstrapExtensionRunOnAllWorkersDoneType on_bootstrap_extension_run_on_all_workers_done_ =
+      nullptr;
+  OnBootstrapExtensionClusterWriterUpdateDoneType
+      on_bootstrap_extension_cluster_writer_update_done_ = nullptr;
+  OnBootstrapExtensionListenerWriterUpdateDoneType
+      on_bootstrap_extension_listener_writer_update_done_ = nullptr;
+  OnBootstrapExtensionFilterChainConfigWriterUpdateDoneType
+      on_bootstrap_extension_filter_chain_config_writer_update_done_ = nullptr;
+  OnBootstrapExtensionRuntimeBoolUpdateType on_bootstrap_extension_runtime_bool_update_ = nullptr;
+  OnBootstrapExtensionRuntimeIntUpdateType on_bootstrap_extension_runtime_int_update_ = nullptr;
+  OnBootstrapExtensionRuntimeNumberUpdateType on_bootstrap_extension_runtime_number_update_ =
+      nullptr;
+
+  // The name of the extension.
+  const std::string extension_name_;
 
   // The dynamic module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
@@ -283,7 +439,19 @@ public:
   // on_bootstrap_extension_admin_request, then consumed by the admin handler lambda.
   std::string admin_response_body_;
 
+  // The cluster writer, or nullptr until the module enables it.
+  DynamicModuleClusterWriterPtr cluster_writer_;
+  // The listener writer, or nullptr until the module enables it.
+  DynamicModuleListenerWriterPtr listener_writer_;
+  // The filter chain config writer, or nullptr until the module enables it.
+  DynamicModuleFilterChainConfigWriterPtr filter_chain_config_writer_;
+
 private:
+  void notifyXdsUpdate(absl::string_view type_url,
+                       envoy_dynamic_module_type_bootstrap_xds_update_status status,
+                       absl::string_view error_detail, absl::string_view version,
+                       absl::string_view nonce, absl::string_view resource_name);
+
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
    * callout from the parent bootstrap extension config.
@@ -312,6 +480,12 @@ private:
 
   uint64_t getNextCalloutId() { return next_callout_id_++; }
 
+  /**
+   * Whether the server still notifies the shutdown that releases the lifecycle registrations. A
+   * server in init only mode exits without it.
+   */
+  bool shutdownNotificationExpected() const;
+
   uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
 
   absl::flat_hash_map<uint64_t,
@@ -325,6 +499,8 @@ private:
   // Handle for the shutdown lifecycle callback that cleans up cluster_update_callbacks_handle_.
   Server::ServerLifecycleNotifier::HandlePtr cluster_lifecycle_shutdown_handle_;
   bool cluster_lifecycle_enabled_ = false;
+
+  std::unique_ptr<ExtensionConfigSubscription> extension_config_subscription_;
 
   // True once the server is initialized, set when the listener manager is provided during
   // onServerInitialized. The cluster manager is only safe to access after this point.
@@ -347,6 +523,20 @@ private:
   // Handle for the shutdown lifecycle callback that cleans up secret_lifecycle_callbacks_handle_.
   Server::ServerLifecycleNotifier::HandlePtr secret_lifecycle_shutdown_handle_;
   bool secret_lifecycle_enabled_ = false;
+
+  Common::CallbackHandlePtr xds_update_handle_;
+  uint64_t xds_notifications_generation_ = 0;
+
+  // Thread-local slot that carries the worker events. Allocated on the first runOnAllWorkers().
+  ThreadLocal::TypedSlotPtr<> worker_slot_;
+
+  // Set once the module signals that its initialization is complete.
+  bool init_complete_signaled_ = false;
+
+  // Set once the server begins to shut down or the extension is destroyed.
+  bool shutdown_started_ = false;
+  // Set when the extension is destroyed, after which context_ can be gone.
+  bool extension_destroyed_ = false;
 };
 
 using DynamicModuleBootstrapExtensionConfigSharedPtr =
@@ -403,7 +593,8 @@ public:
    */
   void setTimer(Event::TimerPtr timer) { timer_ = std::move(timer); }
 
-  Event::Timer& timer() { return *timer_; }
+  // The underlying Envoy timer. Empty when the timer was requested off the main thread.
+  OptRef<Event::Timer> timer() { return makeOptRefFromPtr(timer_.get()); }
 
 private:
   // The config that this timer is associated with. Using a weak pointer to avoid unnecessarily

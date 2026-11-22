@@ -20,7 +20,6 @@ namespace Upstream {
 namespace {
 
 using ::testing::InSequence;
-using ::testing::InvokeWithoutArgs;
 using ::testing::Return;
 using ::testing::ReturnNew;
 
@@ -630,20 +629,19 @@ public:
       }
       EXPECT_CALL(socket,
                   setSocketOption(name_val.first.level(), name_val.first.option(), _, sizeof(int)))
-          .WillOnce(
-              Invoke([&name_val](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
-                EXPECT_EQ(name_val.second, *static_cast<const int*>(optval));
-                return {0, 0};
-              }));
+          .WillOnce([&name_val](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+            EXPECT_EQ(name_val.second, *static_cast<const int*>(optval));
+            return {0, 0};
+          });
     }
     EXPECT_CALL(socket, ipVersion())
         .WillRepeatedly(testing::Return(Network::Address::IpVersion::v4));
     EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
-        .WillOnce(Invoke([this, &names_vals, expect_success, &socket](
-                             Network::Address::InstanceConstSharedPtr,
-                             Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
-                             const Network::ConnectionSocket::OptionsSharedPtr& options)
-                             -> Network::ClientConnection* {
+        .WillOnce([this, &names_vals, expect_success,
+                   &socket](Network::Address::InstanceConstSharedPtr,
+                            Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
+                            const Network::ConnectionSocket::OptionsSharedPtr& options)
+                      -> Network::ClientConnection* {
           EXPECT_NE(nullptr, options.get()) << "Unexpected null options";
           if (options.get() != nullptr) { // Don't crash the entire test.
             EXPECT_EQ(names_vals.size(), options->size());
@@ -656,7 +654,7 @@ public:
                 options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
           }
           return connection_;
-        }));
+        });
     cluster_manager_->getThreadLocalCluster("SockOptsCluster")->tcpConn(nullptr);
   }
 
@@ -675,14 +673,13 @@ public:
 
   void expectNoSocketOptions() {
     EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
-        .WillOnce(
-            Invoke([this](Network::Address::InstanceConstSharedPtr,
-                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
-                          const Network::ConnectionSocket::OptionsSharedPtr& options)
-                       -> Network::ClientConnection* {
-              EXPECT_TRUE(options != nullptr && options->empty());
-              return connection_;
-            }));
+        .WillOnce([this](Network::Address::InstanceConstSharedPtr,
+                         Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
+                         const Network::ConnectionSocket::OptionsSharedPtr& options)
+                      -> Network::ClientConnection* {
+          EXPECT_TRUE(options != nullptr && options->empty());
+          return connection_;
+        });
     auto conn_data = cluster_manager_->getThreadLocalCluster("SockOptsCluster")->tcpConn(nullptr);
     EXPECT_EQ(connection_, conn_data.connection_.get());
   }
@@ -1109,18 +1106,17 @@ public:
                                    std::optional<int> keepalive_interval) {
     if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
       EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
-          .WillOnce(
-              Invoke([this](Network::Address::InstanceConstSharedPtr,
-                            Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
-                            const Network::ConnectionSocket::OptionsSharedPtr& options)
-                         -> Network::ClientConnection* {
-                EXPECT_NE(nullptr, options.get());
-                EXPECT_EQ(1, options->size());
-                NiceMock<Network::MockConnectionSocket> socket;
-                EXPECT_FALSE((Network::Socket::applyOptions(
-                    options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
-                return connection_;
-              }));
+          .WillOnce([this](Network::Address::InstanceConstSharedPtr,
+                           Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
+                           const Network::ConnectionSocket::OptionsSharedPtr& options)
+                        -> Network::ClientConnection* {
+            EXPECT_NE(nullptr, options.get());
+            EXPECT_EQ(1, options->size());
+            NiceMock<Network::MockConnectionSocket> socket;
+            EXPECT_FALSE((Network::Socket::applyOptions(
+                options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
+            return connection_;
+          });
       cluster_manager_->getThreadLocalCluster("TcpKeepaliveCluster")->tcpConn(nullptr);
       return;
     }
@@ -1128,56 +1124,56 @@ public:
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     NiceMock<Network::MockConnectionSocket> socket;
     EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
-        .WillOnce(Invoke([this, &socket](Network::Address::InstanceConstSharedPtr,
-                                         Network::Address::InstanceConstSharedPtr,
-                                         Network::TransportSocketPtr&,
-                                         const Network::ConnectionSocket::OptionsSharedPtr& options)
-                             -> Network::ClientConnection* {
+        .WillOnce([this, &socket](Network::Address::InstanceConstSharedPtr,
+                                  Network::Address::InstanceConstSharedPtr,
+                                  Network::TransportSocketPtr&,
+                                  const Network::ConnectionSocket::OptionsSharedPtr& options)
+                      -> Network::ClientConnection* {
           EXPECT_NE(nullptr, options.get());
           EXPECT_TRUE((Network::Socket::applyOptions(
               options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
           return connection_;
-        }));
+        });
     if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
       EXPECT_CALL(socket, setSocketOption(ENVOY_SOCKET_SO_NOSIGPIPE.level(),
                                           ENVOY_SOCKET_SO_NOSIGPIPE.option(), _, sizeof(int)))
-          .WillOnce(Invoke([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+          .WillOnce([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
             EXPECT_EQ(1, *static_cast<const int*>(optval));
             return {0, 0};
-          }));
+          });
     }
     EXPECT_CALL(socket, setSocketOption(ENVOY_SOCKET_SO_KEEPALIVE.level(),
                                         ENVOY_SOCKET_SO_KEEPALIVE.option(), _, sizeof(int)))
-        .WillOnce(Invoke([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+        .WillOnce([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
           EXPECT_EQ(1, *static_cast<const int*>(optval));
           return {0, 0};
-        }));
+        });
     if (keepalive_probes.has_value()) {
       EXPECT_CALL(socket, setSocketOption(ENVOY_SOCKET_TCP_KEEPCNT.level(),
                                           ENVOY_SOCKET_TCP_KEEPCNT.option(), _, sizeof(int)))
-          .WillOnce(Invoke([&keepalive_probes](int, int, const void* optval,
-                                               socklen_t) -> Api::SysCallIntResult {
+          .WillOnce([&keepalive_probes](int, int, const void* optval,
+                                        socklen_t) -> Api::SysCallIntResult {
             EXPECT_EQ(keepalive_probes.value(), *static_cast<const int*>(optval));
             return {0, 0};
-          }));
+          });
     }
     if (keepalive_time.has_value()) {
       EXPECT_CALL(socket, setSocketOption(ENVOY_SOCKET_TCP_KEEPIDLE.level(),
                                           ENVOY_SOCKET_TCP_KEEPIDLE.option(), _, sizeof(int)))
-          .WillOnce(Invoke(
+          .WillOnce(
               [&keepalive_time](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
                 EXPECT_EQ(keepalive_time.value(), *static_cast<const int*>(optval));
                 return {0, 0};
-              }));
+              });
     }
     if (keepalive_interval.has_value()) {
       EXPECT_CALL(socket, setSocketOption(ENVOY_SOCKET_TCP_KEEPINTVL.level(),
                                           ENVOY_SOCKET_TCP_KEEPINTVL.option(), _, sizeof(int)))
-          .WillOnce(Invoke([&keepalive_interval](int, int, const void* optval,
-                                                 socklen_t) -> Api::SysCallIntResult {
+          .WillOnce([&keepalive_interval](int, int, const void* optval,
+                                          socklen_t) -> Api::SysCallIntResult {
             EXPECT_EQ(keepalive_interval.value(), *static_cast<const int*>(optval));
             return {0, 0};
-          }));
+          });
     }
     auto conn_data =
         cluster_manager_->getThreadLocalCluster("TcpKeepaliveCluster")->tcpConn(nullptr);
@@ -1187,22 +1183,22 @@ public:
   void expectOnlyNoSigpipeOptions() {
     NiceMock<Network::MockConnectionSocket> socket;
     EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
-        .WillOnce(Invoke([this, &socket](Network::Address::InstanceConstSharedPtr,
-                                         Network::Address::InstanceConstSharedPtr,
-                                         Network::TransportSocketPtr&,
-                                         const Network::ConnectionSocket::OptionsSharedPtr& options)
-                             -> Network::ClientConnection* {
+        .WillOnce([this, &socket](Network::Address::InstanceConstSharedPtr,
+                                  Network::Address::InstanceConstSharedPtr,
+                                  Network::TransportSocketPtr&,
+                                  const Network::ConnectionSocket::OptionsSharedPtr& options)
+                      -> Network::ClientConnection* {
           EXPECT_NE(nullptr, options.get());
           EXPECT_TRUE((Network::Socket::applyOptions(
               options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
           return connection_;
-        }));
+        });
     EXPECT_CALL(socket, setSocketOption(ENVOY_SOCKET_SO_NOSIGPIPE.level(),
                                         ENVOY_SOCKET_SO_NOSIGPIPE.option(), _, sizeof(int)))
-        .WillOnce(Invoke([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+        .WillOnce([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
           EXPECT_EQ(1, *static_cast<const int*>(optval));
           return {0, 0};
-        }));
+        });
     auto conn_data =
         cluster_manager_->getThreadLocalCluster("TcpKeepaliveCluster")->tcpConn(nullptr);
     EXPECT_EQ(connection_, conn_data.connection_.get());
@@ -1210,14 +1206,13 @@ public:
 
   void expectNoSocketOptions() {
     EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
-        .WillOnce(
-            Invoke([this](Network::Address::InstanceConstSharedPtr,
-                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
-                          const Network::ConnectionSocket::OptionsSharedPtr& options)
-                       -> Network::ClientConnection* {
-              EXPECT_TRUE(options != nullptr && options->empty());
-              return connection_;
-            }));
+        .WillOnce([this](Network::Address::InstanceConstSharedPtr,
+                         Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
+                         const Network::ConnectionSocket::OptionsSharedPtr& options)
+                      -> Network::ClientConnection* {
+          EXPECT_TRUE(options != nullptr && options->empty());
+          return connection_;
+        });
     auto conn_data =
         cluster_manager_->getThreadLocalCluster("TcpKeepaliveCluster")->tcpConn(nullptr);
     EXPECT_EQ(connection_, conn_data.connection_.get());
@@ -1517,14 +1512,14 @@ TEST_F(PreconnectTest, PreconnectHighHttp) {
   int http_preconnect = 0;
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .Times(4)
-      .WillRepeatedly(InvokeWithoutArgs([&]() -> Http::ConnectionPool::Instance* {
+      .WillRepeatedly([&]() -> Http::ConnectionPool::Instance* {
         auto* ret = new NiceMock<Http::ConnectionPool::MockInstance>();
-        ON_CALL(*ret, maybePreconnect(_)).WillByDefault(InvokeWithoutArgs([&]() -> bool {
+        ON_CALL(*ret, maybePreconnect(_)).WillByDefault([&]() -> bool {
           ++http_preconnect;
           return true;
-        }));
+        });
         return ret;
-      }));
+      });
   auto http_handle =
       cluster_manager_->getThreadLocalCluster("cluster_1")
           ->httpConnPool(
@@ -1541,14 +1536,14 @@ TEST_F(PreconnectTest, PreconnectHighTcp) {
   int tcp_preconnect = 0;
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
       .Times(4)
-      .WillRepeatedly(InvokeWithoutArgs([&]() -> Tcp::ConnectionPool::Instance* {
+      .WillRepeatedly([&]() -> Tcp::ConnectionPool::Instance* {
         auto* ret = new NiceMock<Tcp::ConnectionPool::MockInstance>();
-        ON_CALL(*ret, maybePreconnect(_)).WillByDefault(InvokeWithoutArgs([&]() -> bool {
+        ON_CALL(*ret, maybePreconnect(_)).WillByDefault([&]() -> bool {
           ++tcp_preconnect;
           return true;
-        }));
+        });
         return ret;
-      }));
+      });
   auto tcp_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                         ->tcpConnPool(ResourcePriority::Default, nullptr);
   tcp_handle.value().newConnection(tcp_callbacks_);
@@ -1562,14 +1557,14 @@ TEST_F(PreconnectTest, PreconnectCappedAt3) {
   int http_preconnect = 0;
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .Times(4)
-      .WillRepeatedly(InvokeWithoutArgs([&]() -> Http::ConnectionPool::Instance* {
+      .WillRepeatedly([&]() -> Http::ConnectionPool::Instance* {
         auto* ret = new NiceMock<Http::ConnectionPool::MockInstance>();
-        ON_CALL(*ret, maybePreconnect(_)).WillByDefault(InvokeWithoutArgs([&]() -> bool {
+        ON_CALL(*ret, maybePreconnect(_)).WillByDefault([&]() -> bool {
           ++http_preconnect;
           return true;
-        }));
+        });
         return ret;
-      }));
+      });
   auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                          ->httpConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
                                             ->loadBalancer()
@@ -1601,15 +1596,15 @@ TEST_F(PreconnectTest, PreconnectCappedByMaybePreconnect) {
   int http_preconnect_calls = 0;
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .Times(2)
-      .WillRepeatedly(InvokeWithoutArgs([&]() -> Http::ConnectionPool::Instance* {
+      .WillRepeatedly([&]() -> Http::ConnectionPool::Instance* {
         auto* ret = new NiceMock<Http::ConnectionPool::MockInstance>();
-        ON_CALL(*ret, maybePreconnect(_)).WillByDefault(InvokeWithoutArgs([&]() -> bool {
+        ON_CALL(*ret, maybePreconnect(_)).WillByDefault([&]() -> bool {
           ++http_preconnect_calls;
           // Force maybe preconnect to fail.
           return false;
-        }));
+        });
         return ret;
-      }));
+      });
   auto http_handle =
       cluster_manager_->getThreadLocalCluster("cluster_1")
           ->httpConnPool(

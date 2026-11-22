@@ -3,8 +3,6 @@
 namespace Envoy {
 namespace Init {
 
-using ::testing::Invoke;
-
 ExpectableWatcherImpl::ExpectableWatcherImpl(absl::string_view name)
     : WatcherImpl(name, {[this]() { ready(); }}) {}
 ::testing::internal::TypedExpectation<void()>& ExpectableWatcherImpl::expectReady() const {
@@ -18,7 +16,7 @@ ExpectableTargetImpl::ExpectableTargetImpl(absl::string_view name)
 }
 ::testing::internal::TypedExpectation<void()>&
 ExpectableTargetImpl::expectInitializeWillCallReady() {
-  return expectInitialize().WillOnce(Invoke([this]() { ready(); }));
+  return expectInitialize().WillOnce([this]() { ready(); });
 }
 
 ExpectableSharedTargetImpl::ExpectableSharedTargetImpl(absl::string_view name)

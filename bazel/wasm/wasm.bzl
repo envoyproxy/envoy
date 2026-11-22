@@ -61,10 +61,21 @@ wasi_rust_binary_rule = rule(
     attrs = _wasm_attrs(wasi_rust_transition),
 )
 
-def envoy_wasm_cc_binary(name, additional_linker_inputs = [], linkopts = [], tags = [], **kwargs):
+wasm_cc_binary_rule = rule(
+    implementation = _wasm_binary_impl,
+    attrs = {
+        "binary": attr.label(mandatory = True),
+        "precompile": attr.bool(default = False),
+        # This is deliberately in target configuration to avoid compiling v8 twice.
+        "_compile_tool": attr.label(default = Label("//test/tools/wee8_compile:wee8_compile_tool"), executable = True, cfg = "target"),
+    },
+)
+
+def envoy_wasm_cc_binary(name, additional_linker_inputs = [], linkopts = [], tags = [], precompile = False, **kwargs):
+    wasm_name = "_wasm_" + name.replace(".", "_")
     api_js = Label("//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_js")
     proxy_wasm_cc_binary(
-        name = name,
+        name = wasm_name,
         additional_linker_inputs = additional_linker_inputs + [
             api_js,
         ],
@@ -74,6 +85,19 @@ def envoy_wasm_cc_binary(name, additional_linker_inputs = [], linkopts = [], tag
         tags = tags + ["manual"],
         **kwargs
     )
+
+    wasm_kwargs = {
+        "name": name,
+        "binary": ":" + wasm_name,
+        "precompile": precompile,
+        "tags": tags + ["manual"],
+    }
+
+    # Only consumer-relevant common attributes are propagated to the wrapper target.
+    for key in ["visibility", "testonly", "compatible_with", "target_compatible_with"]:
+        if key in kwargs:
+            wasm_kwargs[key] = kwargs[key]
+    wasm_cc_binary_rule(**wasm_kwargs)
 
 def wasm_rust_binary(name, tags = [], wasi = False, precompile = False, **kwargs):
     wasm_name = "_wasm_" + name.replace(".", "_")

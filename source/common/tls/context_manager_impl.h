@@ -41,6 +41,7 @@ public:
   Ssl::PrivateKeyMethodManager& privateKeyMethodManager() override {
     return private_key_method_manager_;
   };
+  void addContext(const Envoy::Ssl::ContextSharedPtr& context) override;
   void removeContext(const Envoy::Ssl::ContextSharedPtr& old_context) override;
 
 private:

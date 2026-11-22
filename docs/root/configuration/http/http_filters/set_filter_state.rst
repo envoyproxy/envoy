@@ -90,6 +90,34 @@ in access logging, Lua scripts, or other custom processing:
 The stored value can then be accessed in access logs using ``%FILTER_STATE(my.custom.request_id)%``.
 
 
+Upstream Usage
+--------------
+
+This filter can also be used as an upstream HTTP filter, either in a cluster's
+:ref:`http_filters <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.http_filters>`
+or in the router's
+:ref:`upstream_http_filters <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_http_filters>`.
+There it runs after host selection, once per upstream attempt, so the values can be derived from
+the selected host, for example with ``%UPSTREAM_METADATA(...)%``. All attempts share the
+downstream stream's filter state, so each retry or hedged attempt overwrites the values set by the
+one before it.
+
+When used upstream, :ref:`clear_route_cache
+<envoy_v3_api_field_extensions.filters.http.set_filter_state.v3.Config.clear_route_cache>` has no
+effect, and ``shared_with_upstream`` does not apply because the router collects the objects
+shared with the upstream connection before the upstream filter chain runs.
+
+.. validated-code-block:: yaml
+  :type-name: envoy.extensions.filters.http.set_filter_state.v3.Config
+
+  on_request_headers:
+  - object_key: my.custom.upstream_api
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "%UPSTREAM_METADATA(my.namespace:api)%"
+
+
 Statistics
 ----------
 

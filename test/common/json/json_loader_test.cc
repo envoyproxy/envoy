@@ -101,6 +101,9 @@ TEST_F(JsonLoaderTest, DeeplyNestedJsonObjectDestructorStackOverflowConfigurable
 // Verify that with the default nesting depth limit relaxed, Envoy still does not crash when
 // unwinding deeply nested JSON objects.
 TEST_F(JsonLoaderTest, DeeplyNestedJsonDestructorStackOverflowRuntimeOff) {
+#ifdef _WIN32
+  GTEST_SKIP() << "Windows does not support 10K JSON nesting depth.";
+#endif
   TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
       {{"limit_json_parser_nesting_depth", false}});
   const int depth = 100000;

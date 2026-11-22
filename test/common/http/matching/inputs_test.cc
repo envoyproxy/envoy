@@ -52,6 +52,30 @@ TEST(MatchingData, HttpRequestHeadersDataInput) {
   }
 }
 
+TEST(MatchingData, HttpRequestHeadersDataInputSingleValueIsView) {
+  HttpRequestHeadersDataInput input("header");
+  HttpMatchingDataImpl data(createStreamInfo());
+  const std::string value(64, 'a');
+  TestRequestHeaderMapImpl request_headers({{"header", value}});
+  data.onRequestHeaders(request_headers);
+
+  const auto result = input.get(data);
+  const absl::string_view header_value =
+      request_headers.get(LowerCaseString("header"))[0]->value().getStringView();
+  ASSERT_TRUE(result.stringData().has_value());
+  EXPECT_EQ(result.stringData()->data(), header_value.data());
+  EXPECT_EQ(*result.stringData(), value);
+}
+
+TEST(MatchingData, HttpRequestHeadersDataInputMultipleValues) {
+  HttpRequestHeadersDataInput input("header");
+  HttpMatchingDataImpl data(createStreamInfo());
+  TestRequestHeaderMapImpl request_headers({{"header", "foo"}, {"header", "bar"}});
+  data.onRequestHeaders(request_headers);
+
+  EXPECT_EQ(input.get(data).stringData().value(), "foo,bar");
+}
+
 TEST(MatchingData, HttpRequestTrailersDataInput) {
   HttpRequestTrailersDataInput input("header");
   HttpMatchingDataImpl data(createStreamInfo());

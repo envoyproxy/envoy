@@ -1214,13 +1214,12 @@ TEST_F(ProcessFilterDecisionsTest, GlobalTagsOnly_KeepAllAndEnrich) {
   ctx.gauge_buffer_to_snapshot = {0, 1};
   Stats::TagVector global_tags = {{"dc", "us-east-1"}};
 
-  EXPECT_CALL(inner_sink_, flush(testing::_))
-      .WillOnce(testing::Invoke([](Stats::MetricSnapshot& s) {
-        EXPECT_EQ(s.counters().size(), 3);
-        EXPECT_EQ(s.gauges().size(), 2);
-        auto tags = s.counters()[0].counter_.get().tags();
-        EXPECT_EQ(tags.back().name_, "dc");
-      }));
+  EXPECT_CALL(inner_sink_, flush(testing::_)).WillOnce([](Stats::MetricSnapshot& s) {
+    EXPECT_EQ(s.counters().size(), 3);
+    EXPECT_EQ(s.gauges().size(), 2);
+    auto tags = s.counters()[0].counter_.get().tags();
+    EXPECT_EQ(tags.back().name_, "dc");
+  });
 
   processFilterDecisionsAndFlush(snapshot_, ctx, global_tags, symbol_table_, inner_sink_);
 }
@@ -1234,13 +1233,12 @@ TEST_F(ProcessFilterDecisionsTest, FilterDecisions_KeepSubset) {
   ctx.emit_called = true;
   Stats::TagVector global_tags;
 
-  EXPECT_CALL(inner_sink_, flush(testing::_))
-      .WillOnce(testing::Invoke([](Stats::MetricSnapshot& s) {
-        EXPECT_EQ(s.counters().size(), 1);
-        EXPECT_EQ(s.counters()[0].counter_.get().name(), "upstream_rq_2xx");
-        EXPECT_EQ(s.gauges().size(), 1);
-        EXPECT_EQ(s.gauges()[0].get().name(), "connections_active");
-      }));
+  EXPECT_CALL(inner_sink_, flush(testing::_)).WillOnce([](Stats::MetricSnapshot& s) {
+    EXPECT_EQ(s.counters().size(), 1);
+    EXPECT_EQ(s.counters()[0].counter_.get().name(), "upstream_rq_2xx");
+    EXPECT_EQ(s.gauges().size(), 1);
+    EXPECT_EQ(s.gauges()[0].get().name(), "connections_active");
+  });
 
   processFilterDecisionsAndFlush(snapshot_, ctx, global_tags, symbol_table_, inner_sink_);
 }
@@ -1257,11 +1255,10 @@ TEST_F(ProcessFilterDecisionsTest, FilterDecisions_UnusedMetricsPassThrough) {
   ctx.emit_called = true;
   Stats::TagVector global_tags;
 
-  EXPECT_CALL(inner_sink_, flush(testing::_))
-      .WillOnce(testing::Invoke([](Stats::MetricSnapshot& s) {
-        EXPECT_EQ(s.counters().size(), 2);
-        EXPECT_EQ(s.gauges().size(), 2);
-      }));
+  EXPECT_CALL(inner_sink_, flush(testing::_)).WillOnce([](Stats::MetricSnapshot& s) {
+    EXPECT_EQ(s.counters().size(), 2);
+    EXPECT_EQ(s.gauges().size(), 2);
+  });
 
   processFilterDecisionsAndFlush(snapshot_, ctx, global_tags, symbol_table_, inner_sink_);
 }
@@ -1277,21 +1274,20 @@ TEST_F(ProcessFilterDecisionsTest, IndexTranslation) {
   ctx.emit_called = true;
   Stats::TagVector global_tags;
 
-  EXPECT_CALL(inner_sink_, flush(testing::_))
-      .WillOnce(testing::Invoke([](Stats::MetricSnapshot& s) {
-        bool found_total = false;
-        bool found_5xx = false;
-        for (const auto& c : s.counters()) {
-          if (c.counter_.get().name() == "upstream_rq_total") {
-            found_total = true;
-          }
-          if (c.counter_.get().name() == "upstream_rq_5xx") {
-            found_5xx = true;
-          }
-        }
-        EXPECT_TRUE(found_total);
-        EXPECT_TRUE(found_5xx);
-      }));
+  EXPECT_CALL(inner_sink_, flush(testing::_)).WillOnce([](Stats::MetricSnapshot& s) {
+    bool found_total = false;
+    bool found_5xx = false;
+    for (const auto& c : s.counters()) {
+      if (c.counter_.get().name() == "upstream_rq_total") {
+        found_total = true;
+      }
+      if (c.counter_.get().name() == "upstream_rq_5xx") {
+        found_5xx = true;
+      }
+    }
+    EXPECT_TRUE(found_total);
+    EXPECT_TRUE(found_5xx);
+  });
 
   processFilterDecisionsAndFlush(snapshot_, ctx, global_tags, symbol_table_, inner_sink_);
 }
@@ -1307,11 +1303,10 @@ TEST_F(ProcessFilterDecisionsTest, NameOverrideTranslation) {
   ctx.name_overrides.push_back({2, 0, "envoy.membership"});
   Stats::TagVector global_tags;
 
-  EXPECT_CALL(inner_sink_, flush(testing::_))
-      .WillOnce(testing::Invoke([](Stats::MetricSnapshot& s) {
-        EXPECT_EQ(s.counters()[0].counter_.get().name(), "envoy.rq_2xx");
-        EXPECT_EQ(s.gauges()[0].get().name(), "envoy.membership");
-      }));
+  EXPECT_CALL(inner_sink_, flush(testing::_)).WillOnce([](Stats::MetricSnapshot& s) {
+    EXPECT_EQ(s.counters()[0].counter_.get().name(), "envoy.rq_2xx");
+    EXPECT_EQ(s.gauges()[0].get().name(), "envoy.membership");
+  });
 
   processFilterDecisionsAndFlush(snapshot_, ctx, global_tags, symbol_table_, inner_sink_);
 }
@@ -1324,13 +1319,12 @@ TEST_F(ProcessFilterDecisionsTest, SyntheticMetrics_NoFilterDecisions) {
   ctx.synthetic_gauges.push_back({"custom.gauge", 50, {}});
   Stats::TagVector global_tags;
 
-  EXPECT_CALL(inner_sink_, flush(testing::_))
-      .WillOnce(testing::Invoke([](Stats::MetricSnapshot& s) {
-        EXPECT_EQ(s.counters().size(), 4);
-        EXPECT_EQ(s.counters().back().counter_.get().name(), "custom.metric");
-        EXPECT_EQ(s.gauges().size(), 3);
-        EXPECT_EQ(s.gauges().back().get().name(), "custom.gauge");
-      }));
+  EXPECT_CALL(inner_sink_, flush(testing::_)).WillOnce([](Stats::MetricSnapshot& s) {
+    EXPECT_EQ(s.counters().size(), 4);
+    EXPECT_EQ(s.counters().back().counter_.get().name(), "custom.metric");
+    EXPECT_EQ(s.gauges().size(), 3);
+    EXPECT_EQ(s.gauges().back().get().name(), "custom.gauge");
+  });
 
   processFilterDecisionsAndFlush(snapshot_, ctx, global_tags, symbol_table_, inner_sink_);
 }
@@ -1346,11 +1340,10 @@ TEST_F(ProcessFilterDecisionsTest, HistogramFilterDecisions) {
   ctx.histogram_block_present = true;
   Stats::TagVector global_tags;
 
-  EXPECT_CALL(inner_sink_, flush(testing::_))
-      .WillOnce(testing::Invoke([](Stats::MetricSnapshot& s) {
-        EXPECT_EQ(s.histograms().size(), 1);
-        EXPECT_EQ(s.histograms()[0].get().name(), "upstream_rq_time");
-      }));
+  EXPECT_CALL(inner_sink_, flush(testing::_)).WillOnce([](Stats::MetricSnapshot& s) {
+    EXPECT_EQ(s.histograms().size(), 1);
+    EXPECT_EQ(s.histograms()[0].get().name(), "upstream_rq_time");
+  });
 
   processFilterDecisionsAndFlush(snapshot_, ctx, global_tags, symbol_table_, inner_sink_);
 }
@@ -1395,17 +1388,16 @@ TEST_F(ProcessFilterDecisionsTest, CombinedFilterEnrichSyntheticOverride) {
   ctx.synthetic_counters.push_back({"wasm.count", 5, {{"source", "plugin"}}});
   Stats::TagVector global_tags = {{"env", "prod"}};
 
-  EXPECT_CALL(inner_sink_, flush(testing::_))
-      .WillOnce(testing::Invoke([](Stats::MetricSnapshot& s) {
-        EXPECT_EQ(s.counters().size(), 3);
-        EXPECT_EQ(s.counters()[0].counter_.get().name(), "envoy.rq_2xx");
-        auto tags = s.counters()[0].counter_.get().tags();
-        EXPECT_EQ(tags.back().name_, "env");
+  EXPECT_CALL(inner_sink_, flush(testing::_)).WillOnce([](Stats::MetricSnapshot& s) {
+    EXPECT_EQ(s.counters().size(), 3);
+    EXPECT_EQ(s.counters()[0].counter_.get().name(), "envoy.rq_2xx");
+    auto tags = s.counters()[0].counter_.get().tags();
+    EXPECT_EQ(tags.back().name_, "env");
 
-        EXPECT_EQ(s.counters().back().counter_.get().name(), "wasm.count");
-        auto syn_tags = s.counters().back().counter_.get().tags();
-        EXPECT_GE(syn_tags.size(), 2);
-      }));
+    EXPECT_EQ(s.counters().back().counter_.get().name(), "wasm.count");
+    auto syn_tags = s.counters().back().counter_.get().tags();
+    EXPECT_GE(syn_tags.size(), 2);
+  });
 
   processFilterDecisionsAndFlush(snapshot_, ctx, global_tags, symbol_table_, inner_sink_);
 }
@@ -1418,12 +1410,11 @@ TEST_F(ProcessFilterDecisionsTest, EmitCalledWithEmptySets_DropsAllUsedMetrics) 
   ctx.histogram_block_present = true;
   Stats::TagVector global_tags;
 
-  EXPECT_CALL(inner_sink_, flush(testing::_))
-      .WillOnce(testing::Invoke([](Stats::MetricSnapshot& s) {
-        EXPECT_EQ(s.counters().size(), 0);
-        EXPECT_EQ(s.gauges().size(), 0);
-        EXPECT_EQ(s.histograms().size(), 0);
-      }));
+  EXPECT_CALL(inner_sink_, flush(testing::_)).WillOnce([](Stats::MetricSnapshot& s) {
+    EXPECT_EQ(s.counters().size(), 0);
+    EXPECT_EQ(s.gauges().size(), 0);
+    EXPECT_EQ(s.histograms().size(), 0);
+  });
 
   processFilterDecisionsAndFlush(snapshot_, ctx, global_tags, symbol_table_, inner_sink_);
 }
@@ -1438,13 +1429,12 @@ TEST_F(ProcessFilterDecisionsTest, EmitCalledWithEmptySets_UnusedMetricsStillPas
   ctx.emit_called = true;
   Stats::TagVector global_tags;
 
-  EXPECT_CALL(inner_sink_, flush(testing::_))
-      .WillOnce(testing::Invoke([](Stats::MetricSnapshot& s) {
-        EXPECT_EQ(s.counters().size(), 1);
-        EXPECT_EQ(s.counters()[0].counter_.get().name(), "upstream_rq_total");
-        EXPECT_EQ(s.gauges().size(), 1);
-        EXPECT_EQ(s.gauges()[0].get().name(), "connections_active");
-      }));
+  EXPECT_CALL(inner_sink_, flush(testing::_)).WillOnce([](Stats::MetricSnapshot& s) {
+    EXPECT_EQ(s.counters().size(), 1);
+    EXPECT_EQ(s.counters()[0].counter_.get().name(), "upstream_rq_total");
+    EXPECT_EQ(s.gauges().size(), 1);
+    EXPECT_EQ(s.gauges()[0].get().name(), "connections_active");
+  });
 
   processFilterDecisionsAndFlush(snapshot_, ctx, global_tags, symbol_table_, inner_sink_);
 }
@@ -1459,12 +1449,11 @@ TEST_F(ProcessFilterDecisionsTest, EmitCalledNoHistogramBlock_HistogramsPassThro
   ctx.histogram_block_present = false;
   Stats::TagVector global_tags;
 
-  EXPECT_CALL(inner_sink_, flush(testing::_))
-      .WillOnce(testing::Invoke([](Stats::MetricSnapshot& s) {
-        EXPECT_EQ(s.counters().size(), 1);
-        EXPECT_EQ(s.gauges().size(), 1);
-        EXPECT_EQ(s.histograms().size(), 2);
-      }));
+  EXPECT_CALL(inner_sink_, flush(testing::_)).WillOnce([](Stats::MetricSnapshot& s) {
+    EXPECT_EQ(s.counters().size(), 1);
+    EXPECT_EQ(s.gauges().size(), 1);
+    EXPECT_EQ(s.histograms().size(), 2);
+  });
 
   processFilterDecisionsAndFlush(snapshot_, ctx, global_tags, symbol_table_, inner_sink_);
 }

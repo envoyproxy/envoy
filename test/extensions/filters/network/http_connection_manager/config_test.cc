@@ -44,7 +44,6 @@ using testing::An;
 using testing::AnyNumber;
 using testing::ByMove;
 using testing::Eq;
-using testing::InvokeWithoutArgs;
 using ::testing::Not;
 using testing::NotNull;
 using testing::Pointee;
@@ -1240,6 +1239,7 @@ TEST_F(HttpConnectionManagerConfigTest, DrainTimeoutJitter) {
     EXPECT_GE(value, 5000);
     EXPECT_LE(value, 6250);
   }
+  EXPECT_EQ(5000, config.baseDrainTimeout().count());
 }
 
 // Validate that drain_timeout_jitter defaults to unset.
@@ -1261,6 +1261,7 @@ TEST_F(HttpConnectionManagerConfigTest, DrainTimeoutJitterDefault) {
   ASSERT_OK(creation_status_);
   // No jitter configured: drainTimeout() returns its base (default 5s).
   EXPECT_EQ(5000, config.drainTimeout().count());
+  EXPECT_EQ(5000, config.baseDrainTimeout().count());
 }
 
 // Validate that idle_timeout set in common_http_protocol_options is used.
@@ -3770,8 +3771,7 @@ public:
   createFromProto(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&) override {
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
     EXPECT_CALL(*header_validator, createServerHeaderValidator(Http::Protocol::Http2, _))
-        .WillOnce(InvokeWithoutArgs(
-            []() { return std::make_unique<StrictMock<Http::MockServerHeaderValidator>>(); }));
+        .WillOnce([]() { return std::make_unique<StrictMock<Http::MockServerHeaderValidator>>(); });
     return header_validator;
   }
 };
@@ -3805,8 +3805,7 @@ public:
     config_ = proto_config;
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
     EXPECT_CALL(*header_validator, createServerHeaderValidator(Http::Protocol::Http2, _))
-        .WillOnce(InvokeWithoutArgs(
-            []() { return std::make_unique<StrictMock<Http::MockServerHeaderValidator>>(); }));
+        .WillOnce([]() { return std::make_unique<StrictMock<Http::MockServerHeaderValidator>>(); });
     return header_validator;
   }
 
@@ -4139,11 +4138,10 @@ TEST_F(HttpConnectionManagerMobileConfigTest, Mobile) {
   NiceMock<Network::MockReadFilterCallbacks> cb;
   Network::ReadFilterSharedPtr hcm_filter;
   Http::ConnectionManagerImpl* hcm = nullptr;
-  EXPECT_CALL(fm, addReadFilter(_))
-      .WillOnce(Invoke([&](Network::ReadFilterSharedPtr manager) -> void {
-        hcm_filter = manager;
-        hcm = dynamic_cast<Http::ConnectionManagerImpl*>(manager.get());
-      }));
+  EXPECT_CALL(fm, addReadFilter(_)).WillOnce([&](Network::ReadFilterSharedPtr manager) -> void {
+    hcm_filter = manager;
+    hcm = dynamic_cast<Http::ConnectionManagerImpl*>(manager.get());
+  });
   create_hcm_cb(fm);
   ASSERT(hcm != nullptr);
   hcm->initializeReadFilterCallbacks(cb);

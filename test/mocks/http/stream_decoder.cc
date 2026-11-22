@@ -1,7 +1,6 @@
 #include "test/mocks/http/stream_decoder.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 
 namespace Envoy {
@@ -12,24 +11,23 @@ MockRequestDecoderHandle::MockRequestDecoderHandle() {
 }
 
 MockRequestDecoder::MockRequestDecoder() {
-  ON_CALL(*this, decodeHeaders_(_, _))
-      .WillByDefault(Invoke([](RequestHeaderMapSharedPtr& headers, bool) {
-        // Check to see that method is not-null. Path can be null for CONNECT and authority can be
-        // null at the codec level.
-        ASSERT_NE(nullptr, headers->Method());
-      }));
-  ON_CALL(*this, getRequestDecoderHandle()).WillByDefault(Invoke([this]() {
+  ON_CALL(*this, decodeHeaders_(_, _)).WillByDefault([](RequestHeaderMapSharedPtr& headers, bool) {
+    // Check to see that method is not-null. Path can be null for CONNECT and authority can be
+    // null at the codec level.
+    ASSERT_NE(nullptr, headers->Method());
+  });
+  ON_CALL(*this, getRequestDecoderHandle()).WillByDefault([this]() {
     auto handle = std::make_unique<testing::NiceMock<MockRequestDecoderHandle>>();
     ON_CALL(*handle, get()).WillByDefault(Return(OptRef<RequestDecoder>(*this)));
     return handle;
-  }));
+  });
 }
 MockRequestDecoder::~MockRequestDecoder() = default;
 
 MockResponseDecoder::MockResponseDecoder() {
-  ON_CALL(*this, decodeHeaders_(_, _))
-      .WillByDefault(Invoke(
-          [](ResponseHeaderMapPtr& headers, bool) { ASSERT_NE(nullptr, headers->Status()); }));
+  ON_CALL(*this, decodeHeaders_(_, _)).WillByDefault([](ResponseHeaderMapPtr& headers, bool) {
+    ASSERT_NE(nullptr, headers->Status());
+  });
 }
 MockResponseDecoder::~MockResponseDecoder() = default;
 

@@ -27,7 +27,6 @@ using ::Envoy::StatusHelpers::HasStatus;
 using ::testing::_;
 using ::testing::HasSubstr;
 using ::testing::InSequence;
-using ::testing::Invoke;
 using ::testing::NiceMock;
 using ::testing::Return;
 
@@ -45,12 +44,12 @@ public:
 class FcdsApiTest : public testing::Test {
 public:
   FcdsApiTest() {
-    ON_CALL(init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
+    ON_CALL(init_manager_, add(_)).WillByDefault([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
-    }));
-    ON_CALL(init_manager_, initialize(_))
-        .WillByDefault(Invoke(
-            [this](const Init::Watcher& watcher) { init_target_handle_->initialize(watcher); }));
+    });
+    ON_CALL(init_manager_, initialize(_)).WillByDefault([this](const Init::Watcher& watcher) {
+      init_target_handle_->initialize(watcher);
+    });
   }
 
   void setup(const std::string& filter_chain_name) {
@@ -64,15 +63,15 @@ public:
 
     EXPECT_CALL(cluster_manager_.subscription_factory_,
                 subscriptionFromConfigSource(_, _, _, _, _, _))
-        .WillOnce(Invoke([this, subscription = std::move(subscription)](
-                             const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                             Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
-                             Config::OpaqueResourceDecoderSharedPtr,
-                             const Config::SubscriptionOptions&) mutable
-                             -> absl::StatusOr<Config::SubscriptionPtr> {
+        .WillOnce([this, subscription = std::move(subscription)](
+                      const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                      Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
+                      Config::OpaqueResourceDecoderSharedPtr,
+                      const Config::SubscriptionOptions&) mutable
+                      -> absl::StatusOr<Config::SubscriptionPtr> {
           fcds_callbacks_ = &callbacks;
           return std::move(subscription);
-        }));
+        });
 
     absl::Status creation_status;
     fcds_api_ = std::make_unique<FcdsApiImpl>(fcds_config.config_source(), filter_chain_name,

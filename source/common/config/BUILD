@@ -9,6 +9,21 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "ecds_subscription_registry_lib",
+    srcs = ["ecds_subscription_registry.cc"],
+    hdrs = ["ecds_subscription_registry.h"],
+    deps = [
+        ":xds_resource_lib",
+        "//envoy/singleton:instance_interface",
+        "//envoy/singleton:manager_interface",
+        "//source/common/common:cleanup_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "api_version_lib",
     hdrs = ["api_version.h"],
 )
@@ -208,9 +223,12 @@ envoy_cc_library(
     srcs = ["singleton_subscription_adapter.cc"],
     hdrs = ["singleton_subscription_adapter.h"],
     deps = [
+        ":xds_resource_lib",
         "//envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
+        "@abseil-cpp//absl/memory",
         "@abseil-cpp//absl/status:status",
+        "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings:string_view",
     ],
 )
@@ -360,10 +378,13 @@ envoy_cc_library(
         ":singleton_subscription_adapter_lib",
         ":subscription_factory_lib",
         ":utility_lib",
+        "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_manager_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:thread_lib",
         "//source/common/upstream:load_stats_reporter_lib",
+        "@abseil-cpp//absl/functional:function_ref",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

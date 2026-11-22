@@ -98,7 +98,7 @@ public:
   parse(absl::string_view command, absl::string_view command_arg,
         std::optional<size_t> max_length) const override {
     const auto& provider_func_table = providerFuncTable();
-    const auto func_iter = provider_func_table.find(std::string(command));
+    const auto func_iter = provider_func_table.find(command);
     if (func_iter == provider_func_table.end()) {
       return nullptr;
     }

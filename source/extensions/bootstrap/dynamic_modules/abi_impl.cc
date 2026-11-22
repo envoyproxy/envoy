@@ -14,10 +14,17 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
+#include "absl/container/inlined_vector.h"
+#include "absl/strings/str_cat.h"
+
+using Envoy::Extensions::Bootstrap::DynamicModules::ConfigSnapshot;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtension;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfig;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfigScheduler;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionTimer;
+using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleClusterWriter;
+using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleFilterChainConfigWriter;
+using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleListenerWriter;
 using Envoy::Extensions::DynamicModules::MetricRegistry;
 
 namespace {
@@ -67,6 +74,12 @@ void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
 void envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    // Envoy cannot finish initializing without the signal, so deliver it on the main thread.
+    config->postSignalInitComplete();
+    return;
+  }
   config->signalInitComplete();
 }
 
@@ -78,6 +91,10 @@ envoy_dynamic_module_callback_bootstrap_extension_http_callout(
     uint64_t* callout_id_out, envoy_dynamic_module_type_module_buffer cluster_name,
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
+  }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
 
   // Build the HTTP request message.
@@ -514,6 +531,10 @@ envoy_dynamic_module_callback_bootstrap_extension_timer_new(
 
   // Allocate the timer wrapper first so we can capture a stable heap pointer in the callback.
   auto* timer_wrapper = new DynamicModuleBootstrapExtensionTimer(config->weak_from_this());
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return static_cast<void*>(timer_wrapper);
+  }
 
   // Create the timer on the main thread dispatcher. The callback captures a weak_ptr to the config
   // to safely handle the case where the config is destroyed before the timer fires. The
@@ -538,20 +559,39 @@ envoy_dynamic_module_callback_bootstrap_extension_timer_new(
 void envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr,
     uint64_t delay_milliseconds) {
-  auto* timer = static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
-  timer->timer().enableTimer(std::chrono::milliseconds(delay_milliseconds));
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return;
+  }
+  Envoy::OptRef<Envoy::Event::Timer> timer =
+      static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr)->timer();
+  if (timer.has_value()) {
+    timer->enableTimer(std::chrono::milliseconds(delay_milliseconds));
+  }
 }
 
 void envoy_dynamic_module_callback_bootstrap_extension_timer_disable(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
-  auto* timer = static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
-  timer->timer().disableTimer();
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return;
+  }
+  Envoy::OptRef<Envoy::Event::Timer> timer =
+      static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr)->timer();
+  if (timer.has_value()) {
+    timer->disableTimer();
+  }
 }
 
 bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
-  auto* timer = static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
-  return timer->timer().enabled();
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  Envoy::OptRef<Envoy::Event::Timer> timer =
+      static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr)->timer();
+  return timer.has_value() && timer->enabled();
 }
 
 void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
@@ -574,6 +614,10 @@ void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
 bool envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer path, uint32_t events) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
 
   // Create a new filesystem watcher for this path. Envoy owns the watcher lifetime.
@@ -603,6 +647,10 @@ bool envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
 void envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer response_body) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return;
+  }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
   if (response_body.ptr != nullptr && response_body.length > 0) {
     config->admin_response_body_.assign(response_body.ptr, response_body.length);
@@ -613,8 +661,12 @@ bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer path_prefix,
     envoy_dynamic_module_type_module_buffer help_text, bool removable, bool mutates_server_state) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
-  Envoy::OptRef<Envoy::Server::Admin> admin = config->context_.admin();
+  Envoy::OptRef<Envoy::Server::Admin> admin = config->admin();
   if (!admin.has_value()) {
     return false;
   }
@@ -622,14 +674,17 @@ bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
   const std::string prefix_str(path_prefix.ptr, path_prefix.length);
   const std::string help_str(help_text.ptr, help_text.length);
 
-  // Capture a shared_ptr to the config to ensure it stays alive during admin handler callbacks.
-  auto config_shared = config->shared_from_this();
-
+  // The admin server outlives the bootstrap extensions, so the handler must not keep the config
+  // alive.
   return admin->addHandler(
       prefix_str, help_str,
-      [config_shared](Envoy::Http::ResponseHeaderMap& response_headers,
-                      Envoy::Buffer::Instance& response,
-                      Envoy::Server::AdminStream& admin_stream) -> Envoy::Http::Code {
+      [weak_config = config->weak_from_this()](
+          Envoy::Http::ResponseHeaderMap& response_headers, Envoy::Buffer::Instance& response,
+          Envoy::Server::AdminStream& admin_stream) -> Envoy::Http::Code {
+        std::shared_ptr<DynamicModuleBootstrapExtensionConfig> config_shared = weak_config.lock();
+        if (config_shared == nullptr) {
+          return Envoy::Http::Code::NotFound;
+        }
         const auto& request_headers = admin_stream.getRequestHeaders();
         const auto method_entry = request_headers.getMethodValue();
         const auto path_entry = request_headers.getPathValue();
@@ -669,8 +724,12 @@ bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
 bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer path_prefix) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
-  Envoy::OptRef<Envoy::Server::Admin> admin = config->context_.admin();
+  Envoy::OptRef<Envoy::Server::Admin> admin = config->admin();
   if (!admin.has_value()) {
     return false;
   }
@@ -679,14 +738,82 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
   return admin->removeHandler(prefix_str);
 }
 
+bool envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer source_json) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
+  return config->subscribeEcds({name.ptr, name.length}, {source_json.ptr, source_json.length});
+}
+
+envoy_dynamic_module_type_bootstrap_config_snapshot_result
+envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    const envoy_dynamic_module_type_module_buffer* providers, size_t providers_count,
+    envoy_dynamic_module_type_module_buffer name_regex,
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr* snapshot_out) {
+  *snapshot_out = nullptr;
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
+  absl::InlinedVector<absl::string_view, 4> names;
+  names.reserve(providers_count);
+  for (size_t i = 0; i < providers_count; ++i) {
+    names.emplace_back(providers[i].ptr, providers[i].length);
+  }
+  auto snapshot = config->getConfigSnapshot(
+      names, name_regex.ptr != nullptr ? absl::string_view(name_regex.ptr, name_regex.length)
+                                       : absl::string_view{});
+  if (!snapshot.ok()) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "dynamic modules: config snapshot collection failed: {}",
+                        snapshot.status());
+    switch (snapshot.status().code()) {
+    case absl::StatusCode::kFailedPrecondition:
+      return envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed;
+    case absl::StatusCode::kInvalidArgument:
+      return envoy_dynamic_module_type_bootstrap_config_snapshot_result_InvalidRegex;
+    case absl::StatusCode::kUnavailable:
+      return envoy_dynamic_module_type_bootstrap_config_snapshot_result_Unavailable;
+    default:
+      return envoy_dynamic_module_type_bootstrap_config_snapshot_result_CollectionFailed;
+    }
+  }
+  *snapshot_out = snapshot.value().release();
+  return envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success;
+}
+
+bool envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot,
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn json_fn,
+    void* user_data) {
+  auto json = static_cast<ConfigSnapshot*>(snapshot)->serialize();
+  if (!json.ok()) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "dynamic modules: config snapshot encoding failed: {}", json.status());
+    return false;
+  }
+  json_fn({json->data(), json->size()}, user_data);
+  return true;
+}
+
+void envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot) {
+  delete static_cast<ConfigSnapshot*>(snapshot);
+}
+
 // -------------------- Cluster Lifecycle Callbacks --------------------
 
 bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
   if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
-    IS_ENVOY_BUG(
-        "envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle must be called "
-        "on the main thread");
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
     return false;
   }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
@@ -698,9 +825,7 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
 bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
   if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
-    IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle must "
-                 "be called "
-                 "on the main thread");
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
     return false;
   }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
@@ -712,13 +837,198 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle
 bool envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
   if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
-    IS_ENVOY_BUG(
-        "envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle must be called "
-        "on the main thread");
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
     return false;
   }
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
   return config->enableSecretLifecycle();
+}
+
+// -------------------- xDS Notification Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr, bool enabled) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
+  return config->setXdsNotifications(enabled);
+}
+
+// -------------------- Runtime Update Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  auto* extension = static_cast<DynamicModuleBootstrapExtension*>(extension_envoy_ptr);
+  return extension->enableRuntimeUpdate(absl::string_view(key.ptr, key.length));
+}
+
+// -------------------- Run On All Workers Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    uint64_t event_id) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  return config->runOnAllWorkers(event_id);
+}
+
+// -------------------- Cluster Writer Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  return config->enableClusterWriter();
+}
+
+envoy_dynamic_module_type_bootstrap_cluster_writer_update_result
+envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_buffer cluster,
+    envoy_dynamic_module_type_module_buffer version_info, uint64_t* update_id_out) {
+  *update_id_out = 0;
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_NotAllowed;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  DynamicModuleClusterWriter* cluster_writer = config->cluster_writer_.get();
+  if (cluster_writer == nullptr) {
+    return envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_NotAllowed;
+  }
+  return cluster_writer->addOrUpdateCluster(
+      {cluster_name.ptr, cluster_name.length}, {cluster.ptr, cluster.length},
+      {version_info.ptr, version_info.length}, *update_id_out);
+}
+
+envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result
+envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_NotAllowed;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  DynamicModuleClusterWriter* cluster_writer = config->cluster_writer_.get();
+  if (cluster_writer == nullptr) {
+    return envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_NotAllowed;
+  }
+  return cluster_writer->removeCluster({cluster_name.ptr, cluster_name.length});
+}
+
+// -------------------- Listener Writer Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  return config->enableListenerWriter();
+}
+
+envoy_dynamic_module_type_bootstrap_listener_writer_update_result
+envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer listener_name,
+    envoy_dynamic_module_type_module_buffer listener,
+    envoy_dynamic_module_type_module_buffer version_info, uint64_t* update_id_out) {
+  *update_id_out = 0;
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return envoy_dynamic_module_type_bootstrap_listener_writer_update_result_NotAllowed;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  DynamicModuleListenerWriter* listener_writer = config->listener_writer_.get();
+  if (listener_writer == nullptr) {
+    return envoy_dynamic_module_type_bootstrap_listener_writer_update_result_NotAllowed;
+  }
+  return listener_writer->addOrUpdateListener(
+      {listener_name.ptr, listener_name.length}, {listener.ptr, listener.length},
+      {version_info.ptr, version_info.length}, *update_id_out);
+}
+
+envoy_dynamic_module_type_bootstrap_listener_writer_removal_result
+envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer listener_name) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return envoy_dynamic_module_type_bootstrap_listener_writer_removal_result_NotAllowed;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  DynamicModuleListenerWriter* listener_writer = config->listener_writer_.get();
+  if (listener_writer == nullptr) {
+    return envoy_dynamic_module_type_bootstrap_listener_writer_removal_result_NotAllowed;
+  }
+  return listener_writer->removeListener({listener_name.ptr, listener_name.length});
+}
+
+// -------------------- Filter Chain Config Writer Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  return config->enableFilterChainConfigWriter();
+}
+
+envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result
+envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_chain_name,
+    envoy_dynamic_module_type_module_buffer filter_chain, uint64_t* update_id_out) {
+  *update_id_out = 0;
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  DynamicModuleFilterChainConfigWriter* filter_chain_config_writer =
+      config->filter_chain_config_writer_.get();
+  if (filter_chain_config_writer == nullptr) {
+    return envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed;
+  }
+  return filter_chain_config_writer->addOrUpdateFilterChain(
+      {filter_chain_name.ptr, filter_chain_name.length}, {filter_chain.ptr, filter_chain.length},
+      *update_id_out);
+}
+
+envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result
+envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_chain_name) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotAllowed;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  DynamicModuleFilterChainConfigWriter* filter_chain_config_writer =
+      config->filter_chain_config_writer_.get();
+  if (filter_chain_config_writer == nullptr) {
+    return envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotAllowed;
+  }
+  return filter_chain_config_writer->removeFilterChain(
+      {filter_chain_name.ptr, filter_chain_name.length});
 }
 
 } // extern "C"

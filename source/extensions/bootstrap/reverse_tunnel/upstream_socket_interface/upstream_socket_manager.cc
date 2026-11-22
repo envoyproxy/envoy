@@ -322,13 +322,25 @@ std::string UpstreamSocketManager::getNodeWithSocket(const std::string& key) {
   // Check if key exists as a cluster ID by looking at cluster_to_node_info_map_.
   auto cluster_it = cluster_to_node_info_map_.find(key);
   if (cluster_it != cluster_to_node_info_map_.end() && !cluster_it->second.nodes.empty()) {
-    // Key is a cluster ID, use round-robin to select a node.
+    // Key is a cluster ID, use round-robin to select a node. A node stays in the cluster while
+    // any of its sockets is in use, so prefer the next node that still has an idle socket: a node
+    // whose sockets are all handed out, such as a draining initiator whose connections got GOAWAY
+    // but still carry long requests, cannot take a new connection. Without any idle socket in the
+    // cluster, fall back to plain round-robin.
     auto& cluster_info = cluster_it->second;
     const auto& nodes = cluster_info.nodes;
-
-    // Select node at current index and advance for next call.
-    const std::string& selected_node = nodes[cluster_info.round_robin_index % nodes.size()];
-    cluster_info.round_robin_index = (cluster_info.round_robin_index + 1) % nodes.size();
+    const size_t start = cluster_info.round_robin_index % nodes.size();
+    size_t selected = start;
+    for (size_t i = 0; i < nodes.size(); ++i) {
+      const size_t candidate = (start + i) % nodes.size();
+      const auto sockets_it = accepted_reverse_connections_.find(nodes[candidate]);
+      if (sockets_it != accepted_reverse_connections_.end() && !sockets_it->second.empty()) {
+        selected = candidate;
+        break;
+      }
+    }
+    const std::string& selected_node = nodes[selected];
+    cluster_info.round_robin_index = (selected + 1) % nodes.size();
 
     ENVOY_LOG(debug, "reverse_tunnel: key '{}' is a cluster ID; returning node {} via round-robin.",
               key, selected_node);

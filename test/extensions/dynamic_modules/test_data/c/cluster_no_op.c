@@ -14,9 +14,16 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
 envoy_dynamic_module_type_cluster_config_module_ptr envoy_dynamic_module_on_cluster_config_new(
     envoy_dynamic_module_type_cluster_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
-  (void)config_envoy_ptr;
-  (void)name;
   (void)config;
+  static const char kPersistentHostPartitions[] = "use_persistent_host_partitions";
+  if (name.length == sizeof(kPersistentHostPartitions) - 1 &&
+      memcmp(name.ptr, kPersistentHostPartitions, name.length) == 0) {
+    // The config pointer records the result: 0x5 when accepted, 0x6 when refused.
+    return envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(
+               config_envoy_ptr)
+               ? (envoy_dynamic_module_type_cluster_config_module_ptr)0x5
+               : (envoy_dynamic_module_type_cluster_config_module_ptr)0x6;
+  }
   // Return a dummy pointer.
   return (envoy_dynamic_module_type_cluster_config_module_ptr)0x1;
 }

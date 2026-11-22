@@ -51,7 +51,7 @@ TEST_P(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
   EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
       .WillRepeatedly(testing::Return(dns_resolver));
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [address_ptr](const std::string&, Network::DnsLookupFamily,
                         Network::DnsResolver::ResolveCb dns_callback) -> Network::ActiveDnsQuery* {
             const uint32_t address = address_ptr->address_;
@@ -82,7 +82,7 @@ TEST_P(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
                          }));
             address_ptr->address_ = (address + 1) % 128;
             return nullptr;
-          }));
+          });
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);

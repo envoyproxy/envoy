@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Coroutine {
 
-bool Backtrace::log_to_stderr_ = false;
+std::atomic<bool> Backtrace::log_to_stderr_{false};
 bool Backtrace::single_line_ = false;
 
 const PromiseBase* Backtrace::getCurrentCoroutine() {

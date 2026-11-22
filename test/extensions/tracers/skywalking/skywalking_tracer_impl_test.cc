@@ -38,7 +38,7 @@ public:
         .WillOnce(Return(ByMove(std::move(mock_client_factory))));
 
     EXPECT_CALL(factory_context.thread_local_.dispatcher_, createTimer_(_))
-        .WillOnce(Invoke([](Event::TimerCb) { return new NiceMock<Event::MockTimer>(); }));
+        .WillOnce([](Event::TimerCb) { return new NiceMock<Event::MockTimer>(); });
 
     ON_CALL(factory_context.local_info_, clusterName()).WillByDefault(ReturnRef(test_string));
     ON_CALL(factory_context.local_info_, nodeName()).WillByDefault(ReturnRef(test_string));

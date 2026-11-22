@@ -30,7 +30,6 @@ using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::testing::_;
 using ::testing::ElementsAre;
 using ::testing::HasSubstr;
-using ::testing::Invoke;
 using ::testing::IsNull;
 using ::testing::NiceMock;
 using ::testing::Return;
@@ -57,14 +56,14 @@ RouteConstSharedPtr namedRoute(const std::string& name) {
 // route it received in `trace`.
 auto wrapWith(const std::string& name, std::vector<std::string>& trace,
               OnRouteStatus status = OnRouteStatus::Continue) {
-  return Invoke([&trace, name, status](RouteConstSharedPtr route, const Http::RequestHeaderMap&,
-                                       const StreamInfo::StreamInfo&, uint64_t,
-                                       OnRouteInputStatus) -> OnRouteResult {
+  return [&trace, name, status](RouteConstSharedPtr route, const Http::RequestHeaderMap&,
+                                const StreamInfo::StreamInfo&, uint64_t,
+                                OnRouteInputStatus) -> OnRouteResult {
     trace.push_back(route == nullptr ? "<none>" : route->routeName());
     RouteConstSharedPtr base =
         route != nullptr ? std::move(route) : std::make_shared<NiceMock<MockRoute>>();
     return {std::make_shared<NamedRoute>(std::move(base), name), status};
-  });
+  };
 }
 
 class ApplyRouteSpecifiersTest : public testing::Test {
@@ -202,13 +201,13 @@ TEST_F(ApplyRouteSpecifiersTest, StopIterationWithNoRouteIsFinal) {
 // Every specifier sees the request headers, stream info and random value of the request.
 TEST_F(ApplyRouteSpecifiersTest, RequestContextIsForwarded) {
   EXPECT_CALL(*addSpecifier(config_specifiers_), onRoute(_, _, _, 1234, _))
-      .WillOnce(Invoke([this](RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
-                              const StreamInfo::StreamInfo& stream_info, uint64_t,
-                              OnRouteInputStatus) -> OnRouteResult {
+      .WillOnce([this](RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
+                       const StreamInfo::StreamInfo& stream_info, uint64_t,
+                       OnRouteInputStatus) -> OnRouteResult {
         EXPECT_EQ(&headers_, &headers);
         EXPECT_EQ(&stream_info_, &stream_info);
         return {std::move(route)};
-      }));
+      });
 
   RouteConstSharedPtr route = namedRoute("matched");
   EXPECT_EQ(route,
@@ -513,10 +512,9 @@ virtual_hosts:
 TEST_F(RouteSpecifierConfigImplTest, VirtualHostFollowsTheRouteTheSpecifierReturned) {
   auto replacement = std::make_shared<NiceMock<MockRoute>>();
   EXPECT_CALL(*registerSpecifier("config"), onRoute(_, _, _, _, _))
-      .WillOnce(
-          Invoke([replacement](RouteConstSharedPtr, const Http::RequestHeaderMap&,
-                               const StreamInfo::StreamInfo&, uint64_t,
-                               OnRouteInputStatus) -> OnRouteResult { return {replacement}; }));
+      .WillOnce([replacement](RouteConstSharedPtr, const Http::RequestHeaderMap&,
+                              const StreamInfo::StreamInfo&, uint64_t,
+                              OnRouteInputStatus) -> OnRouteResult { return {replacement}; });
 
   const std::string yaml = R"EOF(
 name: config
@@ -546,12 +544,12 @@ virtual_hosts:
 // Makes the specifier hand back the route it was given together with `status`, recording the
 // name of the route it received in `trace`.
 auto passWith(std::vector<std::string>& trace, OnRouteStatus status = OnRouteStatus::Continue) {
-  return Invoke([&trace, status](RouteConstSharedPtr route, const Http::RequestHeaderMap&,
-                                 const StreamInfo::StreamInfo&, uint64_t,
-                                 OnRouteInputStatus) -> OnRouteResult {
+  return [&trace, status](RouteConstSharedPtr route, const Http::RequestHeaderMap&,
+                          const StreamInfo::StreamInfo&, uint64_t,
+                          OnRouteInputStatus) -> OnRouteResult {
     trace.push_back(route == nullptr ? "<none>" : route->routeName());
     return {std::move(route), status};
-  });
+  };
 }
 
 // A chain that runs to completion accepts its result: the status that comes out is Continue.

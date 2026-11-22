@@ -41,18 +41,18 @@ HTTP lifecycle
 
 Proxying of the request begins when the downstream HTTP codec has successfully decoded request header map.
 
-The point at which the proxying completes and the stream is destroyed depends on the upstream protocol and
-whether independent half close is enabled.
+The point at which the proxying completes and the stream is destroyed depends on the upstream.
 
-If independent half-close is enabled and the upstream protocol is either HTTP/2 or HTTP/3 protocols the stream
-is destroyed after both request and response are complete i.e. reach their respective end-of-stream,
-by receiving trailers or the header/body with end-stream set in both directions AND response has
-success (2xx) status code.
+For HTTP upstreams the stream is destroyed when the response is complete and reaches its end-of-stream,
+i.e. when trailers or the response header/body with end-stream set are received, even if the request has
+not yet completed. If the request was incomplete at response completion, the stream is reset.
 
-For HTTP/1 upstream protocol or if independent half-close is disabled the stream is destroyed when the response
-is complete and reaches its end-of-stream, i.e. when trailers or the response header/body with
-end-stream set are received, even if the request has not yet completed. If the request was incomplete at response
-completion, the stream is reset.
+For TCP upstreams, such as a CONNECT request :ref:`terminated <arch_overview_upgrades>` into a TCP
+connection, independent half close is enabled when the downstream is HTTP/2 or HTTP/3: the stream is
+destroyed after both request and response are complete i.e. reach their respective end-of-stream in
+both directions AND response has success (2xx) status code. This lets the upstream half close its TCP connection while the downstream keeps sending
+data. This can be disabled by setting the ``envoy.reloadable_features.tcp_tunnel_allow_upstream_half_close``
+runtime guard to ``false``.
 
 Note that proxying can stop early when an error or timeout occurred or when a peer reset HTTP/2 or HTTP/3 stream.
 

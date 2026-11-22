@@ -159,6 +159,12 @@ cfg = san_multiple_dns_1_cert.cfg
 issuer = ca
 info_header = san_multiple_dns_1_cert_info.h
 
+# Same as san_multiple_dns_cert.pem, but with its two DNS SANs joined into one.
+[cert san_concatenated_dns]
+key = san_concatenated_dns_key.pem
+cfg = san_concatenated_dns_cert.cfg
+issuer = ca
+
 [cert san_only_dns]
 key = san_only_dns_key.pem
 cfg = san_only_dns_cert.cfg
@@ -194,6 +200,12 @@ key = san_uri_key.pem
 cfg = san_uri_cert.cfg
 issuer = ca
 info_header = san_uri_cert_info.h
+
+# Same as san_dns_cert.pem, but with its DNS SAN as a URI SAN.
+[cert san_uri_with_dns_name]
+key = san_uri_with_dns_name_key.pem
+cfg = san_uri_with_dns_name_cert.cfg
+issuer = ca
 
 [cert san_ip]
 key = san_ip_key.pem

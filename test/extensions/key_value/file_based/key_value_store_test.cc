@@ -161,7 +161,7 @@ TEST_F(KeyValueStoreTest, PersistWithTTL) {
   createStore();
   EXPECT_EQ("bar", store_->get("foo").value());
   EXPECT_EQ(std::nullopt, store_->get("ee"));
-  test_time_.setMonotonicTime(std::chrono::milliseconds(2000));
+  test_time_.advanceTimeWait(std::chrono::milliseconds(1000));
   ttl_timer_->invokeCallback();
   EXPECT_EQ(std::nullopt, store_->get("foo"));
 }

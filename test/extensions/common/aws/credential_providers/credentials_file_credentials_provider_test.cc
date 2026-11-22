@@ -9,7 +9,6 @@
 #include "gtest/gtest.h"
 
 using testing::InSequence;
-using testing::InvokeWithoutArgs;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -97,12 +96,12 @@ TEST_F(CredentialsFileCredentialsProviderTest, CustomProfileFromConfigWithWatche
   EXPECT_CALL(context_, api()).WillRepeatedly(ReturnRef(*api_));
   EXPECT_CALL(context_, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
   EXPECT_CALL(dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
-  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([&] {
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly([&] {
     Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
     EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
         .WillRepeatedly(Return(absl::OkStatus()));
     return mock_watcher;
-  }));
+  });
 
   auto provider = CredentialsFileCredentialsProvider(context_, config);
   const auto credentials = provider.getCredentials();
@@ -127,12 +126,12 @@ TEST_F(CredentialsFileCredentialsProviderTest, ConcurrentGetCredentialsWithWatch
   EXPECT_CALL(context_, api()).WillRepeatedly(ReturnRef(*api_));
   EXPECT_CALL(context_, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
   EXPECT_CALL(dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
-  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([&] {
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly([&] {
     Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
     EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
         .WillRepeatedly(Return(absl::OkStatus()));
     return mock_watcher;
-  }));
+  });
 
   auto provider = CredentialsFileCredentialsProvider(context_, config);
 

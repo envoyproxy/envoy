@@ -31,11 +31,13 @@ void TsiHandshaker::onNextDone(absl::Status status, void* handshaker,
   auto next_result = new TsiHandshakerCallbacks::NextResult{status, std::move(to_send),
                                                             std::move(handshake_result)};
 
+  tsi_handshaker->result_posted_ = true;
   tsi_handshaker->dispatcher_.post([tsi_handshaker, next_result]() {
     TsiHandshakerCallbacks::NextResultPtr next_result_ptr{next_result};
 
     ASSERT(tsi_handshaker->calling_);
     tsi_handshaker->calling_ = false;
+    tsi_handshaker->result_posted_ = false;
 
     if (tsi_handshaker->delete_on_done_) {
       tsi_handshaker->deferredDelete();
@@ -70,6 +72,12 @@ absl::Status TsiHandshaker::next(Envoy::Buffer::Instance& received) {
 }
 
 void TsiHandshaker::deferredDelete() {
+  if (calling_ && !result_posted_) {
+    // The call is still waiting for the handshaker service. Cancel it, so that it never posts a
+    // result, and schedule this handshaker's deletion now.
+    handshaker_->cancel();
+    calling_ = false;
+  }
   if (calling_) {
     delete_on_done_ = true;
   } else {

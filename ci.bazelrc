@@ -52,6 +52,7 @@ common:rbe --config=remote-exec
 common:remote-cache --config=engflow-common
 common:remote-cache --remote_cache=grpcs://mordenite.cluster.engflow.com
 common:remote-cache --remote_timeout=3600s
+common:remote-cache --experimental_remote_downloader=grpcs://mordenite.cluster.engflow.com
 
 common:remote-exec --remote_executor=grpcs://mordenite.cluster.engflow.com
 common:remote-exec --jobs=200

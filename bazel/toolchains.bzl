@@ -1,4 +1,3 @@
-load("@envoy_repo//:compiler.bzl", _USE_LIBSTDCPP = "USE_LIBSTDCPP")
 load(
     "@llvm_toolchain_llvm//:llvm.bzl",
     _LLVM_IS_HOST = "LLVM_IS_HOST",
@@ -13,7 +12,6 @@ LLVM_LIB_DIR = _LLVM_LIB_DIR
 LLVM_MAJOR = _LLVM_MAJOR
 LLVM_MAJOR_MINOR = _LLVM_MAJOR_MINOR
 LLVM_VERSION = _LLVM_VERSION
-USE_LIBSTDCPP = _USE_LIBSTDCPP
 
 LIBCLANG_CPP = "@llvm_toolchain_llvm//:%s/libclang-cpp.so.%s" % (LLVM_LIB_DIR, LLVM_MAJOR_MINOR)
 

@@ -2,7 +2,6 @@
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/buffer/buffer.h"
-#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/admin.h"
@@ -37,14 +36,6 @@ private:
   addResourceToDump(envoy::admin::v3::ConfigDump& dump, const std::optional<std::string>& mask,
                     const std::string& resource, const Matchers::StringMatcher& name_matcher,
                     bool include_eds) const;
-
-  /**
-   * Helper methods to add endpoints config
-   */
-  void addLbEndpoint(const Upstream::HostSharedPtr& host,
-                     envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) const;
-
-  ProtobufTypes::MessagePtr dumpEndpointConfigs(const Matchers::StringMatcher& name_matcher) const;
 
   ConfigTracker& config_tracker_;
 };

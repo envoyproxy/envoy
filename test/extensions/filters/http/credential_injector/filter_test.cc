@@ -126,15 +126,15 @@ TEST_P(CredentialInjectorFilterTest, FailedToInjectCredentialDisAllowWithoutCred
   Envoy::Http::TestRequestHeaderMapImpl request_headers{};
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&](Envoy::Http::Code code, absl::string_view body,
-                           std::function<void(Envoy::Http::ResponseHeaderMap & headers)>,
-                           const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                           absl::string_view details) {
+      .WillOnce([&](Envoy::Http::Code code, absl::string_view body,
+                    std::function<void(Envoy::Http::ResponseHeaderMap & headers)>,
+                    const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    absl::string_view details) {
         EXPECT_EQ(Envoy::Http::Code::Unauthorized, code);
         EXPECT_EQ("Failed to inject credential.", body);
         EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "failed_to_inject_credential");
-      }));
+      });
   filter->decodeHeaders(request_headers, true);
 }
 
@@ -323,15 +323,15 @@ TEST_F(GenericCredentialInjectorTrimTest, NewlineOnlySecretTreatedAsMissing) {
 
   Envoy::Http::TestRequestHeaderMapImpl request_headers{};
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&](Envoy::Http::Code code, absl::string_view body,
-                           std::function<void(Envoy::Http::ResponseHeaderMap & headers)>,
-                           const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                           absl::string_view details) {
+      .WillOnce([&](Envoy::Http::Code code, absl::string_view body,
+                    std::function<void(Envoy::Http::ResponseHeaderMap & headers)>,
+                    const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    absl::string_view details) {
         EXPECT_EQ(Envoy::Http::Code::Unauthorized, code);
         EXPECT_EQ("Failed to inject credential.", body);
         EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "failed_to_inject_credential");
-      }));
+      });
   filter->decodeHeaders(request_headers, true);
 }
 

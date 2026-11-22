@@ -17,7 +17,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::ReturnRef;
 
@@ -97,26 +96,26 @@ protected:
 TEST_F(EventReporterTest, AddRemoveConnections) {
   EXPECT_CALL(*mock_client1_, receiveEvents(_))
       .Times(4)
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(1, updates.connections.size());
         EXPECT_EQ(0, updates.disconnections.size());
         EXPECT_EQ("node1", updates.connections[0]->node_id);
-      }))
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      })
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(1, updates.connections.size());
         EXPECT_EQ(0, updates.disconnections.size());
         EXPECT_EQ("node2", updates.connections[0]->node_id);
-      }))
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      })
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(0, updates.connections.size());
         EXPECT_EQ(1, updates.disconnections.size());
         EXPECT_EQ(ReverseTunnelEvent::getName("node1"), updates.disconnections[0]->name);
-      }))
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      })
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(0, updates.connections.size());
         EXPECT_EQ(1, updates.disconnections.size());
         EXPECT_EQ(ReverseTunnelEvent::getName("node2"), updates.disconnections[0]->name);
-      }));
+      });
 
   EXPECT_CALL(*mock_client2_, receiveEvents(_)).Times(4);
 
@@ -164,16 +163,16 @@ TEST_F(EventReporterTest, AddRemoveConnections) {
 TEST_F(EventReporterTest, DuplicateConnectionHandling) {
   EXPECT_CALL(*mock_client1_, receiveEvents(_))
       .Times(2)
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(1, updates.connections.size());
         EXPECT_EQ(0, updates.disconnections.size());
         EXPECT_EQ("node1", updates.connections[0]->node_id);
-      }))
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      })
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(0, updates.connections.size());
         EXPECT_EQ(1, updates.disconnections.size());
         EXPECT_EQ(ReverseTunnelEvent::getName("node1"), updates.disconnections[0]->name);
-      }));
+      });
 
   EXPECT_CALL(*mock_client2_, receiveEvents(_)).Times(2);
 
@@ -223,14 +222,14 @@ TEST_F(EventReporterTest, DuplicateConnectionHandling) {
 TEST_F(EventReporterTest, MultipleConnectionsSameNodeDifferentFds) {
   EXPECT_CALL(*mock_client1_, receiveEvents(_))
       .Times(2)
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(1, updates.connections.size());
         EXPECT_EQ(0, updates.disconnections.size());
-      }))
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      })
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(0, updates.connections.size());
         EXPECT_EQ(1, updates.disconnections.size());
-      }));
+      });
   EXPECT_CALL(*mock_client2_, receiveEvents(_)).Times(2);
 
   reporter_->reportConnectionEvent("node1", "cluster1", "tenant1", 0, 1);
@@ -276,12 +275,12 @@ TEST_F(EventReporterTest, RemoveUnknownFdForKnownNode) {
 TEST_F(EventReporterTest, ReportGoAwayEventRemovesTrackedFd) {
   EXPECT_CALL(*mock_client1_, receiveEvents(_))
       .Times(2)
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(1, updates.connections.size());
-      }))
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      })
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(1, updates.disconnections.size());
-      }));
+      });
   EXPECT_CALL(*mock_client2_, receiveEvents(_)).Times(2);
 
   reporter_->reportConnectionEvent("node1", "cluster1", "tenant1", 0, 42);
@@ -310,10 +309,9 @@ TEST_F(EventReporterTest, RemoveNonExistentConnection) {
   Envoy::Logger::Registry::setLogLevel(Logger::Levels::warn);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
 
-  EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](absl::string_view, const spdlog::details::log_msg& msg) {
-        EXPECT_EQ(spdlog::level::warn, msg.level);
-      }));
+  EXPECT_CALL(sink, log(_, _)).WillOnce([](absl::string_view, const spdlog::details::log_msg& msg) {
+    EXPECT_EQ(spdlog::level::warn, msg.level);
+  });
 
   EXPECT_CALL(*mock_client1_, receiveEvents(_)).Times(0);
   EXPECT_CALL(*mock_client2_, receiveEvents(_)).Times(0);
@@ -330,11 +328,11 @@ TEST_F(EventReporterTest, RemoveNonExistentConnection) {
   EXPECT_EQ(1, getCounterValue("reverse_tunnel_full_pulls_total"));
 
   EXPECT_CALL(*mock_client1_, receiveEvents(_))
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(1, updates.connections.size());
         EXPECT_EQ(0, updates.disconnections.size());
         EXPECT_EQ("node1", updates.connections[0]->node_id);
-      }));
+      });
   EXPECT_CALL(*mock_client2_, receiveEvents(_));
 
   createTestConnection("node1", "cluster1");
@@ -349,10 +347,9 @@ TEST_F(EventReporterTest, OnServerInitialized) {
   Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
 
-  EXPECT_CALL(sink, log(_, _))
-      .WillOnce(Invoke([](absl::string_view, const spdlog::details::log_msg& msg) {
-        EXPECT_EQ(spdlog::level::info, msg.level);
-      }));
+  EXPECT_CALL(sink, log(_, _)).WillOnce([](absl::string_view, const spdlog::details::log_msg& msg) {
+    EXPECT_EQ(spdlog::level::info, msg.level);
+  });
 
   EXPECT_CALL(*mock_client1_, onServerInitialized(_));
   EXPECT_CALL(*mock_client2_, onServerInitialized(_));
@@ -407,29 +404,29 @@ TEST_F(EventReporterTest, DefaultStatPrefix) {
 TEST_F(EventReporterTest, MixedScenario) {
   EXPECT_CALL(*mock_client1_, receiveEvents(_))
       .Times(4)
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(1, updates.connections.size());
         EXPECT_EQ(0, updates.disconnections.size());
         EXPECT_EQ("node1", updates.connections[0]->node_id);
         EXPECT_EQ("tenant_A", updates.connections[0]->tenant_id);
-      }))
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      })
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(1, updates.connections.size());
         EXPECT_EQ(0, updates.disconnections.size());
         EXPECT_EQ("node2", updates.connections[0]->node_id);
         EXPECT_EQ("tenant_B", updates.connections[0]->tenant_id);
-      }))
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      })
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(0, updates.connections.size());
         EXPECT_EQ(1, updates.disconnections.size());
         EXPECT_EQ(ReverseTunnelEvent::getName("node2"), updates.disconnections[0]->name);
-      }))
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      })
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(1, updates.connections.size());
         EXPECT_EQ(0, updates.disconnections.size());
         EXPECT_EQ("node3", updates.connections[0]->node_id);
         EXPECT_EQ("tenant_C", updates.connections[0]->tenant_id);
-      }));
+      });
 
   EXPECT_CALL(*mock_client2_, receiveEvents(_)).Times(4);
 
@@ -502,17 +499,17 @@ TEST_F(EventReporterTest, MixedScenario) {
 TEST_F(EventReporterTest, LargeDuplicateCount) {
   EXPECT_CALL(*mock_client1_, receiveEvents(_))
       .Times(2)
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(1, updates.connections.size());
         EXPECT_EQ(0, updates.disconnections.size());
         EXPECT_EQ("node1", updates.connections[0]->node_id);
         EXPECT_EQ("tenant_A", updates.connections[0]->tenant_id);
-      }))
-      .WillOnce(Invoke([](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      })
+      .WillOnce([](const ReverseTunnelEvent::TunnelUpdates& updates) {
         EXPECT_EQ(0, updates.connections.size());
         EXPECT_EQ(1, updates.disconnections.size());
         EXPECT_EQ(ReverseTunnelEvent::getName("node1"), updates.disconnections[0]->name);
-      }));
+      });
 
   EXPECT_CALL(*mock_client2_, receiveEvents(_)).Times(2);
 
@@ -564,11 +561,11 @@ TEST_F(EventReporterTest, InitiationTimeUsedAsCreatedAt) {
   const auto expected_time = Envoy::SystemTime(std::chrono::milliseconds(dp_timestamp_ms));
 
   EXPECT_CALL(*mock_client1_, receiveEvents(_))
-      .WillOnce(Invoke([&expected_time](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      .WillOnce([&expected_time](const ReverseTunnelEvent::TunnelUpdates& updates) {
         ASSERT_EQ(1, updates.connections.size());
         EXPECT_EQ(expected_time, updates.connections[0]->created_at);
         EXPECT_EQ("node1", updates.connections[0]->node_id);
-      }));
+      });
   EXPECT_CALL(*mock_client2_, receiveEvents(_));
 
   createTestConnection("node1", "cluster1", "tenant1", dp_timestamp_ms);
@@ -581,11 +578,11 @@ TEST_F(EventReporterTest, ZeroInitiationTimeFallsBackToTimeSource) {
   const auto before = context_.timeSource().systemTime();
 
   EXPECT_CALL(*mock_client1_, receiveEvents(_))
-      .WillOnce(Invoke([&before](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      .WillOnce([&before](const ReverseTunnelEvent::TunnelUpdates& updates) {
         ASSERT_EQ(1, updates.connections.size());
         EXPECT_GE(updates.connections[0]->created_at, before);
         EXPECT_LE(updates.connections[0]->created_at, before + std::chrono::seconds(5));
-      }));
+      });
   EXPECT_CALL(*mock_client2_, receiveEvents(_));
 
   createTestConnection("node1", "cluster1", "tenant1", 0);
@@ -599,11 +596,11 @@ TEST_F(EventReporterTest, OverflowInitiationTimeFallsBackToTimeSource) {
   const auto before = context_.timeSource().systemTime();
 
   EXPECT_CALL(*mock_client1_, receiveEvents(_))
-      .WillOnce(Invoke([&before](const ReverseTunnelEvent::TunnelUpdates& updates) {
+      .WillOnce([&before](const ReverseTunnelEvent::TunnelUpdates& updates) {
         ASSERT_EQ(1, updates.connections.size());
         EXPECT_GE(updates.connections[0]->created_at, before);
         EXPECT_LE(updates.connections[0]->created_at, before + std::chrono::seconds(5));
-      }));
+      });
   EXPECT_CALL(*mock_client2_, receiveEvents(_));
 
   createTestConnection("node1", "cluster1", "tenant1", std::numeric_limits<int64_t>::max());
@@ -663,10 +660,10 @@ TEST_F(EventReporterFactoryTest, CreateReporterWithRegisteredClient) {
   Registry::InjectFactory<ReverseTunnelReporterClientFactory> registered(mock_client_factory);
 
   EXPECT_CALL(mock_client_factory, createClient(_, _))
-      .WillOnce(Invoke([](Server::Configuration::ServerFactoryContext&,
-                          const Protobuf::Message&) -> ReverseTunnelReporterClientPtr {
+      .WillOnce([](Server::Configuration::ServerFactoryContext&,
+                   const Protobuf::Message&) -> ReverseTunnelReporterClientPtr {
         return std::make_unique<NiceMock<MockReverseTunnelReporterClient>>();
-      }));
+      });
 
   auto config = factory_.createEmptyConfigProto();
   auto& reporter_config = dynamic_cast<

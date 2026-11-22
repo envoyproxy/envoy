@@ -11,7 +11,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -49,7 +48,7 @@ TEST(BacktraceActionFactoryTest, CanCreateAction) {
   Event::MockDispatcher dispatcher;
   EXPECT_CALL(dispatcher, createTimer_(testing::_))
       .Times(16) // Same value as MaxSlots. See backtrace_action.h.
-      .WillRepeatedly(Invoke([](Event::TimerCb) { return new NiceMock<Event::MockTimer>(); }));
+      .WillRepeatedly([](Event::TimerCb) { return new NiceMock<Event::MockTimer>(); });
   Api::ApiPtr api = Api::createApiForTest(stats);
   Server::Configuration::GuardDogActionFactoryContext context{*api, dispatcher, *stats.rootScope(),
                                                               "test"};

@@ -21,7 +21,6 @@
 
 using testing::_;
 using testing::Combine;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::Values;
@@ -85,14 +84,14 @@ public:
 
   void expectErrorResponse(const Http::Code& expected_code, const std::string& expected_message) {
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-        .WillOnce(Invoke([=](Http::ResponseHeaderMap& headers, bool) {
+        .WillOnce([=](Http::ResponseHeaderMap& headers, bool) {
           uint64_t code;
           ASSERT_TRUE(absl::SimpleAtoi(headers.getStatusValue(), &code));
           EXPECT_EQ(static_cast<uint64_t>(expected_code), code);
-        }));
-    EXPECT_CALL(decoder_callbacks_, encodeData(_, _))
-        .WillOnce(Invoke(
-            [=](Buffer::Instance& data, bool) { EXPECT_EQ(expected_message, data.toString()); }));
+        });
+    EXPECT_CALL(decoder_callbacks_, encodeData(_, _)).WillOnce([=](Buffer::Instance& data, bool) {
+      EXPECT_EQ(expected_message, data.toString());
+    });
   }
 
   void expectRequiredGrpcUpstreamHeaders(const Http::TestRequestHeaderMapImpl& request_headers) {
@@ -125,11 +124,11 @@ public:
       };
       if (last_data != nullptr) {
         EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
-            .WillOnce(Invoke([&](Buffer::Instance& data, bool) { encoded_buffer->move(data); }));
+            .WillOnce([&](Buffer::Instance& data, bool) { encoded_buffer->move(data); });
       }
       EXPECT_CALL(encoder_callbacks_, encodingBuffer).WillRepeatedly(Return(encoded_buffer));
       EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
-          .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+          .WillRepeatedly(on_modify_encoding_buffer);
     }
     Buffer::OwnedImpl output;
     filter_.mergeAndLimitNonProtoEncodedResponseData(output, last_data);
@@ -231,10 +230,9 @@ TEST_F(GrpcWebFilterTest, MergeAndLimitNonProtoEncodedResponseDataWithLargeEncod
 
 TEST_F(GrpcWebFilterTest, MergeAndLimitNonProtoEncodedResponseDataWithNullEncodingBuffer) {
   Buffer::OwnedImpl last_data(std::string(2 * MAX_BUFFERED_PLAINTEXT_LENGTH, 'a'));
-  // If we don't have buffered data in encoding buffer, the merged data will be the same as last
-  // data.
+  // Without buffered data, the last data alone is limited too.
   expectMergedAndLimitedResponseData(nullptr, &last_data,
-                                     /*expected_merged_length=*/last_data.length());
+                                     /*expected_merged_length=*/MAX_BUFFERED_PLAINTEXT_LENGTH);
 }
 
 TEST_F(GrpcWebFilterTest, MergeAndLimitNonProtoEncodedResponseDataWithNoEncodingBufferAndLastData) {
@@ -323,11 +321,10 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForText) {
                                         buffer.get()](std::function<void(Buffer::Instance&)> cb) {
     cb(*encoded_buffer);
   };
-  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
-      .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer).WillRepeatedly(on_modify_encoding_buffer);
 
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
-      .WillOnce(Invoke([&](Buffer::Instance& data, bool) { buffer->move(data); }));
+      .WillOnce([&](Buffer::Instance& data, bool) { buffer->move(data); });
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
 
@@ -358,8 +355,7 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithLargeEncodingBuffer)
     cb(encoded_buffer);
   };
   EXPECT_CALL(encoder_callbacks_, encodingBuffer).WillRepeatedly(Return(&encoded_buffer));
-  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
-      .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer).WillRepeatedly(on_modify_encoding_buffer);
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
             filter_.encodeData(encoded_buffer, false));
@@ -380,13 +376,11 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithLargeLastData) {
             filter_.encodeHeaders(response_headers, false));
   Buffer::OwnedImpl data;
   // The last data length is set to be bigger than "MAX_BUFFERED_PLAINTEXT_LENGTH".
-  const std::string expected_grpc_message = std::string(MAX_BUFFERED_PLAINTEXT_LENGTH + 1, 'a');
-  data.add(expected_grpc_message);
+  data.add(std::string(MAX_BUFFERED_PLAINTEXT_LENGTH + 1, 'a'));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, true));
-  // The grpc-message value length is the same as the last sent buffer.
-  EXPECT_EQ(MAX_BUFFERED_PLAINTEXT_LENGTH + 1,
-            response_headers.get_(Http::Headers::get().GrpcMessage).length());
-  EXPECT_EQ(expected_grpc_message, response_headers.get_(Http::Headers::get().GrpcMessage));
+  // The grpc-message value is limited to MAX_BUFFERED_PLAINTEXT_LENGTH.
+  EXPECT_EQ(std::string(MAX_BUFFERED_PLAINTEXT_LENGTH, 'a'),
+            response_headers.get_(Http::Headers::get().GrpcMessage));
 }
 
 TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithTrailers) {
@@ -404,8 +398,7 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithTrailers) {
                                         buffer.get()](std::function<void(Buffer::Instance&)> cb) {
     cb(*encoded_buffer);
   };
-  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
-      .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer).WillRepeatedly(on_modify_encoding_buffer);
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
 
@@ -613,7 +606,7 @@ TEST_P(GrpcWebFilterTest, Unary) {
   // Tests response trailers.
   Buffer::OwnedImpl trailers_buffer;
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
-      .WillOnce(Invoke([&](Buffer::Instance& data, bool) { trailers_buffer.move(data); }));
+      .WillOnce([&](Buffer::Instance& data, bool) { trailers_buffer.move(data); });
   Http::TestResponseTrailerMapImpl response_trailers;
   response_trailers.addCopy(Http::Headers::get().GrpcStatus, "0");
   response_trailers.addCopy(Http::Headers::get().GrpcMessage, "ok");

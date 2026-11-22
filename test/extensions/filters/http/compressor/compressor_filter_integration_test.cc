@@ -121,6 +121,53 @@ public:
     EXPECT_EQ(response->body(), std::string(content_length, 'a'));
   }
 
+  void doEmptyRequestAndResponseWithoutContentLength(bool with_trailers) {
+    setDownstreamProtocol(Http::CodecType::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+    initializeFullFilter();
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                   {":path", "/test"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "host"},
+                                                   {"content-type", "application/json"},
+                                                   {"accept-encoding", "gzip"}};
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    auto response = std::move(encoder_decoder.second);
+    if (with_trailers) {
+      codec_client_->sendTrailers(encoder_decoder.first,
+                                  Http::TestRequestTrailerMapImpl{{"x-test-trailer", "request"}});
+    } else {
+      Buffer::OwnedImpl empty;
+      codec_client_->sendData(encoder_decoder.first, empty, true);
+    }
+    waitForNextUpstreamRequest();
+    EXPECT_EQ(0, upstream_request_->bodyLength());
+    EXPECT_TRUE(
+        upstream_request_->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
+    if (with_trailers) {
+      ASSERT_NE(nullptr, upstream_request_->trailers());
+      EXPECT_THAT(*upstream_request_->trailers(), ContainsHeader("x-test-trailer", "request"));
+    }
+
+    upstream_request_->encodeHeaders(
+        Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+        false);
+    if (with_trailers) {
+      upstream_request_->encodeTrailers(
+          Http::TestResponseTrailerMapImpl{{"x-test-trailer", "response"}});
+    } else {
+      upstream_request_->encodeData(0, true);
+    }
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
+    EXPECT_TRUE(response->body().empty());
+    if (with_trailers) {
+      ASSERT_NE(nullptr, response->trailers());
+      EXPECT_THAT(*response->trailers(), ContainsHeader("x-test-trailer", "response"));
+    }
+  }
+
   const std::string full_config{R"EOF(
       name: compressor
       typed_config:
@@ -342,6 +389,40 @@ TEST_P(CompressorIntegrationTest, NotEnoughContentLength) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
   EXPECT_EQ(10U, response->body().size());
+}
+
+TEST_P(CompressorIntegrationTest, NonEmptyBodyWithoutContentLength) {
+  initializeFullFilter();
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"content-type", "application/json"},
+                                                 {"accept-encoding", "gzip"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"content-type", "application/json"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 128, response_headers, 128);
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("content-encoding", "gzip"));
+  Extensions::Compression::Gzip::Decompressor::ZlibDecompressorImpl request_decompressor(
+      *stats_store_.rootScope(), "request", 4096, 100);
+  request_decompressor.init(window_bits);
+  Buffer::OwnedImpl compressed_request(upstream_request_->body());
+  Buffer::OwnedImpl decompressed_request;
+  request_decompressor.decompress(compressed_request, decompressed_request);
+  EXPECT_EQ(std::string(128, 'a'), decompressed_request.toString());
+  EXPECT_THAT(response->headers(), ContainsHeader("content-encoding", "gzip"));
+  Buffer::OwnedImpl compressed_response(response->body());
+  Buffer::OwnedImpl decompressed_response;
+  decompressor_.decompress(compressed_response, decompressed_response);
+  EXPECT_EQ(std::string(128, 'a'), decompressed_response.toString());
+}
+
+TEST_P(CompressorIntegrationTest, EmptyBodyWithoutContentLength) {
+  doEmptyRequestAndResponseWithoutContentLength(false);
+}
+
+TEST_P(CompressorIntegrationTest, EmptyBodyWithTrailersWithoutContentLength) {
+  doEmptyRequestAndResponseWithoutContentLength(true);
 }
 
 /**
