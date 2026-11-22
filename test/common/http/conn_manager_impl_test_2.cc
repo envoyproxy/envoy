@@ -75,6 +75,88 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestCompleteWithUpstreamH
   conn_manager_->onData(fake_input, false);
 }
 
+// Starts a request that stays open, then completes the response. The stream must be reset with
+// `reason` because the request is incomplete.
+class ResetReasonAfterResponseTest : public HttpConnectionManagerImplTest {
+public:
+  void completeResponseBeforeRequest(StreamResetReason reason) {
+    setup();
+    setupFilterChain(1, 0);
+    EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+        .WillOnce(Return(FilterHeadersStatus::StopIteration));
+    startRequest();
+
+    EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+    EXPECT_CALL(response_encoder_.stream_, resetStream(reason));
+    EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+    EXPECT_CALL(*decoder_filters_[0], onDestroy());
+    ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+    decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+    decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+  }
+
+  TestScopedRuntime scoped_runtime_;
+};
+
+// Ending an open request after a complete response is not an error, so the codec can finish
+// sending the response before the reset. This is the same for every HTTP version; the codec decides
+// how to deliver it.
+TEST_F(ResetReasonAfterResponseTest, Http2UsesLocalResetNoError) {
+  codec_->protocol_ = Protocol::Http2;
+  completeResponseBeforeRequest(StreamResetReason::LocalResetNoError);
+}
+
+TEST_F(ResetReasonAfterResponseTest, Http3UsesLocalResetNoError) {
+  codec_->protocol_ = Protocol::Http3;
+  completeResponseBeforeRequest(StreamResetReason::LocalResetNoError);
+}
+
+TEST_F(ResetReasonAfterResponseTest, Http1UsesLocalResetNoError) {
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  completeResponseBeforeRequest(StreamResetReason::LocalResetNoError);
+}
+
+TEST_F(ResetReasonAfterResponseTest, RuntimeGuardDisabledUsesLocalReset) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.http2_hold_reset_until_response_sent", "false"}});
+  codec_->protocol_ = Protocol::Http2;
+  completeResponseBeforeRequest(StreamResetReason::LocalReset);
+}
+
+// If the codec reported an error, as HTTP/1 does when it replies to a protocol error, the reset
+// after the response keeps LocalReset, so that the stream is flagged as a downstream protocol
+// error.
+TEST_F(ResetReasonAfterResponseTest, CodecErrorUsesLocalReset) {
+  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
+  access_logs_ = {handler};
+  EXPECT_CALL(*handler, log(_, _))
+      .WillOnce([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_TRUE(
+            stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamProtocolError));
+      });
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  response_encoder_.stream_.setDetails("http1.codec_error");
+  completeResponseBeforeRequest(StreamResetReason::LocalReset);
+}
+
+// An explicit reset before the response is complete aborts the stream, so it uses LocalReset even
+// on HTTP/2.
+TEST_F(ResetReasonAfterResponseTest, Http2ExplicitResetUsesLocalReset) {
+  codec_->protocol_ = Protocol::Http2;
+  setup();
+  setupFilterChain(1, 0);
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  startRequest();
+
+  EXPECT_CALL(response_encoder_.stream_, resetStream(StreamResetReason::LocalReset));
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  decoder_filters_[0]->callbacks_->resetStream();
+}
+
 TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete10) {
   EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http10));
   setup();

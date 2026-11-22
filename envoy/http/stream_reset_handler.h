@@ -43,6 +43,10 @@ enum class StreamResetReason {
   // Per RFC 9113 Section 8.1 (HTTP/2) and RFC 9114 Section 4.1 (HTTP/3), this is not an error, and
   // the client should not discard the response.
   RemoteResetNoError,
+  // If a local reset ends a request that is still open after the response has been completed.
+  // Like RemoteResetNoError, this is not an error. The codec may finish sending the response before
+  // it sends the reset.
+  LocalResetNoError,
 };
 
 /**

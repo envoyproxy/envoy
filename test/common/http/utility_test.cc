@@ -1419,6 +1419,8 @@ TEST(HttpUtility, ResetReasonToString) {
             Utility::resetReasonToString(Http::StreamResetReason::ConnectError));
   EXPECT_EQ("overload manager reset",
             Utility::resetReasonToString(Http::StreamResetReason::OverloadManager));
+  EXPECT_EQ("local reset (no error)",
+            Utility::resetReasonToString(Http::StreamResetReason::LocalResetNoError));
 }
 
 class TestConfig : public Router::RouteSpecificFilterConfig {

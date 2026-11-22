@@ -148,6 +148,7 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
     IS_ENVOY_BUG("H/1 premature response reset is not applicable to H/3.");
     break;
   case Http::StreamResetReason::RemoteResetNoError:
+  case Http::StreamResetReason::LocalResetNoError:
     return quic::QUIC_STREAM_NO_ERROR;
   }
 

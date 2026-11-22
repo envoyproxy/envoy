@@ -266,6 +266,139 @@ protected:
     }
     test_server_->waitForCounter(protocol_error_counter, Ge(1));
   }
+
+  // The HeldReset tests have the upstream complete a response while the downstream request is
+  // still open, and the downstream client's flow-control windows, left at the 65535-byte default,
+  // are used up. The response body is larger than those windows.
+  static constexpr uint32_t DefaultWindowSize = 65535;
+  static constexpr uint32_t HeldResponseBodySize = 100 * 1024;
+
+  static std::string dataPayload(const Http2Frame& frame) {
+    return {reinterpret_cast<const char*>(frame.data()) + Http2Frame::HeaderSize,
+            frame.payloadSize()};
+  }
+
+  // Sends a request without END_STREAM, then has the upstream send a complete response: headers,
+  // a body of HeldResponseBodySize bytes and trailers, followed by RST_STREAM(NO_ERROR) if
+  // `upstream_rst_no_error`, as some gRPC servers do.
+  void sendResponseLargerThanWindow(FakeRawConnectionPtr& upstream, bool upstream_rst_no_error) {
+    const uint32_t stream_id = 1;
+    sendFrame(Http2Frame::makePostRequest(stream_id, "host", "/"));
+
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
+    // Envoy has sent its SETTINGS once the upstream request exists. Acknowledge them, so that Envoy
+    // uses its configured receive window for the body.
+    test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+    std::string response = absl::StrCat(
+        std::string(Http2Frame::makeEmptySettingsFrame()),
+        std::string(Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack)),
+        std::string(Http2Frame::makeHeadersFrameWithStatus("200", stream_id,
+                                                           Http2Frame::HeadersFlags::EndHeaders)));
+    const std::string body(HeldResponseBodySize, 'a');
+    for (size_t offset = 0; offset < body.size(); offset += 16384) {
+      absl::StrAppend(&response, std::string(Http2Frame::makeDataFrame(
+                                     stream_id, absl::string_view(body).substr(offset, 16384))));
+    }
+    auto trailers = Http2Frame::makeEmptyHeadersFrame(
+        stream_id, static_cast<Http2Frame::HeadersFlags>(Http::Http2::orFlags(
+                       Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders)));
+    trailers.appendHeaderWithoutIndexing({"grpc-status", "0"});
+    trailers.adjustPayloadSize();
+    absl::StrAppend(&response, std::string(trailers));
+    if (upstream_rst_no_error) {
+      absl::StrAppend(&response, std::string(Http2Frame::makeResetStreamFrame(
+                                     stream_id, Http2Frame::ErrorCode::NoError)));
+    }
+    ASSERT_TRUE(upstream->write(response));
+  }
+
+  // Reads the response headers and as much of the body as the downstream window allows, then
+  // checks that Envoy finished the downstream stream without resetting it.
+  void readResponseUpToWindow(std::string& body) {
+    bool headers = false;
+    for (int i = 0; i < 100 && body.size() < DefaultWindowSize; ++i) {
+      const Http2Frame frame = readFrame();
+      ASSERT_NE(Http2Frame::Type::RstStream, frame.type());
+      if (frame.type() == Http2Frame::Type::Headers) {
+        EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
+        EXPECT_FALSE(frame.endStream());
+        headers = true;
+      } else if (frame.type() == Http2Frame::Type::Data) {
+        EXPECT_FALSE(frame.endStream());
+        body.append(dataPayload(frame));
+      }
+    }
+    EXPECT_TRUE(headers);
+    ASSERT_EQ(DefaultWindowSize, body.size());
+
+    // Envoy finishes the downstream stream when the response completes. Once it has, a PING round
+    // trip shows that no reset or further data followed.
+    test_server_->waitForGauge("http.config_test.downstream_rq_active", Eq(0));
+    expectNothingBeforePingAck();
+  }
+
+  void expectNothingBeforePingAck() {
+    sendFrame(Http2Frame::makePingFrame("heldrst!"));
+    for (int i = 0; i < 100; ++i) {
+      const Http2Frame frame = readFrame();
+      ASSERT_NE(Http2Frame::Type::RstStream, frame.type());
+      ASSERT_NE(Http2Frame::Type::Data, frame.type());
+      if (frame.type() == Http2Frame::Type::Ping) {
+        return;
+      }
+    }
+    FAIL() << "No PING ACK";
+  }
+
+  // Grants the downstream window for the rest of the response, then reads the rest of the body,
+  // the trailers, and the RST_STREAM(NO_ERROR) that follows them.
+  void finishResponseLargerThanWindow(std::string& body) {
+    sendFrame(Http2Frame::makeWindowUpdateFrame(0, HeldResponseBodySize));
+    sendFrame(Http2Frame::makeWindowUpdateFrame(1, HeldResponseBodySize));
+    bool trailers = false;
+    for (int i = 0; i < 100; ++i) {
+      const Http2Frame frame = readFrame();
+      if (frame.type() == Http2Frame::Type::Data) {
+        ASSERT_FALSE(trailers);
+        EXPECT_FALSE(frame.endStream());
+        body.append(dataPayload(frame));
+      } else if (frame.type() == Http2Frame::Type::Headers) {
+        EXPECT_TRUE(frame.endStream());
+        trailers = true;
+      } else if (frame.type() == Http2Frame::Type::RstStream) {
+        EXPECT_TRUE(trailers);
+        EXPECT_EQ(static_cast<uint32_t>(Http2Frame::ErrorCode::NoError), rstStreamErrorCode(frame));
+        EXPECT_EQ(HeldResponseBodySize, body.size());
+        return;
+      }
+    }
+    FAIL() << "No RST_STREAM after the response";
+  }
+
+  // Reads frames until a RST_STREAM, and returns its error code. `body` collects the response body
+  // received before it.
+  uint32_t readResponseUntilReset(std::string& body) {
+    for (int i = 0; i < 100; ++i) {
+      const Http2Frame frame = readFrame();
+      if (frame.type() == Http2Frame::Type::Data) {
+        EXPECT_FALSE(frame.endStream());
+        body.append(dataPayload(frame));
+      } else if (frame.type() == Http2Frame::Type::Headers) {
+        EXPECT_FALSE(frame.endStream());
+      } else if (frame.type() == Http2Frame::Type::RstStream) {
+        return rstStreamErrorCode(frame);
+      }
+    }
+    ADD_FAILURE() << "No RST_STREAM";
+    return 0;
+  }
+
+  static void drainAfterFirstRequest(
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          hcm) {
+    hcm.mutable_common_http_protocol_options()->mutable_max_requests_per_connection()->set_value(1);
+    hcm.mutable_drain_timeout()->set_nanos(100'000'000); // 100ms
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
@@ -1783,6 +1916,92 @@ TEST_P(Http2FrameIntegrationTest, UpstreamRstStreamNoErrorWithBufferedTrailersLe
                                "NO_ERROR (old behavior sends an error reset)";
 
   tcp_client_->close();
+}
+
+// When the response completes while the request is still open, Envoy resets the downstream stream.
+// If the downstream flow-control window is used up, that reset waits until the rest of the response
+// has been sent, instead of truncating it with RST_STREAM(INTERNAL_ERROR).
+TEST_P(Http2FrameIntegrationTest, HeldResetWaitsForResponse) {
+  beginSession();
+  FakeRawConnectionPtr upstream;
+  ASSERT_NO_FATAL_FAILURE(sendResponseLargerThanWindow(upstream, false));
+  std::string body;
+  ASSERT_NO_FATAL_FAILURE(readResponseUpToWindow(body));
+  ASSERT_NO_FATAL_FAILURE(finishResponseLargerThanWindow(body));
+  test_server_->waitForGauge("http2.streams_active", Eq(0));
+  test_server_->waitForGauge("http2.pending_send_bytes", Eq(0));
+  tcp_client_->close();
+}
+
+// The same, for a gRPC server that sends RST_STREAM(NO_ERROR) after its trailers.
+TEST_P(Http2FrameIntegrationTest, HeldResetWaitsForResponseAfterUpstreamRstNoError) {
+  beginSession();
+  FakeRawConnectionPtr upstream;
+  ASSERT_NO_FATAL_FAILURE(sendResponseLargerThanWindow(upstream, true));
+  std::string body;
+  ASSERT_NO_FATAL_FAILURE(readResponseUpToWindow(body));
+  ASSERT_NO_FATAL_FAILURE(finishResponseLargerThanWindow(body));
+  test_server_->waitForGauge("http2.streams_active", Eq(0));
+  test_server_->waitForGauge("http2.pending_send_bytes", Eq(0));
+  tcp_client_->close();
+}
+
+// With the runtime guard disabled, the response is truncated.
+TEST_P(Http2FrameIntegrationTest, HeldResetLegacyTruncatesResponse) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_hold_reset_until_response_sent", "false");
+  beginSession();
+  FakeRawConnectionPtr upstream;
+  ASSERT_NO_FATAL_FAILURE(sendResponseLargerThanWindow(upstream, false));
+  std::string body;
+  EXPECT_EQ(static_cast<uint32_t>(Http2Frame::ErrorCode::InternalError),
+            readResponseUntilReset(body));
+  EXPECT_LT(body.size(), HeldResponseBodySize);
+  tcp_client_->close();
+}
+
+// A draining connection is not closed while a reset is held. It closes once the rest of the
+// response and the reset have been sent.
+TEST_P(Http2FrameIntegrationTest, HeldResetDelaysDrainClose) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { drainAfterFirstRequest(hcm); });
+  beginSession();
+  FakeRawConnectionPtr upstream;
+  ASSERT_NO_FATAL_FAILURE(sendResponseLargerThanWindow(upstream, false));
+  std::string body;
+  ASSERT_NO_FATAL_FAILURE(readResponseUpToWindow(body));
+
+  // The drain sequence ends with the final GOAWAY, after which Envoy closes the connection as soon
+  // as it has no streams and nothing left to write.
+  test_server_->waitForCounter("http2.goaway_sent", Ge(1));
+  ASSERT_NO_FATAL_FAILURE(expectNothingBeforePingAck());
+  EXPECT_TRUE(tcp_client_->connected());
+
+  ASSERT_NO_FATAL_FAILURE(finishResponseLargerThanWindow(body));
+  tcp_client_->waitForDisconnect();
+}
+
+// If the client never grants more window, the stream flush timeout resets the held stream, and the
+// draining connection is then closed.
+TEST_P(Http2FrameIntegrationTest, HeldResetFlushTimeoutClosesDrainingConnection) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        drainAfterFirstRequest(hcm);
+        // Longer than the drain timeout, so the connection is already waiting to close when the
+        // flush timeout fires.
+        hcm.mutable_stream_flush_timeout()->set_seconds(1);
+      });
+  beginSession();
+  FakeRawConnectionPtr upstream;
+  ASSERT_NO_FATAL_FAILURE(sendResponseLargerThanWindow(upstream, false));
+  std::string body;
+  EXPECT_EQ(static_cast<uint32_t>(Http2Frame::ErrorCode::InternalError),
+            readResponseUntilReset(body));
+  EXPECT_EQ(DefaultWindowSize, body.size());
+  test_server_->waitForCounter("http2.tx_flush_timeout", Eq(1));
+  tcp_client_->waitForDisconnect();
 }
 
 // Verify that RST_STREAM with an actual error code (not NO_ERROR) still correctly resets the stream

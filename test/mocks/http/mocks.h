@@ -128,6 +128,7 @@ public:
   // Http::ServerConnectionCallbacks
   MOCK_METHOD(RequestDecoder&, newStream,
               (ResponseEncoder & response_encoder, bool is_internally_created));
+  MOCK_METHOD(void, onWantsToWriteCleared, ());
 };
 
 class MockStreamCallbacks : public StreamCallbacks {

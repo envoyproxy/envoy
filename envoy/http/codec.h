@@ -760,6 +760,14 @@ public:
    */
   virtual RequestDecoder& newStream(ResponseEncoder& response_encoder,
                                     bool is_internally_created = false) PURE;
+
+  /**
+   * Fires when data that the codec was holding back, and reporting through
+   * Connection::wantsToWrite(), is no longer pending, so wantsToWrite() may now return false. For
+   * example, the HTTP/2 codec fires this when it stops waiting to send the rest of a response
+   * that flow control was holding back.
+   */
+  virtual void onWantsToWriteCleared() {}
 };
 
 /**
