@@ -12,6 +12,8 @@
 #include "source/extensions/common/dynamic_forward_proxy/cluster_store.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
@@ -248,6 +250,11 @@ private:
   void updatePriorityState(const Upstream::HostVector& hosts_added,
                            const Upstream::HostVector& hosts_removed)
       ABSL_LOCKS_EXCLUDED(host_map_lock_);
+  // With dfp_cluster_coalesce_host_updates: queue a host-set change and publish all queued changes
+  // once per main-loop pass instead of once per DNS result.
+  void queueHostUpdate(const Upstream::HostVector& hosts_added,
+                       const Upstream::HostVector& hosts_removed);
+  void flushHostUpdates() ABSL_LOCKS_EXCLUDED(host_map_lock_);
 
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
@@ -268,6 +275,11 @@ private:
 
   mutable absl::Mutex host_map_lock_;
   HostInfoMap host_map_ ABSL_GUARDED_BY(host_map_lock_);
+
+  // Main thread only. Set when dfp_cluster_coalesce_host_updates is on.
+  Event::SchedulableCallbackPtr host_update_flush_;
+  absl::flat_hash_set<Upstream::HostSharedPtr> pending_hosts_added_;
+  Upstream::HostVector pending_hosts_removed_;
 
   mutable absl::Mutex cluster_map_lock_;
   ClusterInfoMap cluster_map_ ABSL_GUARDED_BY(cluster_map_lock_);

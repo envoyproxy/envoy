@@ -25,9 +25,11 @@
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
+using testing::_;
 using testing::AtLeast;
 using testing::DoAll;
 using testing::InSequence;
+using testing::NiceMock;
 using testing::Return;
 using testing::SizeIs;
 using testing::StrictMock;
@@ -40,7 +42,13 @@ namespace DynamicForwardProxy {
 class ClusterTest : public testing::Test,
                     public Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory {
 public:
-  void initialize(const std::string& yaml_config, bool uses_tls) {
+  void initialize(const std::string& yaml_config, bool uses_tls, bool coalesce = false) {
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.dfp_cluster_coalesce_host_updates",
+                                  coalesce ? "true" : "false"}});
+    if (coalesce) {
+      host_update_flush_ =
+          new NiceMock<Event::MockSchedulableCallback>(&server_context_.dispatcher_);
+    }
     envoy::config::cluster::v3::Cluster cluster_config =
         Upstream::parseClusterFromV3Yaml(yaml_config);
     envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig config;
@@ -158,7 +166,9 @@ public:
   MOCK_METHOD(void, onMemberUpdateCb,
               (const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed));
 
+  TestScopedRuntime scoped_runtime_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
+  Event::MockSchedulableCallback* host_update_flush_{};
   Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
   Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
   Ssl::MockContextManager ssl_context_manager_;
@@ -374,6 +384,77 @@ TEST_F(ClusterTest, BasicFlow) {
   update_callbacks_->onDnsHostRemove("host1:0");
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")).host);
+}
+
+// With coalescing, several DNS results in one loop pass publish one host-set update.
+TEST_F(ClusterTest, CoalescedAddsPublishOnce) {
+  initialize(default_yaml_config_, false, true);
+  makeTestHost("host1:0", "1.2.3.4");
+  makeTestHost("host2:0", "1.2.3.5");
+  makeTestHost("host3:0", "1.2.3.6");
+
+  EXPECT_CALL(*host_update_flush_, scheduleCallbackNextIteration());
+  EXPECT_CALL(*this, onMemberUpdateCb(_, _)).Times(0);
+  for (const std::string host : {"host1:0", "host2:0", "host3:0"}) {
+    EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate(host, host_map_[host]).ok());
+  }
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  // Requests already see the new hosts before the publish.
+  EXPECT_CALL(*host_map_["host1:0"], touch());
+  EXPECT_EQ("1.2.3.4:0",
+            lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
+
+  testing::Mock::VerifyAndClearExpectations(this);
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(3), SizeIs(0)));
+  host_update_flush_->invokeCallback();
+  EXPECT_EQ(3UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
+// A host added and removed in the same pass is never published.
+TEST_F(ClusterTest, CoalescedAddThenRemove) {
+  initialize(default_yaml_config_, false, true);
+  makeTestHost("host1:0", "1.2.3.4");
+
+  EXPECT_CALL(*this, onMemberUpdateCb(_, _)).Times(0);
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  update_callbacks_->onDnsHostRemove("host1:0");
+  host_update_flush_->invokeCallback();
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")).host);
+}
+
+// A published host removed and re-added in the same pass ends up present.
+TEST_F(ClusterTest, CoalescedRemoveThenAdd) {
+  initialize(default_yaml_config_, false, true);
+  makeTestHost("host1:0", "1.2.3.4");
+
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  host_update_flush_->invokeCallback();
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  update_callbacks_->onDnsHostRemove("host1:0");
+  updateTestHostAddress("host1:0", "2.3.4.5");
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(1)));
+  host_update_flush_->invokeCallback();
+  ASSERT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ("2.3.4.5:0",
+            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
+}
+
+// Destroying the cluster with a pending publish is clean.
+TEST_F(ClusterTest, CoalescedDestroyWithPendingUpdate) {
+  initialize(default_yaml_config_, false, true);
+  makeTestHost("host1:0", "1.2.3.4");
+
+  EXPECT_CALL(*this, onMemberUpdateCb(_, _)).Times(0);
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  member_update_cb_.reset();
+  lb_.reset();
+  thread_aware_lb_.reset();
+  lb_factory_.reset();
+  cluster_.reset();
 }
 
 // Outlier detection
