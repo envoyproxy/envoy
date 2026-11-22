@@ -9602,7 +9602,10 @@ fn test_bootstrap_extension_secret_lifecycle() {
       _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
       secret_name: &str,
     ) {
-      SECRET_EVENTS.lock().unwrap().push(format!("add:{secret_name}"));
+      SECRET_EVENTS
+        .lock()
+        .unwrap()
+        .push(format!("add:{secret_name}"));
     }
 
     fn on_secret_removal(
@@ -9610,7 +9613,10 @@ fn test_bootstrap_extension_secret_lifecycle() {
       _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
       secret_name: &str,
     ) {
-      SECRET_EVENTS.lock().unwrap().push(format!("remove:{secret_name}"));
+      SECRET_EVENTS
+        .lock()
+        .unwrap()
+        .push(format!("remove:{secret_name}"));
     }
   }
 
@@ -9653,7 +9659,10 @@ fn test_bootstrap_extension_secret_lifecycle() {
       secret_name_buf,
     );
   }
-  assert_eq!(*SECRET_EVENTS.lock().unwrap(), vec!["add:cert", "remove:cert"]);
+  assert_eq!(
+    *SECRET_EVENTS.lock().unwrap(),
+    vec!["add:cert", "remove:cert"]
+  );
 
   // Clean up.
   unsafe {
