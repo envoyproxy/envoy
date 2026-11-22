@@ -681,7 +681,7 @@ bool Utility::isH3UpgradeRequest(const RequestHeaderMap& headers) {
   return isH2UpgradeRequest(headers);
 }
 
-bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
+bool Utility::isWebSocketUpgradeRequest(const RequestOrResponseHeaderMap& headers) {
   return (isUpgrade(headers) &&
           absl::EqualsIgnoreCase(headers.getUpgradeValue(),
                                  Http::Headers::get().UpgradeValues.WebSocket));
