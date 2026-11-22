@@ -9125,6 +9125,24 @@ BORINGSSL_TEST_P(SslReadBufferLimitTest, MaxSendFragment) {
   }
 }
 
+// A configured value other than BoringSSL's 512 floor is applied as given: the data fills records to
+// max_send_fragment bytes of plaintext and no record exceeds it.
+BORINGSSL_TEST_P(SslReadBufferLimitTest, MaxSendFragment8192) {
+  constexpr uint32_t max_send_fragment = 8192;
+  constexpr uint32_t write_size = 3 * 16384;
+  max_send_fragment_ = max_send_fragment;
+
+  const TlsRecordLengths record_lengths =
+      sendAndRecordTlsRecordLengths(generatePayload(write_size));
+
+  ASSERT_FALSE(record_lengths.sent.empty());
+  const uint16_t largest =
+      *std::max_element(record_lengths.sent.begin(), record_lengths.sent.end());
+  // A record length includes the TLS overhead, so a full max_send_fragment record exceeds it.
+  EXPECT_GT(largest, max_send_fragment);
+  EXPECT_LE(largest, max_send_fragment + MaxTlsRecordOverhead);
+}
+
 // Without max_send_fragment, the same exchange sends records larger than MaxSendFragment allows, so
 // that test would catch the setting not being applied.
 BORINGSSL_TEST_P(SslReadBufferLimitTest, NoMaxSendFragmentSendsFullSizeRecords) {
