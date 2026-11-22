@@ -219,6 +219,25 @@ pub enum ActiveResourceKind {
   Secret,
 }
 
+/// An xDS processing outcome or client-initiated unsubscription.
+///
+/// Versions are `version_info` for SotW or `system_version_info` for Delta, rather than
+/// per-resource versions. Nonces are scoped to the xDS stream and resource type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum XdsUpdate<'a> {
+  /// A response was accepted.
+  Accepted { version: &'a str, nonce: &'a str },
+  /// A response was rejected. The version and nonce identify the rejected response;
+  /// `error_details` is the NACK message and may quote rejected configuration.
+  Rejected {
+    version: &'a str,
+    nonce: &'a str,
+    error_details: &'a str,
+  },
+  /// The last watch on the stream dropped interest in this resource.
+  Unsubscribed { resource_name: &'a str },
+}
+
 /// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
 /// This is a handle to the Envoy configuration object.
 #[cfg_attr(any(test, feature = "mock"), automock)]
@@ -502,6 +521,15 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// also returns `false` once the server began to shut down and when Envoy runs with
   /// `--mode init_only`.
   fn enable_listener_lifecycle(&self) -> bool;
+
+  /// Enables or disables [`BootstrapExtensionConfig::on_xds_update`] notifications.
+  ///
+  /// Call on the main thread, typically during or after
+  /// [`BootstrapExtension::on_server_initialized`]. Calls are idempotent. Disabling returns `true`.
+  /// Enabling returns `false` before server initialization, after shutdown begins, or in
+  /// `--mode init_only`. Calling off the main thread reports an Envoy bug and returns `false`.
+  /// Notifications stop when shutdown begins.
+  fn set_xds_notifications(&self, enabled: bool) -> bool;
 
   /// Returns the names of the currently active resources of the given kind, each at most once. See
   /// [`ActiveResourceKind`] for what each kind reports. This must be called on the main thread. It
@@ -950,6 +978,28 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     &self,
     _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
     _listener_name: &str,
+  ) {
+  }
+
+  /// Reports gRPC xDS outcomes on the main thread. Must not block.
+  ///
+  /// Accepted follows successful response processing, before ACK; resources may still be warming.
+  /// Rejected precedes NACK and may follow partial application.
+  /// Unsubscribed is posted once no watch on the stream still names the resource. It can arrive
+  /// after later outcomes, such as the CDS Accepted that removed a cluster. Disabling notifications
+  /// discards pending unsubscriptions, even if re-enabled before delivery.
+  ///
+  /// [`EnvoyBootstrapExtensionConfig::get_config_snapshot`] returns
+  /// [`ConfigSnapshotError::NotAllowed`] during Accepted and Rejected. Use
+  /// [`EnvoyBootstrapExtensionConfig::new_scheduler`] to defer it. Collection can succeed during
+  /// the posted Unsubscribed callback.
+  ///
+  /// Resource payloads are not included. Update metadata is borrowed for this call.
+  fn on_xds_update(
+    &self,
+    _envoy: &mut dyn EnvoyBootstrapExtensionConfig,
+    _type_url: &str,
+    _update: XdsUpdate<'_>,
   ) {
   }
 
@@ -1873,6 +1923,14 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     }
   }
 
+  fn set_xds_notifications(&self, enabled: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+        self.raw, enabled,
+      )
+    }
+  }
+
   fn active_resource_names(&self, kind: ActiveResourceKind) -> Vec<String> {
     extern "C" fn name_trampoline(
       name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -2710,6 +2768,51 @@ ffi_export! {
     removed: bool,
   ) {
     on_runtime_update_impl(envoy_ptr, extension_ptr, key, RuntimeValue::Number(value), removed);
+  }
+}
+
+ffi_export! {
+  /// Forwards an xDS outcome to the bootstrap config.
+  ///
+  /// # Safety
+  /// All pointers and the status must satisfy the Envoy dynamic module ABI. Buffers and the
+  /// module config remain valid until this call returns.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_xds_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    type_url: abi::envoy_dynamic_module_type_envoy_buffer,
+    status: abi::envoy_dynamic_module_type_bootstrap_xds_update_status,
+    error_details: abi::envoy_dynamic_module_type_envoy_buffer,
+    version: abi::envoy_dynamic_module_type_envoy_buffer,
+    nonce: abi::envoy_dynamic_module_type_envoy_buffer,
+    resource_name: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
+    use abi::envoy_dynamic_module_type_bootstrap_xds_update_status as Status;
+
+    let config = unsafe { &**(config_ptr as *const *const dyn BootstrapExtensionConfig) };
+    let [Ok(type_url), Ok(version), Ok(nonce), Ok(resource_name)] =
+      [type_url, version, nonce, resource_name].map(|buffer| {
+        std::str::from_utf8(unsafe {
+          crate::ffi_helpers::slice_from_raw_or_empty(buffer.ptr.cast::<u8>(), buffer.length)
+        })
+      })
+    else {
+      return;
+    };
+    let error_details = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(error_details.ptr.cast::<u8>(), error_details.length)
+    };
+    let update = match status {
+      Status::Accepted => XdsUpdate::Accepted { version, nonce },
+      Status::Rejected => XdsUpdate::Rejected {
+        version,
+        nonce,
+        error_details: error_details.as_ref(),
+      },
+      Status::Unsubscribed => XdsUpdate::Unsubscribed { resource_name },
+    };
+    let mut envoy = EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr);
+    config.on_xds_update(&mut envoy, type_url, update);
   }
 }
 

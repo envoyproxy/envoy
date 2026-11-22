@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/common/optref.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/watcher.h"
 #include "envoy/http/async_client.h"
@@ -69,6 +70,8 @@ using OnBootstrapExtensionListenerAddOrUpdateType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update);
 using OnBootstrapExtensionListenerRemovalType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_removal);
+using OnBootstrapExtensionXdsUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_xds_update);
 using OnBootstrapExtensionWorkerEventType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_worker_event);
 using OnBootstrapExtensionRunOnAllWorkersDoneType =
@@ -98,6 +101,7 @@ class DynamicModuleBootstrapExtensionConfig
     : public std::enable_shared_from_this<DynamicModuleBootstrapExtensionConfig>,
       public Upstream::ClusterUpdateCallbacks,
       public Server::ListenerUpdateCallbacks,
+      public Config::XdsConfigTracker,
       public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
   /**
@@ -222,6 +226,31 @@ public:
   void onListenerRemoval(const std::string& listener_name) override;
 
   /**
+   * Registers or unregisters xDS notifications on the main thread.
+   */
+  bool setXdsNotifications(bool enabled);
+
+  // Config::XdsConfigTracker
+  void onConfigAccepted(absl::string_view type_url,
+                        const std::vector<Config::DecodedResourcePtr>& resources) override;
+  void
+  onConfigAccepted(absl::string_view type_url,
+                   absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+                   const Protobuf::RepeatedPtrField<std::string>& removed_resources) override;
+  void
+  onConfigAcceptedWithResponse(const envoy::service::discovery::v3::DiscoveryResponse& message,
+                               const std::vector<Config::DecodedResourcePtr>& resources) override;
+  void onConfigAcceptedWithResponse(
+      const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+      absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources) override;
+  void onConfigRejected(const envoy::service::discovery::v3::DiscoveryResponse& message,
+                        absl::string_view error_detail) override;
+  void onConfigRejected(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+                        absl::string_view error_detail) override;
+  void onResourceUnsubscribed(absl::string_view type_url, absl::string_view resource) override;
+
+  /**
    * Enumerates the names of the currently active resources of a single kind: the active listeners'
    * filter chains (inline, default and routable FCDS chains), the clusters, the transport socket
    * match names present in every cluster that has matches, or the active dynamic secrets. `emit`
@@ -325,6 +354,7 @@ public:
   OnBootstrapExtensionListenerRemovalType on_bootstrap_extension_listener_removal_ = nullptr;
 
   // The following hooks are optional and stay nullptr when the module does not implement them.
+  OnBootstrapExtensionXdsUpdateType on_bootstrap_extension_xds_update_ = nullptr;
   OnBootstrapExtensionEcdsUpdateType on_bootstrap_extension_ecds_update_ = nullptr;
   OnBootstrapExtensionWorkerEventType on_bootstrap_extension_worker_event_ = nullptr;
   OnBootstrapExtensionRunOnAllWorkersDoneType on_bootstrap_extension_run_on_all_workers_done_ =
@@ -393,6 +423,11 @@ public:
   DynamicModuleFilterChainConfigWriterPtr filter_chain_config_writer_;
 
 private:
+  void notifyXdsUpdate(absl::string_view type_url,
+                       envoy_dynamic_module_type_bootstrap_xds_update_status status,
+                       absl::string_view error_detail, absl::string_view version,
+                       absl::string_view nonce, absl::string_view resource_name);
+
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
    * callout from the parent bootstrap extension config.
@@ -458,6 +493,9 @@ private:
   // Handle for the shutdown lifecycle callback that cleans up listener_update_callbacks_handle_.
   Server::ServerLifecycleNotifier::HandlePtr listener_lifecycle_shutdown_handle_;
   bool listener_lifecycle_enabled_ = false;
+
+  Common::CallbackHandlePtr xds_update_handle_;
+  uint64_t xds_notifications_generation_ = 0;
 
   // Thread-local slot that carries the worker events. Allocated on the first runOnAllWorkers().
   ThreadLocal::TypedSlotPtr<> worker_slot_;

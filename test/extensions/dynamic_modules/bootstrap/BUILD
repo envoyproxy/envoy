@@ -191,6 +191,7 @@ envoy_extension_cc_dyn_module_test(
     deps = [
         "//envoy/common:regex_interface",
         "//source/common/config:ecds_subscription_registry_lib",
+        "//source/common/config:xds_manager_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/dynamic_modules:abi_impl",
@@ -306,6 +307,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_stats_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_timer_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_writer_test",
+        "//test/extensions/dynamic_modules/test_data/rust:bootstrap_xds_test",
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
@@ -316,6 +318,7 @@ envoy_extension_cc_dyn_module_test(
     },
     deps = [
         "//source/common/common:base64_lib",
+        "//source/common/config:resource_name_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/extensions/bootstrap/dynamic_modules:config",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
@@ -327,6 +330,7 @@ envoy_extension_cc_dyn_module_test(
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],

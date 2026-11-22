@@ -544,6 +544,9 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_bootstrap_extension_config_snapshot
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle, false,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications, false,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr, bool)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update, false,
           envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
