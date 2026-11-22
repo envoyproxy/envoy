@@ -1593,6 +1593,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_protocol_integration_lib",
+        ":socket_interface_swap_lib",
         "//envoy/http:header_map_interface",
         "//source/common/stats:histogram_lib",
         "//source/common/stats:stats_matcher_lib",

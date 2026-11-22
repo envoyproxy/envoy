@@ -683,8 +683,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   OptRef<Server::ConfigTracker> config_tracker;
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
-  auto admin_impl = std::make_shared<AdminImpl>(initial_config.admin().profilePath(), *this,
-                                                initial_config.admin().ignoreGlobalConnLimit());
+  auto admin_impl = std::make_shared<AdminImpl>(
+      initial_config.admin().profilePath(), *this, initial_config.admin().ignoreGlobalConnLimit(),
+      initial_config.admin().perConnectionBufferLimitBytes());
 
   for (const auto& allowlisted_path : bootstrap_.admin().allow_paths()) {
     admin_impl->addAllowlistedPath(

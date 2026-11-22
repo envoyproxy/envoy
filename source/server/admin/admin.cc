@@ -107,7 +107,7 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 } // namespace
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
-                     bool ignore_global_conn_limit)
+                     bool ignore_global_conn_limit, uint64_t per_connection_buffer_limit_bytes)
     : server_(server), listener_info_(std::make_shared<ListenerInfoImpl>(
                            envoy::config::listener::v3::Listener::MODIFY_ONLY)),
       factory_context_(server, listener_info_),
@@ -287,6 +287,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
       admin_filter_chain_(std::make_shared<AdminFilterChain>()),
       local_reply_(LocalReply::Factory::createDefault()),
       ignore_global_conn_limit_(ignore_global_conn_limit),
+      per_connection_buffer_limit_bytes_(per_connection_buffer_limit_bytes),
       header_validator_factory_(createHeaderValidatorFactory(server.serverFactoryContext())) {
 #ifndef NDEBUG
   // Verify that no duplicate handlers exist.
