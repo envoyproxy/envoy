@@ -35,6 +35,7 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/upstream_request.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
@@ -312,7 +313,9 @@ class Filter : Logger::Loggable<Logger::Id::router>,
 public:
   Filter(const FilterConfigSharedPtr& config, FilterStats& stats)
       : config_(config), stats_(stats),
-        reject_early_connect_data_enabled_(config->reject_connect_request_early_data_) {}
+        reject_early_connect_data_enabled_(config->reject_connect_request_early_data_),
+        drain_kept_body_on_overflow_(ENVOY_RUNTIME_FEATURE_ENABLED(
+            "envoy.reloadable_features.filter_manager_per_filter_buffer")) {}
 
   ~Filter() override;
 
@@ -725,6 +728,10 @@ private:
   // Cached runtime flag value for reject_early_connect_data to avoid evaluating it on every data
   // chunk.
   bool reject_early_connect_data_enabled_ : 1 = false;
+  // Latched with the filter manager's per-filter buffer flag at stream creation. With per-filter
+  // buffers, the body kept for retries stays in the router's own buffer and counts towards the
+  // stream buffer limit until it is dropped.
+  bool drain_kept_body_on_overflow_ : 1 = false;
   bool saw_local_reply_ : 1 = false;
 };
 

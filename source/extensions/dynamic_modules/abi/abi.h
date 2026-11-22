@@ -2366,6 +2366,12 @@ void envoy_dynamic_module_callback_http_send_response_trailers(
  * in the filter chain could modify the buffered body. That is say for a given filter X, filter X
  * can safely modify the buffered body if and only if the filters following filter X in the filter
  * chain have not yet accessed the body.
+ *
+ * NOTE: When the runtime guard ``envoy.reloadable_features.filter_manager_per_filter_buffer`` is
+ * enabled, each filter has its own buffer. The buffered body is then only the body held by this
+ * filter (what it buffered, or added), not the body buffered by other filters in the chain, and
+ * this filter can modify it whenever it holds it. The received_buffered_* callbacks then only
+ * return true when this filter is resumed with its own buffered body.
  */
 
 /**

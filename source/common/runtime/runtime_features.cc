@@ -110,9 +110,12 @@ RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_held_trailers);
 // When resuming filter chain iteration, compute end_stream from whether the end of the stream has
 // reached the resuming filter, instead of from the stream-level flag. When enabled,
 // envoy.reloadable_features.ext_proc_inject_data_with_state_update is ignored.
-// TODO(wbpcode): flip to true once per-filter body buffering lands behind this flag. This is the
-// first part of that change (https://github.com/envoyproxy/envoy/pull/48660), so the flag is
-// incomplete until then.
+// Also buffer the body data stopped at each filter in that filter's own buffer instead of the
+// buffer shared by the whole stream. decodingBuffer()/encodingBuffer() then only return the data
+// held by the calling filter.
+// Disabled by default because out-of-tree extensions may read the body buffered by other filters
+// through decodingBuffer()/encodingBuffer(), which no longer return it when this is enabled.
+// TODO(wbpcode): flip to true once those extensions have had time to adapt.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_filter_manager_per_filter_buffer);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
 RUNTIME_GUARD(envoy_reloadable_features_geoip_sanitize_geo_headers);
@@ -461,7 +464,10 @@ bool isLegacyRuntimeFeature(absl::string_view feature) {
 }
 
 bool runtimeFeatureEnabled(absl::string_view feature) {
-  absl::CommandLineFlag* flag = RuntimeFeaturesDefaults::get().getFlag(feature);
+  return runtimeFeatureEnabled(RuntimeFeaturesDefaults::get().getFlag(feature), feature);
+}
+
+bool runtimeFeatureEnabled(absl::CommandLineFlag* flag, absl::string_view feature) {
   if (flag == nullptr) {
     IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", feature));
     return false;

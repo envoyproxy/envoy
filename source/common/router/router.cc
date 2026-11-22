@@ -1192,6 +1192,15 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     buffering = false;
     request_buffer_overflowed_ = true;
 
+    // Nothing reads the kept body once retries and redirects are given up, so drop it to release
+    // its buffer accounting. Otherwise, with per-filter buffers, it keeps the stream buffer total
+    // above the low watermark and downstream reads may never resume. Skip it if the current frame
+    // is the decoding buffer itself, since the frame still has to be forwarded upstream.
+    if (drain_kept_body_on_overflow_ && decoding_buffer != nullptr && decoding_buffer != &data) {
+      callbacks_->modifyDecodingBuffer(
+          [](Buffer::Instance& buffer) { buffer.drain(buffer.length()); });
+    }
+
     // Only send local reply and cleanup if we're in a retry waiting state (no active upstream
     // requests). If there are active upstream requests, let the normal upstream failure handling
     // take precedence.
