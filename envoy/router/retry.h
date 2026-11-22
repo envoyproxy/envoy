@@ -222,37 +222,42 @@ public:
   virtual bool isAutomaticallyConfiguredForHttp3() const PURE;
 
   /**
-   * Performs stateful per-request pre-retry preparation (for example, advancing candidate state
-   * or updating request headers, DynamicMetadata, or FilterState on StreamInfo) prior to upstream
-   * cluster refresh and host selection.
+   * Invoked at the start of each retry attempt prior to upstream cluster refresh and host
+   * selection (for example, to advance per-request candidate state or update request headers,
+   * DynamicMetadata, or FilterState on StreamInfo).
    * @param request_headers the request headers for the upcoming retry attempt.
    * @param downstream_stream_info the downstream stream info for the request.
    */
-  virtual void prepareForRetry(Http::RequestHeaderMap& /*request_headers*/,
-                               StreamInfo::StreamInfo& /*downstream_stream_info*/) {}
+  virtual void onRetryAttempt(Http::RequestHeaderMap& /*request_headers*/,
+                              StreamInfo::StreamInfo& /*downstream_stream_info*/) {}
 
   /**
-   * Modifies the request headers for a retry attempt using per-request retry state after an
-   * upstream cluster and host have been selected.
-   * @param request_headers the request headers to modify.
+   * Invoked on each retry attempt after an upstream cluster and host have been selected and
+   * router retry headers have been populated, prior to encoding headers upstream.
+   * @param request_headers the request headers for the retry attempt.
    */
-  virtual void modifyRequestHeadersForRetry(Http::RequestHeaderMap& /*request_headers*/) {}
+  virtual void onRetryRequestHeaders(Http::RequestHeaderMap& /*request_headers*/) {}
 
   /**
-   * Modifies response headers prior to forwarding downstream using per-request retry state.
-   * @param response_headers the response headers to modify.
+   * Invoked on response headers prior to forwarding downstream (including immediate and deferred
+   * local replies).
+   * @param response_headers the response headers.
    * @param stream_info the stream info for the request.
    */
-  virtual void modifyResponseHeaders(Http::ResponseHeaderMap& /*response_headers*/,
-                                     StreamInfo::StreamInfo& /*stream_info*/) {}
+  virtual void onResponseHeaders(Http::ResponseHeaderMap& /*response_headers*/,
+                                 StreamInfo::StreamInfo& /*stream_info*/) {}
 
   /**
-   * Called once when retries finish, are abandoned, or clean up so the retry state can cancel
-   * pending timers and release request-attempt resources while remaining alive until stream
-   * destruction for modifyResponseHeaders (including deferred local replies).
+   * Called once when retries finish, are abandoned, or clean up, while keeping this RetryState
+   * alive until stream destruction so onResponseHeaders() can still run on immediate or deferred
+   * local replies.
+   *
+   * Implementations MUST cancel and clean up all pending retry timers and callbacks in this
+   * method so that no retry callback can fire after onRetryComplete() returns, as firing a retry
+   * callback after completion would violate router state invariants.
    * @param stream_info the stream info for the request.
    */
-  virtual void onRetryComplete(StreamInfo::StreamInfo& /*stream_info*/) {}
+  virtual void onRetryComplete(StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 using RetryStatePtr = std::unique_ptr<RetryState>;

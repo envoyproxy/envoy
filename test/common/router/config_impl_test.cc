@@ -5828,39 +5828,6 @@ virtual_hosts:
   }
 }
 
-TEST_F(RouteMatcherTest, ClusterHeaderRouteRefreshesClusterOnRetry) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- domains: [www.lyft.com]
-  name: www
-  routes:
-  - match: {prefix: /}
-    route:
-      cluster_header: x-target-cluster
-      retry_policy:
-        retry_on: 5xx
-        refresh_cluster_on_retry: true
-  )EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"cluster_a", "cluster_b"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                        creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
-
-  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/v1", "GET");
-  headers.setCopy(Http::LowerCaseString("x-target-cluster"), "cluster_a");
-
-  RouteConstSharedPtr route = config.route(headers, 0);
-  ASSERT_NE(nullptr, route);
-  ASSERT_NE(nullptr, route->routeEntry());
-  EXPECT_EQ("cluster_a", route->routeEntry()->clusterName());
-
-  headers.setCopy(Http::LowerCaseString("x-target-cluster"), "cluster_b");
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  route->routeEntry()->refreshRouteCluster(headers, stream_info);
-  EXPECT_EQ("cluster_b", route->routeEntry()->clusterName());
-}
-
 TEST_F(RouteMatcherTest, GrpcRetry) {
   const std::string yaml = R"EOF(
 virtual_hosts:

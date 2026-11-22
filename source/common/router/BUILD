@@ -437,7 +437,6 @@ envoy_cc_library(
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
-        "//envoy/stream_info:filter_state_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/access_log:access_log_lib",
@@ -611,10 +610,7 @@ envoy_cc_library(
     hdrs = ["header_cluster_specifier.h"],
     deps = [
         ":delegating_route_lib",
-        "//envoy/http:header_map_interface",
         "//envoy/router:cluster_specifier_plugin_interface",
-        "//envoy/router:router_interface",
-        "//envoy/stream_info:stream_info_interface",
     ],
 )
 

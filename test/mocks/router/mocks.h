@@ -256,11 +256,11 @@ public:
   MOCK_METHOD(bool, wouldRetryFromRetriableStatusCode, (Http::Code code), (const));
   MOCK_METHOD(DoRetryType, doRetryType, (), (const));
   MOCK_METHOD(bool, isAutomaticallyConfiguredForHttp3, (), (const));
-  MOCK_METHOD(void, prepareForRetry,
+  MOCK_METHOD(void, onRetryAttempt,
               (Http::RequestHeaderMap & request_headers,
                StreamInfo::StreamInfo& downstream_stream_info));
-  MOCK_METHOD(void, modifyRequestHeadersForRetry, (Http::RequestHeaderMap & request_headers));
-  MOCK_METHOD(void, modifyResponseHeaders,
+  MOCK_METHOD(void, onRetryRequestHeaders, (Http::RequestHeaderMap & request_headers));
+  MOCK_METHOD(void, onResponseHeaders,
               (Http::ResponseHeaderMap & response_headers, StreamInfo::StreamInfo& stream_info));
   MOCK_METHOD(void, onRetryComplete, (StreamInfo::StreamInfo & stream_info));
 

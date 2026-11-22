@@ -1527,12 +1527,13 @@ TEST_F(RouterRetryStateImplTest, DefaultHooksAreNoOps) {
   ASSERT_NE(nullptr, state_);
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  state_->prepareForRetry(request_headers, stream_info);
-  state_->modifyRequestHeadersForRetry(request_headers);
+  state_->onRetryAttempt(request_headers, stream_info);
+  state_->onRetryRequestHeaders(request_headers);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  state_->modifyResponseHeaders(response_headers, stream_info);
+  state_->onResponseHeaders(response_headers, stream_info);
   EXPECT_TRUE(response_headers.getEnvoyAttemptCountValue().empty());
+  state_->onRetryComplete(stream_info);
 }
 
 } // namespace
