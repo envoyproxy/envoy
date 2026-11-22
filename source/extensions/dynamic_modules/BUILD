@@ -107,6 +107,8 @@ envoy_cc_library(
 go_library(
     name = "go_sdk_shared",
     srcs = [
+        "sdk/go/shared/bootstrap.go",
+        "sdk/go/shared/cluster.go",
         "sdk/go/shared/common.go",
         "sdk/go/shared/early_header_mutation.go",
         "sdk/go/shared/early_header_mutation_api.go",
@@ -169,6 +171,8 @@ go_test(
 go_library(
     name = "go_sdk_abi",
     srcs = [
+        "sdk/go/abi/bootstrap.go",
+        "sdk/go/abi/cluster.go",
         "sdk/go/abi/common.go",
         "sdk/go/abi/early_header_mutation.go",
         "sdk/go/abi/header_formatter.go",

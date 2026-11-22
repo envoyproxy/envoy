@@ -418,6 +418,54 @@ TEST_F(DynamicModuleClusterTest, ClusterNewFail) {
   ASSERT_THAT(result, HasStatusMessage(HasSubstr("Failed to create in-module cluster instance")));
 }
 
+TEST_F(DynamicModuleClusterTest, GoConstructionFailures) {
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/go"), 1);
+  // Pin the Go runtime across configurations and tests.
+  auto module = Envoy::Extensions::DynamicModules::newDynamicModule(
+      Envoy::Extensions::DynamicModules::testSharedObjectPath("cluster_integration_test", "go"),
+      /*do_not_close=*/true);
+  ASSERT_OK(module);
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  for (const std::string mode :
+       {"create_error", "create_nil", "create_panic", "new_nil", "new_panic"}) {
+    SCOPED_TRACE(mode);
+    auto result =
+        createCluster(makeYamlConfigWithClusterConfig("cluster_integration_test", "test", mode));
+    const std::string expected = mode.rfind("create_", 0) == 0
+                                     ? "Failed to create in-module cluster configuration"
+                                     : "Failed to create in-module cluster instance";
+    ASSERT_THAT(result, HasStatusMessage(HasSubstr(expected)));
+  }
+}
+
+TEST_F(DynamicModuleClusterTest, GoSchedulerAfterDestructionIsNoOp) {
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/go"), 1);
+  auto module = Envoy::Extensions::DynamicModules::newDynamicModule(
+      Envoy::Extensions::DynamicModules::testSharedObjectPath("cluster_integration_test", "go"),
+      /*do_not_close=*/true);
+  ASSERT_OK(module);
+  auto schedule =
+      module.value()->getFunctionPointer<void (*)()>("go_cluster_test_schedule_after_destroy");
+  ASSERT_OK(schedule);
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  {
+    auto result = createCluster(
+        makeYamlConfigWithClusterConfig("cluster_integration_test", "test", "init_sync"));
+    ASSERT_OK(result);
+    bool initialized = false;
+    result->first->initialize([&initialized]() {
+      initialized = true;
+      return absl::OkStatus();
+    });
+    EXPECT_TRUE(initialized);
+  }
+  (*schedule.value())();
+}
+
 // The cluster_config Any cannot be unpacked. This is parsed before the module is loaded, so it is
 // counted as config_init_error and module_load_error stays zero. A malformed Any must be built
 // programmatically because a cluster_config parsed from YAML is always valid.

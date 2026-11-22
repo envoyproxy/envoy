@@ -71,6 +71,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_shutdown",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_timer_fired",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_worker_initialized",
+        "//test/extensions/dynamic_modules/test_data/go:bootstrap_integration_test",
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
@@ -84,12 +85,14 @@ envoy_extension_cc_dyn_module_test(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/dynamic_modules:abi_impl",
         "//source/extensions/bootstrap/dynamic_modules:extension_config_lib",
+        "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
@@ -231,6 +234,7 @@ envoy_extension_cc_dyn_module_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_extension_new_null",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
+        "//test/extensions/dynamic_modules/test_data/go:bootstrap_integration_test",
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {
@@ -244,6 +248,7 @@ envoy_extension_cc_dyn_module_test(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/dynamic_modules:abi_impl",
         "//source/extensions/bootstrap/dynamic_modules:extension_lib",
+        "//source/extensions/dynamic_modules:abi_impl",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
@@ -288,6 +293,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/config/integration/certs",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_optional_hooks",
+        "//test/extensions/dynamic_modules/test_data/go:bootstrap_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_admin_handler_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_cluster_lifecycle_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_cluster_writer_test",

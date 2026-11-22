@@ -34,6 +34,32 @@ Example Configuration
         "@type": type.googleapis.com/google.protobuf.StringValue
         value: "my_config"
 
+Go SDK
+------
+
+The Go SDK supports bootstrap configuration factories, lifecycle hooks, initialization targets,
+and main-thread scheduling. Register a ``shared.BootstrapExtensionConfigFactory`` with
+``sdk.RegisterBootstrapExtensionConfigFactories`` during Go package initialization. Its
+``Create`` method receives a ``shared.BootstrapExtensionConfigHandle`` and returns a
+``shared.BootstrapExtensionConfig``, which creates extension instances through
+``NewBootstrapExtension``. Embed ``shared.EmptyBootstrapExtension`` in an instance to inherit
+default lifecycle behavior.
+
+Call ``SignalInitComplete`` exactly once to release the bootstrap initialization target. For
+asynchronous initialization, obtain ``GetScheduler`` on the main thread, perform background work,
+then use ``Schedule`` to call ``SignalInitComplete`` back on the main thread. Scheduled tasks may
+schedule more tasks. The SDK discards pending tasks at configuration destruction and ignores
+later scheduling attempts.
+
+``OnShutdown`` receives a completion function. Call it after cleanup finishes; it can be retained
+for asynchronous cleanup and called from another goroutine. The SDK ignores repeated calls and
+completes shutdown if the hook panics. Configuration and instance ``OnDestroy`` callbacks have
+separate lifetimes. As with other Go dynamic modules, configure ``do_not_close: true`` so the Go
+runtime remains loaded.
+
+This Go API does not yet expose the Rust SDK's optional bootstrap capabilities, such as HTTP
+callouts, timers, metrics, or resource management.
+
 Lifecycle Hooks
 ---------------
 

@@ -24,6 +24,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:cluster_null_lb",
         "//test/extensions/dynamic_modules/test_data/c:cluster_run_on_all_workers",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
+        "//test/extensions/dynamic_modules/test_data/go:cluster_integration_test",
     ],
     extension_names = ["envoy.clusters.dynamic_modules"],
     rbe_pool = {
@@ -95,6 +96,7 @@ envoy_extension_cc_dyn_module_test(
     srcs = ["integration_test.cc"],
     data = [
         "//test/config/integration/certs",
+        "//test/extensions/dynamic_modules/test_data/go:cluster_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:cluster_dynamic_metadata_test",
         "//test/extensions/dynamic_modules/test_data/rust:cluster_filter_state_test",
         "//test/extensions/dynamic_modules/test_data/rust:cluster_integration_test",
@@ -113,6 +115,7 @@ envoy_extension_cc_dyn_module_test(
         "//source/common/tls:server_ssl_socket_lib",
         "//source/extensions/clusters/dynamic_modules:cluster",
         "//source/extensions/dynamic_modules:abi_impl",
+        "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/transport_sockets/tls:config",
@@ -121,6 +124,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/integration:http_integration_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/dynamic_modules/v3:pkg_cc_proto",

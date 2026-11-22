@@ -54,6 +54,22 @@ TEST_F(ExtensionTest, NullInModuleExtension) {
   EXPECT_EQ(&extension->getExtensionConfig(), config.value().get());
 }
 
+TEST_F(ExtensionTest, GoInstanceFailure) {
+  const std::string path = TestEnvironment::runfilesPath(
+      "test/extensions/dynamic_modules/test_data/go/libbootstrap_integration_test.so");
+  for (const std::string mode : {"new_nil", "new_panic"}) {
+    SCOPED_TRACE(mode);
+    auto dynamic_module = Extensions::DynamicModules::newDynamicModule(path, true);
+    ASSERT_OK(dynamic_module);
+    auto config = newDynamicModuleBootstrapExtensionConfig("test", mode, DefaultMetricsNamespace,
+                                                           std::move(dynamic_module.value()),
+                                                           dispatcher_, context_, context_.store_);
+    ASSERT_OK(config);
+    auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+    EXPECT_FALSE(extension->initializeInModuleExtension());
+  }
+}
+
 TEST_F(ExtensionTest, IsDestroyedAndGetExtensionConfig) {
   // Test that isDestroyed and getExtensionConfig work correctly.
   auto dynamic_module =

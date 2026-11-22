@@ -7,6 +7,7 @@
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -47,6 +48,50 @@ TEST_F(ExtensionConfigTest, LoadOK) {
   EXPECT_NE(config.value()->on_bootstrap_extension_http_callout_done_, nullptr);
   EXPECT_NE(config.value()->on_bootstrap_extension_timer_fired_, nullptr);
   EXPECT_NE(config.value()->on_bootstrap_extension_admin_request_, nullptr);
+}
+
+TEST_F(ExtensionConfigTest, GoConfigFailure) {
+  const std::string path = TestEnvironment::runfilesPath(
+      "test/extensions/dynamic_modules/test_data/go/libbootstrap_integration_test.so");
+  for (const std::string mode : {"create_error", "create_panic", "create_nil"}) {
+    SCOPED_TRACE(mode);
+    auto dynamic_module = Extensions::DynamicModules::newDynamicModule(path, true);
+    ASSERT_OK(dynamic_module);
+    auto config = newDynamicModuleBootstrapExtensionConfig("test", mode, DefaultMetricsNamespace,
+                                                           std::move(dynamic_module.value()),
+                                                           dispatcher_, context_, context_.store_);
+    EXPECT_FALSE(config.ok());
+  }
+}
+
+TEST_F(ExtensionConfigTest, GoConfigDestroyedDuringSchedulerCommit) {
+  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+      TestEnvironment::runfilesPath(
+          "test/extensions/dynamic_modules/test_data/go/libbootstrap_integration_test.so"),
+      true);
+  ASSERT_OK(dynamic_module);
+  auto wait_for_commit = dynamic_module.value()->getFunctionPointer<void (*)()>(
+      "go_bootstrap_test_wait_for_scheduler");
+  ASSERT_OK(wait_for_commit);
+
+  absl::Notification posting;
+  absl::Notification return_from_post;
+  EXPECT_CALL(dispatcher_, post(testing::_)).WillOnce([&](Event::PostCb) {
+    posting.Notify();
+    return_from_post.WaitForNotification();
+  });
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "commit_teardown", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  posting.WaitForNotification();
+  // commit holds the last native config reference while posting. Releasing it
+  // re-enters Go configuration destruction before Schedule has returned.
+  std::weak_ptr<DynamicModuleBootstrapExtensionConfig> weak_config = config.value();
+  config.value().reset();
+  return_from_post.Notify();
+  wait_for_commit.value()();
+  EXPECT_TRUE(weak_config.expired());
 }
 
 TEST_F(ExtensionConfigTest, ConfigNewFail) {
