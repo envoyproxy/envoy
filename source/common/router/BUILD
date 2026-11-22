@@ -437,6 +437,7 @@ envoy_cc_library(
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
+        "//envoy/stream_info:filter_state_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/access_log:access_log_lib",
