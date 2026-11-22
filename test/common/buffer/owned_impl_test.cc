@@ -1057,6 +1057,27 @@ TEST_F(OwnedImplTest, SearchWithLengthLimit) {
   EXPECT_EQ(12, buffer.search("ba", 2, 11, 10e6));
 }
 
+TEST_F(OwnedImplTest, SearchPartialMatchFallback) {
+  // Single contiguous slice with many partial matches triggering linear-time fallback (>4 false
+  // positives for needle[0]).
+  std::string data = "babbbabbbabbbabbbabbbabbbabbbbbbbXY";
+  Buffer::OwnedImpl buffer;
+  buffer.appendSliceForTest(data);
+  EXPECT_EQ(26, buffer.search("bbbbbbb", 7, 0, 0));
+  EXPECT_EQ(-1, buffer.search("bbbbbbbb", 8, 0, 0));
+  EXPECT_EQ(-1, buffer.search("bbbbbbb", 7, 0, 32));
+  EXPECT_EQ(26, buffer.search("bbbbbbb", 7, 0, 33));
+  EXPECT_EQ(-1, buffer.search("b", 1, buffer.length(), 0));
+  EXPECT_EQ(-1, buffer.search("b", 1, buffer.length() + 5, 0));
+
+  // Cross-slice match after interior fallback misses in the first slice.
+  Buffer::OwnedImpl multi;
+  multi.appendSliceForTest("babbbabbbabbbabbbabbbbbb");
+  multi.appendSliceForTest("bbZ");
+  EXPECT_EQ(18, multi.search("bbbbbbbb", 8, 0, 0));
+  EXPECT_EQ(-1, multi.search("bbbbbbbb", 8, 0, 25));
+}
+
 TEST_F(OwnedImplTest, StartsWith) {
   // Populate a buffer with a string split across many small slices, to
   // exercise edge cases in the startsWith implementation.
