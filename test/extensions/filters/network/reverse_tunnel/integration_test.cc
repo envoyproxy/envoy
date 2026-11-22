@@ -959,6 +959,36 @@ TEST_P(ReverseTunnelFilterIntegrationTest, DrainingAwareHcmSendsMetadataThenGoAw
   test_server_->waitForCounter("listener_manager.listener_stopped", Ge(1));
 }
 
+// When the peer (fake responder) sends only a stream-0 drain METADATA frame, the initiator
+// redials a replacement tunnel while keeping the old tunnel open.
+TEST_P(ReverseTunnelFilterIntegrationTest, InitiatorRedialsOnPeerDrainMetadata) {
+  addDrainingAwareReverseConnectionHcmListenerWithMetadata(1);
+  initialize();
+
+  FakeRawConnectionPtr reverse_conn;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(reverse_conn));
+  completeReverseTunnelHandshake(*reverse_conn);
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  startHttp2Session(*reverse_conn);
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  reverse_conn->clearData();
+
+  Http::MetadataMap metadata_map = {{"envoy.reverse_tunnel.drain", "true"}};
+  const auto metadata_frame = Http::Http2::Http2Frame::makeMetadataFrameFromMetadataMap(
+      0, metadata_map, Http::Http2::Http2Frame::MetadataFlags::EndMetadata);
+  ASSERT_TRUE(reverse_conn->write(std::string(metadata_frame)));
+
+  // The initiator dials a replacement tunnel while the old tunnel remains open.
+  FakeRawConnectionPtr replacement_conn;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(replacement_conn));
+  completeReverseTunnelHandshake(*replacement_conn);
+  test_server_->waitForGauge("http.reverse_connection_hcm.downstream_cx_active", Eq(2));
+  EXPECT_TRUE(reverse_conn->connected());
+
+  EXPECT_TRUE(reverse_conn->close());
+  EXPECT_TRUE(replacement_conn->close());
+}
+
 // A non-reverse connection on the same config ignores the delays: it gets the soft GOAWAY right
 // away and the final GOAWAY at drain_timeout, with no METADATA frame.
 TEST_P(ReverseTunnelFilterIntegrationTest, DrainingAwareHcmNonReverseConnectionIgnoresDelays) {
@@ -1696,7 +1726,7 @@ typed_extension_protocol_options:
   envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
     "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
     explicit_http_config:
-      http2_protocol_options: {}
+      http2_protocol_options: {allow_metadata: true}
   envoy.extensions.upstreams.http.reverse_tunnel.v3.ReverseTunnelUpstreamCodecOptions:
     "@type": type.googleapis.com/envoy.extensions.upstreams.http.reverse_tunnel.v3.ReverseTunnelUpstreamCodecOptions
     enable_drain_with_goaway: )EOF",
@@ -1886,6 +1916,7 @@ load_assignment:
     config.set_enable_drain_with_goaway(true);
     auto* hcm = config.mutable_hcm_config();
     hcm->set_stat_prefix("real_initiator");
+    hcm->mutable_http2_protocol_options()->set_allow_metadata(true);
     hcm->mutable_stream_idle_timeout()->set_seconds(0);
     ConfigHelper::setConnectConfig(*hcm, /*terminate_connect=*/true, /*allow_post=*/false);
     auto* route = hcm->mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
@@ -1914,7 +1945,7 @@ load_assignment:
       Http::CodecType::HTTP1, GetParam());
   ASSERT_TRUE(response->complete());
   ASSERT_EQ("200", response->headers().getStatusValue());
-  // The actual initiator receives the responder's first GOAWAY and establishes a replacement.
+  // The actual initiator receives the responder's drain METADATA and establishes a replacement.
   test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Eq(2));
   test_server_->waitForGauge("http.real_initiator.downstream_cx_active", Eq(2));
   timeSystem().advanceTimeWait(std::chrono::seconds(2));

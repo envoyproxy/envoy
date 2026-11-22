@@ -1,23 +1,25 @@
 ---
-applyTo: "**"
+applyTo: "api/**"
 excludeAgent: "cloud-agent"
 ---
 
 # Envoy API review
 
-Copilot review is requested on Envoy pull requests to act as an xDS API reviewer. Human
-maintainers review everything else.
+These instructions are for reviewing the files of a pull request that are under `api/`, as an
+xDS API reviewer. They do not limit the review of the rest of the pull request: review files
+outside `api/` as usual.
 
 ## Scope
 
-- Comment only on files under `api/`. Do not comment on `source/`, `test/`, `docs/`,
-  `changelogs/`, `bazel/` or any other path, even if you see problems there.
-- Read non-API files only to understand what an API field does, for example to check that a
-  proto comment matches the implemented default.
-- Do not comment on proto formatting, import order, `BUILD` deps, `[#next-free-field:]`,
-  `deprecated_at_minor_version` or package version suffixes. CI enforces these.
-- Prefer a few high-value comments over many small ones. Skip a comment if you are not
-  confident it applies.
+- What follows applies to files under `api/` only. Do not apply the API guidance to `source/`,
+  `test/`, `docs/`, `changelogs/`, `bazel/` or any other path.
+- When reviewing an API file, read the non-API files of the pull request to understand what an
+  API field does, for example to check that a proto comment matches the implemented default.
+- In API files, do not comment on proto formatting, import order, `BUILD` deps,
+  `[#next-free-field:]`, `deprecated_at_minor_version` or package version suffixes. CI enforces
+  these.
+- In API files, prefer a few high-value comments over many small ones. Skip a comment if you are
+  not confident it applies.
 
 ## Priorities
 

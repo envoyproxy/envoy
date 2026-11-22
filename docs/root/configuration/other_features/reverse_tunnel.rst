@@ -539,8 +539,9 @@ with HTTP 503 and response flag ``UH`` (no healthy upstream), instead of ``UF`` 
 fallback connection failure. This local response does not trigger ``connect-failure`` retries that
 could retry the previous connection failure. The counter
 ``cluster.<name>.upstream_rq_all_tunnels_draining`` records these requests instead of
-``fallback_no_reverse_socket``. Early drain METADATA only notifies the reporter and does not exclude
-the tunnel.
+``fallback_no_reverse_socket``. Drain METADATA received from an initiator only notifies the reporter
+and does not exclude the tunnel. Responder admin drain sends METADATA to request a replacement before
+its final GOAWAY; this requires ``allow_metadata`` on both the responder cluster and initiator HCM.
 
 Regardless of the guard, listener teardown cleans up pending and queued tunnel gauges, emits
 ``connection_closed`` access logs for queued tunnels, and logs the stop at info level.

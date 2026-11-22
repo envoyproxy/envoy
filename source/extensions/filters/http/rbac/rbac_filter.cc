@@ -60,8 +60,10 @@ const absl::flat_hash_set<std::string> ActionValidationVisitor::allowed_inputs_s
             ->full_name())}};
 
 absl::Status ActionValidationVisitor::performDataInputValidation(
-    const Matcher::DataInputFactory<Http::HttpMatchingData>&, absl::string_view type_url) {
-  if (allowed_inputs_set_.contains(type_url)) {
+    const Matcher::DataInputFactory<Http::HttpMatchingData>& data_input,
+    absl::string_view type_url) {
+  if (allowed_inputs_set_.contains(type_url) ||
+      data_input.availableAt() <= Matcher::DataInputStage::RequestHeaders) {
     return absl::OkStatus();
   }
 

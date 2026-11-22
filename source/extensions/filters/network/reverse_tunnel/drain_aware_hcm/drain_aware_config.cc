@@ -56,15 +56,15 @@ Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createBaseCodec
 Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createCodec(
     Network::Connection& connection, const Buffer::Instance& data,
     Http::ServerConnectionCallbacks& callbacks, Server::OverloadManager& overload_manager) {
-  // Share the replacement action between peer GOAWAY and any local HTTP/2 drain, including
-  // connection rotation, filter-chain updates and admin drains. With the listener-drain guard
-  // enabled, whole-listener draining stops initiation and suppresses these replacement dials.
-  // Opt-in via enable_drain_with_goaway.
+  // Share the replacement action between peer drain (GOAWAY or drain METADATA) and any local
+  // HTTP/2 drain, including connection rotation, filter-chain updates and admin drains. With the
+  // listener-drain guard enabled, whole-listener draining stops initiation and suppresses these
+  // replacement dials. Opt-in via enable_drain_with_goaway.
   //
   // Recover the IOHandle by typed cast on the accepted socket: connection.localAddress() can't be
   // used because the listener exposes its bound rc:// address, not the socket's local port.
   std::function<void()> on_local_drain = nullptr;
-  std::function<void()> on_peer_goaway = nullptr;
+  std::function<void()> on_peer_drain = nullptr;
   if (enable_drain_with_goaway_) {
     Envoy::Extensions::Bootstrap::ReverseConnection::DownstreamReverseConnectionIOHandle*
         tunnel_iohandle = nullptr;
@@ -84,18 +84,18 @@ Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createCodec(
         tunnel_iohandle->markTunnelDrainingAndDialReplacement();
       };
       on_local_drain = redial;
-      on_peer_goaway = redial;
+      on_peer_drain = redial;
     }
   }
 
-  // If a peer GOAWAY should trigger a re-dial, interpose a callbacks wrapper between the codec and
-  // the HCM so we observe the received GOAWAY (the default server path ignores it). Otherwise use
-  // the HCM callbacks directly.
+  // If a peer drain (METADATA or GOAWAY) should trigger a re-dial, interpose a callbacks wrapper
+  // between the codec and the HCM so we observe the received drain signal (the default server
+  // path ignores it). Otherwise use the HCM callbacks directly.
   std::unique_ptr<DrainAwareServerConnectionCallbacks> callbacks_wrapper;
   Http::ServerConnectionCallbacks* effective_callbacks = &callbacks;
-  if (on_peer_goaway != nullptr) {
+  if (on_peer_drain != nullptr) {
     callbacks_wrapper =
-        std::make_unique<DrainAwareServerConnectionCallbacks>(callbacks, std::move(on_peer_goaway));
+        std::make_unique<DrainAwareServerConnectionCallbacks>(callbacks, std::move(on_peer_drain));
     effective_callbacks = callbacks_wrapper.get();
   }
 

@@ -15,6 +15,7 @@ Requests with no eligible initiator fail with HTTP 503 and response flag
 ``UH`` (no healthy upstream), instead of the previous fallback connection failure with ``UF``.
 This local response does not trigger ``connect-failure`` retries that could retry the previous
 connection failure. These requests increment ``cluster.<name>.upstream_rq_all_tunnels_draining``
-instead of ``fallback_no_reverse_socket``. Early drain METADATA still only notifies the reporter.
+instead of ``fallback_no_reverse_socket``. Drain METADATA received from an initiator still only
+notifies the reporter.
 Regardless of the guard, listener teardown cleans up pending and queued tunnel gauges, emits
 ``connection_closed`` access logs for queued tunnels, and logs the stop at info level.

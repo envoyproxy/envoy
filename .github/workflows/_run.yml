@@ -85,11 +85,8 @@ on:
       docker-cpus:
         type: number
         default: 0
-      docker-ci:
-        type: boolean
-        default: true
-      # Use the devtools image. Only respected by branches whose `ci/run_envoy_docker.sh` defaults
-      # CI to the minimal `ci` image; older branches select the image with `docker-ci`.
+      # Use the devtools image, rather than the minimal `ci` image that `ci/run_envoy_docker.sh`
+      # defaults to under GitHub Actions.
       devtools:
         type: boolean
         default: false
@@ -458,7 +455,6 @@ jobs:
         ENVOY_SIGNING_KEY_PATH: ${{ inputs.signing && '/build/signing/signing-key.asc' || '' }}
         ENVOY_SIGNING_PASSPHRASE_PATH: ${{ inputs.signing && '/build/signing/passphrase' || '' }}
         ENVOY_DOCKER_CPUS: ${{ inputs.docker-cpus }}
-        ENVOY_DOCKER_CI: ${{ inputs.docker-ci && 'true' || '' }}
         ENVOY_DOCKER_DEVTOOLS: ${{ inputs.devtools && 'true' || '' }}
         ENVOY_COMMIT: ${{ fromJSON(inputs.request).request.sha }}
         ENVOY_REPO: ${{ github.repository }}

@@ -562,6 +562,14 @@ TEST_F(RdsImplTest, UnknownFacotryForPerRouteTypedConfig) {
       EnvoyException,
       "Didn't find a registered implementation for 'filter.unknown' with type URL: "
       "'google.protobuf.Struct'");
+
+  // The rejected configuration is rejected again when it is resent.
+  EXPECT_THROW_WITH_MESSAGE(
+      EXPECT_OK(
+          rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info())),
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.Struct'");
 }
 
 // Validates behavior when the config is delivered but it fails PGV validation.

@@ -44,11 +44,13 @@ message DrainAwareHttpConnectionManager {
   // The underlying HCM configuration to apply.
   http_connection_manager.v3.HttpConnectionManager hcm_config = 1;
 
-  // When true, a peer-initiated GOAWAY or any local drain of an established HTTP/2 tunnel retires
+  // When true, a peer-initiated GOAWAY, connection-level METADATA frame carrying
+  // ``envoy.reverse_tunnel.drain: true``, or any local drain of an established HTTP/2 tunnel retires
   // the reverse tunnel and requests a replacement while in-flight streams finish, unless the
-  // listener has stopped tunnel initiation. Local drains include connection rotation, filter-chain
-  // updates and admin listener drains, with either value of the runtime guard below. Default false.
-  // Required by ``metadata_delay`` and ``shutdown_notice_delay``.
+  // listener has stopped tunnel initiation. Receiving the METADATA frame requires
+  // ``hcm_config.http2_protocol_options.allow_metadata`` to be true. Local drains include connection
+  // rotation, filter-chain updates and admin listener drains, with either value of the runtime guard
+  // below. Default false. Required by ``metadata_delay`` and ``shutdown_notice_delay``.
   // With ``envoy.reloadable_features.reverse_tunnel_listener_drain`` enabled, unused tunnels also
   // request replacements during in-place filter-chain updates without shortening their drain grace.
   // The runtime guard separately stops tunnel initiation on whole-listener drains, even when this

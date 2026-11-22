@@ -214,8 +214,6 @@ jobs:
 
     - name: Update bazel module versions and lockfiles
       if: steps.bzlmod.outputs.enabled
-      env:
-        ENVOY_DOCKER_CI: 1
       run: |
         ./ci/run_envoy_docker.sh './ci/do_ci.sh modules.version'
         git add -- ':(glob)**/MODULE.bazel' ':(glob)**/MODULE.bazel.lock' Cargo.lock Cargo.Bazel.envoy.lock
