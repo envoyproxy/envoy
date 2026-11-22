@@ -983,6 +983,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           "envoy.reloadable_features.http2_reject_frames_after_end_stream")),
       trailers_after_exhausted_window_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_trailers_after_exhausted_window")),
+      reject_pseudo_header_after_regular_header_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_reject_pseudo_header_after_regular_header")),
       protocol_constraints_(stats, http2_options,
                             Runtime::runtimeFeatureEnabled(
                                 "envoy.reloadable_features.http2_flood_protection_active_streams")),
@@ -2014,6 +2016,10 @@ bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t
 }
 
 bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_id) {
+  StreamImpl* stream = connection_->getStreamUnchecked(stream_id);
+  if (stream != nullptr) {
+    stream->regular_header_received_ = false;
+  }
   Status status = connection_->onBeginHeaders(stream_id);
   return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
 }
@@ -2021,8 +2027,21 @@ bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_
 OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
                                                                absl::string_view name_view,
                                                                absl::string_view value_view) {
-  if (connection_->getStreamUnchecked(stream_id) == nullptr) {
+  StreamImpl* stream = connection_->getStreamUnchecked(stream_id);
+  if (stream == nullptr) {
     return OnHeaderResult::HEADER_RST_STREAM;
+  }
+  // oghttp2 does not check that pseudo-header fields precede regular fields (RFC 9113 section
+  // 8.3), and the header map does not preserve that order for later validation. nghttp2 rejects
+  // such header blocks before calling the visitor.
+  if (connection_->reject_pseudo_header_after_regular_header_) {
+    if (name_view.empty() || name_view[0] != ':') {
+      stream->regular_header_received_ = true;
+    } else if (stream->regular_header_received_) {
+      ENVOY_CONN_LOG(debug, "pseudo-header {} after a regular header on stream {}",
+                     connection_->connection_, name_view, stream_id);
+      return OnHeaderResult::HEADER_FIELD_INVALID;
+    }
   }
   // We use reference counting to avoid copying well-known header names.
   // For common HTTP/2 headers (e.g., :method, :path, :status), we reference Envoy's
