@@ -208,7 +208,7 @@ ContextConfigImpl::ContextConfigImpl(
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 default_max_protocol_version)),
-      max_send_fragment_(PROTOBUF_GET_OPTIONAL_WRAPPED(config.tls_params(), max_send_fragment)),
+      max_send_fragment_(PROTOBUF_GET_OPTIONAL_WRAPPED(config, max_send_fragment)),
       factory_context_(factory_context), tls_keylog_path_(config.key_log().path()),
       compliance_policy_(Utility::compliancePolicyFromProto(config.tls_params())) {
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);

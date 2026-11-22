@@ -133,12 +133,6 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   if (config.has_tls_params()) {
     const auto& params = config.tls_params();
-    // Only the context-level max_send_fragment is applied, so reject it here rather than ignore it.
-    if (params.has_max_send_fragment()) {
-      creation_status = absl::InvalidArgumentError(
-          "max_send_fragment is not supported in certificate-level tls_params");
-      return;
-    }
     tls_params_ = TlsParams{
         .min_protocol_version = params.tls_minimum_protocol_version(),
         .max_protocol_version = params.tls_maximum_protocol_version(),

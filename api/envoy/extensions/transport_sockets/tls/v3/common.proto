@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common TLS configuration]
 
-// [#next-free-field: 8]
+// [#next-free-field: 7]
 message TlsParameters {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsParameters";
 
@@ -213,11 +213,6 @@ message TlsParameters {
   // The policies are applied last during configuration and may override the other TLS
   // parameters, or any previous policy.
   repeated CompliancePolicy compliance_policies = 6 [(validate.rules).repeated = {max_items: 1}];
-
-  // The maximum plaintext size, in bytes, of each TLS record sent, handshake records included.
-  // Defaults to 16384. Not supported in certificate-level ``tls_params`` and ignored by QUIC.
-  google.protobuf.UInt32Value max_send_fragment = 7
-      [(validate.rules).uint32 = {lte: 16384 gte: 512}];
 }
 
 // BoringSSL private key method configuration. The private key methods are used for external

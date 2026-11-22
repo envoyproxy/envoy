@@ -8683,10 +8683,8 @@ protected:
     TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml_),
                               downstream_tls_context_);
     if (max_send_fragment_.has_value()) {
-      downstream_tls_context_.mutable_common_tls_context()
-          ->mutable_tls_params()
-          ->mutable_max_send_fragment()
-          ->set_value(max_send_fragment_.value());
+      downstream_tls_context_.mutable_common_tls_context()->mutable_max_send_fragment()->set_value(
+          max_send_fragment_.value());
     }
     auto server_cfg =
         *ServerContextConfigImpl::create(downstream_tls_context_, factory_context_, {}, false);
@@ -8703,10 +8701,8 @@ protected:
 
     TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml_), upstream_tls_context_);
     if (max_send_fragment_.has_value()) {
-      upstream_tls_context_.mutable_common_tls_context()
-          ->mutable_tls_params()
-          ->mutable_max_send_fragment()
-          ->set_value(max_send_fragment_.value());
+      upstream_tls_context_.mutable_common_tls_context()->mutable_max_send_fragment()->set_value(
+          max_send_fragment_.value());
     }
     auto client_cfg = *ClientContextConfigImpl::create(upstream_tls_context_, factory_context_);
 
