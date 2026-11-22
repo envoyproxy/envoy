@@ -1177,6 +1177,79 @@ TEST_P(ReverseTunnelDrainIntegrationTest, DisabledListenerDrainGuardKeepsLegacyR
   verifyListenerDrainWithoutCodecOption(/*listener_drain_enabled=*/false);
 }
 
+TEST_P(ReverseTunnelDrainIntegrationTest, EnablingGuardDuringListenerDrainStopsRedials) {
+  DISABLE_IF_ADMIN_DISABLED;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.reverse_tunnel_listener_drain",
+                                    "false");
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(600);
+  setDeterministicValue();
+  addDrainingAwareReverseConnectionHcmListener(/*reverse_connection_count=*/2);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* filter = bootstrap.mutable_static_resources()
+                       ->mutable_listeners(0)
+                       ->mutable_filter_chains(0)
+                       ->mutable_filters(0);
+    envoy::extensions::filters::network::reverse_tunnel::v3::DrainAwareHttpConnectionManager config;
+    ASSERT_TRUE(filter->typed_config().UnpackTo(&config));
+    config.set_enable_drain_with_goaway(true);
+    ASSERT_TRUE(filter->mutable_typed_config()->PackFrom(config));
+  });
+  initialize();
+
+  FakeRawConnectionPtr tunnel;
+  FakeRawConnectionPtr retained_tunnel;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(tunnel));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(retained_tunnel));
+  completeReverseTunnelHandshake(*tunnel);
+  completeReverseTunnelHandshake(*retained_tunnel);
+  test_server_->waitForGauge("http.reverse_connection_hcm.downstream_cx_active", Eq(2));
+  auto response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
+                                                     "/drain_listeners?graceful&skip_exit", "",
+                                                     Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(response->complete());
+  ASSERT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForWorkerThreads();
+  ASSERT_TRUE(tunnel->close());
+  ASSERT_TRUE(tunnel->waitForDisconnect());
+  test_server_->waitForGauge("http.reverse_connection_hcm.downstream_cx_active", Eq(1));
+  timeSystem().advanceTimeWait(std::chrono::seconds(15));
+
+  // Draining with the guard off still redials. Hold this handshake across the runtime opt-in.
+  FakeRawConnectionPtr replacement;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(replacement));
+  response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST",
+      "/runtime_modify?envoy.reloadable_features.reverse_tunnel_listener_drain=true", "",
+      Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(response->complete());
+  ASSERT_EQ("200", response->headers().getStatusValue());
+  completeReverseTunnelHandshake(*replacement);
+  ASSERT_TRUE(replacement->waitForDisconnect());
+  EXPECT_EQ(2, test_server_->counter("http.reverse_connection_hcm.downstream_cx_total")->value());
+
+  // Keep the original socket registered while checking maintenance and subsequent guard rollback.
+  for (const bool enable_guard : {true, false}) {
+    if (!enable_guard) {
+      response = IntegrationUtil::makeSingleRequest(
+          lookupPort("admin"), "POST",
+          "/runtime_modify?envoy.reloadable_features.reverse_tunnel_listener_drain=false", "",
+          Http::CodecType::HTTP1, GetParam());
+      ASSERT_TRUE(response->complete());
+      ASSERT_EQ("200", response->headers().getStatusValue());
+    }
+    timeSystem().advanceTimeWait(std::chrono::seconds(15));
+    FakeRawConnectionPtr unexpected_replacement;
+    EXPECT_FALSE(fake_upstreams_[0]->waitForRawConnection(unexpected_replacement,
+                                                          std::chrono::milliseconds(10)));
+    EXPECT_TRUE(retained_tunnel->connected());
+    EXPECT_EQ(1, test_server_->gauge("http.reverse_connection_hcm.downstream_cx_active")->value());
+  }
+  EXPECT_EQ(0, test_server_->counter("listener_manager.listener_stopped")->value());
+  test_server_.reset();
+  ASSERT_TRUE(retained_tunnel->waitForDisconnect());
+}
+
 void ReverseTunnelDrainIntegrationTest::verifyIdleTunnelReplacement(Server::DrainStrategy strategy,
                                                                     bool use_connection_events) {
   using Http2Frame = Http::Http2::Http2Frame;

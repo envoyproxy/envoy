@@ -75,6 +75,8 @@ TEST_F(DrainAwareReadFilterTest, DestroyBeforeInitialization) {
 }
 
 TEST_F(DrainAwareReadFilterTest, IdleTimerStartsOnlyWhenDrainArrives) {
+  ON_CALL(context_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(10)));
+  EXPECT_CALL(context_.api_.random_, random()).Times(0);
   auto filter = makeFilter();
   EXPECT_CALL(*timer_, enableTimer(_, _)).Times(0);
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
@@ -167,6 +169,7 @@ INSTANTIATE_TEST_SUITE_P(DrainStrategies, DrainAwareReadFilterReplacementTest,
                                          Server::DrainStrategy::Gradual));
 
 TEST_P(DrainAwareReadFilterReplacementTest, InPlaceDrainPreservesIdleTunnelUntilHcmTakesOver) {
+  ON_CALL(context_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(10)));
   Bootstrap::ReverseConnection::ReverseConnectionSocketConfig config;
   Bootstrap::ReverseConnection::ReverseConnectionIOHandle parent(
       INVALID_SOCKET, config, context_.cluster_manager_, nullptr, *context_.store_.rootScope());

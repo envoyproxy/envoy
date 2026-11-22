@@ -365,9 +365,9 @@ public:
    */
   void stopInitiatingConnections();
 
-  // Admin drain can stop initiation while the listener still accepts queued events. Once stopped,
-  // disabling the runtime guard cannot restart this listener; it must be replaced.
-  bool canInitiateConnections() const { return !connections_stopped_; }
+  // Observe a runtime opt-in after listener drain began and stop pending work before allowing
+  // another dial or accept. Once stopped, disabling the guard cannot restart this listener.
+  bool canInitiateConnections();
 
   /**
    * Remove a connection key from per-host tracking (the key set and its state gauge). Shared by the
@@ -599,6 +599,7 @@ private:
   // Single retry timer for all clusters
   Event::TimerPtr rev_conn_retry_timer_;
 
+  bool listener_draining_{false};
   bool connections_stopped_{false};
 
   // Set while waiting for parentStopAcceptingRequested(); cleared after scheduling the one-shot

@@ -244,15 +244,23 @@ public:
   Http::ServerConnectionCallbacks* last_callbacks_{nullptr};
 };
 
-class DrainAwareCodecDrainScopeTest : public DrainAwareConfigTest,
-                                      public testing::WithParamInterface<bool> {};
+class DrainAwareCodecDrainScopeTest
+    : public DrainAwareConfigTest,
+      public testing::WithParamInterface<
+          std::tuple<bool, envoy::config::core::v3::TrafficDirection>> {};
 
-INSTANTIATE_TEST_SUITE_P(ListenerDrainEnabled, DrainAwareCodecDrainScopeTest, testing::Bool());
+INSTANTIATE_TEST_SUITE_P(ListenerDrainEnabled, DrainAwareCodecDrainScopeTest,
+                         testing::Combine(testing::Bool(),
+                                          testing::Values(envoy::config::core::v3::INBOUND,
+                                                          envoy::config::core::v3::OUTBOUND,
+                                                          envoy::config::core::v3::UNSPECIFIED)));
 
-TEST_P(DrainAwareCodecDrainScopeTest, LegacyCodecUsesInboundScopeOnlyWhenListenerDrainEnabled) {
+TEST_P(DrainAwareCodecDrainScopeTest, LegacyCodecUsesListenerScopeOnlyWhenListenerDrainEnabled) {
+  const auto [enable_listener_drain, direction] = GetParam();
   TestScopedStaticReloadableFeaturesRuntime runtime(
-      {{"use_connection_event_drain", false}, {"reverse_tunnel_listener_drain", GetParam()}});
-  ON_CALL(context_, direction()).WillByDefault(Return(envoy::config::core::v3::INBOUND));
+      {{"use_connection_event_drain", false},
+       {"reverse_tunnel_listener_drain", enable_listener_drain}});
+  ON_CALL(context_, direction()).WillByDefault(Return(direction));
   auto proto_config = parseConfig(kMinimalConfig);
   proto_config.set_enable_drain_with_goaway(true);
   auto config = makeConfig<FakeCodecDrainAwareConfig>(proto_config);
@@ -267,10 +275,11 @@ TEST_P(DrainAwareCodecDrainScopeTest, LegacyCodecUsesInboundScopeOnlyWhenListene
   Buffer::OwnedImpl data;
   auto codec = config->createCodec(connection, data, callbacks, overload_manager);
   ASSERT_NE(nullptr, codec);
+  const bool inbound_only = enable_listener_drain && direction == envoy::config::core::v3::INBOUND;
   const auto expected_scope =
-      GetParam() ? Network::DrainDirection::InboundOnly : Network::DrainDirection::All;
+      inbound_only ? Network::DrainDirection::InboundOnly : Network::DrainDirection::All;
   const auto unused_scope =
-      GetParam() ? Network::DrainDirection::All : Network::DrainDirection::InboundOnly;
+      inbound_only ? Network::DrainDirection::All : Network::DrainDirection::InboundOnly;
   EXPECT_CALL(context_.drain_manager_, drainClose(unused_scope)).Times(0);
   EXPECT_CALL(context_.drain_manager_, drainClose(expected_scope)).WillOnce(Return(true));
   EXPECT_CALL(*goaway_timer, enableTimer(std::chrono::milliseconds(5000), _));

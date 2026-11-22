@@ -503,6 +503,9 @@ before notifying accepted tunnels. This stop is independent of ``enable_drain_wi
 permanent for that listener. An admin drain with ``skip_exit`` keeps the listener running but does not
 resume tunnel initiation. Disabling the guard does not restart a listener that has already stopped
 dialing; a full listener replacement is required to initiate tunnels again.
+If draining began while the guard was disabled, enabling it stops initiation on the next maintenance,
+accept or replacement check. Pending handshakes cannot be accepted into the draining listener after
+that check.
 
 With the drain-aware HCM's ``enable_drain_with_goaway`` also enabled, in-place filter-chain updates
 request replacement tunnels while leaving existing unused tunnels open until HCM's normal drain
@@ -510,17 +513,37 @@ closure. This preserves the grace period for requests while replacement handshak
 listener drains close unused tunnels without replacements. Full listener replacement and hot restart
 retain unused tunnels' existing drain grace for the successor; this does not wait indefinitely for
 successor readiness. A first request before idle closure is handled by the HTTP codec and follows
-its normal GOAWAY sequence. With the guard enabled, the legacy HCM drain decision also respects the
-listener direction, including ``INBOUND`` listeners during ``drain_listeners?inboundonly``.
+its normal GOAWAY sequence. With the guard enabled, the HCM drain decision also respects the listener
+direction when ``envoy.reloadable_features.use_connection_event_drain=false``, including
+``INBOUND`` listeners during ``drain_listeners?inboundonly``. The default connection-event mode already
+respects that scope.
+
+The configured reverse connection count targets the current pool, not the total number of open
+tunnels. Repeated in-place updates can overlap multiple draining generations: a count of two can
+temporarily leave four old tunnels and two replacements open after two updates. Each old generation
+retains its own drain deadline. Further updates can add more overlap until HCM closes the unused
+tunnels or the old filter chains are removed. A responder's configured connection limit counts the
+still-open draining tunnels too, so it can reject replacements while those tunnels remain open.
+
+With ``enable_drain_with_goaway``, an established HTTP/2 tunnel also requests a replacement on any
+local drain, including connection rotation, in-place updates and admin drains, unless its listener
+has stopped initiation. This applies with either value of the listener-drain guard; enabling the
+guard makes whole-listener draining stop initiation as described above.
 
 Responder exclusion additionally requires ``enable_drain_with_goaway`` in the reverse connection
-cluster's ``ReverseTunnelUpstreamCodecOptions``. After GOAWAY, a tunnel remains available to existing
-streams but is no longer eligible for new streams. An initiator with no eligible tunnels is skipped
+cluster's ``ReverseTunnelUpstreamCodecOptions``. After receiving GOAWAY or sending the final GOAWAY
+during ``/reverse_tunnel/drain_clusters``, a tunnel remains available to existing streams but is no
+longer eligible for new streams. An initiator with no eligible tunnels is skipped
 during node selection. If the requested node or cluster has only draining tunnels, requests fail
 with HTTP 503 and response flag ``UH`` (no healthy upstream), instead of ``UF`` from the previous
-fallback connection failure. The counter ``cluster.<name>.upstream_rq_all_tunnels_draining`` records
-these requests instead of ``fallback_no_reverse_socket``. Early drain METADATA only notifies the
-reporter and does not exclude the tunnel.
+fallback connection failure. This local response does not trigger ``connect-failure`` retries that
+could retry the previous connection failure. The counter
+``cluster.<name>.upstream_rq_all_tunnels_draining`` records these requests instead of
+``fallback_no_reverse_socket``. Early drain METADATA only notifies the reporter and does not exclude
+the tunnel.
+
+Regardless of the guard, listener teardown cleans up pending and queued tunnel gauges, emits
+``connection_closed`` access logs for queued tunnels, and logs the stop at info level.
 
 .. _config_reverse_tunnel_access_logging:
 

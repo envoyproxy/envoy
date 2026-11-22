@@ -90,8 +90,9 @@ class DrainAwareServerConnection : public Http::ServerConnection,
                                    public Network::ConnectionCallbacks,
                                    public Logger::Loggable<Logger::Id::filter> {
 public:
-  // `on_local_drain` is set for reverse tunnels and dials a replacement on connection rotation.
-  // A listener drain stops the initiator first, so the same callback cannot replenish it.
+  // `on_local_drain` requests a replacement for any local HTTP/2 drain, including connection
+  // rotation, filter-chain updates and admin drains, unless the listener has stopped initiation.
+  // With the listener-drain guard enabled, graceful admin drains stop initiation too.
   DrainAwareServerConnection(
       Http::ServerConnectionPtr inner, Network::Connection& connection,
       const Network::DrainDecision& drain_decision,

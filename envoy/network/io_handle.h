@@ -365,11 +365,11 @@ public:
   virtual void resetFileEvents() PURE;
 
   /**
-   * Notify a running stream listener's handle on its worker thread that the whole listener started
-   * draining, before accepted connections are notified. Handles can stop initiating connections
-   * while accepted connections complete their drain. Other listener types and listeners already
-   * stopped use resetFileEvents() instead; temporary disabling and individual filter-chain drains
-   * do not invoke this hook.
+   * Notify a running, bound TCP listener's handle on its worker thread that the whole listener
+   * started draining, before accepted connections are notified. Handles can stop initiating
+   * connections while accepted connections complete their drain. Datagram, internal, unbound and
+   * already-stopped listeners do not receive this hook. Temporary disabling and individual
+   * filter-chain drains do not invoke it either.
    */
   virtual void onListenerDrain() {}
 

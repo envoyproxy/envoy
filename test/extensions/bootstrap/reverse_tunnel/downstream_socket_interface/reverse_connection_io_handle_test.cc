@@ -3826,6 +3826,109 @@ TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsReplacementDialsBeforeLi
   testing::Mock::VerifyAndClearExpectations(child_io_handle_raw);
 }
 
+TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsOnIdleCheckAfterGuardEnabled) {
+  setListenerDrainGuard(false);
+  setupThreadLocalSlot();
+  io_handle_ = createTestIOHandle(createDefaultTestConfig());
+  bool timer_destroyed = false;
+  auto* timer = new StrictMock<Event::MockTimer>();
+  timer->timer_destroyed_ = &timer_destroyed;
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(timer));
+  EXPECT_CALL(*timer, enableTimer(_, _));
+  io_handle_->initializeFileEvent(
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::FileTriggerType::Level,
+      Event::FileReadyType::Read);
+
+  auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  auto child_io_handle = std::make_unique<StrictMock<Network::MockIoHandle>>();
+  auto* child_io_handle_raw = child_io_handle.get();
+  EXPECT_CALL(*child_io_handle_raw, fdDoNotUse()).WillOnce(Return(42));
+  EXPECT_CALL(*socket, ioHandle()).WillRepeatedly(ReturnRef(*child_io_handle_raw));
+  EXPECT_CALL(*child_io_handle_raw, close()).Times(0);
+  socket->io_handle_ = std::move(child_io_handle);
+  auto child = std::make_unique<DownstreamReverseConnectionIOHandle>(
+      std::move(socket), io_handle_.get(), "192.168.1.1:12345", 42);
+  io_handle_->onListenerDrain();
+  EXPECT_TRUE(child->canInitiateConnections());
+  EXPECT_FALSE(timer_destroyed);
+
+  // The idle filter checks eligibility before deciding whether to replace its tunnel. Observing
+  // the opt-in here must stop initiation without another listener drain notification.
+  setListenerDrainGuard(true);
+  EXPECT_FALSE(child->canInitiateConnections());
+  EXPECT_TRUE(timer_destroyed);
+  EXPECT_FALSE(child->listenerStopped());
+
+  setListenerDrainGuard(false);
+  EXPECT_FALSE(child->canInitiateConnections());
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
+  maintainReverseConnections();
+}
+
+TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsMaintenanceAfterGuardEnabled) {
+  setListenerDrainGuard(false);
+  setupThreadLocalSlot();
+  io_handle_ = createTestIOHandle(createDefaultTestConfig());
+  bool timer_destroyed = false;
+  auto* timer = new StrictMock<Event::MockTimer>();
+  timer->timer_destroyed_ = &timer_destroyed;
+  Event::TimerCb timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([&](Event::TimerCb cb) {
+    timer_cb = std::move(cb);
+    return timer;
+  });
+  EXPECT_CALL(*timer, enableTimer(_, _));
+  io_handle_->initializeFileEvent(
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::FileTriggerType::Level,
+      Event::FileReadyType::Read);
+
+  io_handle_->onListenerDrain();
+  EXPECT_FALSE(timer_destroyed);
+  setListenerDrainGuard(true);
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
+  timer_cb();
+  EXPECT_TRUE(timer_destroyed);
+  EXPECT_FALSE(io_handle_->canInitiateConnections());
+
+  setListenerDrainGuard(false);
+  maintainReverseConnections();
+  EXPECT_FALSE(io_handle_->canInitiateConnections());
+}
+
+TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsReplacementAfterGuardEnabled) {
+  setListenerDrainGuard(false);
+  setupThreadLocalSlot();
+  io_handle_ = createTestIOHandle(createDefaultTestConfig());
+  bool timer_destroyed = false;
+  auto* timer = new StrictMock<Event::MockTimer>();
+  timer->timer_destroyed_ = &timer_destroyed;
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(timer));
+  EXPECT_CALL(*timer, enableTimer(_, _));
+  io_handle_->initializeFileEvent(
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::FileTriggerType::Level,
+      Event::FileReadyType::Read);
+
+  const std::string host = "192.168.1.1";
+  const std::string connection_key = "192.168.1.1:12345";
+  addHostConnectionInfo(host, "remote-cluster", 1);
+  getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+  io_handle_->updateConnectionState(host, "remote-cluster", connection_key,
+                                    ReverseConnectionState::Connected);
+
+  io_handle_->onListenerDrain();
+  EXPECT_FALSE(timer_destroyed);
+  setListenerDrainGuard(true);
+  io_handle_->markTunnelDrainingAndDialReplacement(connection_key, 42);
+  EXPECT_TRUE(timer_destroyed);
+  EXPECT_TRUE(getHostConnectionInfo(host).connection_keys.empty());
+  EXPECT_TRUE(getHostConnectionInfo(host).connection_states.empty());
+
+  setListenerDrainGuard(false);
+  EXPECT_FALSE(io_handle_->canInitiateConnections());
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
+  maintainReverseConnections();
+}
+
 TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsPendingWorkWithoutAcceptedConnections) {
   setListenerDrainGuard(true);
   setupThreadLocalSlot();
@@ -3929,6 +4032,72 @@ TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsPendingWorkWithoutAccept
   // Listener teardown after drain must not close the same connection a second time.
   io_handle_->resetFileEvents();
   EXPECT_EQ(dispatcher_.to_delete_.size(), deferred_before + 4);
+}
+
+TEST_F(ReverseConnectionIOHandleTest, ListenerDrainRejectsHandshakeHandoffAfterGuardEnabled) {
+  setListenerDrainGuard(false);
+  setupThreadLocalSlot();
+  io_handle_ = createTestIOHandle(createDefaultTestConfig());
+  bool timer_destroyed = false;
+  auto* timer = new StrictMock<Event::MockTimer>();
+  timer->timer_destroyed_ = &timer_destroyed;
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(timer));
+  EXPECT_CALL(*timer, enableTimer(_, _));
+  io_handle_->initializeFileEvent(
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::FileTriggerType::Level,
+      Event::FileReadyType::Read);
+
+  const std::string host = "192.168.1.1";
+  addHostConnectionInfo(host, "remote-cluster", 2);
+  bool handoff_complete = false;
+  auto add_handshake = [&](uint32_t port) {
+    auto connection = setupMockConnection();
+    auto local_address = std::make_shared<Network::Address::Ipv4Instance>(host, port);
+    connection->stream_info_.downstream_connection_info_provider_->setLocalAddress(local_address);
+    EXPECT_CALL(*connection, id()).WillRepeatedly(Return(port));
+    EXPECT_CALL(*connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+    EXPECT_CALL(*connection, close(Network::ConnectionCloseType::NoFlush)).WillOnce([&]() {
+      EXPECT_TRUE(handoff_complete);
+    });
+    io_handle_->updateConnectionState(host, "remote-cluster", local_address->asString(),
+                                      ReverseConnectionState::Connecting);
+    auto wrapper = std::make_unique<RCConnectionWrapper>(
+        *io_handle_, std::move(connection),
+        std::make_shared<NiceMock<Upstream::MockHostDescription>>(), "remote-cluster");
+    auto* wrapper_ptr = wrapper.get();
+    addWrapperToHostMap(wrapper_ptr, host);
+    pushConnectionWrapper(std::move(wrapper));
+    return wrapper_ptr;
+  };
+  auto* completed = add_handshake(12345);
+  add_handshake(12346);
+
+  io_handle_->onListenerDrain();
+  EXPECT_FALSE(timer_destroyed);
+  ASSERT_EQ(getConnectionWrappers().size(), 2);
+  setListenerDrainGuard(true);
+
+  // Handshake callbacks must finish without synchronously destroying their codec. The accept
+  // boundary observes the opt-in, rejects the completed tunnel and cancels the remaining handshake.
+  io_handle_->onConnectionDone("reverse connection accepted", completed, false);
+  handoff_complete = true;
+  ASSERT_EQ(getEstablishedConnectionsSize(), 1);
+  ASSERT_EQ(getConnectionWrappers().size(), 1);
+  sockaddr_storage addr{};
+  socklen_t addrlen = sizeof(addr);
+  EXPECT_EQ(io_handle_->accept(reinterpret_cast<sockaddr*>(&addr), &addrlen), nullptr);
+  EXPECT_TRUE(timer_destroyed);
+  EXPECT_EQ(getEstablishedConnectionsSize(), 0);
+  EXPECT_TRUE(getConnectionWrappers().empty());
+  EXPECT_TRUE(getConnWrapperToHostMap().empty());
+  EXPECT_TRUE(getHostConnectionInfo(host).connection_keys.empty());
+  EXPECT_TRUE(getHostConnectionInfo(host).connection_states.empty());
+  EXPECT_EQ(getHostConnectionInfo(host).connecting_count, 0);
+
+  setListenerDrainGuard(false);
+  EXPECT_FALSE(io_handle_->canInitiateConnections());
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
+  maintainReverseConnections();
 }
 
 TEST_F(ReverseConnectionIOHandleTest, TunnelSetupTimeRecordsSampleOnCapacity) {

@@ -56,9 +56,9 @@ Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createBaseCodec
 Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createCodec(
     Network::Connection& connection, const Buffer::Instance& data,
     Http::ServerConnectionCallbacks& callbacks, Server::OverloadManager& overload_manager) {
-  // Build the "dial a replacement tunnel" action shared by per-connection rotation and a peer
-  // GOAWAY, so new requests get a fresh tunnel while existing streams finish on the old one.
-  // Listener drain stops the initiator first, preventing these callbacks from replenishing it.
+  // Share the replacement action between peer GOAWAY and any local HTTP/2 drain, including
+  // connection rotation, filter-chain updates and admin drains. With the listener-drain guard
+  // enabled, whole-listener draining stops initiation and suppresses these replacement dials.
   // Opt-in via enable_drain_with_goaway.
   //
   // Recover the IOHandle by typed cast on the accepted socket: connection.localAddress() can't be
