@@ -1,6 +1,7 @@
 package main
 
 /*
+#include <stdbool.h>
 #include <stdint.h>
 */
 import "C"
@@ -99,7 +100,7 @@ func (c *cluster) OnServerInitialized() {
 }
 
 //export go_cluster_test_start_worker_events
-func go_cluster_test_start_worker_events() bool {
+func go_cluster_test_start_worker_events() C.bool {
 	c := current.Load()
 	if c == nil || !c.serverReady.Load() || !c.started.CompareAndSwap(false, true) {
 		return false
@@ -142,7 +143,7 @@ func (c *cluster) OnDestroy() {
 // These hooks let the native test wait for pushed events without polling or sleeps.
 //
 //export go_cluster_test_wait_for_stage
-func go_cluster_test_wait_for_stage(stage, timeoutMs C.uint32_t) bool {
+func go_cluster_test_wait_for_stage(stage, timeoutMs C.uint32_t) C.bool {
 	c := current.Load()
 	if c == nil {
 		return false
