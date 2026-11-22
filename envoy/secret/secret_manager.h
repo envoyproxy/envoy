@@ -214,7 +214,7 @@ public:
   /**
    * Registers observer callbacks for the dynamic TLS certificate secrets held by this manager.
    * Before this returns, SecretLifecycleCallbacks::onSecretAddOrUpdate is invoked inline once for
-   * each name that currently has a delivered secret. Destroying the returned handle unregisters
+   * each name that has delivered a secret. Destroying the returned handle unregisters
    * the callbacks. Main thread only.
    * @param callbacks supplies the callbacks, which must outlive the returned handle.
    * @return the handle that keeps the callbacks registered.

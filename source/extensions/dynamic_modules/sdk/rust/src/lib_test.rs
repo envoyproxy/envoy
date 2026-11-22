@@ -9584,6 +9584,83 @@ fn test_bootstrap_extension_listener_lifecycle_default_noop() {
   }
 }
 
+#[test]
+fn test_bootstrap_extension_secret_lifecycle() {
+  static SECRET_EVENTS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_secret_add_or_update(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      secret_name: &str,
+    ) {
+      SECRET_EVENTS.lock().unwrap().push(format!("add:{secret_name}"));
+    }
+
+    fn on_secret_removal(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      secret_name: &str,
+    ) {
+      SECRET_EVENTS.lock().unwrap().push(format!("remove:{secret_name}"));
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let secret_name = "cert";
+  let secret_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: secret_name.as_ptr() as *const _,
+    length: secret_name.len(),
+  };
+
+  SECRET_EVENTS.lock().unwrap().clear();
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update(
+      std::ptr::null_mut(),
+      config_ptr,
+      secret_name_buf,
+    );
+    envoy_dynamic_module_on_bootstrap_extension_secret_removal(
+      std::ptr::null_mut(),
+      config_ptr,
+      secret_name_buf,
+    );
+  }
+  assert_eq!(*SECRET_EVENTS.lock().unwrap(), vec!["add:cert", "remove:cert"]);
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
 // =============================================================================
 // MockEnvoyNetworkFilter Tests
 // =============================================================================

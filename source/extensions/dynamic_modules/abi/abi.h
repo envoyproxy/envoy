@@ -10101,12 +10101,12 @@ void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
  * re-pushed.
  *
  * A name can be held by several providers (one per config source and warming mode), so this can
- * repeat for the same name. The event means the provider stored the secret, not that the TLS
- * contexts that use it already serve it.
+ * repeat for the same name, and a rotation that a TLS context rejects can repeat on later file
+ * events. The event means the provider stored the secret; the TLS contexts may never serve it.
  *
- * This is only called if the module has opted in to receiving secret lifecycle events via
- * envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle. The callback is
- * registered on the main thread and invoked on the main thread.
+ * This hook is optional. It is only called if the module has opted in to receiving secret lifecycle
+ * events via envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle. The
+ * callback is registered on the main thread and invoked on the main thread.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
@@ -10121,14 +10121,14 @@ void envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update(
 
 /**
  * envoy_dynamic_module_on_bootstrap_extension_secret_removal is called when the last dynamic (SDS)
- * TLS certificate provider for a name leaves the SecretManager, which happens when the last
- * listener or cluster that references it is removed. It fires only for a name that delivered a
- * secret. A delta xDS removal of the resource does not fire it, since the provider keeps serving
- * the last secret.
+ * TLS certificate provider for a name is destroyed, such as when the last listener or cluster that
+ * references it is removed, or when an on-demand certificate selector drops it after a delta xDS
+ * removal. It fires only for a name that delivered a secret, and the name can leave the active
+ * resource names before it fires.
  *
- * This is only called if the module has opted in to receiving secret lifecycle events via
- * envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle. The callback is
- * registered on the main thread and invoked on the main thread.
+ * This hook is optional. It is only called if the module has opted in to receiving secret lifecycle
+ * events via envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle. The
+ * callback is registered on the main thread and invoked on the main thread.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
@@ -10982,7 +10982,8 @@ void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names
  * envoy_dynamic_module_on_bootstrap_extension_server_initialized. Calls before that return false;
  * the validation server never reaches that point.
  *
- * This should be called at most once. Subsequent calls are no-ops and return false.
+ * This should be called at most once. Subsequent calls are no-ops and return false. This also
+ * returns false once the server began to shut down and when Envoy runs with --mode init_only.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.

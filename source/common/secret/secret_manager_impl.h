@@ -143,6 +143,17 @@ private:
       return providers;
     }
 
+    // The names whose removal will be reported.
+    std::vector<std::string> deliveredNames() const {
+      std::vector<std::string> names;
+      for (const auto& [name, state] : names_) {
+        if (state.delivered_) {
+          names.push_back(name);
+        }
+      }
+      return names;
+    }
+
     // Enables lifecycle tracking: cb is invoked with (name, false) when a provider stores a
     // secret and with (name, true) when the last provider for a delivered name is removed. Must be
     // set before any provider is created.

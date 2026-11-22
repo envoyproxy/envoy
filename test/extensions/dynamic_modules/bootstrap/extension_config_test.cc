@@ -52,8 +52,8 @@ TEST_F(ExtensionConfigTest, LoadOK) {
   EXPECT_NE(config.value()->on_bootstrap_extension_http_callout_done_, nullptr);
   EXPECT_NE(config.value()->on_bootstrap_extension_timer_fired_, nullptr);
   EXPECT_NE(config.value()->on_bootstrap_extension_admin_request_, nullptr);
-  EXPECT_NE(config.value()->on_bootstrap_extension_secret_add_or_update_, nullptr);
-  EXPECT_NE(config.value()->on_bootstrap_extension_secret_removal_, nullptr);
+  EXPECT_EQ(config.value()->on_bootstrap_extension_secret_add_or_update_, nullptr);
+  EXPECT_EQ(config.value()->on_bootstrap_extension_secret_removal_, nullptr);
 }
 
 TEST_F(ExtensionConfigTest, ConfigNewFail) {
@@ -316,36 +316,17 @@ TEST_F(ExtensionConfigTest, ClusterAccessRequiresServerInitialized) {
   EXPECT_TRUE(config->enableClusterLifecycle());
 }
 
-TEST_F(ExtensionConfigTest, MissingSecretAddOrUpdate) {
-  // The secret lifecycle hooks are optional: a module that omits
-  // envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update still loads, with that hook
-  // left null while the sibling hook it does export resolves.
+TEST_F(ExtensionConfigTest, OptionalSecretLifecycleHooks) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      testDataDir() + "/libbootstrap_no_secret_add_or_update.so", false);
+      testDataDir() + "/libbootstrap_optional_hooks.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
                                                          dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
-  EXPECT_EQ(config.value()->on_bootstrap_extension_secret_add_or_update_, nullptr);
-  EXPECT_NE(config.value()->on_bootstrap_extension_secret_removal_, nullptr);
-}
-
-TEST_F(ExtensionConfigTest, MissingSecretRemoval) {
-  // The secret lifecycle hooks are optional: a module that omits
-  // envoy_dynamic_module_on_bootstrap_extension_secret_removal still loads, with that hook left
-  // null while the sibling hook it does export resolves.
-  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      testDataDir() + "/libbootstrap_no_secret_removal.so", false);
-  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
-
-  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
-                                                         std::move(dynamic_module.value()),
-                                                         dispatcher_, context_, context_.store_);
-  ASSERT_TRUE(config.ok()) << config.status();
-  EXPECT_EQ(config.value()->on_bootstrap_extension_secret_removal_, nullptr);
   EXPECT_NE(config.value()->on_bootstrap_extension_secret_add_or_update_, nullptr);
+  EXPECT_NE(config.value()->on_bootstrap_extension_secret_removal_, nullptr);
 }
 
 TEST_F(ExtensionConfigTest, EnableSecretLifecycleRequiresServerInitialized) {

@@ -14,8 +14,6 @@
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 #include "source/common/ssl/tls_certificate_config_impl.h"
 
-#include "absl/container/flat_hash_set.h"
-
 namespace Envoy {
 namespace Secret {
 
@@ -191,13 +189,9 @@ std::vector<absl::string_view> SecretManagerImpl::dynamicActiveSecretNames() con
 Common::CallbackHandlePtr
 SecretManagerImpl::addSecretLifecycleCallbacks(SecretLifecycleCallbacks& callbacks) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  // Replay the names that already have a delivered secret, once per name.
-  absl::flat_hash_set<absl::string_view> replayed;
-  for (const auto& provider : certificate_providers_.allSecretProviders()) {
-    if (provider->secret() != nullptr &&
-        replayed.insert(provider->secretData().resource_name_).second) {
-      callbacks.onSecretAddOrUpdate(provider->secretData().resource_name_);
-    }
+  // Replay the names whose removal will be reported.
+  for (const std::string& name : certificate_providers_.deliveredNames()) {
+    callbacks.onSecretAddOrUpdate(name);
   }
   return secret_lifecycle_callbacks_.add([&callbacks](absl::string_view name, bool removed) {
     if (removed) {

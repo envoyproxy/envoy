@@ -70,12 +70,11 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_listener_add_or_update",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_listener_removal",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
-        "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_secret_add_or_update",
-        "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_secret_removal",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_server_initialized",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_shutdown",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_timer_fired",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_worker_initialized",
+        "//test/extensions/dynamic_modules/test_data/c:bootstrap_optional_hooks",
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     rbe_pool = {

@@ -539,7 +539,9 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// This must be called on the main thread, during or after `on_server_initialized`. Calls before
   /// that return `false`.
   ///
-  /// This should be called at most once. Subsequent calls are no-ops and return `false`.
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`. This
+  /// also returns `false` once the server began to shut down and when Envoy runs with
+  /// `--mode init_only`.
   fn enable_secret_lifecycle(&self) -> bool;
 
   /// Enables or disables [`BootstrapExtensionConfig::on_xds_update`] notifications.
@@ -1003,8 +1005,8 @@ pub trait BootstrapExtensionConfig: Send + Sync {
 
   /// This is called each time a dynamic TLS certificate provider stores a secret, on first
   /// delivery and on every rotation. A name can be held by several providers, so this can repeat
-  /// for the same name. The provider has stored the secret, which does not mean the TLS contexts
-  /// that use it already serve it.
+  /// for the same name, and a rotation that a TLS context rejects can repeat on later file events.
+  /// The provider has stored the secret; the TLS contexts may never serve it.
   ///
   /// This is only called if the module has opted in via
   /// [`EnvoyBootstrapExtensionConfig::enable_secret_lifecycle`]. The callback is invoked on the
@@ -1020,8 +1022,9 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   }
 
   /// This is called when the last dynamic TLS certificate provider for a name that delivered a
-  /// secret leaves Envoy, which happens when the last listener or cluster that references it is
-  /// removed. A delta xDS removal of the resource does not trigger it.
+  /// secret is destroyed, such as when the last listener or cluster that references it is removed,
+  /// or when an on-demand certificate selector drops it after a delta xDS removal. The name can
+  /// leave the active resource names before this is called.
   ///
   /// This is only called if the module has opted in via
   /// [`EnvoyBootstrapExtensionConfig::enable_secret_lifecycle`]. The callback is invoked on the

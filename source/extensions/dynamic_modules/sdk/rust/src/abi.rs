@@ -10503,6 +10503,57 @@ unsafe extern "C" {
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
+    /** envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update is called each time a dynamic
+ (SDS) TLS certificate provider stores a secret, on first delivery and on every rotation. Only TLS
+ certificates fire; certificate validation contexts, session ticket keys and generic secrets do
+ not, although envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names lists
+ them. Secrets are independent xDS resources, so this fires even when no cluster or listener is
+ re-pushed.
+
+ A name can be held by several providers (one per config source and warming mode), so this can
+ repeat for the same name, and a rotation that a TLS context rejects can repeat on later file
+ events. The event means the provider stored the secret; the TLS contexts may never serve it.
+
+ This hook is optional. It is only called if the module has opted in to receiving secret lifecycle
+ events via envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle. The
+ callback is registered on the main thread and invoked on the main thread.
+
+ @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ object.
+ @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ @param secret_name is the name of the secret that became active or was updated.*/
+    pub fn envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update(
+        extension_config_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+        extension_config_module_ptr: envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+        secret_name: envoy_dynamic_module_type_envoy_buffer,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_on_bootstrap_extension_secret_removal is called when the last dynamic (SDS)
+ TLS certificate provider for a name is destroyed, such as when the last listener or cluster that
+ references it is removed, or when an on-demand certificate selector drops it after a delta xDS
+ removal. It fires only for a name that delivered a secret, and the name can leave the active
+ resource names before it fires.
+
+ This hook is optional. It is only called if the module has opted in to receiving secret lifecycle
+ events via envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle. The
+ callback is registered on the main thread and invoked on the main thread.
+
+ @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ object.
+ @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ @param secret_name is the name of the secret that was removed.*/
+    pub fn envoy_dynamic_module_on_bootstrap_extension_secret_removal(
+        extension_config_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+        extension_config_module_ptr: envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+        secret_name: envoy_dynamic_module_type_envoy_buffer,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
     /** Optional main-thread hook for gRPC xDS outcomes, enabled with
  envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications.
 
@@ -11346,6 +11397,31 @@ unsafe extern "C" {
         name_fn: envoy_dynamic_module_type_bootstrap_active_resource_name_fn,
         user_data: *mut ::std::os::raw::c_void,
     );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle is called by the
+ module to opt in to receiving secret lifecycle events
+ (envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update and
+ envoy_dynamic_module_on_bootstrap_extension_secret_removal).
+
+ Before this returns, envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update is invoked
+ once for each name that already has a delivered secret. A module must not hold a lock or borrow
+ across this call that the hook also takes.
+
+ This must be called on the main thread, during or after
+ envoy_dynamic_module_on_bootstrap_extension_server_initialized. Calls before that return false;
+ the validation server never reaches that point.
+
+ This should be called at most once. Subsequent calls are no-ops and return false. This also
+ returns false once the server began to shut down and when Envoy runs with --mode init_only.
+
+ @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ object.
+ @return true if the secret lifecycle callbacks were successfully registered, false otherwise.*/
+    pub fn envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle(
+        extension_config_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    ) -> bool;
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
