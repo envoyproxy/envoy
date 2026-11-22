@@ -936,7 +936,7 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigSnapshotRust) {
     return dump;
   };
   auto snapshot = collect("/snapshot");
-  ASSERT_EQ(2, snapshot.configs_size());
+  ASSERT_EQ(3, snapshot.configs_size());
   envoy::admin::v3::ClustersConfigDump clusters;
   ASSERT_TRUE(snapshot.configs(0).UnpackTo(&clusters));
   ASSERT_EQ(2, clusters.static_clusters_size());
@@ -947,8 +947,18 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigSnapshotRust) {
     cluster_names.push_back(cluster.name());
   }
   EXPECT_THAT(cluster_names, testing::UnorderedElementsAre("cluster_0", "snapshot_extra"));
+  envoy::admin::v3::EndpointsConfigDump endpoints;
+  ASSERT_TRUE(snapshot.configs(1).UnpackTo(&endpoints));
+  ASSERT_EQ(2, endpoints.static_endpoint_configs_size());
+  std::vector<std::string> endpoint_cluster_names;
+  for (const auto& entry : endpoints.static_endpoint_configs()) {
+    envoy::config::endpoint::v3::ClusterLoadAssignment assignment;
+    ASSERT_TRUE(entry.endpoint_config().UnpackTo(&assignment));
+    endpoint_cluster_names.push_back(assignment.cluster_name());
+  }
+  EXPECT_THAT(endpoint_cluster_names, testing::UnorderedElementsAre("cluster_0", "snapshot_extra"));
   envoy::admin::v3::ListenersConfigDump listeners;
-  ASSERT_TRUE(snapshot.configs(1).UnpackTo(&listeners));
+  ASSERT_TRUE(snapshot.configs(2).UnpackTo(&listeners));
   ASSERT_EQ(1, listeners.dynamic_listeners_size());
   envoy::config::listener::v3::Listener listener;
   ASSERT_TRUE(listeners.dynamic_listeners(0).active_state().listener().UnpackTo(&listener));
@@ -956,13 +966,24 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigSnapshotRust) {
   EXPECT_FALSE(listener.filter_chains().empty());
 
   snapshot = collect("/snapshot?filtered");
-  ASSERT_EQ(2, snapshot.configs_size());
+  ASSERT_EQ(3, snapshot.configs_size());
   ASSERT_TRUE(snapshot.configs(0).UnpackTo(&clusters));
   ASSERT_EQ(1, clusters.static_clusters_size());
   envoy::config::cluster::v3::Cluster cluster;
   ASSERT_TRUE(clusters.static_clusters(0).cluster().UnpackTo(&cluster));
   EXPECT_EQ("cluster_0", cluster.name());
-  ASSERT_TRUE(snapshot.configs(1).UnpackTo(&listeners));
+  ASSERT_TRUE(snapshot.configs(1).UnpackTo(&endpoints));
+  ASSERT_EQ(1, endpoints.static_endpoint_configs_size());
+  envoy::config::endpoint::v3::ClusterLoadAssignment assignment;
+  ASSERT_TRUE(endpoints.static_endpoint_configs(0).endpoint_config().UnpackTo(&assignment));
+  EXPECT_EQ("cluster_0", assignment.cluster_name());
+  ASSERT_EQ(1, assignment.endpoints_size());
+  const auto& locality = assignment.endpoints(0);
+  ASSERT_EQ(1, locality.lb_endpoints_size());
+  const auto& address = locality.lb_endpoints(0).endpoint().address().socket_address();
+  EXPECT_EQ(fake_upstreams_[0]->localAddress()->ip()->addressAsString(), address.address());
+  EXPECT_EQ(fake_upstreams_[0]->localAddress()->ip()->port(), address.port_value());
+  ASSERT_TRUE(snapshot.configs(2).UnpackTo(&listeners));
   EXPECT_EQ(0, listeners.dynamic_listeners_size());
 }
 
