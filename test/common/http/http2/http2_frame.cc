@@ -180,6 +180,17 @@ Http2Frame Http2Frame::makeHeadersFrameNoStatus(uint32_t stream_index) {
   return frame;
 }
 
+Http2Frame Http2Frame::makeHeadersFrameWithHeaders(uint32_t stream_index,
+                                                   const std::vector<Header>& headers,
+                                                   HeadersFlags flags) {
+  Http2Frame frame = makeEmptyHeadersFrame(stream_index, flags);
+  for (const auto& header : headers) {
+    frame.appendHeaderWithoutIndexing(header);
+  }
+  frame.adjustPayloadSize();
+  return frame;
+}
+
 Http2Frame Http2Frame::makeHeadersFrameWithStatus(std::string status, uint32_t stream_index,
                                                   HeadersFlags flags) {
   Http2Frame frame;

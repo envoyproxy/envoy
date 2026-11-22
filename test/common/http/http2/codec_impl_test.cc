@@ -109,27 +109,6 @@ private:
   Http::ServerHeaderValidator* header_validator_{nullptr};
   Http::ResponseEncoder* response_encoder_{nullptr};
 };
-
-// Builds a HEADERS frame that carries `fields` in the given order, encoded as HPACK literals
-// without indexing so that the peer's HPACK dynamic table is not affected.
-Http2Frame makeHeadersFrameWithFieldOrder(uint32_t stream_id,
-                                          const std::vector<Http2Frame::Header>& fields,
-                                          bool end_stream) {
-  std::string block;
-  for (const auto& field : fields) {
-    // The lengths are encoded as single-byte HPACK integers.
-    ASSERT(field.key_.size() < 127 && field.value_.size() < 127);
-    block.push_back('\0');
-    block.push_back(static_cast<char>(field.key_.size()));
-    block.append(field.key_);
-    block.push_back(static_cast<char>(field.value_.size()));
-    block.append(field.value_);
-  }
-  const uint8_t flags = end_stream ? orFlags(Http2Frame::HeadersFlags::EndStream,
-                                             Http2Frame::HeadersFlags::EndHeaders)
-                                   : orFlags(Http2Frame::HeadersFlags::EndHeaders);
-  return Http2Frame::makeRawFrame(Http2Frame::Type::Headers, flags, stream_id, block);
-}
 } // namespace
 
 enum class Http2Impl {
@@ -5411,13 +5390,12 @@ TEST_P(Http2CodecImplTest, PseudoHeaderAfterRegularHeaderInRequest) {
   initialize();
   driveToCompletion();
 
-  const Http2Frame request = makeHeadersFrameWithFieldOrder(Http2Frame::makeClientStreamId(0),
-                                                            {{":method", "GET"},
-                                                             {":scheme", "http"},
-                                                             {":authority", "example.com"},
-                                                             {"x-a", "b"},
-                                                             {":path", "/"}},
-                                                            true);
+  const Http2Frame request = Http2Frame::makeHeadersFrameWithHeaders(
+      Http2Frame::makeClientStreamId(0), {{":method", "GET"},
+                                          {":scheme", "http"},
+                                          {":authority", "example.com"},
+                                          {"x-a", "b"},
+                                          {":path", "/"}});
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(0);
   Buffer::OwnedImpl data;
@@ -5436,13 +5414,12 @@ TEST_P(Http2CodecImplTest, PseudoHeaderAfterRegularHeaderInRequestStreamError) {
   initialize();
   driveToCompletion();
 
-  const Http2Frame request = makeHeadersFrameWithFieldOrder(Http2Frame::makeClientStreamId(0),
-                                                            {{":method", "GET"},
-                                                             {":scheme", "http"},
-                                                             {"x-a", "b"},
-                                                             {":authority", "example.com"},
-                                                             {":path", "/"}},
-                                                            true);
+  const Http2Frame request = Http2Frame::makeHeadersFrameWithHeaders(
+      Http2Frame::makeClientStreamId(0), {{":method", "GET"},
+                                          {":scheme", "http"},
+                                          {"x-a", "b"},
+                                          {":authority", "example.com"},
+                                          {":path", "/"}});
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
@@ -5465,8 +5442,8 @@ TEST_P(Http2CodecImplTest, PseudoHeaderAfterRegularHeaderInResponse) {
   EXPECT_OK(request_encoder_->encodeHeaders(request_headers, true));
   driveToCompletion();
 
-  const Http2Frame response = makeHeadersFrameWithFieldOrder(
-      Http2Frame::makeClientStreamId(0), {{"x-r", "1"}, {":status", "200"}}, true);
+  const Http2Frame response = Http2Frame::makeHeadersFrameWithHeaders(
+      Http2Frame::makeClientStreamId(0), {{"x-r", "1"}, {":status", "200"}});
 
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(0);
   client_wrapper_->buffer_.add(response.data(), response.size());
@@ -5517,13 +5494,12 @@ TEST_P(Http2CodecImplTest, PseudoHeaderAfterRegularHeaderAllowedWithRuntimeGuard
   initialize();
   driveToCompletion();
 
-  const Http2Frame request = makeHeadersFrameWithFieldOrder(Http2Frame::makeClientStreamId(0),
-                                                            {{":method", "GET"},
-                                                             {":scheme", "http"},
-                                                             {":authority", "example.com"},
-                                                             {"x-a", "b"},
-                                                             {":path", "/"}},
-                                                            true);
+  const Http2Frame request = Http2Frame::makeHeadersFrameWithHeaders(
+      Http2Frame::makeClientStreamId(0), {{":method", "GET"},
+                                          {":scheme", "http"},
+                                          {":authority", "example.com"},
+                                          {"x-a", "b"},
+                                          {":path", "/"}});
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   Buffer::OwnedImpl data;

@@ -162,6 +162,11 @@ public:
       HeadersFlags flags = static_cast<HeadersFlags>(orFlags(HeadersFlags::EndStream,
                                                              HeadersFlags::EndHeaders)));
   // TODO: MakeHeadersFrameWithStatusAndNonStaticHeaders
+  // Encodes `headers` in the given order as literals without indexing.
+  static Http2Frame makeHeadersFrameWithHeaders(
+      uint32_t stream_index, const std::vector<Header>& headers,
+      HeadersFlags flags = static_cast<HeadersFlags>(orFlags(HeadersFlags::EndStream,
+                                                             HeadersFlags::EndHeaders)));
   static Http2Frame makeEmptyContinuationFrame(uint32_t stream_index,
                                                HeadersFlags flags = HeadersFlags::None);
   static Http2Frame makeEmptyDataFrame(uint32_t stream_index, DataFlags flags = DataFlags::None);

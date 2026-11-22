@@ -768,6 +768,7 @@ void ConnectionImpl::ClientStreamImpl::submitHeaders(const HeaderMap& headers, b
 }
 
 Status ConnectionImpl::ClientStreamImpl::onBeginHeaders() {
+  regular_header_received_ = false;
   if (headers_state_ == HeadersState::Headers) {
     allocTrailers();
   }
@@ -787,6 +788,7 @@ void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers, b
 }
 
 Status ConnectionImpl::ServerStreamImpl::onBeginHeaders() {
+  regular_header_received_ = false;
   if (headers_state_ != HeadersState::Request) {
     parent_.stats_.trailers_.inc();
     ASSERT(headers_state_ == HeadersState::Headers);
@@ -2016,10 +2018,6 @@ bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t
 }
 
 bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_id) {
-  StreamImpl* stream = connection_->getStreamUnchecked(stream_id);
-  if (stream != nullptr) {
-    stream->regular_header_received_ = false;
-  }
   Status status = connection_->onBeginHeaders(stream_id);
   return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
 }
@@ -2035,7 +2033,7 @@ OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId str
   // 8.3), and the header map does not preserve that order for later validation. nghttp2 rejects
   // such header blocks before calling the visitor.
   if (connection_->reject_pseudo_header_after_regular_header_) {
-    if (name_view.empty() || name_view[0] != ':') {
+    if (!HeaderUtility::isPseudoHeader(name_view)) {
       stream->regular_header_received_ = true;
     } else if (stream->regular_header_received_) {
       ENVOY_CONN_LOG(debug, "pseudo-header {} after a regular header on stream {}",
