@@ -123,6 +123,22 @@ TEST_F(JsonSanitizerTest, Utf8) {
   sanitizeAndCheckAgainstProtobufJson(unicode({0xc3, 0xa0})); // 'a' with accent grave.
 }
 
+TEST_F(JsonSanitizerTest, Utf8WithEscapesAndZeroCopy) {
+  // Valid non-ASCII UTF-8 without characters requiring escapes is returned without copying.
+  const std::string utf8_plain = absl::StrCat("hello ", Lambda, " ", Omicron);
+  const absl::string_view sanitized_plain = sanitizeAndCheckAgainstProtobufJson(utf8_plain);
+  EXPECT_EQ(utf8_plain.data(), sanitized_plain.data());
+
+  // Valid non-ASCII UTF-8 mixed with ASCII characters requiring escapes.
+  EXPECT_EQ(absl::StrCat("hello \\\"", Lambda, "\\\"\\n\\\\", Omicron, "\\u0001"),
+            sanitizeAndCheckAgainstProtobufJson(
+                absl::StrCat("hello \"", Lambda, "\"\n\\", Omicron, "\x01")));
+
+  // Invalid UTF-8 containing DEL (0x7f) hex-escapes DEL as \u007f.
+  EXPECT_EQ("a\\u007f\\u00ce",
+            sanitizeInvalidAndCheckEscapes(absl::StrCat("a\x7f", truncate(LambdaUtf8))));
+}
+
 TEST_F(JsonSanitizerTest, Interspersed) {
   EXPECT_EQ("a\\bc", sanitizeAndCheckAgainstProtobufJson("a\bc"));
   EXPECT_EQ("a\\b\\fc", sanitizeAndCheckAgainstProtobufJson("a\b\fc"));
