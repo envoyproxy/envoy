@@ -10,6 +10,21 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "endpoint_config_dump_lib",
+    srcs = ["endpoint_config_dump.cc"],
+    hdrs = ["endpoint_config_dump.h"],
+    deps = [
+        "//envoy/common:matchers_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/network:utility_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "cds_api_helper_lib",
     srcs = ["cds_api_helper.cc"],
     hdrs = ["cds_api_helper.h"],

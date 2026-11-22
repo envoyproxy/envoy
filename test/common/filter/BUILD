@@ -27,6 +27,7 @@ envoy_cc_test(
         },
     },
     deps = [
+        "//source/common/config:ecds_subscription_registry_lib",
         "//source/common/config:utility_lib",
         "//source/common/filter:config_discovery_lib",
         "//source/common/json:json_loader_lib",

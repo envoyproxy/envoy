@@ -36,6 +36,7 @@ namespace {
 class FakeUpstreamStreamFilterCallbacks : public Http::UpstreamStreamFilterCallbacks {
 public:
   StreamInfo::StreamInfo& upstreamStreamInfo() override { return stream_info_; }
+  StreamInfo::StreamInfo& downstreamStreamInfo() override { return downstream_stream_info_; }
   OptRef<Router::GenericUpstream> upstream() override { return {}; }
   void dumpState(std::ostream&, int) const override {}
   bool pausedForConnect() const override { return false; }
@@ -55,6 +56,7 @@ public:
   void setUpstreamToDownstream(Router::UpstreamToDownstream&) override {}
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<StreamInfo::MockStreamInfo> downstream_stream_info_;
   Http::ConnectionPool::Instance::StreamOptions options_{false, false};
   Http::UpstreamCallbacks* registered_callbacks_{};
 };

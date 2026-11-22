@@ -24,12 +24,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-exports_files(glob([
-    "custom/envoy*",
-    "custom/arm64/**/*",
-    "custom/x64/**/*",
-]))
-
 # Configurable binary flags
 label_flag(
     name = "envoy-binary",
@@ -142,16 +136,6 @@ genrule(
 )
 
 label_flag(
-    name = "x64-packages",
-    build_setting_default = ":placeholder",
-)
-
-label_flag(
-    name = "arm64-packages",
-    build_setting_default = ":placeholder",
-)
-
-label_flag(
     name = "x64-release",
     build_setting_default = ":placeholder",
 )
@@ -161,8 +145,8 @@ label_flag(
     build_setting_default = ":placeholder",
 )
 
-# The `.deb`/`.changes` files of each arch, signed (with `signing-inputs=debs`) instead of the
-# packages tarballs, eg when they are built in the same invocation (`ci/do_ci.sh release.multiarch`).
+# The `.deb`/`.changes` files of each arch, to sign: they are built in the same invocation
+# (`ci/do_ci.sh release.multiarch`).
 label_flag(
     name = "x64-debs",
     build_setting_default = ":placeholder",
@@ -171,20 +155,6 @@ label_flag(
 label_flag(
     name = "arm64-debs",
     build_setting_default = ":placeholder",
-)
-
-string_flag(
-    name = "signing-inputs",
-    build_setting_default = "tarballs",
-    values = [
-        "debs",
-        "tarballs",
-    ],
-)
-
-config_setting(
-    name = "signing_inputs_debs",
-    flag_values = {":signing-inputs": "debs"},
 )
 
 # Which committed *public* key is bundled as `signing.key`. Deliberately a
@@ -219,60 +189,12 @@ SIGNED_CHANGES = envoy_signed_changes(
         "arm64": ":arm64-debs",
         "x64": ":x64-debs",
     },
-    arch_packages = {
-        "arm64": ":arm64-packages",
-        "x64": ":x64-packages",
-    },
     release_version = release_version_for(VERSION),
     version = VERSION,
 )
 
-_SIGNED_CHANGES_COPY_CMD = "\n    ".join([
-    'cp $(location %s) "$$tmpdir/%s"' % (label, dest)
-    for label, dest in SIGNED_CHANGES
-])
-
-# Bundle the per-arch debs into a single flat debs.tar.gz, replacing unsigned
-# multi-distro `.changes` with signed per-distro `.changes`.
-genrule(
-    name = "multi_arch_debs_tarballs",
-    srcs = [
-        ":arm64-packages",
-        ":x64-packages",
-    ] + [label for label, _dest in SIGNED_CHANGES],
-    outs = ["tarballs/debs.tar.gz"],
-    cmd = """
-    tmpdir=$$(mktemp -d)
-    NEEDS_PATH=
-    if [[ $$(basename $(location :x64-packages)) == "PLACEHOLDER.TXT" ]]; then
-        NEEDS_PATH=1
-    elif [[ $$(basename $(location :arm64-packages)) == "PLACEHOLDER.TXT" ]]; then
-        NEEDS_PATH=1
-    fi
-    if [[ -n $$NEEDS_PATH ]]; then
-        echo "FAIL: You must set //distribution:x64-packages and //distribution:arm64-packages to build multiarch debs" >&2
-        exit 1
-    fi
-    tar xf $(location :x64-packages) -C "$$tmpdir"
-    tar xf $(location :arm64-packages) -C "$$tmpdir"
-    mv "$${tmpdir}/deb/"* "$${tmpdir}"
-    rm -rf "$${tmpdir}/deb/"
-    rm -f "$${tmpdir}"/*.changes
-    %s
-    chmod 0644 "$${tmpdir}"/*
-    tar czf $@ \
-        --owner=0 \
-        --group=0 \
-        --numeric-owner \
-        --mtime='2000-01-01 00:00:00Z' \
-        --sort=name \
-        -C "$${tmpdir}" .
-    """ % _SIGNED_CHANGES_COPY_CMD,
-    tags = ["manual"] + PUBLISH_PACKAGING_TAGS,
-)
-
-# With `signing-inputs=debs`: the `.deb`s of both arches and the signed `.changes`, bundled directly
-# (as `multi_arch_debs_tarballs` does from the packages tarballs).
+# The `.deb`s of both arches in a single flat `debs.tar.gz`, with signed per-distro `.changes` in
+# place of the unsigned multi-distro ones.
 [
     debian_files(
         name = "%s_debs" % arch,
@@ -308,10 +230,7 @@ pkg_tar(
 
 alias(
     name = "multi_arch_debs",
-    actual = select({
-        ":signing_inputs_debs": ":direct/debs",
-        "//conditions:default": ":multi_arch_debs_tarballs",
-    }),
+    actual = ":direct/debs",
     tags = ["manual"],
 )
 

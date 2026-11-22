@@ -13,6 +13,16 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
+    name = "ecds_subscription_registry_test",
+    srcs = ["ecds_subscription_registry_test.cc"],
+    deps = [
+        "//source/common/config:ecds_subscription_registry_lib",
+        "//source/common/singleton:manager_impl_lib",
+        "//test/test_common:status_utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "decoded_resource_impl_test",
     srcs = ["decoded_resource_impl_test.cc"],
     deps = [
@@ -61,6 +71,7 @@ envoy_cc_test(
     deps = [
         ":grpc_subscription_test_harness",
         "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/config:decoded_resource_lib",
     ],
 )
 
@@ -330,6 +341,7 @@ envoy_cc_test(
         },
     },
     deps = [
+        "//envoy/common:exception_lib",
         "//source/common/config:xds_manager_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",

@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/event/schedulable_cb.h"
@@ -71,12 +72,15 @@ struct WriterResourceState {
   uint64_t warming_update_id = 0;
 };
 
-// The names of the statistics of a writer.
+// The names of the statistics of a writer, and whether it has the ownership statistics.
 struct WriterStatNames {
   // The prefix after dynamic_modules, for example cluster_writer.
   absl::string_view prefix;
   // The gauge of the resources that the module owns, for example clusters_owned.
   absl::string_view owned;
+  // Whether the writer notices when another source takes a resource away from the module, which
+  // the ownership statistics count.
+  bool notices_ownership_loss = true;
 };
 
 struct WriterStats {
@@ -86,8 +90,9 @@ struct WriterStats {
   Stats::Counter& update_superseded_;
   Stats::Counter& update_removed_;
   Stats::Counter& update_failed_;
-  Stats::Counter& update_ownership_lost_;
-  Stats::Counter& ownership_lost_;
+  // Set only for a writer that notices another source taking a resource away from the module.
+  OptRef<Stats::Counter> update_ownership_lost_;
+  OptRef<Stats::Counter> ownership_lost_;
   Stats::Gauge& owned_;
   Stats::Gauge& updates_pending_;
 };
@@ -123,7 +128,7 @@ protected:
    * hook.
    * @param stat_names the names of the statistics.
    * @param resource_type_url the type URL of the resources, whose dependent xDS types a pass holds
-   * back.
+   * back, or empty to hold back none.
    */
   ResourceWriter(absl::string_view extension_name,
                  Server::Configuration::ServerFactoryContext& context,
@@ -132,7 +137,8 @@ protected:
       : config_name_(extension_name.empty() ? "default" : extension_name), context_(context),
         stats_scope_(context.serverScope().store().createScope("")),
         stats_(generateWriterStats(*stats_scope_, config_name_, stat_names)),
-        resource_type_url_(resource_type_url), shared_state_(WriterSharedState::get(context)),
+        resource_type_url_(resource_type_url),
+        shared_state_(resource_type_url.empty() ? nullptr : WriterSharedState::get(context)),
         update_done_(std::move(update_done)),
         apply_callback_(context.mainThreadDispatcher().createSchedulableCallback(
             [this]() { applyQueuedOperations(); })),
@@ -328,7 +334,9 @@ protected:
       stats_.update_failed_.inc();
       break;
     case WriteOutcome::OwnershipLost:
-      stats_.update_ownership_lost_.inc();
+      // Only a writer that notices another source taking a resource reports this outcome, and such
+      // a writer has the ownership statistics.
+      stats_.update_ownership_lost_->inc();
       break;
     }
     if (update_done_ == nullptr) {
@@ -355,7 +363,9 @@ protected:
     shut_down_ = true;
     apply_callback_->cancel();
     deliver_callback_->cancel();
-    shared_state_->onShutdown(this);
+    if (shared_state_ != nullptr) {
+      shared_state_->onShutdown(this);
+    }
     states_.clear();
     queue_.clear();
     undelivered_outcomes_.clear();
@@ -401,8 +411,10 @@ private:
     TimeSource& time_source = context_.mainThreadDispatcher().timeSource();
     // Send the requests of the xDS types that a burst of written resources depends on together, as
     // the xDS API of the resources does.
-    shared_state_->pauseDependentTypes(resource_type_url_, context_.xdsManager(),
-                                       time_source.monotonicTime());
+    if (shared_state_ != nullptr) {
+      shared_state_->pauseDependentTypes(resource_type_url_, context_.xdsManager(),
+                                         time_source.monotonicTime());
+    }
     // Operations queued while this pass runs wait for the next pass, so that every pass ends.
     const uint64_t sequence_cutoff = next_sequence_;
     const MonotonicTime deadline = time_source.monotonicTime() + WriterApplyPassBudget;
@@ -426,7 +438,9 @@ private:
       }
       applied_any = true;
     }
-    shared_state_->onApplyPassDone(this, queue_.empty(), time_source.monotonicTime());
+    if (shared_state_ != nullptr) {
+      shared_state_->onApplyPassDone(this, queue_.empty(), time_source.monotonicTime());
+    }
     onPassApplied();
     scheduleApplyPass();
   }
@@ -447,6 +461,7 @@ private:
   bool clusters_initialized_ = false;
   absl::string_view applying_name_;
   const std::string resource_type_url_;
+  // Null when the writer holds back no xDS types.
   const std::shared_ptr<WriterSharedState> shared_state_;
   const UpdateDoneCallback update_done_;
   std::vector<UpdateOutcome> undelivered_outcomes_;
