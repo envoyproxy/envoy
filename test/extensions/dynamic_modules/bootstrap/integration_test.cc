@@ -1406,6 +1406,7 @@ resources:
                                   {"info", "Secret lifecycle enabled: true"},
                                   {"info", "Secret added or updated: secret_0"}}),
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_secret_lifecycle_test"));
+  EXPECT_LOG_NOT_CONTAINS("info", "Secret removed: secret_0", { test_server_.reset(); });
 }
 
 // Verifies the module observes a secret rotation. After the initial add, rewriting the SDS file

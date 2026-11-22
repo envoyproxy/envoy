@@ -10102,7 +10102,12 @@ void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
  *
  * A name can be held by several providers (one per config source and warming mode), so this can
  * repeat for the same name, and a rotation that a TLS context rejects can repeat on later file
- * events. The event means the provider stored the secret; the TLS contexts may never serve it.
+ * events or polls. The event means the provider stored the secret; the TLS contexts may never
+ * serve it.
+ *
+ * Config snapshot collection returns NotAllowed during this hook, including the replay inside
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle. Defer collection with
+ * the bootstrap config scheduler.
  *
  * This hook is optional. It is only called if the module has opted in to receiving secret lifecycle
  * events via envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle. The
@@ -10123,8 +10128,13 @@ void envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update(
  * envoy_dynamic_module_on_bootstrap_extension_secret_removal is called when the last dynamic (SDS)
  * TLS certificate provider for a name is destroyed, such as when the last listener or cluster that
  * references it is removed, or when an on-demand certificate selector drops it after a delta xDS
- * removal. It fires only for a name that delivered a secret, and the name can leave the active
- * resource names before it fires.
+ * removal. A delta xDS removal alone does not fire it while a listener or cluster still holds a
+ * provider for the name, and a name held only by a draining listener or filter chain fires when
+ * the drain ends. It fires only for a name that delivered a secret, and the name can leave the
+ * active resource names before it fires.
+ *
+ * Config snapshot collection returns NotAllowed during this hook. Defer collection with the
+ * bootstrap config scheduler.
  *
  * This hook is optional. It is only called if the module has opted in to receiving secret lifecycle
  * events via envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle. The
@@ -10975,15 +10985,16 @@ void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names
  * envoy_dynamic_module_on_bootstrap_extension_secret_removal).
  *
  * Before this returns, envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update is invoked
- * once for each name that already has a delivered secret. A module must not hold a lock or borrow
- * across this call that the hook also takes.
+ * once for each name that has delivered a secret. A module must not hold a lock or borrow across
+ * this call that the hook also takes.
  *
  * This must be called on the main thread, during or after
  * envoy_dynamic_module_on_bootstrap_extension_server_initialized. Calls before that return false;
  * the validation server never reaches that point.
  *
  * This should be called at most once. Subsequent calls are no-ops and return false. This also
- * returns false once the server began to shut down and when Envoy runs with --mode init_only.
+ * returns false once the server began to shut down, when Envoy runs with --mode init_only, and when
+ * the module implements neither secret lifecycle hook.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.

@@ -374,10 +374,10 @@ public:
   OnBootstrapExtensionListenerAddOrUpdateType on_bootstrap_extension_listener_add_or_update_ =
       nullptr;
   OnBootstrapExtensionListenerRemovalType on_bootstrap_extension_listener_removal_ = nullptr;
-  OnBootstrapExtensionSecretAddOrUpdateType on_bootstrap_extension_secret_add_or_update_ = nullptr;
-  OnBootstrapExtensionSecretRemovalType on_bootstrap_extension_secret_removal_ = nullptr;
 
   // The following hooks are optional and stay nullptr when the module does not implement them.
+  OnBootstrapExtensionSecretAddOrUpdateType on_bootstrap_extension_secret_add_or_update_ = nullptr;
+  OnBootstrapExtensionSecretRemovalType on_bootstrap_extension_secret_removal_ = nullptr;
   OnBootstrapExtensionXdsUpdateType on_bootstrap_extension_xds_update_ = nullptr;
   OnBootstrapExtensionEcdsUpdateType on_bootstrap_extension_ecds_update_ = nullptr;
   OnBootstrapExtensionWorkerEventType on_bootstrap_extension_worker_event_ = nullptr;

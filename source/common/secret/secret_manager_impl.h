@@ -172,6 +172,8 @@ private:
       Common::CallbackHandlePtr update_handle_;
     };
 
+    // Runs at provider creation, with or without an observer, so this update callback precedes
+    // every TLS context's and a rotation that a context rejects is still reported.
     void trackProvider(const std::string& map_key, const std::string& name,
                        SecretType& secret_provider) {
       ++names_[name].providers_;

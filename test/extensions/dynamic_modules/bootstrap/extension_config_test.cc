@@ -330,8 +330,8 @@ TEST_F(ExtensionConfigTest, OptionalSecretLifecycleHooks) {
 }
 
 TEST_F(ExtensionConfigTest, EnableSecretLifecycleRequiresServerInitialized) {
-  auto dynamic_module =
-      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+      testDataDir() + "/libbootstrap_optional_hooks.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
   auto config_or = newDynamicModuleBootstrapExtensionConfig(
       "test", "config", DefaultMetricsNamespace, std::move(dynamic_module.value()), dispatcher_,
@@ -347,6 +347,19 @@ TEST_F(ExtensionConfigTest, EnableSecretLifecycleRequiresServerInitialized) {
   // After initialization it can be enabled once; a second call is a no-op.
   EXPECT_TRUE(config->enableSecretLifecycle());
   EXPECT_FALSE(config->enableSecretLifecycle());
+}
+
+TEST_F(ExtensionConfigTest, EnableSecretLifecycleRequiresHook) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+  auto config_or = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", DefaultMetricsNamespace, std::move(dynamic_module.value()), dispatcher_,
+      context_, context_.store_);
+  ASSERT_TRUE(config_or.ok()) << config_or.status();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config_or.value()->setListenerManager(listener_manager);
+  EXPECT_FALSE(config_or.value()->enableSecretLifecycle());
 }
 
 std::vector<std::string>& recordedSecretEvents() {
@@ -471,6 +484,37 @@ TEST_F(SecretLifecycleExtensionConfigTest, NoEventsAfterShutdownExit) {
   deliver("CERT_A");
   provider.reset();
   EXPECT_TRUE(recordedSecretEvents().empty());
+}
+
+// Enabling replays a name whose delivering provider is gone while another provider for it still
+// waits, so its later removal was announced.
+TEST_F(SecretLifecycleExtensionConfigTest, ReplayFollowsDeliveredState) {
+  auto delivering = createProvider();
+  deliver("CERT_A");
+  envoy::config::core::v3::ConfigSource other_source;
+  other_source.mutable_ads();
+  auto waiting = context_.secretManager().findOrCreateTlsCertificateProvider(
+      other_source, "secret_0", secret_context_.server_context_, init_manager_, true);
+  delivering.reset();
+  auto config = newConfig();
+
+  ASSERT_TRUE(config->enableSecretLifecycle());
+  EXPECT_THAT(recordedSecretEvents(), testing::ElementsAre("add_or_update:secret_0"));
+  waiting.reset();
+  EXPECT_THAT(recordedSecretEvents(),
+              testing::ElementsAre("add_or_update:secret_0", "removal:secret_0"));
+}
+
+// A rotation that a TLS context rejects is still reported, since tracking runs first.
+TEST_F(SecretLifecycleExtensionConfigTest, RejectedRotationStillReported) {
+  auto provider = createProvider();
+  auto rejecting =
+      provider->addUpdateCallback([]() { return absl::InvalidArgumentError("rejected"); });
+  auto config = newConfig();
+  ASSERT_TRUE(config->enableSecretLifecycle());
+
+  EXPECT_THROW(deliver("CERT_A"), EnvoyException);
+  EXPECT_THAT(recordedSecretEvents(), testing::ElementsAre("add_or_update:secret_0"));
 }
 
 // Two extension configs observe the same secret independently.

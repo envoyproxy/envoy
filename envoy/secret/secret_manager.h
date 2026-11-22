@@ -36,8 +36,8 @@ public:
   /**
    * Called each time a dynamic TLS certificate provider stores a secret, on first delivery and on
    * every rotation. A name can be held by several providers (one per config source and warming
-   * mode), so this can repeat for the same name. The provider has stored the secret, which does
-   * not mean the TLS contexts that use it have been updated yet.
+   * mode), so this can repeat for the same name. The provider has stored the secret; the TLS
+   * contexts that use it may never serve it.
    * @param name supplies the secret name. The view is valid only for the duration of the call.
    */
   virtual void onSecretAddOrUpdate(absl::string_view name) PURE;

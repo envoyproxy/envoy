@@ -265,6 +265,11 @@ bool DynamicModuleBootstrapExtensionConfig::enableSecretLifecycle() {
     ENVOY_LOG(error, "cannot enable secret lifecycle once shutdown started or in init only mode");
     return false;
   }
+  if (on_bootstrap_extension_secret_add_or_update_ == nullptr &&
+      on_bootstrap_extension_secret_removal_ == nullptr) {
+    ENVOY_LOG(error, "cannot enable secret lifecycle without a secret lifecycle hook");
+    return false;
+  }
   secret_lifecycle_enabled_ = true;
   // Replays the delivered secrets inline through onSecretAddOrUpdate.
   secret_lifecycle_callbacks_handle_ = context_.secretManager().addSecretLifecycleCallbacks(*this);

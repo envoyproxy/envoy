@@ -533,8 +533,8 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// SDS secrets are independent xDS resources, so these fire even when no cluster or listener is
   /// re-pushed.
   ///
-  /// Before this returns, `on_secret_add_or_update` is called once for each name that already has
-  /// a delivered secret, so do not hold a lock or borrow across this call that the hook also takes.
+  /// Before this returns, `on_secret_add_or_update` is called once for each name that has
+  /// delivered a secret, so do not hold a lock or borrow across this call that the hook also takes.
   ///
   /// This must be called on the main thread, during or after `on_server_initialized`. Calls before
   /// that return `false`.
@@ -1005,8 +1005,12 @@ pub trait BootstrapExtensionConfig: Send + Sync {
 
   /// This is called each time a dynamic TLS certificate provider stores a secret, on first
   /// delivery and on every rotation. A name can be held by several providers, so this can repeat
-  /// for the same name, and a rotation that a TLS context rejects can repeat on later file events.
-  /// The provider has stored the secret; the TLS contexts may never serve it.
+  /// for the same name, and a rotation that a TLS context rejects can repeat on later file events
+  /// or polls. The provider has stored the secret; the TLS contexts may never serve it.
+  ///
+  /// [`EnvoyBootstrapExtensionConfig::get_config_snapshot`] returns
+  /// [`ConfigSnapshotError::NotAllowed`] during this hook, including the replay inside
+  /// [`EnvoyBootstrapExtensionConfig::enable_secret_lifecycle`].
   ///
   /// This is only called if the module has opted in via
   /// [`EnvoyBootstrapExtensionConfig::enable_secret_lifecycle`]. The callback is invoked on the
@@ -1023,8 +1027,13 @@ pub trait BootstrapExtensionConfig: Send + Sync {
 
   /// This is called when the last dynamic TLS certificate provider for a name that delivered a
   /// secret is destroyed, such as when the last listener or cluster that references it is removed,
-  /// or when an on-demand certificate selector drops it after a delta xDS removal. The name can
-  /// leave the active resource names before this is called.
+  /// or when an on-demand certificate selector drops it after a delta xDS removal. A delta xDS
+  /// removal alone does not trigger it while a listener or cluster still holds a provider for the
+  /// name, and a name held only by a draining listener or filter chain is reported when the drain
+  /// ends. The name can leave the active resource names before this is called.
+  ///
+  /// [`EnvoyBootstrapExtensionConfig::get_config_snapshot`] returns
+  /// [`ConfigSnapshotError::NotAllowed`] during this hook.
   ///
   /// This is only called if the module has opted in via
   /// [`EnvoyBootstrapExtensionConfig::enable_secret_lifecycle`]. The callback is invoked on the
