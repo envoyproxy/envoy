@@ -389,6 +389,134 @@ TEST_F(EdsTest, EndpointWeightChangeCausesRebuild) {
   EXPECT_EQ(new_hosts[0]->weight(), 31);
 }
 
+// Verify that an unchanged endpoint keeps its host, and that changes still apply, with host reuse
+// on and off.
+class EdsHostReuseTest : public EdsTest, public testing::WithParamInterface<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(ReuseUnchangedHosts, EdsHostReuseTest, testing::Bool());
+
+TEST_P(EdsHostReuseTest, UnchangedEndpointKeepsHost) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.eds_reuse_unchanged_hosts", GetParam() ? "true" : "false"}});
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  endpoints->mutable_locality()->set_zone("z1");
+  auto* endpoint = endpoints->add_lb_endpoints();
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+  endpoint->mutable_endpoint()->set_hostname("foo");
+  endpoint->mutable_load_balancing_weight()->set_value(30);
+  (*endpoint->mutable_metadata()->mutable_filter_metadata())["x"] =
+      MessageUtil::keyValueStruct("k", "v");
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const HostSharedPtr host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(1UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
+  ASSERT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+
+  endpoint->mutable_load_balancing_weight()->set_value(31);
+  endpoint->set_health_status(envoy::config::core::v3::DEGRADED);
+  (*endpoint->mutable_metadata()->mutable_filter_metadata())["x"] =
+      MessageUtil::keyValueStruct("k", "w");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const HostSharedPtr updated = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_EQ(31, updated->weight());
+  EXPECT_EQ(Host::HealthStatus::DEGRADED, updated->edsHealthStatus());
+  EXPECT_EQ("w",
+            Config::Metadata::metadataValue(updated->metadata().get(), "x", "k").string_value());
+
+  endpoint->mutable_endpoint()->set_hostname("bar");
+  endpoints->mutable_locality()->set_zone("z2");
+  endpoints->set_priority(1);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().empty());
+  const HostSharedPtr moved = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts()[0];
+  EXPECT_EQ("bar", moved->hostname());
+  EXPECT_EQ("z2", moved->locality().zone());
+  EXPECT_EQ(1, moved->priority());
+}
+
+// Every endpoint field a host is built from must either be compared or force a new host.
+TEST_F(EdsTest, EndpointMatchesHostComparesEveryField) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  endpoints->mutable_locality()->set_zone("z1");
+  auto* endpoint = endpoints->add_lb_endpoints();
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+  endpoint->mutable_endpoint()->set_hostname("foo");
+  endpoint->mutable_load_balancing_weight()->set_value(30);
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const HostSharedPtr host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  const envoy::config::endpoint::v3::LocalityLbEndpoints locality = *endpoints;
+  const envoy::config::endpoint::v3::LbEndpoint lb_endpoint = *endpoint;
+  EXPECT_TRUE(EdsClusterImpl::endpointMatchesHost(lb_endpoint, locality, *host->address(), *host));
+
+  using LbEndpoint = envoy::config::endpoint::v3::LbEndpoint;
+  using Locality = envoy::config::endpoint::v3::LocalityLbEndpoints;
+  const std::vector<std::pair<std::function<void(LbEndpoint&)>, std::function<void(Locality&)>>>
+      changes = {
+          {[](LbEndpoint& e) { e.mutable_endpoint()->set_hostname("bar"); }, nullptr},
+          {[](LbEndpoint& e) { e.mutable_endpoint()->set_observability_name("obs"); }, nullptr},
+          {[](LbEndpoint& e) { e.mutable_load_balancing_weight()->set_value(31); }, nullptr},
+          {[](LbEndpoint& e) { e.set_health_status(envoy::config::core::v3::UNHEALTHY); }, nullptr},
+          {[](LbEndpoint& e) {
+             (*e.mutable_metadata()->mutable_filter_metadata())["x"] =
+                 MessageUtil::keyValueStruct("k", "v");
+           },
+           nullptr},
+          {[](LbEndpoint& e) {
+             e.mutable_endpoint()->mutable_health_check_config()->set_port_value(81);
+           },
+           nullptr},
+          {[](LbEndpoint& e) {
+             e.mutable_endpoint()->mutable_health_check_config()->set_hostname("hc");
+           },
+           nullptr},
+          {[](LbEndpoint& e) {
+             e.mutable_endpoint()->mutable_health_check_config()->set_disable_active_health_check(
+                 true);
+           },
+           nullptr},
+          {[](LbEndpoint& e) {
+             auto* address = e.mutable_endpoint()
+                                 ->add_additional_addresses()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+             address->set_address("1.2.3.5");
+             address->set_port_value(80);
+           },
+           nullptr},
+          {nullptr, [](Locality& l) { l.set_priority(1); }},
+          {nullptr, [](Locality& l) { l.mutable_locality()->set_zone("z2"); }},
+          {nullptr, [](Locality& l) { l.mutable_locality()->set_region("r"); }},
+          {nullptr, [](Locality& l) { l.mutable_locality()->set_sub_zone("s"); }},
+      };
+  for (const auto& [change_endpoint, change_locality] : changes) {
+    LbEndpoint changed_endpoint = lb_endpoint;
+    Locality changed_locality = locality;
+    if (change_endpoint) {
+      change_endpoint(changed_endpoint);
+    }
+    if (change_locality) {
+      change_locality(changed_locality);
+    }
+    EXPECT_FALSE(EdsClusterImpl::endpointMatchesHost(changed_endpoint, changed_locality,
+                                                     *host->address(), *host))
+        << changed_endpoint.DebugString() << changed_locality.DebugString();
+  }
+}
+
 // Verify that host weight changes cause a full rebuild.
 TEST_F(EdsTest, DualStackEndpoint) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;

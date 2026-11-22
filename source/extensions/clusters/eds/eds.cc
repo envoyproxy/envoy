@@ -75,6 +75,11 @@ void EdsClusterImpl::startPreInit() { subscription_->start({edsServiceName()}); 
 void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
   absl::flat_hash_set<std::string> all_new_hosts;
   PriorityStateManager priority_state_manager(parent_, parent_.local_info_, &host_update_cb);
+  // Snapshot of the current hosts, used to reuse hosts for unchanged endpoints.
+  const HostLookupMapConstSharedPtr existing_hosts =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.eds_reuse_unchanged_hosts")
+          ? parent_.prioritySet().crossPriorityHostMap()
+          : nullptr;
   for (const auto& locality_lb_endpoint : cluster_load_assignment_.endpoints()) {
     priority_state_manager.initializePriorityFor(locality_lb_endpoint);
 
@@ -89,12 +94,12 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
       ASSERT(it != parent_.leds_localities_.end() && it->second->isUpdated());
       for (const auto& [_, lb_endpoint] : it->second->getEndpointsMap()) {
         updateLocalityEndpoints(lb_endpoint, locality_lb_endpoint, priority_state_manager,
-                                all_new_hosts);
+                                all_new_hosts, existing_hosts.get());
       }
     } else {
       for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
         updateLocalityEndpoints(lb_endpoint, locality_lb_endpoint, priority_state_manager,
-                                all_new_hosts);
+                                all_new_hosts, existing_hosts.get());
       }
     }
   }
@@ -160,7 +165,8 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
 void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
-    PriorityStateManager& priority_state_manager, absl::flat_hash_set<std::string>& all_new_hosts) {
+    PriorityStateManager& priority_state_manager, absl::flat_hash_set<std::string>& all_new_hosts,
+    const HostLookupMap* existing_hosts) {
   const auto address =
       THROW_OR_RETURN_VALUE(parent_.resolveProtoAddress(lb_endpoint.endpoint().address()),
                             const Network::Address::InstanceConstSharedPtr);
@@ -189,9 +195,46 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
     return;
   }
 
+  if (existing_hosts != nullptr) {
+    HostSharedPtr existing_host = existing_hosts->findHost(address_as_string);
+    if (existing_host != nullptr &&
+        EdsClusterImpl::endpointMatchesHost(lb_endpoint, locality_lb_endpoint, *address,
+                                            *existing_host)) {
+      priority_state_manager.registerHostForPriority(existing_host, locality_lb_endpoint);
+      all_new_hosts.emplace(address_as_string);
+      return;
+    }
+  }
+
   priority_state_manager.registerHostForPriority(lb_endpoint.endpoint().hostname(), address,
                                                  address_list, locality_lb_endpoint, lb_endpoint);
   all_new_hosts.emplace(address_as_string);
+}
+
+bool EdsClusterImpl::endpointMatchesHost(
+    const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
+    const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
+    const Network::Address::Instance& address, const Host& host) {
+  const auto& endpoint = lb_endpoint.endpoint();
+  // Endpoints with a health check config or additional addresses always get a new host, so the
+  // health check address, health check hostname and address list are those of a default host.
+  if (endpoint.has_health_check_config() || !endpoint.additional_addresses().empty() ||
+      host.addressListOrNull() != nullptr || host.healthCheckAddress() != host.address() ||
+      !host.hostnameForHealthChecks().empty() || host.disableActiveHealthCheck()) {
+    return false;
+  }
+  // Locality metadata is not compared: updateDynamicHostList() keeps the existing host when only
+  // locality metadata changes, so reusing it gives the same result.
+  const absl::string_view observability_name =
+      endpoint.observability_name().empty() ? address.asStringView()
+                                            : absl::string_view(endpoint.observability_name());
+  return host.hostname() == endpoint.hostname() && host.observabilityName() == observability_name &&
+         host.weight() == std::max(1U, lb_endpoint.load_balancing_weight().value()) &&
+         host.priority() == locality_lb_endpoint.priority() &&
+         host.edsHealthStatus() == lb_endpoint.health_status() &&
+         LocalityEqualTo()(host.locality(), locality_lb_endpoint.locality()) &&
+         host.metadataHash() ==
+             (lb_endpoint.has_metadata() ? MessageUtil::hash(lb_endpoint.metadata()) : 0);
 }
 
 absl::Status
