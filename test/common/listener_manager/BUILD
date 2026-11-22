@@ -238,6 +238,7 @@ envoy_cc_test(
     },
     deps = [
         "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:base64_lib",
         "//source/common/common:cleanup_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:resource_name_lib",
@@ -249,6 +250,7 @@ envoy_cc_test(
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
         "//source/common/tls:ssl_socket_lib",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/matching/network/common:inputs_lib",
@@ -344,6 +346,7 @@ envoy_cc_benchmark_binary(
     srcs = ["filter_chain_benchmark_test.cc"],
     rbe_pool = {"build": "linux_x64_small"},
     deps = [
+        "//source/common/common:base64_lib",
         "//source/common/listener_manager:filter_chain_manager_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",

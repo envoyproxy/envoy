@@ -2,6 +2,7 @@
 
 #include <cerrno>
 #include <chrono>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
@@ -9605,12 +9606,25 @@ filter_chains:
     return socket;
   }
 
-  ListenerHandle* addActiveListener(const envoy::config::listener::v3::Listener& listener_proto) {
+  // Adds an active listener that builds 1 + further_filter_chain_builds filter chains. gMock tries
+  // the newest expectation first, so the listener handle takes the last build.
+  ListenerHandle* addActiveListener(const envoy::config::listener::v3::Listener& listener_proto,
+                                    uint32_t further_filter_chain_builds = 0) {
     ListenerHandle* listener_handle = expectListenerCreate(false, true);
+    for (uint32_t i = 0; i < further_filter_chain_builds; i++) {
+      expectFilterChainBuild();
+    }
     EXPECT_CALL(*worker_, addListener(Eq(std::nullopt), _, _, _, _));
     EXPECT_TRUE(addOrUpdateListener(listener_proto));
     worker_->callAddCompletion();
     return listener_handle;
+  }
+
+  // The listener handle expects one filter chain build, so each further build loads its filters.
+  void expectFilterChainBuild() {
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+        .WillOnce(testing::DoDefault())
+        .RetiresOnSaturation();
   }
 
   // Applies the update in place and returns the drain timer of the replaced listener.
@@ -9705,6 +9719,78 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, AddAddressWithoutReusePort) 
   EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
   drain_timer->invokeCallback();
   worker_->callDrainFilterChainsComplete();
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+// An in place update drains the default filter chain only when it rebuilds or removes it.
+TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, DrainDefaultFilterChainOnlyWhenNotReused) {
+  startWorkers();
+  auto listener_proto = listenerProto({"127.0.0.1"});
+  listener_proto.mutable_default_filter_chain()->set_name("default");
+  // A message comparison never finds a default filter chain holding a NaN equal to itself, so a
+  // drain that compared messages would drain the default filter chain this update reuses.
+  Config::Metadata::mutableMetadataValue(
+      *listener_proto.mutable_default_filter_chain()->mutable_metadata(), "test", "nan")
+      .set_number_value(std::numeric_limits<double>::quiet_NaN());
+  auto socket = expectListenSocket("127.0.0.1:1234");
+  ListenerHandle* listener_foo = addActiveListener(listener_proto, 1);
+
+  listener_proto.mutable_filter_chains(0)->set_name("bar");
+  expectFilterChainBuild();
+  EXPECT_CALL(
+      *worker_,
+      onFilterChainDrain(_, ElementsAre(Pointee(Property(&Network::FilterChain::name, "foo"))), _));
+  updateInPlace(listener_proto);
+
+  listener_proto.mutable_default_filter_chain()->set_name("new_default");
+  expectFilterChainBuild();
+  EXPECT_CALL(*worker_,
+              onFilterChainDrain(
+                  _, ElementsAre(Pointee(Property(&Network::FilterChain::name, "default"))), _));
+  updateInPlace(listener_proto);
+
+  listener_proto.clear_default_filter_chain();
+  EXPECT_CALL(
+      *worker_,
+      onFilterChainDrain(
+          _, ElementsAre(Pointee(Property(&Network::FilterChain::name, "new_default"))), _));
+  updateInPlace(listener_proto);
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+// An in place update keeps a default filter chain whose Any payload arrives serialized in another
+// order.
+TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, KeepDefaultFilterChainWithReserializedAny) {
+  startWorkers();
+  auto listener_proto = listenerProto({"127.0.0.1"});
+  listener_proto.mutable_default_filter_chain()->set_name("default");
+  auto& typed_metadata = (*listener_proto.mutable_default_filter_chain()
+                               ->mutable_metadata()
+                               ->mutable_typed_filter_metadata())["test"];
+  typed_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  // The same struct with its two fields serialized in two orders.
+  typed_metadata.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+  auto socket = expectListenSocket("127.0.0.1:1234");
+  ListenerHandle* listener_foo = addActiveListener(listener_proto, 1);
+
+  auto reserialized_listener_proto = listener_proto;
+  reserialized_listener_proto.mutable_filter_chains(0)->set_name("bar");
+  (*reserialized_listener_proto.mutable_default_filter_chain()
+        ->mutable_metadata()
+        ->mutable_typed_filter_metadata())["test"]
+      .set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  ASSERT_NE(
+      MessageUtil::serializeDeterministically(listener_proto.default_filter_chain()),
+      MessageUtil::serializeDeterministically(reserialized_listener_proto.default_filter_chain()));
+  ASSERT_TRUE(Protobuf::util::MessageDifferencer::Equals(
+      listener_proto.default_filter_chain(), reserialized_listener_proto.default_filter_chain()));
+  expectFilterChainBuild();
+  EXPECT_CALL(
+      *worker_,
+      onFilterChainDrain(_, ElementsAre(Pointee(Property(&Network::FilterChain::name, "foo"))), _));
+  updateInPlace(reserialized_listener_proto);
 
   EXPECT_CALL(*listener_foo, onDestroy());
 }
