@@ -998,10 +998,13 @@ message RouteAction {
     // Specifies the timeout of the mirrored requests, including all retries. If not set, the
     // timeout of the primary request is used. A value of 0 disables the timeout.
     //
-    // When set, the ``x-envoy-expected-rq-timeout-ms`` and ``x-envoy-upstream-rq-timeout-ms``
-    // headers of the primary request are not copied to the mirrored requests, so that the mirror
-    // timeout also applies with :ref:`respect_expected_rq_timeout
-    // <envoy_v3_api_field_extensions.filters.http.router.v3.Router.respect_expected_rq_timeout>`.
+    // When this timeout or a :ref:`retry_policy
+    // <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.retry_policy>` is set,
+    // the ``x-envoy-expected-rq-timeout-ms`` and ``x-envoy-upstream-rq-timeout-ms`` headers of the
+    // primary request are not copied to the mirrored requests, so that this timeout, or the
+    // timeout of the primary request, also applies with :ref:`respect_expected_rq_timeout
+    // <envoy_v3_api_field_extensions.filters.http.router.v3.Router.respect_expected_rq_timeout>`
+    // instead of the per try timeout of the primary request.
     google.protobuf.Duration timeout = 11;
   }
 

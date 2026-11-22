@@ -961,9 +961,10 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
       shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*original_shadow_headers);
     }
     applyShadowPolicyHeaders(shadow_policy, *shadow_headers);
-    if (shadow_policy.timeout().has_value()) {
+    if (shadow_policy.timeout().has_value() || shadow_policy.retryPolicy() != nullptr) {
       // With respect_expected_rq_timeout, the mirror's router would take its timeout from the
-      // headers of the primary request instead of the mirror timeout.
+      // headers of the primary request, which may hold the primary's per try timeout, instead of
+      // the timeout covering all the mirror attempts.
       shadow_headers->removeEnvoyExpectedRequestTimeoutMs();
       shadow_headers->removeEnvoyUpstreamRequestTimeoutMs();
     }
