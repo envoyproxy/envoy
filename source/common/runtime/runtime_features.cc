@@ -35,8 +35,11 @@
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
-// When enabled, the admin filter returns to the event loop between the chunks of a response.
-RUNTIME_GUARD(envoy_reloadable_features_admin_filter_yield_between_chunks);
+
+// When enabled, which is the default, the ALTS transport socket's server-side handshakes talk to
+// the ALTS handshaker service through Envoy's async gRPC client, so a worker thread never waits for
+// the handshaker service. Disable to restore the previous blocking gRPC calls.
+RUNTIME_GUARD(envoy_reloadable_features_alts_async_handshaker);
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_cache_parsed_tls_certificates);
 RUNTIME_GUARD(envoy_reloadable_features_cares_dual_resolution_preserve_failure);
@@ -83,6 +86,9 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_send_rst_on_user_space_socket);
 // Ignore the automated "remove this flag" issue: never remove this before 2027/10. Confirm with
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
+// Ignore the automated "remove this flag" issue: do not remove this before
+// envoy.reloadable_features.filter_manager_per_filter_buffer is removed, since it is
+// still used when that flag is disabled.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_not_send_empty_data_with_false_eos);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_report_client_creation_error);
@@ -101,6 +107,13 @@ RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_added_data_on_con
 // every later filter, instead of dispatching them from the adding filter at the end of the data
 // pass.
 RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_held_trailers);
+// When resuming filter chain iteration, compute end_stream from whether the end of the stream has
+// reached the resuming filter, instead of from the stream-level flag. When enabled,
+// envoy.reloadable_features.ext_proc_inject_data_with_state_update is ignored.
+// TODO(wbpcode): flip to true once per-filter body buffering lands behind this flag. This is the
+// first part of that change (https://github.com/envoyproxy/envoy/pull/48660), so the flag is
+// incomplete until then.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_filter_manager_per_filter_buffer);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
 RUNTIME_GUARD(envoy_reloadable_features_geoip_sanitize_geo_headers);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
@@ -230,6 +243,10 @@ RUNTIME_GUARD(envoy_reloadable_features_use_stats_prefix_scope_for_http_filter);
 RUNTIME_GUARD(envoy_reloadable_features_vhds_answered_alias_cache);
 RUNTIME_GUARD(envoy_reloadable_features_vhds_overrides_rds_virtual_hosts_with_same_name);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
+// When a never-notified SDS watch is added for a secret name that another watch on the same mux
+// already subscribes to, replay the last delivered secret to the new watch instead of waiting for
+// the server to resend it.
+RUNTIME_GUARD(envoy_reloadable_features_xds_replay_cached_resources);
 // This is only needed if sharing c-ares query cache across dns clusters.
 // Disabled by default for now to prevent behavior changes.
 FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
@@ -316,6 +333,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_async_client_downstream_flow_contr
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_rx_queue_overflow_socket_options);
 // TODO(abeyad): Flip to true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_ip_packet_info_socket_options);
+// When enabled, the admin filter returns to the event loop between the chunks of a response.
+// TODO(wbpcode): flip to true after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_admin_filter_yield_between_chunks);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.

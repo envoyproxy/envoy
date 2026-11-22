@@ -111,6 +111,17 @@ public:
     EXPECT_CALL(callbacks_, encodeData(BufferString(std::string(data)), end_stream));
   }
 
+  // The guard is latched when the filter is created.
+  AdminFilter& createYieldingFilter() {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.admin_filter_yield_between_chunks", "true"}});
+    yielding_filter_ = std::make_unique<AdminFilter>(admin_);
+    yielding_filter_->setDecoderFilterCallbacks(callbacks_);
+    return *yielding_filter_;
+  }
+
+  TestScopedRuntime scoped_runtime_;
+  std::unique_ptr<AdminFilter> yielding_filter_;
   bool request_destroyed_{false};
 };
 
@@ -119,12 +130,13 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminFilterChunkedTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminFilterChunkedTest, YieldsToEventLoopBetweenChunks) {
+  AdminFilter& filter = createYieldingFilter();
   expectCountingRequest(3);
   auto* next_chunk_cb = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
   expectData("0", false);
-  filter_.decodeHeaders(request_headers_, true);
+  filter.decodeHeaders(request_headers_, true);
   EXPECT_TRUE(next_chunk_cb->enabled_);
 
   expectData("1", false);
@@ -135,38 +147,37 @@ TEST_P(AdminFilterChunkedTest, YieldsToEventLoopBetweenChunks) {
   next_chunk_cb->invokeCallback();
   EXPECT_FALSE(next_chunk_cb->enabled_);
   EXPECT_TRUE(request_destroyed_);
-  filter_.onDestroy();
+  filter.onDestroy();
 }
 
 TEST_P(AdminFilterChunkedTest, DestroyCancelsRemainingChunks) {
+  AdminFilter& filter = createYieldingFilter();
   expectCountingRequest(3);
   testing::MockFunction<void()> cb_destroyed;
   new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_, &cb_destroyed);
 
   expectData("0", false);
-  filter_.decodeHeaders(request_headers_, true);
+  filter.decodeHeaders(request_headers_, true);
   EXPECT_FALSE(request_destroyed_);
 
   EXPECT_CALL(cb_destroyed, Call());
-  filter_.onDestroy();
+  filter.onDestroy();
   EXPECT_TRUE(request_destroyed_);
 }
 
 TEST_P(AdminFilterChunkedTest, ResetWhileEncodingStopsChunks) {
+  AdminFilter& filter = createYieldingFilter();
   expectCountingRequest(3);
   EXPECT_CALL(callbacks_.dispatcher_, createSchedulableCallback_(_)).Times(0);
   // The stream is reset from under encodeData().
-  EXPECT_CALL(callbacks_, encodeData(_, false)).WillOnce([this](Buffer::Instance&, bool) {
-    filter_.onDestroy();
+  EXPECT_CALL(callbacks_, encodeData(_, false)).WillOnce([&filter](Buffer::Instance&, bool) {
+    filter.onDestroy();
   });
-  filter_.decodeHeaders(request_headers_, true);
+  filter.decodeHeaders(request_headers_, true);
   EXPECT_TRUE(request_destroyed_);
 }
 
-TEST_P(AdminFilterChunkedTest, AllChunksAtOnceWithRuntimeGuardDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.admin_filter_yield_between_chunks", "false"}});
+TEST_P(AdminFilterChunkedTest, AllChunksAtOnceByDefault) {
   expectCountingRequest(3);
   EXPECT_CALL(callbacks_.dispatcher_, createSchedulableCallback_(_)).Times(0);
 
@@ -174,6 +185,17 @@ TEST_P(AdminFilterChunkedTest, AllChunksAtOnceWithRuntimeGuardDisabled) {
   expectData("0", false);
   expectData("1", false);
   expectData("2", true);
+  filter_.decodeHeaders(request_headers_, true);
+  EXPECT_TRUE(request_destroyed_);
+  filter_.onDestroy();
+}
+
+TEST_P(AdminFilterChunkedTest, ResetWhileEncodingStopsChunksByDefault) {
+  expectCountingRequest(3);
+  // The stream is reset from under encodeData(), so the remaining chunks are dropped.
+  EXPECT_CALL(callbacks_, encodeData(_, false)).WillOnce([this](Buffer::Instance&, bool) {
+    filter_.onDestroy();
+  });
   filter_.decodeHeaders(request_headers_, true);
   EXPECT_TRUE(request_destroyed_);
 }

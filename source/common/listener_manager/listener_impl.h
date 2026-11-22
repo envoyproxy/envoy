@@ -259,12 +259,14 @@ public:
    * @param workers_started supplies whether the listener is being added before or after workers
    *        have been started. This controls various behavior related to init management.
    * @param hash supplies the hash to use for duplicate checking.
+   * @param serialized_hash supplies the hash of the deterministic serialization of config, which
+   *        duplicate checking compares before hash.
    * @param concurrency is the number of listeners instances to be created.
    */
   static absl::StatusOr<std::unique_ptr<ListenerImpl>>
   create(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
          ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-         bool workers_started, uint64_t hash);
+         bool workers_started, uint64_t hash, uint64_t serialized_hash);
   ~ListenerImpl() override;
 
   // The kind of in place update that supportUpdateFilterChain() allows.
@@ -280,7 +282,7 @@ public:
   absl::StatusOr<std::unique_ptr<ListenerImpl>>
   newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
                              const std::string& version_info, bool workers_started, uint64_t hash,
-                             InPlaceUpdate in_place_update);
+                             uint64_t serialized_hash, InPlaceUpdate in_place_update);
   /**
    * Determine if in place filter chain update could be executed at this moment.
    * @return the kind of in place update to the new config, or None if it must replace the entire
@@ -336,6 +338,16 @@ public:
     return (new_hash == maybe_stale_hash_) || !added_via_api_;
   }
   bool blockRemove() { return !added_via_api_; }
+
+  /**
+   * @return the hash of the deterministic serialization of the config this listener was built from,
+   *         or of the last update that blockLdsUpdate() blocked, which the revert and duplicate
+   *         checks compare before MessageUtil::hash().
+   */
+  uint64_t serializedConfigHash() const { return serialized_config_hash_; }
+  void setSerializedConfigHash(uint64_t serialized_config_hash) {
+    serialized_config_hash_ = serialized_config_hash;
+  }
 
   const std::vector<Network::Address::InstanceConstSharedPtr>& addresses() const {
     return addresses_;
@@ -454,8 +466,9 @@ public:
 private:
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash, Stats::ScopeSharedPtr scope,
-               Stats::ScopeSharedPtr listener_scope, absl::Status& creation_status);
+               bool workers_started, uint64_t hash, uint64_t serialized_hash,
+               Stats::ScopeSharedPtr scope, Stats::ScopeSharedPtr listener_scope,
+               absl::Status& creation_status);
   struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
     UdpListenerConfigImpl(const envoy::config::listener::v3::UdpListenerConfig config)
         : config_(config) {}
@@ -507,7 +520,8 @@ private:
   ListenerImpl(ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
                const std::string& version_info, ListenerManagerImpl& parent,
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
-               bool in_place_address_update, absl::Status& creation_status);
+               uint64_t serialized_hash, bool in_place_address_update,
+               absl::Status& creation_status);
   // Determine if the in place update could also change the addresses of this listener.
   bool supportUpdateAddresses(const envoy::config::listener::v3::Listener& new_config) const;
   // Helpers for constructor.
@@ -573,6 +587,10 @@ private:
   // The hash does not cover the FCDS filter chains. It is only used to skip the LDS updates that
   // do not change the listener config.
   const uint64_t maybe_stale_hash_;
+  // The hash of the deterministic serialization of the config this listener was built from, or of
+  // the last update that blockLdsUpdate() blocked. A push of the same bytes matches it without
+  // MessageUtil::hash().
+  uint64_t serialized_config_hash_;
   const uint32_t tcp_backlog_size_;
   const uint32_t max_connections_to_accept_per_socket_event_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;

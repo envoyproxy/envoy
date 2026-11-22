@@ -104,6 +104,7 @@ envoy_extension_cc_test(
         "//envoy/router:string_accessor_interface",
         "//envoy/stream_info:uint64_accessor_interface",
         "//source/common/network:utility_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",

@@ -237,6 +237,9 @@ public:
   // Returns a handle to the upstream stream's stream info.
   virtual StreamInfo::StreamInfo& upstreamStreamInfo() PURE;
 
+  // Returns a handle to the downstream stream's stream info.
+  virtual StreamInfo::StreamInfo& downstreamStreamInfo() PURE;
+
   // Returns the WebTransport session of the *downstream* stream paired with this upstream request,
   // if any. Used by the upstream WebTransport codec to obtain the downstream session so it can
   // bridge the two. Defaults to an empty OptRef for non-WebTransport streams.

@@ -67,17 +67,20 @@ private:
   void onComplete();
 
   /**
-   * Encodes the next chunk of request_, and schedules the one after it on a later event loop
-   * iteration, so a large response does not block the main thread.
+   * Encodes the next chunk of request_.
+   * @return true if there are more chunks to encode and the stream is still alive.
    */
-  void encodeNextChunk();
+  bool encodeNextChunk();
 
   /**
-   * Schedules encodeNextChunk() on the next event loop iteration.
+   * Schedules encodeNextChunk() on the next event loop iteration, so a large response does not
+   * block the main thread.
    */
   void scheduleNextChunk();
 
   const Admin& admin_;
+  // Latched at construction so the runtime guard is not re-read for every request chunk.
+  const bool yield_between_chunks_;
   Http::RequestHeaderMap* request_headers_{};
   std::list<std::function<void()>> on_destroy_callbacks_;
   bool end_stream_on_complete_ = true;

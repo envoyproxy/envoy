@@ -25,6 +25,7 @@
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #endif
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -168,6 +169,20 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
 }
 
+namespace {
+
+// Returns true if the filter chain messages serialize to the same bytes or are equal. The bytes are
+// compared first, so that the reflection-based comparison only runs for messages that change or
+// serialize differently.
+bool filterChainMessagesEqual(const envoy::config::listener::v3::FilterChain& lhs,
+                              const envoy::config::listener::v3::FilterChain& rhs) {
+  return MessageUtil::serializeDeterministically(lhs) ==
+             MessageUtil::serializeDeterministically(rhs) ||
+         Protobuf::util::MessageDifferencer::Equals(lhs, rhs);
+}
+
+} // namespace
+
 absl::Status FilterChainManagerImpl::addFilterChains(
     const xds::type::matcher::v3::Matcher* filter_chain_matcher,
     absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
@@ -181,25 +196,37 @@ absl::Status FilterChainManagerImpl::addFilterChains(
   FilterChainsByMatcher filter_chains;
   uint32_t new_filter_chain_size = 0;
   FilterChainsByName filter_chains_by_name;
+  const auto* origin = getOriginFilterChainManager();
 
+  FcContextsByMessageHash origin_fc_contexts;
+  if (origin != nullptr) {
+    origin_fc_contexts.reserve(origin->fc_contexts_.size());
+    for (const auto& origin_fc_context : origin->fc_contexts_) {
+      origin_fc_contexts[origin_fc_context.second.message_hash].push_back(&origin_fc_context);
+    }
+  }
+
+  fc_contexts_.reserve(filter_chain_span.size());
   for (const auto& filter_chain : filter_chain_span) {
     RETURN_IF_NOT_OK(verifyNoDuplicateMatchers(filter_chain_matcher, filter_chains, *filter_chain));
 
     // Reuse created filter chain if possible.
     // FilterChainManager maintains the lifetime of FilterChainFactoryContext
     // ListenerImpl maintains the dependencies of FilterChainFactoryContext
-    auto filter_chain_impl = findExistingFilterChain(*filter_chain);
-    if (filter_chain_impl == nullptr) {
+    std::string serialized_message = MessageUtil::serializeDeterministically(*filter_chain);
+    FcContext fc_context =
+        findExistingFilterChain(*filter_chain, serialized_message, origin_fc_contexts);
+    if (fc_context.filter_chain == nullptr) {
       auto filter_chain_or_error =
           filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator, false);
       RETURN_IF_NOT_OK(filter_chain_or_error.status());
-      filter_chain_impl = filter_chain_or_error.value();
+      fc_context.filter_chain = filter_chain_or_error.value();
       ++new_filter_chain_size;
     }
 
     RETURN_IF_NOT_OK(setupFilterChainMatcher(filter_chain_matcher, filter_chains_by_name,
-                                             *filter_chain, filter_chain_impl));
-    fc_contexts_[*filter_chain] = filter_chain_impl;
+                                             *filter_chain, fc_context.filter_chain));
+    fc_contexts_[std::move(serialized_message)] = std::move(fc_context);
   }
   RETURN_IF_NOT_OK(convertIPsToTries());
   RETURN_IF_NOT_OK(copyOrRebuildDefaultFilterChain(default_filter_chain,
@@ -208,11 +235,15 @@ absl::Status FilterChainManagerImpl::addFilterChains(
                                          parent_context_, fcds_manager, fcds_config_source,
                                          fcds_callbacks));
 
-  const auto* origin = getOriginFilterChainManager();
   if (origin != nullptr) {
-    for (const auto& message_and_filter_chain : origin->fc_contexts_) {
-      if (!fc_contexts_.contains(message_and_filter_chain.first)) {
-        origin->draining_filter_chains_.push_back(message_and_filter_chain.second);
+    absl::flat_hash_set<const Network::DrainableFilterChain*> current_filter_chains;
+    current_filter_chains.reserve(fc_contexts_.size());
+    for (const auto& [serialized_message, fc_context] : fc_contexts_) {
+      current_filter_chains.insert(fc_context.filter_chain.get());
+    }
+    for (const auto& [serialized_message, fc_context] : origin->fc_contexts_) {
+      if (!current_filter_chains.contains(fc_context.filter_chain.get())) {
+        origin->draining_filter_chains_.push_back(fc_context.filter_chain);
       }
     }
   }
@@ -400,9 +431,9 @@ absl::Status FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
 
   // Copy from original filter chain manager, or build new filter chain if the default filter chain
   // is not equivalent to the one in the original filter chain manager.
-  MessageUtil eq;
   if (origin->default_filter_chain_message_.has_value() &&
-      eq(origin->default_filter_chain_message_.value(), *default_filter_chain)) {
+      filterChainMessagesEqual(origin->default_filter_chain_message_.value(),
+                               *default_filter_chain)) {
     default_filter_chain_ = origin->default_filter_chain_;
   } else {
     auto filter_chain_or_error = filter_chain_factory_builder.buildFilterChain(
@@ -629,9 +660,9 @@ makeCidrListEntry(const std::string& cidr, const T& data, absl::Status& creation
 std::vector<absl::string_view> FilterChainManagerImpl::filterChainNames() const {
   std::vector<absl::string_view> names;
   names.reserve(fc_contexts_.size() + fcds_handles_.size() + 1);
-  for (const auto& [proto, chain] : fc_contexts_) {
-    if (!chain->name().empty()) {
-      names.push_back(chain->name());
+  for (const auto& [serialized_message, fc_context] : fc_contexts_) {
+    if (!fc_context.filter_chain->name().empty()) {
+      names.push_back(fc_context.filter_chain->name());
     }
   }
   if (default_filter_chain_ != nullptr && !default_filter_chain_->name().empty()) {
@@ -933,20 +964,30 @@ absl::Status FilterChainManagerImpl::convertIPsToTries() {
   return absl::OkStatus();
 }
 
-Network::DrainableFilterChainSharedPtr FilterChainManagerImpl::findExistingFilterChain(
-    const envoy::config::listener::v3::FilterChain& filter_chain_message) {
+FilterChainManagerImpl::FcContext FilterChainManagerImpl::findExistingFilterChain(
+    const envoy::config::listener::v3::FilterChain& filter_chain_message,
+    const std::string& serialized_message, const FcContextsByMessageHash& origin_fc_contexts) {
   // Origin filter chain manager could be empty if the current is the ancestor.
   const auto* origin = getOriginFilterChainManager();
-  if (origin == nullptr) {
-    return nullptr;
+  if (origin != nullptr) {
+    const auto iter = origin->fc_contexts_.find(serialized_message);
+    if (iter != origin->fc_contexts_.end()) {
+      return iter->second;
+    }
   }
-  auto iter = origin->fc_contexts_.find(filter_chain_message);
-  if (iter != origin->fc_contexts_.end()) {
-    // copy the context to this filter chain manager.
-    fc_contexts_.emplace(filter_chain_message, iter->second);
-    return iter->second;
+  const std::size_t message_hash = MessageUtil::hash(filter_chain_message);
+  const auto iter = origin_fc_contexts.find(message_hash);
+  if (iter != origin_fc_contexts.end()) {
+    for (const auto* origin_fc_context : iter->second) {
+      // A message that fails to parse back has its filter chain rebuilt.
+      envoy::config::listener::v3::FilterChain origin_message;
+      if (origin_message.ParseFromString(origin_fc_context->first) &&
+          Protobuf::util::MessageDifferencer::Equals(origin_message, filter_chain_message)) {
+        return origin_fc_context->second;
+      }
+    }
   }
-  return nullptr;
+  return {message_hash, nullptr};
 }
 
 Configuration::FilterChainFactoryContextPtr FilterChainManagerImpl::createFilterChainFactoryContext(

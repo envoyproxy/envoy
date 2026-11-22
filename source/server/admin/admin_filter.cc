@@ -6,7 +6,9 @@
 namespace Envoy {
 namespace Server {
 
-AdminFilter::AdminFilter(const Admin& admin) : admin_(admin) {}
+AdminFilter::AdminFilter(const Admin& admin)
+    : admin_(admin), yield_between_chunks_(Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.admin_filter_yield_between_chunks")) {}
 
 Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                      bool end_stream) {
@@ -97,30 +99,21 @@ void AdminFilter::onComplete() {
                                     StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
 
   // TODO(#31087): use high/lower watermarks to apply flow-control to the admin http port.
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.admin_filter_yield_between_chunks")) {
-    bool more_data;
-    do {
-      Buffer::OwnedImpl response;
-      more_data = handler->nextChunk(response);
-      bool end_stream = end_stream_on_complete_ && !more_data;
-      ENVOY_LOG_MISC(debug, "nextChunk: response.length={} more_data={} end_stream={}",
-                     response.length(), more_data, end_stream);
-      if (response.length() > 0 || end_stream) {
-        decoder_callbacks_->encodeData(response, end_stream);
-      }
-    } while (more_data);
-    return;
-  }
-
   if (destroyed_) {
     return;
   }
   request_ = std::move(handler);
-  encodeNextChunk();
+  if (!yield_between_chunks_) {
+    while (encodeNextChunk()) {
+    }
+    return;
+  }
+  if (encodeNextChunk()) {
+    scheduleNextChunk();
+  }
 }
 
-void AdminFilter::encodeNextChunk() {
+bool AdminFilter::encodeNextChunk() {
   ASSERT(request_ != nullptr);
   Buffer::OwnedImpl response;
   const bool more_data = request_->nextChunk(response);
@@ -132,19 +125,22 @@ void AdminFilter::encodeNextChunk() {
     decoder_callbacks_->encodeData(response, end_stream);
   }
   if (destroyed_) {
-    return;
+    return false;
   }
   if (!more_data) {
     request_.reset();
-    return;
+    return false;
   }
-  scheduleNextChunk();
+  return true;
 }
 
 void AdminFilter::scheduleNextChunk() {
   if (next_chunk_cb_ == nullptr) {
-    next_chunk_cb_ =
-        decoder_callbacks_->dispatcher().createSchedulableCallback([this]() { encodeNextChunk(); });
+    next_chunk_cb_ = decoder_callbacks_->dispatcher().createSchedulableCallback([this]() {
+      if (encodeNextChunk()) {
+        scheduleNextChunk();
+      }
+    });
   }
   // Yield to the event loop before the next chunk, so other main thread work like health checks
   // and xDS updates can run in between.
