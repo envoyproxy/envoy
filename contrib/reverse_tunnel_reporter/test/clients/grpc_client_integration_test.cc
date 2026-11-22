@@ -766,7 +766,7 @@ TEST_P(GrpcClientIntegrationTest, UpstreamAdminDrainMetadata) {
   ASSERT_TRUE(admin_response != nullptr);
   ASSERT_TRUE(admin_response->complete());
   EXPECT_EQ("200", admin_response->headers().Status()->value().getStringView());
-  EXPECT_EQ(1, test_server_->counter(drain_started)->value());
+  test_server_->waitForCounter(drain_started, testing::Eq(1));
 
   // The downstream redials as soon as it receives the drain METADATA (sent immediately on the admin
   // trigger), so established_total==2 follows within ~1-2s; ~10s is a tight CI-safe bound.

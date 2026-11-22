@@ -16,7 +16,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/drain_aware_client_connection.h"
 
-#include "absl/status/status.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 

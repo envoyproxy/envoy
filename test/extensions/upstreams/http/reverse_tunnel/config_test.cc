@@ -619,6 +619,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, GracefulDrainWithMetadataOnRealHttp2Codec
   drain_timer->invokeCallback();
   EXPECT_EQ(1, stats_.drain_started_.value());
   EXPECT_EQ(1, cluster_.http2CodecStats().goaway_sent_.value());
+  EXPECT_EQ(1, countHttp2Frames(captured_wire, Envoy::Http::Http2::Http2Frame::Type::GoAway, 0));
 }
 
 // Twin of GracefulDrainWithMetadataOnRealHttp2Codec: no stream-0 METADATA frame is emitted on the
@@ -662,6 +663,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, GracefulDrainWithoutMetadataOnRealHttp2Co
   EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
   drain_timer->invokeCallback();
   EXPECT_EQ(1, cluster_.http2CodecStats().goaway_sent_.value());
+  EXPECT_EQ(1, countHttp2Frames(captured_wire, Envoy::Http::Http2::Http2Frame::Type::GoAway, 0));
 }
 
 // The DrainAwareClientCallbacks wrapper forwards the non-GOAWAY connection callbacks unchanged.

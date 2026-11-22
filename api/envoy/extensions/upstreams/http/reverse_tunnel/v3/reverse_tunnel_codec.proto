@@ -27,7 +27,11 @@ message ReverseTunnelUpstreamCodecOptions {
   // the peer can dial a replacement tunnel, then emits a final GOAWAY after the drain window and
   // drains the pool connection. Emitting and observing drain METADATA frames requires the
   // cluster's ``http2_protocol_options.allow_metadata`` to be true (otherwise the HTTP/2 codec
-  // drops the outgoing METADATA frame and increments ``http2.metadata_dropped``). Defaults to
-  // false, in which case the stock HTTP/2 client codec is used unchanged.
+  // drops the outgoing METADATA frame and increments ``http2.metadata_dropped``). Because the
+  // replacement tunnel overlaps the draining tunnel for the entire drain window, if
+  // ``enable_connection_limit`` is enabled, ``max_connections_per_node`` must leave room for the
+  // replacement connection; otherwise a worker already at the limit rejects it with HTTP 429 and
+  // each refusal lengthens the initiator's backoff. Defaults to false, in which case the stock
+  // HTTP/2 client codec is used unchanged.
   bool enable_drain_with_goaway = 1;
 }

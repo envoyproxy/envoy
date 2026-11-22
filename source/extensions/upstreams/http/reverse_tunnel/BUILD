@@ -44,7 +44,6 @@ envoy_cc_extension(
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:upstream_socket_manager_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
-        "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/upstreams/http/reverse_tunnel/v3:pkg_cc_proto",
     ],
