@@ -9125,8 +9125,8 @@ BORINGSSL_TEST_P(SslReadBufferLimitTest, MaxSendFragment) {
   }
 }
 
-// A configured value other than BoringSSL's 512 floor is applied as given: the data fills records to
-// max_send_fragment bytes of plaintext and no record exceeds it.
+// A configured value other than BoringSSL's 512 floor is applied as given: the data fills records
+// to max_send_fragment bytes of plaintext and no record exceeds it.
 BORINGSSL_TEST_P(SslReadBufferLimitTest, MaxSendFragment8192) {
   constexpr uint32_t max_send_fragment = 8192;
   constexpr uint32_t write_size = 3 * 16384;
