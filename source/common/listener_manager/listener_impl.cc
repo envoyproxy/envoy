@@ -388,14 +388,14 @@ absl::StatusOr<std::unique_ptr<ListenerImpl>>
 ListenerImpl::create(const envoy::config::listener::v3::Listener& config,
                      const std::string& version_info, ListenerManagerImpl& parent,
                      const std::string& name, bool added_via_api, bool workers_started,
-                     uint64_t hash) {
+                     uint64_t hash, uint64_t serialized_hash) {
   auto stats_scope_pair_or_error = generateListenerStatsScope(config, parent.server_);
   RETURN_IF_NOT_OK_REF(stats_scope_pair_or_error.status());
 
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<ListenerImpl>(
       new ListenerImpl(config, version_info, parent, name, added_via_api, workers_started, hash,
-                       std::move(stats_scope_pair_or_error->first),
+                       serialized_hash, std::move(stats_scope_pair_or_error->first),
                        std::move(stats_scope_pair_or_error->second), creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
@@ -404,7 +404,7 @@ ListenerImpl::create(const envoy::config::listener::v3::Listener& config,
 ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
-                           uint64_t hash, Stats::ScopeSharedPtr scope,
+                           uint64_t hash, uint64_t serialized_hash, Stats::ScopeSharedPtr scope,
                            Stats::ScopeSharedPtr listener_scope, absl::Status& creation_status)
     : parent_(parent),
       socket_type_(config.has_internal_listener()
@@ -419,6 +419,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           PROTOBUF_GET_MS_OR_DEFAULT(config, per_connection_buffer_high_watermark_timeout, 0))),
       listener_tag_(parent_.factory_->nextListenerTag()), name_(name),
       added_via_api_(added_via_api), workers_started_(workers_started), maybe_stale_hash_(hash),
+      serialized_config_hash_(serialized_hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
       max_connections_to_accept_per_socket_event_(
@@ -517,7 +518,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
-                           uint64_t hash, bool in_place_address_update,
+                           uint64_t hash, uint64_t serialized_hash, bool in_place_address_update,
                            absl::Status& creation_status)
     : parent_(parent), addresses_(origin.addresses_), socket_type_(origin.socket_type_),
       bind_to_port_(shouldBindToPort(config)), mptcp_enabled_(config.enable_mptcp()),
@@ -529,8 +530,9 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           PROTOBUF_GET_MS_OR_DEFAULT(config, per_connection_buffer_high_watermark_timeout, 0))),
       listener_tag_(origin.listener_tag_), name_(name), added_via_api_(added_via_api),
       workers_started_(workers_started), in_place_address_update_(in_place_address_update),
-      maybe_stale_hash_(hash), tcp_backlog_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-                                   config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
+      maybe_stale_hash_(hash), serialized_config_hash_(serialized_hash),
+      tcp_backlog_size_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
       max_connections_to_accept_per_socket_event_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connections_to_accept_per_socket_event,
                                           Network::DefaultMaxConnectionsToAcceptPerSocketEvent)),
@@ -1249,8 +1251,8 @@ void ListenerImpl::dumpListenerConfig(Protobuf::Any& dump) const {
 
 void ListenerImpl::debugLog(const std::string& message) {
   UNREFERENCED_PARAMETER(message);
-  ENVOY_LOG(debug, "{}: name={}, original_hash={}, tag={}, address={}", message, name_,
-            maybe_stale_hash_, listener_tag_,
+  ENVOY_LOG(debug, "{}: name={}, original_hash={}, serialized_hash={}, tag={}, address={}", message,
+            name_, maybe_stale_hash_, serialized_config_hash_, listener_tag_,
             absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()));
 }
 
@@ -1418,19 +1420,18 @@ ListenerImpl::listenSocketFactory(const Network::Address::Instance& address) con
   return iter == socket_factories_.end() ? nullptr : iter->get();
 }
 
-absl::StatusOr<ListenerImplPtr>
-ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
-                                         const std::string& version_info, bool workers_started,
-                                         uint64_t hash, InPlaceUpdate in_place_update) {
+absl::StatusOr<ListenerImplPtr> ListenerImpl::newListenerWithFilterChain(
+    const envoy::config::listener::v3::Listener& config, const std::string& version_info,
+    bool workers_started, uint64_t hash, uint64_t serialized_hash, InPlaceUpdate in_place_update) {
 
   absl::Status creation_status = absl::OkStatus();
   const bool in_place_address_update = in_place_update == InPlaceUpdate::FilterChainsAndAddresses;
   // Use WrapUnique since the constructor is private.
-  auto ret = absl::WrapUnique(
-      new ListenerImpl(*this, config, in_place_address_update ? version_info : version_info_,
-                       parent_, name_, added_via_api_,
-                       /* new new workers started state */ workers_started,
-                       /* use new hash */ hash, in_place_address_update, creation_status));
+  auto ret = absl::WrapUnique(new ListenerImpl(
+      *this, config, in_place_address_update ? version_info : version_info_, parent_, name_,
+      added_via_api_,
+      /* new new workers started state */ workers_started,
+      /* use new hash */ hash, serialized_hash, in_place_address_update, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
