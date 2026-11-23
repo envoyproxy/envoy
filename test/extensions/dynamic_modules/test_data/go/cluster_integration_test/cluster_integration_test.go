@@ -26,6 +26,7 @@ func main() {}
 
 type configFactory struct{}
 type config struct {
+	shared.EmptyClusterConfig
 	mode   string
 	handle shared.ClusterConfigHandle
 }
@@ -43,7 +44,7 @@ func (*configFactory) Create(handle shared.ClusterConfigHandle, data []byte) (sh
 	return &config{mode: mode, handle: handle}, nil
 }
 
-func (c *config) NewCluster(handle shared.ClusterHandle) shared.Cluster {
+func (c *config) Create(handle shared.ClusterHandle) shared.Cluster {
 	switch c.mode {
 	case "new_nil":
 		handle.GetScheduler()
@@ -52,7 +53,7 @@ func (c *config) NewCluster(handle shared.ClusterHandle) shared.Cluster {
 		handle.GetScheduler()
 		panic("cluster instance panic")
 	}
-	instance := &cluster{handle: handle, mode: c.mode,
+	instance := &cluster{handle: handle, config: c,
 		release: make(chan struct{}), partial: make(chan struct{}), complete: make(chan struct{})}
 	current.Store(instance)
 	return instance
@@ -65,7 +66,6 @@ func (c *config) OnDestroy() {
 	}
 }
 
-const workers = 4
 const eventID = 42
 
 var current atomic.Pointer[cluster]
@@ -76,7 +76,9 @@ type cluster struct {
 	started                    atomic.Bool
 	handle                     shared.ClusterHandle
 	scheduler                  shared.Scheduler
-	mode                       string
+	config                     *config
+	workers                    uint32
+	retainedShutdown           func()
 	arrivals                   atomic.Uint32
 	completions                atomic.Uint32
 	release, partial, complete chan struct{}
@@ -85,7 +87,7 @@ type cluster struct {
 
 func (c *cluster) OnInit() {
 	c.scheduler = c.handle.GetScheduler()
-	if c.mode == "init_sync" {
+	if c.config.mode == "init_sync" {
 		c.handle.PreInitComplete()
 		return
 	}
@@ -96,6 +98,7 @@ func (c *cluster) OnInit() {
 }
 
 func (c *cluster) OnServerInitialized() {
+	c.workers = c.config.handle.GetServerConcurrency()
 	c.serverReady.Store(true)
 }
 
@@ -113,21 +116,29 @@ func (c *cluster) OnWorkerEvent(id uint64) {
 	if id != eventID {
 		panic("unexpected cluster worker event")
 	}
-	if c.arrivals.Add(1) == 1 && c.mode == "blocked" {
+	if c.arrivals.Add(1) == 1 && c.config.mode == "blocked" {
 		<-c.release
 	}
 	c.scheduler.Schedule(func() {
 		switch c.completions.Add(1) {
-		case workers - 1:
+		case c.workers - 1:
 			close(c.partial)
-		case workers:
+		case c.workers:
 			close(c.complete)
 		}
 	})
 }
 
+func (c *cluster) OnDrainStarted() {
+	c.handle.Log(shared.LogLevelInfo, "Go cluster drain started")
+}
+
 func (c *cluster) OnShutdown(complete func()) {
-	if c.mode == "shutdown_panic" {
+	switch c.config.mode {
+	case "retain_shutdown":
+		c.retainedShutdown = complete
+		return
+	case "shutdown_panic":
 		panic("cluster shutdown panic")
 	}
 	go func() { complete(); complete() }()
@@ -135,8 +146,18 @@ func (c *cluster) OnShutdown(complete func()) {
 
 func (c *cluster) OnDestroy() {
 	c.handle.Log(shared.LogLevelInfo, "Go cluster instance destroyed")
-	if c.mode == "destroy_panic" {
+	if c.config.mode == "destroy_panic" {
 		panic("cluster instance destroy panic")
+	}
+}
+
+//export go_cluster_test_finish_shutdown
+func go_cluster_test_finish_shutdown() {
+	c := current.Load()
+	if c.retainedShutdown != nil {
+		c.retainedShutdown()
+		c.retainedShutdown()
+		c.retainedShutdown = nil
 	}
 }
 

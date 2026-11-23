@@ -93,6 +93,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/synchronization",
+        "@abseil-cpp//absl/time",
     ],
 )
 
@@ -253,6 +254,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],

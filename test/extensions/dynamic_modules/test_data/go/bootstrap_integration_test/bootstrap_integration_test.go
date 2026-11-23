@@ -1,10 +1,15 @@
 package main
 
+/*
+#include <stdbool.h>
+#include <stdint.h>
+*/
 import "C"
 
 import (
 	"fmt"
 	"runtime"
+	"time"
 
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
 	_ "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/abi"
@@ -24,8 +29,13 @@ type configFactory struct{}
 var schedulerCommitDone chan struct{}
 
 //export go_bootstrap_test_wait_for_scheduler
-func go_bootstrap_test_wait_for_scheduler() {
-	<-schedulerCommitDone
+func go_bootstrap_test_wait_for_scheduler(timeoutMs C.uint32_t) C.bool {
+	select {
+	case <-schedulerCommitDone:
+		return true
+	case <-time.After(time.Duration(timeoutMs) * time.Millisecond):
+		return false
+	}
 }
 
 func (*configFactory) Create(handle shared.BootstrapExtensionConfigHandle, data []byte) (shared.BootstrapExtensionConfig, error) {
@@ -37,13 +47,14 @@ func (*configFactory) Create(handle shared.BootstrapExtensionConfigHandle, data 
 		panic("bootstrap config panic")
 	case "create_nil":
 		return nil, nil
-	case "new_nil", "new_panic":
+	case "new_nil", "new_panic", "retain_shutdown":
 		return config, nil
 	case "commit_teardown":
-		schedulerCommitDone = make(chan struct{})
+		done := make(chan struct{})
+		schedulerCommitDone = done
 		go func() {
 			config.scheduler.Schedule(func() {})
-			close(schedulerCommitDone)
+			close(done)
 		}()
 		return config, nil
 	}
@@ -61,12 +72,13 @@ func (*configFactory) Create(handle shared.BootstrapExtensionConfigHandle, data 
 }
 
 type bootstrapConfig struct {
+	shared.EmptyBootstrapExtensionConfig
 	handle    shared.BootstrapExtensionConfigHandle
 	scheduler shared.Scheduler
 	mode      string
 }
 
-func (c *bootstrapConfig) NewBootstrapExtension(handle shared.BootstrapExtensionHandle) shared.BootstrapExtension {
+func (c *bootstrapConfig) Create(handle shared.BootstrapExtensionHandle) shared.BootstrapExtension {
 	runtime.GC()
 	switch c.mode {
 	case "new_nil":
@@ -105,8 +117,24 @@ func (e *bootstrapExtension) OnDrainStarted() {
 	e.handle.Log(shared.LogLevelInfo, "Go bootstrap drain started")
 }
 
+// The native test releases this completion after the shutdown hook returns.
+var retainedShutdown func()
+
+//export go_bootstrap_test_finish_shutdown
+func go_bootstrap_test_finish_shutdown() {
+	if retainedShutdown != nil {
+		retainedShutdown()
+		retainedShutdown()
+		retainedShutdown = nil
+	}
+}
+
 func (e *bootstrapExtension) OnShutdown(complete func()) {
-	if e.mode == "shutdown_panic" {
+	switch e.mode {
+	case "retain_shutdown":
+		retainedShutdown = complete
+		return
+	case "shutdown_panic":
 		panic("bootstrap shutdown panic")
 	}
 	go func() {

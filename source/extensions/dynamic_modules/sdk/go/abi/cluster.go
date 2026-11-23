@@ -1,8 +1,9 @@
+//go:build !envoy_dynamic_modules_go_custom_cluster
+
 package abi
 
 /*
 #include <stdint.h>
-#include <stdlib.h>
 #include "../../../abi/abi.h"
 
 static inline void cluster_complete(envoy_dynamic_module_type_event_cb callback, void* context) {
@@ -12,34 +13,14 @@ static inline void cluster_complete(envoy_dynamic_module_type_event_cb callback,
 import "C"
 
 import (
-	"runtime/cgo"
 	"sync"
 	"unsafe"
 
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/internal/recovery"
+	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/internal/scheduler"
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
 )
-
-// Envoy retains C-allocated boxes containing cgo handles, rather than Go pointers.
-// Configurations and extension instances have independent ownership and destruction.
-func newClusterHandle(value any) unsafe.Pointer {
-	box := C.malloc(C.size_t(unsafe.Sizeof(C.uintptr_t(0))))
-	if box == nil {
-		panic("allocating cluster handle")
-	}
-	*(*C.uintptr_t)(box) = C.uintptr_t(cgo.NewHandle(value))
-	return box
-}
-
-func clusterValue[T any](box unsafe.Pointer) T {
-	return cgo.Handle(*(*C.uintptr_t)(box)).Value().(T)
-}
-
-func deleteClusterHandle(box unsafe.Pointer) {
-	cgo.Handle(*(*C.uintptr_t)(box)).Delete()
-	C.free(box)
-}
 
 type dymClusterConfigHandle struct{ dymCommonHandle }
 
@@ -54,7 +35,7 @@ type clusterWrapper struct {
 
 type dymClusterHandle struct {
 	host      C.envoy_dynamic_module_type_cluster_envoy_ptr
-	scheduler *clusterScheduler
+	scheduler scheduler.Scheduler
 }
 
 func (*dymClusterHandle) Log(level shared.LogLevel, format string, args ...any) {
@@ -70,74 +51,20 @@ func (h *dymClusterHandle) RunOnAllWorkers(eventID uint64) {
 }
 
 func (h *dymClusterHandle) GetScheduler() shared.Scheduler {
-	if h.scheduler == nil {
+	h.scheduler.Init(func() (func(uint64), func()) {
 		ptr := C.envoy_dynamic_module_callback_cluster_scheduler_new(h.host)
 		if ptr == nil {
 			panic("creating cluster scheduler")
 		}
-		h.scheduler = &clusterScheduler{scheduler: newDymScheduler(unsafe.Pointer(ptr),
-			func(ptr unsafe.Pointer, id C.uint64_t) {
-				C.envoy_dynamic_module_callback_cluster_scheduler_commit(
-					C.envoy_dynamic_module_type_cluster_scheduler_module_ptr(ptr), id)
-			})}
-	}
-	return h.scheduler
-}
-
-func (h *dymClusterHandle) close() {
-	if h.scheduler != nil {
-		h.scheduler.close()
-	}
-}
-
-// A native commit can release the last reference to the cluster and re-enter
-// its destroy hook. Keep the scheduler alive across commits without holding a lock
-// across the ABI call or waiting for those commits during destruction.
-type clusterScheduler struct {
-	mu        sync.Mutex
-	scheduler *dymScheduler
-	closed    bool
-	active    uint64
-}
-
-func (s *clusterScheduler) Schedule(task func()) {
-	s.mu.Lock()
-	if s.closed {
-		s.mu.Unlock()
-		return
-	}
-	s.active++
-	s.mu.Unlock()
-	defer func() {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		s.active--
-		if s.closed && s.active == 0 {
-			s.destroy()
+		commit := func(id uint64) {
+			C.envoy_dynamic_module_callback_cluster_scheduler_commit(ptr, C.uint64_t(id))
 		}
-	}()
-	s.scheduler.Schedule(task)
-}
-
-func (s *clusterScheduler) close() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.closed {
-		return
-	}
-	s.closed = true
-	if s.active == 0 {
-		s.destroy()
-	}
-}
-
-// destroy runs under mu after the last commit returns.
-func (s *clusterScheduler) destroy() {
-	C.envoy_dynamic_module_callback_cluster_scheduler_delete(
-		C.envoy_dynamic_module_type_cluster_scheduler_module_ptr(s.scheduler.schedulerPtr))
-	s.scheduler.schedulerLock.Lock()
-	clear(s.scheduler.tasks)
-	s.scheduler.schedulerLock.Unlock()
+		destroy := func() {
+			C.envoy_dynamic_module_callback_cluster_scheduler_delete(ptr)
+		}
+		return commit, destroy
+	})
+	return &h.scheduler
 }
 
 //export envoy_dynamic_module_on_cluster_config_new
@@ -147,21 +74,25 @@ func envoy_dynamic_module_on_cluster_config_new(
 ) (result C.envoy_dynamic_module_type_cluster_config_module_ptr) {
 	defer recovery.Export("envoy_dynamic_module_on_cluster_config_new", nil, &result)
 	handle := dymClusterConfigHandle{}
-	clusterConfig, err := sdk.NewClusterConfig(handle,
-		envoyBufferToStringUnsafe(name), envoyBufferToBytesUnsafe(config))
-	if err != nil || clusterConfig == nil {
-		handle.Log(shared.LogLevelWarn, "Failed to load cluster configuration: %v", err)
+	nameString := envoyBufferToStringUnsafe(name)
+	clusterConfig, err := sdk.NewClusterConfig(handle, nameString, envoyBufferToBytesUnsafe(config))
+	if err != nil {
+		handle.Log(shared.LogLevelWarn, "Failed to load cluster configuration for %q: %v", nameString, err)
 		return nil
 	}
-	return C.envoy_dynamic_module_type_cluster_config_module_ptr(newClusterHandle(clusterConfig))
+	if clusterConfig == nil {
+		handle.Log(shared.LogLevelWarn, "Failed to load cluster configuration for %q: config is nil", nameString)
+		return nil
+	}
+	return C.envoy_dynamic_module_type_cluster_config_module_ptr(newHandle(clusterConfig))
 }
 
 //export envoy_dynamic_module_on_cluster_config_destroy
 func envoy_dynamic_module_on_cluster_config_destroy(ptr C.envoy_dynamic_module_type_cluster_config_module_ptr) {
 	defer recovery.ExportVoid("envoy_dynamic_module_on_cluster_config_destroy")
 	box := unsafe.Pointer(ptr)
-	defer deleteClusterHandle(box)
-	clusterValue[shared.ClusterConfig](box).OnDestroy()
+	defer deleteHandle(box)
+	handleValue[shared.ClusterConfig](box).OnDestroy()
 }
 
 //export envoy_dynamic_module_on_cluster_new
@@ -174,15 +105,15 @@ func envoy_dynamic_module_on_cluster_new(
 	retained := false
 	defer func() {
 		if !retained {
-			handle.close()
+			handle.scheduler.Close()
 		}
 	}()
-	cluster := clusterValue[shared.ClusterConfig](unsafe.Pointer(ptr)).NewCluster(handle)
+	cluster := handleValue[shared.ClusterConfig](unsafe.Pointer(ptr)).Create(handle)
 	if cluster == nil {
 		return nil
 	}
 	result = C.envoy_dynamic_module_type_cluster_module_ptr(
-		newClusterHandle(&clusterWrapper{cluster: cluster, handle: handle}))
+		newHandle(&clusterWrapper{cluster: cluster, handle: handle}))
 	retained = true
 	return result
 }
@@ -191,9 +122,9 @@ func envoy_dynamic_module_on_cluster_new(
 func envoy_dynamic_module_on_cluster_destroy(ptr C.envoy_dynamic_module_type_cluster_module_ptr) {
 	defer recovery.ExportVoid("envoy_dynamic_module_on_cluster_destroy")
 	box := unsafe.Pointer(ptr)
-	wrapper := clusterValue[*clusterWrapper](box)
-	defer deleteClusterHandle(box)
-	defer wrapper.handle.close()
+	wrapper := handleValue[*clusterWrapper](box)
+	defer deleteHandle(box)
+	defer wrapper.handle.scheduler.Close()
 	wrapper.cluster.OnDestroy()
 }
 
@@ -203,7 +134,7 @@ func envoy_dynamic_module_on_cluster_init(
 	ptr C.envoy_dynamic_module_type_cluster_module_ptr,
 ) {
 	defer recovery.ExportVoid("envoy_dynamic_module_on_cluster_init")
-	clusterValue[*clusterWrapper](unsafe.Pointer(ptr)).cluster.OnInit()
+	handleValue[*clusterWrapper](unsafe.Pointer(ptr)).cluster.OnInit()
 }
 
 //export envoy_dynamic_module_on_cluster_server_initialized
@@ -212,7 +143,7 @@ func envoy_dynamic_module_on_cluster_server_initialized(
 	ptr C.envoy_dynamic_module_type_cluster_module_ptr,
 ) {
 	defer recovery.ExportVoid("envoy_dynamic_module_on_cluster_server_initialized")
-	clusterValue[*clusterWrapper](unsafe.Pointer(ptr)).cluster.OnServerInitialized()
+	handleValue[*clusterWrapper](unsafe.Pointer(ptr)).cluster.OnServerInitialized()
 }
 
 //export envoy_dynamic_module_on_cluster_drain_started
@@ -221,7 +152,7 @@ func envoy_dynamic_module_on_cluster_drain_started(
 	ptr C.envoy_dynamic_module_type_cluster_module_ptr,
 ) {
 	defer recovery.ExportVoid("envoy_dynamic_module_on_cluster_drain_started")
-	clusterValue[*clusterWrapper](unsafe.Pointer(ptr)).cluster.OnDrainStarted()
+	handleValue[*clusterWrapper](unsafe.Pointer(ptr)).cluster.OnDrainStarted()
 }
 
 //export envoy_dynamic_module_on_cluster_scheduled
@@ -230,10 +161,8 @@ func envoy_dynamic_module_on_cluster_scheduled(
 	ptr C.envoy_dynamic_module_type_cluster_module_ptr, id C.uint64_t,
 ) {
 	defer recovery.ExportVoid("envoy_dynamic_module_on_cluster_scheduled")
-	wrapper := clusterValue[*clusterWrapper](unsafe.Pointer(ptr))
-	if wrapper.handle.scheduler != nil {
-		wrapper.handle.scheduler.scheduler.onScheduled(uint64(id))
-	}
+	wrapper := handleValue[*clusterWrapper](unsafe.Pointer(ptr))
+	wrapper.handle.scheduler.Run(uint64(id))
 }
 
 //export envoy_dynamic_module_on_cluster_worker_event
@@ -242,7 +171,7 @@ func envoy_dynamic_module_on_cluster_worker_event(
 	ptr C.envoy_dynamic_module_type_cluster_module_ptr, id C.uint64_t,
 ) {
 	defer recovery.ExportVoid("envoy_dynamic_module_on_cluster_worker_event")
-	clusterValue[*clusterWrapper](unsafe.Pointer(ptr)).cluster.OnWorkerEvent(uint64(id))
+	handleValue[*clusterWrapper](unsafe.Pointer(ptr)).cluster.OnWorkerEvent(uint64(id))
 }
 
 //export envoy_dynamic_module_on_cluster_shutdown
@@ -260,7 +189,7 @@ func envoy_dynamic_module_on_cluster_shutdown(
 			complete()
 		}
 	}()
-	clusterValue[*clusterWrapper](unsafe.Pointer(ptr)).cluster.OnShutdown(complete)
+	handleValue[*clusterWrapper](unsafe.Pointer(ptr)).cluster.OnShutdown(complete)
 	returned = true
 }
 

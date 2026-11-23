@@ -8,6 +8,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
+#include "absl/time/time.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -60,7 +61,7 @@ TEST_F(ExtensionConfigTest, GoConfigFailure) {
     auto config = newDynamicModuleBootstrapExtensionConfig("test", mode, DefaultMetricsNamespace,
                                                            std::move(dynamic_module.value()),
                                                            dispatcher_, context_, context_.store_);
-    EXPECT_FALSE(config.ok());
+    EXPECT_THAT(config, HasStatusMessage("Failed to initialize dynamic module"));
   }
 }
 
@@ -70,27 +71,29 @@ TEST_F(ExtensionConfigTest, GoConfigDestroyedDuringSchedulerCommit) {
           "test/extensions/dynamic_modules/test_data/go/libbootstrap_integration_test.so"),
       true);
   ASSERT_OK(dynamic_module);
-  auto wait_for_commit = dynamic_module.value()->getFunctionPointer<void (*)()>(
+  auto wait_for_commit = dynamic_module.value()->getFunctionPointer<bool (*)(uint32_t)>(
       "go_bootstrap_test_wait_for_scheduler");
   ASSERT_OK(wait_for_commit);
 
-  absl::Notification posting;
-  absl::Notification return_from_post;
-  EXPECT_CALL(dispatcher_, post(testing::_)).WillOnce([&](Event::PostCb) {
-    posting.Notify();
-    return_from_post.WaitForNotification();
-  });
+  auto posting = std::make_shared<absl::Notification>();
+  auto return_from_post = std::make_shared<absl::Notification>();
+  const auto timeout = absl::FromChrono(TestUtility::DefaultTimeout);
+  EXPECT_CALL(dispatcher_, post(testing::_))
+      .WillOnce([posting, return_from_post, timeout](Event::PostCb) {
+        posting->Notify();
+        EXPECT_TRUE(return_from_post->WaitForNotificationWithTimeout(timeout));
+      });
   auto config = newDynamicModuleBootstrapExtensionConfig(
       "test", "commit_teardown", DefaultMetricsNamespace, std::move(dynamic_module.value()),
       dispatcher_, context_, context_.store_);
   ASSERT_OK(config);
-  posting.WaitForNotification();
+  EXPECT_TRUE(posting->WaitForNotificationWithTimeout(timeout));
   // commit holds the last native config reference while posting. Releasing it
   // re-enters Go configuration destruction before Schedule has returned.
   std::weak_ptr<DynamicModuleBootstrapExtensionConfig> weak_config = config.value();
   config.value().reset();
-  return_from_post.Notify();
-  wait_for_commit.value()();
+  return_from_post->Notify();
+  EXPECT_TRUE(wait_for_commit.value()(TestUtility::DefaultTimeout.count()));
   EXPECT_TRUE(weak_config.expired());
 }
 

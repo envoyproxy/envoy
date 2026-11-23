@@ -19,6 +19,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -87,7 +88,6 @@ public:
   }
 
   void initializeWithGoCluster(const std::string& mode) {
-    concurrency_ = 4;
     TestEnvironment::setEnvVar(
         "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
         TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/go"), 1);
@@ -126,15 +126,17 @@ public:
     ASSERT_OK(count);
     // Unblock the worker even when an assertion fails, so server teardown cannot hang.
     Cleanup unblock([&]() { (*release.value())(); });
+    // Exercise completion accounting with different server worker counts.
+    concurrency_ = mode == "blocked" ? 3 : 2;
     initializeWithGoCluster(mode);
     ASSERT_TRUE((*start.value())());
     if (mode == "blocked") {
-      ASSERT_TRUE((*wait.value())(/*partial=*/0, /*timeout_ms=*/5000));
-      EXPECT_EQ(3U, (*count.value())());
+      ASSERT_TRUE((*wait.value())(/*partial=*/0, TestUtility::DefaultTimeout.count()));
+      EXPECT_EQ(concurrency_ - 1, (*count.value())());
       (*release.value())();
     }
-    ASSERT_TRUE((*wait.value())(/*complete=*/1, /*timeout_ms=*/5000));
-    EXPECT_EQ(4U, (*count.value())());
+    ASSERT_TRUE((*wait.value())(/*complete=*/1, TestUtility::DefaultTimeout.count()));
+    EXPECT_EQ(concurrency_, (*count.value())());
   }
 
   void initializeWithDecCluster(const std::string& cluster_name,

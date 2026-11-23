@@ -41,24 +41,30 @@ The Go SDK supports bootstrap configuration factories, lifecycle hooks, initiali
 and main-thread scheduling. Register a ``shared.BootstrapExtensionConfigFactory`` with
 ``sdk.RegisterBootstrapExtensionConfigFactories`` during Go package initialization. Its
 ``Create`` method receives a ``shared.BootstrapExtensionConfigHandle`` and returns a
-``shared.BootstrapExtensionConfig``, which creates extension instances through
-``NewBootstrapExtension``. Embed ``shared.EmptyBootstrapExtension`` in an instance to inherit
-default lifecycle behavior.
+``shared.BootstrapExtensionConfig``. The configuration's ``Create`` method constructs each
+extension instance. Embed ``shared.EmptyBootstrapExtensionConfig`` and
+``shared.EmptyBootstrapExtension`` to inherit the optional hooks for each.
 
 Call ``SignalInitComplete`` exactly once to release the bootstrap initialization target. For
 asynchronous initialization, obtain ``GetScheduler`` on the main thread, perform background work,
 then use ``Schedule`` to call ``SignalInitComplete`` back on the main thread. Scheduled tasks may
 schedule more tasks. The SDK discards pending tasks at configuration destruction and ignores
-later scheduling attempts.
+later scheduling attempts. ``SignalInitComplete`` can run lifecycle hooks and wait for workers
+to start before it returns. Release any locks those hooks need before calling it.
 
 ``OnShutdown`` receives a completion function. Call it after cleanup finishes; it can be retained
 for asynchronous cleanup and called from another goroutine. The SDK ignores repeated calls and
-completes shutdown if the hook panics. Configuration and instance ``OnDestroy`` callbacks have
-separate lifetimes. As with other Go dynamic modules, configure ``do_not_close: true`` so the Go
-runtime remains loaded.
+completes shutdown if the hook panics. Otherwise Envoy waits for completion before exiting.
+Put essential cleanup in ``OnDestroy`` because Envoy skips ``OnShutdown`` during shutdown before
+workers start and in ``init_only`` and ``validate`` modes. Configuration and instance ``OnDestroy``
+callbacks have separate lifetimes. As with other Go dynamic modules, configure
+``do_not_close: true`` so the Go runtime remains loaded.
 
-This Go API does not yet expose the Rust SDK's optional bootstrap capabilities, such as HTTP
-callouts, timers, metrics, or resource management.
+Modules that need bootstrap APIs such as HTTP callouts or timers can supply their own
+bootstrap ABI hooks. Build with ``go build -buildmode=c-shared -tags envoy_dynamic_modules_go_custom_bootstrap``
+to omit the SDK's bootstrap exports. The module then supplies all required bootstrap hooks.
+Use ``envoy_dynamic_modules_go_custom_cluster`` for a hand-written cluster ABI. The tags are
+independent and can be combined. Other SDK extension kinds remain available.
 
 Lifecycle Hooks
 ---------------

@@ -1,3 +1,4 @@
+load("@rules_go//go:def.bzl", "go_test")
 load(
     "@rules_rust//rust:defs.bzl",
     "rust_clippy",
@@ -124,6 +125,12 @@ envoy_cc_test_library(
 )
 
 # We have targets for the tests of SDK itself here so that //test/... will be able to run them.
+go_test(
+    name = "go_sdk_scheduler_test",
+    srcs = ["//source/extensions/dynamic_modules:sdk/go/internal/scheduler/scheduler_test.go"],
+    embed = ["//source/extensions/dynamic_modules:go_sdk_internal_scheduler"],
+)
+
 rust_test(
     name = "rust_sdk_test",
     crate = "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk_mock",
