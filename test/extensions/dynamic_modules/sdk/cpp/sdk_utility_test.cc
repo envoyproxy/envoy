@@ -30,7 +30,7 @@ TEST(HeaderValidityTest, Values) {
   }
   for (const std::string_view value :
        {std::string_view("a\rb"), std::string_view("a\nb"), std::string_view("a\0b", 3),
-        std::string_view("bell\a"), std::string_view("del\x7f"),
+        std::string_view("bell\a"), std::string_view("del\x7f"), std::string_view("\t\x1f"),
         std::string_view("value\r\nx-injected: 1")}) {
     EXPECT_FALSE(isValidHeaderValue(value)) << value;
   }
@@ -42,12 +42,15 @@ TEST(HeaderValidityTest, EveryByte) {
         (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
         std::string_view("!#$%&'*+-.^_`|~").find(static_cast<char>(c)) != std::string_view::npos;
     EXPECT_EQ(isValidHeaderName(std::string(1, static_cast<char>(c))), token) << c;
-    // In the middle and at the end of a value long enough for the compiler to vectorize.
+    // Sizes that take each branch of the value check, and positions in its whole blocks and in
+    // the bytes it reads again at the end.
     const bool allowed = c == '\t' || (c >= ' ' && c != 0x7f);
-    for (const size_t position : {40, 66}) {
-      std::string value(67, 'v');
-      value[position] = static_cast<char>(c);
-      EXPECT_EQ(isValidHeaderValue(value), allowed) << c << " at " << position;
+    for (const size_t size : {3, 5, 12, 40, 67}) {
+      for (const size_t position : {size_t{0}, size / 2, size - 1}) {
+        std::string value(size, 'v');
+        value[position] = static_cast<char>(c);
+        EXPECT_EQ(isValidHeaderValue(value), allowed) << c << " at " << position << " of " << size;
+      }
     }
   }
 }

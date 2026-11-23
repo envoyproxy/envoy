@@ -89,12 +89,31 @@ bool isValidHeaderName(std::string_view name) {
 }
 
 bool isValidHeaderValue(std::string_view value) {
-  // No early exit, so that the compiler can vectorize the loop.
-  bool valid = true;
-  for (const unsigned char c : value) {
-    valid &= (c >= ' ' && c != 0x7f) || c == '\t';
+  // c ^ 0x16 maps tab to 0x1f and every other control character below it, and DEL is the largest
+  // signed char. A min and a max have no early exit, so the compiler can vectorize them, and
+  // reading the last 16, 8 or 4 bytes a second time keeps short values off the byte-at-a-time path.
+  unsigned char min = 0xff;
+  signed char max = 0;
+  const auto scan = [&min, &max](std::string_view bytes) {
+    for (const unsigned char c : bytes) {
+      min = std::min<unsigned char>(min, c ^ 0x16);
+      max = std::max(max, static_cast<signed char>(c));
+    }
+  };
+  const size_t size = value.size();
+  if (size >= 16) {
+    scan(value.substr(0, size & ~size_t{15}));
+    scan(value.substr(size - 16));
+  } else if (size >= 8) {
+    scan(value.substr(0, 8));
+    scan(value.substr(size - 8));
+  } else if (size >= 4) {
+    scan(value.substr(0, 4));
+    scan(value.substr(size - 4));
+  } else {
+    scan(value);
   }
-  return valid;
+  return min >= 0x1f && max != 0x7f;
 }
 } // namespace Utility
 
