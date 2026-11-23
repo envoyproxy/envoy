@@ -7,12 +7,20 @@ Rate limit
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimit>`
 
-The HTTP rate limit filter will call the rate limit service when the request's route or virtual host
-has one or more :ref:`rate limit configurations<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>`
-that match the filter stage setting. More than one configuration can
-apply to a request. Each configuration results in a descriptor being sent to the rate limit service.
+The HTTP rate limit filter will call the rate limit service when the request has one or more rate
+limit configurations. The rate limit configurations can be set on the filter with
+:ref:`rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits>`,
+or per virtual host or route with
+:ref:`RateLimitPerRoute.rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
+in the ``typed_per_filter_config``, which takes precedence over the filter level configurations.
+More than one configuration can apply to a request. Each configuration results in a descriptor
+being sent to the rate limit service.
 
-Whether the virtual host rate limit configurations apply to a route is set by
+The deprecated route level :ref:`rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>`
+and virtual host level :ref:`rate_limits <envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>`
+are only used when neither of the above is set, and only the ones that match the filter
+:ref:`stage <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.stage>` setting apply.
+Whether the deprecated virtual host rate limit configurations apply to a route is set by
 :ref:`vh_rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`
 in the route's ``typed_per_filter_config``. This replaces the deprecated
 :ref:`include_vh_rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.include_vh_rate_limits>`.
@@ -78,8 +86,8 @@ over-limit descriptor status. The option is disabled by default.
 Composing Actions
 -----------------
 
-Each :ref:`rate limit action <envoy_v3_api_msg_config.route.v3.RateLimit>` on the route or
-virtual host populates a descriptor entry. A vector of descriptor entries compose a descriptor. To
+Each :ref:`rate limit action <envoy_v3_api_msg_config.route.v3.RateLimit>` in a rate limit
+configuration populates a descriptor entry. A vector of descriptor entries compose a descriptor. To
 create more complex rate limit descriptors, actions can be composed in any order. The descriptor
 will be populated in the order the actions are specified in the configuration.
 
@@ -97,7 +105,7 @@ The configuration would be:
 
 .. literalinclude:: _include/rate-limit-routes.yaml
     :language: yaml
-    :lines: 26-30
+    :lines: 26-33
     :lineno-start: 26
     :linenos:
     :caption: :download:`rate-limit-routes.yaml <_include/rate-limit-routes.yaml>`
@@ -112,8 +120,8 @@ For the following configuration:
 
 .. literalinclude:: _include/rate-limit-routes.yaml
     :language: yaml
-    :lines: 36-41
-    :lineno-start: 36
+    :lines: 39-47
+    :lineno-start: 39
     :linenos:
     :caption: :download:`rate-limit-routes.yaml <_include/rate-limit-routes.yaml>`
 
@@ -151,8 +159,8 @@ The following configuration
 
 .. literalinclude:: _include/rate-limit-routes.yaml
     :language: yaml
-    :lines: 47-56
-    :lineno-start: 47
+    :lines: 53-65
+    :lineno-start: 53
     :linenos:
     :caption: :download:`rate-limit-routes.yaml <_include/rate-limit-routes.yaml>`
 
@@ -179,8 +187,8 @@ Rate limit descriptors are extensible with custom descriptors. For example, :ref
 
 .. literalinclude:: _include/rate-limit-routes.yaml
     :language: yaml
-    :lines: 62-69
-    :lineno-start: 62
+    :lines: 71-81
+    :lineno-start: 71
     :linenos:
     :caption: :download:`rate-limit-routes.yaml <_include/rate-limit-routes.yaml>`
 
@@ -188,8 +196,8 @@ Rate limit descriptors are extensible with custom descriptors. For example, :ref
 
 .. literalinclude:: _include/rate-limit-routes.yaml
     :language: yaml
-    :lines: 75-81
-    :lineno-start: 75
+    :lines: 87-96
+    :lineno-start: 87
     :linenos:
     :caption: :download:`rate-limit-routes.yaml <_include/rate-limit-routes.yaml>`
 

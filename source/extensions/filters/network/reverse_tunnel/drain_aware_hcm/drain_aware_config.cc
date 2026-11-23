@@ -9,8 +9,10 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
+#include "source/extensions/filters/network/reverse_tunnel/drain_aware_hcm/drain_aware_read_filter.h"
 #include "source/extensions/filters/network/reverse_tunnel/drain_aware_hcm/drain_aware_server_connection.h"
 
 #include "absl/status/status.h"
@@ -54,16 +56,15 @@ Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createBaseCodec
 Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createCodec(
     Network::Connection& connection, const Buffer::Instance& data,
     Http::ServerConnectionCallbacks& callbacks, Server::OverloadManager& overload_manager) {
-  // Build the "dial a replacement tunnel" action shared by two triggers: on_local_drain (this
-  // connection drains locally via max_connection_duration/graceful shutdown/listener drain) and
-  // on_peer_goaway (the peer's client codec sends a GOAWAY). Either way we ask the initiator
-  // IOHandle to dial a replacement immediately so new requests get a fresh tunnel while in-flight
-  // streams finish on the old one. Opt-in via enable_drain_with_goaway.
+  // Share the replacement action between peer drain (GOAWAY or drain METADATA) and any local
+  // HTTP/2 drain, including connection rotation, filter-chain updates and admin drains. With the
+  // listener-drain guard enabled, whole-listener draining stops initiation and suppresses these
+  // replacement dials. Opt-in via enable_drain_with_goaway.
   //
   // Recover the IOHandle by typed cast on the accepted socket: connection.localAddress() can't be
   // used because the listener exposes its bound rc:// address, not the socket's local port.
   std::function<void()> on_local_drain = nullptr;
-  std::function<void()> on_peer_goaway = nullptr;
+  std::function<void()> on_peer_drain = nullptr;
   if (enable_drain_with_goaway_) {
     Envoy::Extensions::Bootstrap::ReverseConnection::DownstreamReverseConnectionIOHandle*
         tunnel_iohandle = nullptr;
@@ -83,18 +84,18 @@ Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createCodec(
         tunnel_iohandle->markTunnelDrainingAndDialReplacement();
       };
       on_local_drain = redial;
-      on_peer_goaway = redial;
+      on_peer_drain = redial;
     }
   }
 
-  // If a peer GOAWAY should trigger a re-dial, interpose a callbacks wrapper between the codec and
-  // the HCM so we observe the received GOAWAY (the default server path ignores it). Otherwise use
-  // the HCM callbacks directly.
+  // If a peer drain (METADATA or GOAWAY) should trigger a re-dial, interpose a callbacks wrapper
+  // between the codec and the HCM so we observe the received drain signal (the default server
+  // path ignores it). Otherwise use the HCM callbacks directly.
   std::unique_ptr<DrainAwareServerConnectionCallbacks> callbacks_wrapper;
   Http::ServerConnectionCallbacks* effective_callbacks = &callbacks;
-  if (on_peer_goaway != nullptr) {
+  if (on_peer_drain != nullptr) {
     callbacks_wrapper =
-        std::make_unique<DrainAwareServerConnectionCallbacks>(callbacks, std::move(on_peer_goaway));
+        std::make_unique<DrainAwareServerConnectionCallbacks>(callbacks, std::move(on_peer_drain));
     effective_callbacks = callbacks_wrapper.get();
   }
 
@@ -117,7 +118,10 @@ Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createCodec(
   return std::make_unique<DrainAwareServerConnection>(
       std::move(codec), connection, factory_context_.drainDecision(),
       factory_context_.serverFactoryContext(), drain_delay_config, std::move(on_local_drain),
-      std::move(callbacks_wrapper));
+      std::move(callbacks_wrapper),
+      factory_context_.direction() == envoy::config::core::v3::TrafficDirection::INBOUND
+          ? Network::DrainDirection::InboundOnly
+          : Network::DrainDirection::All);
 }
 
 absl::Status
@@ -163,8 +167,15 @@ DrainAwareHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto
       *singletons.filter_config_provider_manager_, creation_status);
   RETURN_IF_NOT_OK(creation_status);
 
-  return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {
+  return [singletons, filter_config, &context,
+          enable_drain_with_goaway = proto_config.enable_drain_with_goaway()](
+             Network::FilterManager& filter_manager) -> void {
     auto& server_context = context.serverFactoryContext();
+    if (enable_drain_with_goaway &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reverse_tunnel_listener_drain")) {
+      filter_manager.addReadFilter(std::make_shared<DrainAwareReadFilter>(
+          server_context, filter_config->stats().named_.downstream_cx_drain_close_));
+    }
     Server::OverloadManager& overload_manager = context.shouldBypassOverloadManager()
                                                     ? server_context.nullOverloadManager()
                                                     : server_context.overloadManager();

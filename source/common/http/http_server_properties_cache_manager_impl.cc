@@ -7,6 +7,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -23,9 +24,11 @@ HttpServerPropertiesCacheManagerImpl::HttpServerPropertiesCacheManagerImpl(
 HttpServerPropertiesCacheSharedPtr HttpServerPropertiesCacheManagerImpl::getCache(
     const envoy::config::core::v3::AlternateProtocolsCacheOptions& options,
     Event::Dispatcher& dispatcher) {
+  std::string serialized_options = MessageUtil::serializeDeterministically(options);
   const auto& existing_cache = (*slot_).caches_.find(options.name());
   if (existing_cache != (*slot_).caches_.end()) {
-    if (!Protobuf::util::MessageDifferencer::Equivalent(options, existing_cache->second.options_)) {
+    if (serialized_options != existing_cache->second.serialized_options_ &&
+        !Protobuf::util::MessageDifferencer::Equivalent(options, existing_cache->second.options_)) {
       IS_ENVOY_BUG(fmt::format(
           "options specified alternate protocols cache '{}' with different settings"
           " first '{}' second '{}'",
@@ -69,7 +72,7 @@ HttpServerPropertiesCacheSharedPtr HttpServerPropertiesCacheManagerImpl::getCach
     }
   }
 
-  (*slot_).caches_.emplace(options.name(), CacheWithOptions{options, new_cache});
+  (*slot_).caches_.try_emplace(options.name(), options, std::move(serialized_options), new_cache);
   return new_cache;
 }
 

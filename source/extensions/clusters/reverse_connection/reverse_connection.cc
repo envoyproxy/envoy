@@ -17,6 +17,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
 #include "absl/status/status.h"
@@ -129,6 +130,10 @@ RevConCluster::checkAndCreateHost(absl::string_view host_id,
   // Use SocketManager to resolve the key to a node ID.
   std::string node_id = socket_manager->getNodeWithSocket(std::string(host_id));
   ENVOY_LOG(debug, "reverse_connection: resolved key '{}' to node: '{}'", host_id, node_id);
+  if (node_id.empty()) {
+    upstream_rq_all_tunnels_draining_->inc();
+    return {nullptr};
+  }
 
   {
     absl::ReaderMutexLock rlock(host_map_lock_);
@@ -291,6 +296,14 @@ RevConCluster::RevConCluster(
       cleanup_interval_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(rev_con_config, cleanup_interval, 60000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })) {
+  if (!creation_status.ok()) {
+    return;
+  }
+  upstream_rq_all_tunnels_draining_ = &info()->statsScope().counterFromStatName(
+      Stats::StatNameManagedStorage("upstream_rq_all_tunnels_draining",
+                                    info()->statsScope().symbolTable())
+          .statName());
+
   // Create the host-id formatter from the format string.
   auto formatter_or_error = Envoy::Formatter::FormatterImpl::create(
       rev_con_config.host_id_format(), /*omit_empty_values=*/false,

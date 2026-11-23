@@ -209,7 +209,8 @@ void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(const std::string& type_url, Watch* 
       effectiveResources(resources, options);
 
   auto added_removed = watch_map.updateWatchInterest(watch, effective_resources);
-  if (xds_config_tracker_.has_value() && !added_removed.removed_.empty()) {
+  if (xds_config_tracker_.has_value() && !added_removed.removed_.empty() &&
+      xds_config_tracker_->enabled()) {
     ENVOY_LOG(debug,
               "GrpcMuxImpl::updateWatch calling onResourceUnsubscribed for "
               "{} resources",
@@ -239,7 +240,8 @@ void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(
   auto added_removed = watchMapFor(type_url).updateWatchInterest(
       watch, effectiveResources(resources_to_add, options),
       effectiveResources(resources_to_remove, options));
-  if (xds_config_tracker_.has_value() && !added_removed.removed_.empty()) {
+  if (xds_config_tracker_.has_value() && !added_removed.removed_.empty() &&
+      xds_config_tracker_->enabled()) {
     ENVOY_LOG(debug,
               "GrpcMuxImpl::updateWatch calling onResourceUnsubscribed for "
               "{} resources",

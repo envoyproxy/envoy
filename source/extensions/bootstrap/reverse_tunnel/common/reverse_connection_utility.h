@@ -5,6 +5,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/random_generator.h"
+#include "envoy/http/metadata_interface.h"
 #include "envoy/network/connection.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -93,6 +94,13 @@ public:
                             Random::RandomGenerator& random);
 
   static uint64_t diffMs(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end);
+
+  // Creates a single-entry MetadataMapVector carrying the reverse-tunnel drain marker.
+  static Http::MetadataMapVector createDrainMetadata();
+
+  // If `metadata_map` contains the reverse-tunnel drain marker with its expected value, removes
+  // that entry and returns true; otherwise leaves `metadata_map` unchanged and returns false.
+  static bool eraseDrainMetadata(Http::MetadataMap& metadata_map);
 
 private:
   ReverseConnectionUtility() = delete;

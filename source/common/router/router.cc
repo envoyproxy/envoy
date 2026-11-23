@@ -371,6 +371,8 @@ FilterUtility::finalHedgingParams(const RouteEntry& route,
 Filter::Filter(const FilterConfigSharedPtr& config, FilterStats& stats)
     : config_(config), stats_(stats),
       reject_early_connect_data_enabled_(config->reject_connect_request_early_data_),
+      drop_kept_body_(ENVOY_RUNTIME_FEATURE_ENABLED(
+          "envoy.reloadable_features.filter_manager_per_filter_buffer")),
       refresh_transport_and_lb_on_retry_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.router_refresh_transport_and_lb_on_retry")) {}
 
@@ -1186,6 +1188,12 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     }
   }
 
+  // Retries and redirects may have been given up on overflow above, or since the last frame, e.g.
+  // once the response started.
+  if (!buffering) {
+    dropKeptBody(decoding_buffer, data);
+  }
+
   for (auto* shadow_stream : shadow_streams_) {
     if (end_stream) {
       shadow_stream->removeDestructorCallback();
@@ -1209,7 +1217,9 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     // so that all buffered data is available by the time we do request complete processing and
     // potentially shadow. Additionally, we can't do a copy here because there's a check down
     // this stack for whether `data` is the same buffer as already buffered data.
+    const uint64_t length_before_keeping = getLength(callbacks_->decodingBuffer());
     callbacks_->addDecodedData(data, true);
+    kept_body_length_ += getLength(callbacks_->decodingBuffer()) - length_before_keeping;
   } else {
     if (!upstream_requests_.empty()) {
       upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
@@ -1230,6 +1240,21 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   }
 
   return Http::FilterDataStatus::StopIterationNoBuffer;
+}
+
+void Filter::dropKeptBody(const Buffer::Instance* decoding_buffer, const Buffer::Instance& data) {
+  // Nothing reads the kept body once retries and redirects are given up, so drop it to release its
+  // buffer accounting. Otherwise, with per-filter buffers, it keeps the stream buffer total above
+  // the low watermark and downstream reads may never resume. The guard is read separately from the
+  // filter manager, so only drop the body while the decoding buffer holds exactly what the router
+  // kept: with the shared buffer it may also hold the data of other filters. Skip it if the current
+  // frame is the decoding buffer itself, since the frame still has to be forwarded upstream.
+  if (!drop_kept_body_ || kept_body_length_ == 0 || decoding_buffer == nullptr ||
+      decoding_buffer == &data || decoding_buffer->length() != kept_body_length_) {
+    return;
+  }
+  kept_body_length_ = 0;
+  callbacks_->modifyDecodingBuffer([](Buffer::Instance& buffer) { buffer.drain(buffer.length()); });
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trailers) {
