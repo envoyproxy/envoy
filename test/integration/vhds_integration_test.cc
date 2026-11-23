@@ -612,5 +612,189 @@ TEST_P(OnDemandVhdsRecreateStreamRegressionTest,
   cleanupUpstreamAndDownstream();
 }
 
+class VhdsOnDemandInitialWarmingIntegrationTest : public Event::TestUsingSimulatedTime,
+                                                  public VhdsIntegrationTest {
+public:
+  using RouteConfigModifier = std::function<void(envoy::config::route::v3::RouteConfiguration&)>;
+
+  void initialize() override {
+    useRdsWithVhosts();
+    config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    )EOF");
+    if (routeConfigType() == RouteConfigType::Static) {
+      config_helper_.addConfigModifier(
+          [&](envoy::extensions::filters::network::http_connection_manager::v3::
+                  HttpConnectionManager& hcm) -> void {
+            hcm.clear_rds();
+            hcm.mutable_route_config()->CopyFrom(rdsConfig());
+          });
+    }
+
+    setUpstreamCount(2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+    defer_listener_finalization_ = true;
+    HttpIntegrationTest::initialize();
+
+    AssertionResult result =
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
+    RELEASE_ASSERT(result, result.message());
+
+    if (routeConfigType() == RouteConfigType::Rds) {
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
+                                              {"my_route"}, true));
+      sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+          Config::TestTypeUrl::get().RouteConfiguration, {rdsConfig()}, "1");
+    }
+
+    test_server_->waitUntilListenersReady();
+    test_server_->notifyingStatsAllocator().waitForCounterFromStringEq(
+        "listener_manager.listener_create_success", 1);
+    absl::Notification main_thread_done;
+    test_server_->server().dispatcher().post([&main_thread_done] { main_thread_done.Notify(); });
+    main_thread_done.WaitForNotification();
+    ASSERT_TRUE(workersStarted());
+    registerTestServerPorts({"http"});
+
+    result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    vhds_stream_->startGrpcStream();
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+  }
+
+  const envoy::config::route::v3::RouteConfiguration rdsConfig() const override {
+    auto config = VhdsIntegrationTest::rdsConfig();
+    config.mutable_vhds()->set_skip_initial_warming(true);
+    config.mutable_vhds()->set_disable_on_demand(true);
+    if (route_config_modifier_ != nullptr) {
+      route_config_modifier_(config);
+    }
+    return config;
+  }
+
+  void waitForHeldRequests(uint64_t expected_downstream_rq_total) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    test_server_->notifyingStatsAllocator().waitForCounterFromStringEq(
+        "http.config_test.downstream_rq_total", expected_downstream_rq_total);
+    test_server_->waitForWorkerThreads();
+    absl::Notification done;
+    test_server_->server().dispatcher().post([&done] { done.Notify(); });
+    done.WaitForNotification();
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  std::string vhdsStatPrefix() const {
+    return routeConfigType() == RouteConfigType::Rds ? "http.config_test.rds.vhds.my_route."
+                                                     : "vhds.my_route.";
+  }
+
+  RouteConfigModifier route_config_modifier_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsOnDemandInitialWarmingIntegrationTest,
+                         VHDS_INTEGRATION_PARAMS, vhdsTestParamsToString);
+
+TEST_P(VhdsOnDemandInitialWarmingIntegrationTest,
+       HoldsUnmatchedRequestsInOnDemandFilterUntilInitialVhdsUpdate) {
+  initialize();
+
+  // Static virtual host matched path succeeds and unmatched path immediately returns 404.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
+  Http::TestRequestHeaderMapImpl unmatched_path_headers{{":method", "GET"},
+                                                        {":path", "/unmatched"},
+                                                        {":scheme", "http"},
+                                                        {":authority", "vhost.rds.first"}};
+  auto static_404_response = codec_client_->makeHeaderOnlyRequest(unmatched_path_headers);
+  ASSERT_TRUE(static_404_response->waitForEndStream());
+  EXPECT_EQ("404", static_404_response->headers().getStatusValue());
+  EXPECT_EQ(0,
+            test_server_->counter("http.config_test.on_demand.route_discovery_requested")->value());
+
+  // Concurrent unmatched POST (with body + trailers) and GET are held without on-demand wire
+  // requests until the initial wildcard VHDS response arrives.
+  Http::TestRequestHeaderMapImpl request_headers1{
+      {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-test-trailer", "trailer-value"}};
+  auto [encoder1, response1] = codec_client_->startRequest(request_headers1);
+  codec_client_->sendData(encoder1, "hello", false);
+  codec_client_->sendTrailers(encoder1, request_trailers);
+
+  Http::TestRequestHeaderMapImpl request_headers2{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "unknown.com"}};
+  auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers2);
+
+  waitForHeldRequests(4);
+  EXPECT_FALSE(response1->complete());
+  EXPECT_FALSE(response2->complete());
+  EXPECT_EQ(2,
+            test_server_->counter("http.config_test.on_demand.route_discovery_requested")->value());
+
+  // sendInitialVhdsResponse() also asserts the next message on vhds_stream_ is the empty ACK.
+  sendInitialVhdsResponse();
+
+  waitForNextUpstreamRequest(1);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("hello", upstream_request_->body().toString());
+  ASSERT_NE(nullptr, upstream_request_->trailers());
+  EXPECT_THAT(*upstream_request_->trailers(), HeaderMapEqualRef(&request_trailers));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response1->waitForEndStream());
+  EXPECT_EQ("200", response1->headers().getStatusValue());
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("404", response2->headers().getStatusValue());
+
+  // Subsequent unmatched host resolves immediately locally without an on-demand discovery request.
+  Http::TestRequestHeaderMapImpl still_unknown_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "still-unknown.com"}};
+  auto unknown_response = codec_client_->makeHeaderOnlyRequest(still_unknown_headers);
+  ASSERT_TRUE(unknown_response->waitForEndStream());
+  EXPECT_EQ("404", unknown_response->headers().getStatusValue());
+  EXPECT_EQ(2,
+            test_server_->counter("http.config_test.on_demand.route_discovery_requested")->value());
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+TEST_P(VhdsOnDemandInitialWarmingIntegrationTest, InitialVhdsFetchTimeoutWakesHeldRequestTo404) {
+  const MonotonicTime start_sim_time = timeSystem().monotonicTime();
+  route_config_modifier_ = [](envoy::config::route::v3::RouteConfiguration& config) {
+    config.mutable_vhds()->mutable_config_source()->mutable_initial_fetch_timeout()->set_seconds(1);
+  };
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForHeldRequests(1);
+  EXPECT_FALSE(response->complete());
+
+  EXPECT_EQ(start_sim_time, timeSystem().monotonicTime());
+  timeSystem().advanceTimeWaitImpl(std::chrono::seconds(1));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringEq(
+      vhdsStatPrefix() + "init_fetch_timeout", 1);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+
+  Http::TestRequestHeaderMapImpl unknown_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "unknown.com"}};
+  auto unknown_response = codec_client_->makeHeaderOnlyRequest(unknown_headers);
+  ASSERT_TRUE(unknown_response->waitForEndStream());
+  EXPECT_EQ("404", unknown_response->headers().getStatusValue());
+  EXPECT_EQ(1,
+            test_server_->counter("http.config_test.on_demand.route_discovery_requested")->value());
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
 } // namespace
 } // namespace Envoy

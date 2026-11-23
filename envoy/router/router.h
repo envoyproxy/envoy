@@ -19,6 +19,7 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/hash_policy.h"
 #include "envoy/http/header_evaluator.h"
+#include "envoy/http/header_map.h"
 #include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
 #include "envoy/router/path_matcher.h"
@@ -1153,6 +1154,11 @@ public:
   virtual bool usesVhds() const PURE;
 
   /**
+   * @return bool whether per-domain on-demand VHDS discovery requests are disabled.
+   */
+  virtual bool vhdsOnDemandDisabled() const { return false; }
+
+  /**
    * @return bool whether most specific header mutations should take precedence. The default
    * evaluation order is route level, then virtual host level and finally global connection
    * manager level.
@@ -1230,6 +1236,17 @@ public:
   virtual VirtualHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
                                  const StreamInfo::StreamInfo& stream_info,
                                  uint64_t random_value) const PURE;
+
+  /**
+   * @return bool whether this route configuration is still awaiting its initial VHDS update
+   * when ``skip_initial_warming`` and ``disable_on_demand`` are enabled.
+   */
+  virtual bool awaitingInitialVhdsUpdate() const { return false; }
+
+  /**
+   * @return bool whether a virtual host matches the supplied request headers.
+   */
+  virtual bool virtualHostExists(const Http::RequestHeaderMap&) const { return false; }
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;

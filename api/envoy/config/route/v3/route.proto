@@ -201,4 +201,22 @@ message Vhds {
 
   // Configuration source specifier for VHDS.
   core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // If true, initial VHDS warming does not block listener or route configuration initialization;
+  // the VHDS init target is marked ready immediately when the subscription starts. When the
+  // :ref:`on-demand HTTP filter <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>`
+  // is also configured on a top-level ``rds`` or ``route_config`` route configuration, unmatched
+  // requests trigger per-domain on-demand VHDS discovery unless :ref:`disable_on_demand
+  // <envoy_v3_api_field_config.route.v3.Vhds.disable_on_demand>` is also set, in which case they
+  // wait only for the initial wildcard VHDS update.
+  bool skip_initial_warming = 2;
+
+  // If true, per-domain on-demand VHDS discovery requests are not sent when the
+  // :ref:`on-demand HTTP filter <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>`
+  // encounters an unmatched host. When combined with ``skip_initial_warming`` and the on-demand
+  // HTTP filter on a top-level ``rds`` or ``route_config`` route configuration, requests that do
+  // not match an existing virtual host are held in memory until the initial wildcard VHDS update
+  // completes (or fails), and subsequent unmatched requests resolve locally without sending
+  // on-demand VHDS requests.
+  bool disable_on_demand = 3;
 }

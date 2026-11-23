@@ -37,8 +37,8 @@ public:
                     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
 private:
-  Router::RouteConfigProvider* route_config_provider_;
-  Router::ScopedRdsConfigProvider* scoped_route_config_provider_;
+  Router::RouteConfigProvider* route_config_provider_{nullptr};
+  Router::ScopedRdsConfigProvider* scoped_route_config_provider_{nullptr};
   OptRef<const Router::ScopeKeyBuilder> scope_key_builder_;
 };
 

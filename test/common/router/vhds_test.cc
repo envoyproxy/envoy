@@ -108,6 +108,28 @@ vhds:
     return route_config;
   }
 
+  bool configAwaitingInitialVhdsUpdate(const RouteConfigUpdateReceiver& receiver) {
+    const auto config =
+        std::dynamic_pointer_cast<const Router::Config>(receiver.parsedConfiguration());
+    return config != nullptr && config->awaitingInitialVhdsUpdate();
+  }
+
+  std::string vhdsConfigYaml(bool skip_initial_warming, bool disable_on_demand) {
+    return fmt::format(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  skip_initial_warming: {}
+  disable_on_demand: {}
+)EOF",
+                       skip_initial_warming, disable_on_demand);
+  }
+
   ProtoTraitsImpl proto_traits_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Init::ManagerImpl init_manager_{"test route config"};
@@ -765,6 +787,191 @@ vhds:
   EXPECT_EQ("vhost.rds.domain", virtual_hosts[0].domains(0));
   EXPECT_EQ("overlapping_vhost", virtual_hosts[1].name());
   EXPECT_EQ("vhost.vhds.domain", virtual_hosts[1].domains(0));
+}
+
+TEST_F(VhdsTest, SkipInitialWarmingOnly) {
+  const auto route_config = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+      vhdsConfigYaml(/*skip_initial_warming=*/true, /*disable_on_demand=*/false));
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  EXPECT_FALSE(config_update_info->configWarming());
+  EXPECT_FALSE(config_update_info->vhdsOnDemandDisabled());
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_,
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"vhost1"}));
+  config_update_info->updateOnDemand("vhost1");
+}
+
+TEST_F(VhdsTest, DisableOnDemandOnly) {
+  const auto route_config = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+      vhdsConfigYaml(/*skip_initial_warming=*/false, /*disable_on_demand=*/true));
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  EXPECT_TRUE(config_update_info->configWarming());
+  EXPECT_TRUE(config_update_info->vhdsOnDemandDisabled());
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+
+  EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_,
+              requestOnDemandUpdate(_))
+      .Times(0);
+  config_update_info->updateOnDemand("vhost1");
+
+  const auto added_resources = buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, {}, "1"));
+  EXPECT_FALSE(config_update_info->configWarming());
+  EXPECT_EQ(1, routeConfiguration(*config_update_info).virtual_hosts().size());
+}
+
+TEST_F(VhdsTest, SkipInitialWarmingAndDisableOnDemand) {
+  NiceMock<MockRouteConfigUpdateObserver> observer;
+  RouteConfigUpdatePtr config_update_info = makeReceiver();
+  ON_CALL(observer, onConfigWarmed()).WillByDefault([&config_update_info]() {
+    config_update_info->onVhdsConfigPublished();
+  });
+  config_update_info->setObserver(observer);
+
+  const auto route_config = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+      vhdsConfigYaml(/*skip_initial_warming=*/true, /*disable_on_demand=*/true));
+  EXPECT_OK(config_update_info->onRdsUpdate(route_config, "1"));
+
+  EXPECT_FALSE(config_update_info->configWarming());
+  EXPECT_TRUE(config_update_info->vhdsOnDemandDisabled());
+  EXPECT_TRUE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_TRUE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  testing::NiceMock<Event::MockDispatcher> local_dispatcher;
+  testing::MockFunction<void(bool)> mock_callback;
+  auto callback_holder =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(mock_callback.AsStdFunction());
+
+  EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_,
+              requestOnDemandUpdate(_))
+      .Times(0);
+  EXPECT_CALL(mock_callback, Call(_)).Times(0);
+  config_update_info->requestVirtualHostsUpdate("bar.com", local_dispatcher, callback_holder);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback);
+
+  EXPECT_CALL(mock_callback, Call(true));
+  const auto added_resources =
+      buildAddedResources({buildVirtualHost("my_route/vhost_bar", "bar.com")});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, {}, "2"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback);
+
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  EXPECT_CALL(mock_callback, Call(false));
+  config_update_info->requestVirtualHostsUpdate("baz.com", local_dispatcher, callback_holder);
+}
+
+class VhdsInitialWarmingResolutionTest : public VhdsTest,
+                                         public testing::WithParamInterface<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(FailureOrEmpty, VhdsInitialWarmingResolutionTest, testing::Bool());
+
+TEST_P(VhdsInitialWarmingResolutionTest, ResolvesInPlaceWithoutRebuildingRemovedClusterConfig) {
+  factory_context_.cluster_manager_.initializeClusters({"my_service"}, {});
+  NiceMock<MockRouteConfigUpdateObserver> observer;
+  RouteConfigUpdatePtr config_update_info = makeReceiver();
+  ON_CALL(observer, onConfigWarmed()).WillByDefault([&config_update_info]() {
+    config_update_info->onVhdsConfigPublished();
+  });
+  config_update_info->setObserver(observer);
+
+  auto route_config = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+      vhdsConfigYaml(/*skip_initial_warming=*/true, /*disable_on_demand=*/true));
+  route_config.mutable_validate_clusters()->set_value(true);
+  *route_config.add_virtual_hosts() = buildVirtualHost("vhost_static", "static.example.com");
+  EXPECT_OK(config_update_info->onRdsUpdate(route_config, "1"));
+
+  const auto published_before = config_update_info->parsedConfiguration();
+  ASSERT_NE(nullptr, published_before);
+  ASSERT_TRUE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  testing::NiceMock<Event::MockDispatcher> local_dispatcher;
+  testing::MockFunction<void(bool)> mock_callback;
+  auto callback_holder =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(mock_callback.AsStdFunction());
+
+  EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_,
+              requestOnDemandUpdate(_))
+      .Times(0);
+  EXPECT_CALL(mock_callback, Call(_)).Times(0);
+  config_update_info->requestVirtualHostsUpdate("bar.com", local_dispatcher, callback_holder);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback);
+
+  // Removing the validated cluster would throw if resolution tried to rebuild ConfigImpl.
+  factory_context_.cluster_manager_.initializeClusters({}, {});
+
+  EXPECT_CALL(mock_callback, Call(false));
+  auto* callbacks = factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  if (GetParam()) {
+    callbacks->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
+                                    nullptr);
+  } else {
+    EXPECT_OK(callbacks->onConfigUpdate({}, {}, "vhds_v1"));
+  }
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback);
+
+  EXPECT_EQ(published_before, config_update_info->parsedConfiguration());
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  EXPECT_CALL(mock_callback, Call(false));
+  config_update_info->requestVirtualHostsUpdate("baz.com", local_dispatcher, callback_holder);
+}
+
+TEST_F(VhdsTest, RejectedInitialVhdsUpdateClearsAwaitingStateAndNotifiesCallbacks) {
+  NiceMock<MockRouteConfigUpdateObserver> observer;
+  RouteConfigUpdatePtr config_update_info = makeReceiver();
+  ON_CALL(observer, onConfigWarmed()).WillByDefault([&config_update_info]() {
+    config_update_info->onVhdsConfigPublished();
+  });
+  config_update_info->setObserver(observer);
+
+  const auto route_config = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+      vhdsConfigYaml(/*skip_initial_warming=*/true, /*disable_on_demand=*/true));
+  EXPECT_OK(config_update_info->onRdsUpdate(route_config, "1"));
+
+  testing::NiceMock<Event::MockDispatcher> local_dispatcher;
+  testing::MockFunction<void(bool)> mock_callback;
+  auto callback_holder =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(mock_callback.AsStdFunction());
+
+  EXPECT_CALL(mock_callback, Call(_)).Times(0);
+  config_update_info->requestVirtualHostsUpdate("bar.com", local_dispatcher, callback_holder);
+
+  const auto added_resources = buildAddedResources(
+      {buildVirtualHost("vhost1", "dup.com"), buildVirtualHost("vhost2", "dup.com")});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  auto* callbacks = factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  bool threw = false;
+  try {
+    FAIL() << callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "2");
+  } catch (const EnvoyException& e) {
+    threw = true;
+    EXPECT_TRUE(config_update_info->awaitingInitialVhdsUpdate());
+    EXPECT_TRUE(configAwaitingInitialVhdsUpdate(*config_update_info));
+    ::testing::Mock::VerifyAndClearExpectations(&mock_callback);
+    EXPECT_CALL(mock_callback, Call(false));
+    callbacks->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
+  }
+  EXPECT_TRUE(threw);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback);
+
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+  EXPECT_CALL(mock_callback, Call(false));
+  config_update_info->requestVirtualHostsUpdate("baz.com", local_dispatcher, callback_holder);
 }
 
 } // namespace

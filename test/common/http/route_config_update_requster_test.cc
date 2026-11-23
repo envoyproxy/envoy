@@ -67,6 +67,40 @@ TEST_F(RdsRouteConfigUpdateRequesterTest, VhdsUpdateWithoutHostContinuesFilterCh
   EXPECT_FALSE(updated);
 }
 
+TEST_F(RdsRouteConfigUpdateRequesterTest, VhdsOnDemandDisabledInitialCompleteSkipsUpdate) {
+  ON_CALL(*route_config_, vhdsOnDemandDisabled()).WillByDefault(Return(true));
+  EXPECT_CALL(provider_, requestVirtualHostsUpdate(_, _, _)).Times(0);
+
+  bool updated = true;
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "Some.Host"}};
+  requestUpdate(headers, updated);
+  EXPECT_FALSE(updated);
+}
+
+TEST_F(RdsRouteConfigUpdateRequesterTest,
+       VhdsOnDemandDisabledExistingVirtualHostSkipsUpdateWhileAwaitingInitialVhds) {
+  ON_CALL(*route_config_, vhdsOnDemandDisabled()).WillByDefault(Return(true));
+  ON_CALL(*route_config_, awaitingInitialVhdsUpdate()).WillByDefault(Return(true));
+  ON_CALL(*route_config_, virtualHostExists(_)).WillByDefault(Return(true));
+  EXPECT_CALL(provider_, requestVirtualHostsUpdate(_, _, _)).Times(0);
+
+  bool updated = true;
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "Some.Host"}};
+  requestUpdate(headers, updated);
+  EXPECT_FALSE(updated);
+}
+
+TEST_F(RdsRouteConfigUpdateRequesterTest,
+       VhdsOnDemandDisabledUnmatchedVirtualHostQueuesWhileAwaitingInitialVhds) {
+  ON_CALL(*route_config_, vhdsOnDemandDisabled()).WillByDefault(Return(true));
+  ON_CALL(*route_config_, awaitingInitialVhdsUpdate()).WillByDefault(Return(true));
+  EXPECT_CALL(provider_, requestVirtualHostsUpdate("some.host", _, _));
+
+  bool updated = false;
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "Some.Host"}};
+  requestUpdate(headers, updated);
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy

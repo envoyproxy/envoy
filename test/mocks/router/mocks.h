@@ -655,6 +655,9 @@ public:
   MOCK_METHOD(const std::vector<Http::LowerCaseString>&, internalOnlyHeaders, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(bool, usesVhds, (), (const));
+  MOCK_METHOD(bool, awaitingInitialVhdsUpdate, (), (const));
+  MOCK_METHOD(bool, vhdsOnDemandDisabled, (), (const));
+  MOCK_METHOD(bool, virtualHostExists, (const Http::RequestHeaderMap&), (const));
   MOCK_METHOD(bool, mostSpecificHeaderMutationsWins, (), (const));
   MOCK_METHOD(uint32_t, maxDirectResponseBodySizeBytes, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
@@ -722,6 +725,7 @@ public:
               (const VirtualHostRefVector& added_vhosts, std::set<std::string>&& added_resource_ids,
                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                const std::string& version_info));
+  MOCK_METHOD(void, onVhdsFailure, ());
 };
 
 class MockScopedConfig : public ScopedConfig {

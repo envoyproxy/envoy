@@ -86,6 +86,7 @@ private:
   VhdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
   Init::TargetImpl init_target_;
+  const bool skip_initial_warming_;
   const Envoy::Config::ResourceTypeHelper<envoy::config::route::v3::VirtualHost>
       resource_type_helper_;
 };

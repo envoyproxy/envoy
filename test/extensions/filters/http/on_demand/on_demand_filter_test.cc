@@ -113,6 +113,52 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteIsNotAvailable) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
 }
 
+TEST_F(OnDemandFilterTest, TestDecodeHeadersRefreshesStaleRouteSnapshot) {
+  Http::TestRequestHeaderMapImpl headers;
+  bool refreshed = false;
+  ON_CALL(decoder_callbacks_, route()).WillByDefault([&]() -> OptRef<const Router::Route> {
+    return makeOptRefFromPtr<const Router::Route>(refreshed ? decoder_callbacks_.route_.get()
+                                                            : nullptr);
+  });
+  {
+    testing::InSequence s;
+    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot());
+    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).WillOnce([&]() {
+      refreshed = true;
+    });
+  }
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+}
+
+TEST_F(OnDemandFilterTest, TestDecodeHeadersRefreshesStaleRouteSnapshotAndTriggersOnDemandCds) {
+  auto mock_odcds = Upstream::MockOdCdsApiHandle::create();
+  auto* odcds = mock_odcds.get();
+  OnDemandFilterConfig per_route_config(
+      DecodeHeadersBehavior::cdsRds(std::move(mock_odcds), std::chrono::milliseconds(5000)));
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(&per_route_config));
+
+  Http::TestRequestHeaderMapImpl headers;
+  bool refreshed = false;
+  ON_CALL(decoder_callbacks_, route()).WillByDefault([&]() -> OptRef<const Router::Route> {
+    return makeOptRefFromPtr<const Router::Route>(refreshed ? decoder_callbacks_.route_.get()
+                                                            : nullptr);
+  });
+  {
+    testing::InSequence s;
+    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot());
+    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).WillOnce([&]() {
+      refreshed = true;
+    });
+  }
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
+  EXPECT_CALL(*odcds, requestOnDemandClusterDiscovery(_, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+}
+
 // tests onRouteConfigUpdateCompletion() invoked synchronously while decodeHeaders() is still
 // active: the callback must not continue decoding (decode_headers_active_ == true).
 TEST_F(OnDemandFilterTest, TestDecodeHeadersRouteConfigUpdateCompletesSynchronously) {
@@ -176,6 +222,13 @@ TEST_F(OnDemandFilterTest, TestDecodeDataReturnsStopIteration) {
   Buffer::OwnedImpl buffer;
   filter_->setFilterIterationState(Http::FilterHeadersStatus::StopIteration);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer, false));
+}
+
+// tests decodeTrailers() when filter state is Http::FilterHeadersStatus::StopIteration
+TEST_F(OnDemandFilterTest, TestDecodeTrailersReturnsStopIteration) {
+  Http::TestRequestTrailerMapImpl trailers;
+  filter_->setFilterIterationState(Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(trailers));
 }
 
 // tests onRouteConfigUpdateCompletion() route hasn't been resolved

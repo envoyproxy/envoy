@@ -97,7 +97,11 @@ VhdsSubscription::VhdsSubscription(const envoy::config::route::v3::RouteConfigur
                      // watch without being subscribed on the wire.
                      subscription_->accept({route_config_name_ + "/*"});
                      subscription_->start({});
+                     if (skip_initial_warming_) {
+                       init_target_.ready();
+                     }
                    }),
+      skip_initial_warming_(route_config.vhds().skip_initial_warming()),
       resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
                             "name") {
   const auto resource_name = resource_type_helper_.getResourceName();
@@ -121,6 +125,7 @@ void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_
 void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                                             const EnvoyException*) {
   ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
+  receiver_.onVhdsFailure();
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();

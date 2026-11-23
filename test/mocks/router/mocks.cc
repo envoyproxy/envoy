@@ -143,6 +143,9 @@ MockConfig::MockConfig() : route_(new NiceMock<MockRoute>()) {
   ON_CALL(*this, internalOnlyHeaders()).WillByDefault(ReturnRef(internal_only_headers_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, usesVhds()).WillByDefault(Return(false));
+  ON_CALL(*this, awaitingInitialVhdsUpdate()).WillByDefault(Return(false));
+  ON_CALL(*this, vhdsOnDemandDisabled()).WillByDefault(Return(false));
+  ON_CALL(*this, virtualHostExists(_)).WillByDefault(Return(false));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
   ON_CALL(*this, ignorePathParametersInPathMatching()).WillByDefault(Return(false));

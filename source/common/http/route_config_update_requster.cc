@@ -8,9 +8,12 @@ void RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
     RouteCache& route_cache, Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
     std::optional<Router::ConfigConstSharedPtr> route_config, Event::Dispatcher& dispatcher,
     RequestHeaderMap& request_headers) {
-  if (route_config.has_value() && route_config.value()->usesVhds()) {
+  if (route_config_provider_ != nullptr && route_config.has_value() &&
+      route_config.value()->usesVhds()) {
     const absl::string_view host = request_headers.getHostValue();
-    if (!host.empty()) {
+    if (!host.empty() && (!route_config.value()->vhdsOnDemandDisabled() ||
+                          (route_config.value()->awaitingInitialVhdsUpdate() &&
+                           !route_config.value()->virtualHostExists(request_headers)))) {
       requestVhdsUpdate(absl::AsciiStrToLower(host), dispatcher,
                         std::move(route_config_updated_cb));
       return;
