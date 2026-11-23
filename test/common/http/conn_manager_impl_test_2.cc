@@ -2491,5 +2491,52 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutNoJitter) {
   drain_timer->invokeCallback();
 }
 
+TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInlineWithPerFilterBuffer) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.filter_manager_per_filter_buffer", "true"}});
+  setup();
+  setupFilterChain(2, 2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true)).WillOnce([&]() -> FilterHeadersStatus {
+    Buffer::OwnedImpl data("hello");
+    decoder_filters_[0]->callbacks_->addDecodedData(data, true);
+    return FilterHeadersStatus::Continue;
+  });
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  startRequest(true);
+
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true)).WillOnce([&]() -> FilterHeadersStatus {
+    Buffer::OwnedImpl data("hello");
+    encoder_filters_[1]->callbacks_->addEncodedData(data, true);
+    // The body is held by the adding filter only.
+    EXPECT_EQ(5UL, encoder_filters_[1]->callbacks_->encodingBuffer()->length());
+    EXPECT_EQ(nullptr, encoder_filters_[0]->callbacks_->encodingBuffer());
+    return FilterHeadersStatus::Continue;
+  });
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
+      .WillOnce([](Buffer::Instance& data, bool) -> FilterDataStatus {
+        EXPECT_EQ("hello", data.toString());
+        return FilterDataStatus::Continue;
+      });
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  expectOnDestroy();
+
+  decoder_filters_[1]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
+}
+
 } // namespace Http
 } // namespace Envoy
