@@ -27,7 +27,7 @@ TEST(KafkaCodecTest, SimpleFrameTest) {
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
             NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
                                                  std::nullopt),
-            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
+            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}, {}, {}));
 
     KafkaRequestFrame frame(request);
     EXPECT_EQ(frame.frameFlags().streamId(), 3);
@@ -66,7 +66,7 @@ TEST(KafkaCodecTest, KafkaRequestCallbacksTest) {
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
             NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
                                                  std::nullopt),
-            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
+            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}, {}, {}));
 
     request_callbacks.onMessage(request);
   }
@@ -119,7 +119,7 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
             NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
                                                  std::nullopt),
-            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
+            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}, {}, {}));
 
     KafkaRequestFrame frame(request);
     auto local_response = server_codec.respond(absl::OkStatus(), "", frame);
@@ -142,7 +142,7 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
             NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
                                                  std::nullopt),
-            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
+            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}, {}, {}));
 
     Buffer::OwnedImpl buffer;
     const uint32_t size = htobe32(request->computeSize());
@@ -160,7 +160,7 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
             NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
                                                  std::nullopt),
-            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
+            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}, {}, {}));
 
     Buffer::OwnedImpl buffer;
     const uint32_t size = htobe32(request->computeSize());
@@ -179,7 +179,7 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
             NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
                                                  std::nullopt),
-            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
+            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}, {}, {}));
     KafkaRequestFrame request_frame(request);
 
     auto status_or = server_codec.encode(request_frame, encoding_context);
@@ -304,7 +304,7 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
             NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
                                                  std::nullopt),
-            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
+            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}, {}, {}));
 
     KafkaRequestFrame request_frame(request);
 
