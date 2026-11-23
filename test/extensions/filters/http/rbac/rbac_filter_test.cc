@@ -11,6 +11,7 @@
 #include "source/extensions/filters/common/rbac/utility.h"
 #include "source/extensions/filters/http/rbac/rbac_filter.h"
 
+#include "test/extensions/filters/common/rbac/extension_input.h"
 #include "test/extensions/filters/common/rbac/mocks.h"
 #include "test/extensions/filters/http/rbac/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -252,6 +253,16 @@ on_no_match:
     *config.mutable_shadow_matcher() = matcher;
     config.set_shadow_rules_stat_prefix("shadow_rules_prefix_");
 
+    setupConfig(std::make_shared<RoleBasedAccessControlFilterConfig>(
+        config, "test", *stats_store_.rootScope(), context_,
+        ProtobufMessage::getStrictValidationVisitor()));
+  }
+
+  void setupExtensionInputMatcher(absl::string_view input_value) {
+    Filters::Common::RBAC::TestExtensionInputFactory input_factory(
+        Envoy::Matcher::DataInputStage::RequestHeaders);
+    envoy::extensions::filters::http::rbac::v3::RBAC config;
+    *config.mutable_matcher() = Filters::Common::RBAC::extensionInputMatcher(input_value);
     setupConfig(std::make_shared<RoleBasedAccessControlFilterConfig>(
         config, "test", *stats_store_.rootScope(), context_,
         ProtobufMessage::getStrictValidationVisitor()));
@@ -1457,6 +1468,22 @@ on_no_match:
 
   setLocalAddressWithNetworkNamespace("/var/run/netns/other", 123);
   setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, ExtensionInputMatcherAllowed) {
+  setupExtensionInputMatcher("foo");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, ExtensionInputMatcherDenied) {
+  setupExtensionInputMatcher("bar");
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
   EXPECT_EQ(0U, config_->stats().allowed_.value());

@@ -26,12 +26,9 @@ envoy_cc_library(
     name = "matching_utils_lib",
     srcs = ["matching_utils.cc"],
     hdrs = ["matching_utils.h"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/local_info:local_info_interface",
@@ -40,14 +37,8 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/status",
         "@cel-cpp//eval/public:cel_expr_builder_factory",
-    ] + select(
-        {
-            "//bazel:windows_x86_64": [],
-            "//conditions:default": [
-                "@cel-cpp//parser",
-            ],
-        },
-    ),
+        "@cel-cpp//parser",
+    ],
 )
 
 envoy_cc_library(
@@ -60,6 +51,7 @@ envoy_cc_library(
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/runtime:runtime_features_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

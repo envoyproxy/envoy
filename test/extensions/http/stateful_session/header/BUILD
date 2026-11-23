@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "header_test",
     srcs = ["header_test.cc"],
     extension_names = ["envoy.http.stateful_session.header"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/http:utility_lib",
         "//source/extensions/http/stateful_session/header:header_lib",
@@ -29,8 +29,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.stateful_session.header"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//envoy/registry",

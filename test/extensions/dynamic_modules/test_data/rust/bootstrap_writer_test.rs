@@ -1,8 +1,8 @@
-//! Test module for the bootstrap extension listener writer.
+//! Test module for the bootstrap extension listener and filter chain config writers.
 //!
 //! The integration test drives this module through the `/writer?<action>=<argument>` admin
-//! endpoint. The module enables the listener writer in config_new, and a write takes the
-//! serialized listener from the request body. When the extension config carries a serialized
+//! endpoint. The module enables both writers in config_new, and a write takes the serialized
+//! listener or filter chain from the request body. When the extension config carries a serialized
 //! listener, the module writes it as `writer.startup` from a scheduler event that it commits in
 //! config_new, and only then signals that its initialization is complete. Metrics count the writer
 //! outcomes, and the `outcomes` action returns the recorded outcomes.
@@ -29,6 +29,7 @@ fn my_new_bootstrap_extension_config_fn(
     .unwrap();
   envoy_extension_config.register_admin_handler("/writer", "Writer test endpoint.", false, false);
   envoy_extension_config.enable_listener_writer();
+  envoy_extension_config.enable_filter_chain_config_writer();
   if config.is_empty() {
     envoy_extension_config.signal_init_complete();
   } else {
@@ -90,6 +91,15 @@ impl BootstrapExtensionConfig for WriterTestConfig {
         "{:?}",
         envoy_extension_config.listener_writer_remove(argument)
       ),
+      "add_filter_chain" => {
+        let (result, update_id) =
+          envoy_extension_config.filter_chain_config_writer_add_or_update(argument, body);
+        format!("{result:?} {update_id}")
+      },
+      "remove_filter_chain" => format!(
+        "{:?}",
+        envoy_extension_config.filter_chain_config_writer_remove(argument)
+      ),
       "run_on_all_workers" => format!(
         "{}",
         envoy_extension_config.run_on_all_workers(argument.parse().unwrap_or(0))
@@ -120,6 +130,22 @@ impl BootstrapExtensionConfig for WriterTestConfig {
   ) {
     self.outcomes.lock().unwrap().push(format!(
       "{update_id} {listener_name} {status:?} {error_details}"
+    ));
+    envoy_extension_config
+      .increment_counter(self.update_done_total, 1)
+      .unwrap();
+  }
+
+  fn on_filter_chain_config_writer_update_done(
+    &self,
+    envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    update_id: u64,
+    filter_chain_name: &str,
+    status: abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status,
+    error_details: &str,
+  ) {
+    self.outcomes.lock().unwrap().push(format!(
+      "{update_id} {filter_chain_name} {status:?} {error_details}"
     ));
     envoy_extension_config
       .increment_counter(self.update_done_total, 1)

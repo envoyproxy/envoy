@@ -116,7 +116,12 @@ public:
 private:
   friend class GcpAuthnFilterTest;
 
-  std::optional<std::string> getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster);
+  struct ClientCertData {
+    std::string fingerprint;
+    std::string pem;
+  };
+
+  std::optional<ClientCertData> getClientCertData(Upstream::ThreadLocalCluster* cluster);
   void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str);
 
   FilterConfigSharedPtr filter_config_;

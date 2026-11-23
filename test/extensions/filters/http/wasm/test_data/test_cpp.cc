@@ -603,10 +603,14 @@ void TestContext::onLog() {
     }
     {
       // Some properties are defined in the stream context.
+      // The null plugin uses host byte order; a Wasm build uses little-endian memory.
+      const uint64_t connection_id_val = 4;
+      const std::string connection_id_bytes(reinterpret_cast<const char*>(&connection_id_val),
+                                            sizeof(uint64_t));
       std::vector<std::pair<std::vector<std::string>, std::string>> properties = {
           {{"plugin_name"}, "plugin_name"},
           {{"plugin_vm_id"}, "vm_id"},
-          {{"connection_id"}, std::string("\x4\0\0\0\0\0\0\0\0", 8)},
+          {{"connection_id"}, connection_id_bytes},
           {{"connection", "requested_server_name"}, "w3.org"},
           {{"source", "address"}, "127.0.0.1:0"},
           {{"destination", "address"}, "127.0.0.2:0"},

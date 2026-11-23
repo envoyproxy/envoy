@@ -13,6 +13,16 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
+    name = "ecds_subscription_registry_test",
+    srcs = ["ecds_subscription_registry_test.cc"],
+    deps = [
+        "//source/common/config:ecds_subscription_registry_lib",
+        "//source/common/singleton:manager_impl_lib",
+        "//test/test_common:status_utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "decoded_resource_impl_test",
     srcs = ["decoded_resource_impl_test.cc"],
     deps = [
@@ -52,12 +62,16 @@ envoy_cc_test(
     name = "grpc_subscription_impl_test",
     srcs = ["grpc_subscription_impl_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":grpc_subscription_test_harness",
         "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/config:decoded_resource_lib",
     ],
 )
 
@@ -123,9 +137,12 @@ envoy_cc_test(
     srcs = ["metadata_test.cc"],
     deps = [
         "//envoy/common:base_includes",
+        "//source/common/common:base64_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
         "//source/common/protobuf:utility_lib",
+        "//source/common/singleton:manager_impl_lib",
+        "//test/mocks/event:event_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -146,8 +163,11 @@ envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/config:api_version_lib",
@@ -194,8 +214,11 @@ envoy_cc_test(
     name = "config_provider_impl_test",
     srcs = ["config_provider_impl_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":dummy_config_proto_cc_proto",
@@ -224,8 +247,11 @@ envoy_cc_test(
     name = "datasource_test",
     srcs = ["datasource_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/common:empty_string",
@@ -285,8 +311,11 @@ envoy_cc_test(
     name = "custom_config_validators_impl_test",
     srcs = ["custom_config_validators_impl_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/config:resource_name_lib",
@@ -302,11 +331,20 @@ envoy_cc_test(
     rbe_pool = {
         "default": {
             "build": "linux_x64_small",
-            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
         },
-        "msan": "linux_x64_small",
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "msan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
     },
     deps = [
+        "//envoy/common:exception_lib",
         "//source/common/config:xds_manager_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",

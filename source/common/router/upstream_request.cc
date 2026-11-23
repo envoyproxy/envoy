@@ -386,6 +386,10 @@ void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
 
 const Route& UpstreamRequest::route() const { return *parent_.callbacks()->route(); }
 
+StreamInfo::StreamInfo& UpstreamRequest::downstreamStreamInfo() {
+  return parent_.callbacks()->streamInfo();
+}
+
 OptRef<Http::WebTransportSession> UpstreamRequest::downstreamWebTransportSession() {
   return parent_.callbacks()->webTransportSession();
 }

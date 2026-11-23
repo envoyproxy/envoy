@@ -7,6 +7,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/config/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/eds/eds.h"
@@ -621,6 +622,34 @@ TEST_F(EdsTest, EndpointMetadata) {
                                             Config::MetadataFilters::get().ENVOY_LB, "version")
                 .string_value(),
             "v3");
+}
+
+// Validate that onConfigUpdate() keeps the endpoint metadata when only the serialization of its Any
+// payload changes.
+TEST_F(EdsTest, EndpointMetadataWithReserializedAnyIsKept) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints();
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+  // The same struct with its two fields serialized in two orders.
+  Protobuf::Any& any =
+      (*endpoint->mutable_metadata()->mutable_typed_filter_metadata())["custom_namespace"];
+  any.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(0UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
+  const MetadataConstSharedPtr metadata =
+      cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->metadata();
+
+  any.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(1UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
+  EXPECT_EQ(metadata, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->metadata());
 }
 
 // Test verifies that updating metadata updates

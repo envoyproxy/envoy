@@ -158,14 +158,17 @@ message CheckResponse {
     // Supplies http attributes for an ok response.
     OkHttpResponse ok_response = 3;
 
-    // Supplies http attributes for an error response. This is used when the authorization
+    // Supplies HTTP attributes for an error response. This is used when the authorization
     // service encounters an internal error and wants to return custom headers and body to the
-    // downstream client. When ``error_response`` is set, the ext_authz filter increments the
-    // ``ext_authz_error`` stat and respects the :ref:`failure_mode_allow
+    // downstream client. The top-level :ref:`status
+    // <envoy_v3_api_field_service.auth.v3.CheckResponse.status>` must be non-``OK`` for this field
+    // to be processed. If ``status`` is ``OK`` or omitted, the request is allowed and this field
+    // is ignored. When processed, the ext_authz filter increments the ``ext_authz_error`` stat and
+    // respects the :ref:`failure_mode_allow
     // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow>`
     // configuration. The HTTP status code, headers, and body are taken from the
     // :ref:`DeniedHttpResponse <envoy_v3_api_msg_service.auth.v3.DeniedHttpResponse>` message.
-    // If the status field is not set, Envoy sends the status code configured via
+    // If ``error_response.status`` is not set, Envoy sends the status code configured via
     // :ref:`status_on_error <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.status_on_error>`,
     // which defaults to ``403 Forbidden``.
     DeniedHttpResponse error_response = 5;

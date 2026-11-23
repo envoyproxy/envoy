@@ -2020,6 +2020,46 @@ TEST_F(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {
       "SDS and non-SDS TLS certificates may not be mixed in server contexts");
 }
 
+// max_send_fragment is read from CommonTlsContext, is unset by default, and the configured value
+// builds a working server context.
+TEST_F(ServerContextConfigImplTest, MaxSendFragment) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+  )EOF";
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  EXPECT_EQ(std::nullopt,
+            (*ServerContextConfigImpl::create(tls_context, factory_context_, {}, false))
+                ->maxSendFragment());
+
+  tls_context.mutable_common_tls_context()->mutable_max_send_fragment()->set_value(8192);
+  TestUtility::validate(tls_context);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+  EXPECT_EQ(8192, server_context_config->maxSendFragment());
+
+  ContextManagerImpl manager(factory_context_.server_context_);
+  Envoy::Ssl::ServerContextSharedPtr server_context =
+      *manager.createSslServerContext(*store_.rootScope(), *server_context_config, nullptr);
+  EXPECT_NE(nullptr, server_context);
+  manager.removeContext(server_context);
+}
+
+// max_send_fragment must be within the TLS record plaintext limits that BoringSSL accepts.
+TEST_F(ServerContextConfigImplTest, MaxSendFragmentOutOfRange) {
+  for (const uint32_t max_send_fragment : {0u, 511u, 16385u}) {
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    tls_context.mutable_common_tls_context()->mutable_max_send_fragment()->set_value(
+        max_send_fragment);
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(tls_context), EnvoyException, "MaxSendFragment");
+  }
+}
+
 TEST_F(ServerContextConfigImplTest, SdsConfigNoName) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();

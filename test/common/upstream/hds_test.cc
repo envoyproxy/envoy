@@ -281,6 +281,27 @@ TEST_F(HdsTest, HealthCheckRequest) {
   createHdsDelegate();
 }
 
+// Test that a reconnect sends the node as it is then, not as it was at construction.
+TEST_F(HdsTest, ReconnectSendsCurrentNode) {
+  envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse request;
+  request.mutable_health_check_request()->mutable_node()->set_id("hds-node-v2");
+  request.mutable_health_check_request()->mutable_capability()->add_health_check_protocols(
+      envoy::service::health::v3::Capability::HTTP);
+  request.mutable_health_check_request()->mutable_capability()->add_health_check_protocols(
+      envoy::service::health::v3::Capability::TCP);
+
+  EXPECT_CALL(server_context_.local_info_, node()).WillRepeatedly(ReturnRef(node_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
+      .WillOnce(Return(nullptr))
+      .WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(request), false));
+
+  createHdsDelegate(); // The first stream fails to start.
+  node_.set_id("hds-node-v2");
+  retry_timer_cb_();
+}
+
 // Test if processMessage processes endpoints from a HealthCheckSpecifier
 // message correctly
 TEST_F(HdsTest, TestProcessMessageEndpoints) {
@@ -506,6 +527,56 @@ TEST_F(HdsTest, TestProcessMessageInvalidFieldsWithFallback) {
   // Check Correctness by verifying one request and one error has been generated in stat_
   EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).errors_.value(), 1);
   EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 2);
+}
+
+// Test if processMessage exits gracefully upon receiving an invalid log path.
+TEST_F(HdsTest, TestProcessMessageUnwritableEventLogPath) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  message.reset(createSimpleMessage());
+  auto* health_check = message->mutable_cluster_health_checks(0)->mutable_health_checks(0);
+  // Make the specifier invalid by using a log path that will fail.
+  health_check->set_event_log_path("/path/to/unwritable/event.log");
+
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(server_context_.access_log_manager_,
+              createAccessLog(Filesystem::FilePathAndType{Filesystem::DestinationType::File,
+                                                          "/path/to/unwritable/event.log"}))
+      .WillOnce(Return(testing::ByMove(absl::StatusOr<AccessLog::AccessLogFileSharedPtr>(
+          absl::InvalidArgumentError("unable to open file '/path/to/unwritable/event.log'")))));
+
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  EXPECT_FALSE(server_response_timer_->enabled_);
+  EXPECT_TRUE(hds_delegate_->hdsClusters().empty());
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).errors_.value(), 1);
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 1);
+}
+
+// Test if processMessage exits gracefully upon receiving an invalid socket address.
+TEST_F(HdsTest, TestProcessMessageUnresolvableEndpointAddress) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  message.reset(createSimpleMessage());
+  message->mutable_cluster_health_checks(0)
+      ->mutable_locality_endpoints(0)
+      ->mutable_endpoints(0)
+      ->mutable_address()
+      ->mutable_socket_address()
+      ->set_address("malformed");
+
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  EXPECT_FALSE(server_response_timer_->enabled_);
+  EXPECT_TRUE(hds_delegate_->hdsClusters().empty());
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).errors_.value(), 1);
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 1);
 }
 
 // Test if sendResponse() retains the structure of all endpoints ingested in the specifier

@@ -52,7 +52,7 @@ using BodySizeLimitFilterConfigSharedPtr = std::shared_ptr<BodySizeLimitFilterCo
  * A streaming filter that rejects requests exceeding a configured body size limit
  * without buffering the request body.
  */
-class BodySizeLimitFilter : public Http::PassThroughDecoderFilter,
+class BodySizeLimitFilter : public Http::PassThroughFilter,
                             public Logger::Loggable<Logger::Id::http> {
 public:
   BodySizeLimitFilter(BodySizeLimitFilterConfigSharedPtr config);
@@ -62,11 +62,17 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
 
+  // Http::StreamEncoderFilter
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override;
+
 private:
   void sizeExceeded(uint64_t length, const char* log_message, const char* reply_text);
 
   BodySizeLimitFilterConfigSharedPtr config_;
   uint64_t bytes_received_{};
+  // Set once the upstream accepts an upgrade or CONNECT. Later bytes are not counted.
+  bool tunnel_established_{false};
 };
 
 } // namespace BodySizeLimitFilter

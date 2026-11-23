@@ -12,11 +12,17 @@ envoy_cc_test(
     name = "rds_test",
     srcs = ["rds_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
+        "//source/common/common:base64_lib",
+        "//source/common/common:hash_lib",
         "//source/common/init:manager_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/rds:rds_lib",
         "//test/mocks/init:init_mocks",
         "//test/mocks/server:server_factory_context_mocks",

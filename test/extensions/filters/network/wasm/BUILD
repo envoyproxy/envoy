@@ -25,8 +25,25 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.filters.network.wasm"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -59,9 +76,23 @@ envoy_extension_cc_test(
     rbe_pool = {
         "default": {
             "build": "linux_x64_small",
-            "link": "linux_x64_small",
+            "test": "linux_x64_large",
         },
-        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [

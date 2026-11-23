@@ -17,8 +17,11 @@ envoy_extension_cc_test(
     srcs = envoy_select_enable_http3(["datasource_server_preferred_address_test.cc"]),
     extension_names = ["envoy.quic.server_preferred_address.datasource"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = envoy_select_enable_http3([
         "//source/extensions/quic/server_preferred_address:datasource_server_preferred_address_config_lib",
@@ -32,8 +35,11 @@ envoy_extension_cc_test(
     srcs = envoy_select_enable_http3(["fixed_server_preferred_address_test.cc"]),
     extension_names = ["envoy.quic.server_preferred_address.fixed"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = envoy_select_enable_http3([
         "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_lib",

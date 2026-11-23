@@ -7,10 +7,9 @@ on:
   workflow_call:
     secrets:
       dockerhub-token:
+      gpg-key:
+      gpg-key-password:
     inputs:
-      arch:
-        type: string
-        required: true
       request:
         type: string
         required: true
@@ -24,14 +23,19 @@ concurrency:
     ${{ github.actor != 'trigger-release-envoy[bot]'
         && github.event.inputs.head_ref
         || github.run_id
-    }}-${{ inputs.arch }}-${{ github.event.workflow.id }}-publish-build-server
+    }}-${{ github.event.workflow.id }}-publish-build-server
   cancel-in-progress: true
 
 
 jobs:
+  # The release binaries, container images and packages of both arches, built by one job
+  # (`release.multiarch`), which also signs the release.
   binary:
     secrets:
       dockerhub-token: ${{ secrets.dockerhub-token }}
+      # Only staged when signing (`signing`, below).
+      gpg-key: ${{ secrets.gpg-key }}
+      gpg-key-password: ${{ secrets.gpg-key-password }}
     permissions:
       actions: read
       contents: read
@@ -39,87 +43,36 @@ jobs:
     name: Binary
     uses: ./.github/workflows/_run.yml
     with:
-      arch: ${{ inputs.arch }}
+      arch: x64
       bazel-extra: >-
         --config=rbe
-      target: release.server_only
-      target-suffix: ${{ inputs.arch }}
+        ${{ fromJSON(inputs.request).run.release
+            && (vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy')
+            && !inputs.trusted
+            && '--//distribution:signing-key=snakeoil'
+            || '' }}
+      # Sign the release of both arches in the same invocation.
+      signing: >-
+        ${{ fromJSON(inputs.request).run.release
+            && (vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy')
+            && true
+            || false }}
+      target: release.multiarch
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
-      cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
-      concurrency-suffix: -${{ inputs.arch }}
+      concurrency-suffix: -x64
       rbe: true
       request: ${{ inputs.request }}
       bazel-rbe-jobs: ${{ fromJSON(inputs.request).config.ci.publish-jobs || 200 }}
       bazel-rbe-priority: ${{ fromJSON(inputs.request).config.ci.publish-priority || '' }}
       runs-on: >-
-        ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm')
-            || fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
+        ${{ fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
       timeout-minutes: 120
       trusted: ${{ inputs.trusted }}
+      # Only what the pipeline uses: the images of both arches, and the signed release.
       uploads: |
-        release.${{ inputs.arch }}: {path: container/envoy/${{ inputs.arch }}/bin/, compression-level: 0}
-
-  docker:
-    secrets:
-      dockerhub-token: ${{ secrets.dockerhub-token }}
-    permissions:
-      actions: read
-      contents: read
-      packages: read
-    name: Docker OCI
-    needs:
-    - binary
-    uses: ./.github/workflows/_run.yml
-    with:
-      arch: ${{ inputs.arch }}
-      target: docker
-      target-suffix: ${{ inputs.arch }}
-      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
-      cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
-      concurrency-suffix: -${{ inputs.arch }}
-      downloads: |
-        release.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}/bin/
-      request: ${{ inputs.request }}
-      source: |
-        export NO_BUILD_SETUP=1
-        export ENVOY_DOCKER_IN_DOCKER=1
-        export ENVOY_DOCKER_SAVE_IMAGE=true
-        export ENVOY_OCI_DIR=build_images
-      trusted: ${{ inputs.trusted }}
-      uploads: |
-        oci.${{ inputs.arch }}: {path: container/envoy/${{ inputs.arch }}/build_images, compression-level: 0}
-      runs-on: >-
-        ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm')
-            || fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
-
-  distribution:
-    secrets:
-      dockerhub-token: ${{ secrets.dockerhub-token }}
-    permissions:
-      actions: read
-      contents: read
-      packages: read
-    name: Packages
-    needs:
-    - binary
-    uses: ./.github/workflows/_run.yml
-    with:
-      arch: ${{ inputs.arch }}
-      bazel-extra: >-
-        --config=remote-cache
-      downloads: |
-        release.${{ inputs.arch }}: container/release/${{ inputs.arch }}/bin/
-      target: distribution
-      target-suffix: ${{ inputs.arch }}
-      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
-      cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
-      concurrency-suffix: -${{ inputs.arch }}
-      docker-ci: false
-      rbe: false
-      request: ${{ inputs.request }}
-      runs-on: >-
-        ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm')
-            || fromJSON(inputs.request).config.ci.agent-publish || fromJSON(inputs.request).config.ci.agent-ubuntu }}
-      trusted: ${{ inputs.trusted }}
-      uploads: |
-        packages.${{ inputs.arch }}: {path: container/envoy/${{ inputs.arch }}, compression-level: 0}
+        oci.x64: {path: container/envoy/x64/build_images, compression-level: 0}
+        oci.arm64: {path: container/envoy/arm64/build_images, compression-level: 0}
+        ${{ fromJSON(inputs.request).run.release
+            && (vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy')
+            && 'release.signed: {path: container/envoy/release.signed.tar.zst, compression-level: 0}'
+            || '' }}

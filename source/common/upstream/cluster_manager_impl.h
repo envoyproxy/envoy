@@ -848,13 +848,15 @@ private:
 
   struct ClusterData : public ClusterManagerCluster {
     ClusterData(Protobuf::Any&& cluster_config_any, const uint64_t cluster_config_hash,
+                const uint64_t serialized_cluster_config_hash,
                 const std::string& version_info, bool added_via_api, bool required_for_ads,
                 ClusterSharedPtr&& cluster, TimeSource& time_source,
                 const bool avoid_cds_removal = false)
         : cluster_config_any_(std::move(cluster_config_any)), config_hash_(cluster_config_hash),
-          version_info_(version_info), cluster_(std::move(cluster)),
-          last_updated_(time_source.systemTime()), added_via_api_(added_via_api),
-          avoid_cds_removal_(avoid_cds_removal), required_for_ads_(required_for_ads) {}
+          serialized_config_hash_(serialized_cluster_config_hash), version_info_(version_info),
+          cluster_(std::move(cluster)), last_updated_(time_source.systemTime()),
+          added_via_api_(added_via_api), avoid_cds_removal_(avoid_cds_removal),
+          required_for_ads_(required_for_ads) {}
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 
@@ -878,6 +880,10 @@ private:
 
     Protobuf::Any cluster_config_any_;
     const uint64_t config_hash_;
+    // The hash of the deterministic serialization of the config this cluster was built from, or of
+    // the last update that blockUpdate() blocked. A push of the same bytes matches it without
+    // MessageUtil::hash().
+    uint64_t serialized_config_hash_;
     const std::string version_info_;
     // Don't change the order of cluster_ and thread_aware_lb_ as the thread_aware_lb_ may
     // keep a reference to the cluster_.
@@ -970,6 +976,7 @@ private:
    */
   absl::StatusOr<ClusterDataPtr> loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                              const uint64_t cluster_hash,
+                                             const uint64_t serialized_cluster_hash,
                                              const std::string& version_info, bool added_via_api,
                                              bool required_for_ads, ClusterMap& cluster_map,
                                              bool avoid_cds_removal = false);

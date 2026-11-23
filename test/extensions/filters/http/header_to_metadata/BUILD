@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "header_to_metadata_filter_test",
     srcs = ["header_to_metadata_filter_test.cc"],
     extension_names = ["envoy.filters.http.header_to_metadata"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/common:base64_lib",
         "//source/extensions/filters/http/header_to_metadata:header_to_metadata_filter_lib",
@@ -30,8 +33,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.header_to_metadata"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/header_to_metadata:config",

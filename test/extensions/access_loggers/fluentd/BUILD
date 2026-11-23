@@ -16,8 +16,11 @@ envoy_extension_cc_test(
     srcs = ["fluentd_access_log_impl_test.cc"],
     extension_names = ["envoy.access_loggers.fluentd"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/access_loggers/fluentd:config",
@@ -34,7 +37,7 @@ envoy_extension_cc_test(
     name = "substitution_formatter_test",
     srcs = ["substitution_formatter_test.cc"],
     extension_names = ["envoy.access_loggers.fluentd"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/formatter:http_speicific_formatter_extension_lib",
         "//source/common/formatter:substitution_format_string_lib",
@@ -51,11 +54,9 @@ envoy_extension_cc_test(
     srcs = ["fluentd_access_log_integration_test.cc"],
     extension_names = ["envoy.access_loggers.fluentd"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/access_loggers/fluentd:config",

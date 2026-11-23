@@ -24,8 +24,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.geoip_providers.maxmind"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -50,8 +53,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.geoip_providers.maxmind"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [

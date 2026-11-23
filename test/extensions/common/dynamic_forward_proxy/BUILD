@@ -13,8 +13,11 @@ envoy_cc_test(
     name = "dns_cache_impl_test",
     srcs = ["dns_cache_impl_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":mocks",
@@ -39,8 +42,11 @@ envoy_cc_test(
     name = "dns_cache_manager_impl_test",
     srcs = ["dns_cache_manager_impl_test.cc"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/stats:allocator_lib",
