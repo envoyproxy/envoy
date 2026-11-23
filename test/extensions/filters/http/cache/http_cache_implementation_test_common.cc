@@ -324,7 +324,7 @@ TEST_P(HttpCacheImplementationTest, Fresh) {
       {"date", time_value_1}, {"cache-control", "public, max-age=3600"}};
   // TODO(toddmgreer): Test with various date headers.
   ASSERT_THAT(insert("/", response_headers, ""), IsOk());
-  time_system_.advanceTimeWait(Seconds(3600));
+  time_system_.advanceTimeWait(Seconds(3599));
   lookup("/");
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
 }
@@ -342,7 +342,7 @@ TEST_P(HttpCacheImplementationTest, StaleUnusable) {
                                                    {"cache-control", "public, max-age=3600"}};
   ASSERT_THAT(insert("/", headers, ""), IsOk());
 
-  time_system_.advanceTimeWait(Seconds(3601));
+  time_system_.advanceTimeWait(Seconds(3600));
 
   LookupContextPtr a_lookup = lookup("/");
   a_lookup->onDestroy();
@@ -361,7 +361,7 @@ TEST_P(HttpCacheImplementationTest, StaleRequiresValidation) {
                                                    {"cache-control", "public, max-age=3600"}};
   ASSERT_THAT(insert("/", headers, ""), IsOk());
 
-  time_system_.advanceTimeWait(Seconds(3601));
+  time_system_.advanceTimeWait(Seconds(3600));
 
   LookupContextPtr a_lookup = lookup("/");
   a_lookup->onDestroy();
