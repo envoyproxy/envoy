@@ -77,13 +77,13 @@ public:
     clusters_by_name_.emplace(cluster->info()->name(), std::move(cluster));
   }
 
-  ClusterInfoMaps clusters() const override {
-    ClusterInfoMaps maps;
-    for (const auto& [name, cluster] : clusters_by_name_) {
-      maps.active_clusters_.emplace(name, *cluster);
-    }
-    return maps;
-  }
+  // ClusterInfoMaps clusters() const override {
+  // ClusterInfoMaps maps;
+  // for (const auto& [name, cluster] : clusters_by_name_) {
+  // maps.active_clusters_.emplace(name, *cluster);
+  //}
+  // return maps;
+  //}
 
   void forEachActiveCluster(std::function<void(const Cluster&)> cb) const override {
     for (const auto& [unused_name, cluster] : clusters_by_name_) {
