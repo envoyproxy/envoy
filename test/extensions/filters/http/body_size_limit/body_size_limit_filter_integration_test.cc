@@ -267,6 +267,8 @@ TEST_P(BodySizeLimitIntegrationTest, ConnectTunnelTrafficNotLimited) {
   cleanupUpstreamAndDownstream();
 }
 
+// Test that the filter can be disabled on a specific route using the generic
+// FilterConfig{disabled: true} mechanism in typed_per_filter_config.
 TEST_P(BodySizeLimitIntegrationTest, RouteDisabled) {
   if (!testing_downstream_filter_) {
     return;
