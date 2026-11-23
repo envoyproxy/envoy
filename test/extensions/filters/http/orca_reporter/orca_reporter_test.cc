@@ -5,6 +5,7 @@
 #include "source/common/common/regex.h"
 #include "source/common/orca/orca_parser.h"
 #include "source/extensions/filters/http/orca_reporter/orca_reporter.h"
+#include "source/extensions/load_balancing_policies/common/orca_weight_manager.h"
 
 #include "test/extensions/filters/http/orca_reporter/fake_cgroup.h"
 #include "test/mocks/event/mocks.h"
@@ -541,99 +542,58 @@ metrics:
               HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("invalid")));
 }
 
-Http::TestResponseHeaderMapImpl grpcHeaders() {
-  return {{":status", "200"}, {"content-type", "application/grpc"}};
-}
-
-TEST_F(OrcaReporterTest, GrpcReportInTrailers) {
+TEST_F(OrcaReporterTest, ReportInHeadersAndTrailers) {
   pod_.setMemory(500, 0);
   pod_.setMemoryMax("1000");
   initialize(cpuAndMemoryConfig(pod_.directory()));
 
-  auto [headers, trailers] = encodeWithTrailers(grpcHeaders(), {{"grpc-status", "0"}});
-  EXPECT_FALSE(headers.has(TextHeader));
+  auto [headers, trailers] = encodeWithTrailers({{":status", "200"}}, {{"foo", "bar"}});
+  EXPECT_EQ("TEXT mem_utilization=0.5", headers.get_(TextHeader));
   EXPECT_EQ("TEXT mem_utilization=0.5", trailers.get_(TextHeader));
 }
 
-TEST_F(OrcaReporterTest, GrpcTrailerReportIsKept) {
+TEST_F(OrcaReporterTest, GrpcReportInHeadersAndTrailers) {
+  pod_.setMemory(500, 0);
+  pod_.setMemoryMax("1000");
+  initialize(cpuAndMemoryConfig(pod_.directory()));
+
+  auto [headers, trailers] = encodeWithTrailers(
+      {{":status", "200"}, {"content-type", "application/grpc"}}, {{"grpc-status", "0"}});
+  EXPECT_EQ("TEXT mem_utilization=0.5", headers.get_(TextHeader));
+  EXPECT_EQ("TEXT mem_utilization=0.5", trailers.get_(TextHeader));
+}
+
+TEST_F(OrcaReporterTest, TrailerReportIsKept) {
   pod_.setMemory(500, 0);
   pod_.setMemoryMax("1000");
   initialize(cpuAndMemoryConfig(pod_.directory()));
 
   auto [headers, trailers] =
-      encodeWithTrailers(grpcHeaders(), {{"endpoint-load-metrics-bin", "abc"}});
-  EXPECT_FALSE(headers.has(TextHeader));
+      encodeWithTrailers({{":status", "200"}}, {{"endpoint-load-metrics-bin", "abc"}});
+  EXPECT_EQ("TEXT mem_utilization=0.5", headers.get_(TextHeader));
   EXPECT_EQ("abc", trailers.get_(BinaryHeader));
   EXPECT_FALSE(trailers.has(TextHeader));
 }
 
-TEST_F(OrcaReporterTest, GrpcTrailerReportIsOverwritten) {
+TEST_F(OrcaReporterTest, HeaderAndTrailerReportsAreOverwritten) {
   pod_.setMemory(500, 0);
   pod_.setMemoryMax("1000");
   initialize(cpuAndMemoryConfig(pod_.directory()) + "overwrite_existing_report: true\n");
 
-  Http::TestResponseHeaderMapImpl grpc_headers = grpcHeaders();
-  grpc_headers.addCopy(TextHeader, "TEXT cpu_utilization=0.9");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_headers.addCopy(TextHeader, "TEXT cpu_utilization=0.9");
   auto [headers, trailers] =
-      encodeWithTrailers(grpc_headers, {{"endpoint-load-metrics", "TEXT cpu_utilization=0.8"},
-                                        {"endpoint-load-metrics-bin", "abc"}});
-  EXPECT_FALSE(headers.has(TextHeader));
+      encodeWithTrailers(response_headers, {{"endpoint-load-metrics", "TEXT cpu_utilization=0.8"},
+                                            {"endpoint-load-metrics-bin", "abc"}});
+  EXPECT_EQ("TEXT mem_utilization=0.5", headers.get_(TextHeader));
   EXPECT_EQ("TEXT mem_utilization=0.5", trailers.get_(TextHeader));
   EXPECT_FALSE(trailers.has(BinaryHeader));
 }
 
-TEST_F(OrcaReporterTest, GrpcHeaderReportIsKept) {
-  pod_.setMemory(500, 0);
-  pod_.setMemoryMax("1000");
+TEST_F(OrcaReporterTest, NoReportAvailableLeavesHeadersAndTrailers) {
   initialize(cpuAndMemoryConfig(pod_.directory()));
 
-  Http::TestResponseHeaderMapImpl grpc_headers = grpcHeaders();
-  grpc_headers.addCopy(TextHeader, "TEXT cpu_utilization=0.9");
-  auto [headers, trailers] = encodeWithTrailers(grpc_headers);
-  EXPECT_EQ("TEXT cpu_utilization=0.9", headers.get_(TextHeader));
-  EXPECT_FALSE(trailers.has(TextHeader));
-}
-
-TEST_F(OrcaReporterTest, GrpcTrailersOnlyResponseGetsHeaderReport) {
-  pod_.setMemory(500, 0);
-  pod_.setMemoryMax("1000");
-  initialize(cpuAndMemoryConfig(pod_.directory()));
-
-  Http::TestResponseHeaderMapImpl headers{
-      {":status", "200"}, {"content-type", "application/grpc"}, {"grpc-status", "14"}};
-  OrcaReporterFilter filter(config_);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(headers, true));
-  EXPECT_EQ("TEXT mem_utilization=0.5", headers.get_(TextHeader));
-}
-
-TEST_F(OrcaReporterTest, NonGrpcTrailerReportIsKept) {
-  pod_.setMemory(500, 0);
-  pod_.setMemoryMax("1000");
-  initialize(cpuAndMemoryConfig(pod_.directory()));
-
-  auto [headers, trailers] = encodeWithTrailers(
-      {{":status", "200"}}, {{"endpoint-load-metrics", "TEXT cpu_utilization=0.9"}});
-  EXPECT_EQ("TEXT mem_utilization=0.5", headers.get_(TextHeader));
-  EXPECT_EQ("TEXT cpu_utilization=0.9", trailers.get_(TextHeader));
-}
-
-TEST_F(OrcaReporterTest, OverwriteRemovesTrailerReport) {
-  pod_.setMemory(500, 0);
-  pod_.setMemoryMax("1000");
-  initialize(cpuAndMemoryConfig(pod_.directory()) + "overwrite_existing_report: true\n");
-
-  auto [headers, trailers] = encodeWithTrailers(
-      {{":status", "200"}}, {{"endpoint-load-metrics", "TEXT cpu_utilization=0.9"},
-                             {"endpoint-load-metrics-bin", "abc"}});
-  EXPECT_EQ("TEXT mem_utilization=0.5", headers.get_(TextHeader));
-  EXPECT_FALSE(trailers.has(TextHeader));
-  EXPECT_FALSE(trailers.has(BinaryHeader));
-}
-
-TEST_F(OrcaReporterTest, GrpcNoReportAvailableLeavesTrailers) {
-  initialize(cpuAndMemoryConfig(pod_.directory()));
-
-  auto [headers, trailers] = encodeWithTrailers(grpcHeaders(), {{"grpc-status", "0"}});
+  auto [headers, trailers] = encodeWithTrailers({{":status", "200"}}, {{"foo", "bar"}});
   EXPECT_FALSE(headers.has(TextHeader));
   EXPECT_FALSE(trailers.has(TextHeader));
 }
@@ -681,6 +641,118 @@ TEST_F(OrcaReporterTest, ReporterReleasedOnWorkerIsDeletedOnMainThread) {
   config_.reset();
   ASSERT_TRUE(delete_cb);
   delete_cb();
+}
+
+TEST_F(OrcaReporterTest, ReportAvailableOnlyAtTrailers) {
+  pod_.setCpuMax("200000 100000");
+  initialize(cpuAndMemoryConfig(pod_.directory()));
+
+  OrcaReporterFilter filter(config_);
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(headers, false));
+  EXPECT_FALSE(headers.has(TextHeader));
+
+  // The first CPU sample completes while the stream is open.
+  pod_.setCpuUsage(1000000);
+  refresh();
+  Http::TestResponseTrailerMapImpl trailers{{"foo", "bar"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter.encodeTrailers(trailers));
+  EXPECT_EQ("TEXT cpu_utilization=0.5", trailers.get_(TextHeader));
+}
+
+TEST_F(OrcaReporterTest, ReportsRequestRate) {
+  pod_.setMemory(500, 0);
+  pod_.setMemoryMax("1000");
+  initialize(cpuAndMemoryConfig(pod_.directory()));
+
+  for (int i = 0; i < 6; ++i) {
+    OrcaReporterFilter filter(config_);
+    Http::TestRequestHeaderMapImpl request_headers;
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.decodeHeaders(request_headers, true));
+  }
+  EXPECT_EQ("TEXT mem_utilization=0.5", reportHeader());
+
+  refresh(std::chrono::seconds(2));
+  EXPECT_EQ("TEXT mem_utilization=0.5,rps_fractional=3", reportHeader());
+  EXPECT_DOUBLE_EQ(3, parsedReport().rps_fractional());
+
+  // No requests in the next interval.
+  refresh();
+  EXPECT_EQ("TEXT mem_utilization=0.5", reportHeader());
+}
+
+TEST_F(OrcaReporterTest, RatesKeptWithoutElapsedTime) {
+  pod_.setMemory(500, 0);
+  pod_.setMemoryMax("1000");
+  initialize(cpuAndMemoryConfig(pod_.directory()));
+
+  config_->reporter().onRequest();
+  refresh();
+  EXPECT_EQ("TEXT mem_utilization=0.5,rps_fractional=1", reportHeader());
+  config_->reporter().onRequest();
+  refresh(std::chrono::milliseconds(0));
+  EXPECT_EQ("TEXT mem_utilization=0.5,rps_fractional=1", reportHeader());
+  refresh();
+  EXPECT_EQ("TEXT mem_utilization=0.5,rps_fractional=1", reportHeader());
+}
+
+TEST_F(OrcaReporterTest, RatesNotReportedWithoutUtilization) {
+  initialize(cpuAndMemoryConfig(pod_.directory()));
+
+  config_->reporter().onRequest();
+  refresh();
+  EXPECT_FALSE(encode().has(TextHeader));
+}
+
+TEST_F(OrcaReporterTest, BinaryReportUpdatesClientSideWeight) {
+  pod_.setCpuMax("200000 100000");
+  initialize(cpuAndMemoryConfig(pod_.directory()) + "format: BINARY\n");
+
+  for (int i = 0; i < 10; ++i) {
+    config_->reporter().onRequest();
+  }
+  pod_.setCpuUsage(1000000);
+  refresh();
+  const xds::data::orca::v3::OrcaLoadReport report = parsedReport();
+  EXPECT_DOUBLE_EQ(0.5, report.cpu_utilization());
+  EXPECT_DOUBLE_EQ(10, report.rps_fractional());
+  // 10 rps at 0.5 utilization.
+  const absl::StatusOr<uint32_t> weight =
+      LoadBalancingPolicies::Common::OrcaLoadReportHandler::calculateWeightFromOrcaReport(
+          report, {}, 1.0);
+  ASSERT_TRUE(weight.ok()) << weight.status();
+  EXPECT_EQ(20, weight.value());
+}
+
+TEST_F(OrcaReporterTest, TrailerReportKeptWhenReportBecomesUnavailable) {
+  pod_.setMemory(500, 0);
+  pod_.setMemoryMax("1000");
+  initialize(cpuAndMemoryConfig(pod_.directory()) + "overwrite_existing_report: true\n");
+
+  OrcaReporterFilter filter(config_);
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
+  headers.addCopy(TextHeader, "TEXT application_utilization=0.9");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(headers, false));
+  EXPECT_EQ("TEXT mem_utilization=0.5", headers.get_(TextHeader));
+
+  // Memory can't be read on the next refresh, so no report is available at the trailers.
+  pod_.removeFile("memory.current");
+  refresh();
+  Http::TestResponseTrailerMapImpl trailers{{"endpoint-load-metrics", "TEXT cpu_utilization=0.8"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter.encodeTrailers(trailers));
+  EXPECT_EQ("TEXT cpu_utilization=0.8", trailers.get_(TextHeader));
+}
+
+TEST_F(OrcaReporterTest, LocalReplyNotCountedAsRequest) {
+  pod_.setMemory(500, 0);
+  pod_.setMemoryMax("1000");
+  initialize(cpuAndMemoryConfig(pod_.directory()));
+
+  config_->reporter().onRequest();
+  // Local replies from earlier filters skip decodeHeaders().
+  encode({{":status", "503"}});
+  refresh();
+  EXPECT_EQ("TEXT mem_utilization=0.5,rps_fractional=1", reportHeader());
 }
 
 } // namespace

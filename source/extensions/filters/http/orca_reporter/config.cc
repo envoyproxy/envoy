@@ -16,7 +16,7 @@ absl::StatusOr<Http::FilterFactoryCb> OrcaReporterFilterFactory::createFilterFac
       OrcaReporterConfig::create(proto_config, context.serverFactoryContext());
   RETURN_IF_NOT_OK_REF(config.status());
   return [config = std::move(config).value()](Http::FilterChainFactoryCallbacks& callbacks) {
-    callbacks.addStreamEncoderFilter(std::make_shared<OrcaReporterFilter>(config));
+    callbacks.addStreamFilter(std::make_shared<OrcaReporterFilter>(config));
   };
 }
 

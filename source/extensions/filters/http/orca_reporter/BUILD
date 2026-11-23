@@ -45,7 +45,6 @@ envoy_cc_library(
         "//source/common/common:fmt_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
-        "//source/common/grpc:common_lib",
         "//source/common/orca:orca_parser",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

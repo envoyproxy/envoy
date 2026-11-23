@@ -48,6 +48,7 @@ envoy_extension_cc_test(
         "//source/common/common:regex_lib",
         "//source/common/orca:orca_parser",
         "//source/extensions/filters/http/orca_reporter:orca_reporter_lib",
+        "//source/extensions/load_balancing_policies/common:orca_weight_manager_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",

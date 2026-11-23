@@ -50,11 +50,11 @@ metrics:
   FakeCgroup cgroup_{"factory"};
 };
 
-TEST_F(OrcaReporterFactoryTest, CreatesEncoderFilter) {
+TEST_F(OrcaReporterFactoryTest, CreatesStreamFilter) {
   absl::StatusOr<Http::FilterFactoryCb> cb = createFactory(cgroup_.directory());
   ASSERT_TRUE(cb.ok()) << cb.status();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
-  EXPECT_CALL(filter_callbacks, addStreamEncoderFilter(_));
+  EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb.value()(filter_callbacks);
 }
 

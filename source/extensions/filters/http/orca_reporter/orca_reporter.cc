@@ -6,7 +6,6 @@
 #include "source/common/common/base64.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread.h"
-#include "source/common/grpc/common.h"
 #include "source/common/orca/orca_parser.h"
 #include "source/common/protobuf/utility.h"
 
@@ -357,8 +356,23 @@ LoadReporter::LoadReporter(const ProtoConfig& proto_config, std::vector<Metric> 
   refresh_timer_->enableTimer(std::min(kFirstRefreshInterval, refresh_interval_));
 }
 
+void LoadReporter::updateRequestRate(MonotonicTime now) {
+  const uint64_t requests = requests_.load(std::memory_order_relaxed);
+  if (last_rate_time_.has_value()) {
+    const double elapsed = std::chrono::duration<double>(now - *last_rate_time_).count();
+    // Without elapsed time, keep the previous rate and baseline.
+    if (elapsed <= 0) {
+      return;
+    }
+    rps_ = (requests - last_requests_) / elapsed;
+  }
+  last_rate_time_ = now;
+  last_requests_ = requests;
+}
+
 std::string LoadReporter::sampleAndEncode() {
   const MonotonicTime now = time_source_.monotonicTime();
+  updateRequestRate(now);
   xds::data::orca::v3::OrcaLoadReport report;
   std::vector<std::string> text_entries;
   for (Metric& metric : metrics_) {
@@ -369,8 +383,16 @@ std::string LoadReporter::sampleAndEncode() {
     setMetric(metric.target, *value, report);
     text_entries.push_back(absl::StrCat(metric.name, "=", *value));
   }
+  // The request rate alone can't weight an endpoint, so it is only reported with a utilization
+  // metric.
   if (text_entries.empty()) {
     return "";
+  }
+  // Weighted round robin needs a positive request rate to use the report. A zero rate is left
+  // out, as an absent field already reads as zero.
+  if (rps_ > 0) {
+    report.set_rps_fractional(rps_);
+    text_entries.push_back(absl::StrCat(Orca::kRpsFractionalField, "=", rps_));
   }
 
   switch (format_) {
@@ -419,54 +441,39 @@ void removeReport(Http::HeaderMap& headers) {
 
 } // namespace
 
+Http::FilterHeadersStatus OrcaReporterFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
+  config_->reporter().onRequest();
+  return Http::FilterHeadersStatus::Continue;
+}
+
+// The report is deliberately written to both the headers and the trailers. Envoy clients use the
+// first report they see, which is the one in the headers, while gRPC clients only read the
+// trailers. Writing both avoids guessing where the client looks, and the headers still carry a
+// report if the response ends without trailers.
 Http::FilterHeadersStatus OrcaReporterFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
-                                                            bool end_stream) {
-  const LoadReporter& reporter = config_->reporter();
-  if (reporter.encodedReport().empty()) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-  if (hasReport(headers)) {
-    if (!config_->overwriteExistingReport()) {
-      return Http::FilterHeadersStatus::Continue;
-    }
-    removeReport(headers);
-  }
-  // A gRPC application usually sends its report in the trailers, and the client only uses the
-  // first report it sees, so decide there.
-  if (!end_stream && Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
-    trailers_action_ = TrailersAction::AddReport;
-    return Http::FilterHeadersStatus::Continue;
-  }
-  headers.addCopy(reporter.headerName(), reporter.encodedReport());
-  if (config_->overwriteExistingReport()) {
-    trailers_action_ = TrailersAction::RemoveReport;
-  }
+                                                            bool) {
+  writeReport(headers);
   return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterTrailersStatus OrcaReporterFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
-  switch (trailers_action_) {
-  case TrailersAction::None:
-    break;
-  case TrailersAction::RemoveReport:
-    removeReport(trailers);
-    break;
-  case TrailersAction::AddReport: {
-    const LoadReporter& reporter = config_->reporter();
-    if (reporter.encodedReport().empty()) {
-      break;
-    }
-    if (hasReport(trailers)) {
-      if (!config_->overwriteExistingReport()) {
-        break;
-      }
-      removeReport(trailers);
-    }
-    trailers.addCopy(reporter.headerName(), reporter.encodedReport());
-    break;
-  }
-  }
+  writeReport(trailers);
   return Http::FilterTrailersStatus::Continue;
+}
+
+void OrcaReporterFilter::writeReport(Http::HeaderMap& headers) const {
+  const LoadReporter& reporter = config_->reporter();
+  // An existing report is kept when there is nothing to replace it with.
+  if (reporter.encodedReport().empty()) {
+    return;
+  }
+  if (hasReport(headers)) {
+    if (!config_->overwriteExistingReport()) {
+      return;
+    }
+    removeReport(headers);
+  }
+  headers.addCopy(reporter.headerName(), reporter.encodedReport());
 }
 
 } // namespace OrcaReporter

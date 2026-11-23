@@ -34,6 +34,10 @@ configuration reload that doesn't change the filter keeps the CPU baseline.
   has no limit, the metric is left out of the report.
 * A metric that can't be read is left out of the report. If no metric is available, no header is
   added.
+* The report also carries ``rps_fractional``, the rate of requests through the filter over the last
+  refresh interval. Client side weighted round robin ignores a report without a positive request
+  rate. A zero rate is left out, and the rate is only reported along with a utilization metric.
+  Requests answered by an earlier filter, for example with a local reply, are not counted.
 
 .. note::
 
@@ -42,15 +46,16 @@ configuration reload that doesn't change the filter keeps the CPU baseline.
   <envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.metric_names_for_computing_utilization>`,
   for example ``[cpu_utilization, mem_utilization]``. The highest of the listed values is used.
 
-A response that already carries a load report, for example one set by the application, is left
-untouched unless :ref:`overwrite_existing_report
-<envoy_v3_api_field_extensions.filters.http.orca_reporter.v3.OrcaReporter.overwrite_existing_report>`
-is set. A client only uses the first report it sees, so the report is written where the
-application is expected to put its own:
+The report is written to the response headers, and to the trailers if the response has trailers.
+A client Envoy uses the first report it sees, which is the one in the headers, while gRPC clients
+read the one in the trailers.
 
-* gRPC responses that don't end with their headers get the report in the trailers.
-* All other responses get the report in the headers. A report that the application sends only in
-  trailers is then ignored by the client.
+The headers and the trailers are handled separately. A load report that is already in one of them,
+for example one set by the application, is left untouched there unless
+:ref:`overwrite_existing_report
+<envoy_v3_api_field_extensions.filters.http.orca_reporter.v3.OrcaReporter.overwrite_existing_report>`
+is set. A report that the application sends only in the trailers is therefore not used by a client
+Envoy, which reads the filter's report in the headers first.
 
 Cgroup paths
 ------------

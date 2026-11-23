@@ -52,8 +52,8 @@ message OrcaReporter {
 
   // How often the cgroups are sampled. CPU utilization is computed over this interval. Defaults
   // to 1s. Intervals shorter than a few CPU quota periods (the period in ``cpu.max``, 100ms by
-  // default) produce noisy CPU values for CPU limited cgroups. The first refresh happens 100ms after the sampler is created, so
-  // that CPU utilization is reported early.
+  // default) produce noisy CPU values for CPU limited cgroups. The first refresh happens 100ms
+  // after the sampler is created, so that CPU utilization is reported early.
   google.protobuf.Duration refresh_interval = 2 [(validate.rules).duration = {
     lte {seconds: 60}
     gte {nanos: 100000000}
@@ -62,13 +62,10 @@ message OrcaReporter {
   // Encoding of the load report. Defaults to ``TEXT``.
   Format format = 3 [(validate.rules).enum = {defined_only: true}];
 
-  // By default, a response that already carries a load report (for example, one set by the
-  // upstream application) is left untouched. If true, that report is removed and replaced, in
-  // both the headers and the trailers.
-  //
-  // The report of a gRPC response that does not end with its headers is written to the trailers,
-  // where gRPC applications usually send theirs. Any other response gets the report in its
-  // headers, so a report the application sends only in trailers is ignored by the client.
+  // The report is written to the response headers, and to the trailers if the response has
+  // trailers. The headers and the trailers are handled separately: by default, a load report that
+  // is already in one of them (for example, one set by the upstream application) is left
+  // untouched there. If true, that report is removed and replaced.
   bool overwrite_existing_report = 4;
 }
 

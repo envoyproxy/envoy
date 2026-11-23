@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <memory>
 #include <optional>
@@ -110,6 +111,10 @@ public:
   // The encoded report on the current thread. Empty if no metric is available.
   const std::string& encodedReport() const { return (*tls_)->encoded_report; }
 
+  // Called on the workers for every request. The count is turned into rps_fractional on the next
+  // refresh.
+  void onRequest() { requests_.fetch_add(1, std::memory_order_relaxed); }
+
 private:
   struct Metric {
     std::string name;
@@ -128,6 +133,7 @@ private:
 
   // Samples all metrics and returns the encoded report.
   std::string sampleAndEncode();
+  void updateRequestRate(MonotonicTime now);
   void onRefreshTimer();
 
   const ProtoConfig::Format format_;
@@ -137,6 +143,11 @@ private:
   TimeSource& time_source_;
   // Only accessed on the main thread.
   std::string published_report_;
+  std::atomic<uint64_t> requests_{0};
+  // Main thread only.
+  std::optional<MonotonicTime> last_rate_time_;
+  uint64_t last_requests_{0};
+  double rps_{0};
   ThreadLocal::TypedSlotPtr<ThreadLocalReport> tls_;
   Event::TimerPtr refresh_timer_;
 };
@@ -170,7 +181,7 @@ public:
         reporter_(std::move(reporter)) {}
 
   bool overwriteExistingReport() const { return overwrite_existing_report_; }
-  const LoadReporter& reporter() const { return *reporter_; }
+  LoadReporter& reporter() const { return *reporter_; }
 
 private:
   const bool overwrite_existing_report_;
@@ -178,29 +189,24 @@ private:
 };
 using OrcaReporterConfigSharedPtr = std::shared_ptr<OrcaReporterConfig>;
 
-// Adds the latest load report to every response. A gRPC response carries the report in its
-// trailers, where the application usually sends its own report.
-class OrcaReporterFilter : public Http::PassThroughEncoderFilter {
+// Adds the latest load report to the headers and the trailers of every response.
+class OrcaReporterFilter : public Http::PassThroughFilter {
 public:
   explicit OrcaReporterFilter(OrcaReporterConfigSharedPtr config) : config_(std::move(config)) {}
 
-  // Http::StreamEncoderFilter
+  // Http::StreamFilter
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
 private:
-  enum class TrailersAction {
-    // Leave the trailers untouched.
-    None,
-    // Add the report to the trailers, or replace one there if overwriting.
-    AddReport,
-    // The report was added to the headers; remove any report from the trailers.
-    RemoveReport,
-  };
+  // Adds the report to the response headers or trailers. Envoy clients use the first report they
+  // see and gRPC clients read the trailers, so the report is written to both.
+  void writeReport(Http::HeaderMap& headers) const;
 
   const OrcaReporterConfigSharedPtr config_;
-  TrailersAction trailers_action_{TrailersAction::None};
 };
 
 } // namespace OrcaReporter

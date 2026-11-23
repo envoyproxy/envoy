@@ -72,7 +72,7 @@ TEST_P(OrcaReporterIntegrationTest, AddsReportToResponse) {
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
   ASSERT_TRUE(response->complete());
 
-  EXPECT_EQ("TEXT mem_utilization=0.4", reportHeader(response->headers()));
+  EXPECT_THAT(reportHeader(response->headers()), testing::StartsWith("TEXT mem_utilization=0.4"));
   const absl::StatusOr<xds::data::orca::v3::OrcaLoadReport> report =
       Orca::parseOrcaLoadReportHeaders(response->headers());
   ASSERT_TRUE(report.ok()) << report.status();
@@ -98,10 +98,10 @@ TEST_P(OrcaReporterIntegrationTest, OverwritesUpstreamReport) {
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, upstream_headers, 0);
   ASSERT_TRUE(response->complete());
 
-  EXPECT_EQ("TEXT mem_utilization=0.4", reportHeader(response->headers()));
+  EXPECT_THAT(reportHeader(response->headers()), testing::StartsWith("TEXT mem_utilization=0.4"));
 }
 
-TEST_P(OrcaReporterIntegrationTest, AddsReportToGrpcTrailers) {
+TEST_P(OrcaReporterIntegrationTest, AddsReportToGrpcHeadersAndTrailers) {
   if (!trailersSupported()) {
     return;
   }
@@ -109,9 +109,10 @@ TEST_P(OrcaReporterIntegrationTest, AddsReportToGrpcTrailers) {
   auto response = sendGrpcResponse({{"grpc-status", "0"}});
   ASSERT_TRUE(response->complete());
 
-  EXPECT_EQ("", reportHeader(response->headers()));
+  EXPECT_THAT(reportHeader(response->headers()), testing::StartsWith("TEXT mem_utilization=0.4"));
   ASSERT_NE(nullptr, response->trailers());
-  EXPECT_EQ("TEXT mem_utilization=0.4", reportHeader(*response->trailers()));
+  EXPECT_THAT(reportHeader(*response->trailers()),
+              testing::StartsWith("TEXT mem_utilization=0.4"));
 }
 
 TEST_P(OrcaReporterIntegrationTest, KeepsUpstreamGrpcTrailerReport) {
@@ -123,7 +124,7 @@ TEST_P(OrcaReporterIntegrationTest, KeepsUpstreamGrpcTrailerReport) {
       {{"grpc-status", "0"}, {"endpoint-load-metrics", "TEXT application_utilization=0.9"}});
   ASSERT_TRUE(response->complete());
 
-  EXPECT_EQ("", reportHeader(response->headers()));
+  EXPECT_THAT(reportHeader(response->headers()), testing::StartsWith("TEXT mem_utilization=0.4"));
   ASSERT_NE(nullptr, response->trailers());
   EXPECT_EQ("TEXT application_utilization=0.9", reportHeader(*response->trailers()));
 }
