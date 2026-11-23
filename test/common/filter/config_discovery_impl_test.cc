@@ -8,6 +8,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/config/ecds_subscription_registry.h"
 #include "source/common/config/utility.h"
 #include "source/common/filter/config_discovery_impl.h"
 #include "source/common/json/json_loader.h"
@@ -177,12 +178,12 @@ public:
         .WillByDefault(ReturnRef(validation_context_));
     ON_CALL(validation_context_, dynamicValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor_));
-    ON_CALL(init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
+    ON_CALL(init_manager_, add(_)).WillByDefault([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
-    }));
-    ON_CALL(init_manager_, initialize(_))
-        .WillByDefault(Invoke(
-            [this](const Init::Watcher& watcher) { init_target_handle_->initialize(watcher); }));
+    });
+    ON_CALL(init_manager_, initialize(_)).WillByDefault([this](const Init::Watcher& watcher) {
+      init_target_handle_->initialize(watcher);
+    });
   }
   virtual ~FilterConfigDiscoveryTestBase() {
     server_factory_context_.thread_local_.shutdownThread();
@@ -452,6 +453,48 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DestroyReady) {
   EXPECT_CALL(config_discovery_test.init_watcher_, ready());
 }
 
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, AdsFilterNamesPreventExclusiveSubscriptions) {
+  TypeParam test;
+  test.setup();
+  auto registry =
+      Config::EcdsSubscriptionRegistry::get(test.server_factory_context_.singletonManager());
+  EXPECT_FALSE(registry->reserve("foo", Config::EcdsSubscriptionRegistry::Sharing::Exclusive).ok());
+  EXPECT_CALL(test.init_watcher_, ready());
+  test.provider_.reset();
+  EXPECT_OK(registry->reserve("foo", Config::EcdsSubscriptionRegistry::Sharing::Exclusive));
+}
+
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, AdsFiltersRefuseExclusiveNames) {
+  TypeParam test;
+  auto reservation =
+      Config::EcdsSubscriptionRegistry::get(test.server_factory_context_.singletonManager())
+          ->reserve("foo", Config::EcdsSubscriptionRegistry::Sharing::Exclusive);
+  ASSERT_OK(reservation);
+  envoy::config::core::v3::ExtensionConfigSource source;
+  source.mutable_config_source()->mutable_ads();
+  source.add_type_urls(test.getTypeUrl());
+  EXPECT_CALL(test.init_manager_, add(_)).Times(0);
+  EXPECT_THROW_WITH_REGEX(test.filter_config_provider_manager_->createDynamicFilterConfigProvider(
+                              source, "foo", test.server_factory_context_, test.factory_context_,
+                              test.server_factory_context_.cluster_manager_, true,
+                              test.getFilterType(), test.getMatcher(), "parent."),
+                          EnvoyException, "already has a bootstrap module subscription");
+}
+
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, PathFilterNamesDoNotReserveSharedStreams) {
+  TypeParam test;
+  const std::string name = "xdstp://invalid";
+  envoy::config::core::v3::ExtensionConfigSource source;
+  source.mutable_config_source()->set_path("unused.yaml");
+  source.add_type_urls(test.getTypeUrl());
+  EXPECT_CALL(test.init_manager_, add(_));
+  auto provider = test.filter_config_provider_manager_->createDynamicFilterConfigProvider(
+      source, name, test.server_factory_context_, test.factory_context_,
+      test.server_factory_context_.cluster_manager_, true, test.getFilterType(), test.getMatcher(),
+      "parent.");
+  EXPECT_EQ(provider->name(), name);
+}
+
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
   InSequence s;
   TypeParam config_discovery_test;
@@ -465,10 +508,9 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
 
-    EXPECT_CALL(config_discovery_test.init_watcher_, ready())
-        .WillOnce(Invoke([&config_discovery_test]() {
-          EXPECT_TRUE(config_discovery_test.filter_factory_.created_);
-        }));
+    EXPECT_CALL(config_discovery_test.init_watcher_, ready()).WillOnce([&config_discovery_test]() {
+      EXPECT_TRUE(config_discovery_test.filter_factory_.created_);
+    });
     ASSERT_OK(config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
                                                                response.version_info()));
     EXPECT_NE(std::nullopt, config_discovery_test.provider_->config());
@@ -746,9 +788,9 @@ TEST_F(FilterConfigDiscoveryShutdownTest, ShutdownDuringInFlightUpdate) {
   // Intercept runOnAllThreads and capture the main thread completion callback
   std::function<void()> pending_completion_callback;
   EXPECT_CALL(server_factory_context_.thread_local_, runOnAllThreads(_, _))
-      .WillOnce(Invoke([&](std::function<void()>, std::function<void()> completion_cb) {
+      .WillOnce([&](std::function<void()>, std::function<void()> completion_cb) {
         pending_completion_callback = completion_cb;
-      }))
+      })
       .WillRepeatedly(Invoke(&server_factory_context_.thread_local_,
                              &ThreadLocal::MockInstance::runOnAllThreads2));
 

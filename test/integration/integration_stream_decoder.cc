@@ -12,6 +12,8 @@
 
 #include "source/common/common/assert.h"
 
+#include "test/test_common/test_time.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -62,12 +64,14 @@ AssertionResult
 IntegrationStreamDecoder::waitForWithDispatcherRun(const std::function<bool()>& condition,
                                                    absl::string_view description,
                                                    std::chrono::milliseconds timeout) {
+  Event::GlobalTimeSystem time_system;
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (!condition()) {
     if (!bound.withinBound()) {
       return AssertionFailure() << "Timed out (" << timeout.count() << "ms) waiting for "
                                 << description << debugState();
     }
+    time_system.advanceTimeForIo(dispatcher_);
     dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
     if (condition()) {
       break;

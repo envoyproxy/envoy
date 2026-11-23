@@ -72,7 +72,7 @@ void Span::finishSpan() {
   s.set_fault(serverError());
   s.set_throttle(isThrottled());
   if (type() == Subsegment) {
-    s.set_type(std::string(Subsegment));
+    s.set_type(Subsegment);
   }
   auto* aws = s.mutable_aws()->mutable_fields();
   for (const auto& field : aws_metadata_) {
@@ -144,8 +144,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   span_ptr->setOrigin(origin_);
   span_ptr->setAwsMetadata(aws_metadata_);
   if (client_ip) {
-    span_ptr->addToHttpRequestAnnotations(SpanClientIp,
-                                          ValueUtil::stringValue(std::string(*client_ip)));
+    span_ptr->addToHttpRequestAnnotations(SpanClientIp, ValueUtil::stringValue(*client_ip));
     // The `client_ip` is the address specified in the HTTP X-Forwarded-For header.
     span_ptr->addToHttpRequestAnnotations(SpanXForwardedFor, ValueUtil::boolValue(true));
   }
@@ -195,12 +194,11 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   }
 
   if (name == Tracing::Tags::get().HttpUrl) {
-    addToHttpRequestAnnotations(SpanUrl, ValueUtil::stringValue(std::string(value)));
+    addToHttpRequestAnnotations(SpanUrl, ValueUtil::stringValue(value));
   } else if (name == Tracing::Tags::get().HttpMethod) {
-    addToHttpRequestAnnotations(SpanMethod, ValueUtil::stringValue(std::string(value)));
+    addToHttpRequestAnnotations(SpanMethod, ValueUtil::stringValue(value));
   } else if (name == Tracing::Tags::get().UserAgent) {
-    addToHttpRequestAnnotations(Tracing::Tags::get().UserAgent,
-                                ValueUtil::stringValue(std::string(value)));
+    addToHttpRequestAnnotations(Tracing::Tags::get().UserAgent, ValueUtil::stringValue(value));
   } else if (name == Tracing::Tags::get().HttpStatusCode) {
     uint64_t status_code;
     if (!absl::SimpleAtoi(value, &status_code)) {
@@ -220,7 +218,7 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   } else if (name == Tracing::Tags::get().PeerAddress) {
     // Use PeerAddress if client_ip is not already set from the header.
     if (!hasKeyInHttpRequestAnnotations(SpanClientIp)) {
-      addToHttpRequestAnnotations(SpanClientIp, ValueUtil::stringValue(std::string(value)));
+      addToHttpRequestAnnotations(SpanClientIp, ValueUtil::stringValue(value));
       // In this case, PeerAddress refers to the client's actual IP address, not
       // the address specified in the HTTP X-Forwarded-For header.
       addToHttpRequestAnnotations(SpanXForwardedFor, ValueUtil::boolValue(false));

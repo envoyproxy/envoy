@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.validate.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/server/overload/load_shed_point.h"
 
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/common/factory_base.h"
@@ -27,7 +28,8 @@ public:
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactory(const FilterConfig& proto_config, const std::string& stat_prefix,
                       Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
-                      OptRef<Init::Manager> init_manager);
+                      OptRef<Init::Manager> init_manager,
+                      OptRef<Server::LoadShedPointProvider> load_shed_point_provider = {});
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createHttpFilterRouteConfigTyped(const RouteConfigProto&,

@@ -1,14 +1,20 @@
+#include <atomic>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/network/address_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/common/upstream/upstream_impl.h"
 
+#include "test/common/upstream/snapshot_host_set.h"
 #include "test/config/utility.h"
 #include "test/integration/clusters/cluster_factory_config.pb.h"
 #include "test/integration/clusters/custom_static_cluster.h"
 #include "test/integration/http_integration.h"
 
+#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 using testing::Contains;
 using testing::Key;
@@ -43,6 +49,7 @@ public:
         config.set_priority(10);
         config.set_address(Network::Test::getLoopbackAddressString(ipVersion()));
         config.set_port_value(fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port());
+        config.set_use_snapshot_host_set(use_snapshot_host_set_);
         std::ignore = cluster_type.mutable_typed_config()->PackFrom(config);
       } else {
         test::integration::clusters::CustomStaticConfig2 config;
@@ -59,7 +66,42 @@ public:
   }
 
   Network::Address::IpVersion ipVersion() const { return version_; }
+
+  // Whether every thread's copy of cluster_0, workers included, holds a SnapshotHostSet with a
+  // snapshot of one host at the configured priority.
+  bool everyThreadHoldsSnapshot() {
+    std::atomic<bool> all_hold{true};
+    absl::Notification done;
+    ThreadLocal::TypedSlotPtr<> slot;
+    test_server_->server().dispatcher().post([&] {
+      slot = ThreadLocal::TypedSlot<>::makeUnique(test_server_->server().threadLocal());
+      slot->set([](Event::Dispatcher&) -> std::shared_ptr<ThreadLocal::ThreadLocalObject> {
+        return nullptr;
+      });
+      slot->runOnAllThreads(
+          [&](OptRef<ThreadLocal::ThreadLocalObject>) {
+            auto* cluster =
+                test_server_->server().clusterManager().getThreadLocalCluster("cluster_0");
+            const auto& host_sets = cluster->prioritySet().hostSetsPerPriority();
+            const bool holds =
+                host_sets.size() > 10 &&
+                dynamic_cast<const Upstream::SnapshotHostSet*>(host_sets[10].get()) != nullptr &&
+                host_sets[10]->snapshot() != nullptr && host_sets[10]->hostCounts().hosts == 1;
+            if (!holds) {
+              all_hold = false;
+            }
+          },
+          [&] {
+            slot.reset(nullptr);
+            done.Notify();
+          });
+    });
+    done.WaitForNotification();
+    return all_hold;
+  }
+
   bool cluster_provided_lb_{};
+  bool use_snapshot_host_set_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, CustomClusterIntegrationTest,
@@ -90,6 +132,17 @@ TEST_P(CustomClusterIntegrationTest, TestCustomConfig) {
   EXPECT_EQ(1, host_set->hosts().size());
   EXPECT_EQ(1, host_set->healthyHosts().size());
   EXPECT_EQ(10, host_set->priority());
+}
+
+// A cluster whose host sets hand workers snapshots serves traffic, every worker copy holds the
+// same host set type and its snapshot, and the membership accounting matches the flat path.
+TEST_P(CustomClusterIntegrationTest, SnapshotHostSetServesTraffic) {
+  use_snapshot_host_set_ = true;
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex);
+
+  EXPECT_TRUE(everyThreadHoldsSnapshot());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 }
 
 } // namespace

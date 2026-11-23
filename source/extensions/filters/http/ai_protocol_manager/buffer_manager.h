@@ -178,6 +178,13 @@ private:
   // watermark more than once (stream and connection), so replay resumes only when this returns to
   // zero.
   uint32_t replay_high_watermark_count_{0};
+  // When pauseSource() or resumeSource() reports an ingest buffer watermark to Envoy, Envoy fans
+  // that same signal back to every watermark subscriber on the stream, including this bridge.
+  // These counters track how many self-triggered callbacks are currently in flight on the stack so
+  // onAboveReplayWatermark() and onBelowReplayWatermark() can ignore our own echoes instead of
+  // mistaking ingest back-pressure for replay back-pressure.
+  uint32_t expected_high_watermark_echoes_{0};
+  uint32_t expected_low_watermark_echoes_{0};
   ReplayResumeHandler* replay_handler_{nullptr};
   absl::flat_hash_set<BufferManager*> registered_managers_;
 };

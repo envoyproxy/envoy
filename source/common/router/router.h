@@ -18,6 +18,7 @@
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/stream_info.h"
@@ -34,6 +35,7 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/upstream_request.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
@@ -182,18 +184,19 @@ public:
  */
 class FilterConfig : public Http::FilterChainFactory {
 public:
-  FilterConfig(Server::Configuration::CommonFactoryContext& factory_context,
-               Stats::StatName stat_prefix, Stats::Scope& scope, Upstream::ClusterManager& cm,
-               Runtime::Loader& runtime, Random::RandomGenerator& random,
-               ShadowWriterPtr&& shadow_writer, bool emit_dynamic_stats, bool start_child_span,
-               bool suppress_envoy_headers, bool respect_expected_rq_timeout,
-               bool suppress_grpc_request_failure_code_stats,
+  FilterConfig(Server::Configuration::CommonFactoryContext& factory_context, Stats::Scope& scope,
+               Stats::StatName stat_prefix, Stats::Scope& stats_prefix_scope,
+               Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+               Random::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
+               bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
+               bool respect_expected_rq_timeout, bool suppress_grpc_request_failure_code_stats,
                bool flush_upstream_log_on_upstream_stream, bool reject_connect_request_early_data,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
       : factory_context_(factory_context), router_context_(router_context), scope_(scope), cm_(cm),
-        runtime_(runtime), default_stats_(router_context_.statNames(), scope_, stat_prefix),
+        runtime_(runtime),
+        default_stats_(router_context_.statNames(), stats_prefix_scope, stat_prefix),
         random_(random), emit_dynamic_stats_(emit_dynamic_stats),
         start_child_span_(start_child_span), suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
@@ -220,12 +223,14 @@ public:
   }
 
   static absl::StatusOr<std::unique_ptr<FilterConfig>>
-  create(Stats::StatName stat_prefix, Server::Configuration::GenericFactoryContext& context,
-         ShadowWriterPtr&& shadow_writer,
+  create(Server::Configuration::ServerFactoryContext& context,
+         Server::Configuration::ExtraFactoryContext& extra_context, ShadowWriterPtr&& shadow_writer,
          const envoy::extensions::filters::http::router::v3::Router& config);
 
 protected:
-  FilterConfig(Stats::StatName stat_prefix, Server::Configuration::GenericFactoryContext& context,
+  FilterConfig(Server::Configuration::ServerFactoryContext& context,
+               Server::Configuration::ExtraFactoryContext& extra_context,
+               Stats::StatName stat_prefix, Stats::Scope& stats_prefix_scope,
                ShadowWriterPtr&& shadow_writer,
                const envoy::extensions::filters::http::router::v3::Router& config,
                absl::Status& creation_status);
@@ -308,9 +313,9 @@ class Filter : Logger::Loggable<Logger::Id::router>,
 public:
   Filter(const FilterConfigSharedPtr& config, FilterStats& stats)
       : config_(config), stats_(stats),
-        allow_multiplexed_upstream_half_close_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
-        reject_early_connect_data_enabled_(config->reject_connect_request_early_data_) {}
+        reject_early_connect_data_enabled_(config->reject_connect_request_early_data_),
+        drop_kept_body_(ENVOY_RUNTIME_FEATURE_ENABLED(
+            "envoy.reloadable_features.filter_manager_per_filter_buffer")) {}
 
   ~Filter() override;
 
@@ -500,7 +505,16 @@ public:
     // connections can receive different cookies if they race on requests.
     std::string value;
     const Network::Connection* conn = downstreamConnection();
-    // Need to check for null conn if this is ever used by Http::AsyncClient in the future.
+    // Async-client-driven router invocations (ext_authz, ratelimit side calls,
+    // mirror/shadow) have a null downstream connection. Previously this path
+    // would unconditionally dereference `conn` to compose the per-connection
+    // seed, which crashed the worker. Skip the connection-derived seed and degrade
+    // to a stable empty seed for those callers; the resulting cookie value is
+    // hashed identically across all such async invocations, which preserves
+    // hash-stability requirements for the cookie hash policy.
+    if (conn == nullptr) {
+      return std::string();
+    }
     value = conn->connectionInfoProvider().remoteAddress()->asString() +
             conn->connectionInfoProvider().localAddress()->asString();
 
@@ -554,6 +568,8 @@ protected:
   }
 
   uint64_t calculateEffectiveBufferLimit() const;
+  // Drops the request body kept for retries and internal redirects once they are given up.
+  void dropKeptBody(const Buffer::Instance* decoding_buffer, const Buffer::Instance& data);
 
 private:
   friend class UpstreamRequest;
@@ -580,6 +596,7 @@ private:
 
   GenericConnPoolPtr createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                                     const Upstream::HostConstSharedPtr& host);
+  void maybeEnableUpstreamHalfClose(const GenericConnPool& conn_pool);
   UpstreamRequestPtr createUpstreamRequest();
   std::optional<absl::string_view> getShadowCluster(const ShadowPolicy& shadow_policy,
                                                     const Http::HeaderMap& headers) const;
@@ -689,6 +706,8 @@ private:
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
+  // Bytes this filter added to the decoding buffer to keep the request body. See dropKeptBody().
+  uint64_t kept_body_length_{};
   uint32_t attempt_count_{0};
   uint32_t pending_retries_{0};
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
@@ -702,7 +721,7 @@ private:
   bool include_attempt_count_in_request_ : 1 = false;
   bool include_timeout_retry_header_in_request_ : 1 = false;
   bool request_buffer_overflowed_ : 1 = false;
-  const bool allow_multiplexed_upstream_half_close_ : 1 = false;
+  bool upstream_half_close_enabled_ : 1 = false;
   bool upstream_request_started_ : 1 = false;
   // True if cross-cluster retry is enabled: refreshClusterOnRetry is set in the effective retry
   // policy and there is no hedge policy (hedging is incompatible with cross-cluster retry).
@@ -713,6 +732,11 @@ private:
   // Cached runtime flag value for reject_early_connect_data to avoid evaluating it on every data
   // chunk.
   bool reject_early_connect_data_enabled_ : 1 = false;
+  // Latched from the per-filter buffer flag when the router is created, which may differ from the
+  // value the filter manager latched for the stream. With per-filter buffers, the body kept for
+  // retries stays in the router's own buffer and counts towards the stream buffer limit until it is
+  // dropped. See dropKeptBody().
+  bool drop_kept_body_ : 1 = false;
   bool saw_local_reply_ : 1 = false;
 };
 

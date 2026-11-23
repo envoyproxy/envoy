@@ -12,7 +12,6 @@
 using Istio::Common::WorkloadMetadataObject;
 using Istio::Common::WorkloadMetadataObjectConstSharedPtr;
 using testing::HasSubstr;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -122,13 +121,13 @@ TEST_F(PeerMetadataTest, DownstreamXDS) {
       "pod-foo-1234", "my-cluster", "default", "foo", "foo-service", "v1alpha3", "", "",
       Istio::Common::WorkloadType::Pod, "", "", "");
   EXPECT_CALL(*metadata_provider_, GetMetadata(_))
-      .WillRepeatedly(Invoke([&](const Network::Address::InstanceConstSharedPtr& address)
-                                 -> WorkloadMetadataObjectConstSharedPtr {
+      .WillRepeatedly([&](const Network::Address::InstanceConstSharedPtr& address)
+                          -> WorkloadMetadataObjectConstSharedPtr {
         if (absl::StartsWith(address->asStringView(), "127.0.0.1")) {
           return pod;
         }
         return {};
-      }));
+      });
   initialize(R"EOF(
     downstream_discovery:
       - workload_discovery: {}
@@ -145,13 +144,13 @@ TEST_F(PeerMetadataTest, UpstreamXDS) {
       "pod-foo-1234", "my-cluster", "foo", "foo", "foo-service", "v1alpha3", "", "",
       Istio::Common::WorkloadType::Pod, "", "", "");
   EXPECT_CALL(*metadata_provider_, GetMetadata(_))
-      .WillRepeatedly(Invoke([&](const Network::Address::InstanceConstSharedPtr& address)
-                                 -> WorkloadMetadataObjectConstSharedPtr {
+      .WillRepeatedly([&](const Network::Address::InstanceConstSharedPtr& address)
+                          -> WorkloadMetadataObjectConstSharedPtr {
         if (absl::StartsWith(address->asStringView(), "10.0.0.1")) {
           return pod;
         }
         return {};
-      }));
+      });
   initialize(R"EOF(
     upstream_discovery:
       - workload_discovery: {}
@@ -182,13 +181,13 @@ TEST_F(PeerMetadataTest, UpstreamXDSInternal) {
       "pod-foo-1234", "my-cluster", "foo", "foo", "foo-service", "v1alpha3", "", "",
       Istio::Common::WorkloadType::Pod, "", "", "");
   EXPECT_CALL(*metadata_provider_, GetMetadata(_))
-      .WillRepeatedly(Invoke([&](const Network::Address::InstanceConstSharedPtr& address)
-                                 -> WorkloadMetadataObjectConstSharedPtr {
+      .WillRepeatedly([&](const Network::Address::InstanceConstSharedPtr& address)
+                          -> WorkloadMetadataObjectConstSharedPtr {
         if (absl::StartsWith(address->asStringView(), "127.0.0.100")) {
           return pod;
         }
         return {};
-      }));
+      });
   initialize(R"EOF(
     upstream_discovery:
       - workload_discovery: {}
@@ -252,13 +251,13 @@ TEST_F(PeerMetadataTest, DownstreamFallbackSecond) {
       "pod-foo-1234", "my-cluster", "default", "foo", "foo-service", "v1alpha3", "", "",
       Istio::Common::WorkloadType::Pod, "", "", "");
   EXPECT_CALL(*metadata_provider_, GetMetadata(_))
-      .WillRepeatedly(Invoke([&](const Network::Address::InstanceConstSharedPtr& address)
-                                 -> WorkloadMetadataObjectConstSharedPtr {
+      .WillRepeatedly([&](const Network::Address::InstanceConstSharedPtr& address)
+                          -> WorkloadMetadataObjectConstSharedPtr {
         if (absl::StartsWith(address->asStringView(), "127.0.0.1")) { // remote address
           return pod;
         }
         return {};
-      }));
+      });
   initialize(R"EOF(
     downstream_discovery:
       - istio_headers: {}
@@ -336,13 +335,13 @@ TEST_F(PeerMetadataTest, UpstreamFallbackSecond) {
       "pod-foo-1234", "my-cluster", "foo", "foo", "foo-service", "v1alpha3", "", "",
       Istio::Common::WorkloadType::Pod, "", "", "");
   EXPECT_CALL(*metadata_provider_, GetMetadata(_))
-      .WillRepeatedly(Invoke([&](const Network::Address::InstanceConstSharedPtr& address)
-                                 -> WorkloadMetadataObjectConstSharedPtr {
+      .WillRepeatedly([&](const Network::Address::InstanceConstSharedPtr& address)
+                          -> WorkloadMetadataObjectConstSharedPtr {
         if (absl::StartsWith(address->asStringView(), "10.0.0.1")) { // upstream host address
           return pod;
         }
         return {};
-      }));
+      });
   initialize(R"EOF(
     upstream_discovery:
       - istio_headers: {}
@@ -359,13 +358,13 @@ TEST_F(PeerMetadataTest, UpstreamFallbackFirstXDS) {
       "pod-foo-1234", "my-cluster", "foo", "foo", "foo-service", "v1alpha3", "", "",
       Istio::Common::WorkloadType::Pod, "", "", "");
   EXPECT_CALL(*metadata_provider_, GetMetadata(_))
-      .WillRepeatedly(Invoke([&](const Network::Address::InstanceConstSharedPtr& address)
-                                 -> WorkloadMetadataObjectConstSharedPtr {
+      .WillRepeatedly([&](const Network::Address::InstanceConstSharedPtr& address)
+                          -> WorkloadMetadataObjectConstSharedPtr {
         if (absl::StartsWith(address->asStringView(), "10.0.0.1")) { // upstream host address
           return pod;
         }
         return {};
-      }));
+      });
   response_headers_.setReference(Headers::get().ExchangeMetadataHeaderId, "test-pod");
   response_headers_.setReference(Headers::get().ExchangeMetadataHeader, SampleIstioHeader);
   initialize(R"EOF(

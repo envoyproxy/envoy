@@ -1,3 +1,4 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/http/body_size_limit/v3/body_size_limit.pb.h"
 #include "envoy/extensions/filters/http/filter_chain/v3/filter_chain.pb.h"
@@ -9,6 +10,36 @@ namespace Envoy {
 namespace {
 
 using BodySizeLimitIntegrationTest = UpstreamDownstreamIntegrationTest;
+
+// WebSocket over HTTP/2 and HTTP/3 uses extended CONNECT, which is off by default on both sides.
+void allowExtendedConnect(ConfigHelper& config_helper, Http::CodecType downstream,
+                          Http::CodecType upstream) {
+  if (upstream != Http::CodecType::HTTP1) {
+    config_helper.addConfigModifier([upstream](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      auto* http_config = protocol_options.mutable_explicit_http_config();
+      if (upstream == Http::CodecType::HTTP2) {
+        http_config->mutable_http2_protocol_options()->set_allow_connect(true);
+      } else {
+        http_config->mutable_http3_protocol_options()->set_allow_extended_connect(true);
+      }
+      ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                       protocol_options);
+    });
+  }
+  if (downstream != Http::CodecType::HTTP1) {
+    config_helper.addConfigModifier(
+        [downstream](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          if (downstream == Http::CodecType::HTTP2) {
+            hcm.mutable_http2_protocol_options()->set_allow_connect(true);
+          } else {
+            hcm.mutable_http3_protocol_options()->set_allow_extended_connect(true);
+          }
+        });
+  }
+}
 
 INSTANTIATE_TEST_SUITE_P(
     Protocols, BodySizeLimitIntegrationTest,
@@ -50,6 +81,22 @@ TEST_P(BodySizeLimitIntegrationTest, RouterRequestAndResponseWithZeroByteBodyBuf
   testRouterRequestAndResponseWithBody(0, 0, false);
 }
 
+// A malformed HTTP/1 request gets its error reply through the filter before any request headers
+// exist, so the filter must not read them.
+TEST_P(BodySizeLimitIntegrationTest, MalformedHttp1RequestRejected) {
+  if (!testing_downstream_filter_ || downstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  config_helper_.prependFilter(ConfigHelper::smallBodySizeLimitFilter(),
+                               testing_downstream_filter_);
+  initialize();
+
+  std::string response;
+  sendRawHttpAndWaitForResponse(
+      lookupPort("http"), "POST / HTTP/1.1\r\nHost: host\r\nbad header\r\n\r\n", &response, false);
+  EXPECT_THAT(response, testing::StartsWith("HTTP/1.1 400 Bad Request\r\n"));
+}
+
 TEST_P(BodySizeLimitIntegrationTest, RouterRequestSizeLimitExceeded) {
   // Make sure the connection isn't closed during request upload.
   // Without a large drain-close it's possible that the local reply will be sent
@@ -76,6 +123,10 @@ TEST_P(BodySizeLimitIntegrationTest, RouterRequestSizeLimitExceeded) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
+  if (testing_downstream_filter_) {
+    test_server_->waitForCounter("http.config_test.body_size_limit.rq_body_too_large",
+                                 testing::Eq(1));
+  }
   cleanupUpstreamAndDownstream();
 }
 
@@ -106,6 +157,130 @@ TEST_P(BodySizeLimitIntegrationTest, RouterHeaderRequestSizeLimitExceeded) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
+  if (testing_downstream_filter_) {
+    test_server_->waitForCounter("http.config_test.body_size_limit.rq_content_length_too_large",
+                                 testing::Eq(1));
+  }
+  cleanupUpstreamAndDownstream();
+}
+
+// Test that bytes sent on an upgraded WebSocket connection are not counted toward the limit.
+TEST_P(BodySizeLimitIntegrationTest, WebSocketTrafficNotLimited) {
+  allowExtendedConnect(config_helper_, downstreamProtocol(), upstreamProtocol());
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.add_upgrade_configs()->set_upgrade_type("websocket"); });
+  config_helper_.prependFilter(ConfigHelper::smallBodySizeLimitFilter(),
+                               testing_downstream_filter_);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/websocket/test"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"upgrade", "websocket"},
+                                     {"connection", "keep-alive, upgrade"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "101"},
+                                                                   {"connection", "upgrade"},
+                                                                   {"upgrade", "websocket"}},
+                                   false);
+  response->waitForHeaders();
+  EXPECT_EQ("101", response->headers().getStatusValue());
+
+  // Send more than the 1024 byte limit over the upgraded connection.
+  const std::string payload(4096, 'a');
+  codec_client_->sendData(*request_encoder_, payload, false);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, payload));
+  EXPECT_FALSE(response->complete());
+  // The filter's counters only exist under this name in the downstream filter chain.
+  if (testing_downstream_filter_) {
+    EXPECT_EQ(0,
+              test_server_->counter("http.config_test.body_size_limit.rq_body_too_large")->value());
+  }
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Test that upgrade headers alone don't lift the limit: bytes sent before the upstream accepts
+// the upgrade are still counted.
+TEST_P(BodySizeLimitIntegrationTest, UpgradeRequestBodyLimitedBeforeAccepted) {
+  if (!testing_downstream_filter_ || downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.add_upgrade_configs()->set_upgrade_type("websocket");
+        hcm.mutable_delayed_close_timeout()->set_seconds(2000 * 1000);
+      });
+  config_helper_.prependFilter(ConfigHelper::smallBodySizeLimitFilter(),
+                               testing_downstream_filter_);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/websocket/test"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"upgrade", "websocket"},
+                                     {"connection", "keep-alive, upgrade"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, std::string(4096, 'a'), false);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("413", response->headers().getStatusValue());
+  test_server_->waitForCounter("http.config_test.body_size_limit.rq_body_too_large",
+                               testing::Eq(1));
+  cleanupUpstreamAndDownstream();
+}
+
+// Test that bytes sent on an accepted CONNECT tunnel are not counted toward the limit.
+TEST_P(BodySizeLimitIntegrationTest, ConnectTunnelTrafficNotLimited) {
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    return;
+  }
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { ConfigHelper::setConnectConfig(hcm, false, false); });
+  config_helper_.prependFilter(ConfigHelper::smallBodySizeLimitFilter(),
+                               testing_downstream_filter_);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "foo.lyft.com:80"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  response->waitForHeaders();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Send more than the 1024 byte limit over the tunnel.
+  const std::string payload(4096, 'a');
+  codec_client_->sendData(*request_encoder_, payload, false);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, payload));
+  EXPECT_FALSE(response->complete());
+  // The filter's counters only exist under this name in the downstream filter chain.
+  if (testing_downstream_filter_) {
+    EXPECT_EQ(0,
+              test_server_->counter("http.config_test.body_size_limit.rq_body_too_large")->value());
+  }
+
   cleanupUpstreamAndDownstream();
 }
 

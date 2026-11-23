@@ -1,16 +1,28 @@
 #include <atomic>
 #include <thread>
 
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/common/regex.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+
+#include "source/common/config/ecds_subscription_registry.h"
+#include "source/common/config/xds_manager_impl.h"
+#include "source/common/runtime/runtime_impl.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/server/admin/config_tracker_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/init/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin_stream.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_manager.h"
 #include "test/mocks/server/listener_update_callbacks_handle.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -21,6 +33,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -43,8 +56,119 @@ protected:
     config.stat_creation_frozen_ = false;
   }
 
+  // Creates a config backed by the bootstrap_optional_hooks module.
+  DynamicModuleBootstrapExtensionConfigSharedPtr
+  newOptionalHooksConfig(absl::string_view extension_config = "config") {
+    auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+        testDataDir() + "/libbootstrap_optional_hooks.so", false);
+    EXPECT_OK(dynamic_module);
+    auto config = newDynamicModuleBootstrapExtensionConfig(
+        "test", extension_config, DefaultMetricsNamespace, std::move(dynamic_module.value()),
+        dispatcher_, context_, context_.store_);
+    EXPECT_OK(config);
+    return config.value();
+  }
+
+  // The thread local mock runs callbacks on the test thread. Run them on another thread first, the
+  // way a worker does, and then on the test thread.
+  void runThreadLocalCallbacksOnAWorker() {
+    // Before the main loop runs, the main dispatcher reports every thread as thread safe.
+    ON_CALL(dispatcher_, isThreadSafe()).WillByDefault(testing::Return(true));
+    ON_CALL(context_.thread_local_, runOnAllThreads(_, _))
+        .WillByDefault([](std::function<void()> cb, std::function<void()> main_callback) {
+          std::thread worker(cb);
+          worker.join();
+          cb();
+          main_callback();
+        });
+  }
+
+  // Returns a test accessor exported by the bootstrap_optional_hooks module.
+  template <class FunctionType> FunctionType optionalHooksFunction(const std::string& name) {
+    if (optional_hooks_module_ == nullptr) {
+      optional_hooks_module_ = Extensions::DynamicModules::newDynamicModule(
+                                   testDataDir() + "/libbootstrap_optional_hooks.so", false)
+                                   .value();
+    }
+    return optional_hooks_module_->getFunctionPointer<FunctionType>(name).value();
+  }
+
+  // Makes the runtime report a snapshot whose layers set the given values, bottom to top. The
+  // values are parsed the way a static layer parses them: "true" and "false" as booleans and the
+  // rest as strings, which can also hold numbers.
+  void
+  setRuntimeLayers(const std::vector<absl::flat_hash_map<std::string, std::string>>& layer_values) {
+    auto snapshot = std::make_shared<TestRuntimeSnapshot>();
+    for (const auto& values : layer_values) {
+      snapshot->layers_.push_back(std::make_unique<TestRuntimeLayer>(values));
+    }
+    ON_CALL(context_.runtime_loader_, threadsafeSnapshot())
+        .WillByDefault(testing::Return(snapshot));
+  }
+
+  // Simulates the runtime loading a new snapshot.
+  void loadRuntimeSnapshot() { context_.runtime_loader_.update_callbacks_.runCallbacks(); }
+
+  // Creates the extension of the config and notifies it that the server is initialized.
+  std::unique_ptr<DynamicModuleBootstrapExtension>
+  initializeExtension(DynamicModuleBootstrapExtensionConfigSharedPtr config) {
+    auto extension = std::make_unique<DynamicModuleBootstrapExtension>(std::move(config));
+    EXPECT_TRUE(extension->initializeInModuleExtension());
+    extension->onServerInitialized(server_);
+    return extension;
+  }
+
+  static bool enableRuntimeUpdate(DynamicModuleBootstrapExtension& extension,
+                                  absl::string_view key) {
+    return envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+        static_cast<void*>(&extension), {key.data(), key.size()});
+  }
+
+  // Returns whether Envoy accepted each key that the module watched from on_server_initialized.
+  std::string runtimeWatchResults() {
+    return optionalHooksFunction<const char* (*)()>(
+        "bootstrap_optional_hooks_test_runtime_watch_results")();
+  }
+
+  std::string runtimeUpdates() {
+    return optionalHooksFunction<const char* (*)()>(
+        "bootstrap_optional_hooks_test_runtime_updates")();
+  }
+
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  testing::NiceMock<Server::MockInstance> server_;
+  Extensions::DynamicModules::DynamicModulePtr optional_hooks_module_;
+
+private:
+  class TestRuntimeLayer : public Runtime::Snapshot::OverrideLayer {
+  public:
+    explicit TestRuntimeLayer(const absl::flat_hash_map<std::string, std::string>& values) {
+      for (const auto& [key, value] : values) {
+        Protobuf::Value proto_value;
+        if (value == "true" || value == "false") {
+          proto_value.set_bool_value(value == "true");
+        } else {
+          proto_value.set_string_value(value);
+        }
+        values_[key] = Runtime::SnapshotImpl::createEntry(proto_value, "");
+      }
+    }
+    const std::string& name() const override { return name_; }
+    const Runtime::Snapshot::EntryMap& values() const override { return values_; }
+
+  private:
+    const std::string name_{"test"};
+    Runtime::Snapshot::EntryMap values_;
+  };
+
+  class TestRuntimeSnapshot : public testing::NiceMock<Runtime::MockSnapshot> {
+  public:
+    TestRuntimeSnapshot() {
+      ON_CALL(*this, getLayers()).WillByDefault(testing::ReturnRef(layers_));
+    }
+    std::vector<Runtime::Snapshot::OverrideLayerConstPtr> layers_;
+  };
 };
 
 // Test that the scheduler can be created, used, and deleted.
@@ -83,9 +207,9 @@ TEST_F(BootstrapAbiImplTest, SchedulerCommit) {
 
   // Expect the dispatcher to receive a post call when commit is called.
   Event::PostCb captured_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   // Commit an event via the ABI callback.
   envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(scheduler_ptr, 42);
@@ -114,9 +238,9 @@ TEST_F(BootstrapAbiImplTest, OnScheduledCallback) {
 
   // Capture the posted callback.
   Event::PostCb captured_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   // Commit an event via the ABI callback.
   envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(scheduler_ptr, 123);
@@ -147,9 +271,9 @@ TEST_F(BootstrapAbiImplTest, OnScheduledAfterConfigDestroyed) {
     EXPECT_NE(scheduler_ptr, nullptr);
 
     // Capture the posted callback.
-    EXPECT_CALL(dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    EXPECT_CALL(dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
       captured_cb = std::move(cb);
-    }));
+    });
 
     // Commit an event via the ABI callback.
     envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(scheduler_ptr, 456);
@@ -315,12 +439,11 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutSuccess) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   // Build headers.
   std::vector<envoy_dynamic_module_type_module_http_header> headers = {
@@ -376,12 +499,11 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureReset) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   // Build headers.
   std::vector<envoy_dynamic_module_type_module_http_header> headers = {
@@ -427,12 +549,11 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureExceedBufferLimit) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   // Build headers.
   std::vector<envoy_dynamic_module_type_module_http_header> headers = {
@@ -497,6 +618,35 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutCannotCreateRequest) {
   EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
 }
 
+// Test that a callout that the async client completes inside send does not call back into the
+// module, which learns about it from the return value.
+TEST_F(BootstrapAbiImplTest, HttpCalloutCompletedInsideSendDoesNotReachTheModule) {
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  testing::NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&thread_local_cluster));
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks.onSuccess(request,
+                            std::make_unique<Http::ResponseMessageImpl>(Http::ResponseHeaderMapPtr{
+                                new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
+        return nullptr;
+      });
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {":method", 7, "GET", 3}, {":path", 5, "/test", 5}, {"host", 4, "example.com", 11}};
+  uint64_t callout_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest,
+            envoy_dynamic_module_callback_bootstrap_extension_http_callout(
+                config->thisAsVoidPtr(), &callout_id, {"test_cluster", 12}, headers.data(),
+                headers.size(), {nullptr, 0}, 5000));
+  EXPECT_EQ(0, optionalHooksFunction<size_t (*)()>(
+                   "bootstrap_optional_hooks_test_http_callout_done_count")());
+}
+
 // Test HTTP callout success when in_module_config is cleared before callback.
 TEST_F(BootstrapAbiImplTest, HttpCalloutSuccessAfterInModuleConfigCleared) {
   auto dynamic_module =
@@ -519,12 +669,11 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutSuccessAfterInModuleConfigCleared) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   // Build headers.
   std::vector<envoy_dynamic_module_type_module_http_header> headers = {
@@ -578,12 +727,11 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureAfterInModuleConfigCleared) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   // Build headers.
   std::vector<envoy_dynamic_module_type_module_http_header> headers = {
@@ -633,13 +781,12 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutWithBody) {
   std::string captured_body;
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            captured_body = message->body().toString();
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        captured_body = message->body().toString();
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   // Build headers.
   std::vector<envoy_dynamic_module_type_module_http_header> headers = {
@@ -1503,10 +1650,10 @@ TEST_F(BootstrapAbiImplTest, TimerFiredAfterConfigDestroyed) {
     ASSERT_OK(dynamic_module);
 
     // Capture the timer callback from createTimer.
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(testing::Invoke([&](Event::TimerCb cb) {
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([&](Event::TimerCb cb) {
       captured_timer_cb = std::move(cb);
       return new testing::NiceMock<Event::MockTimer>();
-    }));
+    });
 
     auto config = newDynamicModuleBootstrapExtensionConfig(
         "test", "config", DefaultMetricsNamespace, std::move(dynamic_module.value()), dispatcher_,
@@ -1566,11 +1713,11 @@ TEST_F(BootstrapAbiImplTest, FileWatcherFired) {
   auto* mock_watcher = new testing::NiceMock<Filesystem::MockWatcher>();
   EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(testing::Return(mock_watcher));
   EXPECT_CALL(*mock_watcher, addWatch(_, _, _))
-      .WillOnce(testing::Invoke(
+      .WillOnce(
           [&](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) -> absl::Status {
             captured_cb = std::move(cb);
             return absl::OkStatus();
-          }));
+          });
 
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
@@ -1597,17 +1744,16 @@ TEST_F(BootstrapAbiImplTest, FileWatcherFiredAfterConfigDestroyed) {
     ASSERT_OK(dynamic_module);
 
     // Capture the watcher callback from addWatch.
-    EXPECT_CALL(dispatcher_, createFilesystemWatcher_())
-        .WillOnce(testing::Invoke([&]() -> Filesystem::Watcher* {
-          auto* mock_watcher = new testing::NiceMock<Filesystem::MockWatcher>();
-          EXPECT_CALL(*mock_watcher, addWatch(_, _, _))
-              .WillOnce(testing::Invoke([&](absl::string_view, uint32_t,
-                                            Filesystem::Watcher::OnChangedCb cb) -> absl::Status {
-                captured_cb = std::move(cb);
-                return absl::OkStatus();
-              }));
-          return mock_watcher;
-        }));
+    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce([&]() -> Filesystem::Watcher* {
+      auto* mock_watcher = new testing::NiceMock<Filesystem::MockWatcher>();
+      EXPECT_CALL(*mock_watcher, addWatch(_, _, _))
+          .WillOnce([&](absl::string_view, uint32_t,
+                        Filesystem::Watcher::OnChangedCb cb) -> absl::Status {
+            captured_cb = std::move(cb);
+            return absl::OkStatus();
+          });
+      return mock_watcher;
+    });
 
     auto config = newDynamicModuleBootstrapExtensionConfig(
         "test", "config", DefaultMetricsNamespace, std::move(dynamic_module.value()), dispatcher_,
@@ -1785,12 +1931,11 @@ TEST_F(BootstrapAbiImplTest, AdminHandlerCallbackInvokesEventHook) {
   // Capture the handler callback when addHandler is called.
   Server::Admin::HandlerCb captured_handler;
   EXPECT_CALL(context_.admin_, addHandler("/test_admin", "Test admin handler", _, true, false, _))
-      .WillOnce(
-          testing::Invoke([&](const std::string&, const std::string&, Server::Admin::HandlerCb cb,
-                              bool, bool, const Server::Admin::ParamDescriptorVec&) -> bool {
-            captured_handler = std::move(cb);
-            return true;
-          }));
+      .WillOnce([&](const std::string&, const std::string&, Server::Admin::HandlerCb cb, bool, bool,
+                    const Server::Admin::ParamDescriptorVec&) -> bool {
+        captured_handler = std::move(cb);
+        return true;
+      });
 
   envoy_dynamic_module_type_module_buffer path_prefix = {"/test_admin", 11};
   envoy_dynamic_module_type_module_buffer help_text = {"Test admin handler", 18};
@@ -1815,6 +1960,29 @@ TEST_F(BootstrapAbiImplTest, AdminHandlerCallbackInvokesEventHook) {
 
   // The no_op module's admin_request hook returns 200.
   EXPECT_EQ(code, Http::Code::OK);
+}
+
+// Test that an admin handler does not keep the configuration alive, since the admin server outlives
+// the bootstrap extensions.
+TEST_F(BootstrapAbiImplTest, AdminHandlerDoesNotKeepTheConfigAlive) {
+  auto config = newOptionalHooksConfig();
+  Server::Admin::HandlerCb captured_handler;
+  EXPECT_CALL(context_.admin_, addHandler("/test_admin", "help", _, true, false, _))
+      .WillOnce([&](const std::string&, const std::string&, Server::Admin::HandlerCb cb, bool, bool,
+                    const Server::Admin::ParamDescriptorVec&) -> bool {
+        captured_handler = std::move(cb);
+        return true;
+      });
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+      config->thisAsVoidPtr(), {"/test_admin", 11}, {"help", 4}, true, false));
+
+  std::weak_ptr<DynamicModuleBootstrapExtensionConfig> weak_config = config;
+  config.reset();
+  EXPECT_TRUE(weak_config.expired());
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl response_body;
+  testing::NiceMock<Server::MockAdminStream> admin_stream;
+  EXPECT_EQ(Http::Code::NotFound, captured_handler(response_headers, response_body, admin_stream));
 }
 
 // Test that re-enabling the timer resets it.
@@ -1844,6 +2012,506 @@ TEST_F(BootstrapAbiImplTest, TimerReEnable) {
 
   // Clean up.
   envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
+}
+
+TEST_F(BootstrapAbiImplTest, ExtensionConfigSubscriptionValidatesLifecycleAndReleasesOnShutdown) {
+  auto config = newOptionalHooksConfig();
+  const std::string source =
+      R"({"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["type.googleapis.com/test.Config"]})";
+  const auto hook = [](auto, auto, auto, auto, auto, auto, bool, auto) { return true; };
+  config->on_bootstrap_extension_ecds_update_ = hook;
+  auto subscribe = [&]() {
+    return envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+        config->thisAsVoidPtr(), {"test-config", 11}, {source.data(), source.size()});
+  };
+  EXPECT_CALL(
+      context_.xds_manager_,
+      subscribeToSingletonResource(_, _, _, _, testing::A<Config::SubscriptionCallbacks&>(), _, _))
+      .Times(0);
+  EXPECT_FALSE(subscribe());
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  config->on_bootstrap_extension_ecds_update_ = nullptr;
+  EXPECT_FALSE(subscribe());
+  config->on_bootstrap_extension_ecds_update_ = hook;
+  ON_CALL(context_.options_, mode()).WillByDefault(testing::Return(Server::Mode::InitOnly));
+  EXPECT_FALSE(subscribe());
+  ON_CALL(context_.options_, mode()).WillByDefault(testing::Return(Server::Mode::Serve));
+  EXPECT_FALSE(config->subscribeEcds("test-config", "invalid-json"));
+  EXPECT_FALSE(config->subscribeEcds("test-config", R"({"unknown":true})"));
+  EXPECT_FALSE(config->subscribeEcds("test-config", "{}"));
+  EXPECT_FALSE(config->subscribeEcds(
+      "test-config",
+      R"({"config_source":{"ads":{},"resource_api_version":99},"type_urls":["test.Config"]})"));
+  testing::Mock::VerifyAndClearExpectations(&context_.xds_manager_);
+  EXPECT_CALL(context_.xds_manager_,
+              subscribeToSingletonResource("test-config", _, _, _,
+                                           testing::A<Config::SubscriptionCallbacks&>(), _, _))
+      .WillOnce(testing::Return(absl::UnavailableError("subscription unavailable")))
+      .WillOnce(testing::Throw(EnvoyException("invalid source")));
+  EXPECT_FALSE(subscribe());
+  EXPECT_FALSE(subscribe());
+  struct TrackedSubscription : testing::StrictMock<Config::MockSubscription> {
+    explicit TrackedSubscription(bool& destroyed) : destroyed_(destroyed) {}
+    ~TrackedSubscription() override { destroyed_ = true; }
+    bool& destroyed_;
+  };
+  bool destroyed = false;
+  auto transport = std::make_unique<TrackedSubscription>(destroyed);
+  EXPECT_CALL(*transport, start(testing::ElementsAre("test-config")));
+  EXPECT_CALL(context_.xds_manager_,
+              subscribeToSingletonResource("test-config", _, _, _,
+                                           testing::A<Config::SubscriptionCallbacks&>(), _, _))
+      .WillOnce([&](auto, auto, auto, auto&, auto&, auto, auto) -> Config::SubscriptionPtr {
+        return std::move(transport);
+      });
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{}));
+  EXPECT_TRUE(subscribe());
+  testing::Mock::VerifyAndClearExpectations(&context_.xds_manager_);
+  EXPECT_CALL(
+      context_.xds_manager_,
+      subscribeToSingletonResource(_, _, _, _, testing::A<Config::SubscriptionCallbacks&>(), _, _))
+      .Times(0);
+  EXPECT_FALSE(subscribe());
+  EXPECT_FALSE(destroyed);
+  config->onShutdown();
+  EXPECT_TRUE(destroyed);
+  EXPECT_FALSE(subscribe());
+}
+
+TEST_F(BootstrapAbiImplTest, EcdsStartFailureReleasesSubscriptionAndName) {
+  auto config = newOptionalHooksConfig();
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{}));
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  config->on_bootstrap_extension_ecds_update_ = [](auto, auto, auto, auto, auto, auto, bool, auto) {
+    return true;
+  };
+  auto transport = std::make_unique<testing::StrictMock<Config::MockSubscription>>();
+  EXPECT_CALL(*transport, start(testing::ElementsAre("test-config")))
+      .WillOnce(testing::Throw(EnvoyException("ADS is not configured")));
+  EXPECT_CALL(
+      context_.xds_manager_,
+      subscribeToSingletonResource(_, _, _, _, testing::A<Config::SubscriptionCallbacks&>(), _, _))
+      .WillOnce(testing::Return(testing::ByMove(std::move(transport))));
+  EXPECT_FALSE(config->subscribeEcds(
+      "test-config",
+      R"({"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["test.Config"]})"));
+  EXPECT_OK(Config::EcdsSubscriptionRegistry::get(context_.singletonManager())
+                ->reserve("test-config", Config::EcdsSubscriptionRegistry::Sharing::Exclusive));
+  EXPECT_CALL(
+      context_.xds_manager_,
+      subscribeToSingletonResource(_, _, _, _, testing::A<Config::SubscriptionCallbacks&>(), _, _))
+      .WillOnce(testing::Return(absl::UnavailableError("subscription unavailable")));
+  EXPECT_FALSE(config->subscribeEcds(
+      "test-config",
+      R"({"config_source":{"ads":{},"resource_api_version":"V3"},"type_urls":["test.Config"]})"));
+}
+
+TEST_F(BootstrapAbiImplTest, EcdsHookPreservesArgumentsAndRefusesSynchronousResubscribe) {
+  struct Update {
+    std::string name;
+    std::string version;
+    std::string type_url;
+    envoy_dynamic_module_type_bootstrap_ecds_config_encoding encoding;
+    bool has_config;
+    std::string config;
+  };
+  std::vector<Update> updates;
+  struct Hook {
+    std::vector<Update>& updates;
+  } hook{updates};
+  auto config = newOptionalHooksConfig();
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{}));
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  const auto original_module_config = config->in_module_config_;
+  Cleanup restore_config([&] { config->in_module_config_ = original_module_config; });
+  config->in_module_config_ = &hook;
+  config->on_bootstrap_extension_ecds_update_ = [](auto envoy, auto module, auto name, auto version,
+                                                   auto type_url, auto encoding, bool has_config,
+                                                   auto payload) {
+    auto& updates = static_cast<const Hook*>(module)->updates;
+    updates.push_back({std::string(name.ptr, name.length), std::string(version.ptr, version.length),
+                       std::string(type_url.ptr, type_url.length), encoding, has_config,
+                       payload.length == 0 ? "" : std::string(payload.ptr, payload.length)});
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot = envoy;
+    EXPECT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed,
+              envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                  envoy, nullptr, 0, {nullptr, 0}, &snapshot));
+    EXPECT_EQ(snapshot, nullptr);
+    const std::string source =
+        R"({"config_source":{"path":"unused.yaml"},"type_urls":["google.protobuf.StringValue"]})";
+    EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+        envoy, {"test-config", 11}, {source.data(), source.size()}));
+    return true;
+  };
+  Config::SubscriptionCallbacks* callbacks = nullptr;
+  auto transport = std::make_unique<testing::StrictMock<Config::MockSubscription>>();
+  EXPECT_CALL(*transport, start(testing::ElementsAre("test-config"))).WillOnce([&] {
+    envoy::config::core::v3::TypedExtensionConfig resource;
+    resource.set_name("test-config");
+    Protobuf::StringValue payload;
+    payload.set_value("enabled");
+    MessageUtil::packFrom(*resource.mutable_typed_config(), payload);
+    auto decoded = TestUtility::decodeResources({resource});
+    EXPECT_OK(callbacks->onConfigUpdate(decoded.refvec_, "v1"));
+  });
+  EXPECT_CALL(
+      context_.xds_manager_,
+      subscribeToSingletonResource(_, _, _, _, testing::A<Config::SubscriptionCallbacks&>(), _, _))
+      .WillOnce(
+          [&](auto, auto, auto, auto&, auto& callback, auto, auto) -> Config::SubscriptionPtr {
+            callbacks = &callback;
+            return std::move(transport);
+          });
+  ASSERT_TRUE(config->subscribeEcds(
+      "test-config",
+      R"({"config_source":{"path":"unused.yaml"},"type_urls":["google.protobuf.StringValue"]})"));
+  Protobuf::RepeatedPtrField<std::string> removed;
+  removed.Add("test-config");
+  EXPECT_OK(callbacks->onConfigUpdate({}, removed, "v2"));
+  ASSERT_EQ(updates.size(), 2);
+  EXPECT_EQ(updates[0].name, "test-config");
+  EXPECT_EQ(updates[0].version, "v1");
+  EXPECT_EQ(updates[0].type_url, "type.googleapis.com/google.protobuf.StringValue");
+  EXPECT_EQ(updates[0].encoding, envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Bytes);
+  EXPECT_TRUE(updates[0].has_config);
+  EXPECT_EQ(updates[0].config, "enabled");
+  EXPECT_EQ(updates[1].name, "test-config");
+  EXPECT_TRUE(updates[1].version.empty());
+  EXPECT_TRUE(updates[1].type_url.empty());
+  EXPECT_FALSE(updates[1].has_config);
+  EXPECT_TRUE(updates[1].config.empty());
+
+  Server::ConfigTrackerImpl tracker;
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{context_.admin_}));
+  EXPECT_CALL(context_.admin_, getConfigTracker()).WillOnce(testing::ReturnRef(tracker));
+  envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot = nullptr;
+  ASSERT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success,
+            envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                config->thisAsVoidPtr(), nullptr, 0, {nullptr, 0}, &snapshot));
+  ASSERT_NE(snapshot, nullptr);
+  envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(snapshot);
+}
+
+TEST_F(BootstrapAbiImplTest, ConfigSnapshotLifecycleAndUnavailableStates) {
+  auto config = newOptionalHooksConfig();
+  const envoy_dynamic_module_type_module_buffer providers[] = {{"bootstrap", 9}};
+  envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot =
+      config->thisAsVoidPtr();
+  auto collect = [&]() {
+    return envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+        config->thisAsVoidPtr(), providers, 1, {nullptr, 0}, &snapshot);
+  };
+  EXPECT_EQ(collect(), envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed);
+  EXPECT_EQ(snapshot, nullptr);
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{}));
+  EXPECT_EQ(collect(), envoy_dynamic_module_type_bootstrap_config_snapshot_result_Unavailable);
+  EXPECT_EQ(snapshot, nullptr);
+  Server::ConfigTrackerImpl tracker;
+  auto provider = tracker.add("bootstrap", [](const Matchers::StringMatcher&) {
+    auto dump = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+    dump->mutable_bootstrap()->mutable_node()->set_id("test-node");
+    return dump;
+  });
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{context_.admin_}));
+  EXPECT_CALL(context_.admin_, getConfigTracker()).WillOnce(testing::ReturnRef(tracker));
+  ASSERT_EQ(collect(), envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success);
+  ASSERT_NE(snapshot, nullptr);
+  auto retained_snapshot = snapshot;
+  config->onShutdown();
+  EXPECT_EQ(collect(), envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed);
+  EXPECT_EQ(snapshot, nullptr);
+  std::string json;
+  std::thread worker([&]() {
+    EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+        retained_snapshot,
+        [](envoy_dynamic_module_type_envoy_buffer buffer, void* result) {
+          static_cast<std::string*>(result)->assign(buffer.ptr, buffer.length);
+        },
+        &json));
+    envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(retained_snapshot);
+  });
+  worker.join();
+  EXPECT_THAT(json, testing::HasSubstr("test-node"));
+  config->onExtensionDestroyed();
+  EXPECT_EQ(collect(), envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed);
+  EXPECT_EQ(snapshot, nullptr);
+  config.reset();
+}
+
+TEST_F(BootstrapAbiImplTest, ConfigSnapshotUnavailableDuringResourceLifecycleHooks) {
+  auto config = newOptionalHooksConfig();
+  auto other_config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  other_config->setListenerManager(listener_manager);
+  auto check_unavailable = [](void* envoy, const void* module,
+                              envoy_dynamic_module_type_envoy_buffer) {
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot = envoy;
+    EXPECT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed,
+              envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                  envoy, nullptr, 0, {nullptr, 0}, &snapshot));
+    EXPECT_EQ(snapshot, nullptr);
+    EXPECT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed,
+              envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                  const_cast<void*>(module), nullptr, 0, {nullptr, 0}, &snapshot));
+    EXPECT_EQ(snapshot, nullptr);
+  };
+  config->on_bootstrap_extension_cluster_add_or_update_ = check_unavailable;
+  config->on_bootstrap_extension_cluster_removal_ = check_unavailable;
+  config->on_bootstrap_extension_listener_add_or_update_ = check_unavailable;
+  config->on_bootstrap_extension_listener_removal_ = [](void* envoy, const void*,
+                                                        envoy_dynamic_module_type_envoy_buffer) {
+    static_cast<DynamicModuleBootstrapExtensionConfig*>(envoy)->onClusterRemoval("nested");
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot = envoy;
+    EXPECT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed,
+              envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                  envoy, nullptr, 0, {nullptr, 0}, &snapshot));
+    EXPECT_EQ(snapshot, nullptr);
+  };
+  Upstream::ThreadLocalClusterCommand get_cluster = []() -> Upstream::ThreadLocalCluster& {
+    PANIC("should not be called");
+  };
+  auto original_module_config = config->in_module_config_;
+  config->in_module_config_ = other_config->thisAsVoidPtr();
+  config->onClusterAddOrUpdate("cluster", get_cluster);
+  config->onClusterRemoval("cluster");
+  testing::NiceMock<Network::MockListenerConfig> listener;
+  config->onListenerAddOrUpdate("listener", listener);
+  config->onListenerRemoval("listener");
+  config->in_module_config_ = original_module_config;
+
+  Server::ConfigTrackerImpl tracker;
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{context_.admin_}));
+  EXPECT_CALL(context_.admin_, getConfigTracker()).WillOnce(testing::ReturnRef(tracker));
+  envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot = nullptr;
+  ASSERT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success,
+            envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                config->thisAsVoidPtr(), nullptr, 0, {nullptr, 0}, &snapshot));
+  ASSERT_NE(snapshot, nullptr);
+  envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(snapshot);
+}
+
+TEST_F(BootstrapAbiImplTest, ConfigSnapshotUnavailableDuringXdsUpdates) {
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  Server::ConfigTrackerImpl tracker;
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{context_.admin_}));
+  EXPECT_CALL(context_.admin_, getConfigTracker()).WillOnce(testing::ReturnRef(tracker));
+  config->on_bootstrap_extension_xds_update_ = [](auto envoy, auto, auto, auto status, auto, auto,
+                                                  auto, auto) {
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot = envoy;
+    const auto result = envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+        envoy, nullptr, 0, {nullptr, 0}, &snapshot);
+    if (status == envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed) {
+      EXPECT_EQ(result, envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success);
+      ASSERT_NE(snapshot, nullptr);
+      envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(snapshot);
+    } else {
+      EXPECT_EQ(result, envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed);
+      EXPECT_EQ(snapshot, nullptr);
+    }
+  };
+  Config::XdsConfigTrackers trackers;
+  EXPECT_CALL(context_.xds_manager_, addXdsConfigTracker(_))
+      .WillOnce([&](Config::XdsConfigTracker& tracker) { return trackers.add(tracker); });
+  ASSERT_TRUE(config->setXdsNotifications(true));
+  envoy::service::discovery::v3::DiscoveryResponse sotw;
+  trackers.onConfigAcceptedWithResponse(sotw, {});
+  trackers.onConfigRejected(sotw, "rejected");
+  envoy::service::discovery::v3::DeltaDiscoveryResponse delta;
+  trackers.onConfigAcceptedWithResponse(delta, {}, {});
+  trackers.onConfigRejected(delta, "rejected");
+  trackers.onConfigAccepted("test-type", {});
+  trackers.onConfigAccepted("test-type", {}, {});
+
+  Event::PostCb post;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&](Event::PostCb callback) {
+    post = std::move(callback);
+  });
+  trackers.onResourceUnsubscribed("test-type", "resource");
+  ASSERT_TRUE(post);
+  post();
+}
+
+TEST_F(BootstrapAbiImplTest, ConfigSnapshotRejectsReentryAndRecoversAfterProviderFailure) {
+  auto config = newOptionalHooksConfig();
+  auto other_config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  other_config->setListenerManager(listener_manager);
+  Server::ConfigTrackerImpl tracker;
+  int calls = 0;
+  auto provider =
+      tracker.add("bootstrap", [&](const Matchers::StringMatcher&) -> ProtobufTypes::MessagePtr {
+        if (++calls == 1) {
+          envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot =
+              nullptr;
+          EXPECT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed,
+                    envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                        other_config->thisAsVoidPtr(), nullptr, 0, {nullptr, 0}, &snapshot));
+          EXPECT_EQ(snapshot, nullptr);
+          throw EnvoyException("provider failed");
+        }
+        return std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+      });
+  EXPECT_CALL(context_, admin())
+      .Times(2)
+      .WillRepeatedly(testing::Return(OptRef<Server::Admin>{context_.admin_}));
+  EXPECT_CALL(context_.admin_, getConfigTracker())
+      .Times(2)
+      .WillRepeatedly(testing::ReturnRef(tracker));
+  const envoy_dynamic_module_type_module_buffer providers[] = {{"bootstrap", 9}};
+  envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot = nullptr;
+  EXPECT_LOG_CONTAINS(
+      "[dynamic_modules]", "config snapshot collection failed: INTERNAL: provider failed", {
+        EXPECT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_CollectionFailed,
+                  envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                      config->thisAsVoidPtr(), providers, 1, {nullptr, 0}, &snapshot));
+      });
+  EXPECT_EQ(snapshot, nullptr);
+  ASSERT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success,
+            envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                other_config->thisAsVoidPtr(), providers, 1, {nullptr, 0}, &snapshot));
+  ASSERT_NE(snapshot, nullptr);
+  EXPECT_EQ(calls, 2);
+  envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(snapshot);
+}
+
+TEST_F(BootstrapAbiImplTest, ConfigSnapshotNameRegexAndLengthAwareProviders) {
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  Server::ConfigTrackerImpl tracker;
+  const std::string provider_name("custom\0provider", 15);
+  const std::string resource_name("resource\0name", 13);
+  auto provider =
+      tracker.add(provider_name, [&resource_name](const Matchers::StringMatcher& matcher) {
+        EXPECT_TRUE(matcher.match(resource_name));
+        EXPECT_FALSE(matcher.match("resource"));
+        return std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+      });
+  ON_CALL(context_, admin()).WillByDefault(testing::Return(OptRef<Server::Admin>{context_.admin_}));
+  ON_CALL(context_.admin_, getConfigTracker()).WillByDefault(testing::ReturnRef(tracker));
+  const envoy_dynamic_module_type_module_buffer providers[] = {
+      {provider_name.data(), provider_name.size()}};
+  envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot = nullptr;
+  ASSERT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success,
+            envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                config->thisAsVoidPtr(), providers, 1, {resource_name.data(), resource_name.size()},
+                &snapshot));
+  ASSERT_NE(snapshot, nullptr);
+  std::string json;
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+      snapshot,
+      [](envoy_dynamic_module_type_envoy_buffer buffer, void* output) {
+        static_cast<std::string*>(output)->assign(buffer.ptr, buffer.length);
+      },
+      &json));
+  EXPECT_THAT(json, testing::HasSubstr("BootstrapConfigDump"));
+  envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(snapshot);
+  EXPECT_LOG_CONTAINS("debug", "config snapshot collection failed", {
+    EXPECT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_InvalidRegex,
+              envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                  config->thisAsVoidPtr(), providers, 1, {"[", 1}, &snapshot));
+  });
+  EXPECT_EQ(snapshot, nullptr);
+}
+
+TEST_F(BootstrapAbiImplTest, ConfigSnapshotReportsJsonEncodingFailure) {
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  Server::ConfigTrackerImpl tracker;
+  auto provider = tracker.add("bootstrap", [](const Matchers::StringMatcher&) {
+    auto dump = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+    auto* extension = dump->mutable_bootstrap()->add_bootstrap_extensions();
+    extension->set_name("unknown");
+    extension->mutable_typed_config()->set_type_url("type.googleapis.com/unknown.Config");
+    return dump;
+  });
+  EXPECT_CALL(context_, admin()).WillOnce(testing::Return(OptRef<Server::Admin>{context_.admin_}));
+  EXPECT_CALL(context_.admin_, getConfigTracker()).WillOnce(testing::ReturnRef(tracker));
+  const envoy_dynamic_module_type_module_buffer providers[] = {{"bootstrap", 9}};
+  envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot = nullptr;
+  ASSERT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success,
+            envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                config->thisAsVoidPtr(), providers, 1, {nullptr, 0}, &snapshot));
+  ASSERT_NE(snapshot, nullptr);
+  EXPECT_LOG_CONTAINS("debug", "dynamic modules: config snapshot encoding failed:", {
+    EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+        snapshot,
+        [](envoy_dynamic_module_type_envoy_buffer, void*) {
+          ADD_FAILURE() << "JSON callback invoked after encoding failure";
+        },
+        nullptr));
+  });
+  envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(snapshot);
+}
+
+TEST_F(BootstrapAbiImplTest, ConfigSnapshotUsesRe2RegardlessOfServerRegexEngine) {
+  class RegexContext : public Server::Configuration::MockServerFactoryContext {
+  public:
+    MOCK_METHOD(Regex::Engine&, regexEngine, (), (override));
+  };
+  class ThrowingRegexEngine : public Regex::Engine {
+  public:
+    absl::StatusOr<Regex::CompiledMatcherPtr> matcher(const std::string&) const override {
+      throw EnvoyException("server regex engine must not be used");
+    }
+  } engine;
+  testing::NiceMock<RegexContext> context;
+  ON_CALL(context, regexEngine()).WillByDefault(testing::ReturnRef(engine));
+  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+      testDataDir() + "/libbootstrap_optional_hooks.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config_or_error = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", DefaultMetricsNamespace, std::move(dynamic_module.value()), dispatcher_,
+      context, context.store_);
+  ASSERT_OK(config_or_error);
+  auto config = std::move(config_or_error.value());
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  Server::ConfigTrackerImpl tracker;
+  bool match_all = false;
+  auto provider = tracker.add("bootstrap", [&](const Matchers::StringMatcher& matcher) {
+    EXPECT_TRUE(matcher.match("resource"));
+    EXPECT_EQ(matcher.match("prefix-resource"), match_all);
+    EXPECT_EQ(matcher.match("resource-suffix"), match_all);
+    EXPECT_EQ(matcher.match(""), match_all);
+    return std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+  });
+  ON_CALL(context, admin()).WillByDefault(testing::Return(OptRef<Server::Admin>{context.admin_}));
+  ON_CALL(context.admin_, getConfigTracker()).WillByDefault(testing::ReturnRef(tracker));
+  const envoy_dynamic_module_type_module_buffer providers[] = {{"bootstrap", 9}};
+  envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot = nullptr;
+  auto check_filter = [&](absl::string_view pattern, bool all_names) {
+    match_all = all_names;
+    ASSERT_EQ(
+        envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success,
+        envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+            config->thisAsVoidPtr(), providers, 1, {pattern.data(), pattern.size()}, &snapshot));
+    ASSERT_NE(snapshot, nullptr);
+    envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(snapshot);
+  };
+  check_filter("resource", false);
+  check_filter(".*", true);
+  check_filter("", true);
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_InvalidRegex,
+            envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                config->thisAsVoidPtr(), providers, 1, {"[", 1}, &snapshot));
+  EXPECT_EQ(snapshot, nullptr);
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"re2.max_program_size.error_level", "1"}});
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_InvalidRegex,
+            envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                config->thisAsVoidPtr(), providers, 1, {"resource", 8}, &snapshot));
+  EXPECT_EQ(snapshot, nullptr);
 }
 
 // Test that enabling cluster lifecycle registers callbacks with ClusterManager.
@@ -1949,6 +2617,204 @@ TEST_F(BootstrapAbiImplTest, EnableListenerLifecycleBeforeServerInit) {
   });
 }
 
+// Test that cluster and listener lifecycle are refused once shutdown started and in init only mode,
+// since nothing would release the registrations before the server frees what they refer to.
+TEST_F(BootstrapAbiImplTest, LifecycleRefusedOnceShutdownStartedAndInInitOnlyMode) {
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  EXPECT_CALL(context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_)).Times(0);
+  EXPECT_CALL(listener_manager, addListenerUpdateCallbacks_(_)).Times(0);
+  for (const bool init_only : {false, true}) {
+    ON_CALL(context_.options_, mode())
+        .WillByDefault(testing::Return(init_only ? Server::Mode::InitOnly : Server::Mode::Serve));
+    auto config = newOptionalHooksConfig();
+    config->setListenerManager(listener_manager);
+    if (!init_only) {
+      config->onShutdown();
+    }
+    EXPECT_LOG_CONTAINS(
+        "error", "cannot enable cluster lifecycle once shutdown started or in init only mode", {
+          EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
+              config->thisAsVoidPtr()));
+        });
+    EXPECT_LOG_CONTAINS(
+        "error", "cannot enable listener lifecycle once shutdown started or in init only mode", {
+          EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
+              config->thisAsVoidPtr()));
+        });
+  }
+}
+
+// Test that the extension is told about every watched runtime key that was added, changed or
+// removed, in key order, and only about the changes made after it started watching the key.
+TEST_F(BootstrapAbiImplTest, RuntimeUpdateReportsWatchedKeys) {
+  setRuntimeLayers({{{"a", "1"}, {"b", "2"}, {"c", "3"}}, {}});
+  auto extension = initializeExtension(newOptionalHooksConfig("watch_runtime_keys:d,c,b,e"));
+  EXPECT_EQ("+d;+c;+b;+e;", runtimeWatchResults());
+  EXPECT_EQ(1, context_.runtime_loader_.update_callbacks_.size());
+  EXPECT_EQ("", runtimeUpdates());
+
+  // A key set by a higher layer reports the value of the highest layer. The unwatched key "a" is
+  // not reported, and a removed key reports its previous value.
+  setRuntimeLayers({{{"a", "10"}, {"b", "2"}}, {{"b", "20"}, {"d", "4"}}});
+  loadRuntimeSnapshot();
+  EXPECT_EQ("b=i:20;c!i:3;d=i:4;", runtimeUpdates());
+
+  // A snapshot that changes no watched key reports nothing.
+  setRuntimeLayers({{{"a", "11"}}, {{"b", "20"}, {"d", "4.0"}}});
+  loadRuntimeSnapshot();
+  EXPECT_EQ("b=i:20;c!i:3;d=i:4;", runtimeUpdates());
+
+  // Removing the override of a key that a lower layer sets reports the value of the lower layer.
+  setRuntimeLayers({{{"a", "1"}, {"b", "2"}}, {{"d", "4"}, {"e", "true"}}});
+  loadRuntimeSnapshot();
+  EXPECT_EQ("b=i:20;c!i:3;d=i:4;b=i:2;e=b:true;", runtimeUpdates());
+}
+
+// Test that a value is reported through the hook of its type, that a change of type is a change,
+// that a NaN that stays NaN is not reported, and that a value that is neither a boolean nor a
+// number counts as unset.
+TEST_F(BootstrapAbiImplTest, RuntimeUpdateReportsTypedValues) {
+  setRuntimeLayers({{}});
+  auto extension = initializeExtension(newOptionalHooksConfig("watch_runtime_keys:k"));
+  std::string expected;
+  for (const auto& [value, update] : std::vector<std::pair<std::string, std::string>>{
+           {"1.5", "k=n:1.5;"},
+           {"1000000", "k=i:1000000;"},
+           {"1000001", "k=i:1000001;"},
+           {"1000001.0", ""},
+           {"-1", "k=n:-1;"},
+           {"0", "k=i:0;"},
+           {"false", "k=b:false;"},
+           {"nan", "k=n:nan;"},
+           {"nan", ""},
+           {"text", "k!n:nan;"},
+           {"other text", ""},
+           {"true", "k=b:true;"},
+       }) {
+    setRuntimeLayers({{{"k", value}}});
+    loadRuntimeSnapshot();
+    expected += update;
+    EXPECT_EQ(expected, runtimeUpdates()) << value;
+  }
+}
+
+// Test that the changes of a type are not reported when the module does not implement its hook.
+TEST_F(BootstrapAbiImplTest, RuntimeUpdateSkipsTypesWithoutAHook) {
+  setRuntimeLayers({{}});
+  auto config = newOptionalHooksConfig("watch_runtime_keys:k");
+  config->on_bootstrap_extension_runtime_bool_update_ = nullptr;
+  config->on_bootstrap_extension_runtime_int_update_ = nullptr;
+  auto extension = initializeExtension(config);
+  EXPECT_EQ("+k;", runtimeWatchResults());
+  for (absl::string_view value : {"true", "1", "1.5"}) {
+    setRuntimeLayers({{{"k", std::string(value)}}});
+    loadRuntimeSnapshot();
+  }
+  EXPECT_EQ("k=n:1.5;", runtimeUpdates());
+}
+
+// Test that the extension cannot watch a key outside of on_server_initialized.
+TEST_F(BootstrapAbiImplTest, WatchRuntimeKeyOutsideServerInitialized) {
+  setRuntimeLayers({{}});
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(newOptionalHooksConfig());
+  EXPECT_TRUE(extension->initializeInModuleExtension());
+  EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_)).Times(0);
+  const std::string error = "cannot enable runtime update outside of "
+                            "envoy_dynamic_module_on_bootstrap_extension_server_initialized";
+  EXPECT_LOG_CONTAINS("error", error, { EXPECT_FALSE(enableRuntimeUpdate(*extension, "a")); });
+  extension->onServerInitialized(server_);
+  EXPECT_LOG_CONTAINS("error", error, { EXPECT_FALSE(enableRuntimeUpdate(*extension, "a")); });
+}
+
+// Test that the extension cannot watch a key from the runtime update hook.
+TEST_F(BootstrapAbiImplTest, WatchRuntimeKeyFromTheHook) {
+  setRuntimeLayers({{}});
+  auto extension = initializeExtension(newOptionalHooksConfig("watch_runtime_keys:watch_more"));
+  EXPECT_EQ("+watch_more;", runtimeWatchResults());
+
+  setRuntimeLayers({{{"more", "1"}, {"watch_more", "1"}}});
+  EXPECT_LOG_CONTAINS("error",
+                      "cannot enable runtime update outside of "
+                      "envoy_dynamic_module_on_bootstrap_extension_server_initialized",
+                      { loadRuntimeSnapshot(); });
+  EXPECT_EQ("watch_more=i:1;", runtimeUpdates());
+
+  setRuntimeLayers({{{"more", "2"}, {"watch_more", "1"}}});
+  loadRuntimeSnapshot();
+  EXPECT_EQ("watch_more=i:1;", runtimeUpdates());
+}
+
+// Test that watching a key twice fails, and that every watched key shares a single registration.
+TEST_F(BootstrapAbiImplTest, WatchRuntimeKeyTwice) {
+  setRuntimeLayers({{}});
+  EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_));
+  auto extension = initializeExtension(newOptionalHooksConfig("watch_runtime_keys:a,a,b"));
+  EXPECT_EQ("+a;-a;+b;", runtimeWatchResults());
+  EXPECT_EQ(1, context_.runtime_loader_.update_callbacks_.size());
+}
+
+// Test that an empty key cannot be watched.
+TEST_F(BootstrapAbiImplTest, WatchEmptyRuntimeKey) {
+  setRuntimeLayers({{}});
+  EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_)).Times(0);
+  std::unique_ptr<DynamicModuleBootstrapExtension> extension;
+  EXPECT_LOG_CONTAINS("error", "cannot enable runtime update for an empty key", {
+    extension = initializeExtension(newOptionalHooksConfig("watch_runtime_keys:"));
+  });
+  EXPECT_EQ("-;", runtimeWatchResults());
+}
+
+// Test that enabling runtime updates fails when the module implements none of the hooks.
+TEST_F(BootstrapAbiImplTest, EnableRuntimeUpdateWithoutHook) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  auto extension = initializeExtension(config.value());
+  EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_)).Times(0);
+  EXPECT_LOG_CONTAINS("error",
+                      "cannot enable runtime update since the module implements none of the "
+                      "envoy_dynamic_module_on_bootstrap_extension_runtime_*_update hooks",
+                      { EXPECT_FALSE(enableRuntimeUpdate(*extension, "a")); });
+}
+
+// Test that the extension cannot watch a key when the server shut down before it initialized its
+// extensions.
+TEST_F(BootstrapAbiImplTest, WatchRuntimeKeyOnceShutdownStarted) {
+  setRuntimeLayers({{}});
+  ON_CALL(server_, isShutdown()).WillByDefault(testing::Return(true));
+  EXPECT_CALL(context_.runtime_loader_, addUpdateCallback(_)).Times(0);
+  std::unique_ptr<DynamicModuleBootstrapExtension> extension;
+  EXPECT_LOG_CONTAINS("error", "cannot enable runtime update once shutdown started", {
+    extension = initializeExtension(newOptionalHooksConfig("watch_runtime_keys:a"));
+  });
+  EXPECT_EQ("-a;", runtimeWatchResults());
+}
+
+// Test that runtime updates stop once shutdown started.
+TEST_F(BootstrapAbiImplTest, RuntimeUpdateStopsOnceShutdownStarted) {
+  setRuntimeLayers({{{"a", "1"}}});
+  auto config = newOptionalHooksConfig("watch_runtime_keys:a");
+  auto extension = initializeExtension(config);
+  EXPECT_EQ("+a;", runtimeWatchResults());
+  config->onShutdown();
+  setRuntimeLayers({{{"a", "2"}}});
+  loadRuntimeSnapshot();
+  EXPECT_EQ("", runtimeUpdates());
+}
+
+// Test that destroying the extension removes its runtime update registration.
+TEST_F(BootstrapAbiImplTest, RuntimeUpdateRemovedWithTheExtension) {
+  setRuntimeLayers({{}});
+  auto extension = initializeExtension(newOptionalHooksConfig("watch_runtime_keys:a"));
+  EXPECT_EQ(1, context_.runtime_loader_.update_callbacks_.size());
+  extension.reset();
+  EXPECT_EQ(0, context_.runtime_loader_.update_callbacks_.size());
+}
+
 // Test that listener add/update events are forwarded to the module.
 TEST_F(BootstrapAbiImplTest, ListenerAddOrUpdateCallback) {
   auto dynamic_module =
@@ -1976,6 +2842,215 @@ TEST_F(BootstrapAbiImplTest, ListenerRemovalCallback) {
   ASSERT_OK(config);
   // Invoke onListenerRemoval directly on the config.
   config.value()->onListenerRemoval("test_listener");
+}
+
+TEST_F(BootstrapAbiImplTest, XdsNotificationsRequireOptInAndReleaseOnDisableAndShutdown) {
+  auto config = newOptionalHooksConfig();
+  Config::XdsConfigTrackers trackers;
+  struct ObservedUpdates {
+    mutable std::vector<envoy_dynamic_module_type_bootstrap_xds_update_status> values;
+    mutable std::vector<std::string> versions;
+  };
+  ObservedUpdates outcomes;
+  config->in_module_config_ = &outcomes;
+  config->on_bootstrap_extension_xds_update_ =
+      [](auto, auto module, envoy_dynamic_module_type_envoy_buffer type_url, auto status,
+         envoy_dynamic_module_type_envoy_buffer error_details,
+         envoy_dynamic_module_type_envoy_buffer version,
+         envoy_dynamic_module_type_envoy_buffer nonce,
+         envoy_dynamic_module_type_envoy_buffer resource_name) {
+        EXPECT_EQ(absl::string_view(type_url.ptr, type_url.length), "test-type");
+        EXPECT_EQ(absl::string_view(error_details.ptr, error_details.length),
+                  status == envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected
+                      ? "rejected"
+                      : "");
+        const auto version_view = absl::string_view(version.ptr, version.length);
+        const bool unsubscribed =
+            status == envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed;
+        EXPECT_EQ(absl::string_view(nonce.ptr, nonce.length),
+                  version_view.empty() ? "" : absl::StrCat(version_view, "-nonce"));
+        EXPECT_EQ(absl::string_view(resource_name.ptr, resource_name.length),
+                  unsubscribed ? "resource" : "");
+        const auto* outcomes = static_cast<const ObservedUpdates*>(module);
+        outcomes->values.push_back(status);
+        outcomes->versions.emplace_back(version_view);
+      };
+  EXPECT_CALL(context_.xds_manager_, addXdsConfigTracker(_))
+      .Times(2)
+      .WillRepeatedly([&](Config::XdsConfigTracker& tracker) {
+        EXPECT_EQ(&tracker, static_cast<Config::XdsConfigTracker*>(config.get()));
+        return trackers.add(tracker);
+      });
+  EXPECT_LOG_CONTAINS(
+      "error", "cannot enable xDS notifications before server is initialized",
+      EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+          config->thisAsVoidPtr(), true)));
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  envoy::service::discovery::v3::DiscoveryResponse sotw;
+  sotw.set_type_url("test-type");
+  sotw.set_version_info("sotw-version");
+  sotw.set_nonce("sotw-version-nonce");
+  envoy::service::discovery::v3::DeltaDiscoveryResponse delta;
+  delta.set_type_url("test-type");
+  delta.set_system_version_info("delta-version");
+  delta.set_nonce("delta-version-nonce");
+  trackers.onConfigAcceptedWithResponse(sotw, {});
+  EXPECT_TRUE(outcomes.values.empty());
+  EXPECT_TRUE(config->setXdsNotifications(true));
+  EXPECT_TRUE(config->setXdsNotifications(true));
+  trackers.onConfigAcceptedWithResponse(sotw, {});
+  trackers.onConfigAcceptedWithResponse(delta, {}, {});
+  trackers.onConfigRejected(sotw, "rejected");
+  trackers.onConfigRejected(delta, "rejected");
+  trackers.onResourceUnsubscribed("test-type", "resource");
+  trackers.onConfigAccepted("test-type", {});
+  trackers.onConfigAccepted("test-type", {}, {});
+  EXPECT_THAT(
+      outcomes.values,
+      testing::ElementsAre(envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted,
+                           envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted,
+                           envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected,
+                           envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected,
+                           envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed,
+                           envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted,
+                           envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted));
+  EXPECT_THAT(outcomes.versions, testing::ElementsAre("sotw-version", "delta-version",
+                                                      "sotw-version", "delta-version", "", "", ""));
+  EXPECT_TRUE(config->setXdsNotifications(false));
+  trackers.onConfigAcceptedWithResponse(sotw, {});
+  EXPECT_EQ(outcomes.values.size(), 7);
+  EXPECT_TRUE(config->setXdsNotifications(true));
+  config->onShutdown();
+  trackers.onConfigAcceptedWithResponse(sotw, {});
+  EXPECT_EQ(outcomes.values.size(), 7);
+  EXPECT_LOG_CONTAINS("error",
+                      "cannot enable xDS notifications once shutdown started or in init only mode",
+                      EXPECT_FALSE(config->setXdsNotifications(true)));
+}
+
+TEST_F(BootstrapAbiImplTest, XdsNotificationsRefusedWithoutHookOrInInitOnlyMode) {
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  EXPECT_CALL(context_.xds_manager_, addXdsConfigTracker(_)).Times(0);
+  config->on_bootstrap_extension_xds_update_ = [](auto, auto, auto, auto, auto, auto, auto, auto) {
+  };
+  ON_CALL(context_.options_, mode()).WillByDefault(testing::Return(Server::Mode::InitOnly));
+  EXPECT_LOG_CONTAINS("error",
+                      "cannot enable xDS notifications once shutdown started or in init only mode",
+                      EXPECT_FALSE(config->setXdsNotifications(true)));
+  ON_CALL(context_.options_, mode()).WillByDefault(testing::Return(Server::Mode::Serve));
+  config->on_bootstrap_extension_xds_update_ = nullptr;
+  EXPECT_LOG_CONTAINS("error", "cannot enable xDS notifications without the xDS update hook",
+                      EXPECT_FALSE(config->setXdsNotifications(true)));
+  EXPECT_TRUE(config->setXdsNotifications(false));
+}
+
+TEST_F(BootstrapAbiImplTest, XdsUnsubscriptionsArePostedAndCancelledWhenDisabled) {
+  auto config = newOptionalHooksConfig();
+  Config::XdsConfigTrackers trackers;
+  std::vector<Event::PostCb> posts;
+  EXPECT_CALL(dispatcher_, post(_)).WillRepeatedly([&](Event::PostCb callback) {
+    posts.push_back(std::move(callback));
+  });
+  struct ObservedUpdates {
+    mutable uint64_t count = 0;
+  } outcomes;
+  config->in_module_config_ = &outcomes;
+  config->on_bootstrap_extension_xds_update_ =
+      [](auto envoy, auto module, envoy_dynamic_module_type_envoy_buffer type_url, auto status,
+         envoy_dynamic_module_type_envoy_buffer error_details,
+         envoy_dynamic_module_type_envoy_buffer version,
+         envoy_dynamic_module_type_envoy_buffer nonce,
+         envoy_dynamic_module_type_envoy_buffer resource_name) {
+        EXPECT_NE(envoy, nullptr);
+        EXPECT_EQ(absl::string_view(type_url.ptr, type_url.length), "test-type");
+        EXPECT_EQ(status, envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed);
+        EXPECT_EQ(error_details.length, 0);
+        EXPECT_EQ(version.length, 0);
+        EXPECT_EQ(nonce.length, 0);
+        EXPECT_EQ(absl::string_view(resource_name.ptr, resource_name.length), "resource");
+        ++static_cast<const ObservedUpdates*>(module)->count;
+      };
+  EXPECT_CALL(context_.xds_manager_, addXdsConfigTracker(_))
+      .Times(3)
+      .WillRepeatedly([&](Config::XdsConfigTracker& tracker) { return trackers.add(tracker); });
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  ASSERT_TRUE(config->setXdsNotifications(true));
+  {
+    const std::string type_url = "test-type";
+    const std::string resource_name = "resource";
+    trackers.onResourceUnsubscribed(type_url, resource_name);
+  }
+  EXPECT_EQ(outcomes.count, 0);
+  ASSERT_EQ(posts.size(), 1);
+  posts[0]();
+  EXPECT_EQ(outcomes.count, 1);
+
+  trackers.onResourceUnsubscribed("test-type", "resource");
+  ASSERT_TRUE(config->setXdsNotifications(false));
+  ASSERT_EQ(posts.size(), 2);
+  posts[1]();
+  EXPECT_EQ(outcomes.count, 1);
+
+  ASSERT_TRUE(config->setXdsNotifications(true));
+  trackers.onResourceUnsubscribed("test-type", "resource");
+  ASSERT_TRUE(config->setXdsNotifications(false));
+  ASSERT_TRUE(config->setXdsNotifications(true));
+  ASSERT_EQ(posts.size(), 3);
+  posts[2]();
+  EXPECT_EQ(outcomes.count, 1);
+
+  trackers.onResourceUnsubscribed("test-type", "resource");
+  config->onShutdown();
+  ASSERT_EQ(posts.size(), 4);
+  posts[3]();
+  EXPECT_EQ(outcomes.count, 1);
+}
+
+TEST_F(BootstrapAbiImplTest, XdsUnsubscriptionsAreDroppedAfterConfigDestruction) {
+  Config::XdsConfigTrackers trackers;
+  auto config = newOptionalHooksConfig();
+  Event::PostCb post;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&](Event::PostCb callback) {
+    post = std::move(callback);
+  });
+  config->on_bootstrap_extension_xds_update_ = [](auto, auto, auto, auto, auto, auto, auto, auto) {
+    ADD_FAILURE() << "xDS callback invoked after module config destruction";
+  };
+  EXPECT_CALL(context_.xds_manager_, addXdsConfigTracker(_))
+      .WillOnce([&](Config::XdsConfigTracker& tracker) { return trackers.add(tracker); });
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  ASSERT_TRUE(config->setXdsNotifications(true));
+  trackers.onResourceUnsubscribed("test-type", "resource");
+  ASSERT_TRUE(post);
+  config.reset();
+  post();
+}
+
+TEST_F(BootstrapAbiImplTest, XdsNotificationsReleaseBeforeModuleConfigDestruction) {
+  Config::XdsConfigTrackers trackers;
+  auto config = newOptionalHooksConfig();
+  config->in_module_config_ = &trackers;
+  config->on_bootstrap_extension_xds_update_ = [](auto, auto, auto, auto, auto, auto, auto, auto) {
+    ADD_FAILURE() << "xDS callback invoked during module config destruction";
+  };
+  config->on_bootstrap_extension_config_destroy_ = [](auto module) {
+    auto* trackers = static_cast<Config::XdsConfigTrackers*>(const_cast<void*>(module));
+    trackers->onConfigAccepted("test-type", std::vector<Config::DecodedResourcePtr>{});
+  };
+  EXPECT_CALL(context_.xds_manager_, addXdsConfigTracker(_))
+      .WillOnce([&](Config::XdsConfigTracker& tracker) {
+        EXPECT_EQ(&tracker, static_cast<Config::XdsConfigTracker*>(config.get()));
+        return trackers.add(tracker);
+      });
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  EXPECT_TRUE(config->setXdsNotifications(true));
+  config.reset();
 }
 
 // Verifies the factory auto-freezes stat creation so `define_*` returns `Frozen` after init.
@@ -2155,6 +3230,894 @@ TEST_F(BootstrapAbiImplTest, GetActiveResourceNamesOffMainThreadFailsClosed) {
       },
       "envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names must be called "
       "on the main thread");
+}
+
+// Test that the main thread only callbacks report an Envoy bug and do nothing off the main thread.
+// The guards return before they touch the config, so a null config is safe here.
+TEST_F(BootstrapAbiImplTest, MainThreadCallbacksOffMainThreadFailClosed) {
+  const std::vector<std::pair<std::string, std::function<void()>>> calls = {
+      {"envoy_dynamic_module_callback_bootstrap_extension_http_callout",
+       [] {
+         uint64_t callout_id = 0;
+         EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest,
+                   envoy_dynamic_module_callback_bootstrap_extension_http_callout(
+                       nullptr, &callout_id, {"cluster", 7}, nullptr, 0, {nullptr, 0}, 100));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_timer_enable",
+       [] { envoy_dynamic_module_callback_bootstrap_extension_timer_enable(nullptr, 100); }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_timer_disable",
+       [] { envoy_dynamic_module_callback_bootstrap_extension_timer_disable(nullptr); }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_timer_enabled",
+       [] {
+         EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(nullptr));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch",
+       [] {
+         EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+             nullptr, {"/tmp", 4}, 0));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_admin_set_response",
+       [] {
+         envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(nullptr, {"body", 4});
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler",
+       [] {
+         EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+             nullptr, {"/test", 5}, {"help", 4}, true, false));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler",
+       [] {
+         EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+             nullptr, {"/test", 5}));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle",
+       [] {
+         EXPECT_FALSE(
+             envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(nullptr));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle",
+       [] {
+         EXPECT_FALSE(
+             envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications",
+       [] {
+         EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+             nullptr, true));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds",
+       [] {
+         EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+             nullptr, {nullptr, 0}, {nullptr, 0}));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new",
+       [] {
+         int sentinel = 0;
+         envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot =
+             &sentinel;
+         EXPECT_EQ(envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed,
+                   envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+                       nullptr, nullptr, 0, {nullptr, 0}, &snapshot));
+         EXPECT_EQ(snapshot, nullptr);
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update",
+       [] {
+         EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+             nullptr, {"a", 1}));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers",
+       [] {
+         EXPECT_FALSE(
+             envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(nullptr, 1));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer",
+       [] {
+         EXPECT_FALSE(
+             envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(nullptr));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update",
+       [] {
+         uint64_t update_id = 1;
+         EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_NotAllowed,
+                   envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
+                       nullptr, {"cluster", 7}, {nullptr, 0}, {nullptr, 0}, &update_id));
+         EXPECT_EQ(0, update_id);
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove",
+       [] {
+         EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_NotAllowed,
+                   envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
+                       nullptr, {"cluster", 7}));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer",
+       [] {
+         EXPECT_FALSE(
+             envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(nullptr));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update",
+       [] {
+         uint64_t update_id = 1;
+         EXPECT_EQ(envoy_dynamic_module_type_bootstrap_listener_writer_update_result_NotAllowed,
+                   envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+                       nullptr, {"listener", 8}, {nullptr, 0}, {nullptr, 0}, &update_id));
+         EXPECT_EQ(0, update_id);
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove",
+       [] {
+         EXPECT_EQ(envoy_dynamic_module_type_bootstrap_listener_writer_removal_result_NotAllowed,
+                   envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(
+                       nullptr, {"listener", 8}));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer",
+       [] {
+         EXPECT_FALSE(
+             envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
+                 nullptr));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update",
+       [] {
+         uint64_t update_id = 1;
+         EXPECT_EQ(
+             envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed,
+             envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+                 nullptr, {"chain", 5}, {nullptr, 0}, &update_id));
+         EXPECT_EQ(0, update_id);
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove",
+       [] {
+         EXPECT_EQ(
+             envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotAllowed,
+             envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
+                 nullptr, {"chain", 5}));
+       }},
+  };
+  for (const auto& [callback_name, call] : calls) {
+    EXPECT_ENVOY_BUG(
+        {
+          std::thread thread(call);
+          thread.join();
+        },
+        absl::StrCat(callback_name, " must be called on the main thread"));
+  }
+}
+
+// Test that signal_init_complete off the main thread reports an Envoy bug and still signals, since
+// Envoy cannot finish initializing without it.
+TEST_F(BootstrapAbiImplTest, SignalInitCompleteOffMainThreadStillSignals) {
+  std::vector<Init::TargetHandlePtr> init_target_handles;
+  ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
+    init_target_handles.push_back(target.createHandle("test"));
+  });
+  // The module does not signal from config_new with this configuration.
+  auto config = newOptionalHooksConfig("run_on_all_workers_at_startup");
+  ASSERT_EQ(1, init_target_handles.size());
+  testing::StrictMock<Init::ExpectableWatcherImpl> init_watcher;
+  init_target_handles[0]->initialize(init_watcher);
+  void* config_ptr = config->thisAsVoidPtr();
+  Event::PostCb posted;
+#if defined(NDEBUG) || defined(ENVOY_CONFIG_COVERAGE)
+  // Builds that keep running after an Envoy bug post the signal to the main thread.
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&posted](Event::PostCb cb) {
+    posted = std::move(cb);
+  });
+#endif
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread thread([config_ptr] {
+          envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(config_ptr);
+        });
+        thread.join();
+      },
+      "envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete must be "
+      "called on the main thread");
+#if defined(NDEBUG) || defined(ENVOY_CONFIG_COVERAGE)
+  ASSERT_NE(nullptr, posted);
+  EXPECT_CALL(init_watcher, ready());
+  posted();
+#endif
+}
+
+// Test that a posted signal reaches a live configuration and does nothing once it is destroyed.
+TEST_F(BootstrapAbiImplTest, PostedSignalInitCompleteReachesOnlyALiveConfiguration) {
+  std::vector<Init::TargetHandlePtr> init_target_handles;
+  ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
+    init_target_handles.push_back(target.createHandle("test"));
+  });
+  for (const bool live : {true, false}) {
+    // The module does not signal from config_new with this configuration.
+    auto config = newOptionalHooksConfig("run_on_all_workers_at_startup");
+    testing::StrictMock<Init::ExpectableWatcherImpl> init_watcher;
+    init_target_handles.back()->initialize(init_watcher);
+    Event::PostCb posted;
+    EXPECT_CALL(dispatcher_, post(_)).WillOnce([&posted](Event::PostCb cb) {
+      posted = std::move(cb);
+    });
+    config->postSignalInitComplete();
+    if (live) {
+      EXPECT_CALL(init_watcher, ready());
+    } else {
+      config.reset();
+    }
+    posted();
+  }
+}
+
+// Test that timer_new off the main thread returns a timer without an Envoy timer behind it.
+TEST_F(BootstrapAbiImplTest, TimerNewOffMainThreadFailsClosed) {
+  auto config = newOptionalHooksConfig();
+  void* config_ptr = config->thisAsVoidPtr();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_ENVOY_BUG(
+      {
+        void* timer_ptr = nullptr;
+        std::thread thread([&] {
+          timer_ptr = envoy_dynamic_module_callback_bootstrap_extension_timer_new(config_ptr);
+        });
+        thread.join();
+        EXPECT_NE(nullptr, timer_ptr);
+        envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
+      },
+      "envoy_dynamic_module_callback_bootstrap_extension_timer_new must be called on the main "
+      "thread");
+}
+
+// Test that the operations of a timer without an Envoy timer behind it do nothing.
+TEST_F(BootstrapAbiImplTest, TimerWithoutEnvoyTimerDoesNothing) {
+  auto config = newOptionalHooksConfig();
+  auto* timer = new DynamicModuleBootstrapExtensionTimer(config->weak_from_this());
+  envoy_dynamic_module_callback_bootstrap_extension_timer_enable(timer, 100);
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(timer));
+  envoy_dynamic_module_callback_bootstrap_extension_timer_disable(timer);
+  envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer);
+}
+
+// Test that a callout failure reaches the module from a posted callback, and only while the config
+// is alive.
+TEST_F(BootstrapAbiImplTest, HttpCalloutFailureIsReportedFromAPostedCallback) {
+  for (const bool destroy_config : {false, true}) {
+    auto config = newOptionalHooksConfig();
+    testing::NiceMock<Server::MockListenerManager> listener_manager;
+    config->setListenerManager(listener_manager);
+    testing::NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
+        .WillOnce(testing::Return(&thread_local_cluster));
+    Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+    Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
+    EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+        .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+          callbacks_captured = &callbacks;
+          return &request;
+        });
+    std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+        {":method", 7, "GET", 3},
+        {":path", 5, "/test", 5},
+        {"host", 4, "example.com", 11},
+    };
+    uint64_t callout_id = 0;
+    EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success,
+              envoy_dynamic_module_callback_bootstrap_extension_http_callout(
+                  config->thisAsVoidPtr(), &callout_id, {"test_cluster", 12}, headers.data(),
+                  headers.size(), {nullptr, 0}, 5000));
+    ASSERT_NE(callbacks_captured, nullptr);
+
+    Event::PostCb posted_cb;
+    EXPECT_CALL(dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
+      posted_cb = std::move(cb);
+    });
+    callbacks_captured->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+    const auto callout_done_count = optionalHooksFunction<size_t (*)()>(
+        "bootstrap_optional_hooks_test_http_callout_done_count");
+    EXPECT_EQ(0, callout_done_count());
+
+    if (destroy_config) {
+      config.reset();
+    }
+    posted_cb();
+    EXPECT_EQ(destroy_config ? 0 : 1, callout_done_count());
+    if (!destroy_config) {
+      EXPECT_EQ(envoy_dynamic_module_type_http_callout_result_Reset,
+                optionalHooksFunction<int (*)()>(
+                    "bootstrap_optional_hooks_test_last_http_callout_result")());
+    }
+  }
+}
+
+// Test that the worker event runs on every worker thread, and that the done hook follows on the
+// main thread.
+TEST_F(BootstrapAbiImplTest, RunOnAllWorkersRunsTheWorkerAndDoneHooks) {
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  runThreadLocalCallbacksOnAWorker();
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(
+      config->thisAsVoidPtr(), 7));
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(
+      config->thisAsVoidPtr(), 8));
+  EXPECT_EQ(
+      2, optionalHooksFunction<size_t (*)()>("bootstrap_optional_hooks_test_worker_event_count")());
+  EXPECT_EQ(8, optionalHooksFunction<uint64_t (*)()>(
+                   "bootstrap_optional_hooks_test_last_worker_event_id")());
+  EXPECT_EQ(2, optionalHooksFunction<size_t (*)()>("bootstrap_optional_hooks_test_done_count")());
+  EXPECT_EQ(8, optionalHooksFunction<uint64_t (*)()>(
+                   "bootstrap_optional_hooks_test_last_done_event_id")());
+}
+
+// Test that the done hook follows even when the module does not implement the worker event hook.
+TEST_F(BootstrapAbiImplTest, RunOnAllWorkersRunsTheDoneHookWithoutAWorkerHook) {
+  auto config = newOptionalHooksConfig();
+  config->on_bootstrap_extension_worker_event_ = nullptr;
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  runThreadLocalCallbacksOnAWorker();
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(
+      config->thisAsVoidPtr(), 5));
+  EXPECT_EQ(
+      0, optionalHooksFunction<size_t (*)()>("bootstrap_optional_hooks_test_worker_event_count")());
+  EXPECT_EQ(1, optionalHooksFunction<size_t (*)()>("bootstrap_optional_hooks_test_done_count")());
+  EXPECT_EQ(5, optionalHooksFunction<uint64_t (*)()>(
+                   "bootstrap_optional_hooks_test_last_done_event_id")());
+}
+
+// Test that the main thread does not run the worker event.
+TEST_F(BootstrapAbiImplTest, RunOnAllWorkersSkipsTheMainThread) {
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(
+      config->thisAsVoidPtr(), 7));
+  EXPECT_EQ(
+      0, optionalHooksFunction<size_t (*)()>("bootstrap_optional_hooks_test_worker_event_count")());
+  EXPECT_EQ(1, optionalHooksFunction<size_t (*)()>("bootstrap_optional_hooks_test_done_count")());
+}
+
+// Test that a module without the optional hooks can still post events.
+TEST_F(BootstrapAbiImplTest, RunOnAllWorkersWithoutHooks) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
+  runThreadLocalCallbacksOnAWorker();
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(
+      config.value()->thisAsVoidPtr(), 1));
+}
+
+// Test that events are refused before the server is initialized and after shutdown began, and that
+// a worker still runs an event in flight after shutdown began but the done hook does not.
+TEST_F(BootstrapAbiImplTest, RunOnAllWorkersRefusedOutsideTheServerLifetime) {
+  auto config = newOptionalHooksConfig();
+  void* config_ptr = config->thisAsVoidPtr();
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(config_ptr, 1));
+
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  std::function<void()> worker_cb;
+  std::function<void()> done_cb;
+  EXPECT_CALL(context_.thread_local_, runOnAllThreads(_, _))
+      .WillOnce([&](std::function<void()> cb, std::function<void()> main_callback) {
+        worker_cb = std::move(cb);
+        done_cb = std::move(main_callback);
+      });
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(config_ptr, 2));
+  config->onShutdown();
+  std::thread worker(worker_cb);
+  worker.join();
+  done_cb();
+  EXPECT_EQ(
+      1, optionalHooksFunction<size_t (*)()>("bootstrap_optional_hooks_test_worker_event_count")());
+  EXPECT_EQ(0, optionalHooksFunction<size_t (*)()>("bootstrap_optional_hooks_test_done_count")());
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(config_ptr, 3));
+}
+
+// Test that an event in flight does not complete once the configuration is destroyed.
+TEST_F(BootstrapAbiImplTest, RunOnAllWorkersDoneDoesNotRunOnceTheConfigIsDestroyed) {
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  std::function<void()> done_cb;
+  EXPECT_CALL(context_.thread_local_, runOnAllThreads(_, _))
+      .WillOnce([&](std::function<void()>, std::function<void()> main_callback) {
+        done_cb = std::move(main_callback);
+      });
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(
+      config->thisAsVoidPtr(), 1));
+  // Load the accessor first so that the module stays loaded once the configuration is gone.
+  const auto done_count =
+      optionalHooksFunction<size_t (*)()>("bootstrap_optional_hooks_test_done_count");
+  config.reset();
+  done_cb();
+  EXPECT_EQ(0, done_count());
+}
+
+// Test that the callbacks that use the server context are refused once the extension is destroyed,
+// for example from the module's destroy hooks, since the server destroys its context before its
+// bootstrap extensions.
+TEST_F(BootstrapAbiImplTest, ServerCallbacksRefusedOnceTheExtensionIsDestroyed) {
+  auto config = newOptionalHooksConfig();
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config);
+  ASSERT_TRUE(extension->initializeInModuleExtension());
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  extension.reset();
+
+  EXPECT_CALL(context_, clusterManager()).Times(0);
+  EXPECT_CALL(context_, admin()).Times(0);
+  EXPECT_CALL(context_, options()).Times(0);
+  void* config_ptr = config->thisAsVoidPtr();
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {":method", 7, "GET", 3}, {":path", 5, "/", 1}, {"host", 4, "example.com", 11}};
+  uint64_t callout_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound,
+            envoy_dynamic_module_callback_bootstrap_extension_http_callout(
+                config_ptr, &callout_id, {"cluster", 7}, headers.data(), headers.size(),
+                {nullptr, 0}, 1000));
+  envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+      config_ptr, envoy_dynamic_module_type_bootstrap_active_resource_kind_Cluster,
+      [](envoy_dynamic_module_type_envoy_buffer, void*) { FAIL(); }, nullptr);
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+      config_ptr, {"/test_admin", 11}, {"help", 4}, true, false));
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+      config_ptr, {"/test_admin", 11}));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(config_ptr));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(config_ptr));
+}
+
+// Test that the cluster writer callbacks are refused until the module enables the cluster writer.
+TEST_F(BootstrapAbiImplTest, ClusterWriterNotAllowedUntilEnabled) {
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  uint64_t update_id = 1;
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_NotAllowed,
+            envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
+                config->thisAsVoidPtr(), {"writer.a", 8}, {nullptr, 0}, {nullptr, 0}, &update_id));
+  EXPECT_EQ(0, update_id);
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_NotAllowed,
+            envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
+                config->thisAsVoidPtr(), {"writer.a", 8}));
+  EXPECT_EQ(nullptr, config->cluster_writer_);
+}
+
+// Test that the module enables the cluster writer at most once and not once shutdown began, and
+// that a writer enabled before the server is initialized adds its init target then.
+TEST_F(BootstrapAbiImplTest, EnableClusterWriter) {
+  std::vector<std::string> init_target_names;
+  ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
+    init_target_names.emplace_back(target.name());
+  });
+  auto config = newOptionalHooksConfig();
+  // The writer creates its schedulable callbacks when the module enables it.
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+      config->thisAsVoidPtr()));
+  EXPECT_NE(nullptr, config->cluster_writer_);
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+      config->thisAsVoidPtr()));
+  EXPECT_THAT(init_target_names, testing::ElementsAre("target dynamic_modules_bootstrap"));
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  EXPECT_THAT(init_target_names,
+              testing::ElementsAre("target dynamic_modules_bootstrap",
+                                   "target dynamic_modules_bootstrap_cluster_writer:test"));
+
+  auto shut_down_config = newOptionalHooksConfig();
+  shut_down_config->onShutdown();
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+      shut_down_config->thisAsVoidPtr()));
+  EXPECT_EQ(nullptr, shut_down_config->cluster_writer_);
+}
+
+// Test that a write through the callbacks is applied once Envoy initialized its clusters, that its
+// outcome reaches the done hook of the module, and that shutdown stops the writer.
+TEST_F(BootstrapAbiImplTest, ClusterWriterReportsOutcomesToTheModule) {
+  std::vector<Init::TargetHandlePtr> init_target_handles;
+  ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
+    init_target_handles.push_back(target.createHandle("test"));
+  });
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  // The writer creates its apply callback first, and the newest expectation matches first.
+  auto* deliver_callback =
+      new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  auto* apply_callback =
+      new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  ASSERT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+      config->thisAsVoidPtr()));
+
+  envoy::config::cluster::v3::Cluster cluster;
+  cluster.set_name("writer.a");
+  std::string serialized_cluster;
+  ASSERT_TRUE(cluster.SerializeToString(&serialized_cluster));
+  uint64_t update_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_Success,
+            envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
+                config->thisAsVoidPtr(), {"writer.a", 8},
+                {serialized_cluster.data(), serialized_cluster.size()}, {"v1", 2}, &update_id));
+  EXPECT_EQ(1, update_id);
+
+  // The writer registers its init target after the one of the extension.
+  ASSERT_EQ(2, init_target_handles.size());
+  testing::NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  init_target_handles[1]->initialize(init_watcher);
+  EXPECT_CALL(context_.cluster_manager_, addOrUpdateCluster(_, "v1", true))
+      .WillOnce(testing::Return(false));
+  apply_callback->invokeCallback();
+  deliver_callback->invokeCallback();
+
+  EXPECT_EQ(
+      1, optionalHooksFunction<size_t (*)()>("bootstrap_optional_hooks_test_update_done_count")());
+  EXPECT_EQ(
+      1, optionalHooksFunction<uint64_t (*)()>("bootstrap_optional_hooks_test_last_update_id")());
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_update_status_Active,
+            optionalHooksFunction<int (*)()>("bootstrap_optional_hooks_test_last_update_status")());
+  EXPECT_STREQ("writer.a", optionalHooksFunction<const char* (*)()>(
+                               "bootstrap_optional_hooks_test_last_update_cluster_name")());
+  EXPECT_STREQ("", optionalHooksFunction<const char* (*)()>(
+                       "bootstrap_optional_hooks_test_last_update_error_details")());
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_Success,
+            envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
+                config->thisAsVoidPtr(), {"writer.a", 8}));
+
+  config->onShutdown();
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_NotAllowed,
+            envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
+                config->thisAsVoidPtr(), {"writer.a", 8},
+                {serialized_cluster.data(), serialized_cluster.size()}, {"v1", 2}, &update_id));
+}
+
+// Test that the listener writer callbacks are refused until the module enables the listener
+// writer.
+TEST_F(BootstrapAbiImplTest, ListenerWriterNotAllowedUntilEnabled) {
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  uint64_t update_id = 1;
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_listener_writer_update_result_NotAllowed,
+            envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+                config->thisAsVoidPtr(), {"writer.a", 8}, {nullptr, 0}, {nullptr, 0}, &update_id));
+  EXPECT_EQ(0, update_id);
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_listener_writer_removal_result_NotAllowed,
+            envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(
+                config->thisAsVoidPtr(), {"writer.a", 8}));
+  EXPECT_EQ(nullptr, config->listener_writer_);
+}
+
+// Test that the module enables the listener writer at most once and not once shutdown began, and
+// that a writer enabled before the server is initialized adds its init target then.
+TEST_F(BootstrapAbiImplTest, EnableListenerWriter) {
+  std::vector<std::string> init_target_names;
+  ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
+    init_target_names.emplace_back(target.name());
+  });
+  auto config = newOptionalHooksConfig();
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(
+      config->thisAsVoidPtr()));
+  EXPECT_NE(nullptr, config->listener_writer_);
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(
+      config->thisAsVoidPtr()));
+  EXPECT_THAT(init_target_names, testing::ElementsAre("target dynamic_modules_bootstrap"));
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  EXPECT_THAT(init_target_names,
+              testing::ElementsAre("target dynamic_modules_bootstrap",
+                                   "target dynamic_modules_bootstrap_listener_writer:test"));
+
+  auto shut_down_config = newOptionalHooksConfig();
+  shut_down_config->onShutdown();
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(
+      shut_down_config->thisAsVoidPtr()));
+  EXPECT_EQ(nullptr, shut_down_config->listener_writer_);
+}
+
+// Test that the init target of the listener writer waits for the module to signal that its
+// initialization is complete.
+TEST_F(BootstrapAbiImplTest, ListenerWriterInitTargetWaitsForTheModule) {
+  std::vector<Init::TargetHandlePtr> init_target_handles;
+  ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
+    init_target_handles.push_back(target.createHandle("test"));
+  });
+  // The module does not signal from config_new with this configuration.
+  auto config = newOptionalHooksConfig("run_on_all_workers_at_startup");
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  ASSERT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(
+      config->thisAsVoidPtr()));
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  ASSERT_EQ(2, init_target_handles.size());
+  testing::StrictMock<Init::ExpectableWatcherImpl> init_watcher;
+  init_target_handles[1]->initialize(init_watcher);
+  EXPECT_CALL(init_watcher, ready());
+  config->signalInitComplete();
+}
+
+// Test that a write through the callbacks is applied once Envoy initializes its listeners, that its
+// outcome reaches the done hook of the module, and that shutdown stops the writer.
+TEST_F(BootstrapAbiImplTest, ListenerWriterReportsOutcomesToTheModule) {
+  std::vector<Init::TargetHandlePtr> init_target_handles;
+  ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
+    init_target_handles.push_back(target.createHandle("test"));
+  });
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  ON_CALL(listener_manager, isWorkerStarted()).WillByDefault(testing::Return(true));
+  Server::ListenerUpdateCallbacks* listener_update_callbacks = nullptr;
+  ON_CALL(listener_manager, addListenerUpdateCallbacks_(_))
+      .WillByDefault([&](Server::ListenerUpdateCallbacks& callbacks) {
+        listener_update_callbacks = &callbacks;
+        return nullptr;
+      });
+  config->setListenerManager(listener_manager);
+  // The writer creates its apply callback first, and the newest expectation matches first.
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  auto* deliver_callback =
+      new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  auto* apply_callback =
+      new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  ASSERT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(
+      config->thisAsVoidPtr()));
+
+  envoy::config::listener::v3::Listener listener;
+  listener.set_name("writer.a");
+  envoy::config::core::v3::SocketAddress* socket_address =
+      listener.mutable_address()->mutable_socket_address();
+  socket_address->set_address("127.0.0.1");
+  socket_address->set_port_value(0);
+  std::string serialized_listener;
+  ASSERT_TRUE(listener.SerializeToString(&serialized_listener));
+  uint64_t update_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_listener_writer_update_result_Success,
+            envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+                config->thisAsVoidPtr(), {"writer.a", 8},
+                {serialized_listener.data(), serialized_listener.size()}, {"v1", 2}, &update_id));
+  EXPECT_EQ(1, update_id);
+
+  // The writer registers its init target after the one of the extension. The module signaled
+  // before it wrote the listener, so the write does not hold back Envoy.
+  ASSERT_EQ(2, init_target_handles.size());
+  testing::StrictMock<Init::ExpectableWatcherImpl> init_watcher;
+  EXPECT_CALL(init_watcher, ready());
+  init_target_handles[1]->initialize(init_watcher);
+  ASSERT_NE(nullptr, listener_update_callbacks);
+  testing::NiceMock<Network::MockListenerConfig> listener_config;
+  EXPECT_CALL(listener_manager, addOrUpdateListener(_, "v1", true))
+      .WillOnce([&](const envoy::config::listener::v3::Listener& written_listener,
+                    const std::string&, bool) -> absl::StatusOr<bool> {
+        listener_update_callbacks->onListenerAddOrUpdate(written_listener.name(), listener_config);
+        return true;
+      });
+  apply_callback->invokeCallback();
+  deliver_callback->invokeCallback();
+
+  EXPECT_EQ(1, optionalHooksFunction<size_t (*)()>(
+                   "bootstrap_optional_hooks_test_listener_update_done_count")());
+  EXPECT_EQ(1, optionalHooksFunction<uint64_t (*)()>(
+                   "bootstrap_optional_hooks_test_last_listener_update_id")());
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_listener_writer_update_status_Active,
+            optionalHooksFunction<int (*)()>(
+                "bootstrap_optional_hooks_test_last_listener_update_status")());
+  EXPECT_STREQ("writer.a", optionalHooksFunction<const char* (*)()>(
+                               "bootstrap_optional_hooks_test_last_listener_update_name")());
+  EXPECT_STREQ("", optionalHooksFunction<const char* (*)()>(
+                       "bootstrap_optional_hooks_test_last_listener_update_error_details")());
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_listener_writer_removal_result_Success,
+            envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(
+                config->thisAsVoidPtr(), {"writer.a", 8}));
+
+  config->onShutdown();
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_listener_writer_update_result_NotAllowed,
+            envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+                config->thisAsVoidPtr(), {"writer.a", 8},
+                {serialized_listener.data(), serialized_listener.size()}, {"v1", 2}, &update_id));
+}
+
+// Test that the listener writer of a module without the done hook applies writes and keeps no
+// outcomes.
+TEST_F(BootstrapAbiImplTest, ListenerWriterWithoutTheDoneHookKeepsNoOutcomes) {
+  std::vector<Init::TargetHandlePtr> init_target_handles;
+  ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
+    init_target_handles.push_back(target.createHandle("test"));
+  });
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
+  // The writer creates its apply callback first, and the newest expectation matches first.
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  auto* deliver_callback =
+      new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  auto* apply_callback =
+      new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  ASSERT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(
+      config.value()->thisAsVoidPtr()));
+
+  // The empty listener is not named writer.a, so the write fails when it is applied.
+  uint64_t update_id = 0;
+  EXPECT_EQ(
+      envoy_dynamic_module_type_bootstrap_listener_writer_update_result_Success,
+      envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+          config.value()->thisAsVoidPtr(), {"writer.a", 8}, {nullptr, 0}, {"v1", 2}, &update_id));
+  EXPECT_EQ(1, update_id);
+  ASSERT_EQ(2, init_target_handles.size());
+  testing::NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  init_target_handles[1]->initialize(init_watcher);
+  apply_callback->invokeCallback();
+  EXPECT_FALSE(deliver_callback->enabled_);
+  config.value()->onShutdown();
+}
+
+// Test that the filter chain config writer callbacks are refused until the module enables the
+// filter chain config writer.
+TEST_F(BootstrapAbiImplTest, FilterChainConfigWriterNotAllowedUntilEnabled) {
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  uint64_t update_id = 1;
+  EXPECT_EQ(
+      envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed,
+      envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+          config->thisAsVoidPtr(), {"writer.a", 8}, {nullptr, 0}, &update_id));
+  EXPECT_EQ(0, update_id);
+  EXPECT_EQ(
+      envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotAllowed,
+      envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
+          config->thisAsVoidPtr(), {"writer.a", 8}));
+  EXPECT_EQ(nullptr, config->filter_chain_config_writer_);
+}
+
+// Test that the module enables the filter chain config writer at most once and not once shutdown
+// began, and that a writer enabled before the server is initialized adds its init target then.
+TEST_F(BootstrapAbiImplTest, EnableFilterChainConfigWriter) {
+  std::vector<std::string> init_target_names;
+  ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
+    init_target_names.emplace_back(target.name());
+  });
+  auto config = newOptionalHooksConfig();
+  // The writer creates its schedulable callbacks when the module enables it.
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
+      config->thisAsVoidPtr()));
+  EXPECT_NE(nullptr, config->filter_chain_config_writer_);
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
+      config->thisAsVoidPtr()));
+  EXPECT_THAT(init_target_names, testing::ElementsAre("target dynamic_modules_bootstrap"));
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  EXPECT_THAT(
+      init_target_names,
+      testing::ElementsAre("target dynamic_modules_bootstrap",
+                           "target dynamic_modules_bootstrap_filter_chain_config_writer:test"));
+
+  auto shut_down_config = newOptionalHooksConfig();
+  shut_down_config->onShutdown();
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
+      shut_down_config->thisAsVoidPtr()));
+  EXPECT_EQ(nullptr, shut_down_config->filter_chain_config_writer_);
+}
+
+// Test that a write through the callbacks is applied once Envoy initialized its clusters, that its
+// outcome reaches the done hook of the module, and that shutdown stops the writer.
+TEST_F(BootstrapAbiImplTest, FilterChainConfigWriterReportsOutcomesToTheModule) {
+  std::vector<Init::TargetHandlePtr> init_target_handles;
+  ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
+    init_target_handles.push_back(target.createHandle("test"));
+  });
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  // The writer creates its apply callback first, and the newest expectation matches first.
+  auto* deliver_callback =
+      new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  auto* apply_callback =
+      new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  ASSERT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
+      config->thisAsVoidPtr()));
+
+  envoy::config::listener::v3::FilterChain filter_chain;
+  filter_chain.set_name("writer.a");
+  std::string serialized_filter_chain;
+  ASSERT_TRUE(filter_chain.SerializeToString(&serialized_filter_chain));
+  uint64_t update_id = 0;
+  EXPECT_EQ(
+      envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_Success,
+      envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+          config->thisAsVoidPtr(), {"writer.a", 8},
+          {serialized_filter_chain.data(), serialized_filter_chain.size()}, &update_id));
+  EXPECT_EQ(1, update_id);
+
+  // The writer registers its init target after the one of the extension.
+  ASSERT_EQ(2, init_target_handles.size());
+  testing::NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  init_target_handles[1]->initialize(init_watcher);
+  EXPECT_CALL(listener_manager, addOrUpdateFilterChain(_)).WillOnce(testing::Return(false));
+  apply_callback->invokeCallback();
+  deliver_callback->invokeCallback();
+
+  EXPECT_EQ(1, optionalHooksFunction<size_t (*)()>(
+                   "bootstrap_optional_hooks_test_filter_chain_update_done_count")());
+  EXPECT_EQ(1, optionalHooksFunction<uint64_t (*)()>(
+                   "bootstrap_optional_hooks_test_last_filter_chain_update_id")());
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status_Active,
+            optionalHooksFunction<int (*)()>(
+                "bootstrap_optional_hooks_test_last_filter_chain_update_status")());
+  EXPECT_STREQ("writer.a", optionalHooksFunction<const char* (*)()>(
+                               "bootstrap_optional_hooks_test_last_filter_chain_update_name")());
+  EXPECT_STREQ("", optionalHooksFunction<const char* (*)()>(
+                       "bootstrap_optional_hooks_test_last_filter_chain_update_error_details")());
+  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_Success,
+            envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
+                config->thisAsVoidPtr(), {"writer.a", 8}));
+
+  config->onShutdown();
+  EXPECT_EQ(
+      envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed,
+      envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+          config->thisAsVoidPtr(), {"writer.a", 8},
+          {serialized_filter_chain.data(), serialized_filter_chain.size()}, &update_id));
+}
+
+// Test that the filter chain config writer of a module without the done hook applies writes and
+// keeps no outcomes.
+TEST_F(BootstrapAbiImplTest, FilterChainConfigWriterWithoutTheDoneHookKeepsNoOutcomes) {
+  std::vector<Init::TargetHandlePtr> init_target_handles;
+  ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
+    init_target_handles.push_back(target.createHandle("test"));
+  });
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
+  // The writer creates its apply callback first, and the newest expectation matches first.
+  auto* deliver_callback =
+      new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  auto* apply_callback =
+      new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  ASSERT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
+      config.value()->thisAsVoidPtr()));
+
+  // The empty filter chain is not named writer.a, so the write fails when it is applied.
+  uint64_t update_id = 0;
+  EXPECT_EQ(
+      envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_Success,
+      envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+          config.value()->thisAsVoidPtr(), {"writer.a", 8}, {nullptr, 0}, &update_id));
+  EXPECT_EQ(1, update_id);
+  ASSERT_EQ(2, init_target_handles.size());
+  testing::NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  init_target_handles[1]->initialize(init_watcher);
+  apply_callback->invokeCallback();
+  EXPECT_FALSE(deliver_callback->enabled_);
+  config.value()->onShutdown();
 }
 
 } // namespace DynamicModules

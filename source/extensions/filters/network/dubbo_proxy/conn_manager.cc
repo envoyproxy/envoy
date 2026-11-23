@@ -70,8 +70,8 @@ StreamHandler& ConnectionManager::newStream() {
 
   ActiveMessagePtr new_message(std::make_unique<ActiveMessage>(*this));
   new_message->createFilterChain();
-  LinkedList::moveIntoList(std::move(new_message), active_message_list_);
-  return **active_message_list_.begin();
+  active_message_list_.push(std::move(new_message));
+  return *active_message_list_.front();
 }
 
 void ConnectionManager::onHeartbeat(MessageMetadataSharedPtr metadata) {
@@ -155,8 +155,7 @@ void ConnectionManager::deferredMessage(ActiveMessage& message) {
   if (!message.inserted()) {
     return;
   }
-  read_callbacks_->connection().dispatcher().deferredDelete(
-      message.removeFromList(active_message_list_));
+  read_callbacks_->connection().dispatcher().deferredDelete(message.removeFromList());
 }
 
 void ConnectionManager::resetAllMessages(bool local_reset) {

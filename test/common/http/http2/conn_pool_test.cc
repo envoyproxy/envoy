@@ -30,8 +30,6 @@ using testing::AnyNumber;
 using testing::AtLeast;
 using testing::DoAll;
 using testing::InSequence;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
@@ -109,10 +107,10 @@ public:
     // Outside the for loop, set the createTimer expectations.
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .Times(num_clients)
-        .WillRepeatedly(Invoke([this](Event::TimerCb cb) {
+        .WillRepeatedly([this](Event::TimerCb cb) {
           test_clients_[timer_index_].connect_timer_->callback_ = cb;
           return test_clients_[timer_index_++].connect_timer_;
-        }));
+        });
     // Loop again through the last num_clients entries to set enableTimer expectations.
     // Ideally this could be done in the loop above but it breaks InSequence
     // assertions.
@@ -127,9 +125,9 @@ public:
     // below takes care of making sure connection_index_ is updated.
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .Times(num_clients)
-        .WillRepeatedly(InvokeWithoutArgs([this]() -> Network::ClientConnection* {
+        .WillRepeatedly([this]() -> Network::ClientConnection* {
           return test_clients_[connection_index_].connection_;
-        }));
+        });
 
     // Loop through the last num_clients clients, setting up codec clients and
     // per-client mocks.
@@ -152,9 +150,9 @@ public:
     // index is incremented to avoid returning the same client more than once.
     EXPECT_CALL(*pool_, createCodecClient_(_))
         .Times(num_clients)
-        .WillRepeatedly(Invoke([this](Upstream::Host::CreateConnectionData&) -> CodecClient* {
+        .WillRepeatedly([this](Upstream::Host::CreateConnectionData&) -> CodecClient* {
           return test_clients_[connection_index_++].codec_client_;
-        }));
+        });
   }
 
   // Creates a new test client, expecting a new connection to be created and associated
@@ -356,12 +354,12 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
   // of the mocks that are constructed as part of the test client.
   createTestClients(1);
   EXPECT_CALL(*factory_ptr, createTransportSocket(_, _))
-      .WillOnce(Invoke([](Network::TransportSocketOptionsConstSharedPtr options,
-                          Upstream::HostDescriptionConstSharedPtr) -> Network::TransportSocketPtr {
+      .WillOnce([](Network::TransportSocketOptionsConstSharedPtr options,
+                   Upstream::HostDescriptionConstSharedPtr) -> Network::TransportSocketPtr {
         EXPECT_TRUE(options != nullptr);
         EXPECT_EQ(options->applicationProtocolFallback()[0], Http::Utility::AlpnNames::get().Http2);
         return std::make_unique<Network::RawBufferSocket>();
-      }));
+      });
   expectConnectionSetupForClient(1);
   ActiveTestRequest r(*this, 0, false);
   expectClientConnect(0, r);
@@ -2126,7 +2124,7 @@ TEST_F(Http2ConnPoolImplTest, ReentrancySynchronousResetInPoolReady) {
       .WillOnce(DoAll(SaveArgAddress(&r.inner_decoder_), ReturnRef(r.inner_encoder_)));
 
   bool already_called = false;
-  EXPECT_CALL(r.callbacks_.pool_ready_, ready()).WillRepeatedly(Invoke([&]() {
+  EXPECT_CALL(r.callbacks_.pool_ready_, ready()).WillRepeatedly([&]() {
     if (already_called) {
       ADD_FAILURE() << "Recursive onPoolReady call detected! Core pool reentrant bug is active!";
       return;
@@ -2134,7 +2132,7 @@ TEST_F(Http2ConnPoolImplTest, ReentrancySynchronousResetInPoolReady) {
     already_called = true;
     ASSERT_NE(r.callbacks_.outer_encoder_, nullptr);
     r.callbacks_.outer_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
-  }));
+  });
 
   // 3. Connect the client. This will trigger onPoolReady -> resetStream -> onStreamClosed ->
   // onUpstreamReady recursively.

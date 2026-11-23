@@ -11,6 +11,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/deterministic_hash.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 
@@ -45,8 +46,8 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
 
   // TODO(toddmgreer): get cluster name.
   key_.set_cluster_name("cluster_name_goes_here");
-  key_.set_host(std::string(request_headers.getHostValue()));
-  key_.set_path(std::string(request_headers.getPathValue()));
+  key_.set_host(request_headers.getHostValue());
+  key_.set_path(request_headers.getPathValue());
   if (Http::Utility::schemeIsHttp(scheme)) {
     key_.set_scheme(Key::HTTP);
   } else if (Http::Utility::schemeIsHttps(scheme)) {
@@ -58,6 +59,8 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
 // the same result, or a way must be provided to deal with a complete cache
 // flush.
 size_t stableHashKey(const Key& key) { return DeterministicProtoHash::hash(key); }
+
+SerializedKey serializeKey(const Key& key) { return MessageUtil::serializeDeterministically(key); }
 
 void LookupRequest::initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers) {
   const absl::string_view cache_control =

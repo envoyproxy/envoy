@@ -16,7 +16,8 @@ namespace NetworkFilters {
 namespace RBACFilter {
 
 absl::Status ActionValidationVisitor::performDataInputValidation(
-    const Matcher::DataInputFactory<Http::HttpMatchingData>&, absl::string_view type_url) {
+    const Matcher::DataInputFactory<Http::HttpMatchingData>& data_input,
+    absl::string_view type_url) {
   static const absl::flat_hash_set<std::string> allowed_inputs_set{
       {TypeUtil::descriptorFullNameToTypeUrl(
           envoy::extensions::matching::common_inputs::network::v3::DestinationIPInput::descriptor()
@@ -51,7 +52,8 @@ absl::Status ActionValidationVisitor::performDataInputValidation(
       {TypeUtil::descriptorFullNameToTypeUrl(
           envoy::extensions::matching::common_inputs::network::v3::FilterStateInput::descriptor()
               ->full_name())}};
-  if (allowed_inputs_set.contains(type_url)) {
+  if (allowed_inputs_set.contains(type_url) ||
+      data_input.availableAt() <= Matcher::DataInputStage::Connection) {
     return absl::OkStatus();
   }
 
@@ -63,7 +65,8 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(), "",
-                                                  proto_config.shadow_rules_stat_prefix(), scope)),
+                                                  proto_config.shadow_rules_stat_prefix(),
+                                                  /*http_filter=*/false, scope)),
       shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
       engine_(Filters::Common::RBAC::createEngine(proto_config, context, validation_visitor,
                                                   action_validation_visitor_)),

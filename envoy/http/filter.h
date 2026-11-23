@@ -160,6 +160,12 @@ enum class FilterDataStatus {
   // Note that if a local reply was sent, no further iteration for either data or trailers
   // for the current filter and the filters following will happen. A local reply can be
   // triggered via sendLocalReply() or encodeHeaders().
+  //
+  // When the runtime guard ``envoy.reloadable_features.filter_manager_per_filter_buffer`` is
+  // enabled, the filter is treated as having consumed the frame: whatever it leaves in a frame
+  // that was replayed from an earlier filter's buffer is dropped, as it is for a frame that came
+  // from the codec. A filter that wants to keep the data must move it out of the frame (e.g. with
+  // addDecodedData()/addEncodedData()). A frame replayed from the filter's own buffer is kept.
   StopIterationNoBuffer
 };
 
@@ -236,6 +242,9 @@ public:
 
   // Returns a handle to the upstream stream's stream info.
   virtual StreamInfo::StreamInfo& upstreamStreamInfo() PURE;
+
+  // Returns a handle to the downstream stream's stream info.
+  virtual StreamInfo::StreamInfo& downstreamStreamInfo() PURE;
 
   // Returns the WebTransport session of the *downstream* stream paired with this upstream request,
   // if any. Used by the upstream WebTransport codec to obtain the downstream session so it can
@@ -434,6 +443,14 @@ public:
    */
   virtual void
   requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+
+  /**
+   * Enables independent half close for the current stream: the stream is not reset when the
+   * response completes before the request. Used by the router filter for TCP upstreams.
+   *
+   * NOTE: this must be called before the response is encoded and cannot be undone.
+   */
+  virtual void enableHalfClose() PURE;
 };
 
 /**
@@ -655,12 +672,22 @@ public:
   /**
    * @return const Buffer::Instance* the currently buffered data as buffered by this filter or
    *         previous ones in the filter chain. May be nullptr if nothing has been buffered yet.
+   *
+   * When the runtime guard ``envoy.reloadable_features.filter_manager_per_filter_buffer`` is
+   * enabled, each filter has its own buffer and this returns only the data held by the calling
+   * filter: the data it stopped and buffered, the data parked at it by a StopAll status, and the
+   * data it added with addDecodedData(). Data buffered by other filters in the chain is not
+   * visible. May be nullptr if the calling filter has not buffered anything yet.
    */
   virtual const Buffer::Instance* decodingBuffer() PURE;
 
   /**
    * Allows modifying the decoding buffer. May only be called before any data has been continued
    * past the calling filter.
+   *
+   * When the runtime guard ``envoy.reloadable_features.filter_manager_per_filter_buffer`` is
+   * enabled, this modifies the data held by the calling filter only (see decodingBuffer()), and may
+   * be called whenever the calling filter holds buffered data.
    */
   virtual void modifyDecodingBuffer(std::function<void(Buffer::Instance&)> callback) PURE;
 
@@ -686,6 +713,13 @@ public:
    * buffered, so that the further filters will not receive decodeData() before decodeHeaders().
    *
    * It is an error to call this method in any other case.
+   *
+   * When the runtime guard ``envoy.reloadable_features.filter_manager_per_filter_buffer`` is
+   * enabled, the data is added to the calling filter's own buffer and is sent on from the calling
+   * filter when it continues, so it is only seen by the calling filter's decodingBuffer() and by
+   * later filters. In case 1), if several filters add a body while the headers pass through the
+   * chain, the bodies are combined in the buffer of the first filter that added one and sent once
+   * from there, so a later adding filter no longer holds the body it added.
    *
    * See also injectDecodedDataToFilterChain() for a different way of passing data to further
    * filters and also how the two methods are different.
@@ -1111,12 +1145,22 @@ public:
   /**
    * @return const Buffer::Instance* the currently buffered data as buffered by this filter or
    *         previous ones in the filter chain. May be nullptr if nothing has been buffered yet.
+   *
+   * When the runtime guard ``envoy.reloadable_features.filter_manager_per_filter_buffer`` is
+   * enabled, each filter has its own buffer and this returns only the data held by the calling
+   * filter: the data it stopped and buffered, the data parked at it by a StopAll status, and the
+   * data it added with addEncodedData(). Data buffered by other filters in the chain is not
+   * visible. May be nullptr if the calling filter has not buffered anything yet.
    */
   virtual const Buffer::Instance* encodingBuffer() PURE;
 
   /**
    * Allows modifying the encoding buffer. May only be called before any data has been continued
    * past the calling filter.
+   *
+   * When the runtime guard ``envoy.reloadable_features.filter_manager_per_filter_buffer`` is
+   * enabled, this modifies the data held by the calling filter only (see encodingBuffer()), and may
+   * be called whenever the calling filter holds buffered data.
    */
   virtual void modifyEncodingBuffer(std::function<void(Buffer::Instance&)> callback) PURE;
 
@@ -1142,6 +1186,13 @@ public:
    * buffered, so that the further filters will not receive encodeData() before encodeHeaders().
    *
    * It is an error to call this method in any other case.
+   *
+   * When the runtime guard ``envoy.reloadable_features.filter_manager_per_filter_buffer`` is
+   * enabled, the data is added to the calling filter's own buffer and is sent on from the calling
+   * filter when it continues, so it is only seen by the calling filter's encodingBuffer() and by
+   * later filters. In case 1), if several filters add a body while the headers pass through the
+   * chain, the bodies are combined in the buffer of the first filter that added one and sent once
+   * from there, so a later adding filter no longer holds the body it added.
    *
    * See also injectEncodedDataToFilterChain() for a different way of passing data to further
    * filters and also how the two methods are different.
@@ -1196,6 +1247,9 @@ public:
    *
    * When called in encodeData, the trailers map will be initialized to an empty map and returned by
    * reference. Calling this function more than once is invalid.
+   *
+   * Filters after the caller observe end_stream == false on the current data frame and then receive
+   * the new trailers via encodeTrailers(), including when one of them stops data iteration.
    *
    * @return a reference to the newly created trailers map.
    */

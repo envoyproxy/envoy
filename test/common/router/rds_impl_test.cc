@@ -35,7 +35,6 @@
 using testing::_;
 using testing::Eq;
 using testing::InSequence;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -64,12 +63,12 @@ public:
     EXPECT_CALL(validation_context_, dynamicValidationVisitor())
         .WillRepeatedly(ReturnRef(validation_visitor_));
 
-    ON_CALL(outer_init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
+    ON_CALL(outer_init_manager_, add(_)).WillByDefault([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
-    }));
-    ON_CALL(outer_init_manager_, initialize(_))
-        .WillByDefault(Invoke(
-            [this](const Init::Watcher& watcher) { init_target_handle_->initialize(watcher); }));
+    });
+    ON_CALL(outer_init_manager_, initialize(_)).WillByDefault([this](const Init::Watcher& watcher) {
+      init_target_handle_->initialize(watcher);
+    });
   }
 
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
@@ -563,6 +562,14 @@ TEST_F(RdsImplTest, UnknownFacotryForPerRouteTypedConfig) {
       EnvoyException,
       "Didn't find a registered implementation for 'filter.unknown' with type URL: "
       "'google.protobuf.Struct'");
+
+  // The rejected configuration is rejected again when it is resent.
+  EXPECT_THROW_WITH_MESSAGE(
+      EXPECT_OK(
+          rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info())),
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.Struct'");
 }
 
 // Validates behavior when the config is delivered but it fails PGV validation.
@@ -984,6 +991,19 @@ parseRouteConfigurationFromV3Yaml(const std::string& yaml) {
   envoy::config::route::v3::RouteConfiguration route_config;
   TestUtility::loadFromYaml(yaml, route_config);
   return route_config;
+}
+
+TEST_F(RouteConfigProviderManagerImplTest, ConfigDumpDuringProviderDestruction) {
+  setup();
+  outer_init_manager_.initialize(init_watcher_);
+
+  init_watcher_.expectReady().WillOnce([this]() {
+    UniversalStringMatcher name_matcher;
+    const auto config_dump = route_config_provider_manager_->dumpRouteConfigs(name_matcher);
+    EXPECT_TRUE(config_dump->dynamic_route_configs().empty());
+  });
+
+  provider_.reset();
 }
 
 TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
@@ -1453,10 +1473,7 @@ TEST_F(RdsVhdsOnDemandTest, AnsweredAliasIsAnsweredLocally) {
   Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
   ASSERT_NE(nullptr, vhds_callbacks);
 
-  // Land the initial fetch, which is what publishes the route configuration: the alias of a
-  // request is built from the published configuration's name, which is empty before the first
-  // publish. In production a worker can't reach the provider that early, because the initial
-  // fetch gates initialization.
+  // Land the initial fetch, which is what publishes the route configuration.
   const auto initial_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
           vhdsResources("vhost_initial", "initial.com"));
@@ -1552,8 +1569,7 @@ TEST_F(RdsVhdsOnDemandTest, QueuedCallbackForAnsweredAliasResolvesOnNextPublish)
   Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
   ASSERT_NE(nullptr, vhds_callbacks);
 
-  // Land the initial fetch first: a request made before the first publish can't build its alias,
-  // because the published route configuration's name is still empty.
+  // Land the initial fetch, which is what publishes the route configuration.
   const auto initial_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
           vhdsResources("vhost_initial", "initial.com"));

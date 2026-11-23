@@ -2,11 +2,12 @@ load("@base_pip3//:requirements.bzl", "requirement")
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@envoy_toolshed//:utils.bzl", "json_merge")
+load("@envoy_toolshed//dependency:macros.bzl", "release_date_updater")
 load("@envoy_toolshed//dependency:reachability.bzl", "dependency_reachability")
-load("@rules_python//python:defs.bzl", "py_binary", "py_test")
+load("@envoy_toolshed//dependency/cve:macros.bzl", "cve_scan")
+load("@rules_python//python:defs.bzl", "py_test")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
-load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load(":reachability.bzl", "WASM_RUNTIME_FLAG", "envoy_dependency_reachability")
 
 licenses(["notice"])  # Apache 2
@@ -43,39 +44,72 @@ json_merge(
     visibility = ["//visibility:public"],
 )
 
+# Metadata-only repositories absent from the resolved module graph have no
+# version to check.
+# TODO(phlax): Skip nested archive tags until envoy.dependency.check can parse nested tag names.
 json_merge(
-    name = "cpe-dependencies",
+    name = "check-dependencies",
     srcs = [":filtered-dependencies"],
-    args = [
-        "-s",
-        "-c",
-        "-L",
-        "tools/dependency",
-    ],
-    data = [
-        ":cve_utils.jq",
-        ":version.jq",
-    ],
     filter = """
-    import "cve_utils" as Utils;
-    .[0] as $deps
-    | Utils::parse_deps($deps)
+    .[0]
+    | with_entries(
+        select(.value.version != null)
+        | .value |= (
+            .source as $source
+            | if $source.url then
+                .urls = ([
+                    $source.url
+                    | sub("^(?<archive>https://github.com/[^/]+/[^/]+/archive/)refs/tags/(?<tag>.+[.](tar[.]gz|zip))$";
+                          "\\(.archive)\\(.tag)")
+                ] + ($source.mirror_urls // []))
+              else . end
+            | .sha256 = ($source.integrity // "")
+        )
+        | select((.value.urls[0] // ""
+                  | test("^https://github.com/[^/]+/[^/]+/archive/.*/.*[.](tar[.]gz|zip)$")) | not)
+      )
     """,
     visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "check_dependencies_test",
+    srcs = ["check_dependencies_test.py"],
+    args = [
+        "$(location :filtered-dependencies)",
+        "$(location :check-dependencies)",
+    ],
+    data = [
+        ":check-dependencies",
+        ":filtered-dependencies",
+    ],
 )
 
 py_console_script_binary(
     name = "check",
     args = [
-        "--repository_locations=$(location :filtered-dependencies)",
+        "--repository_locations=$(location :check-dependencies)",
     ],
     data = [
-        ":filtered-dependencies",
+        ":check-dependencies",
     ],
     pkg = "@base_pip3//envoy_dependency_check",
     script = "envoy.dependency.check",
     visibility = ["//visibility:public"],
     deps = [requirement("orjson")],
+)
+
+# Fix the release dates of dependencies in the metadata (`bazel/deps.yaml`, `api/bazel/deps.yaml`),
+# with the dates that `:check` looks up for them. Requires `GITHUB_TOKEN`.
+#   bazel run //tools/dependency:release_dates -- <name>...
+release_date_updater(
+    name = "release_dates",
+    check = ":check",
+    dependencies = ":check-dependencies",
+    metadata = [
+        "//bazel:deps.yaml",
+        "@envoy_api//bazel:deps.yaml",
+    ],
 )
 
 py_console_script_binary(
@@ -177,51 +211,12 @@ sh_binary(
     toolchains = ["@jq_toolchains//:resolved_toolchain"],
 )
 
-json_merge(
-    name = "start-year",
-    filter = """
-    .[0].start_year
-    """,
-    visibility = ["//visibility:public"],
-    yaml_srcs = [":cve.yaml"],
-)
-
-py_binary(
-    name = "cve_fetch",
-    srcs = ["cve_fetch.py"],
-    deps = [
-        requirement("aiohttp"),
-        requirement("aio.run.runner"),
-    ],
-)
-
-sh_binary(
-    name = "cve_update",
-    srcs = ["cve_update.sh"],
-    data = [
-        ":cve_fetch",
-        ":start-year",
-    ],
-    env = {
-        "FETCHER": "$(location :cve_fetch)",
-        "START_YEAR_PATH": "$(location :start-year)",
-        # NOTE: usage of PATH means this _must_ be run locally
-        "CVE_DATA_PATH": "%s/tools/dependency/cve_data" % PATH,
-    },
-)
-
-json_merge(
-    name = "ignored-cves",
-    filter = """
-    .[0].ignored_cves
-    """,
-    visibility = ["//visibility:public"],
-    yaml_srcs = [":cve.yaml"],
-)
-
 filegroup(
     name = "cve-data-dir",
-    srcs = glob(["cve_data/*.json"]),
+    srcs = glob([
+        "cve_data/*.json",
+        "cve_data/cvelist/*.json",
+    ]),
     visibility = ["//visibility:public"],
 )
 
@@ -243,91 +238,12 @@ label_flag(
     visibility = ["//visibility:public"],
 )
 
-sh_binary(
+cve_scan(
     name = "cves",
-    srcs = ["cves.sh"],
-    data = [
-        ":cpe-dependencies",
-        ":cve-data",
-        ":cve_matcher.jq",
-        ":cve_utils.jq",
-        ":ignored-cves.json",
-        ":version.jq",
-        "@jq_toolchains//:resolved_toolchain",
-    ],
-    env = {
-        "JQ_BIN": "$(JQ_BIN)",
-        "CPE_DEPS": "$(location :cpe-dependencies)",
-        "JQ_CVE_UTILS": "$(location :cve_utils.jq)",
-        "JQ_CVE_MATCHER": "$(location :cve_matcher.jq)",
-        "JQ_VERSION_UTILS": "$(location :version.jq)",
-        "CVES_IGNORED": "$(location :ignored-cves.json)",
-        "CVES": "$(locations :cve-data)",
-    },
-    toolchains = ["@jq_toolchains//:resolved_toolchain"],
-)
-
-genrule(
-    name = "cves-scanned",
-    outs = ["scanned.json"],
-    cmd = """
-    export JQ_BIN="$(JQ_BIN)"
-    export CPE_DEPS="$(location :cpe-dependencies)"
-    export JQ_CVE_UTILS="$(location :cve_utils.jq)"
-    export JQ_CVE_MATCHER="$(location :cve_matcher.jq)"
-    export JQ_VERSION_UTILS="$(location :version.jq)"
-    export CVES_IGNORED="$(location :ignored-cves.json)"
-    export CVES="$(locations :cve-data)"
-    read -ra CVELIST <<< "$$CVES"
-    HAS_JSON=false
-    for f in "$${CVELIST[@]}"; do
-        if [[ "$$f" == *.json ]]; then
-            HAS_JSON=true
-            break
-        fi
-    done
-    if [[ "$$HAS_JSON" != true ]]; then
-        echo "No CVE data set, perhaps use --config=cves?" >&2
-        exit 1
-    fi
-    $(location :cves) \
-      > $@ || :
-    """,
-    tags = ["no-remote-exec"],
-    toolchains = ["@jq_toolchains//:resolved_toolchain"],
-    tools = [
-        ":cpe-dependencies",
-        ":cve-data",
-        ":cve_matcher.jq",
-        ":cve_utils.jq",
-        ":cves",
-        ":ignored-cves.json",
-        ":version.jq",
-        "@jq_toolchains//:resolved_toolchain",
-    ],
-)
-
-sh_test(
-    name = "cve_test",
-    srcs = [":cve_test.sh"],
-    args = ["$(location :cves-scanned)"],
-    data = [
-        ":ansi.jq",
-        ":cve_report.jq",
-        ":cve_utils.jq",
-        ":cves-scanned",
-        ":version.jq",
-        "@jq_toolchains//:resolved_toolchain",
-    ],
-    env = {
-        "JQ_BIN": "$(JQ_BIN)",
-        "JQ_ANSI_UTILS": "$(location :ansi.jq)",
-        "JQ_CVE_UTILS": "$(location :cve_utils.jq)",
-        "JQ_VERSION_UTILS": "$(location :version.jq)",
-        "JQ_REPORT": "$(location :cve_report.jq)",
-    },
-    tags = ["no-remote-exec"],
-    toolchains = ["@jq_toolchains//:resolved_toolchain"],
+    config = ":cve.yaml",
+    cve_data = ":cve-data",
+    visibility = ["//visibility:public"],
+    deps = ":filtered-dependencies",
 )
 
 # These targets are for testing

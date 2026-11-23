@@ -159,7 +159,7 @@ bool ReverseTunnelInitiator::ipFamilySupported(int domain) {
   return domain == AF_INET || domain == AF_INET6;
 }
 
-Server::BootstrapExtensionPtr ReverseTunnelInitiator::createBootstrapExtension(
+Server::BootstrapExtensionCreationResult ReverseTunnelInitiator::createBootstrapExtension(
     const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
   ENVOY_LOG(debug, "ReverseTunnelInitiator::createBootstrapExtension()");
   const auto& message = MessageUtil::downcastAndValidate<

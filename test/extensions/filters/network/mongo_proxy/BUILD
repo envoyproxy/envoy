@@ -15,7 +15,6 @@ envoy_extension_cc_test(
     name = "bson_impl_test",
     srcs = ["bson_impl_test.cc"],
     extension_names = ["envoy.filters.network.mongo_proxy"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/mongo_proxy:bson_lib",
@@ -27,7 +26,6 @@ envoy_extension_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
     extension_names = ["envoy.filters.network.mongo_proxy"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/json:json_loader_lib",
@@ -41,7 +39,13 @@ envoy_extension_cc_test(
     name = "proxy_test",
     srcs = ["proxy_test.cc"],
     extension_names = ["envoy.filters.network.mongo_proxy"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:stats_lib",
@@ -67,7 +71,6 @@ envoy_extension_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     extension_names = ["envoy.filters.network.mongo_proxy"],
-    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/network/mongo_proxy:bson_lib",
         "//source/extensions/filters/network/mongo_proxy:codec_lib",
@@ -79,7 +82,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.mongo_proxy"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/network/mongo_proxy:config",
         "//test/mocks/server:factory_context_mocks",
@@ -94,7 +103,11 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["mongo_proxy_integration_test.cc"],
     extension_names = ["envoy.filters.network.mongo_proxy"],
-    rbe_pool = "linux_x64_medium",
+    rbe_pool = {
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/config:well_known_names",

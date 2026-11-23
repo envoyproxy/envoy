@@ -57,6 +57,13 @@ message Config {
   //
   // "configuration_version" must contain a 1 byte unsigned integer of value less than 7.
   // See https://datatracker.ietf.org/doc/html/draft-ietf-quic-load-balancers#name-config-rotation.
+  //
+  // To change the encryption key, change the configuration version too, so that a load balancer can
+  // hold the previous and the new configuration side by side while connection IDs issued under the
+  // previous one are still in use. An SDS update that changes the key under the active configuration
+  // version is applied, with a warning: connection IDs already issued under the previous key may no
+  // longer be routed to this server by a load balancer holding the new key. An update with an
+  // identical key and version leaves the active configuration unchanged.
   transport_sockets.tls.v3.SdsSecretConfig encryption_parameters = 5
       [(validate.rules).message = {required: true}];
 

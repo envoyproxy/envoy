@@ -523,9 +523,9 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, NonOKResponseStatusOnly) {
   Buffer::OwnedImpl expected_response;
   Grpc::Encoder().prependFrameHeader(Grpc::GRPC_FH_DEFAULT, expected_response);
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
-      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
+      .WillOnce([&expected_response](Buffer::Instance& data, bool) {
         EXPECT_EQ(data.toString(), expected_response.toString());
-      }));
+      });
   Http::TestResponseTrailerMapImpl trailers;
   EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(trailers));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(res_headers, true));
@@ -660,22 +660,21 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKResponseWithTrailer) {
 
   Buffer::OwnedImpl buffer{"{\"id\":123,\"author\":\"John Doe\",\"title\":\"A Book\"}"};
 
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
-      .WillOnce(Invoke([](Buffer::Instance& data, bool) {
-        bookstore::Book expected_book;
-        expected_book.set_id(123);
-        expected_book.set_author("John Doe");
-        expected_book.set_title("A Book");
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _)).WillOnce([](Buffer::Instance& data, bool) {
+    bookstore::Book expected_book;
+    expected_book.set_id(123);
+    expected_book.set_author("John Doe");
+    expected_book.set_title("A Book");
 
-        Grpc::Decoder decoder;
-        std::vector<Grpc::Frame> frames;
-        std::ignore = decoder.decode(data, frames);
+    Grpc::Decoder decoder;
+    std::vector<Grpc::Frame> frames;
+    std::ignore = decoder.decode(data, frames);
 
-        bookstore::Book book;
-        std::ignore = book.ParseFromString(frames[0].data_->toString());
+    bookstore::Book book;
+    std::ignore = book.ParseFromString(frames[0].data_->toString());
 
-        EXPECT_TRUE(MessageDifferencer::Equals(expected_book, book));
-      }));
+    EXPECT_TRUE(MessageDifferencer::Equals(expected_book, book));
+  });
 
   Http::TestResponseHeaderMapImpl res_headers{{":status", "200"},
                                               {"content-type", "application/json"},
@@ -758,7 +757,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKHttpBodyResponseWithTrailer) {
   buffer.add(book_str);
 
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
-      .WillOnce(Invoke([&book_str](Buffer::Instance& data, bool) {
+      .WillOnce([&book_str](Buffer::Instance& data, bool) {
         google::api::HttpBody expected_body;
         expected_body.set_content_type("application/json");
         expected_body.set_data(book_str);
@@ -771,7 +770,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKHttpBodyResponseWithTrailer) {
         std::ignore = body.ParseFromString(frames[0].data_->toString());
 
         EXPECT_TRUE(MessageDifferencer::Equals(expected_body, body));
-      }));
+      });
 
   Http::TestResponseHeaderMapImpl res_headers{{":status", "200"},
                                               {"content-type", "application/json"},

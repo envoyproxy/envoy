@@ -69,7 +69,6 @@ envoy_cc_test_library(
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/runtime:runtime_features_lib",
-        "//test/test_common:global_lib",
     ],
 )
 

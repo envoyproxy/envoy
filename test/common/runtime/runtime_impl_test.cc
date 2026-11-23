@@ -22,8 +22,10 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
 #include "absl/flags/declare.h"
 #include "gmock/gmock.h"
@@ -34,8 +36,7 @@
 #endif
 
 using testing::_;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
+using testing::ElementsAre;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
@@ -44,22 +45,57 @@ namespace Envoy {
 namespace Runtime {
 namespace {
 
+// Setup test data files.
+void setupTestFilesystem() {
+  const std::string test_data = "test/common/runtime/test_data";
+  const std::string src_dir = TestEnvironment::runfilesPath(test_data);
+  const std::string temp_dir = TestEnvironment::temporaryPath(test_data);
+  TestEnvironment::removePath(temp_dir);
+
+  for (const std::string& src_file : TestUtility::listFiles(src_dir, true)) {
+    const std::string rel_path = src_file.substr(src_dir.length() + 1);
+    const std::string dst_file = absl::StrCat(temp_dir, "/", rel_path);
+    const Filesystem::PathSplitResult parent =
+        Filesystem::fileSystemForTest().splitPathFromFilename(dst_file).value();
+    TestEnvironment::createPath(std::string(parent.directory_));
+    TestEnvironment::writeStringToFileForTest(dst_file,
+                                              TestEnvironment::readFileToStringForTest(src_file),
+                                              /*fully_qualified_path=*/true);
+  }
+
+  // Verify text value is treated as a binary blob regardless of source line-ending settings.
+  TestEnvironment::writeStringToFileForTest(absl::StrCat(test_data, "/root/envoy/file_lf"),
+                                            "hello\nworld");
+  TestEnvironment::writeStringToFileForTest(absl::StrCat(test_data, "/root/envoy/file_crlf"),
+                                            "hello\r\nworld");
+
+  // Deliberate symlink of doom.
+  const std::string loop_path = absl::StrCat(temp_dir, "/loop");
+  TestEnvironment::createPath(loop_path);
+
+  TestEnvironment::createSymlink(absl::StrCat(temp_dir, "/root"),
+                                 absl::StrCat(temp_dir, "/current"));
+  TestEnvironment::createSymlink(absl::StrCat(temp_dir, "/root/envoy/subdir"),
+                                 absl::StrCat(temp_dir, "/root/envoy/badlink"));
+  TestEnvironment::createSymlink(loop_path, absl::StrCat(loop_path, "/loop"));
+}
+
 class LoaderImplTest : public testing::Test {
 protected:
   LoaderImplTest() : api_(Api::createApiForTest(store_)) { local_info_.node_.set_cluster(""); }
 
   virtual void setup() {
-    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([this] {
+    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly([this] {
       Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
       EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
           .WillRepeatedly(
-              Invoke([this](absl::string_view path, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+              [this](absl::string_view path, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
                 EXPECT_EQ(path, expected_watch_root_);
                 on_changed_cbs_.emplace_back(cb);
                 return absl::OkStatus();
-              }));
+              });
       return mock_watcher;
-    }));
+    });
   }
 
   Event::MockDispatcher dispatcher_;
@@ -77,10 +113,7 @@ protected:
 
 class DiskLoaderImplTest : public LoaderImplTest {
 public:
-  void SetUp() override {
-    TestEnvironment::exec(
-        {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
-  }
+  void SetUp() override { setupTestFilesystem(); }
 
   void TearDown() override {
     TestEnvironment::removePath(TestEnvironment::temporaryPath("test/common/runtime/test_data"));
@@ -299,6 +332,16 @@ TEST_F(DiskLoaderImplTest, GetLayers) {
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
 }
 
+TEST_F(DiskLoaderImplTest, UpdateCallbackRunsOnDiskLayerChange) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+  MockFunction<void()> update_cb;
+  Common::CallbackHandlePtr handle = loader_->addUpdateCallback(update_cb.AsStdFunction());
+
+  EXPECT_CALL(update_cb, Call());
+  updateDiskLayer(0);
+}
+
 TEST_F(DiskLoaderImplTest, BadDirectory) {
   setup();
   run("/baddir", "/baddir");
@@ -334,12 +377,12 @@ TEST_F(DiskLoaderImplTest, OverrideFolderDoesNotExist) {
 }
 
 TEST_F(DiskLoaderImplTest, FileDoesNotExist) {
-  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([] {
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly([] {
     Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
     EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
         .WillRepeatedly(Return(absl::InvalidArgumentError("file does not exist")));
     return mock_watcher;
-  }));
+  });
 
   EXPECT_THROW_WITH_MESSAGE(
       run("test/common/runtime/test_data/current", "envoy_override_does_not_exist"), EnvoyException,
@@ -867,13 +910,52 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
   EXPECT_EQ(original_thread_snapshot_pointer, original_snapshot_pointer);
 }
 
+// Update callbacks run after every loaded snapshot, including one with no change, and observe the
+// new snapshot from both snapshot() and threadsafeSnapshot().
+TEST_F(StaticLoaderImplTest, UpdateCallbackObservesNewSnapshot) {
+  setup();
+  std::vector<std::string> observed;
+  Common::CallbackHandlePtr handle = loader_->addUpdateCallback([&]() {
+    const auto value = loader_->snapshot().get("foo");
+    const auto threadsafe_value = loader_->threadsafeSnapshot()->get("foo");
+    ASSERT_EQ(value.has_value(), threadsafe_value.has_value());
+    if (value.has_value()) {
+      EXPECT_EQ(value.ref(), threadsafe_value.ref());
+    }
+    observed.push_back(value.has_value() ? value.ref() : "<unset>");
+  });
+  EXPECT_TRUE(observed.empty());
+
+  ASSERT_OK(loader_->mergeValues({{"foo", "bar"}}));
+  ASSERT_OK(loader_->mergeValues({{"foo", ""}}));
+  ASSERT_OK(loader_->onWorkerThreadsRegistered());
+  EXPECT_THAT(observed, ElementsAre("bar", "<unset>", "<unset>"));
+}
+
+// A callback stops running once its handle is destroyed, and a handle can outlive the loader.
+TEST_F(StaticLoaderImplTest, UpdateCallbackRemovedWithItsHandle) {
+  setup();
+  MockFunction<void()> first_cb;
+  MockFunction<void()> second_cb;
+  Common::CallbackHandlePtr first_handle = loader_->addUpdateCallback(first_cb.AsStdFunction());
+  Common::CallbackHandlePtr second_handle = loader_->addUpdateCallback(second_cb.AsStdFunction());
+
+  EXPECT_CALL(first_cb, Call());
+  EXPECT_CALL(second_cb, Call()).Times(2);
+  ASSERT_OK(loader_->mergeValues({{"foo", "bar"}}));
+  first_handle.reset();
+  ASSERT_OK(loader_->mergeValues({{"foo", "baz"}}));
+
+  loader_.reset();
+  second_handle.reset();
+}
+
 class DiskLayerTest : public testing::Test {
 protected:
   DiskLayerTest() : api_(Api::createApiForTest()) {}
 
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
-    TestEnvironment::exec(
-        {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
+    setupTestFilesystem();
   }
 
   static void TearDownTestSuite() {
@@ -937,15 +1019,15 @@ public:
     }
     EXPECT_CALL(cm_, subscriptionFactory()).Times(layers_.size());
     ON_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
-        .WillByDefault(testing::Invoke(
-            [this](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
-                   Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoderSharedPtr,
-                   const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
-              auto ret = std::make_unique<testing::NiceMock<Config::MockSubscription>>();
-              rtds_subscriptions_.push_back(ret.get());
-              rtds_callbacks_.push_back(&callbacks);
-              return ret;
-            }));
+        .WillByDefault([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                              Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
+                              Config::OpaqueResourceDecoderSharedPtr,
+                              const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
+          auto ret = std::make_unique<testing::NiceMock<Config::MockSubscription>>();
+          rtds_subscriptions_.push_back(ret.get());
+          rtds_callbacks_.push_back(&callbacks);
+          return ret;
+        });
     absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
         dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
     THROW_IF_NOT_OK_REF(loader.status());
@@ -1105,6 +1187,40 @@ TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
   EXPECT_EQ(3, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+TEST_F(RtdsLoaderImplTest, UpdateCallbackRunsOnConfigUpdate) {
+  setup();
+  MockFunction<void()> update_cb;
+  Common::CallbackHandlePtr handle = loader_->addUpdateCallback(update_cb.AsStdFunction());
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      foo: bar
+  )EOF");
+  EXPECT_CALL(rtds_init_callback_, Call());
+  EXPECT_CALL(update_cb, Call()).WillOnce([this]() {
+    EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
+  });
+  doOnConfigUpdateVerifyNoThrow(runtime);
+}
+
+// A snapshot that fails to load does not run the update callbacks.
+TEST_F(RtdsLoaderImplTest, UpdateCallbackSkippedWhenSnapshotFailsToLoad) {
+  setup();
+  MockFunction<void()> update_cb;
+  Common::CallbackHandlePtr handle = loader_->addUpdateCallback(update_cb.AsStdFunction());
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      foo: [bar]
+  )EOF");
+  EXPECT_CALL(update_cb, Call()).Times(0);
+  const auto decoded_resources = TestUtility::decodeResources({runtime});
+  EXPECT_FALSE(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, "").ok());
+  EXPECT_EQ("whatevs", loader_->snapshot().get("foo").value().get());
 }
 
 TEST_F(RtdsLoaderImplTest, RuntimeFeatureRemovalRestoresRuntimeGuardDefault) {
@@ -1292,10 +1408,10 @@ TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
 TEST_F(RtdsLoaderImplTest, BadConfigSource) {
   Upstream::MockClusterManager cm_;
   EXPECT_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillOnce(InvokeWithoutArgs([]() -> Config::SubscriptionPtr {
+      .WillOnce([]() -> Config::SubscriptionPtr {
         throw EnvoyException("bad config");
         return nullptr;
-      }));
+      });
 
   envoy::config::bootstrap::v3::LayeredRuntime config;
   auto* layer = config.add_layers();
@@ -1325,6 +1441,29 @@ TEST_F(RtdsLoaderImplTest, BooleanToStringConversion) {
   doOnConfigUpdateVerifyNoThrow(runtime);
 
   EXPECT_EQ("true", loader_->snapshot().get("toggle").value().get());
+}
+
+TEST(NoRuntime, CachedFeatureEnabledDefaults) {
+  EXPECT_FALSE(ENVOY_RUNTIME_FEATURE_ENABLED("envoy.reloadable_features.test_feature_false"));
+  EXPECT_TRUE(ENVOY_RUNTIME_FEATURE_ENABLED("envoy.reloadable_features.test_feature_true"));
+}
+
+TEST(NoRuntime, CachedFeatureEnabledSeesOverrides) {
+  const auto enabled = []() {
+    return ENVOY_RUNTIME_FEATURE_ENABLED("envoy.reloadable_features.test_feature_false");
+  };
+  EXPECT_FALSE(enabled());
+  maybeSetRuntimeGuard("envoy.reloadable_features.test_feature_false", true);
+  // Same call site, so the cached flag is reused and the new value is read.
+  EXPECT_TRUE(enabled());
+  maybeSetRuntimeGuard("envoy.reloadable_features.test_feature_false", false);
+  EXPECT_FALSE(enabled());
+}
+
+TEST(NoRuntime, CachedFeatureEnabledUnknownFeature) {
+  EXPECT_ENVOY_BUG(
+      EXPECT_FALSE(ENVOY_RUNTIME_FEATURE_ENABLED("envoy.reloadable_features.not_a_feature")),
+      "Unable to find runtime feature envoy.reloadable_features.not_a_feature");
 }
 
 } // namespace

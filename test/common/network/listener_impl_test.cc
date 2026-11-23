@@ -23,7 +23,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 
 namespace Envoy {
@@ -56,13 +55,13 @@ static void errorCallbackTest(Address::IpVersion version) {
   StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(), nullptr,
                                          StreamInfo::FilterState::LifeSpan::Connection);
   EXPECT_CALL(listener_callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+      .WillOnce([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         Network::ConnectionPtr conn = dispatcher->createServerConnection(
             std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info);
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         socket->close();
-      }));
+      });
 
   dispatcher->run(Event::Dispatcher::RunType::Block);
 }
@@ -131,7 +130,7 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
                                          StreamInfo::FilterState::LifeSpan::Connection);
   EXPECT_CALL(listener_callbacks2, onAccept_(_)).Times(0);
   EXPECT_CALL(listener_callbacks1, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+      .WillOnce([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         EXPECT_CALL(listener_callbacks1, recordConnectionsAcceptedOnSocketEvent(_));
         Network::ConnectionPtr conn = dispatcher_->createServerConnection(
             std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info);
@@ -140,7 +139,7 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher_->exit();
-      }));
+      });
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -166,11 +165,11 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr,
                                          StreamInfo::FilterState::LifeSpan::Connection);
   EXPECT_CALL(listener_callbacks, onAccept_(_))
-      .WillRepeatedly(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+      .WillRepeatedly([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         server_connections.emplace_back(dispatcher_->createServerConnection(
             std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info));
         dispatcher_->exit();
-      }));
+      });
 
   auto initiate_connections = [&](const int count) {
     for (int i = 0; i < count; ++i) {
@@ -241,11 +240,11 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitListenerOptOut) {
   StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr,
                                          StreamInfo::FilterState::LifeSpan::Connection);
   EXPECT_CALL(listener_callbacks, onAccept_(_))
-      .WillRepeatedly(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+      .WillRepeatedly([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         server_connections.emplace_back(dispatcher_->createServerConnection(
             std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info));
         dispatcher_->exit();
-      }));
+      });
 
   auto initiate_connections = [&](const int count) {
     for (int i = 0; i < count; ++i) {
@@ -296,14 +295,14 @@ TEST_P(TcpListenerImplTest, WildcardListenerUseActualDst) {
   StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr,
                                          StreamInfo::FilterState::LifeSpan::Connection);
   EXPECT_CALL(listener_callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+      .WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
         Network::ConnectionPtr conn = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket(), stream_info);
         EXPECT_EQ(*conn->connectionInfoProvider().localAddress(), *local_dst_address);
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher_->exit();
-      }));
+      });
 
   EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -346,7 +345,7 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
   StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr,
                                          StreamInfo::FilterState::LifeSpan::Connection);
   EXPECT_CALL(listener_callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+      .WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
         Network::ConnectionPtr conn = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket(), stream_info);
         EXPECT_EQ(conn->connectionInfoProvider().localAddress()->ip()->version(),
@@ -357,10 +356,53 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         dispatcher_->exit();
-      }));
+      });
 
   EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+class DrainAwareMockIoHandle : public MockIoHandle {
+public:
+  MOCK_METHOD(void, onListenerDrain, (), (override));
+};
+
+TEST_P(TcpListenerImplTest, DrainNotifiesIoHandle) {
+  testing::StrictMock<DrainAwareMockIoHandle> io_handle;
+  auto socket = std::make_shared<NiceMock<MockListenSocket>>();
+  ON_CALL(*socket, ioHandle()).WillByDefault(testing::ReturnRef(io_handle));
+  MockTcpListenerCallbacks listener_callbacks;
+  Random::MockRandomGenerator random_generator;
+  NiceMock<Runtime::MockLoader> runtime;
+  Event::FileReadyCb accept_callback;
+  EXPECT_CALL(io_handle,
+              createFileEvent_(_, _, Event::FileTriggerType::Level, Event::FileReadyType::Read))
+      .WillOnce(testing::SaveArg<1>(&accept_callback));
+  EXPECT_CALL(io_handle, resetFileEvents());
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
+                               listener_callbacks, true, false, false, std::nullopt);
+
+  EXPECT_CALL(io_handle, onListenerDrain());
+  listener.onDrain();
+
+  // Starting drain does not disable the listener: normal sockets can still accept connections
+  // during the grace period. In particular, no enableFileEvents(0) call is made.
+  EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
+  EXPECT_CALL(io_handle, accept(_, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(0));
+  EXPECT_TRUE(accept_callback(Event::FileReadyType::Read).ok());
+}
+
+TEST_P(TcpListenerImplTest, DrainWithoutBoundSocket) {
+  // An unbound listener has no IoHandle to notify.
+  auto socket = std::make_shared<TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version_), nullptr, false);
+  MockTcpListenerCallbacks listener_callbacks;
+  Random::MockRandomGenerator random_generator;
+  NiceMock<Runtime::MockLoader> runtime;
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
+                               listener_callbacks, false, false, false, std::nullopt);
+  listener.onDrain();
 }
 
 TEST_P(TcpListenerImplTest, DisableAndEnableListener) {
@@ -387,23 +429,23 @@ TEST_P(TcpListenerImplTest, DisableAndEnableListener) {
 
   EXPECT_CALL(listener_callbacks, onAccept_(_)).Times(0);
   EXPECT_CALL(connection_callbacks, onEvent(_))
-      .WillOnce(Invoke([&](Network::ConnectionEvent event) -> void {
+      .WillOnce([&](Network::ConnectionEvent event) -> void {
         EXPECT_EQ(event, Network::ConnectionEvent::Connected);
         dispatcher_->exit();
-      }));
+      });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // When the listener is re-enabled, the pending connection should be accepted.
   listener.enable();
 
-  EXPECT_CALL(listener_callbacks, onAccept_(_)).WillOnce(Invoke([&](ConnectionSocketPtr&) -> void {
+  EXPECT_CALL(listener_callbacks, onAccept_(_)).WillOnce([&](ConnectionSocketPtr&) -> void {
     client_connection->close(ConnectionCloseType::NoFlush);
-  }));
+  });
   EXPECT_CALL(connection_callbacks, onEvent(_))
-      .WillOnce(Invoke([&](Network::ConnectionEvent event) -> void {
+      .WillOnce([&](Network::ConnectionEvent event) -> void {
         EXPECT_NE(event, Network::ConnectionEvent::Connected);
         dispatcher_->exit();
-      }));
+      });
 
   EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -797,13 +839,12 @@ TEST_P(TcpListenerImplTest, ShouldOnlyAcceptTheMaxNumberOfConnectionsConfiguredP
   // accepted.
   std::vector<Network::ConnectionSocketPtr> server_sockets;
   EXPECT_CALL(listener_callbacks, onAccept_(_))
-      .WillRepeatedly(
-          Invoke([this, &server_sockets](Network::ConnectionSocketPtr& server_socket) -> void {
-            server_sockets.push_back(std::move(server_socket));
-            if (server_sockets.size() == 2) {
-              dispatcher_->exit();
-            }
-          }));
+      .WillRepeatedly([this, &server_sockets](Network::ConnectionSocketPtr& server_socket) -> void {
+        server_sockets.push_back(std::move(server_socket));
+        if (server_sockets.size() == 2) {
+          dispatcher_->exit();
+        }
+      });
   //  Check the logs that they are accepted at different socket events
   EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(1)).Times(2);
   EXPECT_LOG_CONTAINS_N_TIMES("trace", "accepted 1 new connections", 2,

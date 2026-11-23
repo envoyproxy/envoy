@@ -38,6 +38,7 @@
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/tcp/async_tcp_client_impl.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
+#include "source/common/upstream/cluster_dns_resolver_cache.h"
 #include "source/common/upstream/host_utility.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -92,6 +93,9 @@ protected:
   Server::Configuration::ServerFactoryContext& context_;
   Stats::Store& stats_;
   LazyCreateDnsResolver dns_resolver_fn_;
+  // Lets clusters configured with an identical DNS resolver configuration share a resolver. Owned
+  // here so that the sharing is scoped to this server's clusters and to the main thread.
+  ClusterDnsResolverCache dns_resolver_cache_;
   Quic::QuicStatNames& quic_stat_names_;
   Http::HttpServerPropertiesCacheManager& alternate_protocols_cache_manager_;
 };
@@ -470,19 +474,20 @@ protected:
     ClusterInitializationObject(const ThreadLocalClusterUpdateParams& params,
                                 ClusterInfoConstSharedPtr cluster_info,
                                 LoadBalancerFactorySharedPtr load_balancer_factory,
-                                HostLookupMapConstSharedPtr map, UnitFloat drop_overload,
-                                absl::string_view drop_category);
+                                HostSetFactory host_set_factory, HostLookupMapConstSharedPtr map,
+                                UnitFloat drop_overload, absl::string_view drop_category);
 
     ClusterInitializationObject(
         const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>&
             per_priority_state,
         const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
-        LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupMapConstSharedPtr map,
-        UnitFloat drop_overload, absl::string_view drop_category);
+        LoadBalancerFactorySharedPtr load_balancer_factory, HostSetFactory host_set_factory,
+        HostLookupMapConstSharedPtr map, UnitFloat drop_overload, absl::string_view drop_category);
 
     absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority> per_priority_state_;
     const ClusterInfoConstSharedPtr cluster_info_;
     const LoadBalancerFactorySharedPtr load_balancer_factory_;
+    const HostSetFactory host_set_factory_;
     const HostLookupMapConstSharedPtr cross_priority_host_map_;
     UnitFloat drop_overload_{0};
     const std::string drop_category_;
@@ -615,8 +620,9 @@ private:
 
     class ClusterEntry : public ThreadLocalCluster {
     public:
+      // `host_set_factory` is the main-thread cluster's, so worker host sets have its type.
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
-                   const LoadBalancerFactorySharedPtr& lb_factory);
+                   const LoadBalancerFactorySharedPtr& lb_factory, HostSetFactory host_set_factory);
       ~ClusterEntry() override;
 
       // Upstream::ThreadLocalCluster
@@ -754,6 +760,7 @@ private:
     struct LocalClusterParams {
       LoadBalancerFactorySharedPtr load_balancer_factory_;
       ClusterInfoConstSharedPtr info_;
+      HostSetFactory host_set_factory_{};
     };
 
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
@@ -839,13 +846,15 @@ private:
 
   struct ClusterData : public ClusterManagerCluster {
     ClusterData(const envoy::config::cluster::v3::Cluster& cluster_config,
-                const uint64_t cluster_config_hash, const std::string& version_info,
-                bool added_via_api, bool required_for_ads, ClusterSharedPtr&& cluster,
-                TimeSource& time_source, const bool avoid_cds_removal = false)
+                const uint64_t cluster_config_hash, const uint64_t serialized_cluster_config_hash,
+                const std::string& version_info, bool added_via_api, bool required_for_ads,
+                ClusterSharedPtr&& cluster, TimeSource& time_source,
+                const bool avoid_cds_removal = false)
         : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
-          version_info_(version_info), cluster_(std::move(cluster)),
-          last_updated_(time_source.systemTime()), added_via_api_(added_via_api),
-          avoid_cds_removal_(avoid_cds_removal), required_for_ads_(required_for_ads) {}
+          serialized_config_hash_(serialized_cluster_config_hash), version_info_(version_info),
+          cluster_(std::move(cluster)), last_updated_(time_source.systemTime()),
+          added_via_api_(added_via_api), avoid_cds_removal_(avoid_cds_removal),
+          required_for_ads_(required_for_ads) {}
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 
@@ -867,6 +876,10 @@ private:
 
     const envoy::config::cluster::v3::Cluster cluster_config_;
     const uint64_t config_hash_;
+    // The hash of the deterministic serialization of the config this cluster was built from, or of
+    // the last update that blockUpdate() blocked. A push of the same bytes matches it without
+    // MessageUtil::hash().
+    uint64_t serialized_config_hash_;
     const std::string version_info_;
     // Don't change the order of cluster_ and thread_aware_lb_ as the thread_aware_lb_ may
     // keep a reference to the cluster_.
@@ -959,6 +972,7 @@ private:
    */
   absl::StatusOr<ClusterDataPtr> loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                              const uint64_t cluster_hash,
+                                             const uint64_t serialized_cluster_hash,
                                              const std::string& version_info, bool added_via_api,
                                              bool required_for_ads, ClusterMap& cluster_map,
                                              bool avoid_cds_removal = false);
@@ -996,8 +1010,8 @@ private:
    */
   ClusterInitializationObjectConstSharedPtr addOrUpdateClusterInitializationObjectIfSupported(
       const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-      LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupMapConstSharedPtr map,
-      UnitFloat drop_overload, absl::string_view drop_category);
+      LoadBalancerFactorySharedPtr load_balancer_factory, HostSetFactory host_set_factory,
+      HostLookupMapConstSharedPtr map, UnitFloat drop_overload, absl::string_view drop_category);
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
 

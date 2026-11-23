@@ -1,3 +1,7 @@
+#include "source/common/common/base64.h"
+#include "source/common/common/hash.h"
+#include "source/common/protobuf/utility.h"
+
 #include "test/common/upstream/cluster_manager_impl_test_common.h"
 #include "test/mocks/upstream/cds_api.h"
 #include "test/mocks/upstream/cluster_real_priority_set.h"
@@ -685,6 +689,112 @@ TEST_P(ClusterManagerLifecycleTest, ShutdownWithWarming) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
+// An update that only serializes an Any payload differently should not change the cluster.
+TEST_P(ClusterManagerLifecycleTest, UpdateWithReserializedAnyIsNoop) {
+  create(defaultConfig());
+
+  auto cluster = defaultStaticCluster("fake_cluster");
+  // The same struct with its two fields serialized in two orders.
+  Protobuf::Any& any = (*cluster.mutable_metadata()->mutable_typed_filter_metadata())["foo"];
+  any.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster1, initialize(_));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster, "version1"));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+
+  any.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  EXPECT_FALSE(*cluster_manager_->addOrUpdateCluster(cluster, "version2"));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+
+  // The cluster keeps the new bytes, so that the next push of them skips MessageUtil::hash().
+  cluster1->initialize_callback_();
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)),
+            cluster_manager_->activeClusterSerializedConfigHash("fake_cluster"));
+
+  // An active cluster blocks the update the same way.
+  any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+  EXPECT_FALSE(*cluster_manager_->addOrUpdateCluster(cluster, "version3"));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)),
+            cluster_manager_->activeClusterSerializedConfigHash("fake_cluster"));
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
+// An active cluster keeps the bytes it was built from, blocks a re-encoded update and keeps that
+// update's bytes, rejects a rejected update again when it is resent, still applies a changed
+// update, and matches its stored bytes before MessageUtil::hash().
+TEST_P(ClusterManagerLifecycleTest, UpdateActiveWithReserializedAnyIsNoop) {
+  create(defaultConfig());
+
+  auto cluster = defaultStaticCluster("fake_cluster");
+  // The same struct with its two fields serialized in two orders.
+  Protobuf::Any& any = (*cluster.mutable_metadata()->mutable_typed_filter_metadata())["foo"];
+  any.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster1, initialize(_));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster, "version1"));
+  cluster1->initialize_callback_();
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)),
+            cluster_manager_->activeClusterSerializedConfigHash("fake_cluster"));
+
+  any.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  EXPECT_FALSE(*cluster_manager_->addOrUpdateCluster(cluster, "version2"));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)),
+            cluster_manager_->activeClusterSerializedConfigHash("fake_cluster"));
+
+  // A rejected update is rejected again when it is resent. Returning a null cluster from the
+  // factory is converted to an error status by the test factory.
+  auto rejected_cluster = cluster;
+  rejected_cluster.mutable_per_connection_buffer_limit_bytes()->set_value(54321);
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+      .Times(2)
+      .WillRepeatedly(Return(std::make_pair(ClusterSharedPtr(), nullptr)));
+  EXPECT_THAT(cluster_manager_->addOrUpdateCluster(rejected_cluster, "version3"),
+              StatusHelpers::HasStatusMessage("Failed to create cluster from proto"));
+  EXPECT_THAT(cluster_manager_->addOrUpdateCluster(rejected_cluster, "version3"),
+              StatusHelpers::HasStatusMessage("Failed to create cluster from proto"));
+  // A rejected update still counts as modified, since the stat moves before the cluster loads.
+  checkStats(1 /*added*/, 2 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+
+  cluster.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
+  std::shared_ptr<MockClusterMockPrioritySet> cluster2(new NiceMock<MockClusterMockPrioritySet>());
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+      .WillOnce(Return(std::make_pair(cluster2, nullptr)));
+  EXPECT_CALL(*cluster2, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster2, initialize(_)).WillOnce([](std::function<void()> initialize_callback) {
+    initialize_callback();
+  });
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster, "version4"));
+  checkStats(1 /*added*/, 3 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)),
+            cluster_manager_->activeClusterSerializedConfigHash("fake_cluster"));
+
+  // A push whose bytes match the stored hash is blocked without MessageUtil::hash(), which would
+  // find this config changed. The test sets the stored hash by hand, which no push does.
+  cluster.mutable_per_connection_buffer_limit_bytes()->set_value(23456);
+  cluster_manager_->setActiveClusterSerializedConfigHash(
+      "fake_cluster", HashUtil::xxHash64(MessageUtil::serializeDeterministically(cluster)));
+  EXPECT_FALSE(*cluster_manager_->addOrUpdateCluster(cluster, "version5"));
+  checkStats(1 /*added*/, 3 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
+}
+
 TEST_P(ClusterManagerLifecycleTest, DynamicAddRemove) {
   create(defaultConfig());
 
@@ -727,10 +837,10 @@ TEST_P(ClusterManagerLifecycleTest, DynamicAddRemove) {
       .WillOnce(Return(std::make_pair(cluster2, nullptr)));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize(_))
-      .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+      .WillOnce([cluster1](std::function<void()> initialize_callback) {
         // Test inline init.
         initialize_callback();
-      }));
+      });
   EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_, _));
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(update_cluster, ""));
 
@@ -811,10 +921,10 @@ TEST_P(ClusterManagerLifecycleTest, ClusterAddOrUpdateCallbackRemovalDuringItera
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
   EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_, _))
-      .WillOnce(Invoke([&cb](absl::string_view, ThreadLocalClusterCommand&) {
+      .WillOnce([&cb](absl::string_view, ThreadLocalClusterCommand&) {
         // This call will remove the callback from the list.
         cb.reset();
-      }));
+      });
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
@@ -836,10 +946,10 @@ TEST_P(ClusterManagerLifecycleTest, ClusterAddOrUpdateCallbackRemovalDuringItera
       .WillOnce(Return(std::make_pair(cluster2, nullptr)));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize(_))
-      .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+      .WillOnce([cluster1](std::function<void()> initialize_callback) {
         // Test inline init.
         initialize_callback();
-      }));
+      });
   // There shouldn't be a call to onClusterAddOrUpdate on the callbacks as the
   // handler was removed.
   EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_, _)).Times(0);
@@ -956,10 +1066,10 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsOnHealthFailure) {
     EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
     EXPECT_CALL(outlier_detector, addChangedStateCb(_));
     EXPECT_CALL(*cluster1, initialize(_))
-        .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+        .WillOnce([cluster1](std::function<void()> initialize_callback) {
           // Test inline init.
           initialize_callback();
-        }));
+        });
     create(parseBootstrapFromV3Json(json));
 
     EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(cp1));
@@ -1031,10 +1141,10 @@ TEST_P(ClusterManagerLifecycleTest,
   EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(outlier_detector, addChangedStateCb(_));
   EXPECT_CALL(*cluster1, initialize(_))
-      .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+      .WillOnce([cluster1](std::function<void()> initialize_callback) {
         // Test inline init.
         initialize_callback();
-      }));
+      });
   create(parseBootstrapFromV3Json(json));
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(cp1));
@@ -1083,10 +1193,10 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsAndDeletePoolOnHealthFai
   EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(outlier_detector, addChangedStateCb(_));
   EXPECT_CALL(*cluster1, initialize(_))
-      .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+      .WillOnce([cluster1](std::function<void()> initialize_callback) {
         // Test inline init.
         initialize_callback();
-      }));
+      });
   create(parseBootstrapFromV3Json(json));
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(cp1));
@@ -1098,7 +1208,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsAndDeletePoolOnHealthFai
 
   EXPECT_CALL(*cp1,
               drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections))
-      .WillOnce(Invoke([&]() { cp1->idle_cb_(); }));
+      .WillOnce([&]() { cp1->idle_cb_(); });
   test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
 
@@ -1132,10 +1242,10 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionPoolsOnHealthFailure) {
     EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
     EXPECT_CALL(outlier_detector, addChangedStateCb(_));
     EXPECT_CALL(*cluster1, initialize(_))
-        .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+        .WillOnce([cluster1](std::function<void()> initialize_callback) {
           // Test inline init.
           initialize_callback();
-        }));
+        });
     create(parseBootstrapFromV3Json(json));
 
     EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(cp1));
@@ -1208,10 +1318,10 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionsOnHealthFailure) {
     EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
     EXPECT_CALL(outlier_detector, addChangedStateCb(_));
     EXPECT_CALL(*cluster1, initialize(_))
-        .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+        .WillOnce([cluster1](std::function<void()> initialize_callback) {
           // Test inline init.
           initialize_callback();
-        }));
+        });
     create(parseBootstrapFromV3Yaml(yaml));
 
     EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
@@ -1285,10 +1395,10 @@ TEST_P(ClusterManagerLifecycleTest, DoNotCloseTcpConnectionsOnHealthFailure) {
   EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(outlier_detector, addChangedStateCb(_));
   EXPECT_CALL(*cluster1, initialize(_))
-      .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+      .WillOnce([cluster1](std::function<void()> initialize_callback) {
         // Test inline init.
         initialize_callback();
-      }));
+      });
   create(parseBootstrapFromV3Yaml(yaml));
 
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
@@ -1861,15 +1971,15 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveDefaultPriority) {
 
   // Immediate drain, since this can happen with the HTTP codecs.
   EXPECT_CALL(*cp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
-      .WillOnce(Invoke([&]() {
+      .WillOnce([&]() {
         cp->idle_cb_();
         cp->idle_cb_ = nullptr;
-      }));
+      });
   EXPECT_CALL(*tcp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
-      .WillOnce(Invoke([&]() {
+      .WillOnce([&]() {
         tcp->idle_cb_();
         tcp->idle_cb_ = nullptr;
-      }));
+      });
 
   // Remove the first host, this should lead to the cp being drained, without
   // crash.
@@ -1967,8 +2077,8 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolDestroyWithDraining) {
                TestUtility::makeDnsResponse({}));
 
   // The drained callback might get called when the CP is being destroyed.
-  EXPECT_CALL(*mock_cp, onDestroy()).WillOnce(Invoke(drained_cb));
-  EXPECT_CALL(*mock_tcp, onDestroy()).WillOnce(Invoke(tcp_drained_cb));
+  EXPECT_CALL(*mock_cp, onDestroy()).WillOnce(drained_cb);
+  EXPECT_CALL(*mock_tcp, onDestroy()).WillOnce(tcp_drained_cb);
   factory_.tls_.shutdownThread();
 }
 
@@ -1979,48 +2089,47 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolDestroyWithDraining) {
 TEST_P(ClusterManagerLifecycleTest, MergedUpdates) {
   // Ensure we see the right set of added/removed hosts on every call.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
-      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed) -> void {
+      .WillOnce([](uint32_t priority, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) -> void {
         // 1st add of the 2 static localhost endpoints.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(2, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
-      }))
-      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed) -> void {
+      })
+      .WillOnce([](uint32_t priority, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) -> void {
         // 1st removal.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(0, hosts_added.size());
         EXPECT_EQ(1, hosts_removed.size());
-      }))
-      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed) -> void {
+      })
+      .WillOnce([](uint32_t priority, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) -> void {
         // Triggered by the 2 HC updates, it's a merged update so no added/removed
         // hosts.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(0, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
-      }))
-      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed) -> void {
+      })
+      .WillOnce([](uint32_t priority, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) -> void {
         // 1st removed host added back.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(1, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
-      }))
-      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed) -> void {
+      })
+      .WillOnce([](uint32_t priority, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) -> void {
         // 1st removed host removed again, plus the 3 HC/weight/metadata updates that were
         // waiting for delivery.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(0, hosts_added.size());
         EXPECT_EQ(1, hosts_removed.size());
-      }));
+      });
 
-  EXPECT_CALL(local_hosts_removed_, post(_))
-      .Times(2)
-      .WillRepeatedly(
-          Invoke([](const auto& hosts_removed) { EXPECT_EQ(1, hosts_removed.size()); }));
+  EXPECT_CALL(local_hosts_removed_, post(_)).Times(2).WillRepeatedly([](const auto& hosts_removed) {
+    EXPECT_EQ(1, hosts_removed.size());
+  });
 
   createWithLocalClusterUpdate();
 
@@ -2123,20 +2232,20 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdates) {
 TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindow) {
   // Ensure we see the right set of added/removed hosts on every call.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
-      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed) -> void {
+      .WillOnce([](uint32_t priority, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) -> void {
         // 2 static host endpoints on Bootstrap's cluster.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(2, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
-      }))
-      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed) -> void {
+      })
+      .WillOnce([](uint32_t priority, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) -> void {
         // HC update, immediately delivered.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(0, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
-      }));
+      });
 
   createWithLocalClusterUpdate();
 
@@ -2165,12 +2274,12 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindow) {
 // Tests that mergeable updates inside of a window are not applied immediately.
 TEST_P(ClusterManagerLifecycleTest, MergedUpdatesInsideWindow) {
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
-      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed) -> void {
+      .WillOnce([](uint32_t priority, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) -> void {
         EXPECT_EQ(0, priority);
         EXPECT_EQ(2, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
-      }));
+      });
 
   createWithLocalClusterUpdate();
 
@@ -2202,20 +2311,20 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesInsideWindow) {
 TEST_P(ClusterManagerLifecycleTest, MergedUpdatesOutOfWindowDisabled) {
   // Ensure we see the right set of added/removed hosts on every call.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
-      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed) -> void {
+      .WillOnce([](uint32_t priority, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) -> void {
         // 2 static host endpoints on Bootstrap's cluster.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(2, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
-      }))
-      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed) -> void {
+      })
+      .WillOnce([](uint32_t priority, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) -> void {
         // HC update, immediately delivered.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(0, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
-      }));
+      });
 
   createWithLocalClusterUpdate(false);
 
@@ -2243,32 +2352,32 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesDestroyedOnUpdate) {
   // Ensure we see the right set of added/removed hosts on every call, for the
   // dynamically added/updated cluster.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
-      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed) -> void {
+      .WillOnce([](uint32_t priority, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) -> void {
         // 1st add, which adds 2 localhost static hosts at ports 11001 and 11002.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(2, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
-      }))
-      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed) -> void {
+      })
+      .WillOnce([](uint32_t priority, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) -> void {
         // 2nd add, when the dynamic `new_cluster` is added with static host 127.0.0.1:12001.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(1, hosts_added.size());
         EXPECT_EQ(0, hosts_removed.size());
-      }))
-      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed) -> void {
+      })
+      .WillOnce([](uint32_t priority, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) -> void {
         // 1st removal of the dynamic `new_cluster`.
         EXPECT_EQ(0, priority);
         EXPECT_EQ(0, hosts_added.size());
         EXPECT_EQ(1, hosts_removed.size());
-      }));
+      });
 
-  EXPECT_CALL(local_hosts_removed_, post(_)).WillOnce(Invoke([](const auto& hosts_removed) {
+  EXPECT_CALL(local_hosts_removed_, post(_)).WillOnce([](const auto& hosts_removed) {
     // 1st removal of the dynamic `new_cluster`.
     EXPECT_EQ(1, hosts_removed.size());
-  }));
+  });
 
   // We create the default cluster, although for this test we won't use it since
   // we can only update dynamic clusters.
@@ -2600,25 +2709,25 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolsDrainedOnHostSetChange) {
   EXPECT_NE(tcp1, tcp2);
 
   EXPECT_CALL(*cp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
-      .WillOnce(Invoke([&]() {
+      .WillOnce([&]() {
         cp2->idle_cb_();
         cp2->idle_cb_ = nullptr;
-      }));
+      });
   EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
-      .WillOnce(Invoke([&]() {
+      .WillOnce([&]() {
         cp1->idle_cb_();
         cp1->idle_cb_ = nullptr;
-      }));
+      });
   EXPECT_CALL(*tcp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
-      .WillOnce(Invoke([&]() {
+      .WillOnce([&]() {
         tcp1->idle_cb_();
         tcp1->idle_cb_ = nullptr;
-      }));
+      });
   EXPECT_CALL(*tcp2, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
-      .WillOnce(Invoke([&]() {
+      .WillOnce([&]() {
         tcp2->idle_cb_();
         tcp2->idle_cb_ = nullptr;
-      }));
+      });
 
   HostVector hosts_removed;
   hosts_removed.push_back(host2);
@@ -2644,15 +2753,15 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolsDrainedOnHostSetChange) {
   hosts_added.push_back(host3);
 
   EXPECT_CALL(*cp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
-      .WillOnce(Invoke([&]() {
+      .WillOnce([&]() {
         cp1->idle_cb_();
         cp1->idle_cb_ = nullptr;
-      }));
+      });
   EXPECT_CALL(*tcp1, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete))
-      .WillOnce(Invoke([&]() {
+      .WillOnce([&]() {
         tcp1->idle_cb_();
         tcp1->idle_cb_ = nullptr;
-      }));
+      });
 
   // Adding host3 should drain connection pool for host1.
   cluster.prioritySet().updateHosts(
