@@ -13,7 +13,6 @@ x-envoy-build-base: &envoy-build-base
   - DOCKER_COMMAND
   - ENVOY_DOCKER_SOURCE_DIR=${ENVOY_DOCKER_SOURCE_DIR:-/source}
   - ENVOY_DOCKER_BUILD_DIR="${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}"
-  - ENVOY_OCI_DIR
 
   # Proxy settings
   - HTTP_PROXY
@@ -65,9 +64,7 @@ x-envoy-build-base: &envoy-build-base
   - ENVOY_GEN_COMPDB_OPTIONS
 
   # Publishing and artifacts
-  - ENVOY_DOCKER_SAVE_IMAGE
   - ENVOY_PUBLISH_DRY_RUN
-  - ENVOY_TARBALL_DIR
   - DOCS_BUILD_RELEASE
   - BUILD_DOCS_TAG
   - BUILD_DOCS_SHA

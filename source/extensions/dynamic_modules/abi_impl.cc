@@ -522,8 +522,34 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_file_watcher_a
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle, false,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds, false,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(envoy_dynamic_module_type_bootstrap_config_snapshot_result,
+          envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new,
+          envoy_dynamic_module_type_bootstrap_config_snapshot_result_Unavailable,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+          const envoy_dynamic_module_type_module_buffer*, size_t,
+          envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize, false,
+          envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr,
+          envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn, void*)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete,
+               envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle, false,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications, false,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr, bool)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update, false,
+          envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers, false,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr, uint64_t)
@@ -541,6 +567,38 @@ WEAK_STUB(envoy_dynamic_module_type_bootstrap_cluster_writer_update_result,
 WEAK_STUB(envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result,
           envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove,
           envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_NotAllowed,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer, false,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
+
+WEAK_STUB(envoy_dynamic_module_type_bootstrap_listener_writer_update_result,
+          envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update,
+          envoy_dynamic_module_type_bootstrap_listener_writer_update_result_NotAllowed,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_module_buffer, uint64_t*)
+
+WEAK_STUB(envoy_dynamic_module_type_bootstrap_listener_writer_removal_result,
+          envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove,
+          envoy_dynamic_module_type_bootstrap_listener_writer_removal_result_NotAllowed,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer,
+          false, envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
+
+WEAK_STUB(
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result,
+    envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update,
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed,
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, uint64_t*)
+
+WEAK_STUB(envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result,
+          envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove,
+          envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotAllowed,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 
@@ -1377,6 +1435,56 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_has_upstream_host, 
 
 WEAK_STUB(uint64_t, envoy_dynamic_module_callback_network_filter_get_upstream_connection_id, 0,
           envoy_dynamic_module_type_network_filter_envoy_ptr)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_upstream_host, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+          uint32_t)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_upstream_cluster, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_upstream_local_address, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, uint32_t)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason,
+          false, envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type,
+          false, envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_detected_close_type)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_upstream_request_attempt_count,
+          false, envoy_dynamic_module_type_network_filter_envoy_ptr, uint32_t)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_record_upstream_timing, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_upstream_timing_event)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr, uint64_t, uint64_t)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr, uint64_t, uint64_t)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_set_response_flag, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_response_flag)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_add_custom_flag, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_flush_access_log, false,
+          envoy_dynamic_module_type_network_filter_envoy_ptr,
+          envoy_dynamic_module_type_access_log_type)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport,
           false, envoy_dynamic_module_type_network_filter_envoy_ptr)
@@ -2887,6 +2995,27 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_metadata_list_bool, false
           envoy_dynamic_module_type_http_filter_envoy_ptr,
           envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
           envoy_dynamic_module_type_module_buffer, size_t, bool*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_metadata_nested_string, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr,
+          envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
+          const envoy_dynamic_module_type_module_metadata_path_component*, size_t,
+          envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_metadata_nested_number, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr,
+          envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
+          const envoy_dynamic_module_type_module_metadata_path_component*, size_t, double*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_metadata_nested_bool, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr,
+          envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
+          const envoy_dynamic_module_type_module_metadata_path_component*, size_t, bool*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_metadata_nested_list_size, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr,
+          envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
+          const envoy_dynamic_module_type_module_metadata_path_component*, size_t, size_t*)
 
 // DNS resolver callbacks.
 WEAK_STUB_VOID(envoy_dynamic_module_callback_dns_resolve_complete,

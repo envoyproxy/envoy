@@ -451,6 +451,9 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   sendXdsResponse(filter_name_, "1", 1);
   test_server_->waitForCounter(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_fail", Ge(1));
+  // The config failure completes warming, but the listener only starts listening once the
+  // workers add it, so wait for that before connecting.
+  test_server_->waitUntilListenersReady();
   // The missing config filter will be installed and close the connection when a correction is
   // created.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));

@@ -66,13 +66,23 @@ test_program(name = "bootstrap_file_watcher_test")
 
 test_program(name = "bootstrap_admin_handler_test")
 
+test_program(name = "bootstrap_ecds_test")
+
 test_program(name = "bootstrap_cluster_lifecycle_test")
 
 test_program(name = "bootstrap_cluster_writer_test")
 
 test_program(name = "bootstrap_config_names_test")
 
+test_program(name = "bootstrap_config_snapshot_test")
+
 test_program(name = "bootstrap_listener_lifecycle_test")
+
+test_program(name = "bootstrap_runtime_update_test")
+
+test_program(name = "bootstrap_writer_test")
+
+test_program(name = "bootstrap_xds_test")
 
 test_program(name = "network_integration_test")
 

@@ -20,7 +20,4 @@ strum_macros = "0.26"
 [dev-dependencies]
 mockall = "0.15.0"
 
-[build-dependencies]
-bindgen = "0.73.2"
-
 [lib]

@@ -210,6 +210,9 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
     if (fni->Action == FILE_ACTION_MODIFIED) {
       events |= Events::Modified;
     }
+    if (fni->Action == FILE_ACTION_ADDED) {
+      events |= Events::Created;
+    }
 
     constexpr absl::string_view data{"a"};
     // Protect watches_ access with ReaderMutexLock

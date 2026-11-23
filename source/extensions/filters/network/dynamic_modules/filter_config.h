@@ -1,5 +1,10 @@
 #pragma once
 
+#include <chrono>
+#include <optional>
+
+#include "envoy/access_log/access_log.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/overload/load_shed_point.h"
 #include "envoy/stats/scope.h"
@@ -112,6 +117,16 @@ public:
   // The provider of the load shed points that the module can check. It is empty when the factory
   // context of the filter bypasses the overload manager.
   const OptRef<Server::LoadShedPointProvider> load_shed_point_provider_;
+
+  // The access logs that the filters flush against the connection's stream info. The factory sets
+  // them before the configuration is shared with the workers.
+  AccessLog::InstanceSharedPtrVector access_logs_;
+  // When set, the filters also flush a ``TcpPeriodic`` access log at this interval.
+  std::optional<std::chrono::milliseconds> access_log_flush_interval_;
+  // Whether the filters flush a ``TcpConnectionStart`` access log on a new connection.
+  bool flush_access_log_on_start_ = false;
+  // Generates the stream ID that the filters give a connection. The factory always sets it.
+  OptRef<Random::RandomGenerator> random_generator_;
 
   // ----------------------------- Metrics Support -----------------------------
   // The shared registry holding all module-defined metrics.

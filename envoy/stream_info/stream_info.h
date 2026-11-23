@@ -287,6 +287,10 @@ struct LocalCloseReasonValues {
   const std::string TriggeredDelayedCloseTimeout = "triggered_delayed_close_timeout";
   const std::string TcpProxyInitializationFailure = "tcp_initializion_failure:";
   const std::string TcpProxyDrainClose = "tcp_proxy_drain_close";
+  // Downstream half-closed with no data while tcp_proxy had not yet established (and will not
+  // establish) an upstream connection, e.g. ON_DOWNSTREAM_DATA with an empty FIN.
+  const std::string TcpProxyDownstreamClosedWithoutData =
+      "tcp_proxy_downstream_closed_without_data";
   const std::string TcpSessionIdleTimeout = "tcp_session_idle_timeout";
   const std::string MaxConnectionDurationReached = "max_connection_duration_reached";
   const std::string ClosingUpstreamTcpDueToDownstreamRemoteClose =

@@ -17,6 +17,8 @@ public:
   MOCK_METHOD(void, onListenerAddOrUpdate,
               (absl::string_view listener_name, const Network::ListenerConfig& listener_config));
   MOCK_METHOD(void, onListenerRemoval, (const std::string& listener_name));
+  MOCK_METHOD(void, onListenerListenFailure, (absl::string_view listener_name, bool removed));
+  MOCK_METHOD(void, onFilterChainAddOrUpdate, (absl::string_view filter_chain_name));
 };
 } // namespace Server
 } // namespace Envoy

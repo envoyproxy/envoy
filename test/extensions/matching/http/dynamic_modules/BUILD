@@ -19,6 +19,12 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:matcher_string_input_echo",
     ],
     extension_names = ["envoy.matching.inputs.dynamic_module_string_data_input"],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/matching/http/dynamic_modules:string_data_input_lib",
         "//test/extensions/dynamic_modules:util",

@@ -2,11 +2,11 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
-#include "test/tools/router_check/router.h"
-#include "test/tools/router_check/validation.pb.h"
 
 #include "absl/strings/str_join.h"
 #include "gtest/gtest.h"
+#include "tools/router_check/router.h"
+#include "tools/router_check/validation.pb.h"
 
 namespace Envoy {
 namespace {

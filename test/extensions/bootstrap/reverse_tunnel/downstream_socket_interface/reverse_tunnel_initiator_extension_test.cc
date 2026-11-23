@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <memory>
 
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
@@ -5,16 +6,24 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/network/connection_socket_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
 #include "test/common/formatter/command_extension.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/mocks.h"
+#include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -36,8 +45,10 @@ using testing::HasSubstr;
 using testing::IsSupersetOf;
 using testing::Key;
 using testing::NiceMock;
+using testing::Pair;
 using testing::Return;
 using testing::ReturnRef;
+using testing::SaveArg;
 using testing::UnorderedElementsAre;
 
 namespace Envoy {
@@ -106,6 +117,29 @@ protected:
   // Helper to inject a mock access log into the extension (friend access).
   void addAccessLog(AccessLog::InstanceSharedPtr log) {
     extension_->access_logs_.push_back(std::move(log));
+  }
+
+  static os_fd_t createTestSocket() {
+    const os_fd_t fd =
+        Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, 0).return_value_;
+    EXPECT_TRUE(SOCKET_VALID(fd));
+    return fd;
+  }
+
+  std::unique_ptr<ReverseConnectionIOHandle>
+  createTestIOHandle(const ReverseConnectionSocketConfig& config) {
+    return std::make_unique<ReverseConnectionIOHandle>(createTestSocket(), config, cluster_manager_,
+                                                       extension_.get(), *stats_scope_);
+  }
+
+  // Mirrors ReverseConnectionIOHandle::accept(): the tunnel handle registers itself with the
+  // worker registry on construction and unregisters on destruction.
+  static std::unique_ptr<DownstreamReverseConnectionIOHandle>
+  createTunnelHandle(ReverseConnectionIOHandle& parent, const std::string& key) {
+    auto socket = std::make_unique<Network::ConnectionSocketImpl>(
+        std::make_unique<Network::IoSocketHandleImpl>(createTestSocket()), nullptr, nullptr);
+    return std::make_unique<DownstreamReverseConnectionIOHandle>(std::move(socket), &parent, key,
+                                                                 /*connection_id=*/1);
   }
 
   void TearDown() override {
@@ -986,6 +1020,269 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogErrorFieldAlwaysPresent
 
   extension_->emitAccessLog(time_system, "handshake_success", "node1", "cluster1", "tenant1",
                             "upstream", "10.0.0.1:443", "conn-1", "worker_0", "1", "");
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, IndexParsesWorkerDispatcherName) {
+  Stats::IsolatedStoreImpl store;
+  auto scope = store.createScope("idx.");
+  NiceMock<Event::MockDispatcher> worker0{"worker_0"};
+  NiceMock<Event::MockDispatcher> worker1{"worker_1"};
+  NiceMock<Event::MockDispatcher> worker42{"worker_42"};
+  NiceMock<Event::MockDispatcher> main{"main_thread"};
+  NiceMock<Event::MockDispatcher> non_numeric{"worker_abc"};
+  NiceMock<Event::MockDispatcher> empty_suffix{"worker_"};
+  NiceMock<Event::MockDispatcher> not_prefixed{"notworker_0"};
+
+  auto expect_index = [](std::optional<size_t> got, size_t want) {
+    ASSERT_TRUE(got.has_value());
+    EXPECT_EQ(*got, want);
+  };
+
+  expect_index(DownstreamSocketThreadLocal(worker0, *scope).index(), 0);
+  expect_index(DownstreamSocketThreadLocal(worker1, *scope).index(), 1);
+  expect_index(DownstreamSocketThreadLocal(worker42, *scope).index(), 42);
+
+  EXPECT_EQ(DownstreamSocketThreadLocal(main, *scope).index(), std::nullopt);
+  EXPECT_EQ(DownstreamSocketThreadLocal(non_numeric, *scope).index(), std::nullopt);
+  EXPECT_EQ(DownstreamSocketThreadLocal(empty_suffix, *scope).index(), std::nullopt);
+  EXPECT_EQ(DownstreamSocketThreadLocal(not_prefixed, *scope).index(), std::nullopt);
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, ActiveTunnelsCountsTunnelHandles) {
+  setupThreadLocalSlot();
+  auto* registry = extension_->getLocalRegistry();
+  ASSERT_NE(registry, nullptr);
+
+  ReverseConnectionSocketConfig config_a;
+  config_a.src_cluster_id = "cluster-a";
+  config_a.src_node_id = "node-a";
+  auto parent_a = createTestIOHandle(config_a);
+
+  ReverseConnectionSocketConfig config_b;
+  config_b.src_cluster_id = "cluster-b";
+  config_b.src_node_id = "node-b";
+  config_b.src_tenant_id = "tenant-b";
+  auto parent_b = createTestIOHandle(config_b);
+
+  // A listener handle with no accepted tunnels is not reported.
+  absl::flat_hash_map<std::string, size_t> empty;
+  registry->activeTunnels(empty);
+  EXPECT_TRUE(empty.empty());
+
+  auto tunnel_a1 = createTunnelHandle(*parent_a, "a1");
+  auto tunnel_a2 = createTunnelHandle(*parent_a, "a2");
+  auto tunnel_b1 = createTunnelHandle(*parent_b, "b1");
+
+  absl::flat_hash_map<std::string, size_t> map;
+  registry->activeTunnels(map);
+  EXPECT_THAT(map, UnorderedElementsAre(Pair("node-a:cluster-a:", 2),
+                                        Pair("node-b:cluster-b:tenant-b", 1)));
+
+  tunnel_a1.reset();
+  tunnel_b1.reset();
+  absl::flat_hash_map<std::string, size_t> after_close;
+  registry->activeTunnels(after_close);
+  EXPECT_THAT(after_close, UnorderedElementsAre(Pair("node-a:cluster-a:", 1)));
+}
+
+// Stopping the listener resets its file events, but accepted tunnels stay open and must still be
+// reported until they close.
+TEST_F(ReverseTunnelInitiatorExtensionTest, ActiveTunnelsSurviveListenerResetFileEvents) {
+  setupThreadLocalSlot();
+  auto* registry = extension_->getLocalRegistry();
+  ASSERT_NE(registry, nullptr);
+
+  ReverseConnectionSocketConfig config;
+  config.src_cluster_id = "cluster-a";
+  config.src_node_id = "node-a";
+  auto parent = createTestIOHandle(config);
+  auto tunnel = createTunnelHandle(*parent, "a1");
+
+  parent->resetFileEvents();
+
+  absl::flat_hash_map<std::string, size_t> map;
+  registry->activeTunnels(map);
+  EXPECT_THAT(map, UnorderedElementsAre(Pair("node-a:cluster-a:", 1)));
+
+  tunnel.reset();
+  absl::flat_hash_map<std::string, size_t> after_close;
+  registry->activeTunnels(after_close);
+  EXPECT_TRUE(after_close.empty());
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, ActiveTunnelsSkipsNonWorkerAndUninitializedSlots) {
+  setupThreadLocalSlot();
+  const size_t slot_index = thread_local_.data_.size() - 1;
+
+  absl::InlinedVector<absl::flat_hash_map<std::string, size_t>, 3> active_tunnels(1);
+  bool callback_ran = false;
+  auto callback = [&callback_ran] { callback_ran = true; };
+
+  NiceMock<Event::MockDispatcher> main_dispatcher{"main_thread"};
+  thread_local_.data_[slot_index] =
+      std::make_shared<DownstreamSocketThreadLocal>(main_dispatcher, *stats_scope_);
+  extension_->activeTunnels(callback, active_tunnels);
+  EXPECT_TRUE(callback_ran);
+  EXPECT_TRUE(active_tunnels[0].empty());
+
+  callback_ran = false;
+  thread_local_.data_[slot_index].reset();
+  extension_->activeTunnels(callback, active_tunnels);
+  EXPECT_TRUE(callback_ran);
+  EXPECT_TRUE(active_tunnels[0].empty());
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, ResultsReadyMergesAndStreamsPerWorkerMaps) {
+  NiceMock<Server::MockAdminStream> admin_stream;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  ON_CALL(admin_stream, getDecoderFilterCallbacks()).WillByDefault(ReturnRef(decoder_callbacks));
+
+  auto attached = std::make_shared<AttachedTunnelsRequest>(&admin_stream, 2);
+  attached->active_tunnels[0]["node:cluster:"] = 2;
+  attached->active_tunnels[0]["node:cluster:tenant"] = 1;
+  attached->active_tunnels[1]["node:cluster:"] = 3;
+  attached->active_tunnels[1]["other:cluster2:"] = 5;
+
+  std::string streamed;
+  EXPECT_CALL(decoder_callbacks, encodeData(_, true))
+      .WillOnce(Invoke([&streamed](Buffer::Instance& data, bool) { streamed = data.toString(); }));
+
+  attached->resultsReady();
+
+  EXPECT_THAT(streamed, HasSubstr("node:cluster:: 5"));
+  EXPECT_THAT(streamed, HasSubstr("node:cluster:tenant: 1"));
+  EXPECT_THAT(streamed, HasSubstr("other:cluster2:: 5"));
+  EXPECT_EQ(std::count(streamed.begin(), streamed.end(), '\n'), 3);
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, ResultsReadyStreamsEmptyBodyWhenNoTunnels) {
+  NiceMock<Server::MockAdminStream> admin_stream;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  ON_CALL(admin_stream, getDecoderFilterCallbacks()).WillByDefault(ReturnRef(decoder_callbacks));
+
+  auto attached = std::make_shared<AttachedTunnelsRequest>(&admin_stream, 1);
+
+  Buffer::OwnedImpl captured;
+  EXPECT_CALL(decoder_callbacks, encodeData(_, true))
+      .WillOnce(Invoke([&captured](Buffer::Instance& data, bool) { captured.move(data); }));
+
+  attached->resultsReady();
+  EXPECT_EQ(captured.length(), 0);
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, ResultsReadyNoOpsWhenStreamDestroyed) {
+  NiceMock<Server::MockAdminStream> admin_stream;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  ON_CALL(admin_stream, getDecoderFilterCallbacks()).WillByDefault(ReturnRef(decoder_callbacks));
+
+  auto attached = std::make_shared<AttachedTunnelsRequest>(&admin_stream, 1);
+  attached->active_tunnels[0]["node:cluster:"] = 7;
+  attached->admin_stream = nullptr;
+
+  EXPECT_CALL(decoder_callbacks, encodeData(_, _)).Times(0);
+  attached->resultsReady();
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, TunnelsHandlerGathersAndStreamsResult) {
+  setupThreadLocalSlot();
+
+  ReverseConnectionSocketConfig config;
+  config.src_cluster_id = "cluster-a";
+  config.src_node_id = "node-a";
+  auto parent = createTestIOHandle(config);
+  auto tunnel = createTunnelHandle(*parent, "a1");
+
+  NiceMock<Server::MockAdminStream> admin_stream;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  ON_CALL(admin_stream, getDecoderFilterCallbacks()).WillByDefault(ReturnRef(decoder_callbacks));
+
+  EXPECT_CALL(admin_stream, setEndStreamOnComplete(false));
+  std::function<void()> destroy_cb;
+  EXPECT_CALL(admin_stream, addOnDestroyCallback(_)).WillOnce(SaveArg<0>(&destroy_cb));
+
+  std::string streamed;
+  EXPECT_CALL(decoder_callbacks, encodeData(_, true))
+      .WillOnce(Invoke([&streamed](Buffer::Instance& data, bool) { streamed = data.toString(); }));
+
+  EXPECT_CALL(thread_local_, runOnAllThreads(_, _))
+      .WillOnce(Invoke(&thread_local_, &ThreadLocal::MockInstance::runOnAllThreads2));
+
+  Http::TestResponseHeaderMapImpl headers;
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(extension_->tunnelsHandler(headers, response, admin_stream), Http::Code::OK);
+  EXPECT_TRUE(response.toString().empty());
+  EXPECT_EQ(headers.getContentTypeValue(), "text/plain");
+
+  EXPECT_EQ(streamed, "node-a:cluster-a:: 1\n");
+
+  ASSERT_NE(destroy_cb, nullptr);
+  destroy_cb();
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, TunnelsHandlerSkipsWriteOnClientDisconnect) {
+  setupThreadLocalSlot();
+
+  ReverseConnectionSocketConfig config;
+  config.src_cluster_id = "cluster-a";
+  config.src_node_id = "node-a";
+  auto parent = createTestIOHandle(config);
+  auto tunnel = createTunnelHandle(*parent, "a1");
+
+  NiceMock<Server::MockAdminStream> admin_stream;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  ON_CALL(admin_stream, getDecoderFilterCallbacks()).WillByDefault(ReturnRef(decoder_callbacks));
+
+  EXPECT_CALL(admin_stream, setEndStreamOnComplete(false));
+  std::function<void()> destroy_cb;
+  EXPECT_CALL(admin_stream, addOnDestroyCallback(_)).WillOnce(SaveArg<0>(&destroy_cb));
+
+  EXPECT_CALL(decoder_callbacks, encodeData(_, _)).Times(0);
+  EXPECT_CALL(thread_local_, runOnAllThreads(_, _))
+      .WillOnce(
+          Invoke([&destroy_cb](std::function<void()> worker_cb, std::function<void()> complete_cb) {
+            worker_cb();
+            destroy_cb();
+            complete_cb();
+          }));
+
+  Http::TestResponseHeaderMapImpl headers;
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(extension_->tunnelsHandler(headers, response, admin_stream), Http::Code::OK);
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, TunnelsHandlerRejectsZeroConcurrency) {
+  context_.options_.concurrency_ = 0;
+
+  NiceMock<Server::MockAdminStream> admin_stream;
+  EXPECT_CALL(admin_stream, setEndStreamOnComplete(_)).Times(0);
+  EXPECT_CALL(admin_stream, addOnDestroyCallback(_)).Times(0);
+
+  Http::TestResponseHeaderMapImpl headers;
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(extension_->tunnelsHandler(headers, response, admin_stream),
+            Http::Code::ServiceUnavailable);
+  EXPECT_THAT(response.toString(), HasSubstr("concurrency is zero"));
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, OnServerInitializedRegistersTunnelsHandler) {
+  ON_CALL(server_, admin()).WillByDefault(Return(OptRef<Server::Admin>{server_.admin_}));
+
+  Server::Admin::HandlerCb captured;
+  EXPECT_CALL(server_.admin_, addHandler("/reverse_tunnel/tunnels", _, _, true, false, _))
+      .WillOnce([&captured](const std::string&, const std::string&, Server::Admin::HandlerCb cb,
+                            bool, bool, const Server::Admin::ParamDescriptorVec&) {
+        captured = std::move(cb);
+        return true;
+      });
+
+  extension_->onServerInitialized(server_);
+  ASSERT_NE(captured, nullptr);
+
+  NiceMock<Server::MockAdminStream> admin_stream;
+  Http::TestResponseHeaderMapImpl headers;
+  Buffer::OwnedImpl response;
+  context_.options_.concurrency_ = 0;
+  EXPECT_EQ(captured(headers, response, admin_stream), Http::Code::ServiceUnavailable);
 }
 
 // Verifies that a provider-backed handshake formatter (%FILE_CONTENT%) resolves to the file
