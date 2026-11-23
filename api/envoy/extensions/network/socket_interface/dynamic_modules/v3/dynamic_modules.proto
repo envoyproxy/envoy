@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package envoy.extensions.network.socket_interface.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.network.socket_interface.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/network/socket_interface/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Modules Socket Interface]
+// [#extension: envoy.extensions.network.socket_interface.dynamic_modules]
+
+// Configuration for a socket interface implemented by a dynamic module. See
+// :ref:`Dynamic Modules <arch_overview_dynamic_modules>`.
+//
+// The interface is selected only as the bootstrap's
+// :ref:`default_socket_interface <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.default_socket_interface>`,
+// so the module is asked for every socket of every listener and cluster except the admin
+// listener's, including health checks and Envoy gRPC xDS. For each socket the module creates the
+// socket itself or leaves it to the standard socket interface. Exactly one bootstrap extension of
+// this type can be configured, and the interface is supported on POSIX platforms only. A socket
+// whose I/O the module performs, or whose connections it hands over, requires hot restart to be
+// disabled.
+//
+// .. code-block:: yaml
+//
+//   bootstrap_extensions:
+//   - name: envoy.extensions.network.socket_interface.dynamic_modules
+//     typed_config:
+//       "@type": type.googleapis.com/envoy.extensions.network.socket_interface.dynamic_modules.v3.DynamicModuleSocketInterface
+//       dynamic_module_config:
+//         name: my_module
+//       socket_interface_name: my_socket_interface
+//   default_socket_interface: envoy.extensions.network.socket_interface.dynamic_modules
+message DynamicModuleSocketInterface {
+  // Specifies the shared-object level configuration. This field is required.
+  //
+  // Only the ``name`` and ``module.local.filename`` sources are supported. Remote module sources
+  // are rejected, since the interface is created before the cluster manager that would fetch them.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name identifying the socket interface implementation within the module. This is passed to
+  // the module's socket interface init function so that a module can host multiple
+  // implementations. This field is required.
+  string socket_interface_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  // The configuration for the implementation chosen by ``socket_interface_name``. If not
+  // specified, an empty configuration is passed to the module.
+  //
+  // ``google.protobuf.Struct`` and the ``value`` field of ``xds.type.v3.TypedStruct`` are
+  // serialized as JSON before passing them to the module.
+  // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly without
+  // the wrapper. Otherwise the serialized bytes of the configured message are passed.
+  google.protobuf.Any socket_interface_config = 3;
+}

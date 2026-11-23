@@ -2,12 +2,15 @@ load("@rules_cc//cc:defs.bzl", "cc_library", "cc_shared_library")
 load("//source/extensions/dynamic_modules:dynamic_modules.bzl", "envoy_dynamic_module_prefix_symbols")
 
 # This declares a cc_library target that is used to build a shared library.
-# name + ".c" is the source file that is compiled to create the shared library.
-def test_program(name):
+# name + ".c" is the source file that is compiled to create the shared library, unless src names
+# another one, which copts can then build differently.
+def test_program(name, src = None, copts = []):
     _name = "_" + name
+    _src = src or name + ".c"
     cc_library(
         name = _name,
-        srcs = [name + ".c"],
+        srcs = [_src],
+        copts = copts,
         deps = [
             "//source/extensions/dynamic_modules/abi",
         ],
@@ -59,7 +62,8 @@ def test_program(name):
     _static_lib_name = "_" + name + "_static_lib"
     cc_library(
         name = _static_lib_name,
-        srcs = [name + ".c"],
+        srcs = [_src],
+        copts = copts,
         deps = [
             "//source/extensions/dynamic_modules/abi:abi",
         ],

@@ -2639,6 +2639,10 @@ WEAK_STUB(ResourceMonitorConfigSchedulerReportFailure,
           envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_failure(nullptr))
 WEAK_STUB(ResourceMonitorConfigSchedulerDelete,
           envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete(nullptr))
+WEAK_STUB(SocketInterfaceIoReady,
+          envoy_dynamic_module_callback_socket_interface_io_ready(nullptr, 0))
+WEAK_STUB(SocketInterfaceIoReadyDelete,
+          envoy_dynamic_module_callback_socket_interface_io_ready_delete(nullptr))
 
 } // namespace
 } // namespace DynamicModules
