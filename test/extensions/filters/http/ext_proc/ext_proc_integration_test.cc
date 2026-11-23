@@ -5503,11 +5503,16 @@ TEST_P(ExtProcIntegrationTest, RequestTimeoutWhileWaitingForGracefulClose) {
   // was reset and reset the side stream in this case.
   codec_client_->sendReset(*request_encoder_);
 
+  // Wait for filter teardown to half-close the side stream and arm its timers. The downstream
+  // reset counter is incremented before teardown and does not guarantee that the timers exist.
+  test_server_->waitForCounter("http.config_test.ext_proc.streams_closed", Ge(1));
+  ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+
   // Without any activity side stream should hit per try timeout and try to send error response,
   // but since the stream is waiting for graceful close, it will get reset.
-  test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset", Ge(1));
   // 2s reaches the side stream's configured per-try deadline, before the 60s remote-close timer.
   simTime().advanceTimeWait(2s);
+  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_per_try_timeout", Ge(1));
   EXPECT_TRUE(processor_stream_->waitForReset());
 }
 
