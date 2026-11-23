@@ -495,6 +495,15 @@ TEST_F(ScopedConfigImplTest, PickRoute) {
           {"bar_header", ";val1;NOT_BAZ;val3"},
       }));
   EXPECT_EQ(route_config, nullptr);
+
+  // Null scope key returns nullptr.
+  EXPECT_EQ(scoped_config_impl_->getRouteConfig(nullptr), nullptr);
+
+  // NullScopedConfigImpl returns a NullConfigImpl.
+  NullScopedConfigImpl null_scoped_config;
+  ConfigConstSharedPtr null_route_config = null_scoped_config.getRouteConfig(nullptr);
+  ASSERT_NE(null_route_config, nullptr);
+  EXPECT_EQ(null_route_config->name(), "");
 }
 
 // Test a ScopedConfigImpl returns the correct route Config before and after scope config update.
@@ -547,6 +556,95 @@ TEST_F(ScopedConfigImplTest, Update) {
   // Now delete some non-existent scopes.
   EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScopes(
       {"foo_scope1", "base_scope", "bluh_scope", "xyz_scope"}));
+}
+
+// Verify that ScopedConfigImpl::onConfigUpdate atomically adds new scopes and
+// removes old ones when there is no key overlap.
+TEST_F(ScopedConfigImplTest, AtomicUpdateNonOverlappingScopes) {
+  scoped_key_builder_impl_ = std::make_unique<ScopeKeyBuilderImpl>(std::move(key_builder_config_));
+  scoped_config_impl_ = std::make_unique<ScopedConfigImpl>();
+  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_a_, scope_info_b_});
+
+  auto scope_info_c = makeScopedRouteInfo(R"EOF(
+    name: baz_scope
+    route_configuration_name: baz_route
+    key:
+      fragments:
+        - string_key: baz
+        - string_key: qux
+)EOF");
+
+  // Simultaneously add baz_scope and remove bar_scope (scope_info_b_).
+  scoped_config_impl_->onConfigUpdate({scope_info_c}, {"bar_scope"});
+
+  auto key_a = scoped_key_builder_impl_->computeScopeKey(TestRequestHeaderMapImpl{
+      {"foo_header", "bar=foo"},
+      {"bar_header", ";;bar"},
+  });
+  auto key_b = scoped_key_builder_impl_->computeScopeKey(TestRequestHeaderMapImpl{
+      {"foo_header", "bar=bar"},
+      {"bar_header", ";;baz"},
+  });
+  auto key_c = scoped_key_builder_impl_->computeScopeKey(TestRequestHeaderMapImpl{
+      {"foo_header", "bar=baz"},
+      {"bar_header", ";;qux"},
+  });
+
+  EXPECT_EQ(scoped_config_impl_->getRouteConfig(key_a), scope_info_a_->routeConfig());
+  EXPECT_EQ(scoped_config_impl_->getRouteConfig(key_b), nullptr);
+  EXPECT_EQ(scoped_config_impl_->getRouteConfig(key_c), scope_info_c->routeConfig());
+}
+
+// Verify that ScopedConfigImpl::onConfigUpdate correctly handles replacing a
+// scope when the removed scope and the newly added scope share the exact same
+// ScopeKey. Because removals are processed before additions, the new scope's
+// key mapping must survive.
+TEST_F(ScopedConfigImplTest, AtomicScopeReplacement) {
+  scoped_key_builder_impl_ = std::make_unique<ScopeKeyBuilderImpl>(std::move(key_builder_config_));
+  scoped_config_impl_ = std::make_unique<ScopedConfigImpl>();
+  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_a_, scope_info_b_});
+
+  // Create a replacement for foo_scope with a different scope name
+  // ("foo_scope_new") and different route ("foo_route_new"), but the exact same
+  // ScopeKey (foo, bar).
+  auto scope_info_a_replacement = makeScopedRouteInfo(R"EOF(
+    name: foo_scope_new
+    route_configuration_name: foo_route_new
+    key:
+      fragments:
+        - string_key: foo
+        - string_key: bar
+)EOF");
+
+  // Atomically remove "foo_scope" and add "foo_scope_new".
+  scoped_config_impl_->onConfigUpdate({scope_info_a_replacement}, {"foo_scope"});
+
+  auto key_a = scoped_key_builder_impl_->computeScopeKey(TestRequestHeaderMapImpl{
+      {"foo_header", "bar=foo"},
+      {"bar_header", ";;bar"},
+  });
+  auto key_b = scoped_key_builder_impl_->computeScopeKey(TestRequestHeaderMapImpl{
+      {"foo_header", "bar=bar"},
+      {"bar_header", ";;baz"},
+  });
+
+  // Key (foo, bar) must now resolve to the new route configuration, not nullptr
+  // or the old one.
+  EXPECT_EQ(scoped_config_impl_->getRouteConfig(key_a), scope_info_a_replacement->routeConfig());
+  // Unrelated scope_info_b_ must remain untouched.
+  EXPECT_EQ(scoped_config_impl_->getRouteConfig(key_b), scope_info_b_->routeConfig());
+
+  // Updating an existing scope in-place via onConfigUpdate also succeeds.
+  auto scope_info_a_replacement_v2 = makeScopedRouteInfo(R"EOF(
+    name: foo_scope_new
+    route_configuration_name: foo_route_new_v2
+    key:
+      fragments:
+        - string_key: foo
+        - string_key: bar
+)EOF");
+  scoped_config_impl_->onConfigUpdate({scope_info_a_replacement_v2}, {});
+  EXPECT_EQ(scoped_config_impl_->getRouteConfig(key_a), scope_info_a_replacement_v2->routeConfig());
 }
 
 } // namespace
