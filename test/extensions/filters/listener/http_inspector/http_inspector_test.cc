@@ -468,9 +468,7 @@ TEST_P(HttpInspectorTest, LdapBindWithSpaceLengthAndBinaryBody) {
   testHttpInspectNotFound(header);
 }
 
-TEST_P(HttpInspectorTest, TabMethodSeparator) {
-  testHttpInspectNotFound("GET\t/ HTTP/1.1\r\n");
-}
+TEST_P(HttpInspectorTest, TabMethodSeparator) { testHttpInspectNotFound("GET\t/ HTTP/1.1\r\n"); }
 
 TEST_P(HttpInspectorTest, FormFeedMethodSeparator) {
   testHttpInspectNotFound("GET\f/ HTTP/1.1\r\n");
@@ -497,6 +495,16 @@ TEST_P(HttpInspectorTest, FastFailGuardDisabled) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.http_inspector_fast_fail_invalid_method_bytes", "false"}});
   const absl::string_view header("\x4a\x52\x4d\x49\x00\x02\x4b\n", 8);
+  testHttpInspectMultipleReadsNotFound(header);
+}
+
+TEST_P(HttpInspectorTest, FastFailNonSpWhitespaceGuardDisabled) {
+  if (parser_impl_ != Http1ParserImpl::BalsaParser) {
+    return;
+  }
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.http_inspector_fast_fail_non_sp_whitespace", "false"}});
+  const absl::string_view header("\x30\x0c\x02\x01\x01\x60\x07\x02\x01\x03\x04\x00\x80\x00\n", 15);
   testHttpInspectMultipleReadsNotFound(header);
 }
 
