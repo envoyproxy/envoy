@@ -303,7 +303,7 @@
     "https://bcr.bazel.build/modules/jsoncpp/1.9.6.bcr.2/MODULE.bazel": "64f508885f907ac2518039b3d0c5c1703a8f6137d9f5d635067ba93d33c2670a",
     "https://bcr.bazel.build/modules/jsoncpp/1.9.6.bcr.2/source.json": "13199fa0a267ca46814e9e6ab313a71890c8f1822e57376fdc23a2d2cd384051",
     "https://bcr.bazel.build/modules/jsoncpp/1.9.6/MODULE.bazel": "2f8d20d3b7d54143213c4dfc3d98225c42de7d666011528dc8fe91591e2e17b0",
-    "https://bcr.bazel.build/modules/kafka/3.9.2.envoy/MODULE.bazel": "not found",
+    "https://bcr.bazel.build/modules/kafka/4.4.0.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/libbpf/1.7.0.envoy.1/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/libcircllhist/0.3.2.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/libevent/2.2.2-alpha.envoy/MODULE.bazel": "not found",
@@ -825,8 +825,7 @@
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d72a2528f930f8cdcd3b0f04e30b258e169bd91f/modules/icu/78.2.envoy/source.json": "b6233eecf893f48f303597ca4b46959638de5237828df860bf51f58664540567",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d72a2528f930f8cdcd3b0f04e30b258e169bd91f/modules/ipp-crypto/2.2.0.envoy/MODULE.bazel": "4aae1eb5b5e974ddd3e2e86b0259f4e3b4d9e346d8044065a9cd82c4b09e5803",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d72a2528f930f8cdcd3b0f04e30b258e169bd91f/modules/ipp-crypto/2.2.0.envoy/source.json": "a815528d2e6d2eb0a1dbc4cf80f3505ad4bcd717bd69e9fd6bf4d48b8e73af30",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d72a2528f930f8cdcd3b0f04e30b258e169bd91f/modules/kafka/3.9.2.envoy/MODULE.bazel": "6073e3999d462408a541d0d2a997685f24023a4d574b84fa91c06a1ecf447ccc",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d72a2528f930f8cdcd3b0f04e30b258e169bd91f/modules/kafka/3.9.2.envoy/source.json": "df37e7c4a0c424b81b1e312590987f8c300487d1b3562d3e4a54b93f927a03b7",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d72a2528f930f8cdcd3b0f04e30b258e169bd91f/modules/kafka/4.4.0.envoy/MODULE.bazel": "not found",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d72a2528f930f8cdcd3b0f04e30b258e169bd91f/modules/libbpf/1.7.0.envoy.1/MODULE.bazel": "b16b52b98ef5f2da83f2b669080cdce1d486ba84f5dad3520853b74e155525fb",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d72a2528f930f8cdcd3b0f04e30b258e169bd91f/modules/libbpf/1.7.0.envoy.1/source.json": "415d90063415c5e80beed5d94dc074df6ff26f0b7c8bf8c452c55c698855d8ba",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d72a2528f930f8cdcd3b0f04e30b258e169bd91f/modules/libcircllhist/0.3.2.envoy/MODULE.bazel": "093e50ec67a5615229453870c477310985f6feaf282d6a2dbb4ed7059be0085d",
@@ -908,7 +907,10 @@
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d72a2528f930f8cdcd3b0f04e30b258e169bd91f/modules/wasmtime/49.0.5.envoy/MODULE.bazel": "4b2651d0d3572a030ba49d40b8b6a5dca84326b3edf3e5942b0efa0dae06fc19",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d72a2528f930f8cdcd3b0f04e30b258e169bd91f/modules/wasmtime/49.0.5.envoy/source.json": "34f59a98f6b565dc39c444dbca425199c8f926d68b13c1774670b4fb78c6039a",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d72a2528f930f8cdcd3b0f04e30b258e169bd91f/modules/wuffs/0.4.0-alpha.9.envoy/MODULE.bazel": "e46699ee4851ddd18a50012b34c662f2390f014394cb17b8e07337cbc4033eb2",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d72a2528f930f8cdcd3b0f04e30b258e169bd91f/modules/wuffs/0.4.0-alpha.9.envoy/source.json": "b215401a4bd5bb7c4af8b37940209e955e905cd41f3beaffffb00424eec8afcc"
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d72a2528f930f8cdcd3b0f04e30b258e169bd91f/modules/wuffs/0.4.0-alpha.9.envoy/source.json": "b215401a4bd5bb7c4af8b37940209e955e905cd41f3beaffffb00424eec8afcc",
+    "https://raw.githubusercontent.com/phlax/bazel-registry/37fa41023beb078ef604994255ad16c9ed4e8d0b/bazel_registry.json": "51bd3a0b193753e419c5d3db38e92fbcb9f7f97fd992ef2e24a0addd7274b37a",
+    "https://raw.githubusercontent.com/phlax/bazel-registry/37fa41023beb078ef604994255ad16c9ed4e8d0b/modules/kafka/4.4.0.envoy/MODULE.bazel": "685320b27dcac95162cd6fb78fa00b823601b8390ab7d305ec9da42ed68d4ba1",
+    "https://raw.githubusercontent.com/phlax/bazel-registry/37fa41023beb078ef604994255ad16c9ed4e8d0b/modules/kafka/4.4.0.envoy/source.json": "05edf1e01e96ee3ebbf99d81a33cdd95757660291279313b469afb02c67fac58"
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {
