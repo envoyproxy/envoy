@@ -129,6 +129,7 @@ go_test(
     name = "go_sdk_scheduler_test",
     srcs = ["//source/extensions/dynamic_modules:sdk/go/internal/scheduler/scheduler_test.go"],
     embed = ["//source/extensions/dynamic_modules:go_sdk_internal_scheduler"],
+    tags = ["nocoverage"],
 )
 
 rust_test(
