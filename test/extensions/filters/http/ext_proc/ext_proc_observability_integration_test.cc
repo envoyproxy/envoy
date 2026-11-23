@@ -536,8 +536,10 @@ TEST_P(ExtProcIntegrationTest, InvalidServerOnResponseInObservabilityMode) {
 
   auto response = sendDownstreamRequestWithBody("Replace this!", std::nullopt);
   handleUpstreamRequest();
-  EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
-                                                         std::chrono::milliseconds(25000)));
+  // Wait until response processing is complete before checking that the valid ext_proc
+  // server was not used. No fixed observation window is needed after stream completion.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(grpc_upstreams_[0]->assertPendingConnectionsEmpty());
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS));
 }
 

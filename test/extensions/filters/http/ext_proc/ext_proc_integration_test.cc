@@ -417,10 +417,10 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithInvalidServer) {
   initializeConfig(config_option);
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(std::nullopt);
-  // Failure is expected when it is connecting to invalid gRPC server. Therefore, default timeout
-  // is not used here.
-  EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
-                                                         std::chrono::milliseconds(25000)));
+  // The error response confirms that the invalid-server failure has been handled, so there
+  // is no need to wait for a connection to the unused, valid ext_proc server.
+  verifyDownstreamResponse(*response, 500);
+  EXPECT_TRUE(grpc_upstreams_[0]->assertPendingConnectionsEmpty());
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithInvalidServerOnResponse) {
@@ -436,8 +436,9 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithInvalidServerOnResponse) {
   auto response = sendDownstreamRequestWithBody("Replace this!", std::nullopt);
 
   handleUpstreamRequest();
-  EXPECT_FALSE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_,
-                                                         std::chrono::milliseconds(25000)));
+  // Wait for the invalid-server failure before checking that the valid server was not used.
+  verifyDownstreamResponse(*response, 500);
+  EXPECT_TRUE(grpc_upstreams_[0]->assertPendingConnectionsEmpty());
 }
 
 // Test the filter using the default configuration by connecting to
@@ -1296,9 +1297,10 @@ TEST_P(ExtProcIntegrationTest, MismatchedContentLengthAndBodyLength) {
         body_mut->set_body(modified_body);
         return true;
       });
-  EXPECT_FALSE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
-                                                         std::chrono::milliseconds(25000)));
   verifyDownstreamResponse(*response, 500);
+  // Rejection is complete. Check connection attempts directly instead of waiting for an
+  // upstream connection that should never arrive.
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 0);
 }
 
 // Test the filter using the default configuration by connecting to
