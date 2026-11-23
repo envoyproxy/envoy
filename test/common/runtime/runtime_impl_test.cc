@@ -1015,13 +1015,18 @@ TEST(ExtensibleRuntimeTest, DefaultFallbackWithoutProvider) {
   EXPECT_TRUE(
       ExtensibleRuntime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
 
-  EXPECT_FALSE(ExtensibleRuntime::runtimeFeatureEnabled(
+  EXPECT_FALSE(ExtensibleRuntime::connectionRuntimeFeatureEnabled(
       "envoy.reloadable_features.test_feature_false", stream_info));
-  EXPECT_TRUE(ExtensibleRuntime::runtimeFeatureEnabled(
+  EXPECT_TRUE(ExtensibleRuntime::connectionRuntimeFeatureEnabled(
+      "envoy.reloadable_features.test_feature_true", stream_info));
+
+  EXPECT_FALSE(ExtensibleRuntime::requestRuntimeFeatureEnabled(
+      "envoy.reloadable_features.test_feature_false", stream_info));
+  EXPECT_TRUE(ExtensibleRuntime::requestRuntimeFeatureEnabled(
       "envoy.reloadable_features.test_feature_true", stream_info));
 }
 
-TEST(ExtensibleRuntimeTest, DelegatesToRegisteredProvider) {
+TEST(ExtensibleRuntimeTest, EvaluatesWithRegisteredProvider) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   auto provider = std::make_unique<NiceMock<ExtensibleRuntime::MockProvider>>();
   ExtensibleRuntime::MockProvider* provider_ptr = provider.get();
@@ -1032,10 +1037,16 @@ TEST(ExtensibleRuntimeTest, DelegatesToRegisteredProvider) {
   EXPECT_TRUE(
       ExtensibleRuntime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
-  EXPECT_CALL(*provider_ptr, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true",
-                                                   Ref(stream_info)))
+  EXPECT_CALL(*provider_ptr, connectionRuntimeFeatureEnabled(
+                                 "envoy.reloadable_features.test_feature_false", Ref(stream_info)))
+      .WillOnce(Return(true));
+  EXPECT_TRUE(ExtensibleRuntime::connectionRuntimeFeatureEnabled(
+      "envoy.reloadable_features.test_feature_false", stream_info));
+
+  EXPECT_CALL(*provider_ptr, requestRuntimeFeatureEnabled(
+                                 "envoy.reloadable_features.test_feature_true", Ref(stream_info)))
       .WillOnce(Return(false));
-  EXPECT_FALSE(ExtensibleRuntime::runtimeFeatureEnabled(
+  EXPECT_FALSE(ExtensibleRuntime::requestRuntimeFeatureEnabled(
       "envoy.reloadable_features.test_feature_true", stream_info));
 }
 

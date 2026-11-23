@@ -102,7 +102,10 @@ public:
   ~MockProvider() override;
 
   MOCK_METHOD(bool, runtimeFeatureEnabled, (absl::string_view feature), (const, override));
-  MOCK_METHOD(bool, runtimeFeatureEnabled,
+  MOCK_METHOD(bool, connectionRuntimeFeatureEnabled,
+              (absl::string_view feature, const StreamInfo::StreamInfo& stream_info),
+              (const, override));
+  MOCK_METHOD(bool, requestRuntimeFeatureEnabled,
               (absl::string_view feature, const StreamInfo::StreamInfo& stream_info),
               (const, override));
 };

@@ -17,10 +17,20 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
   return Runtime::runtimeFeatureEnabled(feature);
 }
 
-bool runtimeFeatureEnabled(absl::string_view feature, const StreamInfo::StreamInfo& stream_info) {
+bool connectionRuntimeFeatureEnabled(absl::string_view feature,
+                                     const StreamInfo::StreamInfo& stream_info) {
   Provider* provider = ProviderSingleton::getExisting();
   if (provider != nullptr) {
-    return provider->runtimeFeatureEnabled(feature, stream_info);
+    return provider->connectionRuntimeFeatureEnabled(feature, stream_info);
+  }
+  return Runtime::runtimeFeatureEnabled(feature);
+}
+
+bool requestRuntimeFeatureEnabled(absl::string_view feature,
+                                  const StreamInfo::StreamInfo& stream_info) {
+  Provider* provider = ProviderSingleton::getExisting();
+  if (provider != nullptr) {
+    return provider->requestRuntimeFeatureEnabled(feature, stream_info);
   }
   return Runtime::runtimeFeatureEnabled(feature);
 }

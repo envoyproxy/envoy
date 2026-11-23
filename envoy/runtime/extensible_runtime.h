@@ -20,27 +20,37 @@ namespace ExtensibleRuntime {
  *
  * Replaces Envoy's built-in process-wide boolean flag lookup, allowing runtime guards to be
  * evaluated by a custom backend (for example, an external feature management or experimentation
- * system) and to incorporate connection or stream context when available.
+ * system) and to incorporate connection or request context when available.
  */
 class Provider {
 public:
   virtual ~Provider() = default;
 
   /**
-   * Evaluate whether a runtime feature is enabled.
+   * Evaluate whether a runtime feature is enabled without connection or request context.
    * @param feature the runtime feature name.
    * @return bool true if the feature is enabled.
    */
   virtual bool runtimeFeatureEnabled(absl::string_view feature) const PURE;
 
   /**
-   * Evaluate whether a runtime feature is enabled given connection or stream context.
+   * Evaluate whether a connection-level runtime feature is enabled.
    * @param feature the runtime feature name.
-   * @param stream_info connection or stream StreamInfo providing evaluation context.
+   * @param stream_info StreamInfo providing connection-level context.
    * @return bool true if the feature is enabled.
    */
-  virtual bool runtimeFeatureEnabled(absl::string_view feature,
-                                     const StreamInfo::StreamInfo& stream_info) const PURE;
+  virtual bool
+  connectionRuntimeFeatureEnabled(absl::string_view feature,
+                                  const StreamInfo::StreamInfo& stream_info) const PURE;
+
+  /**
+   * Evaluate whether a request-level runtime feature is enabled.
+   * @param feature the runtime feature name.
+   * @param stream_info StreamInfo providing request- and connection-level context.
+   * @return bool true if the feature is enabled.
+   */
+  virtual bool requestRuntimeFeatureEnabled(absl::string_view feature,
+                                            const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using ProviderPtr = std::unique_ptr<Provider>;

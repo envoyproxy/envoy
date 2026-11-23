@@ -156,12 +156,17 @@ To use extensible runtime:
       class MyProvider : public ExtensibleRuntime::Provider {
       public:
         bool runtimeFeatureEnabled(absl::string_view feature) const override {
-          // Evaluate feature without connection or stream context.
+          // Evaluate a feature without connection or request context.
         }
 
-        bool runtimeFeatureEnabled(absl::string_view feature,
-                                   const StreamInfo::StreamInfo& stream_info) const override {
-          // Evaluate feature using connection or stream context from stream_info.
+        bool connectionRuntimeFeatureEnabled(
+            absl::string_view feature, const StreamInfo::StreamInfo& stream_info) const override {
+          // Evaluate a connection-level feature using connection context from stream_info.
+        }
+
+        bool requestRuntimeFeatureEnabled(
+            absl::string_view feature, const StreamInfo::StreamInfo& stream_info) const override {
+          // Evaluate a request-level feature using request or connection context from stream_info.
         }
       };
 
@@ -196,18 +201,29 @@ To use extensible runtime:
 
    .. code-block:: cpp
 
-      // Without connection or stream context:
+      // Without connection or request context:
       if (ExtensibleRuntime::runtimeFeatureEnabled("envoy.reloadable_features.my_feature")) {
         // ...
       }
 
-      // With connection or stream context:
-      if (ExtensibleRuntime::runtimeFeatureEnabled("envoy.reloadable_features.my_feature",
-                                                   stream_info)) {
+      // Connection-level feature:
+      if (ExtensibleRuntime::connectionRuntimeFeatureEnabled(
+              "envoy.reloadable_features.my_conn_feature", connection.streamInfo())) {
+        // ...
+      }
+
+      // Request-level feature:
+      if (ExtensibleRuntime::requestRuntimeFeatureEnabled(
+              "envoy.reloadable_features.my_req_feature", stream_info)) {
         // ...
       }
 
    When :ref:`extensible_runtime
    <envoy_v3_api_field_config.bootstrap.v3.LayeredRuntime.extensible_runtime>` is configured, these
-   calls delegate to the configured ``ExtensibleRuntime::Provider``; when unset, they fall back to
-   ``Runtime::runtimeFeatureEnabled(feature)``.
+   functions evaluate flags through the configured ``ExtensibleRuntime::Provider``; when unset, they
+   fall back to ``Runtime::runtimeFeatureEnabled(feature)``.
+
+   Because a provider's state can change during a connection or request, repeated calls with the
+   same ``StreamInfo`` are not guaranteed to return the same value. As with
+   ``Runtime::runtimeFeatureEnabled``, callers that need the same value across multiple calls should
+   evaluate the feature once and store the result.
