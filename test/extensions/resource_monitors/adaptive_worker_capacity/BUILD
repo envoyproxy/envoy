@@ -12,6 +12,7 @@ envoy_cc_test(
     name = "dynamic_token_bucket_test",
     srcs = ["dynamic_token_bucket_test.cc"],
     deps = [
+        "//envoy/common:time_interface",
         "//source/extensions/resource_monitors/adaptive_worker_capacity:dynamic_token_bucket_lib",
         "//test/test_common:simulated_time_system_lib",
         "@abseil-cpp//absl/time",
