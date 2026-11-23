@@ -329,7 +329,8 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
   const absl::flat_hash_set<std::string> effective_resources =
       effectiveResources(resources, options);
   auto added_removed = sub->second->watch_map_.updateWatchInterest(watch, effective_resources);
-  if (xds_config_tracker_.has_value() && !added_removed.removed_.empty()) {
+  if (xds_config_tracker_.has_value() && !added_removed.removed_.empty() &&
+      xds_config_tracker_->enabled()) {
     for (absl::string_view resource : added_removed.removed_) {
       xds_config_tracker_->onResourceUnsubscribed(type_url, resource);
     }
@@ -354,7 +355,8 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
   auto added_removed = sub->second->watch_map_.updateWatchInterest(
       watch, effectiveResources(resources_to_add, options),
       effectiveResources(resources_to_remove, options));
-  if (xds_config_tracker_.has_value() && !added_removed.removed_.empty()) {
+  if (xds_config_tracker_.has_value() && !added_removed.removed_.empty() &&
+      xds_config_tracker_->enabled()) {
     for (absl::string_view resource : added_removed.removed_) {
       xds_config_tracker_->onResourceUnsubscribed(type_url, resource);
     }

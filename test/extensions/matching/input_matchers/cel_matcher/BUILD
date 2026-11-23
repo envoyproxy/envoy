@@ -22,7 +22,17 @@ envoy_extension_cc_test(
     name = "cel_matcher_test",
     srcs = ["cel_matcher_test.cc"],
     extension_names = ["envoy.matching.matchers.cel_matcher"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":cel_matcher_test_lib",

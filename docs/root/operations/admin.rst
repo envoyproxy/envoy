@@ -792,6 +792,11 @@ modify different aspects of the server:
   Outputs /stats in `Prometheus <https://prometheus.io/docs/instrumenting/exposition_formats/>`_
   format. This can be used to integrate with a Prometheus server.
 
+  The stats are not sorted by name. Each metric family is emitted as one group with a single
+  ``TYPE`` line, as the exposition format requires, but the order of the families and series can
+  change from one scrape to the next. Set the runtime guard
+  ``envoy.reloadable_features.prometheus_stats_unsorted`` to ``false`` to sort the stats by name.
+
   The output will either be the protobuf format or the v0.0.4 text format, depending on the value
   of the ``Accept`` header. A prometheus scrape configuration specifies the desired protocol:
 

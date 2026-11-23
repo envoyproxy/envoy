@@ -16,6 +16,7 @@ envoy_cc_extension(
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/common:random_generator_interface",
+        "//envoy/http:metadata_interface",
         "//envoy/network:connection_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",

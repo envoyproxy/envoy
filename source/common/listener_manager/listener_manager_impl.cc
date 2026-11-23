@@ -13,12 +13,14 @@
 #include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/cpu_affinity.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/hash.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/utility.h"
 #include "source/common/network/filter_matcher.h"
@@ -737,17 +739,43 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     return false;
   }
 
-  const uint64_t hash = MessageUtil::hash(config);
-  ENVOY_LOG(debug, "begin add/update listener: name={} hash={}", name, hash);
+  // Each check below compares the serialized config first, so MessageUtil::hash() only runs for a
+  // new config or one whose bytes differ from the listener it is compared with.
+  const uint64_t serialized_hash =
+      HashUtil::xxHash64(MessageUtil::serializeDeterministically(config));
+  ENVOY_LOG(debug, "begin add/update listener: name={} serialized_hash={}", name, serialized_hash);
+  std::optional<uint64_t> hash;
+  const auto block_lds_update = [&config, serialized_hash, &hash](ListenerImpl& listener) {
+    if (listener.serializedConfigHash() == serialized_hash) {
+      return true;
+    }
+    if (!hash.has_value()) {
+      hash = MessageUtil::hash(config);
+    }
+    if (!listener.blockLdsUpdate(*hash)) {
+      return false;
+    }
+    // Storing the hash of these bytes lets the next push of the same bytes skip
+    // MessageUtil::hash(). An update that this listener blocks, or that reverts to it, brings new
+    // bytes when the listener is static, or when MessageUtil::hash() finds the config equal
+    // although its bytes differ, for example on a full-proto build when the sender re-encodes an
+    // Any payload with its map entries in another order after a restart or an upgrade. Without
+    // this, every later push of these bytes would pay for both hashes, which costs more than
+    // MessageUtil::hash() alone. A sender that re-encodes on every push pays for both anyway.
+    listener.setSerializedConfigHash(serialized_hash);
+    return true;
+  };
 
   auto existing_active_listener = getListenerByName(active_listeners_, name);
   auto existing_warming_listener = getListenerByName(warming_listeners_, name);
 
   // The listener should be updated back to its original state and the warming listener should be
-  // removed.
+  // removed. A warming listener only exists for an update that the active one did not block, so a
+  // push of the warming listener's own bytes skips this check and its MessageUtil::hash().
   if (existing_warming_listener != warming_listeners_.end() &&
       existing_active_listener != active_listeners_.end() &&
-      (*existing_active_listener)->blockLdsUpdate(hash)) {
+      (*existing_warming_listener)->serializedConfigHash() != serialized_hash &&
+      block_lds_update(**existing_active_listener)) {
     warming_listeners_.erase(existing_warming_listener);
     updateWarmingActiveGauges();
     stats_.listener_modified_.inc();
@@ -757,11 +785,14 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   // Do a quick blocked update check before going further. This check needs to be done against both
   // warming and active.
   if ((existing_warming_listener != warming_listeners_.end() &&
-       (*existing_warming_listener)->blockLdsUpdate(hash)) ||
+       block_lds_update(**existing_warming_listener)) ||
       (existing_active_listener != active_listeners_.end() &&
-       (*existing_active_listener)->blockLdsUpdate(hash))) {
+       block_lds_update(**existing_active_listener))) {
     ENVOY_LOG(debug, "duplicate/locked listener '{}'. no add/update", name);
     return false;
+  }
+  if (!hash.has_value()) {
+    hash = MessageUtil::hash(config);
   }
 
   ListenerImplPtr new_listener = nullptr;
@@ -774,18 +805,18 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   const bool in_place_update = in_place_update_kind != ListenerImpl::InPlaceUpdate::None;
   if (in_place_update) {
     ENVOY_LOG(debug, "use in place update filter chain update path for listener name={} hash={}",
-              name, hash);
+              name, *hash);
     auto listener_or_error =
         (*existing_active_listener)
-            ->newListenerWithFilterChain(config, version_info, workers_started_, hash,
-                                         in_place_update_kind);
+            ->newListenerWithFilterChain(config, version_info, workers_started_, *hash,
+                                         serialized_hash, in_place_update_kind);
     RETURN_IF_NOT_OK_REF(listener_or_error.status());
     new_listener = std::move(*listener_or_error);
     stats_.listener_in_place_updated_.inc();
   } else {
-    ENVOY_LOG(debug, "use full listener update path for listener name={} hash={}", name, hash);
+    ENVOY_LOG(debug, "use full listener update path for listener name={} hash={}", name, *hash);
     auto listener_or_error = ListenerImpl::create(config, version_info, *this, name, added_via_api,
-                                                  workers_started_, hash);
+                                                  workers_started_, *hash, serialized_hash);
     RETURN_IF_NOT_OK_REF(listener_or_error.status());
     new_listener = std::move(*listener_or_error);
   }
@@ -1777,6 +1808,57 @@ void ListenerManagerImpl::notifyListenerListenFailureCallbacks(absl::string_view
                                                                bool removed) {
   notifyListenerCallbacks(
       [&](ListenerUpdateCallbacks* cb) { cb->onListenerListenFailure(listener_name, removed); });
+}
+
+void ListenerManagerImpl::notifyFilterChainUpdateCallbacks(absl::string_view filter_chain_name) {
+  notifyListenerCallbacks(
+      [&](ListenerUpdateCallbacks* cb) { cb->onFilterChainAddOrUpdate(filter_chain_name); });
+}
+
+SINGLETON_MANAGER_REGISTRATION(fcds_shared_filter_chain_manager);
+
+std::shared_ptr<FcdsSharedFilterChainManager> ListenerManagerImpl::fcdsSharedFilterChainManager() {
+  return server_.serverFactoryContext().singletonManager().getTyped<FcdsSharedFilterChainManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(fcds_shared_filter_chain_manager),
+      [this]() -> Singleton::InstanceSharedPtr {
+        return std::make_shared<FcdsSharedFilterChainManager>(server_.serverFactoryContext(),
+                                                              *factory_, *this);
+      });
+}
+
+absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateFilterChain(
+    const envoy::config::listener::v3::FilterChain& filter_chain) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  auto [it, inserted] = local_filter_chains_.try_emplace(filter_chain.name());
+  if (inserted) {
+    absl::StatusOr<FcdsLocalSubscriptionHandleSharedPtr> handle_or_error =
+        fcdsSharedFilterChainManager()->subscribeLocal(filter_chain.name());
+    if (!handle_or_error.ok()) {
+      local_filter_chains_.erase(it);
+      return handle_or_error.status();
+    }
+    it->second = std::move(handle_or_error).value();
+  }
+  // The update can warm listeners, so the copy keeps the handle even if the map changes inside it.
+  const FcdsLocalSubscriptionHandleSharedPtr handle = it->second;
+  absl::StatusOr<bool> updated = handle->update(filter_chain);
+  if (!updated.ok() && inserted) {
+    // A first write that fails keeps nothing.
+    local_filter_chains_.erase(filter_chain.name());
+  }
+  return updated;
+}
+
+bool ListenerManagerImpl::removeFilterChain(absl::string_view name) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  auto node = local_filter_chains_.extract(name);
+  if (node.empty()) {
+    return false;
+  }
+  // The handle keeps the state of the name while the removal readies listeners, and the listeners
+  // that still use the name keep it once the handle goes away.
+  node.mapped()->remove();
+  return true;
 }
 
 REGISTER_FACTORY(DefaultListenerManagerFactoryImpl, ListenerManagerFactory);

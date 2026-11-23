@@ -24,6 +24,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/peak_ewma/load_balancing_policies/source:config",
         "//contrib/peak_ewma/load_balancing_policies/source:peak_ewma_lb_lib",

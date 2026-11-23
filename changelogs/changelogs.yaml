@@ -93,6 +93,8 @@ areas:
     title: decompression
   dns:
     title: dns
+  dns_cluster:
+    title: dns_cluster
   dns_resolver:
     title: dns_resolver
   drain:
@@ -128,6 +130,10 @@ areas:
     title: grpc_field_extraction
   grpc_http1_reverse_bridge:
     title: grpc_http1_reverse_bridge
+  grpc_sidestream:
+    title: grpc_sidestream
+  grpc_web:
+    title: grpc_web
 
   happy_eyeballs:
     title: happy_eyeballs
