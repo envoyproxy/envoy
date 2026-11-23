@@ -48,6 +48,14 @@ the reporter denies the request for private disclosure, the PST will move swiftl
 release process. In extreme cases GitHub can be asked to delete the issue but this generally isn't
 necessary and is unlikely to make a public disclosure less damaging.
 
+### Handling of Easily or Widely Discovered Vulnerabilities
+
+The PST may, at it's discretion, decide that a privately disclosed vulnerability should be immediately
+made public, if it is decided that the vulnerability is likely to be found by others. Some examples
+are if the same issue is reported multiple times, or if the issue appears obvious to the PST and likely
+to quickly be discovered by others. In this case, the vulnerability will be published and handled
+in the same way as a zero day vulnerability.
+
 ## Patch, Release, and Public Communication
 
 For each vulnerability a member of the PST will volunteer to lead coordination with the "Fix Team"
@@ -118,8 +126,6 @@ These steps should be completed within the first 24 hours of disclosure.
 
 ### Fix Development Process
 
-These steps should be completed within the 1-7 days of Disclosure.
-
 - The Fix Lead and the Fix Team will create a
   [CVSS](https://www.first.org/cvss/specification-document) using the [CVSS
   Calculator](https://www.first.org/cvss/calculator/3.0). The Fix Lead makes the final call on the
@@ -143,8 +149,8 @@ holiday periods or end-of-quarter (e.g. impacting downstream Istio releases), wh
 
 ### Fix and disclosure SLOs
 
-* All reports to envoy-security@googlegroups.com will be triaged and have an
-  initial response within 1 business day.
+* All reports to envoy-security@googlegroups.com or https://github.com/envoyproxy/envoy/security/advisories/new
+  will be triaged and have an initial response within 15 business days.
 
 * Privately disclosed issues will be fixed or publicly disclosed within 90 days
   by the Envoy security team. In exceptional circumstances we reserve the right
@@ -225,18 +231,6 @@ List for the purpose of testing and internal vulnerability mitigation. They must
 accept the embargo policy below in order for this to occur. If the vulnerability
 reporter is also responsible for developing fix patches, they may make use of
 the patches internally in their organization at any point in the fix cycle.
-
-### Retrospective
-
-These steps should be completed 1-3 days after the Release Date. The retrospective process
-[should be blameless](https://landing.google.com/sre/book/chapters/postmortem-culture.html).
-
-- The Fix Lead will send a retrospective of the process to envoy-dev@googlegroups.com including
-  details on everyone involved, the timeline of the process, links to relevant PRs that introduced
-  the issue, if relevant, and any critiques of the response and release process.
-- Maintainers and Fix Team are also encouraged to send their own feedback on the process to
-  envoy-dev@googlegroups.com. Honest critique is the only way we are going to get good at this as a
-  community.
 
 ## Private Distributors List
 

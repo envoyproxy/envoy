@@ -462,6 +462,7 @@ envoy_cc_library(
         "//source/common/network:upstream_socket_options_filter_state_lib",
         "//source/common/orca:orca_load_metrics_lib",
         "//source/common/orca:orca_parser",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/upstream:host_utility_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
@@ -540,8 +541,6 @@ envoy_cc_library(
     srcs = ["shadow_writer_impl.cc"],
     hdrs = ["shadow_writer_impl.h"],
     deps = [
-        "//envoy/event:deferred_deletable",
-        "//envoy/event:dispatcher_interface",
         "//envoy/router:router_interface",
         "//envoy/router:shadow_writer_interface",
         "//envoy/upstream:cluster_manager_interface",

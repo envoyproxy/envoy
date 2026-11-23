@@ -26,9 +26,6 @@ static_resources:
                   cluster: cluster_1
               - match: {prefix: "/test/long/url"}
                 route:
-                  rate_limits:
-                  - actions:
-                    - destination_cluster: {}
                   cluster: cluster_1
               - match: {prefix: "/test/"}
                 route: {cluster: cluster_2}

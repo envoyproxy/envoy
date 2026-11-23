@@ -40,6 +40,14 @@ management server<xds_protocol>` using :ref:`ExtensionConfiguration discovery
 service<envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>`.
 The name field in the extension configuration acts as the resource identifier.
 
+Bootstrap dynamic modules
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:ref:`Bootstrap dynamic modules <config_bootstrap_extensions_dynamic_modules_ecds>` can subscribe
+to ECDS. Their ADS and xDS-TP names cannot be shared with another bootstrap module. Filter ECDS
+subscriptions conflict with bootstrap subscriptions only on ADS. The first subscriber keeps
+the name until its subscription ends; later conflicting subscriptions are refused.
+
 Listener filters
 ^^^^^^^^^^^^^^^^
 

@@ -5,6 +5,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/random_generator.h"
+#include "envoy/http/metadata_interface.h"
 #include "envoy/network/connection.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -27,6 +28,8 @@ public:
   static constexpr absl::string_view DEFAULT_REVERSE_TUNNEL_REQUEST_PATH =
       "/reverse_connections/request";
   static constexpr absl::string_view TENANT_SCOPE_DELIMITER = ":";
+  static constexpr absl::string_view DRAIN_METADATA_KEY = "envoy.reverse_tunnel.drain";
+  static constexpr absl::string_view DRAIN_METADATA_VALUE = "true";
 
   // Upgrade token advertised when the handshake is negotiated as an HTTP/1.1 Upgrade.
   // Used by both the initiator (request `Upgrade:` header) and responder (`101` response).
@@ -91,6 +94,13 @@ public:
                             Random::RandomGenerator& random);
 
   static uint64_t diffMs(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end);
+
+  // Creates a single-entry MetadataMapVector carrying the reverse-tunnel drain marker.
+  static Http::MetadataMapVector createDrainMetadata();
+
+  // If `metadata_map` contains the reverse-tunnel drain marker with its expected value, removes
+  // that entry and returns true; otherwise leaves `metadata_map` unchanged and returns false.
+  static bool eraseDrainMetadata(Http::MetadataMap& metadata_map);
 
 private:
   ReverseConnectionUtility() = delete;

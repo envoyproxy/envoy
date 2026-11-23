@@ -583,6 +583,101 @@ typedef enum envoy_dynamic_module_type_socket_direction {
 } envoy_dynamic_module_type_socket_direction;
 
 /**
+ * envoy_dynamic_module_type_access_log_type represents the type of access log event.
+ * This corresponds to envoy::data::accesslog::v3::AccessLogType, except that modules see
+ * TcpConnectionStart as NotSet.
+ */
+typedef enum envoy_dynamic_module_type_access_log_type {
+  envoy_dynamic_module_type_access_log_type_NotSet = 0,
+  envoy_dynamic_module_type_access_log_type_TcpUpstreamConnected = 1,
+  envoy_dynamic_module_type_access_log_type_TcpPeriodic = 2,
+  envoy_dynamic_module_type_access_log_type_TcpConnectionEnd = 3,
+  envoy_dynamic_module_type_access_log_type_DownstreamStart = 4,
+  envoy_dynamic_module_type_access_log_type_DownstreamPeriodic = 5,
+  envoy_dynamic_module_type_access_log_type_DownstreamEnd = 6,
+  envoy_dynamic_module_type_access_log_type_UpstreamPoolReady = 7,
+  envoy_dynamic_module_type_access_log_type_UpstreamPeriodic = 8,
+  envoy_dynamic_module_type_access_log_type_UpstreamEnd = 9,
+  envoy_dynamic_module_type_access_log_type_DownstreamTunnelSuccessfullyEstablished = 10,
+  envoy_dynamic_module_type_access_log_type_UdpTunnelUpstreamConnected = 11,
+  envoy_dynamic_module_type_access_log_type_UdpPeriodic = 12,
+  envoy_dynamic_module_type_access_log_type_UdpSessionEnd = 13,
+} envoy_dynamic_module_type_access_log_type;
+
+/**
+ * envoy_dynamic_module_type_response_flag represents a response flag from StreamInfo.
+ * Values correspond to CoreResponseFlag enum.
+ */
+typedef enum envoy_dynamic_module_type_response_flag {
+  envoy_dynamic_module_type_response_flag_FailedLocalHealthCheck = 0,
+  envoy_dynamic_module_type_response_flag_NoHealthyUpstream = 1,
+  envoy_dynamic_module_type_response_flag_UpstreamRequestTimeout = 2,
+  envoy_dynamic_module_type_response_flag_LocalReset = 3,
+  envoy_dynamic_module_type_response_flag_UpstreamRemoteReset = 4,
+  envoy_dynamic_module_type_response_flag_UpstreamConnectionFailure = 5,
+  envoy_dynamic_module_type_response_flag_UpstreamConnectionTermination = 6,
+  envoy_dynamic_module_type_response_flag_UpstreamOverflow = 7,
+  envoy_dynamic_module_type_response_flag_NoRouteFound = 8,
+  envoy_dynamic_module_type_response_flag_DelayInjected = 9,
+  envoy_dynamic_module_type_response_flag_FaultInjected = 10,
+  envoy_dynamic_module_type_response_flag_RateLimited = 11,
+  envoy_dynamic_module_type_response_flag_UnauthorizedExternalService = 12,
+  envoy_dynamic_module_type_response_flag_RateLimitServiceError = 13,
+  envoy_dynamic_module_type_response_flag_DownstreamConnectionTermination = 14,
+  envoy_dynamic_module_type_response_flag_UpstreamRetryLimitExceeded = 15,
+  envoy_dynamic_module_type_response_flag_StreamIdleTimeout = 16,
+  envoy_dynamic_module_type_response_flag_InvalidEnvoyRequestHeaders = 17,
+  envoy_dynamic_module_type_response_flag_DownstreamProtocolError = 18,
+  envoy_dynamic_module_type_response_flag_UpstreamMaxStreamDurationReached = 19,
+  envoy_dynamic_module_type_response_flag_ResponseFromCacheFilter = 20,
+  envoy_dynamic_module_type_response_flag_NoFilterConfigFound = 21,
+  envoy_dynamic_module_type_response_flag_DurationTimeout = 22,
+  envoy_dynamic_module_type_response_flag_UpstreamProtocolError = 23,
+  envoy_dynamic_module_type_response_flag_NoClusterFound = 24,
+  envoy_dynamic_module_type_response_flag_OverloadManager = 25,
+  envoy_dynamic_module_type_response_flag_DnsResolutionFailed = 26,
+  envoy_dynamic_module_type_response_flag_DropOverLoad = 27,
+  envoy_dynamic_module_type_response_flag_DownstreamRemoteReset = 28,
+  envoy_dynamic_module_type_response_flag_UnconditionalDropOverload = 29,
+} envoy_dynamic_module_type_response_flag;
+
+/**
+ * envoy_dynamic_module_type_detected_close_type represents how a connection was closed.
+ * This corresponds to `StreamInfo::DetectedCloseType` in envoy/stream_info/stream_info.h.
+ */
+typedef enum envoy_dynamic_module_type_detected_close_type {
+  // The connection was closed normally.
+  envoy_dynamic_module_type_detected_close_type_Normal,
+  // The connection was reset locally.
+  envoy_dynamic_module_type_detected_close_type_LocalReset,
+  // The peer reset the connection.
+  envoy_dynamic_module_type_detected_close_type_RemoteReset,
+} envoy_dynamic_module_type_detected_close_type;
+
+/**
+ * envoy_dynamic_module_type_upstream_timing_event represents an event of a connection to the
+ * upstream. In their declared order, the events set the fields of `StreamInfo::UpstreamTiming` in
+ * envoy/stream_info/stream_info.h that the access log time points US_CX_BEG, US_CX_END, US_HS_END,
+ * US_TX_BEG, US_TX_END, US_RX_BEG and US_RX_END read.
+ */
+typedef enum envoy_dynamic_module_type_upstream_timing_event {
+  // The connection to the upstream started.
+  envoy_dynamic_module_type_upstream_timing_event_ConnectStart,
+  // The connection to the upstream was established.
+  envoy_dynamic_module_type_upstream_timing_event_ConnectComplete,
+  // The handshake with the upstream, such as a TLS handshake, completed.
+  envoy_dynamic_module_type_upstream_timing_event_HandshakeComplete,
+  // The first byte was sent to the upstream.
+  envoy_dynamic_module_type_upstream_timing_event_FirstByteSent,
+  // The last byte was sent to the upstream.
+  envoy_dynamic_module_type_upstream_timing_event_LastByteSent,
+  // The first byte was received from the upstream.
+  envoy_dynamic_module_type_upstream_timing_event_FirstByteReceived,
+  // The last byte was received from the upstream.
+  envoy_dynamic_module_type_upstream_timing_event_LastByteReceived,
+} envoy_dynamic_module_type_upstream_timing_event;
+
+/**
  * envoy_dynamic_module_type_load_shed_point_envoy_ptr is a raw pointer to a load shed point of the
  * overload manager in Envoy, which corresponds to Server::LoadShedPoint. It is returned by
  * envoy_dynamic_module_callback_http_filter_config_get_load_shed_point and its network, listener
@@ -2271,6 +2366,12 @@ void envoy_dynamic_module_callback_http_send_response_trailers(
  * in the filter chain could modify the buffered body. That is say for a given filter X, filter X
  * can safely modify the buffered body if and only if the filters following filter X in the filter
  * chain have not yet accessed the body.
+ *
+ * NOTE: When the runtime guard ``envoy.reloadable_features.filter_manager_per_filter_buffer`` is
+ * enabled, each filter has its own buffer. The buffered body is then only the body held by this
+ * filter (what it buffered, or added), not the body buffered by other filters in the chain, and
+ * this filter can modify it whenever it holds it. The received_buffered_* callbacks then only
+ * return true when this filter is resumed with its own buffered body.
  */
 
 /**
@@ -2802,6 +2903,130 @@ bool envoy_dynamic_module_callback_http_get_metadata_list_bool(
     envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     size_t index, bool* result);
+
+/**
+ * The kind of selector used by a metadata path component.
+ */
+typedef enum envoy_dynamic_module_type_metadata_path_component_kind {
+  envoy_dynamic_module_type_metadata_path_component_kind_Key,
+  envoy_dynamic_module_type_metadata_path_component_kind_Index,
+  // Reserved for ABI compatibility. Keeps the type 32 bits wide and lets older C++ consumers
+  // reject future kinds safely.
+  envoy_dynamic_module_type_metadata_path_component_kind_Sentinel = 0x7FFFFFFF,
+} envoy_dynamic_module_type_metadata_path_component_kind;
+
+/**
+ * A component of a metadata path. The kind selects either a literal struct key or a zero-based
+ * list index. The other field is ignored. A key of length zero selects an empty key and may have a
+ * null pointer. The callbacks reject unknown component kinds.
+ */
+typedef struct envoy_dynamic_module_type_module_metadata_path_component {
+  envoy_dynamic_module_type_metadata_path_component_kind kind;
+  envoy_dynamic_module_type_module_buffer key;
+  size_t index;
+} envoy_dynamic_module_type_module_metadata_path_component;
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_nested_string gets the
+ * nested string metadata value.
+ *
+ * The path contains struct keys and list indices relative to the namespace, starting with a key.
+ * Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ * metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ * returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the metadata namespace.
+ * @param path is an array of path components, borrowed for this call. May be null only when
+ * path_length is zero.
+ * @param path_length is the number of path components.
+ * @param result receives the value on success and is unchanged on failure.
+ * The returned buffer is owned by Envoy and valid until the end of the current event hook
+ * unless a metadata setter is called.
+ * @return true on success, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_nested_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_nested_number gets the
+ * nested number metadata value.
+ *
+ * The path contains struct keys and list indices relative to the namespace, starting with a key.
+ * Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ * metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ * returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the metadata namespace.
+ * @param path is an array of path components, borrowed for this call. May be null only when
+ * path_length is zero.
+ * @param path_length is the number of path components.
+ * @param result receives the value on success and is unchanged on failure.
+ * @return true on success, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_nested_number(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
+    double* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_nested_bool gets the
+ * nested bool metadata value.
+ *
+ * The path contains struct keys and list indices relative to the namespace, starting with a key.
+ * Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ * metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ * returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the metadata namespace.
+ * @param path is an array of path components, borrowed for this call. May be null only when
+ * path_length is zero.
+ * @param path_length is the number of path components.
+ * @param result receives the value on success and is unchanged on failure.
+ * @return true on success, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
+    bool* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_nested_list_size gets the
+ * number of elements in a nested metadata list.
+ *
+ * The path contains struct keys and list indices relative to the namespace, starting with a key.
+ * Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ * metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ * returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the metadata namespace.
+ * @param path is an array of path components, borrowed for this call. May be null only when
+ * path_length is zero.
+ * @param path_length is the number of path components.
+ * @param result receives the value on success and is unchanged on failure.
+ * @return true on success, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_metadata_path_component* path, size_t path_length,
+    size_t* result);
 
 // -------------------------- Filter State Callbacks ---------------------------
 
@@ -5324,6 +5549,207 @@ bool envoy_dynamic_module_callback_network_filter_has_upstream_host(
 uint64_t envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
 
+// ---------------------- Stream Info Reporting Callbacks ----------------------
+//
+// A terminal network filter that reaches its upstream itself, rather than through an Envoy upstream
+// connection, reports that upstream and the outcome of the connection with these callbacks. They
+// set fields of the connection's stream info so that access logs show them as they do for the TCP
+// proxy. They cannot set the upstream TLS information. A filter ahead of a TCP proxy should not
+// report the upstream or the wire bytes, because the TCP proxy sets those fields itself. Envoy
+// writes the TcpConnectionEnd access log when it destroys the connection soon after the close
+// event, so the module reports by the time it handles that event. Calls made before
+// envoy_dynamic_module_on_network_filter_new_connection have no effect and return false.
+
+/**
+ * envoy_dynamic_module_callback_network_filter_set_upstream_host is called by the module to set
+ * the upstream host of the connection to the given address, as a host of the given cluster.
+ *
+ * Envoy sets the host on the read filter callbacks, which the upstream host getters read, and on
+ * the stream info together with the upstream remote address and the upstream cluster. It also adds
+ * the host to the upstream hosts attempted, so the module calls this once for each attempt. A host
+ * of the cluster with the same address is reused with its hostname and metadata. Otherwise Envoy
+ * creates a host without a hostname, which counts toward the transport socket match statistics of
+ * the cluster. The hosts of the cluster are not changed.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param cluster_name is the name of the cluster. The buffer is owned by the module.
+ * @param address is the IP address of the host, without brackets for IPv6. The buffer is owned by
+ * the module.
+ * @param port is the port of the host.
+ * @return true if the upstream host was set, false if the cluster does not exist, the address is
+ * not a valid IP address or the port is above 65535.
+ */
+bool envoy_dynamic_module_callback_network_filter_set_upstream_host(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_buffer address, uint32_t port);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_set_upstream_cluster is called by the module to set
+ * the upstream cluster of the connection, for example when no host of the cluster was available.
+ * envoy_dynamic_module_callback_network_filter_set_upstream_host sets it as well.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param cluster_name is the name of the cluster. The buffer is owned by the module.
+ * @return true if the upstream cluster was set, false if the cluster does not exist.
+ */
+bool envoy_dynamic_module_callback_network_filter_set_upstream_cluster(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_set_upstream_local_address is called by the module
+ * to set the local address of its connection to the upstream.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param address is the local IP address, without brackets for IPv6. The buffer is owned by the
+ * module.
+ * @param port is the local port.
+ * @return true if the local address was set, false if the address is not a valid IP address or the
+ * port is above 65535.
+ */
+bool envoy_dynamic_module_callback_network_filter_set_upstream_local_address(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address, uint32_t port);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason is called by
+ * the module to set why its connection to the upstream failed, such as a failed TLS handshake.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param reason is the reason owned by the module. Its pointer may be null only when its length is
+ * zero.
+ * @return true if the reason was set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer reason);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason is called by the
+ * module to set why it closed its connection to the upstream.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param reason is the reason owned by the module. Its pointer may be null only when its length is
+ * zero.
+ * @return true if the reason was set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer reason);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type is called by the
+ * module to set how its connection to the upstream was closed.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param close_type is how the connection was closed.
+ * @return true if the close type was set, false if it is not a known close type.
+ */
+bool envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_detected_close_type close_type);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_set_upstream_request_attempt_count is called by the
+ * module to set how many times it tried to connect to the upstream.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param attempt_count is the number of attempts.
+ * @return true if the attempt count was set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_set_upstream_request_attempt_count(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint32_t attempt_count);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_record_upstream_timing is called by the module to
+ * record that an event of its connection to the upstream happened now. A later record of an event
+ * replaces the earlier one.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param event is the event that happened.
+ * @return true if the event was recorded, false if it is not a known event.
+ */
+bool envoy_dynamic_module_callback_network_filter_record_upstream_timing(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_upstream_timing_event event);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes is called by the module to
+ * add to the upstream wire bytes of the connection. The module reports the payload bytes without
+ * transport overhead such as TLS, as the TCP proxy counts them, and reports them as they move, so
+ * that periodic access logs see them.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param bytes_received is the number of bytes received from the upstream.
+ * @param bytes_sent is the number of bytes sent to the upstream.
+ * @return true if the bytes were added, false if the connection has no upstream bytes meter.
+ */
+bool envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint64_t bytes_received,
+    uint64_t bytes_sent);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes is called by the module
+ * to add to the downstream wire bytes of the connection, and creates its downstream bytes meter if
+ * there is none. The module reports the bytes it reads from and writes to the downstream, as the
+ * TCP proxy counts them, and reports them as they move, so that periodic access logs see them.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param bytes_received is the number of bytes received from the downstream.
+ * @param bytes_sent is the number of bytes sent to the downstream.
+ * @return true if the bytes were added, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint64_t bytes_received,
+    uint64_t bytes_sent);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_set_response_flag is called by the module to set a
+ * response flag of the connection, such as UpstreamConnectionFailure when it could not connect to
+ * the upstream.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param flag is the response flag to set.
+ * @return true if the flag was set, false if it is not a known flag.
+ */
+bool envoy_dynamic_module_callback_network_filter_set_response_flag(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_response_flag flag);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_add_custom_flag is called by the module to add a
+ * custom flag that marks a noteworthy event of the connection. Multiple flags are joined with
+ * commas.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param flag is the flag owned by the module. It must not be empty, contain whitespace or be the
+ * short name of a response flag.
+ * @return true if the flag was added, false if it is not a valid flag.
+ */
+bool envoy_dynamic_module_callback_network_filter_add_custom_flag(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer flag);
+
+// ---------------------- Access Log Callbacks ---------------------------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_flush_access_log is called by the module to flush
+ * the access logs configured on the filter, using the given access log type, for example
+ * TcpUpstreamConnected once it has connected to the upstream. The access loggers run before this
+ * returns, including a dynamic module access logger configured on the filter. A TcpPeriodic flush
+ * also snapshots the bytes meters, like the flushes at access_log_flush_interval.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param access_log_type is the access log type, TcpUpstreamConnected or TcpPeriodic.
+ * @return true if the type is TcpUpstreamConnected or TcpPeriodic, even when the filter has no
+ * access logs, false if the type is another one or the call is made before
+ * envoy_dynamic_module_on_network_filter_new_connection.
+ */
+bool envoy_dynamic_module_callback_network_filter_flush_access_log(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_access_log_type access_log_type);
+
 // ---------------------- StartTLS Support Callbacks ---------------------------
 
 /**
@@ -7498,64 +7924,6 @@ typedef void* envoy_dynamic_module_type_access_logger_envoy_ptr;
 typedef const void* envoy_dynamic_module_type_access_logger_module_ptr;
 
 /**
- * envoy_dynamic_module_type_access_log_type represents the type of access log event.
- * This corresponds to envoy::data::accesslog::v3::AccessLogType.
- */
-typedef enum envoy_dynamic_module_type_access_log_type {
-  envoy_dynamic_module_type_access_log_type_NotSet = 0,
-  envoy_dynamic_module_type_access_log_type_TcpUpstreamConnected = 1,
-  envoy_dynamic_module_type_access_log_type_TcpPeriodic = 2,
-  envoy_dynamic_module_type_access_log_type_TcpConnectionEnd = 3,
-  envoy_dynamic_module_type_access_log_type_DownstreamStart = 4,
-  envoy_dynamic_module_type_access_log_type_DownstreamPeriodic = 5,
-  envoy_dynamic_module_type_access_log_type_DownstreamEnd = 6,
-  envoy_dynamic_module_type_access_log_type_UpstreamPoolReady = 7,
-  envoy_dynamic_module_type_access_log_type_UpstreamPeriodic = 8,
-  envoy_dynamic_module_type_access_log_type_UpstreamEnd = 9,
-  envoy_dynamic_module_type_access_log_type_DownstreamTunnelSuccessfullyEstablished = 10,
-  envoy_dynamic_module_type_access_log_type_UdpTunnelUpstreamConnected = 11,
-  envoy_dynamic_module_type_access_log_type_UdpPeriodic = 12,
-  envoy_dynamic_module_type_access_log_type_UdpSessionEnd = 13,
-} envoy_dynamic_module_type_access_log_type;
-
-/**
- * envoy_dynamic_module_type_response_flag represents a response flag from StreamInfo.
- * Values correspond to CoreResponseFlag enum.
- */
-typedef enum envoy_dynamic_module_type_response_flag {
-  envoy_dynamic_module_type_response_flag_FailedLocalHealthCheck = 0,
-  envoy_dynamic_module_type_response_flag_NoHealthyUpstream = 1,
-  envoy_dynamic_module_type_response_flag_UpstreamRequestTimeout = 2,
-  envoy_dynamic_module_type_response_flag_LocalReset = 3,
-  envoy_dynamic_module_type_response_flag_UpstreamRemoteReset = 4,
-  envoy_dynamic_module_type_response_flag_UpstreamConnectionFailure = 5,
-  envoy_dynamic_module_type_response_flag_UpstreamConnectionTermination = 6,
-  envoy_dynamic_module_type_response_flag_UpstreamOverflow = 7,
-  envoy_dynamic_module_type_response_flag_NoRouteFound = 8,
-  envoy_dynamic_module_type_response_flag_DelayInjected = 9,
-  envoy_dynamic_module_type_response_flag_FaultInjected = 10,
-  envoy_dynamic_module_type_response_flag_RateLimited = 11,
-  envoy_dynamic_module_type_response_flag_UnauthorizedExternalService = 12,
-  envoy_dynamic_module_type_response_flag_RateLimitServiceError = 13,
-  envoy_dynamic_module_type_response_flag_DownstreamConnectionTermination = 14,
-  envoy_dynamic_module_type_response_flag_UpstreamRetryLimitExceeded = 15,
-  envoy_dynamic_module_type_response_flag_StreamIdleTimeout = 16,
-  envoy_dynamic_module_type_response_flag_InvalidEnvoyRequestHeaders = 17,
-  envoy_dynamic_module_type_response_flag_DownstreamProtocolError = 18,
-  envoy_dynamic_module_type_response_flag_UpstreamMaxStreamDurationReached = 19,
-  envoy_dynamic_module_type_response_flag_ResponseFromCacheFilter = 20,
-  envoy_dynamic_module_type_response_flag_NoFilterConfigFound = 21,
-  envoy_dynamic_module_type_response_flag_DurationTimeout = 22,
-  envoy_dynamic_module_type_response_flag_UpstreamProtocolError = 23,
-  envoy_dynamic_module_type_response_flag_NoClusterFound = 24,
-  envoy_dynamic_module_type_response_flag_OverloadManager = 25,
-  envoy_dynamic_module_type_response_flag_DnsResolutionFailed = 26,
-  envoy_dynamic_module_type_response_flag_DropOverLoad = 27,
-  envoy_dynamic_module_type_response_flag_DownstreamRemoteReset = 28,
-  envoy_dynamic_module_type_response_flag_UnconditionalDropOverload = 29,
-} envoy_dynamic_module_type_response_flag;
-
-/**
  * envoy_dynamic_module_type_bytes_info contains byte count information.
  */
 typedef struct envoy_dynamic_module_type_bytes_info {
@@ -9204,6 +9572,16 @@ typedef enum envoy_dynamic_module_type_file_watcher_event {
 } envoy_dynamic_module_type_file_watcher_event;
 
 /**
+ * The outcome of an xDS response, or a client-initiated unsubscribe.
+ * New outcomes require a new hook to preserve compatibility with existing modules.
+ */
+typedef enum {
+  envoy_dynamic_module_type_bootstrap_xds_update_status_Accepted = 0,
+  envoy_dynamic_module_type_bootstrap_xds_update_status_Rejected = 1,
+  envoy_dynamic_module_type_bootstrap_xds_update_status_Unsubscribed = 2,
+} envoy_dynamic_module_type_bootstrap_xds_update_status;
+
+/**
  * envoy_dynamic_module_type_bootstrap_active_resource_kind selects which kind of active resource
  * envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names enumerates. New kinds
  * may be appended as new values without changing the enumeration function's signature.
@@ -9214,6 +9592,42 @@ typedef enum {
   envoy_dynamic_module_type_bootstrap_active_resource_kind_TransportSocketMatch = 2,
   envoy_dynamic_module_type_bootstrap_active_resource_kind_Secret = 3,
 } envoy_dynamic_module_type_bootstrap_active_resource_kind;
+
+/**
+ * A configuration snapshot owned by the module. Release it with
+ * envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete before
+ * envoy_dynamic_module_on_bootstrap_extension_config_destroy returns for its owning config.
+ * It may move between threads, but must not be used concurrently.
+ */
+typedef void* envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr;
+
+/**
+ * Receives JSON owned by Envoy and valid only during this invocation.
+ *
+ * @param json is the encoded snapshot. Its pointer is non-null.
+ * @param user_data is the opaque pointer supplied to the serialize callback and may be null.
+ */
+typedef void (*envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn)(
+    envoy_dynamic_module_type_envoy_buffer json, void* user_data);
+
+/**
+ * The result of envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new.
+ */
+typedef enum envoy_dynamic_module_type_bootstrap_config_snapshot_result {
+  // the snapshot was collected and redacted
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success = 0,
+  // called off the main thread, before
+  // envoy_dynamic_module_on_bootstrap_extension_server_initialized, during shutdown, from a
+  // cluster or listener lifecycle hook, whatever triggered it, from another bootstrap hook Envoy
+  // runs inside an xDS update or a resource's destruction, or while another collection runs
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed = 1,
+  // the name regex is invalid or its RE2 program size exceeds re2.max_program_size.error_level
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_InvalidRegex = 2,
+  // admin support is unavailable
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_Unavailable = 3,
+  // collection failed for any other reason, such as a provider that throws or returns no message
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result_CollectionFailed = 4,
+} envoy_dynamic_module_type_bootstrap_config_snapshot_result;
 
 /**
  * The callback type invoked once per active resource name during enumeration.
@@ -9275,9 +9689,156 @@ typedef enum envoy_dynamic_module_type_bootstrap_cluster_writer_update_status {
   envoy_dynamic_module_type_bootstrap_cluster_writer_update_status_OwnershipLost = 4,
 } envoy_dynamic_module_type_bootstrap_cluster_writer_update_status;
 
+/**
+ * envoy_dynamic_module_type_bootstrap_listener_writer_update_result is the result of
+ * envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update.
+ */
+typedef enum envoy_dynamic_module_type_bootstrap_listener_writer_update_result {
+  // The write is queued. The done hook reports its outcome with the returned update ID.
+  envoy_dynamic_module_type_bootstrap_listener_writer_update_result_Success = 0,
+  // The module has not called
+  // envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer, or the call was made
+  // off the main thread, before envoy_dynamic_module_on_bootstrap_extension_server_initialized or
+  // after shutdown began. A call off the main thread also reports an Envoy bug.
+  envoy_dynamic_module_type_bootstrap_listener_writer_update_result_NotAllowed = 1,
+} envoy_dynamic_module_type_bootstrap_listener_writer_update_result;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_listener_writer_removal_result is the result of
+ * envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove.
+ */
+typedef enum envoy_dynamic_module_type_bootstrap_listener_writer_removal_result {
+  // The removal is queued. A queued write of the listener completes as Removed, and the removal of
+  // a listener that is only queued cancels its write.
+  envoy_dynamic_module_type_bootstrap_listener_writer_removal_result_Success = 0,
+  // The call is not allowed for the same reasons as a write.
+  envoy_dynamic_module_type_bootstrap_listener_writer_removal_result_NotAllowed = 1,
+  // The extension neither owns nor has queued a listener with this name.
+  envoy_dynamic_module_type_bootstrap_listener_writer_removal_result_NotFound = 2,
+} envoy_dynamic_module_type_bootstrap_listener_writer_removal_result;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_listener_writer_update_status is the outcome of a write that
+ * envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done reports.
+ */
+typedef enum envoy_dynamic_module_type_bootstrap_listener_writer_update_status {
+  // The listener finished warming with this configuration or an identical one. Every worker
+  // applies the listener before it runs any event that the module posts afterwards.
+  envoy_dynamic_module_type_bootstrap_listener_writer_update_status_Active = 0,
+  // A later write of the listener replaced this one before it became active.
+  envoy_dynamic_module_type_bootstrap_listener_writer_update_status_Superseded = 1,
+  // A removal of the listener ended this write before it became active. A write that becomes
+  // active before Envoy applies the removal completes as Active instead.
+  envoy_dynamic_module_type_bootstrap_listener_writer_update_status_Removed = 2,
+  // Envoy rejected the write. The listener failed to parse or validate, its name differs from the
+  // name passed in, it is an API listener, a listener with this name exists that the extension does
+  // not own, Envoy failed to create the listener, Envoy stopped the listeners of its traffic
+  // direction and the write changes the listener, or the listener failed to listen after it
+  // warmed. When it fails to listen on an address that the write adds in place, the workers keep
+  // serving the previous configuration. When it fails to listen otherwise, Envoy removes the
+  // listener and its previous configuration, and the extension no longer owns it. The error details
+  // of a listen failure say which of the two happened. In every other case the workers keep serving
+  // the previous configuration, if any.
+  envoy_dynamic_module_type_bootstrap_listener_writer_update_status_Failed = 3,
+  // Another component removed or replaced the listener before this write became active, so the
+  // extension no longer owns it.
+  envoy_dynamic_module_type_bootstrap_listener_writer_update_status_OwnershipLost = 4,
+} envoy_dynamic_module_type_bootstrap_listener_writer_update_status;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result is the result of
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update.
+ */
+typedef enum envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result {
+  // The write is queued. The done hook reports its outcome with the returned update ID.
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_Success = 0,
+  // The module has not called
+  // envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer, or the
+  // call was made off the main thread, before
+  // envoy_dynamic_module_on_bootstrap_extension_server_initialized or after shutdown began. A call
+  // off the main thread also reports an Envoy bug.
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed = 1,
+} envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result is the result of
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove.
+ */
+typedef enum envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result {
+  // The removal is queued. A queued write of the filter chain completes as Removed, and the removal
+  // of a filter chain that is only queued cancels its write.
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_Success = 0,
+  // The call is not allowed for the same reasons as a write.
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotAllowed = 1,
+  // The extension neither owns nor has queued a filter chain with this name.
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotFound = 2,
+} envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status is the outcome of a
+ * write that envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done
+ * reports. Unlike the cluster and listener writer statuses, it has no OwnershipLost, since Envoy
+ * does not notice when another extension writes or removes the same filter chain.
+ */
+typedef enum envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status {
+  // The filter chain finished warming with this configuration or an identical one. Every worker
+  // applies the filter chain before it runs any event that the module posts afterwards.
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status_Active = 0,
+  // A later write of the filter chain replaced this one before it became active.
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status_Superseded = 1,
+  // A removal of the filter chain ended this write before it became active. A write that becomes
+  // active before Envoy applies the removal completes as Active instead.
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status_Removed = 2,
+  // Envoy rejected the write. The filter chain failed to parse or validate, its name differs from
+  // the name passed in, a listener requests the name through FCDS, or Envoy failed to build the
+  // filter chain. The listeners keep using the previous configuration, if any.
+  envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status_Failed = 3,
+} envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status;
+
+/**
+ * The encoding of an ECDS configuration payload delivered to a bootstrap extension.
+ */
+typedef enum {
+  // A protobuf message in its native wire format.
+  envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Protobuf = 0,
+  // JSON from Struct or the inner value of TypedStruct.
+  envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Json = 1,
+  // The unwrapped contents of StringValue or BytesValue.
+  envoy_dynamic_module_type_bootstrap_ecds_config_encoding_Bytes = 2,
+} envoy_dynamic_module_type_bootstrap_ecds_config_encoding;
+
 // =============================================================================
 // Bootstrap Extension Event Hooks
 // =============================================================================
+
+/**
+ * Called on the main thread when an ECDS resource changes or is removed, including TTL expiry.
+ * This hook must not block. Rejecting an update NACKs the response, which may contain other ECDS
+ * resources and may have been partly applied. A rejected removal is only logged and retains
+ * the previous configuration. Delta can report a missing resource as a removal before any config.
+ *
+ * A module that waits for its first configuration before completing initialization must set its
+ * own startup timeout. Initial fetch failures do not invoke this hook.
+ *
+ * @param config_envoy_ptr is the pointer to the bootstrap extension configuration.
+ * @param config_module_ptr is the pointer to the in-module bootstrap extension configuration.
+ * @param name is the resource name, with xDS-TP context parameters sorted.
+ * @param version is the SotW response version or Delta resource version. It is empty for removals
+ * and may be empty for filesystem updates without version_info.
+ * @param type_url is the payload type URL, using the inner type for TypedStruct, empty for
+ * removals.
+ * @param encoding describes the config bytes and is ignored for removals.
+ * @param has_config is false when the resource was removed.
+ * @param config is the payload. All buffers are owned by Envoy and valid only during this call.
+ * @return true if accepted, false if rejected without changing the module's current settings.
+ */
+bool envoy_dynamic_module_on_bootstrap_extension_ecds_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer version,
+    envoy_dynamic_module_type_envoy_buffer type_url,
+    envoy_dynamic_module_type_bootstrap_ecds_config_encoding encoding, bool has_config,
+    envoy_dynamic_module_type_envoy_buffer config);
 
 /**
  * envoy_dynamic_module_on_bootstrap_extension_config_new is called by the main thread when the
@@ -9384,10 +9945,11 @@ typedef void (*envoy_dynamic_module_type_event_cb)(void* context);
  * going away.
  *
  * Shutdown has begun when Envoy calls this, so
- * envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers returns false, the cluster
- * writer callbacks return NotAllowed, and Envoy drops the done hooks of pending worker events and
- * the pending cluster writer outcomes. A worker can still run the worker event hook of an event
- * posted before shutdown began, until the workers stop.
+ * envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers and the writer enable
+ * callbacks return false, the other cluster, listener and filter chain config writer callbacks
+ * return NotAllowed, and Envoy drops the done hooks of pending worker events and the pending writer
+ * outcomes. A worker can still run the worker event hook of an event posted before shutdown began,
+ * until the workers stop.
  *
  * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
  * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
@@ -9536,6 +10098,44 @@ void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
     envoy_dynamic_module_type_envoy_buffer listener_name);
 
+/**
+ * Optional main-thread hook for gRPC xDS outcomes, enabled with
+ * envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications.
+ *
+ * Accepted is reported after successful response processing, before ACK; resources may still be
+ * warming. Rejected is reported before NACK and may follow partial application.
+ * Unsubscribed is posted to the main dispatcher once no watch on the stream still names the
+ * resource. It can arrive after later outcomes, such as the CDS Accepted that removed a cluster.
+ * Disabling notifications discards pending unsubscriptions, even if re-enabled before delivery.
+ *
+ * Config snapshot collection returns NotAllowed during Accepted and Rejected. Defer collection
+ * with the bootstrap config scheduler. Collection can succeed during the posted Unsubscribed
+ * callback.
+ *
+ * Implementations must not block. Resource payloads are not included.
+ * All buffers are borrowed for this call.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.
+ * @param config_module_ptr is the pointer to the in-module bootstrap extension configuration.
+ * @param type_url is the resource type URL.
+ * @param status is the processing outcome or client-initiated unsubscription.
+ * @param error_details is the NACK message for Rejected, or empty otherwise. It may quote rejected
+ * configuration.
+ * @param version is version_info for SotW or system_version_info for Delta, or empty for
+ * Unsubscribed. A Delta system version is not a per-resource version.
+ * @param nonce is the response nonce for Accepted and Rejected, or empty for Unsubscribed.
+ * Nonces are scoped to an xDS stream and resource type.
+ * @param resource_name is the resource name for Unsubscribed, or empty otherwise.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_xds_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer type_url,
+    envoy_dynamic_module_type_bootstrap_xds_update_status status,
+    envoy_dynamic_module_type_envoy_buffer error_details,
+    envoy_dynamic_module_type_envoy_buffer version, envoy_dynamic_module_type_envoy_buffer nonce,
+    envoy_dynamic_module_type_envoy_buffer resource_name);
+
 // =============================================================================
 // Bootstrap Extension Callbacks
 // =============================================================================
@@ -9668,7 +10268,11 @@ envoy_dynamic_module_callback_bootstrap_extension_http_callout(
  *
  * When this completes the initialization of Envoy, it can run other hooks and start the workers
  * before it returns, and it waits until every worker ran the worker events posted before it. The
- * module must not hold a lock across this call that those hooks take.
+ * module must not hold a lock across this call that those hooks take. With the listener writer
+ * enabled, Envoy finishes initializing only once it applied the listener writes submitted before
+ * this call, or the module removed them. Writes can only be submitted during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized, so a module whose listeners must
+ * serve from the first connection calls this only after it submitted their writes.
  *
  * This must be called on the main thread. To call from other threads, use the scheduler mechanism
  * to post an event to the main thread first. Off the main thread this reports an Envoy bug and
@@ -10145,6 +10749,89 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer path_prefix);
 
+// -------------------- Bootstrap Extension Callbacks - ECDS --------------------
+
+/**
+ * Subscribes to one named ECDS resource on the main thread until shutdown. Filesystem sources can
+ * invoke envoy_dynamic_module_on_bootstrap_extension_ecds_update before this call returns;
+ * do not hold a lock across this call that the hook takes.
+ *
+ * @param config_envoy_ptr is the pointer to the bootstrap extension configuration.
+ * @param name is the resource name. Wildcards are not supported. Another bootstrap extension
+ * cannot use the same ADS or xDS-TP name. Filter ECDS subscriptions conflict only on ADS.
+ * @param source_json is a JSON-encoded envoy.config.core.v3.ExtensionConfigSource. Its type_urls
+ * lists permitted payload types, using the inner type for TypedStruct. Default configurations
+ * are not supported. For types not linked into Envoy, use TypedStruct, or BytesValue for binary
+ * payloads; an accepted payload that Envoy cannot render fails the whole unfiltered config dump.
+ * Both input buffers are owned by the module and only need to last this call.
+ * @return true if started; false before server initialization, after shutdown, in init_only mode,
+ * without the ECDS update hook, if already subscribed, or if the name or source is invalid or in
+ * use.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer source_json);
+
+// -------------------- Bootstrap Extension Callbacks - Configuration Snapshots --------------------
+
+/**
+ * Collects and redacts selected providers synchronously on the main thread. Missing providers are
+ * omitted, duplicates are collected once, and results are sorted by provider key. An empty
+ * selection collects nothing. Selecting "endpoint" includes active cluster endpoint assignments.
+ * The endpoint name filter and each assignment's cluster_name use the EDS service name, or the
+ * cluster name when no service name is set.
+ * Cost grows with the selected resources, so combine frequent notifications into one collection.
+ *
+ * Collection is refused in cluster or listener lifecycle hooks, whatever triggered them, and in
+ * other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction. Providers can
+ * contain partial changes under the previous version. Defer collection with the bootstrap config
+ * scheduler. Callout failures during cluster removal are already reported from a posted callback.
+ *
+ * Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
+ * configuration may retain sensitive data. No admin listener is needed, and admin allow_paths does
+ * not restrict access.
+ *
+ * @param config_envoy_ptr is the non-null pointer to the bootstrap extension configuration.
+ * @param providers is an array of provider keys, borrowed for this call. May be null only when
+ * providers_count is zero. Each key's pointer must be non-null when its length is nonzero.
+ * @param providers_count is the number of entries in providers.
+ * @param name_regex is a full-match RE2 resource name filter, ignored by providers without name
+ * filtering. A null pointer or zero length disables filtering. The buffer is borrowed for this
+ * call.
+ * @param snapshot_out is a non-null output pointer. Receives the module-owned snapshot on success,
+ * or null on failure. Release it with the snapshot delete callback before its config is destroyed.
+ * @return the collection result. A call off the main thread also reports an Envoy bug.
+ */
+envoy_dynamic_module_type_bootstrap_config_snapshot_result
+envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    const envoy_dynamic_module_type_module_buffer* providers, size_t providers_count,
+    envoy_dynamic_module_type_module_buffer name_regex,
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr* snapshot_out);
+
+/**
+ * Encodes the snapshot as envoy.admin.v3.ConfigDump JSON on any thread without consuming it.
+ * Encoding can be expensive; use a module-owned thread to avoid blocking Envoy's main thread or
+ * workers.
+ *
+ * @param snapshot is a non-null snapshot handle. Must not be used concurrently.
+ * @param json_fn is a non-null callback invoked synchronously once on success, and not on failure.
+ * @param user_data is an opaque pointer passed to json_fn and may be null.
+ * @return true on success, false if encoding fails, including for unknown or unlinked Any types.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot,
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn json_fn, void* user_data);
+
+/**
+ * Deletes a snapshot on any thread.
+ *
+ * @param snapshot is the snapshot to release, or null. Must not be in use by another call.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(
+    envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr snapshot);
+
 // -------------------- Bootstrap Extension Callbacks - Cluster Lifecycle --------------------
 
 /**
@@ -10189,6 +10876,22 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
 bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
 
+// -------------------- Bootstrap Extension Callbacks - xDS Notifications --------------------
+
+/**
+ * Enables or disables envoy_dynamic_module_on_bootstrap_extension_xds_update notifications.
+ * Call on the main thread, typically during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized. Calls are idempotent.
+ * Notifications stop when shutdown begins.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.
+ * @param enabled is true to enable notifications, or false to unregister them.
+ * @return true on success. Enabling returns false before server initialization, after shutdown
+ * begins, in --mode init_only, or if the module does not export the hook.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr, bool enabled);
+
 // -------------------- Bootstrap Extension Callbacks - Active Resource Names --------------------
 
 /**
@@ -10219,6 +10922,99 @@ void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_active_resource_kind kind,
     envoy_dynamic_module_type_bootstrap_active_resource_name_fn name_fn, void* user_data);
+
+// -------------------- Bootstrap Extension - Runtime Update --------------------
+
+// The runtime update hooks below report the changes of the runtime keys that a bootstrap extension
+// watches with envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update. They are
+// all optional. A watched key is reported through the hook of the type of its value, the way the
+// runtime getters read it:
+//  * A number that is a non-negative integer, so that envoy_dynamic_module_callback_get_runtime_int
+//    reads it exactly, is reported through
+//    envoy_dynamic_module_on_bootstrap_extension_runtime_int_update.
+//  * Any other number is reported through
+//    envoy_dynamic_module_on_bootstrap_extension_runtime_number_update. An integer is not reported
+//    as a boolean, though envoy_dynamic_module_callback_get_runtime_bool also reads it as one.
+//  * A boolean is reported through envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update.
+//  * Any other value, such as a string, counts as unset.
+//
+// Envoy loads a new runtime snapshot whenever a layer of the `layered_runtime` bootstrap option
+// changes, for example on an RTDS update, a disk layer update or a request to the admin
+// `/runtime_modify` endpoint. For every watched key, Envoy compares its value in the new snapshot,
+// that is the value of the topmost layer that sets the key, with its value at the previous update,
+// and calls one hook for every watched key whose type or value changed, in lexicographic order of
+// the keys. A snapshot that changes no watched value calls nothing. NaN is equal to itself. The
+// first comparison is against the value when the extension started watching the key, so that value
+// is not reported.
+//
+// When a key becomes unset, Envoy calls the hook of the type of its previous value with that value
+// and removed set to true. For a runtime guard such as "envoy.reloadable_features.some_flag", the
+// guard then returns to its value before any layer set it, normally its compiled default, while
+// envoy_dynamic_module_callback_get_runtime_bool returns the default given by the caller.
+//
+// When a hook is called, the runtime getters already return the new value on the main thread. The
+// worker threads observe the new snapshot shortly after. The hooks are called on the main thread,
+// never once the server began to shut down, and they cannot watch more keys. When the module does
+// not implement the hook of a type, the changes of that type are not reported.
+//
+// For all of them:
+//  * extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+//  * extension_module_ptr is the pointer to the in-module bootstrap extension.
+//  * key is the watched runtime key whose value changed. It is owned by Envoy and valid only for
+//    the duration of the call.
+//  * value is the new value of the key, or its previous value when removed is true.
+//  * removed is true when the key became unset.
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update is called when a watched runtime
+ * key gets a new boolean value, or becomes unset after having one.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, bool value, bool removed);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_runtime_int_update is called when a watched runtime
+ * key gets a new non-negative integer value, or becomes unset after having one.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_runtime_int_update(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, uint64_t value, bool removed);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_runtime_number_update is called when a watched
+ * runtime key gets a new number that is not a non-negative integer, or becomes unset after having
+ * one.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_runtime_number_update(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, double value, bool removed);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update is called by the module
+ * to watch a runtime key, so that the runtime update hooks above are called on the bootstrap
+ * extension when its value changes. Call it once for each key to watch. The key does not need to
+ * have a value yet.
+ *
+ * This can only be called during envoy_dynamic_module_on_bootstrap_extension_server_initialized.
+ * RTDS may or may not have delivered its layers by then, so the module should read the current
+ * value with the runtime getters such as envoy_dynamic_module_callback_get_runtime_bool when it
+ * starts watching the key, and then rely on the hooks for the later changes.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param key is the runtime key to watch, for example "envoy.reloadable_features.some_flag". It is
+ * only read during the call.
+ * @return true if the module now watches the key. Returns false when the key is empty or already
+ * watched, when the module implements none of the runtime update hooks, outside of
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized, once the server began to shut
+ * down, or when called off the main thread. A call off the main thread also reports an Envoy bug.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
 
 // -------------------- Bootstrap Extension - Run On All Workers --------------------
 
@@ -10269,9 +11065,10 @@ void envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done(
  * thread does not run the worker event. The done hook follows even when the module does not
  * implement the worker event hook.
  *
- * A worker runs the event after it applied every cluster addition, update and removal, and every
- * host addition and removal, that Envoy posted to it before this call. Host health, weight and
- * metadata changes merged by the update_merge_window of a cluster may reach the workers later.
+ * A worker runs the event after it applied every cluster addition, update and removal, every host
+ * addition and removal, every listener addition, update and stop, and every filter chain addition,
+ * update and removal, that Envoy posted to it before this call. Host health, weight and metadata
+ * changes merged by the update_merge_window of a cluster may reach the workers later.
  *
  * An event posted before the module calls
  * envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete runs on each worker
@@ -10371,7 +11168,7 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
  * cluster holds back the CDS requests while it warms, as a cluster delivered by CDS does, unless
  * its wait_for_warm_on_init is false. While Envoy applies a burst of writes, it holds back the EDS,
  * LEDS and SDS requests on those streams, including their ACKs, for about one second, as it does
- * while it applies a CDS update.
+ * while it applies a CDS update. A burst of the listener writer extends this hold.
  *
  * A write that changes a cluster rebuilds it and drains its connection pools on every worker, so
  * endpoint changes should not go through the writer. Use a dynamic module cluster and its host
@@ -10423,6 +11220,264 @@ envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result
 envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer cluster_name);
+
+// -------------------- Bootstrap Extension - Listener Writer --------------------
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done is called on the main
+ * thread with the outcome of a write accepted by
+ * envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update.
+ *
+ * This hook is optional. Without it, Envoy still applies the writes.
+ *
+ * Envoy calls this at most once per update ID, and never from inside a callback that the module
+ * called. It is called exactly once unless shutdown began first, the listener never finishes
+ * warming, or the workers never start. To end a write that stays warming, write the listener again
+ * or remove it, which completes the write as Superseded or Removed. Once Envoy stopped the
+ * listeners, only a removal ends the warming. Outcomes can arrive out of update ID order. When
+ * Envoy fails to create the listener of a write, the status is Failed, Envoy logs the error at most
+ * once every 10 seconds, and the extension keeps owning the listener if it exists.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param update_id is the ID returned by
+ * envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update.
+ * @param listener_name is the name of the listener. It is owned by Envoy and valid only during
+ * this call.
+ * @param status is the outcome of the write.
+ * @param error_details describes the problem when the status is Failed or OwnershipLost, and is
+ * empty otherwise. It is owned by Envoy and valid only during this call.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    uint64_t update_id, envoy_dynamic_module_type_envoy_buffer listener_name,
+    envoy_dynamic_module_type_bootstrap_listener_writer_update_status status,
+    envoy_dynamic_module_type_envoy_buffer error_details);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer is called by the module
+ * to opt in to adding, updating and removing listeners. Until it is called,
+ * envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update and
+ * envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove return NotAllowed.
+ *
+ * This must be called on the main thread. It can be called before
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized, for example from
+ * envoy_dynamic_module_on_bootstrap_extension_config_new.
+ *
+ * This should be called at most once. Subsequent calls are no-ops and return false. This also
+ * returns false once shutdown began.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @return true if the listener writer was enabled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update is called by the
+ * module to add or update a listener in the listener manager. Envoy queues the write, applies it
+ * asynchronously on the main thread, and reports the outcome through
+ * envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done.
+ *
+ * The extension owns the listeners it writes, and a State-of-the-World LDS update that leaves them
+ * out does not remove them. When another component, for example LDS, replaces an active listener
+ * that the extension owns, the extension no longer owns it and later writes of the listener
+ * complete as Failed. Envoy does not notice a replacement of a listener that is still warming, so
+ * the module should only write listeners that no other component writes. Writes submitted before
+ * Envoy finishes initializing its static and CDS clusters are applied once it has. When the module
+ * writes a listener again before its previous write is applied, Envoy applies only the latest write
+ * and the previous one completes as Superseded. The cluster and listener writers apply their writes
+ * independently, so write a listener whose inline routes name a written cluster only after that
+ * cluster write completed as Active. A listener can be written before the filter chains that it
+ * finds by name.
+ *
+ * Writes submitted before the module calls
+ * envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete are applied before
+ * Envoy finishes initializing, and Envoy starts its workers once their listeners warmed, so they
+ * serve from the first connection. Their writes complete as Active once the workers started, so the
+ * module must not wait for them before it signals that its initialization is complete.
+ *
+ * A written listener has the same authority as a listener delivered by LDS, so build listeners from
+ * a schema that the module owns. While Envoy applies a burst of writes, it holds back the RDS,
+ * SRDS, VHDS, FCDS and SDS requests on the ADS stream and the xDS-TP authority streams, including
+ * their ACKs, for about one second, as it does while it applies an LDS update. A burst of the
+ * cluster writer extends this hold.
+ *
+ * This must be called on the main thread, during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized. The buffers are owned by the
+ * module and only need to be valid during this call. A buffer pointer may be null only when its
+ * length is zero.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param listener_name is the name of the listener. It must not be empty.
+ * @param listener is the serialized envoy.config.listener.v3.Listener. Its name must equal
+ * listener_name.
+ * @param version_info is the version that Envoy stores with the listener when the write changes it,
+ * and shows in the config dump. A change of only the filter chains of an active listener can keep
+ * the previous version.
+ * @param update_id_out receives a nonzero ID that increases with every accepted write, or 0 when
+ * the write is rejected. It must not be null.
+ * @return envoy_dynamic_module_type_bootstrap_listener_writer_update_result is Success when the
+ * write is queued.
+ */
+envoy_dynamic_module_type_bootstrap_listener_writer_update_result
+envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer listener_name,
+    envoy_dynamic_module_type_module_buffer listener,
+    envoy_dynamic_module_type_module_buffer version_info, uint64_t* update_id_out);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove is called by the module
+ * to remove a listener that it owns. Envoy queues the removal and applies it asynchronously on the
+ * main thread. A removal has no outcome of its own. Once Envoy applies it, the workers stop
+ * accepting connections on the listener and drain its connections. With listener lifecycle
+ * enabled, envoy_dynamic_module_on_bootstrap_extension_listener_removal reports the removal.
+ *
+ * This must be called on the main thread, during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param listener_name is the name of the listener. The buffer is owned by the module and only
+ * needs to be valid during this call.
+ * @return envoy_dynamic_module_type_bootstrap_listener_writer_removal_result is Success when the
+ * removal is queued.
+ */
+envoy_dynamic_module_type_bootstrap_listener_writer_removal_result
+envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer listener_name);
+
+// -------------------- Bootstrap Extension - Filter Chain Config Writer --------------------
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done is called on
+ * the main thread with the outcome of a write accepted by
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update.
+ *
+ * This hook is optional. Without it, Envoy still applies the writes.
+ *
+ * Envoy calls this at most once per update ID, and never from inside a callback that the module
+ * called. It is called exactly once unless shutdown began first, the filter chain never finishes
+ * warming, or Envoy never finishes initializing its clusters. To end a write that stays warming,
+ * write the filter chain again or remove it, which completes the write as Superseded or Removed.
+ * Outcomes can arrive out of update ID order. When Envoy fails to build the filter chain of a
+ * write, the status is Failed, Envoy logs the error at most once every 10 seconds, and the
+ * extension keeps owning the filter chain if it exists.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param update_id is the ID returned by
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update.
+ * @param filter_chain_name is the name of the filter chain. It is owned by Envoy and valid only
+ * during this call.
+ * @param status is the outcome of the write.
+ * @param error_details describes the problem when the status is Failed, and is empty otherwise. It
+ * is owned by Envoy and valid only during this call.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    uint64_t update_id, envoy_dynamic_module_type_envoy_buffer filter_chain_name,
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status status,
+    envoy_dynamic_module_type_envoy_buffer error_details);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer is called by
+ * the module to opt in to adding, updating and removing filter chains. Until it is called,
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update and
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove return
+ * NotAllowed.
+ *
+ * This must be called on the main thread. It can be called before
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized, for example from
+ * envoy_dynamic_module_on_bootstrap_extension_config_new.
+ *
+ * This should be called at most once. Subsequent calls are no-ops and return false. This also
+ * returns false once shutdown began.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @return true if the filter chain config writer was enabled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update is
+ * called by the module to add or update a filter chain that the listeners with fcds_config find by
+ * name, as FCDS would deliver it. Envoy queues the write, applies it asynchronously on the main
+ * thread, and reports the outcome through
+ * envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done.
+ *
+ * The extension owns the filter chains it writes. A listener whose fcds_config has no config_source
+ * waits, without a timeout, until the filter chains that it finds by name are written and finished
+ * warming, so such a listener that Envoy creates before it starts its workers holds back the
+ * initialization of Envoy until then. A name is either discovered through FCDS or written by an
+ * extension. Envoy rejects a listener that requests a name of the other kind, and a write of a name
+ * that a listener requests through FCDS completes as Failed. A listener keeps its names until it is
+ * removed and has finished draining. Envoy does not notice when another extension writes or removes
+ * the same filter chain, so the module must only write filter chains that no other extension
+ * writes. Writes submitted before Envoy finishes initializing its static and CDS clusters are
+ * applied once it has. When the module writes a filter chain again before its previous write is
+ * applied, Envoy applies only the latest write and the previous one completes as Superseded. The
+ * cluster and filter chain config writers apply their writes independently, so write a filter chain
+ * whose inline routes name a written cluster only after that cluster write completed as Active.
+ *
+ * A written filter chain has the same authority as a filter chain delivered by FCDS, so build
+ * filter chains from a schema that the module owns. A write that changes a filter chain drains the
+ * connections of its previous version on the listeners that use it.
+ *
+ * This must be called on the main thread, during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized. The buffers are owned by the
+ * module and only need to be valid during this call. A buffer pointer may be null only when its
+ * length is zero.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param filter_chain_name is the name of the filter chain. It must not be empty.
+ * @param filter_chain is the serialized envoy.config.listener.v3.FilterChain. Its name must equal
+ * filter_chain_name.
+ * @param update_id_out receives a nonzero ID that increases with every accepted write, or 0 when
+ * the write is rejected. It must not be null.
+ * @return envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result is Success
+ * when the write is queued.
+ */
+envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result
+envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_chain_name,
+    envoy_dynamic_module_type_module_buffer filter_chain, uint64_t* update_id_out);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove is called by
+ * the module to remove a filter chain that it owns. Envoy queues the removal and applies it
+ * asynchronously on the main thread. A removal has no outcome of its own. Once Envoy applies it,
+ * the listeners that use the filter chain drain its connections, and the listeners that wait for it
+ * stop waiting and can become active without it.
+ *
+ * This must be called on the main thread, during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param filter_chain_name is the name of the filter chain. The buffer is owned by the module and
+ * only needs to be valid during this call.
+ * @return envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result is Success
+ * when the removal is queued.
+ */
+envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result
+envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_chain_name);
 
 // =============================================================================
 // Common Host Types (shared by cluster and standalone load balancer extensions)

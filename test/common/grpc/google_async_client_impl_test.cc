@@ -11,6 +11,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/proto/helloworld.pb.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -253,6 +254,31 @@ TEST_F(EnvoyGoogleLessMockedAsyncClientImplTest, AsyncRequestDetach) {
   grpc_request->detach();
 
   grpc_request->cancel();
+}
+
+TEST_F(EnvoyGoogleLessMockedAsyncClientImplTest, ClientDestroyedWhileWaitingForGracefulClose) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "true"}});
+  RawAsyncClientPtr grpc_client_impl = std::make_unique<GoogleAsyncClientImpl>(
+      *dispatcher_, *tls_, real_stub_factory_, scope_, config_, context_, stat_names_);
+  auto grpc_client_ptr =
+      std::make_unique<AsyncClient<helloworld::HelloRequest, helloworld::HelloReply>>(
+          std::move(grpc_client_impl));
+
+  {
+    NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+    AsyncStream<helloworld::HelloRequest> grpc_stream = grpc_client_ptr->start(
+        *method_descriptor_, grpc_callbacks, Http::AsyncClient::RequestOptions());
+
+    grpc_stream.waitForRemoteCloseAndDelete();
+    // At this point both the stream and callback are deleted.
+  }
+
+  // Simulate the AsyncGrpcClient deletion. This can happen if it is getting evicted from a
+  // its cache in the cluster manager.
+  // There is no way to verify that the queue was cancelled, the test can only check that nothing is
+  // crashing.
+  grpc_client_ptr.reset();
 }
 
 } // namespace

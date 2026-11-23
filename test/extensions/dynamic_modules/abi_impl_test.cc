@@ -667,8 +667,26 @@ WEAK_STUB(BootstrapExtensionFileWatcherAddWatch,
                                                                                    {nullptr, 0}, 0))
 WEAK_STUB(BootstrapExtensionEnableClusterLifecycle,
           envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(nullptr))
+WEAK_STUB(BootstrapExtensionSubscribeEcds,
+          envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(nullptr, {nullptr, 0},
+                                                                           {nullptr, 0}))
+WEAK_STUB(BootstrapExtensionConfigSnapshotNew,
+          envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(nullptr, nullptr, 0,
+                                                                                {nullptr, 0},
+                                                                                nullptr))
+WEAK_STUB(BootstrapExtensionConfigSnapshotSerialize,
+          envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(nullptr,
+                                                                                      nullptr,
+                                                                                      nullptr))
+WEAK_STUB(BootstrapExtensionConfigSnapshotDelete,
+          envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(nullptr))
 WEAK_STUB(BootstrapExtensionEnableListenerLifecycle,
           envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr))
+WEAK_STUB(BootstrapExtensionSetXdsNotifications,
+          envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(nullptr, true))
+WEAK_STUB(BootstrapExtensionEnableRuntimeUpdate,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(nullptr,
+                                                                                  {nullptr, 0}))
 WEAK_STUB(BootstrapExtensionRunOnAllWorkers,
           envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(nullptr, 1))
 WEAK_STUB(BootstrapExtensionEnableClusterWriter,
@@ -679,6 +697,24 @@ WEAK_STUB(BootstrapExtensionClusterWriterAddOrUpdate,
 WEAK_STUB(BootstrapExtensionClusterWriterRemove,
           envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(nullptr,
                                                                                   {nullptr, 0}))
+WEAK_STUB(BootstrapExtensionEnableListenerWriter,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(nullptr))
+WEAK_STUB(BootstrapExtensionListenerWriterAddOrUpdate,
+          envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+              nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(BootstrapExtensionListenerWriterRemove,
+          envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(nullptr,
+                                                                                   {nullptr, 0}))
+WEAK_STUB(
+    BootstrapExtensionEnableFilterChainConfigWriter,
+    envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(nullptr))
+WEAK_STUB(
+    BootstrapExtensionFilterChainConfigWriterAddOrUpdate,
+    envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+        nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(BootstrapExtensionFilterChainConfigWriterRemove,
+          envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
+              nullptr, {nullptr, 0}))
 
 WEAK_STUB(BootstrapExtensionRegisterAdminHandler,
           envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
@@ -1251,6 +1287,42 @@ WEAK_STUB(NetworkFilterHasUpstreamHost,
           envoy_dynamic_module_callback_network_filter_has_upstream_host(nullptr))
 WEAK_STUB(NetworkFilterGetUpstreamConnectionId,
           envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(nullptr))
+WEAK_STUB(NetworkFilterSetUpstreamHost,
+          envoy_dynamic_module_callback_network_filter_set_upstream_host(nullptr, {nullptr, 0},
+                                                                         {nullptr, 0}, 0))
+WEAK_STUB(NetworkFilterSetUpstreamCluster,
+          envoy_dynamic_module_callback_network_filter_set_upstream_cluster(nullptr, {nullptr, 0}))
+WEAK_STUB(NetworkFilterSetUpstreamLocalAddress,
+          envoy_dynamic_module_callback_network_filter_set_upstream_local_address(nullptr,
+                                                                                  {nullptr, 0}, 0))
+WEAK_STUB(NetworkFilterSetUpstreamTransportFailureReason,
+          envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason(
+              nullptr, {nullptr, 0}))
+WEAK_STUB(NetworkFilterSetUpstreamLocalCloseReason,
+          envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason(nullptr,
+                                                                                       {nullptr,
+                                                                                        0}))
+WEAK_STUB(NetworkFilterSetUpstreamDetectedCloseType,
+          envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type(
+              nullptr, envoy_dynamic_module_type_detected_close_type_Normal))
+WEAK_STUB(NetworkFilterSetUpstreamRequestAttemptCount,
+          envoy_dynamic_module_callback_network_filter_set_upstream_request_attempt_count(nullptr,
+                                                                                          0))
+WEAK_STUB(NetworkFilterRecordUpstreamTiming,
+          envoy_dynamic_module_callback_network_filter_record_upstream_timing(
+              nullptr, envoy_dynamic_module_type_upstream_timing_event_ConnectStart))
+WEAK_STUB(NetworkFilterAddUpstreamWireBytes,
+          envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes(nullptr, 0, 0))
+WEAK_STUB(NetworkFilterAddDownstreamWireBytes,
+          envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes(nullptr, 0, 0))
+WEAK_STUB(NetworkFilterSetResponseFlag,
+          envoy_dynamic_module_callback_network_filter_set_response_flag(
+              nullptr, envoy_dynamic_module_type_response_flag_UpstreamConnectionFailure))
+WEAK_STUB(NetworkFilterAddCustomFlag,
+          envoy_dynamic_module_callback_network_filter_add_custom_flag(nullptr, {nullptr, 0}))
+WEAK_STUB(NetworkFilterFlushAccessLog,
+          envoy_dynamic_module_callback_network_filter_flush_access_log(
+              nullptr, envoy_dynamic_module_type_access_log_type_TcpUpstreamConnected))
 WEAK_STUB(NetworkFilterStartDownstreamSecureTransport,
           envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(nullptr))
 WEAK_STUB(NetworkFilterStartUpstreamSecureTransport,
@@ -1821,6 +1893,22 @@ WEAK_STUB(HttpGetMetadataListString, envoy_dynamic_module_callback_http_get_meta
 WEAK_STUB(HttpGetMetadataListBool, envoy_dynamic_module_callback_http_get_metadata_list_bool(
                                        nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                        {nullptr, 0}, {nullptr, 0}, 0, nullptr))
+
+WEAK_STUB(HttpGetMetadataNestedString,
+          envoy_dynamic_module_callback_http_get_metadata_nested_string(
+              nullptr, envoy_dynamic_module_type_metadata_source_Dynamic, {nullptr, 0}, nullptr, 0,
+              nullptr))
+WEAK_STUB(HttpGetMetadataNestedNumber,
+          envoy_dynamic_module_callback_http_get_metadata_nested_number(
+              nullptr, envoy_dynamic_module_type_metadata_source_Dynamic, {nullptr, 0}, nullptr, 0,
+              nullptr))
+WEAK_STUB(HttpGetMetadataNestedBool, envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+                                         nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
+                                         {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(HttpGetMetadataNestedListSize,
+          envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+              nullptr, envoy_dynamic_module_type_metadata_source_Dynamic, {nullptr, 0}, nullptr, 0,
+              nullptr))
 
 WEAK_STUB(TracerGetTraceContextValue,
           envoy_dynamic_module_callback_tracer_get_trace_context_value(nullptr, {nullptr, 0},

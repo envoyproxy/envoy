@@ -16,6 +16,7 @@
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "benchmark/benchmark.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -77,8 +78,60 @@ void testGetOrCreateAsyncClientWithHashConfig(::benchmark::State& state) {
   }
 }
 
+// A GrpcService with a timeout, a retry policy and the given number of initial metadata entries.
+envoy::config::core::v3::GrpcService makeGrpcServiceWithMetadata(int64_t metadata_count) {
+  envoy::config::core::v3::GrpcService grpc_service;
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
+  grpc_service.mutable_timeout()->set_seconds(1);
+  auto* retry_policy = grpc_service.mutable_retry_policy();
+  retry_policy->mutable_retry_back_off()->mutable_base_interval()->set_nanos(100000000);
+  retry_policy->mutable_retry_back_off()->mutable_max_interval()->set_seconds(1);
+  retry_policy->mutable_num_retries()->set_value(3);
+  for (int64_t i = 0; i < metadata_count; i++) {
+    auto* metadata = grpc_service.add_initial_metadata();
+    metadata->set_key(absl::StrCat("x-metadata-", i));
+    metadata->set_value(absl::StrCat("value-", i));
+  }
+  return grpc_service;
+}
+
+void testGetOrCreateAsyncClientWithHashConfigAndMetadata(::benchmark::State& state) {
+  AsyncClientManagerImplTest async_client_man_test;
+
+  GrpcServiceConfigWithHashKey config_with_hash_key_a =
+      GrpcServiceConfigWithHashKey(makeGrpcServiceWithMetadata(state.range(0)));
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    for (int i = 0; i < 1000; i++) {
+      RawAsyncClientSharedPtr foo_client0 =
+          async_client_man_test.async_client_manager_
+              ->getOrCreateRawAsyncClientWithHashKey(
+                  config_with_hash_key_a, *async_client_man_test.context_.store_.rootScope(), true)
+              .value();
+    }
+  }
+}
+
+void testCreateGrpcServiceConfigWithHashKey(::benchmark::State& state) {
+  const envoy::config::core::v3::GrpcService grpc_service =
+      makeGrpcServiceWithMetadata(state.range(0));
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service);
+    ::benchmark::DoNotOptimize(config_with_hash_key);
+  }
+}
+
 BENCHMARK(testGetOrCreateAsyncClientWithConfig)->Unit(::benchmark::kMicrosecond);
 BENCHMARK(testGetOrCreateAsyncClientWithHashConfig)->Unit(::benchmark::kMicrosecond);
+BENCHMARK(testGetOrCreateAsyncClientWithHashConfigAndMetadata)
+    ->Arg(0)
+    ->Arg(8)
+    ->Arg(16)
+    ->Unit(::benchmark::kMicrosecond);
+BENCHMARK(testCreateGrpcServiceConfigWithHashKey)->Arg(0)->Arg(8)->Arg(16);
 
 } // namespace
 } // namespace Grpc

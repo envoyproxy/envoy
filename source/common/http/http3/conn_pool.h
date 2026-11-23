@@ -132,6 +132,10 @@ private:
   Event::SchedulableCallbackPtr async_connect_callback_;
   // True if newStream() is ever called.
   bool has_created_stream_{false};
+  // True once pre-handshake stream capacity has been processed, ensuring only the initial 0-RTT
+  // capacity notification dispatches early data and subsequent FinishHandshake() notifications wait
+  // for Connected.
+  bool early_data_capacity_initialized_{false};
 };
 
 // An interface to propagate H3 handshake result.

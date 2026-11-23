@@ -2,7 +2,6 @@
 #include <gtest/gtest.h>
 
 #include "contrib/postgres_proxy/filters/network/source/postgres_encoder.h"
-#include "contrib/postgres_proxy/filters/network/source/postgres_message.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,22 +17,16 @@ protected:
 };
 
 TEST_F(EncoderTest, BuildErrorResponseProducesCorrectFormat) {
-  const std::string severity = "FATAL";
-  const std::string message = "some error";
-  const std::string code = "01007";
+  using namespace std::string_literals;
+  Buffer::OwnedImpl data = encoder_->buildErrorResponse("FATAL", "some error", "28000");
+  constexpr uint32_t header_size = 1 + sizeof(uint32_t);
 
-  Buffer::OwnedImpl data = encoder_->buildErrorResponse(severity, message, code);
-
-  std::unique_ptr<Message> msg = createMsgBodyReader<Byte1, Repeated<String>>();
   // Make sure response sent back to client is valid
-  ASSERT_THAT(msg->validate(data, 0, data.length()), Message::ValidationOK);
-  ASSERT_TRUE(msg->read(data, data.length()));
-  auto out = msg->toString();
-
-  ASSERT_TRUE(out.find("[E]") != std::string::npos);
-  ASSERT_TRUE(out.find(severity) != std::string::npos);
-  ASSERT_TRUE(out.find(message) != std::string::npos);
-  ASSERT_TRUE(out.find(code) != std::string::npos);
+  ASSERT_GE(data.length(), header_size);
+  EXPECT_EQ(data.peekBEInt<char>(0), 'E');
+  EXPECT_EQ(data.peekBEInt<uint32_t>(1), data.length() - 1);
+  data.drain(header_size);
+  EXPECT_EQ(data.toString(), "SFATAL\0Msome error\0C28000\0\0"s);
 }
 
 } // namespace PostgresProxy

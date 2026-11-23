@@ -701,6 +701,50 @@ impl From<envoy_dynamic_module_type_metrics_result>
   }
 }
 
+/// NoopScheduler discards every commit. Useful as a test double when the
+/// scheduler's side effects are irrelevant.
+pub struct NoopScheduler;
+
+impl bootstrap::EnvoyBootstrapExtensionConfigScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl cluster::EnvoyClusterScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl http::EnvoyHttpFilterConfigScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl http::EnvoyHttpFilterScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl listener::EnvoyListenerFilterConfigScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl listener::EnvoyListenerFilterScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl network::EnvoyNetworkFilterConfigScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl network::EnvoyNetworkFilterScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl stats_sink::EnvoyStatSinkConfigScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
+impl tls_certificate_selector::EnvoyTlsCertificateSelectorConfigScheduler for NoopScheduler {
+  fn commit(&self, _event_id: u64) {}
+}
+
 /// We wrap the Box<dyn T> in another Box to be able to pass the address of the Box to C, and
 /// retrieve it back when the C code calls the destroy function via [`drop_wrapped_c_void_ptr!`].
 /// This is necessary because the Box<dyn T> is a fat pointer, and we can't pass it directly.

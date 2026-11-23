@@ -367,6 +367,7 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
   main_common.reset(nullptr);
   bug_handler_registration_.reset(nullptr);
   assert_handler_registration_.reset(nullptr);
+  log_delegate_ptr_.reset(nullptr);
 
   if (event_tracker_ != nullptr) {
     event_tracker_->on_exit_();

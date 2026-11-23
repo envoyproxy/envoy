@@ -15,7 +15,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.router"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/http/router:config",
         "//test/mocks/server:factory_context_mocks",
@@ -33,7 +39,12 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.filters.http.router"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/router:config",
         "//test/integration:http_integration_lib",

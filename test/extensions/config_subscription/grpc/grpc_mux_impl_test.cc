@@ -1713,6 +1713,26 @@ TEST(GrpcMuxFactoryTest, InvalidRateLimit) {
                EnvoyException);
 }
 
+TEST_P(GrpcMuxImplTest, XdsConfigTrackerSkipsUnsubscriptionsWhileDisabled) {
+  use_config_tracker_ = true;
+  config_tracker_.enabled_ = false;
+  setup();
+
+  auto watch = grpc_mux_->addWatch("type", {"x", "y", "z"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(config_tracker_, onResourceUnsubscribed(_, _)).Times(0);
+  watch->update({"y", "z"});
+  testing::Mock::VerifyAndClearExpectations(&config_tracker_);
+
+  config_tracker_.enabled_ = true;
+  EXPECT_CALL(config_tracker_, onResourceUnsubscribed("type", "y"));
+  watch->update({"z"});
+  testing::Mock::VerifyAndClearExpectations(&config_tracker_);
+
+  config_tracker_.enabled_ = false;
+  EXPECT_CALL(config_tracker_, onResourceUnsubscribed(_, _)).Times(0);
+  watch.reset();
+}
+
 TEST_P(GrpcMuxImplTest, XdsConfigTrackerOnConfigAccepted) {
   use_config_tracker_ = true;
   resource_decoder_ = std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<

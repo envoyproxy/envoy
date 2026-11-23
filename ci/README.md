@@ -39,7 +39,7 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 # Build image base and compiler versions
 
 * `envoyproxy/envoy-build:ci-<tag>` &mdash; based on Debian (trixie-slim); the compilers (Clang and GCC) and other toolchains are
-  fetched by Bazel rather than installed in the image. Variants `devtools`, `docker`, `mobile` and `worker` add tooling for
+  fetched by Bazel rather than installed in the image. Variants `devtools`, `docker` and `worker` add tooling for
   specific CI jobs.
 
 `./ci/run_envoy_docker.sh` picks the variant itself: `devtools` by default, `ci` under GitHub Actions or with
@@ -50,7 +50,7 @@ The source for these images is located in the [envoyproxy/toolshed](https://gith
 repository.
 
 The default toolchain uses the Clang compiler with libc++ for all Linux CI runs with tests and requires no configuration flag. We have an additional Linux CI run with GCC, configured with `--config=gcc`, which builds the binary and runs the tests
-(`ci/do_ci.sh gcc`; `gcc.server_only` and `gcc.test_only` run just one of the two).
+(`ci/do_ci.sh gcc`; `gcc.build` and `gcc.test` run just one of the two).
 
 # Supported compiler configurations
 
@@ -190,7 +190,6 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
 * `debug <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c dbg`.
 * `debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
-* `docker` &mdash; build Docker images, expects `release` or `release.server_only` to have been run first.
 * `dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with clang.
 * `dev <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c fastbuild` with clang.
 * `dev.contrib` &mdash; build Envoy static binary with contrib and run tests under `-c fastbuild` with clang.
@@ -198,19 +197,22 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `release` &mdash; build Envoy static binary and run tests under `-c opt` with clang.
 * `release <test>` &mdash; build Envoy static binaries and run a specified test or test dir under `-c opt` with clang.
 * `release.server_only` &mdash; build Envoy static binaries under `-c opt` with clang.
+* `release.containers` &mdash; build the Envoy container images, as OCI tarballs in `$ENVOY_DOCKER_BUILD_DIR/envoy/<arch>/build_images`.
 * `sizeopt` &mdash; build Envoy static binary and run tests under `-c opt --config=sizeopt` with clang.
 * `sizeopt <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt --config=sizeopt` with clang.
 * `sizeopt.server_only` &mdash; build Envoy static binary under `-c opt --config=sizeopt` with clang.
 * `coverage` &mdash; build and run tests under `-c dbg` with clang, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
 * `coverage <test>` &mdash; build and run a specified test or test dir under `-c dbg` with clang, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`. Specify `//contrib/...` to get contrib coverage.
+* `coverage.fuzz` &mdash; build and run the fuzz tests with clang, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/fuzz_coverage/html`. `fuzz_coverage` is the previous name of this target.
 * `msan` &mdash; build and run tests under `-c dbg --config=msan` with clang.
 * `msan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=msan` with clang.
 * `tsan` &mdash; build and run tests under `-c dbg --config=tsan` with clang.
 * `tsan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=tsan` with clang.
 * `fuzz` &mdash; build and run fuzz tests under `-c dbg --config=asan-fuzzer` with clang.
 * `fuzz <test>` &mdash; build and run a specified fuzz test or test dir under `-c dbg --config=asan-fuzzer` with clang. If specifying a single fuzz test, must use the full target name with "_with_libfuzzer" for `<test>`.
-* `compile_time_options` &mdash; build Envoy and run tests with various compile-time options toggled to their non-default state, to ensure they still build.
-* `compile_time_options <test>` &mdash; build Envoy and run a specified test or test dir with various compile-time options toggled to their non-default state, to ensure they still build.
+* `cto.<option>` &mdash; run tests with the compile-time options that can be set together (`--config=compile-time-options`) toggled to their non-default state, and one further option, on the tests it can affect: `cto.jemalloc` (jemalloc, all tests), `cto.noadmin` (admin disabled, all tests), `cto.gperftools`, `cto.wamr`, `cto.wasmtime`, `cto.asserts` (release-mode asserts), `cto.nolog` (builds the server with logging disabled).
+* `compile_time_options` (or `cto`) &mdash; run all of the `cto.*` targets.
+* `cto.<option> <test>` &mdash; run a specified test or test dir with that target's options (`cto.asserts` and `cto.nolog` have fixed targets).
 * `clang-tidy <targets>` &mdash; build and run clang-tidy on the specified Bazel targets. If no targets are provided, it uses `CLANG_TIDY_TARGETS` when set, otherwise the default target set.
 * `check_proto_format`&mdash; check configuration, formatting and build issues in API proto files.
 * `fix_proto_format`&mdash; fix configuration, formatting and build issues in API proto files.
@@ -219,9 +221,9 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `lockfiles`/`lockfiles.regenerate` &mdash; repin `Cargo.Bazel.envoy.lock` from `Cargo.toml` and `Cargo.lock` with `CARGO_BAZEL_REPIN=true`, then regenerate all `MODULE.bazel.lock` files with `bazel mod deps --lockfile_mode=update`.
 * `lockfiles.check` &mdash; regenerate the lockfiles as `lockfiles` does and fail with a diff summary if any lockfile, including `Cargo.lock`, changes; the full diff is written to `LOCKFILES_DIFF_OUTPUT` (default `/build/fix_lockfiles.diff`, uploaded as an artifact in CI). Run `ci/do_ci.sh lockfiles` to update them.
 * `modules.version` &mdash; set the `module()` version, and the `bazel_dep` versions of in-repo modules (`envoy`, `envoy_api`, `envoy-docs`, `envoy_mobile`, `envoy_build_config`), in all `MODULE.bazel` files to match `VERSION.txt`, then regenerate the lockfiles as `lockfiles` does.
-* `deps` &mdash; validate dependency metadata ordering, reachability, graph structure, the pinned bazel-registry commit, lockfile sync, and dependabot configuration.
+* `deps` &mdash; validate dependency metadata ordering, reachability, graph structure, the pinned bazel-registry commit, lockfile sync, release dates/releases (requires `GITHUB_TOKEN`), and dependabot configuration.
 * `deps.report` &mdash; run the per-workspace bzlmod dependency report targets and print the current/latest version status for each workspace.
-* `deps.update <name[=version]>` &mdash; run the per-workspace bzlmod dependency updater for the requested module, skipping workspaces where that dependency is not declared, then regenerate the lockfiles as `lockfiles` does.
+* `deps.update <name[=version]>` &mdash; run the per-workspace bzlmod dependency updater for the requested module, skipping workspaces where that dependency is not declared, then regenerate the lockfiles as `lockfiles` does, and fix the release date of the module in the dependency metadata (requires `GITHUB_TOKEN`).
 * `registry` &mdash; run the per-workspace Bazel registry updater targets for `.bazelrc`, `api/.bazelrc`, and `bazel/tests/external/.bazelrc`, then regenerate the lockfiles as `lockfiles` does. Set `ENVOY_REGISTRY_HASH` to request a specific hash, and set `ENVOY_REGISTRY_ALLOW_UNSAFE` to allow non-ancestor pins for testing.
 * `registry.check` &mdash; run the per-workspace Bazel registry status targets, verify they all report the same pinned hash, and require a tagged registry pin for non-`-dev` releases.
 * `docs`&mdash; build documentation tree in `generated/docs`.
