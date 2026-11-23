@@ -5,190 +5,25 @@
 #include <utility>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/pure.h"
-#include "envoy/event/dispatcher.h"
 #include "envoy/event/schedulable_cb.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
+#include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
 
-#include "absl/container/flat_hash_set.h"
 #include "absl/functional/any_invocable.h"
 #include "absl/status/status.h"
-#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-class BufferManager;
-
 // Invoked once a replay() range has been fully injected into the filter chain (or on error). The
 // caller can start to stream further sub-ranges or to terminate the stream.
 using ReplayDoneCallback = absl::AnyInvocable<void(absl::Status)>;
-
-// Replay-side resume notification. A BufferManager implements this and attaches itself to the
-// bridge while it replays; the bridge invokes it once chain back-pressure has drained.
-class ReplayResumeHandler {
-public:
-  virtual ~ReplayResumeHandler() = default;
-
-  virtual void onReplayResumed() PURE;
-};
-
-// Path-agnostic view of the Envoy filter chain, and the owner of this path's flow control.
-//
-// Each path supplies a concrete adapter (see filter_chain_bridge.h) that maps the virtual methods
-// onto the corresponding decoder/encoder callbacks. The bridge is shared by every BufferManager on
-// the path and outlives all of them: data into the BufferManager instances is from the same source
-// (either downstream or upstream), so the back-pressure is aggregated across BufferManager
-// instances.
-class FilterChainBridge : public Logger::Loggable<Logger::Id::filter> {
-public:
-  // `buffer_limit` is the chain's ingest high watermark (the configured decoder/encoder buffer
-  // limit); 0 disables ingest flow control.
-  explicit FilterChainBridge(uint32_t buffer_limit)
-      : high_watermark_(buffer_limit), low_watermark_(buffer_limit / 2) {}
-
-  virtual ~FilterChainBridge();
-
-  // Registers/unregisters a BufferManager on this path so detachFromFilterChain() can detach all
-  // active stores on stream teardown.
-  void registerBufferManager(BufferManager& manager) { registered_managers_.insert(&manager); }
-
-  void unregisterBufferManager(BufferManager& manager) { registered_managers_.erase(&manager); }
-
-  // Dispatcher the external buffer should use for completion/watermark callbacks.
-  virtual Event::Dispatcher& dispatcher() PURE;
-
-  // Re-injects a replayed data frame into the filter chain. Always a non-terminal
-  // frame: end-of-stream is the caller's concern (see ReplayDoneCallback).
-  virtual void injectData(Buffer::Instance& data) PURE;
-
-  // Fails the stream after an unrecoverable external-buffer error.
-  virtual void onUnrecoverableError() PURE;
-
-  // Reports bytes a BufferManager has accepted but not yet made durable. The bridge sums them
-  // across BufferManager instances and pauses the data source once the total reaches
-  // high_watermark_.
-  void addUnacked(uint64_t bytes);
-
-  // Reports bytes that have since become durable, resuming the data source once the total falls
-  // to low_watermark_.
-  void releaseUnacked(uint64_t bytes);
-
-  // Move-only RAII token that charges `bytes` to `addUnacked()` on construction and releases them
-  // via `releaseUnacked()` on destruction.
-  class ScopedUnacked {
-  public:
-    ScopedUnacked(FilterChainBridge& bridge, uint64_t bytes) : bridge_(&bridge), bytes_(bytes) {
-      if (bytes_ > 0) {
-        bridge_->addUnacked(bytes_);
-      }
-    }
-    ScopedUnacked(ScopedUnacked&& other) noexcept
-        : bridge_(std::exchange(other.bridge_, nullptr)), bytes_(std::exchange(other.bytes_, 0)) {}
-    ScopedUnacked& operator=(ScopedUnacked&&) = delete;
-    ScopedUnacked(const ScopedUnacked&) = delete;
-    ScopedUnacked& operator=(const ScopedUnacked&) = delete;
-    ~ScopedUnacked() {
-      if (bridge_ != nullptr && bytes_ > 0) {
-        bridge_->releaseUnacked(bytes_);
-      }
-    }
-
-  private:
-    FilterChainBridge* bridge_{nullptr};
-    uint64_t bytes_{0};
-  };
-
-  // True while the data source is paused.
-  bool ingestPaused() const { return source_paused_; }
-
-  // Sets the handler to notify when replay back-pressure drains, for the duration of one replay
-  // range. A handler set while the chain is already backed up starts out paused. The slot holds
-  // one handler because only one BufferManager on a path injects at a time.
-  void setReplayHandler(ReplayResumeHandler& handler) {
-    ASSERT(replay_handler_ == nullptr || replay_handler_ == &handler);
-    replay_handler_ = &handler;
-  }
-
-  // Releases the slot, if `handler` still holds it.
-  void clearReplayHandler(const ReplayResumeHandler& handler) {
-    if (replay_handler_ == &handler) {
-      replay_handler_ = nullptr;
-    }
-  }
-
-  // Stops watermark delivery. Must be called on or before the filter's onDestroy(): FilterManager
-  // destroys its watermark callback lists before it destroys the filters that registered with
-  // them, so unsubscribing from the bridge's destructor is too late.
-  void detachFromFilterChain();
-
-  // True while the chain we replay into is backed up.
-  bool replayPaused() const { return replay_high_watermark_count_ > 0; }
-
-  // Bounds the chunks injected in one event-loop pass, across every BufferManager on the path.
-  // Returns false once the budget is spent, at which point the caller must stop injecting and
-  // resume on a later pass. A BufferManager that completes reads synchronously can otherwise drive
-  // the read/inject loop back-to-back, replaying a whole payload in one pass and starving other
-  // connections and timers on this worker. The budget also caps that loop's recursion depth.
-  bool tryConsumeInjectBudget();
-
-  // Refills the budget. Called by a BufferManager re-entering the inject loop on a later pass than
-  // the one that spent it -- never on a same-pass continuation, which would defeat the cap.
-  void resetInjectBudget();
-
-protected:
-  // Entry points the adapter calls from the path's Envoy watermark callbacks.
-  void onAboveReplayWatermark();
-
-  void onBelowReplayWatermark();
-
-private:
-  // Pushes ingest back-pressure toward the data source (the filter's own
-  // write-buffer high/low watermark on this path).
-  virtual void pauseSource() PURE;
-
-  virtual void resumeSource() PURE;
-
-  // Unsubscribes *this from the path's Envoy watermark callbacks. The adapter subscribes in its
-  // constructor, for the bridge's whole life.
-  virtual void unsubscribeReplayWatermarks() PURE;
-
-  void updateIngestBackpressure();
-
-  // Chunks that can be injected in one event-loop pass (see tryConsumeInjectBudget).
-  // BufferManager's ReadChunkSize times this bounds the bytes injected per pass.
-  static constexpr uint32_t InjectChunksPerIteration = 8;
-
-  uint32_t inject_budget_used_{0};
-
-  // Bytes accepted by any store on this path that are not yet durable.
-  uint64_t unacked_{0};
-  const uint32_t high_watermark_;
-  const uint32_t low_watermark_;
-  // Tracked so each crossing pauses or resumes the source exactly once.
-  bool source_paused_{false};
-  bool detached_{false};
-
-  // Depth of unmatched replay high-watermark callbacks. The connection manager may raise the
-  // watermark more than once (stream and connection), so replay resumes only when this returns to
-  // zero.
-  uint32_t replay_high_watermark_count_{0};
-  // When pauseSource() or resumeSource() reports an ingest buffer watermark to Envoy, Envoy fans
-  // that same signal back to every watermark subscriber on the stream, including this bridge.
-  // These counters track how many self-triggered callbacks are currently in flight on the stack so
-  // onAboveReplayWatermark() and onBelowReplayWatermark() can ignore our own echoes instead of
-  // mistaking ingest back-pressure for replay back-pressure.
-  uint32_t expected_high_watermark_echoes_{0};
-  uint32_t expected_low_watermark_echoes_{0};
-  ReplayResumeHandler* replay_handler_{nullptr};
-  absl::flat_hash_set<BufferManager*> registered_managers_;
-};
-using FilterChainBridgePtr = std::unique_ptr<FilterChainBridge>;
 
 // Owns the "offload the payload into an ExternalBuffer, then replay ranges of it
 // back into the filter chain" pipeline, with flow control in both directions.
@@ -221,8 +56,7 @@ using FilterChainBridgePtr = std::unique_ptr<FilterChainBridge>;
 // registration. Refactoring replay/injection into a coroutine loop on the stream writer while
 // keeping SseEvent stores purely passive (exposing async readChunk()) will restore strict
 // std::unique_ptr lexical ownership without callback reentrancy.
-class BufferManager : public ReplayResumeHandler,
-                      public std::enable_shared_from_this<BufferManager>,
+class BufferManager : public std::enable_shared_from_this<BufferManager>,
                       Logger::Loggable<Logger::Id::filter> {
 public:
   struct Config {
@@ -240,7 +74,7 @@ public:
 
   // onDestroy() must run before destruction (see onDestroy()): it detaches the
   // manager so nothing touches a half-torn-down bridge/buffer.
-  ~BufferManager() override { onDestroy(); }
+  ~BufferManager() { onDestroy(); }
 
   // Offloads `data` into the external buffer (batching small frames). The caller
   // holds the filter chain (returns StopIteration*) while the body is buffered.
@@ -293,13 +127,19 @@ public:
   // external BufferManagerPtr synchronously during injectData() or replay completion is safe.
   void onDestroy();
 
-  // ReplayResumeHandler
-  void onReplayResumed() override;
-
-  // Flushes any sub-threshold queued backlog when the bridge pauses the ingest source.
-  void onIngestPaused() { maybeIssueWrite(); }
-
 private:
+  class BridgeAdapter : public FilterChainBridge::Client {
+  public:
+    explicit BridgeAdapter(BufferManager& owner) : owner_(owner) {}
+    void onBridgeDetached() override { owner_.onDestroy(); }
+    void onIngestPaused() override { owner_.maybeIssueWrite(); }
+
+  private:
+    BufferManager& owner_;
+  };
+
+  void onReplayResumed();
+  void armWriteResumeCallback();
   // Issues a write of the queued backlog when one is warranted: no write is in
   // flight and the backlog has reached WriteFlushThreshold, the stream has ended,
   // or the source is paused. Hands the whole backlog to the buffer as a single
@@ -370,6 +210,7 @@ private:
   Config config_;
   ExternalBufferFactory& buffer_factory_;
   FilterChainBridge& bridge_;
+  BridgeAdapter bridge_adapter_{*this};
   ExternalBufferPtr buffer_;
   // Reschedules replay work out of the current call stack: starts it when replay()
   // is requested after the offload is already durable (deferred to later in the

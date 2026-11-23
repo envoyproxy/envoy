@@ -758,7 +758,7 @@ TEST_F(BufferManagerTest, ReplayPausesUnderBackPressure) {
 
   // The chain signals back-pressure before replay begins.
   ASSERT_TRUE(bridge_->subscribed_);
-  bridge_->raiseReplayWatermark();
+  bridge_->raiseWriteWatermark();
 
   // Draining completes the write and starts replay, but replay is paused: no
   // chunk is read or injected while the high watermark is held.
@@ -769,7 +769,7 @@ TEST_F(BufferManagerTest, ReplayPausesUnderBackPressure) {
   // Releasing back-pressure schedules the resume off the watermark callback stack
   // (deferred so we never read/inject reentrantly from within it); firing the
   // continuation runs replay to completion.
-  bridge_->lowerReplayWatermark();
+  bridge_->lowerWriteWatermark();
   ASSERT_TRUE(replay_cb_->enabled());
   replay_cb_->invokeCallback();
   drain();
@@ -784,7 +784,7 @@ TEST_F(BufferManagerTest, ReplayResumesMidStream) {
   const std::string big(200 * 1024, 'x'); // 4 chunks of 64KiB + remainder.
   // The chain raises its replay high watermark right after the first injected
   // chunk; the loop must then stop until it is released.
-  bridge_->raise_replay_watermark_at_inject_ = 1;
+  bridge_->raise_write_watermark_at_inject_ = 1;
   Buffer::OwnedImpl body(big);
   manager_->onData(body);
   manager_->endStream();
@@ -801,7 +801,7 @@ TEST_F(BufferManagerTest, ReplayResumesMidStream) {
   // stack (deferred to avoid reentrant read/inject) and the continuation runs
   // replay to completion.
   ASSERT_TRUE(bridge_->subscribed_);
-  bridge_->lowerReplayWatermark();
+  bridge_->lowerWriteWatermark();
   ASSERT_TRUE(replay_cb_->enabled());
   replay_cb_->invokeCallback();
   EXPECT_TRUE(replay_done_);
@@ -818,20 +818,20 @@ TEST_F(BufferManagerTest, NestedWatermarksRequireBalancedRelease) {
   replayAll();
 
   ASSERT_TRUE(bridge_->subscribed_);
-  bridge_->raiseReplayWatermark();
-  bridge_->raiseReplayWatermark();
+  bridge_->raiseWriteWatermark();
+  bridge_->raiseWriteWatermark();
   drain();
   EXPECT_EQ(bridge_->inject_calls_, 0);
 
   // One release is not enough to resume.
-  bridge_->lowerReplayWatermark();
+  bridge_->lowerWriteWatermark();
   drain();
   EXPECT_EQ(bridge_->inject_calls_, 0);
   EXPECT_FALSE(replay_done_);
 
   // Balanced release schedules the resume off the watermark callback stack; the
   // continuation runs replay to completion.
-  bridge_->lowerReplayWatermark();
+  bridge_->lowerWriteWatermark();
   ASSERT_TRUE(replay_cb_->enabled());
   replay_cb_->invokeCallback();
   drain();
@@ -914,8 +914,8 @@ TEST_F(BufferManagerTest, ResumeSkipsReadWhileOneInFlight) {
 
   // A watermark cycle schedules a resume while the read is still in flight.
   ASSERT_TRUE(bridge_->subscribed_);
-  bridge_->raiseReplayWatermark();
-  bridge_->lowerReplayWatermark();
+  bridge_->raiseWriteWatermark();
+  bridge_->lowerWriteWatermark();
   ASSERT_TRUE(replay_cb_->enabled());
   // The continuation finds a read in flight and returns without issuing another.
   replay_cb_->invokeCallback();
@@ -957,7 +957,7 @@ TEST_F(BufferManagerTest, InjectRespectsWatermarkBackpressure) {
   drain();
 
   // Set bridge to raise high watermark on the first injected chunk.
-  bridge_->raise_replay_watermark_at_inject_ = 1;
+  bridge_->raise_write_watermark_at_inject_ = 1;
 
   const std::string big_payload(200 * 1024, 'z'); // Multiple 64KB chunks
   Buffer::OwnedImpl inject_data(big_payload);
@@ -976,7 +976,7 @@ TEST_F(BufferManagerTest, InjectRespectsWatermarkBackpressure) {
 
   // Now clear the watermark: low watermark schedules continuation to resume draining.
   ASSERT_TRUE(bridge_->subscribed_);
-  bridge_->lowerReplayWatermark();
+  bridge_->lowerWriteWatermark();
   ASSERT_TRUE(replay_cb_->enabled());
   replay_cb_->invokeCallback();
 
@@ -1282,8 +1282,8 @@ TEST_F(BufferManagerTest, OnReplayResumedWhileBudgetYieldedDoesNotScheduleCurren
 
   // Simulate a watermark cycle while budget_yielded_ is true.
   current_iter_calls = 0;
-  bridge_->raiseReplayWatermark();
-  bridge_->lowerReplayWatermark();
+  bridge_->raiseWriteWatermark();
+  bridge_->lowerWriteWatermark();
   EXPECT_EQ(current_iter_calls, 0);
 }
 
