@@ -31,6 +31,9 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
   }
 
   socket_->connectionInfoProvider().setListenerInfo(listener_.config_->listenerInfo());
+  // Transfer any connection-scoped state carried by the accepted IoHandle before listener filters
+  // and filter-chain matching run.
+  socket_->ioHandle().mergeStateInto(stream_info_->dynamicMetadata(), *stream_info_->filterState());
 }
 
 ActiveTcpSocket::~ActiveTcpSocket() {

@@ -2013,9 +2013,8 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
       });
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   Network::MockIoHandle io_handle;
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
+  ON_CALL(*accepted_socket, ioHandle()).WillByDefault(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
   EXPECT_CALL(io_handle,
               createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
                                Event::FileReadyType::Read | Event::FileReadyType::Closed));
@@ -2067,8 +2066,7 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
       });
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   Network::IoSocketHandleImpl io_handle{42};
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
+  ON_CALL(*accepted_socket, ioHandle()).WillByDefault(ReturnRef(io_handle));
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
 
@@ -2125,9 +2123,8 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
         return Network::FilterStatus::StopIteration;
       });
   Network::MockIoHandle io_handle;
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle));
+  ON_CALL(*accepted_socket, ioHandle()).WillByDefault(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle));
 
   Event::FileReadyCb file_event_callback;
   EXPECT_CALL(io_handle,
@@ -2187,9 +2184,8 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
       });
   Network::MockIoHandle io_handle;
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
+  ON_CALL(*accepted_socket, ioHandle()).WillByDefault(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
   EXPECT_CALL(io_handle,
               createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
                                Event::FileReadyType::Read | Event::FileReadyType::Closed));
