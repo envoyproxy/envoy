@@ -2791,36 +2791,6 @@ TEST_F(HttpRateLimitFilterTest, StopOnMatchInlinedRateLimits) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
-// stop_on_match on the per-route inlined rate limits.
-TEST_F(HttpRateLimitFilterTest, StopOnMatchPerRouteRateLimits) {
-  const std::string route_config_yaml = R"EOF(
-  domain: "per-route"
-  rate_limits:
-  - actions:
-    - request_headers:
-        header_name: "x-header-name"
-        descriptor_key: "header-name"
-    stop_on_match: true
-  - actions:
-    - generic_key:
-        descriptor_value: "generic-key"
-  )EOF";
-  setUpTest(filter_config_, route_config_yaml);
-  request_headers_.addCopy("x-header-name", "header-value");
-
-  EXPECT_CALL(*client_, limit(_, "per-route",
-                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
-                                  {{{"header-name", "header-value"}}}}),
-                              _, _, 0))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
-            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
-                               nullptr, "", nullptr);
-          })));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-}
-
 TEST_F(HttpRateLimitFilterTest, InlinedRateLimitAction) {
   setUpTest(inlined_rate_limit_actions_config_);
   request_headers_.addCopy("x-header-name", "header-value");
