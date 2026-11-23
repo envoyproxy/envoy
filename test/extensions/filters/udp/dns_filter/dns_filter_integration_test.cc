@@ -128,14 +128,11 @@ static_resources:
                        Network::Test::getLoopbackAddressString(GetParam()));
   }
 
-  Network::Address::InstanceConstSharedPtr getListenerBindAddressAndPortNoThrow() {
+  Network::Address::InstanceConstSharedPtr getListenerBindAddressNoThrow() {
     auto addr = Network::Utility::parseInternetAddressAndPortNoThrow(
         fmt::format("{}:{}", Envoy::Network::Test::getLoopbackAddressUrlString(version_), 0),
         false);
 
-    ASSERT(addr != nullptr);
-
-    addr = Network::Test::findOrCheckFreePort(addr, Network::Socket::Type::Datagram);
     ASSERT(addr != nullptr && addr->ip() != nullptr);
 
     return addr;
@@ -150,6 +147,7 @@ address:
     address: {}
     port_value: 0
     protocol: udp
+enable_reuse_port: false
 listener_filters:
   name: "envoy.filters.udp.dns_filter"
   typed_config:
@@ -221,8 +219,9 @@ name: listener_1
 address:
   socket_address:
     address: {}
-    port_value: {}
+    port_value: 0
     protocol: udp
+enable_reuse_port: false
 listener_filters:
   name: "envoy.filters.udp.dns_filter"
   typed_config:
@@ -239,7 +238,7 @@ listener_filters:
               - 42.42.42.42
               - 2607:42:42::42:42
 )EOF",
-                              addr->ip()->addressAsString(), addr->ip()->port());
+                              addr->ip()->addressAsString());
     return TestUtility::parseYaml<envoy::config::listener::v3::Listener>(config);
   }
 
@@ -273,7 +272,10 @@ listener_filters:
     }
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto addr_port = getListenerBindAddressAndPortNoThrow();
+      // Both listeners are given a port by the kernel, and do not reuse ports: with a port found
+      // in advance for one of them, the kernel could give the same port to the other, and with
+      // SO_REUSEPORT both would bind it and share the queries.
+      auto addr_port = getListenerBindAddressNoThrow();
       auto listener_0 = getListener0(addr_port);
       auto* listener0 = bootstrap.mutable_static_resources()->add_listeners();
       listener0->MergeFrom(listener_0);
