@@ -6429,7 +6429,9 @@ TEST_P(ExtProcIntegrationTest, ThreeExtProcFiltersInRequestProcessingStreamed) {
   ASSERT_TRUE(body_request.has_request_body());
   EXPECT_FALSE(body_request.request_body().end_of_stream());
   processor_stream_1_->sendGrpcMessage(body_response);
-  timeSystem().advanceTimeWaitImpl(50ms);
+  // Wait for both header responses and both responses for the first body chunk before sending
+  // end_stream. Advancing simulated time does not ensure these responses have been processed.
+  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(4));
 
   // "xxx" with end_stream goes through filter-0 and is held by filter-1.
   codec_client_->sendData(*request_encoder_, "xxx", true);
@@ -6493,21 +6495,28 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamedWithP
   // The ext_proc_server_0 sends back the header response.
   serverSendHeaderResp();
 
-  timeSystem().advanceTimeWaitImpl(20ms);
+  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(1));
   codec_client_->sendData(*request_encoder_, "sss", false);
-  codec_client_->sendData(*request_encoder_, "xxx", true);
+  processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_EQ(body.body(), "sss");
+    EXPECT_FALSE(body.end_of_stream());
+    return true;
+  });
 
-  processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
-
-  timeSystem().advanceTimeWaitImpl(20ms);
+  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(2));
   // The ext_proc_server_1 receives the headers.
   server1ReceiveHeaderReq(header_request);
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp();
 
-  timeSystem().advanceTimeWaitImpl(50ms);
-  // The ext_proc_server_0 now sends back the last chunk of the body responses.
-  processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
+  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(3));
+  // Send the final chunk only after processing the first one, so the two chunks cannot coalesce.
+  codec_client_->sendData(*request_encoder_, "xxx", true);
+  processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_EQ(body.body(), "xxx");
+    EXPECT_TRUE(body.end_of_stream());
+    return true;
+  });
 
   handleUpstreamRequest();
   EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
