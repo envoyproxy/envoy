@@ -216,7 +216,11 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
 
   // Get a connection from the queue.
   ENVOY_LOG(debug, "reverse_tunnel: accept() called");
-  if (!canInitiateConnections() || established_connections_.empty()) {
+  if (!canInitiateConnections()) {
+    stopInitiatingConnections();
+    return nullptr;
+  }
+  if (established_connections_.empty()) {
     return nullptr;
   }
   EstablishedConnection established = std::move(established_connections_.front());
@@ -329,15 +333,17 @@ void ReverseConnectionIOHandle::resetFileEvents() {
 
 void ReverseConnectionIOHandle::onListenerDrain() {
   listener_draining_ = true;
-  canInitiateConnections();
-}
-
-bool ReverseConnectionIOHandle::canInitiateConnections() {
-  if (!connections_stopped_ && listener_draining_ &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reverse_tunnel_listener_drain")) {
+  if (!canInitiateConnections()) {
     stopInitiatingConnections();
   }
-  return !connections_stopped_;
+}
+
+bool ReverseConnectionIOHandle::canInitiateConnections() const {
+  if (connections_stopped_) {
+    return false;
+  }
+  return !listener_draining_ ||
+         !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reverse_tunnel_listener_drain");
 }
 
 void ReverseConnectionIOHandle::stopInitiatingConnections() {
@@ -893,7 +899,10 @@ void ReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement(
   emitAccessLog("connection_draining", host_address, cluster_name, connection_key, connection_id,
                 "");
   // A runtime opt-in after listener drain began must also prevent replacement dials.
-  if (!canInitiateConnections() || rev_conn_retry_timer_ == nullptr) {
+  if (!canInitiateConnections()) {
+    stopInitiatingConnections();
+  }
+  if (rev_conn_retry_timer_ == nullptr) {
     ENVOY_LOG(debug,
               "reverse_tunnel: skipping replacement dial for {}; retry timer is gone "
               "(listener stop)",
@@ -951,6 +960,7 @@ void ReverseConnectionIOHandle::updateStateGauge(const std::string& host_address
 
 void ReverseConnectionIOHandle::maintainReverseConnections() {
   if (!canInitiateConnections()) {
+    stopInitiatingConnections();
     return;
   }
   // During a hot restart, don't dial until we've asked the parent to stop accepting new

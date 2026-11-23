@@ -3826,7 +3826,7 @@ TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsReplacementDialsBeforeLi
   testing::Mock::VerifyAndClearExpectations(child_io_handle_raw);
 }
 
-TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsOnIdleCheckAfterGuardEnabled) {
+TEST_F(ReverseConnectionIOHandleTest, IdleDrainCheckLeavesRetryTimerUntilMaintenance) {
   setListenerDrainGuard(false);
   setupThreadLocalSlot();
   io_handle_ = createTestIOHandle(createDefaultTestConfig());
@@ -3852,17 +3852,16 @@ TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsOnIdleCheckAfterGuardEna
   EXPECT_TRUE(child->canInitiateConnections());
   EXPECT_FALSE(timer_destroyed);
 
-  // The idle filter checks eligibility before deciding whether to replace its tunnel. Observing
-  // the opt-in here must stop initiation without another listener drain notification.
   setListenerDrainGuard(true);
   EXPECT_FALSE(child->canInitiateConnections());
-  EXPECT_TRUE(timer_destroyed);
+  EXPECT_FALSE(timer_destroyed);
   EXPECT_FALSE(child->listenerStopped());
 
-  setListenerDrainGuard(false);
-  EXPECT_FALSE(child->canInitiateConnections());
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
   maintainReverseConnections();
+  EXPECT_TRUE(timer_destroyed);
+  setListenerDrainGuard(false);
+  EXPECT_FALSE(child->canInitiateConnections());
 }
 
 TEST_F(ReverseConnectionIOHandleTest, ListenerDrainStopsMaintenanceAfterGuardEnabled) {

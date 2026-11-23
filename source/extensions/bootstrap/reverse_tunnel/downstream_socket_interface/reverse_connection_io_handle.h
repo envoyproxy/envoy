@@ -365,9 +365,8 @@ public:
    */
   void stopInitiatingConnections();
 
-  // Observe a runtime opt-in after listener drain began and stop pending work before allowing
-  // another dial or accept. Once stopped, disabling the guard cannot restart this listener.
-  bool canInitiateConnections();
+  // A draining listener becomes ineligible as soon as the runtime guard is enabled.
+  bool canInitiateConnections() const;
 
   /**
    * Remove a connection key from per-host tracking (the key set and its state gauge). Shared by the
