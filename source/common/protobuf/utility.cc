@@ -518,9 +518,8 @@ bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
     ENVOY_LOG_MISC(warn, "Could not reify {} with unknown type URL {}", opaque_type_name, type_url);
     return false;
   }
-  Protobuf::DynamicMessageFactory message_factory;
   std::unique_ptr<Protobuf::Message> typed_message(
-      message_factory.GetPrototype(concrete_descriptor)->New());
+      Protobuf::MessageFactory::generated_factory()->GetPrototype(concrete_descriptor)->New());
 
   // Finally we can unpack, redact, and repack the opaque message using the provided callbacks.
 

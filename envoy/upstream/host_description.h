@@ -153,7 +153,8 @@ public:
   virtual MetadataConstSharedPtr metadata() const PURE;
 
   /**
-   * @return the cached hash of the metadata associated with this host, or 0 if no metadata.
+   * @return the hash of the metadata associated with this host, or 0 if no metadata. The first call
+   * after the metadata is set computes the hash, and later calls return the cached value.
    */
   virtual std::size_t metadataHash() const PURE;
 

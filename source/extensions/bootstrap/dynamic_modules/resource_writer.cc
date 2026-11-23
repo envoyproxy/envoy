@@ -24,11 +24,19 @@ WriterStats generateWriterStats(Stats::Scope& scope, absl::string_view config_na
     return Stats::Utility::gaugeFromElements(scope, elements(name),
                                              Stats::Gauge::ImportMode::NeverImport, tags);
   };
-  return WriterStats{
-      counter("update_submitted"),      counter("update_rejected"), counter("update_active"),
-      counter("update_superseded"),     counter("update_removed"),  counter("update_failed"),
-      counter("update_ownership_lost"), counter("ownership_lost"),  gauge(names.owned),
-      gauge("updates_pending")};
+  const auto ownership_counter = [&](absl::string_view name) {
+    return names.notices_ownership_loss ? makeOptRef(counter(name)) : OptRef<Stats::Counter>();
+  };
+  return WriterStats{counter("update_submitted"),
+                     counter("update_rejected"),
+                     counter("update_active"),
+                     counter("update_superseded"),
+                     counter("update_removed"),
+                     counter("update_failed"),
+                     ownership_counter("update_ownership_lost"),
+                     ownership_counter("ownership_lost"),
+                     gauge(names.owned),
+                     gauge("updates_pending")};
 }
 
 } // namespace DynamicModules

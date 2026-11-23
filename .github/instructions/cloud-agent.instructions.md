@@ -1,9 +1,15 @@
+---
+applyTo: "**"
+excludeAgent: "code-review"
+---
+
 # GitHub Copilot instructions for envoyproxy/envoy
 
 **Note:** These instructions are specifically for GitHub Copilot's cloud agent environment, not for
-developers using Copilot in VS Code or other IDEs.
+developers using Copilot in VS Code or other IDEs. Copilot code review does not read this file
+(see `api-review.instructions.md`).
 
-**Read [AGENTS.md](../AGENTS.md) first.** It is the canonical guide for AI coding agents in this
+**Read [AGENTS.md](../../AGENTS.md) first.** It is the canonical guide for AI coding agents in this
 repository (critical rules, coding/testing conventions, format checks, release notes, runtime
 guards, dependencies and PR workflow). This file only adds what is specific to the Copilot agent
 environment.
@@ -11,7 +17,7 @@ environment.
 ## Copilot environment setup
 
 The environment is prepared by
-[copilot-setup-steps.yml](workflows/copilot-setup-steps.yml).
+[copilot-setup-steps.yml](../workflows/copilot-setup-steps.yml).
 
 - **IMPORTANT:** You MUST run `/tmp/fix-bazel-truststore.sh` before the first time you issue a
   bazel command!!!
@@ -62,7 +68,7 @@ bazel run //tools/code:check
 ./ci/do_ci.sh deps
 ```
 
-See the format and dependency sections of [AGENTS.md](../AGENTS.md) for the full commands.
+See the format and dependency sections of [AGENTS.md](../../AGENTS.md) for the full commands.
 
 ## CI script targets
 

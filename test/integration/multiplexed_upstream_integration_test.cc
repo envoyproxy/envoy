@@ -4,6 +4,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/http/header_map_impl.h"
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/envoy_quic_server_crypto_stream_factory.h"
@@ -17,6 +18,7 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/match.h"
 #include "gtest/gtest.h"
 
 using testing::Eq;
@@ -601,7 +603,45 @@ TEST_P(MultiplexedUpstreamIntegrationTest, NoInitialStreams) {
   envoy::config::listener::v3::QuicProtocolOptions options;
   options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(0);
   mergeOptions(options);
+  // The retries below can open further HTTP/3 connections, which resume with 0-RTT. Until its
+  // handshake completes, such a connection is ready for early data without knowing the cached
+  // stream limit of 0, so a retry landing then is sent beyond the limit and fails a QUICHE_BUG.
+  // Disable early data, so that the retries wait for the handshake.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* early_data_policy = hcm.mutable_route_config()
+                                      ->mutable_virtual_hosts(0)
+                                      ->mutable_routes(0)
+                                      ->mutable_route()
+                                      ->mutable_early_data_policy();
+        envoy::extensions::early_data::v3::DefaultEarlyDataPolicy config;
+        early_data_policy->set_name("envoy.route.early_data_policy.default");
+        std::ignore = early_data_policy->mutable_typed_config()->PackFrom(config);
+      });
   initialize();
+
+  // This test flakes, rarely and so far only in CI: the client gets a 504, or no response, after
+  // the upstream has answered. If it fails, print the upstream cluster's stats, which say how many
+  // connections (and 0-RTT connections) were opened, and how the tries ended.
+  Cleanup print_stats_on_failure([this]() {
+    if (!HasFailure() || test_server_ == nullptr) {
+      return;
+    }
+    const std::string prefix = "cluster.cluster_0.";
+    std::cerr << "NoInitialStreams failed, with the stats (non-zero) of the upstream cluster:"
+              << std::endl;
+    for (const auto& counter : test_server_->counters()) {
+      if (counter->value() != 0 && absl::StartsWith(counter->name(), prefix)) {
+        std::cerr << "  counter " << counter->name() << ": " << counter->value() << std::endl;
+      }
+    }
+    for (const auto& gauge : test_server_->gauges()) {
+      if (gauge->value() != 0 && absl::StartsWith(gauge->name(), prefix)) {
+        std::cerr << "  gauge " << gauge->name() << ": " << gauge->value() << std::endl;
+      }
+    }
+  });
 
   // Create the client connection and send a request.
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
