@@ -1156,6 +1156,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   filter_manager_.streamInfo().downstreamTiming().setDownstreamConnectionBegin(
       connection_manager_.read_callbacks_->connection().streamInfo().startTimeMonotonic());
 
+  filter_manager_.streamInfo().setWorkerId(connection_manager_.dispatcher_->workerId());
+
   // Copy the connection-level downstream TLS handshake time points onto the request-level stream
   // info so they are available to COMMON_DURATION (DS_HS_BEG/DS_HS_END) access logging.
   const auto& connection_downstream_timing =

@@ -2360,6 +2360,18 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                            .directRemoteAddress();
                                      });
                                }}},
+                             {"WORKER_ID",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::optional<std::string> {
+                                       if (auto workerId = stream_info.workerId(); workerId) {
+                                         return {absl::StrCat(*workerId)};
+                                       }
+                                       return {"-"};
+                                     });
+                               }}},
                              {"CONNECTION_ID",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {

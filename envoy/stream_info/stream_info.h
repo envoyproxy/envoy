@@ -1223,6 +1223,16 @@ public:
    * @param id the codec level stream ID for the associated stream.
    */
   virtual void setCodecStreamId(std::optional<uint32_t> id) PURE;
+
+  /**
+   * @return the workerId that the request is executing on.
+   */
+  virtual std::optional<uint32_t> workerId() const PURE;
+
+  /**
+   * @param id the worker ID for the associated stream.
+   */
+  virtual void setWorkerId(std::optional<uint32_t> id) PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

@@ -201,6 +201,8 @@ public:
   MOCK_METHOD(absl::string_view, customFlags, (), (const));
   MOCK_METHOD(std::optional<uint32_t>, codecStreamId, (), (const, override));
   MOCK_METHOD(void, setCodecStreamId, (std::optional<uint32_t> id), (override));
+  MOCK_METHOD(std::optional<uint32_t>, workerId, (), (const, override));
+  MOCK_METHOD(void, setWorkerId, (std::optional<uint32_t>), (override));
 
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
@@ -231,6 +233,7 @@ public:
   std::string stream_flags_;
   Router::RouteConstSharedPtr route_;
   Router::VirtualHostConstSharedPtr virtual_host_;
+  std::optional<uint32_t> worker_id_;
 };
 
 } // namespace StreamInfo
