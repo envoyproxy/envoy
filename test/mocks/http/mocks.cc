@@ -53,6 +53,14 @@ MockClientConnection::~MockClientConnection() = default;
 MockFilterChainFactory::MockFilterChainFactory() = default;
 MockFilterChainFactory::~MockFilterChainFactory() = default;
 
+MockUpstreamStreamFilterCallbacks::MockUpstreamStreamFilterCallbacks() {
+  ON_CALL(*this, upstreamStreamInfo()).WillByDefault(ReturnRef(upstream_stream_info_));
+  ON_CALL(*this, downstreamStreamInfo()).WillByDefault(ReturnRef(downstream_stream_info_));
+  ON_CALL(*this, upstreamStreamOptions()).WillByDefault(ReturnRef(stream_options_));
+}
+
+MockUpstreamStreamFilterCallbacks::~MockUpstreamStreamFilterCallbacks() = default;
+
 template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks) {
   callbacks.cluster_info_.reset(new NiceMock<Upstream::MockClusterInfo>());
   callbacks.route_.reset(new NiceMock<Router::MockRoute>());

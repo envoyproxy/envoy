@@ -58,6 +58,11 @@ void ExtProcIntegrationTest::TearDown() {
     ASSERT_TRUE(processor_connection_1_->waitForDisconnect());
   }
 
+  if (processor_connection_2_) {
+    ASSERT_TRUE(processor_connection_2_->close());
+    ASSERT_TRUE(processor_connection_2_->waitForDisconnect());
+  }
+
   cleanupUpstreamAndDownstream();
 }
 
@@ -66,6 +71,11 @@ void ExtProcIntegrationTest::addDownstreamExtProcFilter(
     envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config,
     const std::string& ext_proc_filter_name) {
   setGrpcService(*proto_config.mutable_grpc_service(), cluster_name, grpc_upstream->localAddress());
+  // Same default message timeout as initializeConfig() gives the single filter, see the comment
+  // there.
+  if (!proto_config.has_message_timeout()) {
+    proto_config.mutable_message_timeout()->set_seconds(5);
+  }
   envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
   ext_proc_filter.set_name(ext_proc_filter_name);
   std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(proto_config);
@@ -74,8 +84,6 @@ void ExtProcIntegrationTest::addDownstreamExtProcFilter(
 
 void ExtProcIntegrationTest::initializeConfig(
     ConfigOptions config_option, const std::vector<std::pair<int, int>>& cluster_endpoints) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
   int total_cluster_endpoints = 0;
   std::for_each(
       cluster_endpoints.begin(), cluster_endpoints.end(),

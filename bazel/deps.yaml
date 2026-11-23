@@ -77,7 +77,7 @@ bazel_features:
   project_name: "Bazel features"
   project_desc: "Support Bazel feature detection from starlark"
   project_url: "https://github.com/bazel-contrib/bazel_features"
-  release_date: "2026-10-21"
+  release_date: "2026-11-17"
   use_category:
   - build
   license: "Apache-2.0"
@@ -398,7 +398,7 @@ fmt:
   project_name: "fmt"
   project_desc: "{fmt} is an open-source formatting library providing a fast and safe alternative to C stdio and C++ iostreams"
   project_url: "https://fmt.dev"
-  release_date: "2026-06-16"
+  release_date: "2026-11-07"
   use_category:
   - dataplane_core
   - controlplane
@@ -983,7 +983,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-11-11"
+  release_date: "2026-11-17"
   use_category:
   - controlplane
   - dataplane_core
@@ -1018,7 +1018,7 @@ rules_apple:
   project_name: "Apple Rules for Bazel"
   project_desc: "Bazel rules for Apple platforms"
   project_url: "https://github.com/bazelbuild/rules_apple"
-  release_date: "2026-10-17"
+  release_date: "2026-10-30"
   use_category:
   - build
   license: "Apache-2.0"
@@ -1028,7 +1028,7 @@ rules_cc:
   project_name: "C++ rules for Bazel"
   project_desc: "Bazel rules for the C++ language"
   project_url: "https://github.com/bazelbuild/rules_cc"
-  release_date: "2026-10-22"
+  release_date: "2026-11-05"
   use_category:
   - build
   - controlplane
@@ -1152,7 +1152,7 @@ rules_python:
   project_name: "Python rules for Bazel"
   project_desc: "Bazel rules for the Python language"
   project_url: "https://github.com/bazelbuild/rules_python"
-  release_date: "2026-10-23"
+  release_date: "2026-11-13"
   use_category:
   - build
   - controlplane
@@ -1179,7 +1179,7 @@ rules_shell:
   project_name: "Shell script rules for Bazel"
   project_desc: "Bazel rules for shell scripts"
   project_url: "https://github.com/bazelbuild/rules_shell"
-  release_date: "2026-04-15"
+  release_date: "2026-11-16"
   use_category:
   - build
   - dataplane_core
@@ -1288,7 +1288,7 @@ tcmalloc:
   project_name: "tcmalloc"
   project_desc: "Fast, multi-threaded malloc implementation"
   project_url: "https://github.com/google/tcmalloc"
-  release_date: "2025-09-26"
+  release_date: "2026-11-17"
   use_category:
   - dataplane_core
   - controlplane

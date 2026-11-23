@@ -1,6 +1,5 @@
 #pragma once
 
-#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/cache_v2/http_cache.h"
 
 #include "absl/base/thread_annotations.h"
@@ -54,8 +53,7 @@ public:
               std::shared_ptr<CacheProgressReceiver> progress) override;
 
   absl::Mutex mu_;
-  absl::flat_hash_map<Key, std::shared_ptr<Entry>, MessageUtil, MessageUtil>
-      entries_ ABSL_GUARDED_BY(mu_);
+  absl::flat_hash_map<SerializedKey, std::shared_ptr<Entry>> entries_ ABSL_GUARDED_BY(mu_);
 };
 
 } // namespace CacheV2

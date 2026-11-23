@@ -12,7 +12,7 @@ Envoy::Buffer::OwnedImpl Encoder::buildErrorResponse(absl::string_view severity,
   response.add("E");
   // Length of message contents in bytes, including self.
   const uint32_t length =
-      sizeof(uint32_t) + 3 + severity.length() + message.length() + code.length() + 3;
+      sizeof(uint32_t) + severity.length() + message.length() + code.length() + 3 * 2 + 1;
   response.writeBEInt<uint32_t>(length);
 
   // Severity

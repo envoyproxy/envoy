@@ -1371,6 +1371,70 @@ TEST_P(ExtProcIntegrationTest, DownstreamPushbackDeferredUntilRequestCompleteFul
   cleanupUpstreamAndDownstream();
 }
 
+class ExtProcDuplexRouterRetryIntegrationTest : public ExtProcIntegrationTest {
+protected:
+  // Returns the body the ext_proc server sends back.
+  std::string sendBodyAndTrailersWithRouterRetry() {
+    // With retries enabled the router keeps the body it sends upstream.
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          auto* retry_policy = hcm.mutable_route_config()
+                                   ->mutable_virtual_hosts(0)
+                                   ->mutable_routes(0)
+                                   ->mutable_route()
+                                   ->mutable_retry_policy();
+          retry_policy->set_retry_on("5xx");
+          retry_policy->mutable_num_retries()->set_value(1);
+        });
+    const std::string body_sent(8 * 1024, 's');
+    response_ = initAndSendDataDuplexStreamedMode(body_sent, false);
+    Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
+    codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+    ProcessingRequest header_request;
+    serverReceiveHeaderReq(header_request);
+    uint32_t total_req_body_msg = 0;
+    bool trailers_received = false;
+    while (!trailers_received) {
+      ProcessingRequest request;
+      EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+      trailers_received = request.has_request_trailers();
+      total_req_body_msg += request.has_request_body() ? 1 : 0;
+    }
+
+    // The body is injected to the router first, then the trailers response resumes ext_proc.
+    serverSendHeaderResp();
+    serverSendBodyRespDuplexStreamed(total_req_body_msg, processor_stream_, false);
+    serverSendTrailerRespDuplexStreamed(processor_stream_, false);
+
+    handleUpstreamRequest();
+    verifyDownstreamResponse(*response_, 200);
+    return std::string(total_req_body_msg, 'r');
+  }
+
+  IntegrationStreamDecoderPtr response_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing,
+                         ExtProcDuplexRouterRetryIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// https://github.com/envoyproxy/envoy/issues/45470
+TEST_P(ExtProcDuplexRouterRetryIntegrationTest, BodyNotDuplicatedWithPerFilterBuffer) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.filter_manager_per_filter_buffer", "true"}});
+  const std::string body_upstream = sendBodyAndTrailersWithRouterRetry();
+  EXPECT_EQ(body_upstream, upstream_request_->body().toString());
+}
+
+TEST_P(ExtProcDuplexRouterRetryIntegrationTest, BodyDuplicatedWithoutPerFilterBuffer) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.filter_manager_per_filter_buffer", "false"}});
+  const std::string body_upstream = sendBodyAndTrailersWithRouterRetry();
+  // Legacy behavior: resuming ext_proc replays the body kept by the router.
+  EXPECT_EQ(body_upstream + body_upstream, upstream_request_->body().toString());
+}
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions
