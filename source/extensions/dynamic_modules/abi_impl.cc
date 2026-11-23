@@ -166,6 +166,21 @@ double envoy_dynamic_module_callback_get_runtime_number(envoy_dynamic_module_typ
   return snapshot->getDouble(absl::string_view(key.ptr, key.length), default_value);
 }
 
+bool envoy_dynamic_module_callback_get_runtime_string(
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result) {
+  const auto snapshot = currentRuntimeSnapshot();
+  if (!snapshot.has_value()) {
+    return false;
+  }
+  const auto value = snapshot->get(absl::string_view(key.ptr, key.length));
+  if (!value.has_value()) {
+    return false;
+  }
+  result->ptr = value->data();
+  result->length = value->size();
+  return true;
+}
+
 // ---------------------- Function registry callbacks --------------------------------
 
 bool envoy_dynamic_module_callback_register_function(envoy_dynamic_module_type_module_buffer key,
