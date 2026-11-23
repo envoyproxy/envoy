@@ -1134,12 +1134,15 @@ protected:
     bool request_buffer_backpressure_applied_{};
     bool response_buffer_backpressure_applied_{};
 
-    // The following 3 members are booleans rather than part of the space-saving bitfield as they
-    // are passed as arguments to functions expecting bools. Extend State using the bitfield
-    // where possible.
+    // The following 4 members are booleans rather than part of the space-saving bitfield as they
+    // are passed as arguments to functions expecting bool references. Extend State using the
+    // bitfield where possible.
     bool encoder_filters_streaming_{true};
     bool decoder_filters_streaming_{true};
     bool destroyed_{false};
+    // Set when encoding the headers of a prepared local reply aborts, resets, completes, or
+    // destroys the stream, so Utility::encodeLocalReply skips encoding the local reply body.
+    bool local_reply_aborted_{false};
 
     // Set true when a filter calls addDecodedData()/addEncodedData() during its own
     // decodeData()/encodeData() callback. Reset immediately before each data callback. Combined
@@ -1508,11 +1511,6 @@ public:
   }
 
   CreateChainResult createDownstreamFilterChain();
-
-  /**
-   * Whether downstream has observed end_stream.
-   */
-  bool decoderObservedEndStream() const override { return state_.observed_decode_end_stream_; }
 
   /**
    * Return true if the timestamp of the downstream end_stream was recorded.
