@@ -155,6 +155,7 @@ private:
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
+using ProcessingMode = envoy::extensions::filters::network::ext_proc::v3::ProcessingMode;
 using ProcessingRequest = envoy::service::network_ext_proc::v3::ProcessingRequest;
 using ProcessingResponse = envoy::service::network_ext_proc::v3::ProcessingResponse;
 
@@ -258,6 +259,7 @@ private:
   Envoy::Network::FilterStatus handleStreamError();
   void closeConnection(const std::string& reason, Network::ConnectionCloseType close_type);
   void handleConnectionStatus(const ProcessingResponse& response);
+  bool isSpuriousResponse(const ProcessingResponse& response) const;
 
   void recordCallCompletion(Grpc::Status::GrpcStatus status, bool is_read_direction);
 

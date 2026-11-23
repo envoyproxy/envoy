@@ -25,6 +25,7 @@ envoy_extension_cc_test(
         },
     },
     deps = [
+        "//source/common/common:base64_lib",
         "//source/common/config:utility_lib",
         "//source/extensions/clusters/eds:eds_lib",
         "//source/extensions/load_balancing_policies/round_robin:config",
@@ -61,6 +62,7 @@ envoy_extension_cc_benchmark_binary(
     rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//envoy/config:xds_resources_delegate_interface",
+        "//source/common/config:metadata_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:utility_lib",
         "//source/extensions/clusters/eds:eds_lib",

@@ -70,7 +70,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
                               StreamSharingMayImpactPooling stream_sharing) {
   auto index = FilterState::nameToIndex(data_name);
   if (index.has_value()) {
-    setIndexedData(index.value(), data, life_span, stream_sharing);
+    setIndexedData(index.value(), std::move(data), life_span, stream_sharing);
     return;
   }
   if (life_span > life_span_) {
@@ -85,7 +85,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
     // construction directly and this call will be a no-op.
     // So we only need to consider the case where ancestor is nullptr.
     maybeCreateParent(nullptr);
-    parent_->setData(data_name, data, life_span, stream_sharing);
+    parent_->setData(data_name, std::move(data), life_span, stream_sharing);
     return;
   }
   if (parent_ && parent_->hasDataWithName(data_name)) {
@@ -96,10 +96,9 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
     return;
   }
 
-  std::unique_ptr<FilterStateImpl::FilterObject> filter_object(new FilterStateImpl::FilterObject());
-  filter_object->data_ = data;
-  filter_object->stream_sharing_ = stream_sharing;
-  data_storage_[data_name] = std::move(filter_object);
+  StoredObject& stored = data_storage_[data_name];
+  stored.data_ = std::move(data);
+  stored.stream_sharing_ = stream_sharing;
 }
 
 bool FilterStateImpl::hasDataWithName(absl::string_view data_name) const {
@@ -125,8 +124,7 @@ FilterStateImpl::getDataReadOnlyGeneric(absl::string_view data_name) const {
     return nullptr;
   }
 
-  const FilterStateImpl::FilterObject* current = it->second.get();
-  return current->data_.get();
+  return it->second.data_.get();
 }
 
 FilterState::Object* FilterStateImpl::getDataMutableGeneric(absl::string_view data_name) {
@@ -148,8 +146,7 @@ FilterStateImpl::getDataSharedMutableGeneric(absl::string_view data_name) {
     return nullptr;
   }
 
-  FilterStateImpl::FilterObject* current = it->second.get();
-  return current->data_;
+  return it->second.data_;
 }
 
 bool FilterStateImpl::hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) const {
@@ -166,12 +163,12 @@ FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() c
   auto objects = parent_ ? parent_->objectsSharedWithUpstreamConnection()
                          : std::make_unique<FilterState::Objects>();
   for (const auto& [name, object] : data_storage_) {
-    switch (object->stream_sharing_) {
+    switch (object.stream_sharing_) {
     case StreamSharingMayImpactPooling::SharedWithUpstreamConnection:
-      objects->push_back({object->data_, object->stream_sharing_, name});
+      objects->push_back({object.data_, object.stream_sharing_, name});
       break;
     case StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce:
-      objects->push_back({object->data_, StreamSharingMayImpactPooling::None, name});
+      objects->push_back({object.data_, StreamSharingMayImpactPooling::None, name});
       break;
     default:
       break;
@@ -218,7 +215,7 @@ void FilterStateImpl::setIndexedData(FilterStateIndex index, std::shared_ptr<Obj
       return;
     }
     maybeCreateParent(nullptr);
-    parent_->setIndexedData(index, data, life_span, stream_sharing);
+    parent_->setIndexedData(index, std::move(data), life_span, stream_sharing);
     return;
   }
   if (parent_ && parent_->hasIndexedData(index)) {
@@ -232,8 +229,8 @@ void FilterStateImpl::setIndexedData(FilterStateIndex index, std::shared_ptr<Obj
   if (indexed_data_storage_[idx] == nullptr) {
     ++indexed_count_;
   }
-  auto filter_object = std::make_unique<FilterStateImpl::IndexedFilterObject>();
-  filter_object->data_ = data;
+  auto filter_object = std::make_unique<StoredObject>();
+  filter_object->data_ = std::move(data);
   filter_object->stream_sharing_ = stream_sharing;
   indexed_data_storage_[idx] = std::move(filter_object);
 }

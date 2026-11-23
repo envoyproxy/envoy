@@ -13,6 +13,7 @@ envoy_cc_extension(
     srcs = ["drain_aware_config.cc"],
     hdrs = [
         "drain_aware_config.h",
+        "drain_aware_read_filter.h",
         "drain_aware_server_connection.h",
     ],
     deps = [
@@ -21,12 +22,14 @@ envoy_cc_extension(
         "//envoy/http:codec_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:drain_decision_interface",
+        "//envoy/network:filter_interface",
         "//envoy/server:factory_context_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/http:conn_manager_lib",
         "//source/common/network:drain_close_util_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
-        "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_includes",
+        "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",

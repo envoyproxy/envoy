@@ -66,6 +66,12 @@ crate-type = ["cdylib"]
 test = true
 
 [[example]]
+name = "bootstrap_config_snapshot_test"
+path = "bootstrap_config_snapshot_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
 name = "bootstrap_shared_data_test"
 path = "bootstrap_shared_data_test.rs"
 crate-type = ["cdylib"]

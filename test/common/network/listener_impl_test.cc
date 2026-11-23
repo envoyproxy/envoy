@@ -362,6 +362,49 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+class DrainAwareMockIoHandle : public MockIoHandle {
+public:
+  MOCK_METHOD(void, onListenerDrain, (), (override));
+};
+
+TEST_P(TcpListenerImplTest, DrainNotifiesIoHandle) {
+  testing::StrictMock<DrainAwareMockIoHandle> io_handle;
+  auto socket = std::make_shared<NiceMock<MockListenSocket>>();
+  ON_CALL(*socket, ioHandle()).WillByDefault(testing::ReturnRef(io_handle));
+  MockTcpListenerCallbacks listener_callbacks;
+  Random::MockRandomGenerator random_generator;
+  NiceMock<Runtime::MockLoader> runtime;
+  Event::FileReadyCb accept_callback;
+  EXPECT_CALL(io_handle,
+              createFileEvent_(_, _, Event::FileTriggerType::Level, Event::FileReadyType::Read))
+      .WillOnce(testing::SaveArg<1>(&accept_callback));
+  EXPECT_CALL(io_handle, resetFileEvents());
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
+                               listener_callbacks, true, false, false, std::nullopt);
+
+  EXPECT_CALL(io_handle, onListenerDrain());
+  listener.onDrain();
+
+  // Starting drain does not disable the listener: normal sockets can still accept connections
+  // during the grace period. In particular, no enableFileEvents(0) call is made.
+  EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
+  EXPECT_CALL(io_handle, accept(_, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(0));
+  EXPECT_TRUE(accept_callback(Event::FileReadyType::Read).ok());
+}
+
+TEST_P(TcpListenerImplTest, DrainWithoutBoundSocket) {
+  // An unbound listener has no IoHandle to notify.
+  auto socket = std::make_shared<TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version_), nullptr, false);
+  MockTcpListenerCallbacks listener_callbacks;
+  Random::MockRandomGenerator random_generator;
+  NiceMock<Runtime::MockLoader> runtime;
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
+                               listener_callbacks, false, false, false, std::nullopt);
+  listener.onDrain();
+}
+
 TEST_P(TcpListenerImplTest, DisableAndEnableListener) {
   testing::InSequence s1;
 
