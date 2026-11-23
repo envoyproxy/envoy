@@ -13,14 +13,24 @@
 #include "source/common/event/file_event_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_keys.h"
 
 namespace Envoy {
 namespace Network {
 
-bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
+bool TcpListenerImpl::rejectCxOverGlobalLimit(bool& holds_global_cx_resource) const {
+  holds_global_cx_resource = false;
   // Enforce the global connection limit if necessary, immediately closing the accepted connection.
   if (ignore_global_conn_limit_) {
+    // Connections to a listener that opts out of the limit still count towards it while it has
+    // room, but are admitted without a resource once it is reached.
+    if (track_global_cx_limit_in_overload_manager_ &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.global_conn_limit_opt_out_counts_connections")) {
+      holds_global_cx_resource = overload_state_->tryAllocateResource(
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
+    }
     return false;
   }
   // TODO(nezdolik): deprecate `overload.global_downstream_max_connections` key once
@@ -39,8 +49,9 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
     // Try to allocate resource within overload manager. We do it once here, instead of checking if
     // it is possible to allocate resource in this method and then actually allocating it later in
     // the code to avoid race conditions.
-    return !overload_state_->tryAllocateResource(
+    holds_global_cx_resource = overload_state_->tryAllocateResource(
         Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
+    return !holds_global_cx_resource;
   } else {
     // If the connection limit is not set, don't limit the connections, but still track them.
     // TODO(tonya11en): In integration tests, threadsafeSnapshot is necessary since the
@@ -53,8 +64,8 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
   }
 }
 
-void TcpListenerImpl::releaseGlobalCxLimitResource() const {
-  if (track_global_cx_limit_in_overload_manager_) {
+void TcpListenerImpl::releaseGlobalCxLimitResource(bool holds_global_cx_resource) const {
+  if (holds_global_cx_resource) {
     overload_state_->tryDeallocateResource(
         Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
   }
@@ -80,16 +91,17 @@ absl::Status TcpListenerImpl::onSocketEvent(short flags) {
       break;
     }
 
-    if (rejectCxOverGlobalLimit()) {
+    bool holds_global_cx_resource;
+    if (rejectCxOverGlobalLimit(holds_global_cx_resource)) {
       // The global connection limit has been reached.
       io_handle->close();
       cb_.onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit);
       continue;
     } else if ((listener_accept_ != nullptr && listener_accept_->shouldShedLoad()) ||
                random_.bernoulli(reject_fraction_)) {
-      // rejectCxOverGlobalLimit() returned false, meaning it allocated a connection resource.
-      // Since we're rejecting due to load shedding, we must release that resource.
-      releaseGlobalCxLimitResource();
+      // Since we're rejecting due to load shedding, we must release any connection resource
+      // rejectCxOverGlobalLimit() allocated.
+      releaseGlobalCxLimitResource(holds_global_cx_resource);
       io_handle->close();
       cb_.onReject(TcpListenerCallbacks::RejectCause::OverloadAction);
       continue;
@@ -101,7 +113,7 @@ absl::Status TcpListenerImpl::onSocketEvent(short flags) {
     if (!local_address) {
       auto address_or_error = io_handle->localAddress();
       if (!address_or_error.status().ok()) {
-        releaseGlobalCxLimitResource();
+        releaseGlobalCxLimitResource(holds_global_cx_resource);
         return address_or_error.status();
       }
       local_address = std::move(address_or_error.value());
@@ -119,7 +131,7 @@ absl::Status TcpListenerImpl::onSocketEvent(short flags) {
     if (remote_addr.ss_family == AF_UNIX) {
       auto address_or_error = io_handle->peerAddress();
       if (!address_or_error.status().ok()) {
-        releaseGlobalCxLimitResource();
+        releaseGlobalCxLimitResource(holds_global_cx_resource);
         return address_or_error.status();
       }
       remote_address = std::move(address_or_error.value());
@@ -127,7 +139,7 @@ absl::Status TcpListenerImpl::onSocketEvent(short flags) {
       auto address_or_error = Address::addressFromSockAddr(
           remote_addr, remote_addr_len, local_address->ip()->version() == Address::IpVersion::v6);
       if (!address_or_error.status().ok()) {
-        releaseGlobalCxLimitResource();
+        releaseGlobalCxLimitResource(holds_global_cx_resource);
         return address_or_error.status();
       }
       remote_address = std::move(address_or_error.value());
@@ -135,7 +147,7 @@ absl::Status TcpListenerImpl::onSocketEvent(short flags) {
 
     cb_.onAccept(std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address,
                                                       remote_address, overload_state_,
-                                                      track_global_cx_limit_in_overload_manager_));
+                                                      holds_global_cx_resource));
   }
 
   ENVOY_LOG_MISC(trace, "TcpListener accepted {} new connections.",

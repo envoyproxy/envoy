@@ -265,6 +265,63 @@ TEST_F(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitOptOutConnectionsRelea
   }
 }
 
+// With the runtime guard disabled, connections to an opted-out listener are left out of the count
+// entirely, so they neither use up the limit nor release resources held by other listeners.
+TEST_F(GlobalDownstreamCxLimitIntegrationTest, GlobalLimitOptOutUncountedWithGuardDisabled) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.global_conn_limit_opt_out_counts_connections", "false");
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* opted_out = static_resources->add_listeners();
+    opted_out->CopyFrom(static_resources->listeners(0));
+    opted_out->set_name("opted_out");
+    opted_out->set_stat_prefix("opted_out");
+    opted_out->set_ignore_global_conn_limit(true);
+  });
+  initializeOverloadManager(2);
+  const std::string failed_updates =
+      "overload.envoy.resource_monitors.global_downstream_max_connections.failed_updates";
+
+  std::vector<IntegrationTcpClientPtr> limited_clients;
+  std::vector<IntegrationTcpClientPtr> opted_out_clients;
+  std::vector<FakeRawConnectionPtr> opted_out_raw_conns;
+  std::vector<FakeRawConnectionPtr> limited_raw_conns;
+  auto connect = [&](const std::string& listener, std::vector<IntegrationTcpClientPtr>& clients,
+                     std::vector<FakeRawConnectionPtr>& raw_conns) {
+    clients.emplace_back(makeTcpConnection(lookupPort(listener)));
+    FakeRawConnectionPtr conn;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(conn));
+    raw_conns.push_back(std::move(conn));
+    ASSERT_TRUE(clients.back()->connected());
+  };
+
+  connect("listener_0", limited_clients, limited_raw_conns);
+  ASSERT_TRUE(waitForConnections(1));
+  connect("opted_out", opted_out_clients, opted_out_raw_conns);
+  connect("opted_out", opted_out_clients, opted_out_raw_conns);
+  ASSERT_TRUE(waitForConnections(1));
+
+  connect("listener_0", limited_clients, limited_raw_conns);
+  ASSERT_TRUE(waitForConnections(2));
+
+  for (size_t i = 0; i < opted_out_clients.size(); ++i) {
+    opted_out_clients[i]->close();
+    ASSERT_TRUE(opted_out_raw_conns[i]->waitForDisconnect());
+  }
+  ASSERT_TRUE(waitForConnections(2));
+  EXPECT_EQ(0, test_server_->counter(failed_updates)->value());
+
+  limited_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
+  FakeRawConnectionPtr rejected_conn;
+  ASSERT_FALSE(
+      fake_upstreams_[0]->waitForRawConnection(rejected_conn, std::chrono::milliseconds(500)));
+  limited_clients.back()->waitForDisconnect();
+  test_server_->waitForCounter("listener.127.0.0.1_0.downstream_global_cx_overflow", Eq(1));
+  for (auto& tcp_client : limited_clients) {
+    tcp_client->close();
+  }
+}
+
 TEST_F(GlobalDownstreamCxLimitIntegrationTest, PerListenerLimitAndGlobalLimitInOverloadManager) {
   config_helper_.addRuntimeOverride("envoy.resource_limits.listener.listener_0.connection_limit",
                                     "2");

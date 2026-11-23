@@ -119,6 +119,10 @@ RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_held_trailers);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_filter_manager_per_filter_buffer);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
 RUNTIME_GUARD(envoy_reloadable_features_geoip_sanitize_geo_headers);
+// When enabled, which is the default, connections to a listener with ignore_global_conn_limit
+// count towards the overload manager's global downstream connection limit while it has room, as
+// they do with the deprecated runtime key. Disable to leave them out of the count entirely.
+RUNTIME_GUARD(envoy_reloadable_features_global_conn_limit_opt_out_counts_connections);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
 RUNTIME_GUARD(envoy_reloadable_features_happy_eyeballs_sort_non_ip_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_header_mutation_url_encode_query_params);
