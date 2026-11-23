@@ -13,8 +13,11 @@ For CONNECT requests, and for upgrade requests of any type such as WebSocket, th
 counting once the upstream accepts the CONNECT or upgrade. Bytes sent after that are tunneled
 traffic rather than a request body. Bytes sent before it, and the ``Content-Length`` check, still
 apply. The filter decides from the request headers the router forwards, so a later filter that
-removes the upgrade headers keeps the body limited. CONNECT-UDP that Envoy terminates itself is
-answered without an upgrade and is still counted, so disable the filter on that route.
+removes the upgrade headers keeps the body limited. Two kinds of tunnel are answered without an
+upgrade and are still counted, so disable the filter on their routes: raw TCP tunneled over POST on
+a route with :ref:`allow_post
+<envoy_v3_api_field_config.route.v3.RouteAction.UpgradeConfig.ConnectConfig.allow_post>`, and
+CONNECT-UDP that Envoy terminates itself.
 
 Route-Based Filter Control
 --------------------------
