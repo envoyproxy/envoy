@@ -117,7 +117,6 @@ void EnvoyQuicProofSource::updateFilterChainManager(
 }
 
 void EnvoyQuicProofSource::OnNewSslCtx(SSL_CTX* ssl_ctx) {
-  registerCertCompression(ssl_ctx);
   if (Runtime::runtimeFeatureEnabled("envoy.restart_features.quic_keylog_support")) {
     SSL_CTX_set_keylog_callback(ssl_ctx, EnvoyTlsServerHandshaker::keylogCallback);
   }

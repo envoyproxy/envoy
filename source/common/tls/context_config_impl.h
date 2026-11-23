@@ -43,6 +43,10 @@ public:
   compliancePolicy() const override {
     return compliance_policy_;
   }
+  const envoy::extensions::transport_sockets::tls::v3::CertificateCompression&
+  certificateCompression() const override {
+    return certificate_compression_;
+  }
   // TODO(htuch): This needs to be made const again and/or zero copy and/or callers fixed.
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
   tlsCertificates() const override {
@@ -140,6 +144,8 @@ private:
   const std::optional<
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
       compliance_policy_;
+  const envoy::extensions::transport_sockets::tls::v3::CertificateCompression
+      certificate_compression_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {

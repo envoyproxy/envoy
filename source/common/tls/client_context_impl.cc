@@ -26,6 +26,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
+#include "source/common/tls/cert_compression.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
@@ -67,6 +68,13 @@ ClientContextImpl::ClientContextImpl(
       max_session_keys_(config.maxSessionKeys()) {
   if (!creation_status.ok()) {
     return;
+  }
+
+  const CertCompression::Algorithms cert_compression =
+      CertCompression::enabledAlgorithms(config.certificateCompression(), /*quic=*/false);
+  for (const Ssl::TlsContext& ctx : tls_contexts_) {
+    CertCompression::registerAlgorithms(ctx.ssl_ctx_.get(), CertCompression::Mode::Decompress,
+                                        cert_compression);
   }
 
   // Disallow insecure configuration.

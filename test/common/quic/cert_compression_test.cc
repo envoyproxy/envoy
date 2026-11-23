@@ -28,7 +28,8 @@ TEST(CertCompressionZlibTest, DecompressBadLength) {
   // The compression callback caches per SSL_CTX, so it requires a valid SSL whose
   // context has the algorithm (and thus a cache) registered, as in production.
   bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
-  TlsCertCompression::registerZlib(ssl_ctx.get());
+  TlsCertCompression::registerAlgorithms(ssl_ctx.get(), TlsCertCompression::Mode::Compress,
+                                         {/*brotli=*/false, /*zlib=*/true});
   bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
 
   bssl::ScopedCBB compressed;
