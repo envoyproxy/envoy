@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.service.network_ext_proc.v3;
 
+import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 
 import "google/protobuf/struct.proto";
@@ -55,6 +56,23 @@ service NetworkExternalProcessor {
   }
 }
 
+// Information about a new connection event sent when a downstream connection is first established.
+message NewConnection {
+  // The downstream remote (client) address. Unset if unavailable.
+  config.core.v3.Address downstream_remote_address = 1;
+
+  // The downstream local (listener/server) address. Unset if unavailable.
+  config.core.v3.Address downstream_local_address = 2;
+
+  // Server Name Indication (SNI) or requested server name for the connection, if available.
+  // Empty if not present or not yet inspected.
+  string requested_server_name = 3;
+
+  // Negotiated application-layer protocol (ALPN) for the connection, if available.
+  // Empty if no protocol has been negotiated at connection establishment time.
+  string negotiated_protocol = 4;
+}
+
 // The payload data from network layer
 message Data {
   // The raw payload data
@@ -67,17 +85,18 @@ message Data {
 }
 
 // ProcessingRequest contains data sent from Envoy to the external processing server.
-// Each request contains either read data (from client) or write data (to client)
-// along with optional metadata and attributes.
+// Each request contains read data (from client), write data (to client), or a new connection
+// event along with optional metadata and attributes.
+// [#next-free-field: 6]
 message ProcessingRequest {
   // ReadData contains the network data intercepted in the request path (client to server).
   // This is sent to the external processor when data arrives from the downstream client.
-  // If this is set, write_data should not be set.
+  // If this is set, ``write_data`` and ``new_connection`` should not be set.
   Data read_data = 1;
 
   // WriteData contains the network data intercepted in the response path (server to client).
   // This is sent to the external processor when data arrives from the upstream server.
-  // If this is set, read_data should not be set.
+  // If this is set, ``read_data`` and ``new_connection`` should not be set.
   Data write_data = 2;
 
   // Optional metadata associated with the request.
@@ -92,6 +111,12 @@ message ProcessingRequest {
   // list in the configuration. Each entry in the list is populated
   // from the standard :ref:`attributes <arch_overview_attributes>` supported in the data plane.
   map<string, google.protobuf.Struct> attributes = 4;
+
+  // NewConnection contains connection information sent when a downstream connection is
+  // established and
+  // :ref:`process_new_connection <envoy_v3_api_field_extensions.filters.network.ext_proc.v3.ProcessingMode.process_new_connection>`
+  // is set to ``SEND``. If this is set, ``read_data`` and ``write_data`` should not be set.
+  NewConnection new_connection = 5;
 }
 
 // ProcessingResponse contains the response from the external processing server to Envoy.
@@ -144,7 +169,8 @@ message ProcessingResponse {
   Data write_data = 2;
 
   // Indicates whether the data was modified or not.
-  // This is mandatory and tells Envoy whether to use the original or modified data.
+  // This is mandatory for data responses and tells Envoy whether to use the original or modified
+  // data. Ignored when responding to a ``new_connection`` request.
   DataProcessedStatus data_processing_status = 3;
 
   // Optional: Determines the connection behavior after processing.
