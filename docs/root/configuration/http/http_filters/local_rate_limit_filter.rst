@@ -162,9 +162,14 @@ By default, the token bucket of every matched descriptor is consumed. Setting
 :ref:`rate limit configuration <envoy_v3_api_msg_config.route.v3.RateLimit>` makes the filter skip
 all later configurations once that configuration has matched, so later buckets are not consumed.
 Earlier configurations still apply, so configurations that should always count must be placed
-before the first one with the flag. Route configurations are evaluated before virtual host
-configurations, so a match on a route configuration with the flag also skips the virtual host
-configurations.
+before the first one with the flag.
+
+The search stops only within one ``rate_limits`` list. When
+:ref:`rate_limits_override_option <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limits_override_option>`
+is ``ALL_LEVELS``, each level is checked against its own token buckets, and a stop in one level's
+list does not skip the other levels. Put tiers that should exclude each other in the same list.
+The deprecated route and virtual host ``rate_limits`` are the exception: a match on a route
+configuration with the flag also skips the virtual host configurations.
 
 A configuration matches when every one of its ``actions`` populates and the resulting descriptor
 has at least one entry, so a configuration whose actions are all skipped through

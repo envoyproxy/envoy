@@ -2861,8 +2861,13 @@ message RateLimit {
   // field set. This allows ordered, tiered limits: put the more specific configurations first,
   // each with this field set, and a catch-all configuration last.
   //
-  // Route configurations are evaluated before virtual host configurations, so a match on a
-  // route configuration with this field set also skips the virtual host configurations.
+  // The search stops only within one ``rate_limits`` list. When several lists apply to a request,
+  // for example per-route lists at more than one level with ``rate_limits_override_option`` set to
+  // ``ALL_LEVELS``, a stop in one list does not skip the others. Tiers that should exclude each
+  // other must therefore be in the same list, and lists at other levels, such as a filter level
+  // cap, always apply. The deprecated route and virtual host ``rate_limits`` are the exception:
+  // a match on a route configuration with this field set also skips the virtual host ones.
+  //
   // Configurations with :ref:`apply_on_stream_done
   // <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` are evaluated
   // separately from the request-time configurations, so each phase stops on its own.
@@ -2875,8 +2880,8 @@ message RateLimit {
   // least one entry. A configuration whose actions are all skipped through ``skip_if_absent`` does
   // not match and does not stop the search. Neither does a configuration whose
   // :ref:`hits_addend <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` fails to
-  // evaluate, so such a request falls through to later configurations. For the HTTP local rate limit filter a match does not
-  // require a configured token bucket for the descriptor.
+  // evaluate, so such a request falls through to later configurations. For the HTTP local rate
+  // limit filter a match does not require a configured token bucket for the descriptor.
   //
   // Currently, this is only supported by the HTTP global and local rate limit filters. Other
   // filters that use this message, such as the Thrift rate limit filter, ignore it.

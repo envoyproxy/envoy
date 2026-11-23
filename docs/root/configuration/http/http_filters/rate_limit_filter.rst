@@ -152,12 +152,18 @@ negate all of the earlier ones.
 Setting :ref:`stop_on_match <envoy_v3_api_field_config.route.v3.RateLimit.stop_on_match>` on a
 configuration makes the filter skip all later configurations once that configuration has produced a
 descriptor. Earlier configurations still apply, so configurations that should always count must be
-placed before the first one with the flag. Route configurations are evaluated before virtual host
-configurations, so a match on a route configuration with the flag also skips the virtual host
-configurations. Configurations that
+placed before the first one with the flag. Configurations that
 :ref:`apply on stream done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` are
 evaluated separately, so a stop at request time does not affect them. Only later configurations of
 the same :ref:`stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>` are skipped.
+
+The search stops only within one ``rate_limits`` list. When
+:ref:`rate_limits_override_option <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits_override_option>`
+is ``ALL_LEVELS``, the lists at every level are evaluated, and a stop in one list does not skip
+the others. Put tiers that should exclude each other in the same list. A list at another level,
+such as a filter level cap, then always applies. The deprecated route and virtual host
+``rate_limits`` are the exception: a match on a route configuration with the flag also skips the
+virtual host configurations.
 
 A configuration matches when all of its actions populate and the resulting descriptor has at least
 one entry. If an action cannot populate, for example because a required header is missing, the
