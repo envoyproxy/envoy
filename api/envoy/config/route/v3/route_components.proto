@@ -2885,7 +2885,9 @@ message RateLimit {
   // a configuration whose :ref:`hits_addend
   // <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` fails to evaluate, so such a
   // request falls through to later configurations. For the HTTP local rate limit filter a match
-  // does not require a configured token bucket for the descriptor.
+  // does not require a configured token bucket for the descriptor. What a configuration counts
+  // does not matter either: one whose ``hits_addend`` is zero or sets ``is_negative_hits`` still
+  // matches and stops the search, so this field is usually left unset on such configurations.
   //
   // Currently, this is only supported by the HTTP global and local rate limit filters. Other
   // filters that use this message, such as the Thrift rate limit filter, ignore it.
