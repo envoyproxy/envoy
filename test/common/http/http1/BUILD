@@ -141,3 +141,24 @@ envoy_cc_fuzz_test(
         "//test/test_common:test_runtime_lib",
     ],
 )
+
+envoy_cc_benchmark_binary(
+    name = "codec_impl_speed_test",
+    srcs = ["codec_impl_speed_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http/http1:codec_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:overload_manager_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "codec_impl_speed_test_benchmark_test",
+    benchmark_binary = "codec_impl_speed_test",
+)
