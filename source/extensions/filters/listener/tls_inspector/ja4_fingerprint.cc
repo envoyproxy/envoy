@@ -24,6 +24,16 @@ const std::array<uint16_t, 16> GREASE_VALUES = {
     0x0a0a, 0x1a1a, 0x2a2a, 0x3a3a, 0x4a4a, 0x5a5a, 0x6a6a, 0x7a7a,
     0x8a8a, 0x9a9a, 0xaaaa, 0xbaba, 0xcaca, 0xdada, 0xeaea, 0xfafa,
 };
+
+absl::string_view protocolChar(JA4Fingerprinter::Protocol protocol) {
+  switch (protocol) {
+  case JA4Fingerprinter::Protocol::QUIC:
+    return "q";
+  case JA4Fingerprinter::Protocol::TLS:
+    return "t";
+  }
+  return "t";
+}
 } // namespace
 
 bool JA4Fingerprinter::isNotGrease(uint16_t id) {
@@ -237,12 +247,16 @@ std::string JA4Fingerprinter::getJA4ExtensionHash(const SSL_CLIENT_HELLO* ssl_cl
         CBS_init(&sig_alg_data, CBS_data(&extension), CBS_len(&extension));
         uint16_t sig_alg_len;
         if (CBS_get_u16(&sig_alg_data, &sig_alg_len)) {
+          const bool filter_grease = Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.ja4_filter_grease_signature_algorithms");
           while (CBS_len(&sig_alg_data) >= 2) {
             uint16_t sig_alg;
             if (!CBS_get_u16(&sig_alg_data, &sig_alg)) {
               break;
             }
-            sig_algs.push_back(sig_alg);
+            if (!filter_grease || isNotGrease(sig_alg)) {
+              sig_algs.push_back(sig_alg);
+            }
           }
         }
       }
@@ -293,11 +307,11 @@ std::string JA4Fingerprinter::getJA4ExtensionHash(const SSL_CLIENT_HELLO* ssl_cl
   return Envoy::Hex::encode(absl::Span<const uint8_t>(hash.data(), JA4_HASH_LENGTH / 2));
 }
 
-std::string JA4Fingerprinter::create(const SSL_CLIENT_HELLO* ssl_client_hello) {
+std::string JA4Fingerprinter::create(const SSL_CLIENT_HELLO* ssl_client_hello, Protocol protocol) {
   return absl::StrCat(
-      // Protocol type (t for TLS, q for QUIC, d for `DTLS`)
-      // In this implementation, we only handle TLS
-      "t",
+      // Protocol type: ``t`` for TLS, ``q`` for QUIC. Chosen by the caller based
+      // on the transport carrying the handshake.
+      protocolChar(protocol),
 
       // TLS Version
       getJA4TlsVersion(ssl_client_hello),

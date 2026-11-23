@@ -846,11 +846,16 @@ int StreamHandleWrapper::luaStreamInfo(lua_State* state) {
 
 int StreamHandleWrapper::luaConnectionStreamInfo(lua_State* state) {
   ASSERT(state_ == State::Running);
+  const auto* connection = callbacks_.connection();
+  if (connection == nullptr) {
+    lua_pushnil(state);
+    return 1;
+  }
   if (connection_stream_info_wrapper_.get() != nullptr) {
     connection_stream_info_wrapper_.pushStack();
   } else {
     connection_stream_info_wrapper_.reset(
-        ConnectionStreamInfoWrapper::create(state, callbacks_.connection()->streamInfo()), true);
+        ConnectionStreamInfoWrapper::create(state, connection->streamInfo()), true);
   }
   return 1;
 }
@@ -1210,8 +1215,12 @@ int StreamHandleWrapper::luaFilterContext(lua_State* state) {
   if (filter_context_wrapper_.get() != nullptr) {
     filter_context_wrapper_.pushStack();
   } else {
-    filter_context_wrapper_.reset(
-        Filters::Common::Lua::MetadataMapWrapper::create(state, callbacks_.filterContext()), true);
+    // The context is owned by the filter's config, which this filter holds, or by the route's
+    // per-filter config, which the connection manager keeps alive until the stream ends even
+    // after the route cache is cleared.
+    filter_context_wrapper_.reset(Filters::Common::Lua::MetadataMapWrapper::create(
+                                      state, std::cref(callbacks_.filterContext())),
+                                  true);
   }
   return 1;
 }

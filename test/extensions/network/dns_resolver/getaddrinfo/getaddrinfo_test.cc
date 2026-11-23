@@ -46,13 +46,13 @@ public:
                         Utility::getCanonicalIpv4LoopbackAddress(),
                         Utility::getIpv6LoopbackAddress()}) {
     EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
-        .WillOnce(Invoke([addresses](const char*, const char*, const addrinfo*, addrinfo** res) {
+        .WillOnce([addresses](const char*, const char*, const addrinfo*, addrinfo** res) {
           *res = makeGaiResponse(addresses);
           return Api::SysCallIntResult{0, 0};
-        }));
-    EXPECT_CALL(os_sys_calls_, freeaddrinfo(_)).WillOnce(Invoke([](addrinfo* res) {
+        });
+    EXPECT_CALL(os_sys_calls_, freeaddrinfo(_)).WillOnce([](addrinfo* res) {
       freeGaiResponse(res);
-    }));
+    });
   }
 
   static addrinfo* makeGaiResponse(std::vector<Address::InstanceConstSharedPtr> addresses) {
@@ -283,10 +283,10 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainThenCancel) {
 
   EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
       .Times(testing::AnyNumber())
-      .WillOnce(Invoke([&](const char*, const char*, const addrinfo*, addrinfo**) {
+      .WillOnce([&](const char*, const char*, const addrinfo*, addrinfo**) {
         dispatcher_->exit();
         return Api::SysCallIntResult{EAI_AGAIN, 0};
-      }));
+      });
   query = resolver_->resolve(
       "localhost", DnsLookupFamily::All,
       [](DnsResolver::ResolutionStatus, absl::string_view, std::list<DnsResponse>&&) { FAIL(); });

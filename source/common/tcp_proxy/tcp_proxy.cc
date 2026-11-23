@@ -1028,8 +1028,9 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
       route_stat_name_storage_("tcpproxy_tunneling", context.scope().symbolTable()),
       // TODO(vikaschoudhary16): figure out which of the following router_config_ members are
       // not required by tcp_proxy and move them to a different class
-      router_config_(context.serverFactoryContext(), route_stat_name_storage_.statName(),
-                     stats_scope, context.serverFactoryContext().clusterManager(),
+      router_config_(context.serverFactoryContext(), stats_scope,
+                     route_stat_name_storage_.statName(), stats_scope,
+                     context.serverFactoryContext().clusterManager(),
                      context.serverFactoryContext().runtime(),
                      context.serverFactoryContext().api().randomGenerator(),
                      std::make_unique<Router::ShadowWriterImpl>(
@@ -1162,6 +1163,23 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
           return Network::FilterStatus::StopIteration;
         }
       }
+    } else if (connect_mode_ == UpstreamConnectMode::ON_DOWNSTREAM_DATA &&
+               !initial_data_received_ && end_stream && early_data_buffer_.length() == 0) {
+      // ON_DOWNSTREAM_DATA never connects upstream for a downstream that half-closes before
+      // sending data. Half-close is enabled, so that FIN is not a RemoteClose, and the session
+      // would otherwise stay open until idle_timeout or max_downstream_connection_duration ends
+      // it, or indefinitely when idle_timeout is 0s and no duration is set.
+      //
+      // Other modes have already started or scheduled an upstream connect, and they flush the
+      // buffered end_stream to it once it connects.
+      ENVOY_CONN_LOG(debug,
+                     "Downstream closed without data before upstream connect; closing connection",
+                     read_callbacks_->connection());
+      config_->stats().downstream_cx_closed_without_data_.inc();
+      read_callbacks_->connection().close(
+          Network::ConnectionCloseType::FlushWrite,
+          StreamInfo::LocalCloseReasons::get().TcpProxyDownstreamClosedWithoutData);
+      return Network::FilterStatus::StopIteration;
     }
 
     // Read-disable downstream when receiving early data to prevent excessive buffering.
@@ -1408,9 +1426,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
     } else {
       if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
         // Propagate upstream RST to downstream.
-        if (upstream_detected_close_type == StreamInfo::DetectedCloseType::RemoteReset &&
-            Runtime::runtimeFeatureEnabled("envoy.reloadable_features."
-                                           "propagate_upstream_rst_through_tunneled_tcp_proxy")) {
+        if (upstream_detected_close_type == StreamInfo::DetectedCloseType::RemoteReset) {
           ENVOY_CONN_LOG(trace, "TCP:onUpstreamEvent(): propagating upstream RST to downstream",
                          read_callbacks_->connection());
           disableIdleTimer();

@@ -42,6 +42,8 @@ public:
   MockXdsConfigTracker();
   ~MockXdsConfigTracker() override;
 
+  bool enabled() const override { return enabled_; }
+
   MOCK_METHOD(void, onConfigAccepted,
               (const absl::string_view type_url, const std::vector<DecodedResourcePtr>& resources),
               (override));
@@ -60,6 +62,8 @@ public:
               (override));
   MOCK_METHOD(void, onResourceUnsubscribed,
               (const absl::string_view type_url, absl::string_view resource), (override));
+
+  bool enabled_{true};
 };
 
 class MockXdsConfigTrackerFactory : public XdsConfigTrackerFactory {
@@ -100,9 +104,12 @@ public:
   MockOpaqueResourceDecoder();
   ~MockOpaqueResourceDecoder() override;
 
-  MOCK_METHOD(ArenaWrappedProto<Protobuf::Message>, decodeResource,
-              (const Protobuf::Any& resource));
+  MOCK_METHOD(Protobuf::Arena::UniquePtr<Protobuf::Message>, decodeResource,
+              (const Protobuf::Any& resource, Protobuf::Arena& arena));
   MOCK_METHOD(std::string, resourceName, (const Protobuf::Message& resource));
+  MOCK_METHOD(const Protobuf::ArenaOptions&, arenaOptions, (), (const));
+
+  Protobuf::ArenaOptions arena_options_;
 };
 
 class MockUntypedConfigUpdateCallbacks : public UntypedConfigUpdateCallbacks {
@@ -132,7 +139,23 @@ public:
               (const absl::flat_hash_set<std::string>& update_to_these_names));
   MOCK_METHOD(void, requestOnDemandUpdate,
               (const absl::flat_hash_set<std::string>& add_these_names));
+  MOCK_METHOD(void, update,
+              (const absl::flat_hash_set<std::string>& add_these_names,
+               const absl::flat_hash_set<std::string>& remove_these_names));
   MOCK_METHOD(void, accept, (const absl::flat_hash_set<std::string>& patterns));
+};
+
+class MockSingletonSubscription : public SingletonSubscription {
+public:
+  MOCK_METHOD(void, start, ());
+};
+
+class MockSingletonSubscriptionCallbacks : public SingletonSubscriptionCallbacks {
+public:
+  MOCK_METHOD(absl::Status, onResourceUpdate,
+              (const DecodedResource& resource, const std::string& version_info));
+  MOCK_METHOD(void, onResourceRemoved, ());
+  MOCK_METHOD(void, onFailure, (ConfigUpdateFailureReason reason, const EnvoyException* e));
 };
 
 class MockSubscriptionFactory : public SubscriptionFactory {
@@ -143,6 +166,12 @@ public:
   MOCK_METHOD(absl::StatusOr<SubscriptionPtr>, subscriptionFromConfigSource,
               (const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
                Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+               OpaqueResourceDecoderSharedPtr resource_decoder,
+               const SubscriptionOptions& options));
+  MOCK_METHOD(absl::StatusOr<std::unique_ptr<SingletonSubscription>>, subscriptionFromConfigSource,
+              (const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
+               Stats::Scope& scope, absl::string_view resource_name,
+               SingletonSubscriptionCallbacks& callbacks,
                OpaqueResourceDecoderSharedPtr resource_decoder,
                const SubscriptionOptions& options));
   MOCK_METHOD(absl::StatusOr<SubscriptionPtr>, subscriptionOverAdsGrpcMux,
@@ -159,6 +188,9 @@ public:
 
   MockSubscription* subscription_{};
   SubscriptionCallbacks* callbacks_{};
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
+  MockSingletonSubscription* singleton_subscription_{};
+  SingletonSubscriptionCallbacks* singleton_callbacks_{};
 };
 
 class MockGrpcMuxWatch : public GrpcMuxWatch {

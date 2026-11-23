@@ -63,12 +63,17 @@ using LookupResultPtr = std::unique_ptr<LookupResult>;
 // leaves alpha, any improvements to stableHashKey that would change its output
 // for existing callers is a breaking change.
 //
-// For non-persistent storage, use MessageUtil, which has no long-term stability
-// guarantees.
+// For non-persistent storage, key by serializeKey(), whose bytes are stable
+// only within one binary.
 //
 // When providing a cached response, Caches must ensure that the keys (and not
 // just their hashes) match.
 size_t stableHashKey(const Key& key);
+
+// The deterministic serialization of a Key, which in-memory maps and sets of
+// Keys use as their key.
+using SerializedKey = std::string;
+SerializedKey serializeKey(const Key& key);
 
 // LookupRequest holds everything about a request that's needed to look for a
 // response in a cache, to evaluate whether an entry from a cache is usable, and

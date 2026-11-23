@@ -1,0 +1,84 @@
+name: Envoy/JUnit
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      since-hours:
+        description: Collect runs completed in the last N hours.
+        type: number
+        default: 2
+      workflows:
+        description: Comma-separated workflow names to collect from.
+        type: string
+        default: Envoy/Checks,Envoy/Prechecks
+      datadog-service:
+        description: Datadog service name to upload test results under.
+        type: string
+        default: envoy-ci
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+
+jobs:
+  collect:
+    # Manually triggered, not run on each CI run, so collecting never slows CI down. Each run
+    # looks back over --since-hours and pulls the test.xml of every test the matched runs' Bazel
+    # invocations actually executed, from EngFlow.
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      with:
+        sparse-checkout: ci/junit
+    - name: Collect JUnit XML from EngFlow
+      run: >-
+        python3 ci/junit/collect.py
+        --repo "${{ github.repository }}"
+        --since-hours "${{ inputs.since-hours || 2 }}"
+        --workflows "${{ inputs.workflows || 'Envoy/Checks,Envoy/Prechecks' }}"
+        --out junit
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      with:
+        name: junit
+        path: junit
+        if-no-files-found: warn
+    - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5.0.0
+      with:
+        node-version: '22'
+    - name: Restore Datadog upload watermark
+      # Which run ids a previous dispatch already uploaded, so two overlapping --since-hours
+      # windows (e.g. re-running this manually before narrowing the window) don't re-upload the
+      # same run's results. The workflow-level concurrency group means these never run two at a
+      # time, so there's no concurrent writer to race against.
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+      with:
+        path: .datadog-watermark.json
+        key: datadog-watermark-${{ github.run_id }}
+        restore-keys: datadog-watermark-
+    - name: Upload JUnit XML to Datadog
+      # Best effort, same as collection above: a Datadog hiccup shouldn't fail the run.
+      continue-on-error: true
+      run: >-
+        python3 ci/junit/upload_datadog.py
+        --repo "${{ github.repository }}"
+        --service "${{ inputs.datadog-service || 'envoy-ci' }}"
+        --junit-dir junit
+        --watermark .datadog-watermark.json
+      env:
+        DD_API_KEY: ${{ secrets.DD_API_KEY }}
+    - name: Save Datadog upload watermark
+      if: always()
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+      with:
+        path: .datadog-watermark.json
+        key: datadog-watermark-${{ github.run_id }}

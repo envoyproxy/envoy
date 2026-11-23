@@ -146,7 +146,7 @@ private:
         if (eds_resources_cache_.has_value()) {
           removeResourcesFromCache(resources_);
         }
-        if (parent_.xds_config_tracker_.has_value()) {
+        if (parent_.xds_config_tracker_.has_value() && parent_.xds_config_tracker_->enabled()) {
           notifyUnsubscribedResources(resources_);
         }
       }
@@ -163,7 +163,8 @@ private:
 
     // On-demand and glob watch interest are only supported by the delta muxes; this legacy
     // state-of-the-world mux does not implement them.
-    void append(const absl::flat_hash_set<std::string>&) override {}
+    void update(const absl::flat_hash_set<std::string>&,
+                const absl::flat_hash_set<std::string>&) override {}
     void accept(const absl::flat_hash_set<std::string>&) override {}
 
     // Maintain deterministic wire ordering via ordered std::set.
@@ -199,8 +200,10 @@ private:
             }
             return resource_name;
           });
+      const bool track_unsubscriptions =
+          parent_.xds_config_tracker_.has_value() && parent_.xds_config_tracker_->enabled();
       std::vector<std::string> removed_resources;
-      if (eds_resources_cache_.has_value() || parent_.xds_config_tracker_.has_value()) {
+      if (eds_resources_cache_.has_value() || track_unsubscriptions) {
         // Computes the removed resources.
         std::set_difference(previous_resources.begin(), previous_resources.end(),
                             resources_.begin(), resources_.end(),
@@ -211,7 +214,7 @@ private:
         // Removes the computed resources from cache.
         removeResourcesFromCache(removed_resources);
       }
-      if (parent_.xds_config_tracker_.has_value()) {
+      if (track_unsubscriptions) {
         // Notifies the config tracker, if present.
         notifyUnsubscribedResources(removed_resources);
       }

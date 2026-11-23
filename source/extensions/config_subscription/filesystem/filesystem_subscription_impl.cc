@@ -155,9 +155,8 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
   if (collection_descriptor == nullptr) {
     throw EnvoyException(fmt::format("Unknown collection type {}", collection_type));
   }
-  Protobuf::DynamicMessageFactory dmf;
-  ProtobufTypes::MessagePtr collection_message;
-  collection_message.reset(dmf.GetPrototype(collection_descriptor)->New());
+  ProtobufTypes::MessagePtr collection_message(
+      Protobuf::MessageFactory::generated_factory()->GetPrototype(collection_descriptor)->New());
   THROW_IF_NOT_OK(MessageUtil::unpackTo(resource_message.resource(), *collection_message));
   const auto* collection_entries_field_descriptor = collection_descriptor->field(0);
   // Verify collection message type structure.
@@ -172,7 +171,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
   const auto* reflection = collection_message->GetReflection();
   const uint32_t num_entries =
       reflection->FieldSize(*collection_message, collection_entries_field_descriptor);
-  DecodedResourcesWrapper decoded_resources;
+  DecodedResourcesWrapper decoded_resources(resource_decoder_->arenaOptions());
   for (uint32_t i = 0; i < num_entries; ++i) {
     xds::core::v3::CollectionEntry collection_entry;
     collection_entry.MergeFrom(reflection->GetRepeatedMessage(
@@ -180,7 +179,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
     // TODO(htuch): implement indirect collection entries.
     if (collection_entry.has_inline_entry()) {
       decoded_resources.pushBack(std::make_unique<DecodedResourceImpl>(
-          *resource_decoder_, collection_entry.inline_entry()));
+          *resource_decoder_, collection_entry.inline_entry(), *decoded_resources.arena_));
     }
   }
   *config_update = std::move(owned_resource_message);

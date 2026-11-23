@@ -11,7 +11,6 @@
 
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -27,9 +26,9 @@ public:
       envoymobile::extensions::stat_sinks::metrics_service::EnvoyMobileStreamMetricsResponse>;
 
   EnvoyMobileGrpcMetricsStreamerImplTest() {
-    EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
+    EXPECT_CALL(*factory_, create()).WillOnce([this] {
       return Grpc::RawAsyncClientPtr{async_client_};
-    }));
+    });
 
     streamer_ = std::make_unique<EnvoyMobileGrpcMetricsStreamerImpl>(
         Grpc::AsyncClientFactoryPtr{factory_}, local_info_, random_generator);
@@ -37,12 +36,12 @@ public:
 
   void expectStreamStart(MockMetricsStream& stream, MetricsServiceCallbacks** callbacks_to_set) {
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
-        .WillOnce(Invoke([&stream, callbacks_to_set](absl::string_view, absl::string_view,
-                                                     Grpc::RawAsyncStreamCallbacks& callbacks,
-                                                     const Http::AsyncClient::StreamOptions&) {
+        .WillOnce([&stream, callbacks_to_set](absl::string_view, absl::string_view,
+                                              Grpc::RawAsyncStreamCallbacks& callbacks,
+                                              const Http::AsyncClient::StreamOptions&) {
           *callbacks_to_set = dynamic_cast<MetricsServiceCallbacks*>(&callbacks);
           return &stream;
-        }));
+        });
   }
 
   NiceMock<Random::MockRandomGenerator> random_generator;
@@ -104,12 +103,11 @@ TEST_F(EnvoyMobileGrpcMetricsStreamerImplTest, StreamFailure) {
   InSequence s;
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
-      .WillOnce(
-          Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
-                    const Http::AsyncClient::StreamOptions&) {
-            callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
-            return nullptr;
-          }));
+      .WillOnce([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
+                   const Http::AsyncClient::StreamOptions&) {
+        callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
+        return nullptr;
+      });
   EXPECT_CALL(local_info_, node());
   auto metrics =
       std::make_unique<Envoy::Protobuf::RepeatedPtrField<io::prometheus::client::MetricFamily>>();

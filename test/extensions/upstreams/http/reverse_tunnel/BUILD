@@ -1,17 +1,27 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "linux_x64_small",
+    extension_names = ["envoy.upstreams.http.reverse_tunnel"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:utility_lib",
@@ -34,6 +44,7 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/reverse_tunnel/v3:pkg_cc_proto",

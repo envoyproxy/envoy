@@ -13,12 +13,14 @@
 #include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/cpu_affinity.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/hash.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/utility.h"
 #include "source/common/network/filter_matcher.h"
@@ -82,6 +84,28 @@ void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& stat
   listener.dumpListenerConfig(*state.mutable_listener());
   TimestampUtil::systemClockToTimestamp(listener.last_updated_, *(state.mutable_last_updated()));
 }
+
+// Returns the socket factories of the listener whose addresses the other listener does not listen
+// on.
+std::vector<Network::ListenSocketFactory*> exclusiveSocketFactories(const ListenerImpl& listener,
+                                                                    const ListenerImpl& other) {
+  std::vector<Network::ListenSocketFactory*> socket_factories;
+  for (const auto& socket_factory : listener.getSocketFactories()) {
+    if (other.listenSocketFactory(*socket_factory->localAddress()) == nullptr) {
+      socket_factories.push_back(socket_factory.get());
+    }
+  }
+  return socket_factories;
+}
+
+// Keeps a listener until the dispatcher deletes it.
+class DeferredDeleteListener : public Event::DeferredDeletable {
+public:
+  explicit DeferredDeleteListener(ListenerImplPtr&& listener) : listener_(std::move(listener)) {}
+
+private:
+  ListenerImplPtr listener_;
+};
 } // namespace
 
 absl::StatusOr<Filter::NetworkFilterFactoriesList>
@@ -103,7 +127,7 @@ ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
           proto_config.config_discovery(), proto_config.name(),
           filter_chain_factory_context.serverFactoryContext(), filter_chain_factory_context,
           filter_chain_factory_context.serverFactoryContext().clusterManager(), is_terminal,
-          "network", nullptr));
+          "network", nullptr, ""));
       continue;
     }
 
@@ -169,7 +193,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
       auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
           config_discovery, name, context.serverFactoryContext(), context,
           context.serverFactoryContext().clusterManager(), false, "tcp-listener",
-          createListenerFilterMatcher(proto_config));
+          createListenerFilterMatcher(proto_config), "");
       ret.push_back(std::move(filter_config_provider));
     } else {
       ENVOY_LOG(debug, "  config: {}",
@@ -256,7 +280,7 @@ ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
       ret.push_back(config_provider_manager.createDynamicFilterConfigProvider(
           config_discovery, name, context.serverFactoryContext(), context,
           context.serverFactoryContext().clusterManager(), false, "quic-listener",
-          createListenerFilterMatcher(proto_config)));
+          createListenerFilterMatcher(proto_config), ""));
     } else {
       ENVOY_LOG(debug, "  config: {}",
                 MessageUtil::convertToStringForLogs(
@@ -430,9 +454,11 @@ DrainManagerPtr ProdListenerComponentFactory::createDrainManager(
 }
 
 DrainingFilterChainsManager::DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
-                                                         uint64_t workers_pending_removal)
+                                                         uint64_t workers_pending_removal,
+                                                         uint32_t num_draining_addresses)
     : draining_listener_(std::move(draining_listener)),
       listener_tag_(draining_listener_->listenerTag()),
+      num_draining_addresses_(num_draining_addresses),
       workers_pending_removal_(workers_pending_removal) {}
 
 DrainingFilterChainsManager::DrainingFilterChainsManager(
@@ -445,6 +471,36 @@ DrainingFilterChainsManager::DrainingFilterChainsManager(
     fc->startDraining();
     draining_filter_chains_.push_back(fc.get());
   }
+}
+
+uint32_t DrainingFilterChainsManager::keepFilterChains(
+    const absl::flat_hash_set<const Network::FilterChain*>& filter_chains) {
+  if (removed_filter_chains_built_) {
+    return 0;
+  }
+  uint32_t num_kept = 0;
+  for (const auto& filter_chain : draining_filter_chain_shared_ptrs_) {
+    if (filter_chains.contains(filter_chain.get()) &&
+        kept_filter_chains_.insert(filter_chain.get()).second) {
+      num_kept++;
+    }
+  }
+  return num_kept;
+}
+
+const std::list<const Network::FilterChain*>&
+DrainingFilterChainsManager::buildRemovedFilterChains() {
+  ASSERT(!removed_filter_chains_built_);
+  removed_filter_chains_built_ = true;
+  if (kept_filter_chains_.empty()) {
+    return draining_filter_chains_;
+  }
+  for (const Network::FilterChain* filter_chain : draining_filter_chains_) {
+    if (!kept_filter_chains_.contains(filter_chain)) {
+      removed_filter_chains_.push_back(filter_chain);
+    }
+  }
+  return removed_filter_chains_;
 }
 
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
@@ -611,23 +667,63 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
                                           *(it->second->mutable_last_update_attempt()));
     it->second->set_details(add_or_update_status.status().message());
     std::ignore = it->second->mutable_failed_configuration()->PackFrom(config);
+  } else {
+    // Callers other than LDS do not clear the error states before an update.
+    lds_error_state_tracker_.erase(name);
   }
   return add_or_update_status;
 }
 
-absl::Status
-ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
-                                                   const ListenerImpl& existing_listener) {
+absl::Status ListenerManagerImpl::setupSocketFactoryForListener(
+    ListenerImpl& new_listener, const ListenerImpl& existing_listener, bool in_place_update) {
   if (new_listener.reusePort() != existing_listener.reusePort()) {
     return absl::InvalidArgumentError(fmt::format(
         "Listener {}: reuse port cannot be changed during an update", new_listener.name()));
   }
 
-  if (!existing_listener.hasCompatibleAddress(new_listener)) {
+  if (new_listener.inPlaceAddressUpdate()) {
+    RETURN_IF_NOT_OK(validateNoDuplicatedAddress(new_listener.name(), new_listener));
+    std::vector<Network::ListenSocketFactory*> kept_socket_factories;
+    kept_socket_factories.reserve(new_listener.addresses().size());
+    // An added address clones the open sockets of a listener that an earlier in place update
+    // replaced, like a full update does, since new sockets would compete with them for the address.
+    std::vector<Network::ListenSocketFactory*> cloned_socket_factories;
+    cloned_socket_factories.reserve(new_listener.addresses().size());
+    for (uint32_t i = 0; i < new_listener.addresses().size(); i++) {
+      Network::ListenSocketFactory* kept_socket_factory =
+          existing_listener.listenSocketFactory(*new_listener.addresses()[i]);
+      // The warming listener that the update replaces has not listened on its sockets, whose
+      // duplicates would miss the socket options that apply once they listen.
+      if (kept_socket_factory == nullptr) {
+        kept_socket_factory = warmingVersionSocketFactory(new_listener, i);
+      }
+      kept_socket_factories.push_back(kept_socket_factory);
+      cloned_socket_factories.push_back(
+          kept_socket_factory == nullptr ? drainingVersionSocketFactory(new_listener, i) : nullptr);
+    }
+    RETURN_IF_NOT_OK(
+        createListenSocketFactory(new_listener, kept_socket_factories, cloned_socket_factories));
+  } else if (!existing_listener.hasCompatibleAddress(new_listener)) {
     RETURN_IF_NOT_OK(setNewOrDrainingSocketFactory(new_listener.name(), new_listener));
   } else {
     RETURN_IF_NOT_OK(new_listener.cloneSocketFactoryFrom(existing_listener));
   }
+
+  return initializeWorkerRoutingForUdpListener(new_listener, in_place_update);
+}
+
+absl::Status ListenerManagerImpl::initializeWorkerRoutingForUdpListener(ListenerImpl& new_listener,
+                                                                        bool in_place_update) {
+  if (in_place_update ||
+      !Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
+    return absl::OkStatus();
+  }
+
+  if (auto udp_listener_config = new_listener.udpListenerConfig()) {
+    RETURN_IF_NOT_OK(udp_listener_config->listenerFactory().initializeWorkerRouting(
+        new_listener.listenSocketFactories()));
+  }
+
   return absl::OkStatus();
 }
 
@@ -643,17 +739,43 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     return false;
   }
 
-  const uint64_t hash = MessageUtil::hash(config);
-  ENVOY_LOG(debug, "begin add/update listener: name={} hash={}", name, hash);
+  // Each check below compares the serialized config first, so MessageUtil::hash() only runs for a
+  // new config or one whose bytes differ from the listener it is compared with.
+  const uint64_t serialized_hash =
+      HashUtil::xxHash64(MessageUtil::serializeDeterministically(config));
+  ENVOY_LOG(debug, "begin add/update listener: name={} serialized_hash={}", name, serialized_hash);
+  std::optional<uint64_t> hash;
+  const auto block_lds_update = [&config, serialized_hash, &hash](ListenerImpl& listener) {
+    if (listener.serializedConfigHash() == serialized_hash) {
+      return true;
+    }
+    if (!hash.has_value()) {
+      hash = MessageUtil::hash(config);
+    }
+    if (!listener.blockLdsUpdate(*hash)) {
+      return false;
+    }
+    // Storing the hash of these bytes lets the next push of the same bytes skip
+    // MessageUtil::hash(). An update that this listener blocks, or that reverts to it, brings new
+    // bytes when the listener is static, or when MessageUtil::hash() finds the config equal
+    // although its bytes differ, for example on a full-proto build when the sender re-encodes an
+    // Any payload with its map entries in another order after a restart or an upgrade. Without
+    // this, every later push of these bytes would pay for both hashes, which costs more than
+    // MessageUtil::hash() alone. A sender that re-encodes on every push pays for both anyway.
+    listener.setSerializedConfigHash(serialized_hash);
+    return true;
+  };
 
   auto existing_active_listener = getListenerByName(active_listeners_, name);
   auto existing_warming_listener = getListenerByName(warming_listeners_, name);
 
   // The listener should be updated back to its original state and the warming listener should be
-  // removed.
+  // removed. A warming listener only exists for an update that the active one did not block, so a
+  // push of the warming listener's own bytes skips this check and its MessageUtil::hash().
   if (existing_warming_listener != warming_listeners_.end() &&
       existing_active_listener != active_listeners_.end() &&
-      (*existing_active_listener)->blockLdsUpdate(hash)) {
+      (*existing_warming_listener)->serializedConfigHash() != serialized_hash &&
+      block_lds_update(**existing_active_listener)) {
     warming_listeners_.erase(existing_warming_listener);
     updateWarmingActiveGauges();
     stats_.listener_modified_.inc();
@@ -663,44 +785,68 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   // Do a quick blocked update check before going further. This check needs to be done against both
   // warming and active.
   if ((existing_warming_listener != warming_listeners_.end() &&
-       (*existing_warming_listener)->blockLdsUpdate(hash)) ||
+       block_lds_update(**existing_warming_listener)) ||
       (existing_active_listener != active_listeners_.end() &&
-       (*existing_active_listener)->blockLdsUpdate(hash))) {
+       block_lds_update(**existing_active_listener))) {
     ENVOY_LOG(debug, "duplicate/locked listener '{}'. no add/update", name);
     return false;
+  }
+  if (!hash.has_value()) {
+    hash = MessageUtil::hash(config);
   }
 
   ListenerImplPtr new_listener = nullptr;
 
   // In place filter chain update depends on the active listener at worker.
-  if (existing_active_listener != active_listeners_.end() &&
-      (*existing_active_listener)->supportUpdateFilterChain(config, workers_started_)) {
+  const ListenerImpl::InPlaceUpdate in_place_update_kind =
+      existing_active_listener != active_listeners_.end()
+          ? (*existing_active_listener)->supportUpdateFilterChain(config, workers_started_)
+          : ListenerImpl::InPlaceUpdate::None;
+  const bool in_place_update = in_place_update_kind != ListenerImpl::InPlaceUpdate::None;
+  if (in_place_update) {
     ENVOY_LOG(debug, "use in place update filter chain update path for listener name={} hash={}",
-              name, hash);
+              name, *hash);
     auto listener_or_error =
-        (*existing_active_listener)->newListenerWithFilterChain(config, workers_started_, hash);
+        (*existing_active_listener)
+            ->newListenerWithFilterChain(config, version_info, workers_started_, *hash,
+                                         serialized_hash, in_place_update_kind);
     RETURN_IF_NOT_OK_REF(listener_or_error.status());
     new_listener = std::move(*listener_or_error);
     stats_.listener_in_place_updated_.inc();
   } else {
-    ENVOY_LOG(debug, "use full listener update path for listener name={} hash={}", name, hash);
+    ENVOY_LOG(debug, "use full listener update path for listener name={} hash={}", name, *hash);
     auto listener_or_error = ListenerImpl::create(config, version_info, *this, name, added_via_api,
-                                                  workers_started_, hash);
+                                                  workers_started_, *hash, serialized_hash);
     RETURN_IF_NOT_OK_REF(listener_or_error.status());
     new_listener = std::move(*listener_or_error);
   }
 
   ListenerImpl& new_listener_ref = *new_listener;
+  ListenerImplPtr replaced_listener;
 
   bool added = false;
   if (existing_warming_listener != warming_listeners_.end()) {
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
-    RETURN_IF_NOT_OK(setupSocketFactoryForListener(*new_listener, **existing_warming_listener));
+    // The active listener is removed along with its in place updates.
+    ASSERT(!(*existing_warming_listener)->inPlaceAddressUpdate() ||
+           existing_active_listener != active_listeners_.end());
+    // An in place update of the addresses keeps listening on the sockets of the active listener,
+    // and so does an update that replaces it with the addresses and socket options of the active
+    // listener.
+    const bool keeps_active_sockets =
+        new_listener->inPlaceAddressUpdate() ||
+        ((*existing_warming_listener)->inPlaceAddressUpdate() &&
+         (*existing_active_listener)->hasCompatibleAddress(*new_listener));
+    RETURN_IF_NOT_OK(setupSocketFactoryForListener(
+        *new_listener,
+        keeps_active_sockets ? **existing_active_listener : **existing_warming_listener,
+        in_place_update));
     // In this case we can just replace inline.
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
-    RETURN_IF_NOT_OK(setupSocketFactoryForListener(*new_listener, **existing_active_listener));
+    RETURN_IF_NOT_OK(
+        setupSocketFactoryForListener(*new_listener, **existing_active_listener, in_place_update));
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not.
     if (workers_started_) {
@@ -708,12 +854,15 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
       warming_listeners_.emplace_back(std::move(new_listener));
     } else {
       new_listener->debugLog("update active listener");
-      *existing_active_listener = std::move(new_listener);
+      replaced_listener = std::exchange(*existing_active_listener, std::move(new_listener));
     }
   } else {
     // We have no warming or active listener so we need to make a new one. What we do depends on
     // whether workers have been started or not.
     RETURN_IF_NOT_OK(setNewOrDrainingSocketFactory(name, *new_listener));
+    // This can never be an in-place update
+    RETURN_IF_NOT_OK(
+        initializeWorkerRoutingForUdpListener(*new_listener, /*in_place_update=*/false));
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -723,6 +872,13 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     }
 
     added = true;
+  }
+
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
+    // The listener init target must be registered with the server init manager after all of the
+    // listener's children have registered their targets with the listener's init manager. QUIC
+    // listeners also register targets in initializeWorkerRoutingForUdpListener().
+    new_listener_ref.registerInitTargetIfWorkersNotStarted();
   }
 
   updateWarmingActiveGauges();
@@ -740,6 +896,9 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   }
 
   new_listener_ref.initialize();
+  // Destroying the replaced listener readies its init target, which can finish the server
+  // initialization and start the workers, so it waits until the new listener is set up.
+  replaced_listener.reset();
   return true;
 }
 
@@ -750,11 +909,14 @@ bool ListenerManagerImpl::hasListenerWithDuplicatedAddress(const ListenerList& l
   // Check if the listener has duplicated address with existing listeners.
 
   for (const auto& existing_listener : listener_list) {
-    if (listener.reusePort() && existing_listener->name() == listener.name()) {
+    if ((listener.reusePort() || listener.inPlaceAddressUpdate()) &&
+        existing_listener->name() == listener.name()) {
       // If reuse port is enabled, we can skip the check between different versions of the
       // same listener as they can create their own sockets anyway.
       // If reuse port is disabled, the duplicated addresses check is necessary to to avoid
       // attempting to bind to the same address when creating new sockets for the listener.
+      // An in place update of the addresses shares the sockets of the addresses it keeps, and the
+      // active listener does not have the addresses it adds.
       continue;
     }
 
@@ -865,8 +1027,18 @@ ListenerManagerImpl::listeners(ListenerState state) {
 }
 
 bool ListenerManagerImpl::doFinalPreWorkerListenerInit(ListenerImpl& listener) {
+  std::vector<Network::ListenSocketFactory*> socket_factories;
+  socket_factories.reserve(listener.listenSocketFactories().size());
+  for (auto& socket_factory : listener.listenSocketFactories()) {
+    socket_factories.push_back(socket_factory.get());
+  }
+  return doFinalPreWorkerListenerInit(listener, socket_factories);
+}
+
+bool ListenerManagerImpl::doFinalPreWorkerListenerInit(
+    ListenerImpl& listener, absl::Span<Network::ListenSocketFactory* const> socket_factories) {
   TRY_ASSERT_MAIN_THREAD {
-    for (auto& socket_factory : listener.listenSocketFactories()) {
+    for (Network::ListenSocketFactory* socket_factory : socket_factories) {
       absl::Status success = (socket_factory->doFinalPreWorkerInit());
       if (!success.ok()) {
         ENVOY_LOG(error, "final pre-worker listener init for listener '{}' failed: {}",
@@ -906,14 +1078,61 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
       server_.runtime(), server_.api().randomGenerator());
 }
 
+void ListenerManagerImpl::stopListenerAddresses(
+    ListenerImpl& listener, absl::Span<Network::ListenSocketFactory* const> socket_factories) {
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses;
+  auto sockets = std::make_shared<std::vector<Network::SocketSharedPtr>>();
+  const auto add_sockets = [this, &sockets](Network::ListenSocketFactory& socket_factory) {
+    for (uint32_t i = 0; i < server_.options().concurrency(); i++) {
+      sockets->push_back(socket_factory.getListenSocket(i));
+    }
+  };
+  for (Network::ListenSocketFactory* socket_factory : socket_factories) {
+    const Network::Address::InstanceConstSharedPtr& address = socket_factory->localAddress();
+    addresses.push_back(address);
+    add_sockets(*socket_factory);
+    // The earlier versions of the listener that are still draining may hold duplicates of the
+    // sockets.
+    for (const DrainingFilterChainsManager& draining_group : draining_filter_chains_manager_) {
+      OptRef<ListenerImpl> draining_listener = draining_group.getDrainingListener();
+      if (draining_listener && draining_group.getDrainingListenerTag() == listener.listenerTag()) {
+        if (Network::ListenSocketFactory* draining_socket_factory =
+                draining_listener->listenSocketFactory(*address);
+            draining_socket_factory != nullptr) {
+          add_sockets(*draining_socket_factory);
+        }
+      }
+    }
+  }
+  listener.debugLog(absl::StrCat("stopping removed addresses ",
+                                 absl::StrJoin(addresses, ",", Network::AddressStrFormatter())));
+  const auto workers_pending_stop = std::make_shared<std::atomic<uint64_t>>(workers_.size());
+  for (const auto& worker : workers_) {
+    worker->stopListenerAddresses(listener, addresses, [this, sockets, workers_pending_stop]() {
+      // Close the sockets once all workers have stopped accepting connections on them, so that the
+      // connections waiting in their accept queues fail fast.
+      if (--(*workers_pending_stop) == 0) {
+        server_.dispatcher().post([sockets]() {
+          for (const auto& socket : *sockets) {
+            socket->close();
+          }
+        });
+      }
+    });
+  }
+}
+
 void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   // The warmed listener should be added first so that the worker will accept new connections
   // when it stops listening on the old listener.
   if (!doFinalPreWorkerListenerInit(listener)) {
     incListenerCreateFailureStat();
+    // The removal frees the listener, so the removal callbacks get a copy of its name.
+    const std::string name = listener.name();
+    notifyListenerListenFailureCallbacks(name, /*removed=*/true);
     // TODO(mattklein123): Technically we don't need to remove the active listener if one exists.
     // The following call will remove both.
-    removeListenerInternal(listener.name(), true);
+    removeListenerInternal(name, true);
     return;
   }
   for (const auto& worker : workers_) {
@@ -953,6 +1172,35 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
   ASSERT(existing_active_listener != active_listeners_.end());
   ASSERT(*existing_active_listener != nullptr);
 
+  std::vector<Network::ListenSocketFactory*> removed_socket_factories;
+  if (listener.inPlaceAddressUpdate()) {
+    // The workers keep their listeners of the kept addresses, so only the added addresses start
+    // listening.
+    const std::vector<Network::ListenSocketFactory*> added_socket_factories =
+        exclusiveSocketFactories(listener, **existing_active_listener);
+    if (!doFinalPreWorkerListenerInit(listener, added_socket_factories)) {
+      incListenerCreateFailureStat();
+      ENVOY_LOG(warn, "dropped the update of listener '{}', which keeps serving its addresses",
+                listener.name());
+      // This can run inside callbacks of objects that the listener owns, like its init manager, so
+      // the listener is deleted later. The sockets of its added addresses are closed now, so that
+      // the deferred deletion does not keep them bound.
+      for (Network::ListenSocketFactory* socket_factory : added_socket_factories) {
+        socket_factory->closeAllSockets();
+      }
+      server_.dispatcher().deferredDelete(
+          std::make_unique<DeferredDeleteListener>(std::move(*existing_warming_listener)));
+      warming_listeners_.erase(existing_warming_listener);
+      updateWarmingActiveGauges();
+      notifyListenerListenFailureCallbacks(listener.name(), /*removed=*/false);
+      return;
+    }
+    removed_socket_factories = exclusiveSocketFactories(**existing_active_listener, listener);
+    if (!removed_socket_factories.empty()) {
+      stopListenerAddresses(**existing_active_listener, removed_socket_factories);
+    }
+  }
+
   for (const auto& worker : workers_) {
     // Explicitly override the existing listener with a new listener config.
     addListenerToWorker(*worker, listener.listenerTag(), listener, nullptr);
@@ -962,7 +1210,8 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
   *existing_active_listener = std::move(*existing_warming_listener);
   // Finish active_listeners_ transformation before calling `drainFilterChains` as it depends on
   // their state.
-  drainFilterChains(std::move(previous_listener), **existing_active_listener);
+  drainFilterChains(std::move(previous_listener), **existing_active_listener,
+                    removed_socket_factories.size());
 
   warming_listeners_.erase(existing_warming_listener);
   updateWarmingActiveGauges();
@@ -971,15 +1220,33 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
 }
 
 void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
-                                            ListenerImpl& new_listener) {
+                                            ListenerImpl& new_listener,
+                                            uint32_t num_draining_addresses) {
+  // The earlier drains of the listener that have not completed no longer remove the FCDS filter
+  // chains that the new listener uses again, since the new listener accepts connections on them.
+  if (const auto filter_chains = new_listener.activeFcdsFilterChains(); !filter_chains.empty()) {
+    for (auto& draining_group : draining_filter_chains_manager_) {
+      if (draining_group.getDrainingListenerTag() == new_listener.listenerTag()) {
+        stats_.total_filter_chains_draining_.sub(draining_group.keepFilterChains(filter_chains));
+      }
+    }
+  }
+
   // First add the listener to the draining list.
   std::list<DrainingFilterChainsManager>::iterator draining_group =
       draining_filter_chains_manager_.emplace(draining_filter_chains_manager_.begin(),
-                                              std::move(draining_listener), workers_.size());
+                                              std::move(draining_listener), workers_.size(),
+                                              num_draining_addresses);
   draining_group->getDrainingListener()->diffFilterChain(
       new_listener, [&draining_group](Network::DrainableFilterChain& filter_chain) mutable {
         filter_chain.startDraining();
         draining_group->addFilterChainToDrain(filter_chain);
+      });
+  // Other listeners may use the FCDS filter chains, so only the connections of this listener are
+  // drained.
+  draining_group->getDrainingListener()->diffFcdsFilterChain(
+      new_listener, [&draining_group](Network::DrainableFilterChainSharedPtr&& filter_chain) {
+        draining_group->addFilterChainToDrain(std::move(filter_chain));
       });
   drainGroup(draining_group);
   updateWarmingActiveGauges();
@@ -989,9 +1256,14 @@ void ListenerManagerImpl::drainGroup(
     std::list<DrainingFilterChainsManager>::iterator draining_group) {
   auto filter_chain_size = draining_group->numDrainingFilterChains();
   stats_.total_filter_chains_draining_.add(filter_chain_size);
+  // The gauge stays unused until an address drains, since adding 0 also marks it as used.
+  if (draining_group->numDrainingAddresses() != 0) {
+    stats_.total_listener_addresses_draining_.add(draining_group->numDrainingAddresses());
+  }
   if (auto listener = draining_group->getDrainingListener(); listener) {
-    listener->debugLog(absl::StrCat("draining ", filter_chain_size, " filter chains in listener ",
-                                    listener->name()));
+    listener->debugLog(absl::StrCat("draining ", filter_chain_size, " filter chains and ",
+                                    draining_group->numDrainingAddresses(),
+                                    " addresses in listener ", listener->name()));
   }
 
   // Notify existing connections in the draining filter chains that draining has begun so
@@ -1019,6 +1291,14 @@ void ListenerManagerImpl::drainGroup(
     worker->onFilterChainDrain(draining_group->getDrainingListenerTag(),
                                draining_group->getDrainingFilterChains(), filter_chain_drain_event);
   }
+  // The connections of the addresses that the in place update stopped drain like those of the
+  // removed filter chains.
+  if (draining_group->numDrainingAddresses() != 0) {
+    for (const auto& worker : workers_) {
+      worker->onListenerAddressesDrain(*draining_group->getDrainingListener(),
+                                       filter_chain_drain_event);
+    }
+  }
 
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.
@@ -1028,11 +1308,18 @@ void ListenerManagerImpl::drainGroup(
           listener->debugLog(
               absl::StrCat("removing draining filter chains from listener ", listener->name()));
         }
+        const std::list<const Network::FilterChain*>& removed_filter_chains =
+            draining_group->buildRemovedFilterChains();
         for (const auto& worker : workers_) {
+          // The stopped addresses use the draining listener, which is destroyed once the filter
+          // chains are removed.
+          if (draining_group->numDrainingAddresses() != 0) {
+            worker->removeListenerAddresses(*draining_group->getDrainingListener());
+          }
           // Once the drain time has completed via the drain manager's timer, we tell the workers
           // to remove the filter chains.
           worker->removeFilterChains(
-              draining_group->getDrainingListenerTag(), draining_group->getDrainingFilterChains(),
+              draining_group->getDrainingListenerTag(), removed_filter_chains,
               [this, draining_group]() -> void {
                 // The remove listener completion is called on the worker thread. We post back to
                 // the main thread to avoid locking. This makes sure that we don't destroy the
@@ -1045,6 +1332,8 @@ void ListenerManagerImpl::drainGroup(
                     }
                     stats_.total_filter_chains_draining_.sub(
                         draining_group->numDrainingFilterChains());
+                    stats_.total_listener_addresses_draining_.sub(
+                        draining_group->numDrainingAddresses());
                     draining_filter_chains_manager_.erase(draining_group);
                   }
                 });
@@ -1075,6 +1364,8 @@ uint64_t ListenerManagerImpl::numConnections() const {
 }
 
 bool ListenerManagerImpl::removeListener(const std::string& name) {
+  // Callers other than LDS do not clear the error states before a removal.
+  lds_error_state_tracker_.erase(name);
   return removeListenerInternal(name, true);
 }
 
@@ -1172,6 +1463,7 @@ absl::Status ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
 
     if (!*init_status) {
       incListenerCreateFailureStat();
+      notifyListenerListenFailureCallbacks(listener->name(), /*removed=*/true);
       removeListenerInternal(listener->name(), false);
       continue;
     }
@@ -1311,8 +1603,8 @@ void ListenerManagerImpl::endListenerUpdate(FailureStates&& failure_states) {
   overall_error_state_ = std::move(failure_states);
 }
 
-absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::string& name,
-                                                                ListenerImpl& listener) {
+absl::Status ListenerManagerImpl::validateNoDuplicatedAddress(const std::string& name,
+                                                              const ListenerImpl& listener) const {
   if (hasListenerWithDuplicatedAddress(warming_listeners_, listener) ||
       hasListenerWithDuplicatedAddress(active_listeners_, listener)) {
     const std::string message =
@@ -1323,6 +1615,12 @@ absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::strin
     ENVOY_LOG(warn, "{}", message);
     return absl::InvalidArgumentError(message);
   }
+  return absl::OkStatus();
+}
+
+absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::string& name,
+                                                                ListenerImpl& listener) {
+  RETURN_IF_NOT_OK(validateNoDuplicatedAddress(name, listener));
 
   // Search through draining listeners to see if there is a listener that has a socket factory for
   // the same address we are configured for. This is an edge case, but
@@ -1346,8 +1644,13 @@ absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::strin
         draining_filter_chains_manager_.cbegin(), draining_filter_chains_manager_.cend(),
         [&listener](const DrainingFilterChainsManager& draining_filter_chain) {
           OptRef<ListenerImpl> draining_listener = draining_filter_chain.getDrainingListener();
+          // The sockets of the addresses that in place updates removed may be closed.
           return draining_listener &&
-                 draining_listener->listenSocketFactories()[0]->getListenSocket(0)->isOpen() &&
+                 std::all_of(draining_listener->listenSocketFactories().begin(),
+                             draining_listener->listenSocketFactories().end(),
+                             [](const Network::ListenSocketFactoryPtr& socket_factory) {
+                               return socket_factory->getListenSocket(0)->isOpen();
+                             }) &&
                  listener.hasCompatibleAddress(*draining_listener);
         });
 
@@ -1368,7 +1671,36 @@ absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::strin
   return absl::OkStatus();
 }
 
-absl::Status ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listener) {
+Network::ListenSocketFactory*
+ListenerManagerImpl::warmingVersionSocketFactory(const ListenerImpl& listener,
+                                                 uint32_t address_index) {
+  // A warming full update has another tag, and may differ in socket type and options.
+  if (auto warming_listener = getListenerByName(warming_listeners_, listener.name());
+      warming_listener != warming_listeners_.end() &&
+      (*warming_listener)->listenerTag() == listener.listenerTag()) {
+    return listener.reusableSocketFactory(**warming_listener, address_index);
+  }
+  return nullptr;
+}
+
+Network::ListenSocketFactory*
+ListenerManagerImpl::drainingVersionSocketFactory(const ListenerImpl& listener,
+                                                  uint32_t address_index) {
+  for (const DrainingFilterChainsManager& draining_group : draining_filter_chains_manager_) {
+    OptRef<ListenerImpl> draining_listener = draining_group.getDrainingListener();
+    if (draining_listener && draining_group.getDrainingListenerTag() == listener.listenerTag()) {
+      if (Network::ListenSocketFactory* socket_factory =
+              listener.reusableSocketFactory(*draining_listener, address_index)) {
+        return socket_factory;
+      }
+    }
+  }
+  return nullptr;
+}
+
+absl::Status ListenerManagerImpl::createListenSocketFactory(
+    ListenerImpl& listener, absl::Span<Network::ListenSocketFactory* const> kept_socket_factories,
+    absl::Span<Network::ListenSocketFactory* const> cloned_socket_factories) {
   Network::Socket::Type socket_type = listener.socketType();
   ListenerComponentFactory::BindType bind_type = ListenerComponentFactory::BindType::NoBind;
   if (listener.bindToPort()) {
@@ -1381,14 +1713,24 @@ absl::Status ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listen
     creation_options.mptcp_enabled_ = listener.mptcpEnabled();
     for (std::vector<Network::Address::InstanceConstSharedPtr>::size_type i = 0;
          i < listener.addresses().size(); i++) {
-      auto factory_or_error = ListenSocketFactoryImpl::create(
-          *factory_, listener.addresses()[i], socket_type, listener.listenSocketOptions(i),
-          listener.name(), listener.tcpBacklogSize(), bind_type, creation_options,
-          server_.options().concurrency());
-      if (!factory_or_error.status().ok()) {
-        socket_status = factory_or_error.status();
+      if (i < kept_socket_factories.size() && kept_socket_factories[i] != nullptr) {
+        socket_status = listener.addSocketFactory(ListenSocketFactoryImpl::createWithSharedSockets(
+            *factory_, *kept_socket_factories[i], listener.listenSocketOptions(i), listener.name(),
+            listener.tcpBacklogSize(), bind_type, creation_options,
+            server_.options().concurrency()));
+      } else if (i < cloned_socket_factories.size() && cloned_socket_factories[i] != nullptr) {
+        socket_status =
+            listener.addSocketFactory(cloned_socket_factories[i]->clone(listener.tcpBacklogSize()));
       } else {
-        socket_status = listener.addSocketFactory(std::move(*factory_or_error));
+        auto factory_or_error = ListenSocketFactoryImpl::create(
+            *factory_, listener.addresses()[i], socket_type, listener.listenSocketOptions(i),
+            listener.name(), listener.tcpBacklogSize(), bind_type, creation_options,
+            server_.options().concurrency());
+        if (!factory_or_error.status().ok()) {
+          socket_status = factory_or_error.status();
+        } else {
+          socket_status = listener.addSocketFactory(std::move(*factory_or_error));
+        }
       }
       if (!socket_status.ok()) {
         break;
@@ -1460,6 +1802,63 @@ void ListenerManagerImpl::notifyListenerUpdateCallbacks(absl::string_view listen
 void ListenerManagerImpl::notifyListenerRemovalCallbacks(const std::string& listener_name) {
   notifyListenerCallbacks(
       [&](ListenerUpdateCallbacks* cb) { cb->onListenerRemoval(listener_name); });
+}
+
+void ListenerManagerImpl::notifyListenerListenFailureCallbacks(absl::string_view listener_name,
+                                                               bool removed) {
+  notifyListenerCallbacks(
+      [&](ListenerUpdateCallbacks* cb) { cb->onListenerListenFailure(listener_name, removed); });
+}
+
+void ListenerManagerImpl::notifyFilterChainUpdateCallbacks(absl::string_view filter_chain_name) {
+  notifyListenerCallbacks(
+      [&](ListenerUpdateCallbacks* cb) { cb->onFilterChainAddOrUpdate(filter_chain_name); });
+}
+
+SINGLETON_MANAGER_REGISTRATION(fcds_shared_filter_chain_manager);
+
+std::shared_ptr<FcdsSharedFilterChainManager> ListenerManagerImpl::fcdsSharedFilterChainManager() {
+  return server_.serverFactoryContext().singletonManager().getTyped<FcdsSharedFilterChainManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(fcds_shared_filter_chain_manager),
+      [this]() -> Singleton::InstanceSharedPtr {
+        return std::make_shared<FcdsSharedFilterChainManager>(server_.serverFactoryContext(),
+                                                              *factory_, *this);
+      });
+}
+
+absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateFilterChain(
+    const envoy::config::listener::v3::FilterChain& filter_chain) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  auto [it, inserted] = local_filter_chains_.try_emplace(filter_chain.name());
+  if (inserted) {
+    absl::StatusOr<FcdsLocalSubscriptionHandleSharedPtr> handle_or_error =
+        fcdsSharedFilterChainManager()->subscribeLocal(filter_chain.name());
+    if (!handle_or_error.ok()) {
+      local_filter_chains_.erase(it);
+      return handle_or_error.status();
+    }
+    it->second = std::move(handle_or_error).value();
+  }
+  // The update can warm listeners, so the copy keeps the handle even if the map changes inside it.
+  const FcdsLocalSubscriptionHandleSharedPtr handle = it->second;
+  absl::StatusOr<bool> updated = handle->update(filter_chain);
+  if (!updated.ok() && inserted) {
+    // A first write that fails keeps nothing.
+    local_filter_chains_.erase(filter_chain.name());
+  }
+  return updated;
+}
+
+bool ListenerManagerImpl::removeFilterChain(absl::string_view name) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  auto node = local_filter_chains_.extract(name);
+  if (node.empty()) {
+    return false;
+  }
+  // The handle keeps the state of the name while the removal readies listeners, and the listeners
+  // that still use the name keep it once the handle goes away.
+  node.mapped()->remove();
+  return true;
 }
 
 REGISTER_FACTORY(DefaultListenerManagerFactoryImpl, ListenerManagerFactory);

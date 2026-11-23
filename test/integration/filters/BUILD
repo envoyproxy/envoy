@@ -71,6 +71,19 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "stats_prefix_filter_config_lib",
+    srcs = ["stats_prefix_filter.cc"],
+    deps = [
+        ":test_filters_proto_cc_proto",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//envoy/stats:stats_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+    alwayslink = 1,
+)
+
+envoy_cc_test_library(
     name = "add_header_filter_config_lib",
     srcs = ["add_header_filter.cc"],
     deps = [
@@ -355,6 +368,24 @@ envoy_cc_test_library(
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "per_filter_buffer_test_filters_lib",
+    srcs = [
+        "per_filter_buffer_test_filters.cc",
+    ],
+    deps = [
+        ":common_lib",
+        ":test_filters_proto_cc_proto",
+        "//envoy/event:timer_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -1206,6 +1237,23 @@ envoy_cc_test_library(
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
         "//source/common/router:string_accessor_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "breaking_change_filter_lib",
+    srcs = [
+        "breaking_change_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        ":test_filters_proto_cc_proto",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/runtime:breaking_changes",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],

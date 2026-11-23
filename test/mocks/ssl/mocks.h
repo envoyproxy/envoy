@@ -33,6 +33,7 @@ public:
   MOCK_METHOD(std::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(void, iterateContexts, (std::function<void(const Context&)> callback));
   MOCK_METHOD(Ssl::PrivateKeyMethodManager&, privateKeyMethodManager, ());
+  MOCK_METHOD(void, addContext, (const Envoy::Ssl::ContextSharedPtr& context));
   MOCK_METHOD(void, removeContext, (const Envoy::Ssl::ContextSharedPtr& old_context));
 };
 
@@ -116,6 +117,7 @@ public:
   MOCK_METHOD(bool, validationContextConfigured, (), (const));
   MOCK_METHOD(unsigned, minProtocolVersion, (), (const));
   MOCK_METHOD(unsigned, maxProtocolVersion, (), (const));
+  MOCK_METHOD(std::optional<uint32_t>, maxSendFragment, (), (const));
   MOCK_METHOD(bool, isReady, (), (const));
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<absl::Status()> callback));
 
@@ -164,6 +166,7 @@ public:
   MOCK_METHOD(bool, validationContextConfigured, (), (const));
   MOCK_METHOD(unsigned, minProtocolVersion, (), (const));
   MOCK_METHOD(unsigned, maxProtocolVersion, (), (const));
+  MOCK_METHOD(std::optional<uint32_t>, maxSendFragment, (), (const));
   MOCK_METHOD(bool, isReady, (), (const));
   MOCK_METHOD(std::optional<std::chrono::seconds>, sessionTimeout, (), (const));
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<absl::Status()> callback));

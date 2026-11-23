@@ -156,6 +156,23 @@ runtime_enabled:
                    ->value());
 }
 
+// The stats carry the stat prefix as an explicit tag.
+TEST_F(LocalRateLimitTest, StatsAreTagged) {
+  initialize(R"EOF(
+stat_prefix: local_rate_limit_stats
+token_bucket:
+  max_tokens: 1
+  fill_interval: 1s
+)EOF");
+
+  const Stats::Counter& rate_limited = config_->stats().rate_limited_;
+  EXPECT_EQ("listener_local_ratelimit.local_rate_limit_stats.rate_limited", rate_limited.name());
+  EXPECT_EQ("listener_local_ratelimit.rate_limited", rate_limited.tagExtractedName());
+  ASSERT_EQ(1U, rate_limited.tags().size());
+  EXPECT_EQ("envoy.local_listener_ratelimit_prefix", rate_limited.tags()[0].name_);
+  EXPECT_EQ("local_rate_limit_stats", rate_limited.tags()[0].value_);
+}
+
 } // namespace
 } // namespace LocalRateLimit
 } // namespace ListenerFilters

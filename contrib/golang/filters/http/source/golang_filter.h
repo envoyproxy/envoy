@@ -149,7 +149,7 @@ class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig,
 public:
   FilterConfigPerRoute(const envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute&,
                        Server::Configuration::ServerFactoryContext&);
-  uint64_t getPluginConfigId(uint64_t parent_id, std::string plugin_name) const;
+  uint64_t getPluginConfigId(uint64_t parent_id, const std::string& plugin_name) const;
 
   ~FilterConfigPerRoute() override { plugins_config_.clear(); }
 

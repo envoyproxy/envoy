@@ -2,6 +2,8 @@
 
 #include <functional>
 
+#include "source/common/common/hash.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/rds/util.h"
 
 namespace Envoy {
@@ -56,30 +58,30 @@ RouteConfigUpdateReceiverImpl::RouteConfigUpdateReceiverImpl(
     ConfigTraits& config_traits, ProtoTraits& proto_traits,
     Server::Configuration::ServerFactoryContext& factory_context)
     : config_traits_(config_traits), proto_traits_(proto_traits), factory_context_(factory_context),
-      time_source_(factory_context.timeSource()),
-      route_config_proto_(proto_traits_.createEmptyProto()),
-      config_(config_traits_.createNullConfig()),
+      time_source_(factory_context.timeSource()), config_(config_traits_.createNullConfig()),
       warmer_(factory_context_.mainThreadDispatcher(), [this]() { onConfigWarmed(); }) {}
 
-void RouteConfigUpdateReceiverImpl::updateConfig(
-    std::unique_ptr<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
-    absl::string_view version_info) {
-  std::string update_id =
-      fmt::format("rds {}:{}", resourceName(proto_traits_, *route_config_proto), version_info);
+void RouteConfigUpdateReceiverImpl::updateConfig(const Protobuf::Message& route_config_proto,
+                                                 std::optional<ConfigHashes> hashes,
+                                                 absl::string_view version_info) {
+  std::string route_config_name = resourceName(proto_traits_, route_config_proto);
+  std::string update_id = fmt::format("rds {}:{}", route_config_name, version_info);
   // The init manager is kept local until the new route configuration is known to be built without
   // throwing, so that a rejected update leaves a previous update that is still warming up alone.
   auto update_init_manager = warmer_.createInitManager(update_id);
   auto config =
-      config_traits_.createConfig(*route_config_proto, factory_context_, *update_init_manager,
+      config_traits_.createConfig(route_config_proto, factory_context_, *update_init_manager,
                                   false /* not validate unknown cluster */);
 
-  updateState(std::move(route_config_proto), hash, version_info, std::move(config),
-              std::move(update_init_manager), std::move(update_id));
+  Protobuf::Any route_config_any;
+  MessageUtil::packFrom(route_config_any, route_config_proto);
+  updateState(std::move(route_config_any), std::move(route_config_name), hashes, version_info,
+              std::move(config), std::move(update_init_manager), std::move(update_id));
 }
 
 void RouteConfigUpdateReceiverImpl::updateState(
-    std::unique_ptr<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
-    absl::string_view version_info, ConfigConstSharedPtr config,
+    Protobuf::Any route_config_any, std::string route_config_name,
+    std::optional<ConfigHashes> hashes, absl::string_view version_info, ConfigConstSharedPtr config,
     std::unique_ptr<Init::ManagerImpl> update_init_manager, std::string update_id) {
   // Abort a previous warming update first to ensure the init watcher will never be notified when
   // destroying the previous configuration.
@@ -89,14 +91,15 @@ void RouteConfigUpdateReceiverImpl::updateState(
     warmer_.abortWarming();
   }
 
-  warming_state_.route_config_proto_ = std::move(route_config_proto);
+  warming_state_.route_config_any_ = std::move(route_config_any);
+  warming_state_.route_config_name_ = std::move(route_config_name);
   warming_state_.config_ = std::move(config);
-  // If previously, there was a pending RDS update that contains a hash. And then a new VHDS
-  // update arrives, the new VHDS update will not contain a hash. In this case, we should keep the
-  // last_config_hash_ in the warming state, so that when the configuration is warmed up,
-  // the last_config_hash_ will be updated to the last RDS update's hash.
-  if (hash.has_value()) {
-    warming_state_.last_config_hash_ = hash;
+  // If previously, there was a pending RDS update that contains hashes. And then a new VHDS
+  // update arrives, the new VHDS update will not contain hashes. In this case, we should keep the
+  // last_config_hashes_ in the warming state, so that when the configuration is warmed up,
+  // the last_config_hashes_ will be updated to the last RDS update's hashes.
+  if (hashes.has_value()) {
+    warming_state_.last_config_hashes_ = hashes;
   }
   warming_state_.last_updated_ = time_source_.systemTime();
   warming_state_.version_info_.assign(version_info.data(), version_info.size());
@@ -106,17 +109,40 @@ void RouteConfigUpdateReceiverImpl::updateState(
   warmer_.updateInitManager(std::move(update_init_manager), std::move(update_id));
 }
 
+std::optional<ConfigHashes>
+RouteConfigUpdateReceiverImpl::changedConfigHashes(const Protobuf::Message& rc) {
+  ConfigHashes& last_config_hashes = warming_state_.last_config_hashes_.has_value()
+                                         ? *warming_state_.last_config_hashes_
+                                         : last_config_hashes_;
+  const uint64_t serialized_hash = HashUtil::xxHash64(MessageUtil::serializeDeterministically(rc));
+  if (serialized_hash == last_config_hashes.serialized_hash) {
+    return std::nullopt;
+  }
+  const uint64_t hash = MessageUtil::hash(rc);
+  if (hash == last_config_hashes.hash) {
+    // Storing the hash of these bytes lets the next push of the same bytes skip
+    // MessageUtil::hash(). MessageUtil::hash() can find a route configuration equal although its
+    // bytes differ, for example on a full-proto build when the sender re-encodes an Any payload
+    // with its map entries in another order after a restart or an upgrade. Without this, every
+    // later push of these bytes would pay for both hashes, which costs more than
+    // MessageUtil::hash() alone. A sender that re-encodes on every push pays for both anyway.
+    last_config_hashes.serialized_hash = serialized_hash;
+    return std::nullopt;
+  }
+  return ConfigHashes{hash, serialized_hash};
+}
+
 // Rds::RouteConfigUpdateReceiver
 absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
                                                         const std::string& version_info) {
-  uint64_t new_hash = getHash(rc);
-  if (!checkHash(new_hash)) {
+  const std::optional<ConfigHashes> new_hashes = changedConfigHashes(rc);
+  if (!new_hashes.has_value()) {
     // The route configuration is unchanged, so there is nothing to build, warm up or publish. An
     // update that is still warming up is deliberately left alone.
     return absl::OkStatus();
   }
 
-  updateConfig(cloneProto(proto_traits_, rc), new_hash, version_info);
+  updateConfig(rc, new_hashes, version_info);
   startWarming();
   return absl::OkStatus();
 }
@@ -125,15 +151,17 @@ void RouteConfigUpdateReceiverImpl::onConfigWarmed() {
   // Mark that we have received at least one valid route configuration update.
   initialized_ = true;
 
-  if (warming_state_.route_config_proto_ != nullptr) {
-    route_config_proto_ = std::move(warming_state_.route_config_proto_);
+  if (warming_state_.route_config_any_.has_value()) {
+    route_config_any_ = std::move(*warming_state_.route_config_any_);
+    route_config_name_ = std::move(warming_state_.route_config_name_);
     config_ = std::move(warming_state_.config_);
-    // Only update the last config hash if it was set in the warming state.
-    if (warming_state_.last_config_hash_.has_value()) {
-      last_config_hash_ = warming_state_.last_config_hash_.value();
+    // Only update the last config hashes if they were set in the warming state.
+    if (warming_state_.last_config_hashes_.has_value()) {
+      last_config_hashes_ = warming_state_.last_config_hashes_.value();
     }
     last_updated_ = warming_state_.last_updated_;
-    config_info_.emplace(*route_config_proto_, std::move(warming_state_.version_info_));
+    config_info_.emplace(RouteConfigProvider::ConfigInfo{route_config_any_, route_config_name_,
+                                                         std::move(warming_state_.version_info_)});
   }
   // Defensively clear the warming state.
   warming_state_.clear();

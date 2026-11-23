@@ -386,6 +386,10 @@ void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
 
 const Route& UpstreamRequest::route() const { return *parent_.callbacks()->route(); }
 
+StreamInfo::StreamInfo& UpstreamRequest::downstreamStreamInfo() {
+  return parent_.callbacks()->streamInfo();
+}
+
 OptRef<Http::WebTransportSession> UpstreamRequest::downstreamWebTransportSession() {
   return parent_.callbacks()->webTransportSession();
 }
@@ -456,6 +460,16 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   }
 
   conn_pool_->newStream(this);
+
+  // The connection pool can fail synchronously, e.g. when a circuit breaker overflows,
+  // which resets this request and schedules it for deferred deletion before newStream()
+  // returns. Deferred deletion synchronously runs deleteIsPending() -> cleanUp(), destroying
+  // the upstream HTTP filter chain. Do not drive the destroyed filter chain any further.
+  if (cleaned_up_) {
+    ENVOY_STREAM_LOG(debug, "upstream request aborted during connection pool newStream",
+                     *parent_.callbacks());
+    return;
+  }
 
   if (parent_.config().upstream_log_flush_interval_.has_value()) {
     upstream_log_flush_timer_ = parent_.callbacks()->dispatcher().createTimer([this]() -> void {

@@ -23,7 +23,6 @@
 
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -97,12 +96,11 @@ ip_white_list:
     EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
         .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
     EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-        .WillOnce(
-            Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-              callbacks_ = &callbacks;
-              return &request_;
-            }));
+        .WillOnce([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                         const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+          callbacks_ = &callbacks;
+          return &request_;
+        });
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -261,21 +259,35 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
       .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks.onSuccess(
-                request_,
-                Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
-            // Intentionally return nullptr (instead of request handle) to trigger a particular
-            // code path.
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks.onSuccess(
+            request_,
+            Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
+        // Intentionally return nullptr (instead of request handle) to trigger a particular
+        // code path.
+        return nullptr;
+      });
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   interval_timer_->invokeCallback();
 
   EXPECT_EQ(4U, stats_store_.counter("auth.clientssl.vpn.update_failure").value());
+}
+
+// The filter's stats carry the stat prefix as an explicit tag.
+TEST_F(ClientSslAuthFilterTest, StatsAreTagged) {
+  setup();
+
+  const Stats::CounterSharedPtr auth_no_ssl =
+      TestUtility::findCounter(stats_store_, "auth.clientssl.vpn.auth_no_ssl");
+  ASSERT_NE(auth_no_ssl, nullptr);
+  EXPECT_EQ("auth.clientssl.auth_no_ssl", auth_no_ssl->tagExtractedName());
+  ASSERT_EQ(1U, auth_no_ssl->tags().size());
+  EXPECT_EQ("envoy.clientssl_prefix", auth_no_ssl->tags()[0].name_);
+  EXPECT_EQ("vpn", auth_no_ssl->tags()[0].value_);
+
+  EXPECT_CALL(request_, cancel());
 }
 
 } // namespace ClientSslAuth

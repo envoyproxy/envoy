@@ -1,4 +1,6 @@
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load("@envoy//bazel:envoy_rbe.bzl", "envoy_exec_properties")
+load("@envoy_toolshed//dependency:macros.bzl", "module_deps_json", "module_updater")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("//bazel:sphinx_html.bzl", "sphinx_html")
@@ -43,10 +45,26 @@ _LINK_SUFFIX_ENV = select({
 })
 
 exports_files([
+    ".bazelrc",
+    "MODULE.bazel",
+    "MODULE.bazel.lock",
     "v2_mapping.json",
     "empty_extensions.json",
     "redirects.txt",
 ])
+
+module_deps_json(
+    name = "module_deps",
+    lockfile = "//:MODULE.bazel.lock",
+    module_file = "//:MODULE.bazel",
+)
+
+module_updater(
+    name = "update_module",
+    bazelrc = "@envoy//:.bazelrc",
+    dependencies = ":module_deps",
+    module_file = "//:MODULE.bazel",
+)
 
 filegroup(
     name = "configs",
@@ -276,10 +294,18 @@ pkg_tar(
     ],
 )
 
+# Sphinx builds in parallel (`-j auto`), which needs more than the single core (and 3GiB) of an
+# action on the default pool.
+SPHINX_EXEC_PROPERTIES = envoy_exec_properties(
+    rbe_pool = "linux_x64_large",
+    test = False,
+)
+
 sphinx_html(
     name = "html_release",
     out = "html_release.tar.gz",
     descriptor_path = "@envoy_api//:v3_proto_set",
+    exec_properties = SPHINX_EXEC_PROPERTIES,
     link_suffix_env = _LINK_SUFFIX_ENV,
     # Build sha/tag may be supplied with --@envoy-docs//:build_sha=<sha> and
     # --@envoy-docs//:docs_tag=<tag>. When unset, stamped builds fall back to workspace status
@@ -297,6 +323,7 @@ sphinx_html(
     name = "html",
     out = "html.tar.gz",
     descriptor_path = "@envoy_api//:v3_proto_set",
+    exec_properties = SPHINX_EXEC_PROPERTIES,
     link_suffix_env = _LINK_SUFFIX_ENV,
     rst = ":rst",
     sphinx_runner = "//tools:sphinx_runner",

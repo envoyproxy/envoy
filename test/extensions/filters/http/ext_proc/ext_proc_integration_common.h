@@ -166,6 +166,12 @@ protected:
   void
   processResponseBodyMessage(FakeUpstream& grpc_upstream, bool first_message,
                              std::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb);
+  // Answers STREAMED response body messages on the open processor stream until one carries
+  // end_of_stream, replacing the first chunk with `body` and emptying any later ones. An HTTP/1
+  // upstream delivers the body and the end of stream as separate frames, which reach the
+  // processor in one message or two depending on whether they arrive before the response
+  // headers reply.
+  void processStreamedResponseBodyAs(absl::string_view body);
   void processResponseTrailersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
       std::optional<std::function<bool(const HttpTrailers&, TrailersResponse&)>> cb);
@@ -206,8 +212,8 @@ protected:
   void testSendTypedDynamicMetadata();
   void testSidestreamPushbackDownstream(uint32_t body_size, bool check_downstream_flow_control);
   void performStandAloneModeOverrideNormal(
-      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode
-          initial_body_mode);
+      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode initial_body_mode,
+      bool delay_header_response = false);
   void initializeConfigDuplexStreamed(bool both_direction = false);
 
   IntegrationStreamDecoderPtr initAndSendDataDuplexStreamedMode(absl::string_view body_sent,
@@ -242,6 +248,7 @@ protected:
       processing_response_factory_registration_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_1_;
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_2_;
   bool protocol_config_encoded_ = false;
   ProtocolConfiguration protocol_config_;
   uint32_t max_message_timeout_ms_{0};
@@ -250,10 +257,13 @@ protected:
   FakeStreamPtr processor_stream_;
   FakeHttpConnectionPtr processor_connection_1_;
   FakeStreamPtr processor_stream_1_;
+  FakeHttpConnectionPtr processor_connection_2_;
+  FakeStreamPtr processor_stream_2_;
   TestScopedRuntime scoped_runtime_;
   // Number of grpc upstreams in the test.
   int grpc_upstream_count_ = 2;
   bool two_ext_proc_filters_ = false;
+  bool per_try_timeout_enabled_ = false;
 };
 
 } // namespace ExternalProcessing

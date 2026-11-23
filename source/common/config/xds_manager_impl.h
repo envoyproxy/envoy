@@ -1,13 +1,58 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <vector>
+
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/config/xds_manager.h"
 
 #include "source/common/common/thread.h"
 #include "source/common/config/subscription_factory_impl.h"
 #include "source/common/config/xds_resource.h"
 
+#include "absl/functional/function_ref.h"
+
 namespace Envoy {
 namespace Config {
+
+class XdsConfigTrackers : public XdsConfigTracker {
+public:
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr add(XdsConfigTracker& tracker);
+
+  // Config::XdsConfigTracker
+  bool enabled() const override;
+  void onConfigAccepted(absl::string_view type_url,
+                        const std::vector<DecodedResourcePtr>& resources) override;
+  void
+  onConfigAccepted(absl::string_view type_url,
+                   absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+                   const Protobuf::RepeatedPtrField<std::string>& removed_resources) override;
+  void onConfigAcceptedWithResponse(const envoy::service::discovery::v3::DiscoveryResponse& message,
+                                    const std::vector<DecodedResourcePtr>& resources) override;
+  void onConfigAcceptedWithResponse(
+      const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+      absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources) override;
+  void onConfigRejected(const envoy::service::discovery::v3::DiscoveryResponse& message,
+                        absl::string_view error_detail) override;
+  void onConfigRejected(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+                        absl::string_view error_detail) override;
+  void onResourceUnsubscribed(absl::string_view type_url, absl::string_view resource) override;
+
+private:
+  class Registration;
+  struct Trackers {
+    std::vector<Registration*> entries_;
+    uint32_t iteration_depth_{0};
+    bool has_removed_entries_{false};
+  };
+
+  void forEach(absl::FunctionRef<void(XdsConfigTracker&)> callback);
+
+  // registration handles can outlive the manager during server teardown
+  const std::shared_ptr<Trackers> trackers_{std::make_shared<Trackers>()};
+};
 
 class XdsManagerImpl : public XdsManager {
 public:
@@ -24,9 +69,17 @@ public:
   absl::Status
   initializeAdsConnections(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
   void startXdstpAdsMuxes() override;
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addXdsConfigTracker(XdsConfigTracker& tracker) override {
+    return xds_config_trackers_.add(tracker);
+  }
   absl::StatusOr<SubscriptionPtr> subscribeToSingletonResource(
       absl::string_view resource_name, OptRef<const envoy::config::core::v3::ConfigSource> config,
       absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+      OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) override;
+  absl::StatusOr<std::unique_ptr<SingletonSubscription>> subscribeToSingletonResource(
+      absl::string_view resource_name, OptRef<const envoy::config::core::v3::ConfigSource> config,
+      absl::string_view type_url, Stats::Scope& scope, SingletonSubscriptionCallbacks& callbacks,
       OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) override;
   ScopedResume pause(const std::string& type_url) override {
     return pause(std::vector<std::string>{type_url});
@@ -81,6 +134,8 @@ private:
   ProtobufMessage::ValidationContext& validation_context_;
   XdsResourcesDelegatePtr xds_resources_delegate_;
   XdsConfigTrackerPtr xds_config_tracker_;
+  XdsConfigTrackers xds_config_trackers_;
+  Common::CallbackHandlePtr xds_config_tracker_handle_;
   std::unique_ptr<SubscriptionFactoryImpl> subscription_factory_;
   // The cm_ will only be valid after the cluster-manager is initialized.
   // Note that this implies that the xDS-manager must be shut down properly

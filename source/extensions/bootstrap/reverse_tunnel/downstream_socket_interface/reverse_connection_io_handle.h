@@ -21,6 +21,7 @@
 #include "source/common/network/filter_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
+#include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
@@ -152,8 +153,8 @@ public:
 
   /**
    * Override of accept method for reverse connections.
-   * Returns established reverse connections when they become available. This is woken up using the
-   * trigger pipe when a tcp connection to an upstream cluster is established.
+   * Returns established reverse connections when they become available. maybePushConn() activates a
+   * read event when a tcp connection to an upstream cluster is established.
    * @param addr pointer to store the client address information.
    * @param addrlen pointer to the length of the address structure.
    * @return IoHandlePtr for the accepted reverse connection, or nullptr if none available.
@@ -206,6 +207,9 @@ public:
    */
   void resetFileEvents() override;
 
+  // When enabled, stop the dial loop even when the listener has no accepted connections to notify.
+  void onListenerDrain() override;
+
   /**
    * Triggers the reverse connection workflow.
    * @param dispatcher the event dispatcher.
@@ -215,6 +219,24 @@ public:
    */
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override;
+
+  // Check and signal to the listener that a new connection is available.
+  void maybePushConn() {
+    if (listener_want_read_ && !established_connections_.empty()) {
+      activateFileEvents(Event::FileReadyType::Read);
+    }
+  }
+
+  /**
+   * Enable the file events.
+   */
+  void enableFileEvents(uint32_t events) override {
+    listener_want_read_ = events & Event::FileReadyType::Read;
+    // Cancel the existing events for overload management.
+    // If the listener wants to read we will push in the maybePushConn().
+    Network::IoSocketHandleImpl::enableFileEvents(0);
+    maybePushConn();
+  }
 
   // Network::ConnectionCallbacks.
   /**
@@ -242,12 +264,6 @@ public:
     return Api::SysCallIntResult{0, 0};
   }
 
-  /**
-   * Get the file descriptor for the pipe monitor used to wake up accept().
-   * @return the file descriptor for the pipe monitor
-   */
-  os_fd_t getPipeMonitorFd() const;
-
   // Callbacks from RCConnectionWrapper.
   /**
    * Called when a reverse connection handshake completes. This method wakes up accept() if the
@@ -270,7 +286,8 @@ public:
    * @return true if connection attempt should be made, false if in backoff.
    */
   bool shouldAttemptConnectionToHost(const std::string& host_address,
-                                     const std::string& cluster_name);
+                                     const std::string& cluster_name,
+                                     const RemoteClusterConnectionConfig& cluster_config);
 
   /**
    * Track a connection failure for a specific host and cluster and trigger backoff logic.
@@ -341,6 +358,17 @@ public:
                                             uint64_t connection_id);
 
   /**
+   * Stop creating tunnels when the listener begins draining. Must run on the worker dispatcher.
+   * Cancels pending handshakes and queued accepts while preserving accepted tunnel sockets.
+   * This is permanent for this listener, including an admin drain with skip_exit. Repeated calls
+   * are harmless; restarting tunnel initiation requires replacing the listener.
+   */
+  void stopInitiatingConnections();
+
+  // A draining listener becomes ineligible as soon as the runtime guard is enabled.
+  bool canInitiateConnections() const;
+
+  /**
    * Remove a connection key from per-host tracking (the key set and its state gauge). Shared by the
    * normal close path and the draining path.
    * @param connection_key the unique key identifying the connection.
@@ -402,6 +430,15 @@ public:
    */
   std::chrono::milliseconds handshakeTimeout() const {
     return std::chrono::milliseconds(config_.handshake_timeout_ms);
+  }
+
+  /**
+   * @return "src_node:src_cluster:src_tenant", the key used by the /reverse_tunnel/tunnels admin
+   * endpoint.
+   */
+  std::string connectionInfo() const {
+    return fmt::format("{}:{}:{}", config_.src_node_id, config_.src_cluster_id,
+                       config_.src_tenant_id);
   }
 
 private:
@@ -477,24 +514,6 @@ private:
    */
   void cleanup();
 
-  // Pipe trigger mechanism helpers
-  /**
-   * Create trigger pipe used to wake up accept() when a connection is established.
-   */
-  void createTriggerPipe();
-
-  /**
-   * Check if trigger pipe is ready for use.
-   * @return true if initialized and ready
-   */
-  bool isTriggerPipeReady() const;
-
-  /**
-   * Write a trigger byte so accept() consumes a queued tunnel. On a failed write the maintenance
-   * timer is rearmed to retry the wake while a tunnel remains queued.
-   */
-  void signalAcceptReady();
-
   // Host/cluster mapping management
   /**
    * Update cluster -> host mappings from the cluster manager. Called before connection initiation
@@ -503,7 +522,8 @@ private:
    * @param hosts the list of hosts in the cluster
    */
   void maybeUpdateHostsMappingsAndConnections(const std::string& cluster_id,
-                                              const std::vector<std::string>& hosts);
+                                              const std::vector<std::string>& hosts,
+                                              const RemoteClusterConnectionConfig& cluster_config);
 
   /**
    * Remove stale host entries and close associated connections.
@@ -524,20 +544,23 @@ private:
   struct HostConnectionInfo {
     std::string host_address;                                // Host address
     std::string cluster_name;                                // Cluster to which host belongs
-    absl::flat_hash_set<std::string> connection_keys;        // Connection keys for stats tracking
+    absl::flat_hash_set<std::string> connection_keys{};      // Connection keys for stats tracking
     uint32_t target_connection_count;                        // Target connection count for the host
     uint32_t failure_count{0};                               // Number of consecutive failures
     std::chrono::steady_clock::time_point last_failure_time; // NO_CHECK_FORMAT(real_time)
     std::chrono::steady_clock::time_point backoff_until;     // NO_CHECK_FORMAT(real_time)
     absl::flat_hash_map<std::string, ReverseConnectionState>
-        connection_states;        // State tracking per connection
+        connection_states{};      // State tracking per connection
     uint32_t connecting_count{0}; // Number of pending connections.
     // Wall-clock epoch millis of the first dial in the current establishment episode. Set on the
-    // first dial made while the host has no live connection, carried unchanged across handshake
-    // retries, and cleared on handshake success. This makes retries during initial establishment
-    // report the original intent time, while a redial after a previously-established connection
-    // drops starts a fresh episode.
-    std::optional<int64_t> episode_initiation_time_ms;
+    // first dial while the host is below target capacity, carried across handshake retries, and
+    // cleared when the host reaches target connection count (or when a new episode starts after
+    // capacity drops). Setup-time span is armed with this stamp.
+    std::optional<int64_t> episode_initiation_time_ms{};
+    std::unique_ptr<Stats::HistogramCompletableTimespanImpl> setup_time_span{};
+
+    HostConnectionInfo(absl::string_view host_address, absl::string_view cluster_name,
+                       uint32_t target_connection_count, Event::Dispatcher& dispatcher);
   };
 
   // Map from host address to connection info.
@@ -559,11 +582,6 @@ private:
   // Mapping from wrapper to host. This designates the number of successful connections to a host.
   absl::flat_hash_map<RCConnectionWrapper*, std::string> conn_wrapper_to_host_map_;
 
-  // Simple pipe-based trigger mechanism to wake up accept() when a connection is established.
-  // Inlined directly for simplicity and reduced test coverage requirements.
-  os_fd_t trigger_pipe_read_fd_{INVALID_SOCKET};
-  os_fd_t trigger_pipe_write_fd_{INVALID_SOCKET};
-
   // An established tunnel awaiting accept(), with any bytes the responder coalesced with the
   // handshake response so accept() can replay them before reading the socket.
   struct EstablishedConnection {
@@ -571,13 +589,17 @@ private:
     Buffer::InstancePtr residual_bytes;
   };
 
-  // Connection management : We store the established connections in a queue.
-  // and pop the last established connection when data is read on trigger_pipe_read_fd_
-  // to determine the connection that got established last.
+  // Established tunnels wait here until the listener accepts them. accept() pops the front
+  // entry, and maybePushConn() injects a read event so the listener keeps draining the queue
+  // without the fd ever being registered for kernel readability.
   std::queue<EstablishedConnection> established_connections_;
+  bool listener_want_read_{false}; // Whether the listener wants to read data.
 
   // Single retry timer for all clusters
   Event::TimerPtr rev_conn_retry_timer_;
+
+  bool listener_draining_{false};
+  bool connections_stopped_{false};
 
   // Set while waiting for parentStopAcceptingRequested(); cleared after scheduling the one-shot
   // drain-propagation grace timer so fresh starts dial immediately.
@@ -586,9 +608,6 @@ private:
   bool is_reverse_conn_started_{
       false}; // Whether reverse connections have been started on worker thread
   Event::Dispatcher* worker_dispatcher_{nullptr}; // Dispatcher for the worker thread
-
-  // Store original socket FD for cleanup.
-  os_fd_t original_socket_fd_{INVALID_SOCKET};
 };
 
 } // namespace ReverseConnection

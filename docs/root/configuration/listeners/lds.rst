@@ -25,8 +25,10 @@ The semantics of listener updates are as follows:
 * When a tcp listener is updated, if the new listener contains a subset of filter chains in the old listener,
   the connections owned by these overlapping filter chains remain open. Only the connections owned by the
   removed filter chains will be drained following the above pattern. Note that if any global listener attributes are
-  changed, the entire listener (and all filter chains) are drained similar to removal above. See
-  :ref:`filter chain only update <filter_chain_only_update>` for detailed rules to reason about the impacted filter chains.
+  changed, the entire listener (and all filter chains) are drained similar to removal above. Addresses can also be
+  added or removed without draining the entire listener, in which case the connections accepted on the removed
+  addresses are drained as well. See :ref:`filter chain only update <filter_chain_only_update>` for detailed rules to
+  reason about the impacted filter chains and addresses.
 
   .. note::
 

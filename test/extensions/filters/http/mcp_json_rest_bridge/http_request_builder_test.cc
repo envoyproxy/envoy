@@ -35,7 +35,7 @@ body: "*"
       "code": 3,
       "content": "Some random content",
       "active": true,
-      "editions": ["kindle", "hardback", "audobook"],
+      "editions": ["kindle", "hardback", "audiobook"],
       "authors": [
         {"name": "author1"},
         {"name": "author2"}
@@ -58,7 +58,7 @@ body: "*"
                 "code": 3,
                 "content": "Some random content",
                 "active": true,
-                "editions": ["kindle", "hardback", "audobook"],
+                "editions": ["kindle", "hardback", "audiobook"],
                 "authors": [
                   {"name": "author1"},
                   {"name": "author2"}
@@ -82,7 +82,7 @@ body: "shelf"
       "code": 3,
       "content": "Some random content",
       "active": true,
-      "editions": ["kindle", "hardback", "audobook"],
+      "editions": ["kindle", "hardback", "audiobook"],
       "authors": [
         {"name": "author1"},
         {"name": "author2"}
@@ -104,7 +104,7 @@ body: "shelf"
               "code": 3,
               "content": "Some random content",
               "active": true,
-              "editions": ["kindle", "hardback", "audobook"],
+              "editions": ["kindle", "hardback", "audiobook"],
               "authors": [
                 {"name": "author1"},
                 {"name": "author2"}
@@ -121,7 +121,7 @@ put: "/v1/{parent=projects/*}/shelves/{shelf.name}"
   json arguments = json::parse(R"json({
     "shelf": {
       "name": "science-fiction",
-      "editions": ["kindle", "hardback", "audobook"]
+      "editions": ["kindle", "hardback", "audiobook"]
     },
     "parent": "projects/123456789"
   })json");
@@ -131,11 +131,9 @@ put: "/v1/{parent=projects/*}/shelves/{shelf.name}"
   ASSERT_OK(http_request);
   EXPECT_EQ(status, BridgeStatus::Ok);
 
-  EXPECT_THAT(
-      http_request->url,
-      StrEq(
-          "/v1/projects/123456789/shelves/"
-          "science-fiction?shelf.editions=kindle&shelf.editions=hardback&shelf.editions=audobook"));
+  EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789/shelves/"
+                                       "science-fiction?shelf.editions=kindle&shelf.editions="
+                                       "hardback&shelf.editions=audiobook"));
   EXPECT_THAT(http_request->method, StrEq("PUT"));
   EXPECT_TRUE(http_request->body.is_null());
 }
@@ -205,7 +203,7 @@ body: "*"
   json arguments = json::parse(R"json({
     "shelf": {
       "name": "science-fiction",
-      "editions": ["kindle", "hardback", "audobook"]
+      "editions": ["kindle", "hardback", "audiobook"]
     },
     "parent": "projects/123456789",
     "theme": "Kids"
@@ -220,7 +218,7 @@ body: "*"
   EXPECT_THAT(http_request->method, StrEq("GET"));
   EXPECT_EQ(http_request->body, json::parse(R"json({
               "shelf": {
-                "editions": ["kindle", "hardback", "audobook"]
+                "editions": ["kindle", "hardback", "audiobook"]
               },
               "theme": "Kids"
             })json"));

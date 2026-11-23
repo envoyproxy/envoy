@@ -133,8 +133,7 @@ void GeoipFilter::onLookupComplete(Geolocation::LookupResult&& result) {
 
   if (!geoip_info->empty()) {
     read_callbacks_->connection().streamInfo().filterState()->setData(
-        std::string(GeoipFilterStateKey), std::move(geoip_info),
-        StreamInfo::FilterState::LifeSpan::Connection);
+        GeoipFilterStateKey, std::move(geoip_info), StreamInfo::FilterState::LifeSpan::Connection);
     ENVOY_LOG(debug, "geoip: stored data in filter state key '{}'", GeoipFilterStateKey);
   }
 

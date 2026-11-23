@@ -171,6 +171,19 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
 #endif
 }
 
+std::string MessageUtil::serializeDeterministically(const Protobuf::Message& message) {
+  std::string bytes;
+  bytes.resize(message.ByteSizeLong());
+  {
+    // The coded stream writes its last bytes when it goes out of scope.
+    Protobuf::io::ArrayOutputStream stream(bytes.data(), static_cast<int>(bytes.size()));
+    Protobuf::io::CodedOutputStream coded_stream(&stream);
+    coded_stream.SetSerializationDeterministic(true);
+    message.SerializeWithCachedSizes(&coded_stream);
+  }
+  return bytes;
+}
+
 #if !defined(ENVOY_ENABLE_FULL_PROTOS)
 // NOLINTNEXTLINE(readability-identifier-naming)
 bool MessageLiteDifferencer::Equals(const Protobuf::Message& message1,
@@ -505,9 +518,8 @@ bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
     ENVOY_LOG_MISC(warn, "Could not reify {} with unknown type URL {}", opaque_type_name, type_url);
     return false;
   }
-  Protobuf::DynamicMessageFactory message_factory;
   std::unique_ptr<Protobuf::Message> typed_message(
-      message_factory.GetPrototype(concrete_descriptor)->New());
+      Protobuf::MessageFactory::generated_factory()->GetPrototype(concrete_descriptor)->New());
 
   // Finally we can unpack, redact, and repack the opaque message using the provided callbacks.
 
@@ -808,7 +820,7 @@ absl::string_view TypeUtil::typeUrlToDescriptorFullName(absl::string_view type_u
 }
 
 std::string TypeUtil::descriptorFullNameToTypeUrl(absl::string_view type) {
-  return "type.googleapis.com/" + std::string(type);
+  return absl::StrCat("type.googleapis.com/", type);
 }
 
 void StructUtil::update(Protobuf::Struct& obj, const Protobuf::Struct& with) {

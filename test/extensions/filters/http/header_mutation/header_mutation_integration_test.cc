@@ -2,7 +2,9 @@
 
 #include "source/extensions/filters/http/header_mutation/config.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -1293,6 +1295,84 @@ TEST_P(HeaderMutationIntegrationTest,
 
   checkHeader(__LINE__, *response, "upstream-global-flag-header", true);
   checkHeader(__LINE__, *response, "request-method-in-upstream-filter", true, "GET");
+
+  codec_client_->close();
+}
+
+TEST_P(HeaderMutationIntegrationTest, TestCustomFormatter) {
+  Formatter::TestCommandFactory factory;
+  Registry::InjectFactory<Formatter::CommandParserFactory> register_factory(factory);
+
+  config_helper_.prependFilter(R"EOF(
+name: downstream-header-mutation
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
+  mutations:
+    request_mutations:
+    - append:
+        header:
+          key: "request-custom-formatter-header"
+          value: "%COMMAND_EXTENSION()%"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+    response_mutations:
+    - append:
+        header:
+          key: "response-custom-formatter-header"
+          value: "%COMMAND_EXTENSION()%"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+    formatters:
+    - name: envoy.formatter.TestFormatter
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+)EOF");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        PerRouteProtoConfig header_mutation;
+        TestUtility::loadFromYaml(R"EOF(
+mutations:
+  request_mutations:
+  - append:
+      header:
+        key: "per-route-custom-formatter-header"
+        value: "%COMMAND_EXTENSION()%"
+      append_action: APPEND_IF_EXISTS_OR_ADD
+  formatters:
+  - name: envoy.formatter.TestFormatter
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+)EOF",
+                                  header_mutation);
+        Protobuf::Any per_route_config;
+        std::ignore = per_route_config.PackFrom(header_mutation);
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_typed_per_filter_config()
+            ->insert({"downstream-header-mutation", per_route_config});
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("TestFormatter", upstream_request_->headers()
+                                 .get(Http::LowerCaseString("request-custom-formatter-header"))[0]
+                                 ->value()
+                                 .getStringView());
+  EXPECT_EQ("TestFormatter", upstream_request_->headers()
+                                 .get(Http::LowerCaseString("per-route-custom-formatter-header"))[0]
+                                 ->value()
+                                 .getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  checkHeader(__LINE__, *response, "response-custom-formatter-header", true, "TestFormatter");
 
   codec_client_->close();
 }

@@ -3,7 +3,6 @@
 #include "envoy/common/exception.h"
 
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
-#include "source/extensions/dynamic_modules/worker_index.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,8 +36,7 @@ DynamicModuleAccessLog::DynamicModuleAccessLog(AccessLog::FilterPtr&& filter,
       auto concurrency = context->options().concurrency();
       worker_index = concurrency; // Set main/test thread on free index.
     } else {
-      worker_index =
-          Extensions::DynamicModules::parseWorkerIndexFromDispatcherName(dispatcher.name());
+      worker_index = dispatcher.workerId().value_or(0);
     }
     // Create a thread-local logger wrapper first, then pass it to the module.
     auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config, worker_index);
@@ -55,6 +53,10 @@ void DynamicModuleAccessLog::emitLog(const Formatter::Context& context,
     return;
   }
 
+  // The module can trigger a nested log from its log callback, so the context of the outer log is
+  // restored afterwards.
+  const Formatter::Context* const outer_log_context = tl_logger.log_context_;
+  const StreamInfo::StreamInfo* const outer_stream_info = tl_logger.stream_info_;
   tl_logger.log_context_ = &context;
   tl_logger.stream_info_ = &stream_info;
 
@@ -64,8 +66,8 @@ void DynamicModuleAccessLog::emitLog(const Formatter::Context& context,
   // Invoke the module's log callback with the context pointer.
   config_->on_logger_log_(tl_logger.thisAsVoidPtr(), tl_logger.logger_, abi_log_type);
 
-  tl_logger.log_context_ = nullptr;
-  tl_logger.stream_info_ = nullptr;
+  tl_logger.log_context_ = outer_log_context;
+  tl_logger.stream_info_ = outer_stream_info;
 }
 
 } // namespace DynamicModules

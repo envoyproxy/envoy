@@ -9,7 +9,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
@@ -37,7 +36,7 @@ public:
   DecoderFilterChainBridgeTest() {
     EXPECT_CALL(callbacks_, bufferLimit()).WillOnce(Return(100));
     EXPECT_CALL(callbacks_, addUpstreamWatermarkCallbacks(_))
-        .WillOnce(Invoke([this](Http::UpstreamWatermarkCallbacks& cb) { subscriber_ = &cb; }));
+        .WillOnce([this](Http::UpstreamWatermarkCallbacks& cb) { subscriber_ = &cb; });
     bridge_ = std::make_unique<DecoderFilterChainBridge>(callbacks_, stats_);
   }
 
@@ -68,6 +67,31 @@ TEST_F(DecoderFilterChainBridgeTest, IngestBackpressureDrivesDecoderWriteBuffer)
   EXPECT_CALL(callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
   bridge_->releaseUnacked(200);
   EXPECT_FALSE(bridge_->ingestPaused());
+}
+
+// If the filter callbacks do not synchronously echo pauseSource()/resumeSource() (e.g. AsyncStream
+// or teardown), subsequent genuine upstream watermarks must not be swallowed.
+TEST_F(DecoderFilterChainBridgeTest, NonEchoingSourcePauseDoesNotSwallowGenuineWatermark) {
+  bridge_->setReplayHandler(handler_);
+
+  bridge_->addUnacked(200);
+  EXPECT_TRUE(bridge_->ingestPaused());
+  EXPECT_FALSE(bridge_->replayPaused());
+
+  bridge_->onAboveWriteBufferHighWatermark();
+  EXPECT_TRUE(bridge_->replayPaused());
+  bridge_->onBelowWriteBufferLowWatermark();
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 1);
+
+  bridge_->releaseUnacked(200);
+  EXPECT_FALSE(bridge_->ingestPaused());
+
+  bridge_->onAboveWriteBufferHighWatermark();
+  EXPECT_TRUE(bridge_->replayPaused());
+  bridge_->onBelowWriteBufferLowWatermark();
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 2);
 }
 
 // The bridge subscribes for its whole life rather than per handler, so the depth it reports is
@@ -127,6 +151,98 @@ TEST_F(DecoderFilterChainBridgeTest, UnrecoverableErrorSendsLocalReply) {
   EXPECT_EQ(stats_.request_external_buffer_error_.value(), 1);
 }
 
+// Both DownstreamFilterManager and UpstreamFilterManager fan the decoder's own high/low watermark
+// calls out to every upstream watermark subscriber, including this bridge. Wire the mock to do the
+// same.
+class DecoderFilterChainBridgeEchoTest : public DecoderFilterChainBridgeTest {
+public:
+  DecoderFilterChainBridgeEchoTest() {
+    ON_CALL(callbacks_, onDecoderFilterAboveWriteBufferHighWatermark()).WillByDefault([this] {
+      subscriber_->onAboveWriteBufferHighWatermark();
+    });
+    ON_CALL(callbacks_, onDecoderFilterBelowWriteBufferLowWatermark()).WillByDefault([this] {
+      subscriber_->onBelowWriteBufferLowWatermark();
+    });
+    bridge_->setReplayHandler(handler_);
+  }
+};
+
+// Pausing the source for ingest back-pressure must not pause replay through the echo on a shared
+// bridge. Resuming must not produce a spurious resume notification either.
+TEST_F(DecoderFilterChainBridgeEchoTest, OwnSourcePauseDoesNotPauseReplay) {
+  bridge_->addUnacked(200);
+  EXPECT_TRUE(bridge_->ingestPaused());
+  EXPECT_FALSE(bridge_->replayPaused());
+
+  bridge_->releaseUnacked(200);
+  EXPECT_FALSE(bridge_->ingestPaused());
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 0);
+}
+
+// Genuine upstream back-pressure arriving while ingest is paused still pauses and resumes replay;
+// only the bridge's own echoes are filtered.
+TEST_F(DecoderFilterChainBridgeEchoTest, GenuineUpstreamWatermarkStillPausesReplay) {
+  bridge_->addUnacked(200);
+  EXPECT_TRUE(bridge_->ingestPaused());
+
+  bridge_->onAboveWriteBufferHighWatermark();
+  EXPECT_TRUE(bridge_->replayPaused());
+  bridge_->onBelowWriteBufferLowWatermark();
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 1);
+
+  bridge_->releaseUnacked(200);
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 1);
+}
+
+// A pause nested inside our own resume keeps the echoes balanced, so replay is never paused.
+TEST_F(DecoderFilterChainBridgeEchoTest, PauseNestedInResumeStaysBalanced) {
+  bridge_->addUnacked(200);
+  ON_CALL(callbacks_, onDecoderFilterBelowWriteBufferLowWatermark()).WillByDefault([this] {
+    bridge_->addUnacked(200);
+    subscriber_->onBelowWriteBufferLowWatermark();
+  });
+
+  bridge_->releaseUnacked(200);
+  EXPECT_TRUE(bridge_->ingestPaused());
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 0);
+}
+
+// A genuine upstream high during our own pause still pauses replay.
+TEST_F(DecoderFilterChainBridgeEchoTest, GenuineWatermarkDuringOwnPauseCounts) {
+  ON_CALL(callbacks_, onDecoderFilterAboveWriteBufferHighWatermark()).WillByDefault([this] {
+    subscriber_->onAboveWriteBufferHighWatermark();
+    subscriber_->onAboveWriteBufferHighWatermark();
+  });
+
+  bridge_->addUnacked(200);
+  EXPECT_TRUE(bridge_->replayPaused());
+  bridge_->onBelowWriteBufferLowWatermark();
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 1);
+}
+
+// If resumeSource() does not synchronously echo, a subsequent genuine low watermark must still
+// resume replay rather than staying deadlocked.
+TEST_F(DecoderFilterChainBridgeEchoTest, NonEchoingResumeDoesNotDeadlockReplay) {
+  bridge_->addUnacked(200);
+  EXPECT_TRUE(bridge_->ingestPaused());
+  EXPECT_FALSE(bridge_->replayPaused());
+
+  EXPECT_CALL(callbacks_, onDecoderFilterBelowWriteBufferLowWatermark()).WillOnce([]() {});
+  bridge_->releaseUnacked(200);
+  EXPECT_FALSE(bridge_->ingestPaused());
+
+  bridge_->onAboveWriteBufferHighWatermark();
+  EXPECT_TRUE(bridge_->replayPaused());
+  bridge_->onBelowWriteBufferLowWatermark();
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 1);
+}
+
 // EncoderFilterChainBridge maps the bridge surface onto StreamEncoderFilterCallbacks
 // but subscribes to downstream watermarks through the decoder callbacks.
 class EncoderFilterChainBridgeTest : public testing::Test {
@@ -135,7 +251,7 @@ public:
   EncoderFilterChainBridgeTest() {
     EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillOnce(Return(100));
     EXPECT_CALL(decoder_callbacks_, addDownstreamWatermarkCallbacks(_))
-        .WillOnce(Invoke([this](Http::DownstreamWatermarkCallbacks& cb) { subscriber_ = &cb; }));
+        .WillOnce([this](Http::DownstreamWatermarkCallbacks& cb) { subscriber_ = &cb; });
     bridge_ =
         std::make_unique<EncoderFilterChainBridge>(encoder_callbacks_, decoder_callbacks_, stats_);
   }
@@ -170,6 +286,31 @@ TEST_F(EncoderFilterChainBridgeTest, IngestBackpressureDrivesEncoderWriteBuffer)
   EXPECT_FALSE(bridge_->ingestPaused());
 }
 
+// If the filter callbacks do not synchronously echo pauseSource()/resumeSource(), subsequent
+// genuine downstream watermarks must not be swallowed.
+TEST_F(EncoderFilterChainBridgeTest, NonEchoingSourcePauseDoesNotSwallowGenuineWatermark) {
+  bridge_->setReplayHandler(handler_);
+
+  bridge_->addUnacked(200);
+  EXPECT_TRUE(bridge_->ingestPaused());
+  EXPECT_FALSE(bridge_->replayPaused());
+
+  bridge_->onAboveWriteBufferHighWatermark();
+  EXPECT_TRUE(bridge_->replayPaused());
+  bridge_->onBelowWriteBufferLowWatermark();
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 1);
+
+  bridge_->releaseUnacked(200);
+  EXPECT_FALSE(bridge_->ingestPaused());
+
+  bridge_->onAboveWriteBufferHighWatermark();
+  EXPECT_TRUE(bridge_->replayPaused());
+  bridge_->onBelowWriteBufferLowWatermark();
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 2);
+}
+
 // The subscription goes through the *decoder* callbacks, and lasts the bridge's whole life.
 TEST_F(EncoderFilterChainBridgeTest, SubscribesAtConstructionAndUnsubscribesOnDetach) {
   EXPECT_EQ(subscriber_, bridge_.get());
@@ -198,6 +339,97 @@ TEST_F(EncoderFilterChainBridgeTest, WatermarksWithNoHandlerAreNoOps) {
   bridge_->onAboveWriteBufferHighWatermark();
   bridge_->onBelowWriteBufferLowWatermark();
   EXPECT_FALSE(bridge_->replayPaused());
+}
+
+// The filter manager fans the encoder's own high/low watermark calls out to every downstream
+// watermark subscriber, including this bridge. Wires the mock to do the same.
+class EncoderFilterChainBridgeEchoTest : public EncoderFilterChainBridgeTest {
+public:
+  EncoderFilterChainBridgeEchoTest() {
+    ON_CALL(encoder_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark())
+        .WillByDefault([this] { subscriber_->onAboveWriteBufferHighWatermark(); });
+    ON_CALL(encoder_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark())
+        .WillByDefault([this] { subscriber_->onBelowWriteBufferLowWatermark(); });
+    bridge_->setReplayHandler(handler_);
+  }
+};
+
+// Pausing the source for ingest back-pressure must not pause replay through the echo: replay is
+// what drains the charged bytes, so that would deadlock. Resuming must not produce a spurious
+// resume notification either.
+TEST_F(EncoderFilterChainBridgeEchoTest, OwnSourcePauseDoesNotPauseReplay) {
+  bridge_->addUnacked(200);
+  EXPECT_TRUE(bridge_->ingestPaused());
+  EXPECT_FALSE(bridge_->replayPaused());
+
+  bridge_->releaseUnacked(200);
+  EXPECT_FALSE(bridge_->ingestPaused());
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 0);
+}
+
+// Genuine downstream back-pressure arriving while ingest is paused still pauses and resumes
+// replay; only the bridge's own echoes are filtered.
+TEST_F(EncoderFilterChainBridgeEchoTest, GenuineDownstreamWatermarkStillPausesReplay) {
+  bridge_->addUnacked(200);
+  EXPECT_TRUE(bridge_->ingestPaused());
+
+  bridge_->onAboveWriteBufferHighWatermark();
+  EXPECT_TRUE(bridge_->replayPaused());
+  bridge_->onBelowWriteBufferLowWatermark();
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 1);
+
+  bridge_->releaseUnacked(200);
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 1);
+}
+
+// A pause nested inside our own resume keeps the echoes balanced, so replay
+// is never paused.
+TEST_F(EncoderFilterChainBridgeEchoTest, PauseNestedInResumeStaysBalanced) {
+  bridge_->addUnacked(200);
+  ON_CALL(encoder_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark()).WillByDefault([this] {
+    bridge_->addUnacked(200);
+    subscriber_->onBelowWriteBufferLowWatermark();
+  });
+
+  bridge_->releaseUnacked(200);
+  EXPECT_TRUE(bridge_->ingestPaused());
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 0);
+}
+
+// A genuine downstream high during our own pause still pauses replay.
+TEST_F(EncoderFilterChainBridgeEchoTest, GenuineWatermarkDuringOwnPauseCounts) {
+  ON_CALL(encoder_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark()).WillByDefault([this] {
+    subscriber_->onAboveWriteBufferHighWatermark();
+    subscriber_->onAboveWriteBufferHighWatermark();
+  });
+
+  bridge_->addUnacked(200);
+  EXPECT_TRUE(bridge_->replayPaused());
+  bridge_->onBelowWriteBufferLowWatermark();
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 1);
+}
+
+// If resumeSource() does not synchronously echo, a subsequent genuine low watermark must still
+// resume replay rather than staying deadlocked.
+TEST_F(EncoderFilterChainBridgeEchoTest, NonEchoingResumeDoesNotDeadlockReplay) {
+  bridge_->addUnacked(200);
+  EXPECT_TRUE(bridge_->ingestPaused());
+  EXPECT_FALSE(bridge_->replayPaused());
+
+  EXPECT_CALL(encoder_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark()).WillOnce([]() {});
+  bridge_->releaseUnacked(200);
+  EXPECT_FALSE(bridge_->ingestPaused());
+
+  bridge_->onAboveWriteBufferHighWatermark();
+  EXPECT_TRUE(bridge_->replayPaused());
+  bridge_->onBelowWriteBufferLowWatermark();
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 1);
 }
 
 // On the response path the error is surfaced through the encoder callbacks'

@@ -3,6 +3,7 @@
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
 
+aarch
 AI
 Allshard
 FCS
@@ -52,10 +53,12 @@ BOM
 CCL
 CGROUP
 CROSSSLOT
+DLL
 ECN
 ECS
 EdDSA
 EKS
+LEB
 Millicores
 NID
 NIST
@@ -194,6 +197,7 @@ DESC
 DFATAL
 DGRAM
 DLOG
+DMA
 DNS
 DQUOTE
 DS
@@ -329,6 +333,7 @@ JWT
 JWTs
 alg
 aud
+audiobook
 crv
 iat
 iss
@@ -467,6 +472,7 @@ Prereq
 QDCOUNT
 QPACK
 QUIC
+QUIC's
 QUICHE
 QoS
 qat
@@ -601,6 +607,7 @@ VM
 VPN
 WAITFORONE
 WASM
+WGS
 WIP
 WKT
 WRONGPASS
@@ -647,7 +654,7 @@ alls
 alphanumerics
 amongst
 anno
-Anthropic
+anthropic
 anonymization
 anonymizing
 anys
@@ -674,6 +681,7 @@ auths
 authz
 automata
 autoscale
+autosharding
 awaitable
 awaitables
 awaiter
@@ -1068,6 +1076,8 @@ keyset
 ketama
 keyder
 kqueue
+kTLS
+ktls
 kubernetes
 kv
 kvlist
@@ -1283,6 +1293,7 @@ precompile
 precompiled
 precompute
 precomputed
+precomputing
 preconnect
 preconnected
 preconnecting
@@ -1328,6 +1339,7 @@ quantiles
 querydetails
 quiesce
 quitquitquit
+quota
 qvalue
 radix
 radixtree
@@ -1383,6 +1395,7 @@ rele
 releasor
 reloadable
 remoting
+renormalize
 renderers
 reparse
 repeatability
@@ -1536,6 +1549,7 @@ subnets
 subobject
 suboptimal
 subprocess
+subregion
 subsecond
 subseconds
 subsegment
@@ -1665,12 +1679,16 @@ util
 utils
 va
 valgrind
+valkey
 validator
 validators
+valkey
 vanishingly
 varchar
 variadic
 varint
+Vcluster
+vcluster
 vec
 vectorize
 VBC
@@ -1838,3 +1856,7 @@ X25519MLKEM768
 cpaths
 SynchronousFeedbackResourceMonitor
 bernoulli
+vendored
+reparent
+reparents
+reparenting

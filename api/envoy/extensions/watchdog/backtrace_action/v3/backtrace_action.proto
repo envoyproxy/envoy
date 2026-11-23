@@ -19,7 +19,20 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // This action is currently only supported on Linux.
 message BacktraceActionConfig {
+  // Log levels at which the backtrace can be logged.
+  enum LogLevel {
+    CRITICAL = 0;
+    TRACE = 1;
+    DEBUG = 2;
+    INFO = 3;
+    WARN = 4;
+    ERROR = 5;
+  }
+
   // Minimum time between backtrace logs per thread. Defaults to 10 seconds if not set.
   // Set to 0 to disable the cooldown and log a backtrace on every watchdog event.
   google.protobuf.Duration cooldown_duration = 1;
+
+  // Log level used for the emitted backtrace. Defaults to critical.
+  LogLevel log_level = 2;
 }

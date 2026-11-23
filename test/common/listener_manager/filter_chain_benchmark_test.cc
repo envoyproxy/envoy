@@ -7,6 +7,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/protobuf/message_validator.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/common/network/socket_impl.h"
 
@@ -200,6 +201,7 @@ const char YamlSingleDstPortBottom[] = R"EOF(
             - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a")EOF";
 } // namespace
 
+// Fixtures are destroyed at exit in an unspecified order, so they must not hold a Logger::Context.
 class FilterChainBenchmarkFixture : public ::benchmark::Fixture {
 public:
   void initialize(::benchmark::State& state) {
@@ -216,9 +218,40 @@ public:
     filter_chains_ = listener_config_.filter_chains();
   }
 
-  Envoy::Thread::MutexBasicLockable lock_;
-  Logger::Context logging_state_{spdlog::level::warn, Logger::Logger::DEFAULT_LOG_FORMAT, lock_,
-                                 false};
+  // Measures in place updates of a manager with the origin filter chains to the updated ones, and
+  // returns how many drains of origin filter chains the updates recorded in all.
+  size_t updateFilterChains(
+      ::benchmark::State& state,
+      absl::Span<const envoy::config::listener::v3::FilterChain* const> origin_filter_chains,
+      absl::Span<const envoy::config::listener::v3::FilterChain* const> updated_filter_chains) {
+    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+    std::vector<Network::Address::InstanceConstSharedPtr> addresses;
+    addresses.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+    FilterChainManagerImpl origin_filter_chain_manager{addresses, factory_context, init_manager_};
+    THROW_IF_NOT_OK(origin_filter_chain_manager.addFilterChains(
+        nullptr, origin_filter_chains, nullptr, dummy_builder_, origin_filter_chain_manager,
+        nullptr, empty_config_source_, dummy_fcds_callbacks_));
+    for (auto _ : state) {
+      UNREFERENCED_PARAMETER(_);
+      FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_,
+                                                  origin_filter_chain_manager};
+      THROW_IF_NOT_OK(filter_chain_manager.addFilterChains(
+          nullptr, updated_filter_chains, nullptr, dummy_builder_, filter_chain_manager, nullptr,
+          empty_config_source_, dummy_fcds_callbacks_));
+    }
+    return origin_filter_chain_manager.drainingFilterChains().size();
+  }
+
+  static std::vector<const envoy::config::listener::v3::FilterChain*>
+  pointersTo(const std::vector<envoy::config::listener::v3::FilterChain>& filter_chains) {
+    std::vector<const envoy::config::listener::v3::FilterChain*> pointers;
+    pointers.reserve(filter_chains.size());
+    for (const auto& filter_chain : filter_chains) {
+      pointers.push_back(&filter_chain);
+    }
+    return pointers;
+  }
+
   std::string listener_yaml_config_;
   envoy::config::listener::v3::Listener listener_config_;
   absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chains_;
@@ -252,6 +285,69 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
   }
 }
 
+// Measures an in place update that keeps every filter chain.
+BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateTest)
+(::benchmark::State& state) {
+  if (benchmark::skipExpensiveBenchmarks() && state.range(0) > 64) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
+  initialize(state);
+  RELEASE_ASSERT(updateFilterChains(state, filter_chains_, filter_chains_) == 0,
+                 "an unchanged filter chain was rebuilt");
+}
+
+// Measures an in place update whose filter chains equal the ones it replaces but serialize
+// differently, as when a control plane encodes their Any payloads again.
+BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateReencodedTest)
+(::benchmark::State& state) {
+  if (benchmark::skipExpensiveBenchmarks() && state.range(0) > 64) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
+  initialize(state);
+  // The same struct with its two fields serialized in two orders.
+  std::vector<envoy::config::listener::v3::FilterChain> origin_messages;
+  std::vector<envoy::config::listener::v3::FilterChain> updated_messages;
+  origin_messages.reserve(filter_chains_.size());
+  updated_messages.reserve(filter_chains_.size());
+  for (const auto* filter_chain : filter_chains_) {
+    auto& origin_message = origin_messages.emplace_back(*filter_chain);
+    auto* typed_config = origin_message.add_filters()->mutable_typed_config();
+    typed_config->set_type_url("type.googleapis.com/google.protobuf.Struct");
+    typed_config->set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+    updated_messages.emplace_back(origin_message)
+        .mutable_filters(0)
+        ->mutable_typed_config()
+        ->set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  }
+  RELEASE_ASSERT(
+      updateFilterChains(state, pointersTo(origin_messages), pointersTo(updated_messages)) == 0,
+      "an equal filter chain was rebuilt");
+}
+
+// Measures an in place update that changes every filter chain.
+BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateChangedTest)
+(::benchmark::State& state) {
+  if (benchmark::skipExpensiveBenchmarks() && state.range(0) > 64) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
+  initialize(state);
+  std::vector<envoy::config::listener::v3::FilterChain> updated_messages;
+  updated_messages.reserve(filter_chains_.size());
+  for (const auto* filter_chain : filter_chains_) {
+    updated_messages.emplace_back(*filter_chain).set_name("changed");
+  }
+  // Count the drains first, since the benchmark loop sets the iteration count.
+  const size_t drains = updateFilterChains(state, filter_chains_, pointersTo(updated_messages));
+  RELEASE_ASSERT(drains == state.iterations() * filter_chains_.size(),
+                 "a changed filter chain was reused");
+}
+
 BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
 (::benchmark::State& state) {
   if (benchmark::skipExpensiveBenchmarks() && state.range(0) > 64) {
@@ -283,6 +379,24 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
   }
 }
 BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
+    ->Ranges({
+        // scale of the chains
+        {1, 4096},
+    })
+    ->Unit(::benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateTest)
+    ->Ranges({
+        // scale of the chains
+        {1, 4096},
+    })
+    ->Unit(::benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateReencodedTest)
+    ->Ranges({
+        // scale of the chains
+        {1, 4096},
+    })
+    ->Unit(::benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainManagerUpdateChangedTest)
     ->Ranges({
         // scale of the chains
         {1, 4096},
@@ -343,17 +457,19 @@ struct FcdsTlsUpdateBenchmarkState {
     ON_CALL(server_context_.cluster_manager_.subscription_factory_,
             subscriptionFromConfigSource(testing::_, testing::_, testing::_, testing::_, testing::_,
                                          testing::_))
-        .WillByDefault(testing::Invoke(
+        .WillByDefault(
             [](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
                Config::SubscriptionCallbacks&, Config::OpaqueResourceDecoderSharedPtr,
                const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
               return std::make_unique<NiceMock<Config::MockSubscription>>();
-            }));
+            });
 
     // The manager owns the returned callback. The raw pointer drives the coalesced publish.
     tls_update_cb_ = new NiceMock<Event::MockSchedulableCallback>(&server_context_.dispatcher_);
-    manager_ = std::make_shared<FcdsSharedFilterChainManager>(server_context_,
-                                                              listener_component_factory_);
+    manager_ = std::make_shared<FcdsSharedFilterChainManager>(
+        server_context_, listener_component_factory_, dummy_listener_manager_callbacks_);
+    // Makes FCDS subscribe to the filter chains.
+    config_source_.mutable_ads();
     for (int64_t i = 0; i < chain_count; i++) {
       const std::string name = absl::StrCat("dynamic_filter_chain_", i);
       auto handle = manager_->subscribe(config_source_, name, dummy_fcds_callbacks_, init_manager_);
@@ -366,10 +482,14 @@ struct FcdsTlsUpdateBenchmarkState {
   struct DummyFcdsClientCallbacks : public FcdsClientCallbacks {
     void drainFilterChain(Network::DrainableFilterChainSharedPtr) override {}
   };
+  struct DummyFcdsListenerManagerCallbacks : public FcdsListenerManagerCallbacks {
+    void notifyFilterChainUpdateCallbacks(absl::string_view) override {}
+  };
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<MockListenerComponentFactory> listener_component_factory_;
   envoy::config::core::v3::ConfigSource config_source_;
   DummyFcdsClientCallbacks dummy_fcds_callbacks_;
+  DummyFcdsListenerManagerCallbacks dummy_listener_manager_callbacks_;
   Init::ManagerImpl init_manager_{"fcds_tls_update_benchmark"};
   Event::MockSchedulableCallback* tls_update_cb_{};
   std::shared_ptr<FcdsSharedFilterChainManager> manager_;

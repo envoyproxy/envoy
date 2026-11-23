@@ -178,6 +178,13 @@ private:
   // watermark more than once (stream and connection), so replay resumes only when this returns to
   // zero.
   uint32_t replay_high_watermark_count_{0};
+  // When pauseSource() or resumeSource() reports an ingest buffer watermark to Envoy, Envoy fans
+  // that same signal back to every watermark subscriber on the stream, including this bridge.
+  // These counters track how many self-triggered callbacks are currently in flight on the stack so
+  // onAboveReplayWatermark() and onBelowReplayWatermark() can ignore our own echoes instead of
+  // mistaking ingest back-pressure for replay back-pressure.
+  uint32_t expected_high_watermark_echoes_{0};
+  uint32_t expected_low_watermark_echoes_{0};
   ReplayResumeHandler* replay_handler_{nullptr};
   absl::flat_hash_set<BufferManager*> registered_managers_;
 };
@@ -237,7 +244,8 @@ public:
 
   // Offloads `data` into the external buffer (batching small frames). The caller
   // holds the filter chain (returns StopIteration*) while the body is buffered.
-  void onData(Buffer::Instance& data);
+  // `end_stream` marks `data` as the last frame of the body.
+  void onData(Buffer::Instance& data, bool end_stream = false);
 
   // Signals that the full body has been offloaded, flushing any batched backlog to
   // the buffer so all of it becomes durable, and is ready to replay.
@@ -372,9 +380,11 @@ private:
   // we never inject/error reentrantly from within it).
   Event::SchedulableCallbackPtr replay_cb_;
 
-  // True once endStream() has been called; gates flushing the batched backlog (the
+  // True once the body has ended; gates flushing the batched backlog (the
   // tail is written even if it is below WriteFlushThreshold).
   bool end_stream_seen_{false};
+  // True once a write carrying end_stream has been issued.
+  bool end_stream_flushed_{false};
   // True once cancelReplay() has been called. Permanent: disables all subsequent replay attempts.
   bool replay_cancelled_{false};
   // True once replay() has been requested by the caller and not yet started.

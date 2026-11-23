@@ -1,5 +1,7 @@
 #include "source/extensions/filters/udp/udp_proxy/config.h"
 
+#include "envoy/network/udp_packet_writer_factory_factory.h"
+
 #include "source/common/filter/config_discovery_impl.h"
 #include "source/common/formatter/substitution_format_string.h"
 
@@ -146,6 +148,16 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
         "is not running with the CAP_NET_ADMIN capability.");
   }
 
+  if (config.has_upstream_packet_writer_config()) {
+    if (config.has_tunneling_config()) {
+      throw EnvoyException("upstream_packet_writer_config cannot be used with tunneling_config.");
+    }
+    auto& factory = Config::Utility::getAndCheckFactory<Network::UdpPacketWriterFactoryFactory>(
+        config.upstream_packet_writer_config());
+    upstream_packet_writer_factory_ =
+        factory.createUdpPacketWriterFactory(config.upstream_packet_writer_config(), context);
+  }
+
   session_access_logs_.reserve(config.access_log_size());
   for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {
     session_access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
@@ -185,7 +197,7 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
       filter_factories_.push_back(
           udp_session_filter_config_provider_manager_->createDynamicFilterConfigProvider(
               filter.config_discovery(), filter.name(), context.serverFactoryContext(), context,
-              context.serverFactoryContext().clusterManager(), false, "udp_session", nullptr));
+              context.serverFactoryContext().clusterManager(), false, "udp_session", nullptr, ""));
       continue;
     }
 

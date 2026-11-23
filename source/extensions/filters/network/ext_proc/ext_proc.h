@@ -126,6 +126,8 @@ public:
     return untyped_receiving_namespaces_;
   }
 
+  bool sendOnce() const { return send_once_; }
+
   const NetworkExtProcStats& stats() const { return stats_; }
 
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
@@ -146,12 +148,14 @@ private:
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   const absl::flat_hash_set<std::string> untyped_receiving_namespaces_;
+  const bool send_once_;
   NetworkExtProcStats stats_;
   const std::chrono::milliseconds message_timeout_;
   const ExpressionManager expression_manager_;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
+using ProcessingMode = envoy::extensions::filters::network::ext_proc::v3::ProcessingMode;
 using ProcessingRequest = envoy::service::network_ext_proc::v3::ProcessingRequest;
 using ProcessingResponse = envoy::service::network_ext_proc::v3::ProcessingResponse;
 
@@ -255,6 +259,7 @@ private:
   Envoy::Network::FilterStatus handleStreamError();
   void closeConnection(const std::string& reason, Network::ConnectionCloseType close_type);
   void handleConnectionStatus(const ProcessingResponse& response);
+  bool isSpuriousResponse(const ProcessingResponse& response) const;
 
   void recordCallCompletion(Grpc::Status::GrpcStatus status, bool is_read_direction);
 
@@ -278,6 +283,7 @@ private:
 
   bool processing_complete_{false};
   bool attributes_sent_{false};
+  bool metadata_sent_{false};
 
   bool read_pending_{false};
   bool write_pending_{false};

@@ -35,7 +35,7 @@
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::_;
-using testing::Invoke;
+using testing::AnyNumber;
 using testing::Return;
 
 namespace Envoy {
@@ -101,6 +101,11 @@ private:
   uint32_t num_packets_received_{0};
 };
 
+class MockQuicClientHttpConnectionCallbacks : public Http::MockServerConnectionCallbacks {
+public:
+  MOCK_METHOD(void, onMaxStreamsChanged, (uint32_t num_streams), (override));
+};
+
 class EnvoyQuicClientSessionTest
     : public testing::TestWithParam<std::tuple<quic::ParsedQuicVersion, bool>> {
 public:
@@ -132,6 +137,7 @@ public:
     if (quiche_handles_migration_) {
       migration_config_.allow_port_migration = true;
     }
+    EXPECT_CALL(http_connection_callbacks_, onMaxStreamsChanged(_)).Times(AnyNumber());
   }
 
   void SetUp() override {
@@ -175,6 +181,8 @@ public:
 
     envoy_quic_session_->Initialize();
     setQuicConfigWithDefaultValues(envoy_quic_session_->config());
+    quic::test::QuicConfigPeer::SetReceivedMaxBidirectionalStreams(
+        envoy_quic_session_->config(), received_max_bidirectional_streams_);
     quic::test::QuicConfigPeer::SetReceivedStatelessResetToken(
         envoy_quic_session_->config(),
         quic::QuicUtils::GenerateStatelessResetToken(quic::test::TestConnectionId()));
@@ -234,7 +242,8 @@ protected:
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   std::unique_ptr<EnvoyQuicClientSession> envoy_quic_session_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
-  Http::MockServerConnectionCallbacks http_connection_callbacks_;
+  MockQuicClientHttpConnectionCallbacks http_connection_callbacks_;
+  uint32_t received_max_bidirectional_streams_{quic::kDefaultMaxStreamsPerConnection};
   testing::StrictMock<Stats::MockCounter> read_total_;
   testing::StrictMock<Stats::MockGauge> read_current_;
   testing::StrictMock<Stats::MockCounter> write_total_;
@@ -279,9 +288,9 @@ TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Response headers should be propagated to decoder.
   EXPECT_CALL(response_decoder, decodeHeaders_(_, /*end_stream=*/true))
-      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
+      .WillOnce([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ("200", decoded_headers->getStatusValue());
-      }));
+      });
   stream.OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
 }
 
@@ -312,9 +321,9 @@ TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Response headers should be propagated to decoder.
   EXPECT_CALL(response_decoder, decodeHeaders_(_, /*end_stream=*/false))
-      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
+      .WillOnce([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ("200", decoded_headers->getStatusValue());
-      }));
+      });
   stream.OnStreamHeaderList(/*fin=*/false, headers.uncompressed_header_bytes(), headers);
   // With one stream, still read 16 packets.
   EXPECT_EQ(1, envoy_quic_session_->GetNumActiveStreams());
@@ -322,9 +331,9 @@ TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
 
   EnvoyQuicClientStream& stream2 = sendGetRequest(response_decoder, stream_callbacks);
   EXPECT_CALL(response_decoder, decodeHeaders_(_, /*end_stream=*/false))
-      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
+      .WillOnce([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ("200", decoded_headers->getStatusValue());
-      }));
+      });
   stream2.OnStreamHeaderList(/*fin=*/false, headers.uncompressed_header_bytes(), headers);
   // With 2 streams, read 32 packets.
   EXPECT_EQ(2, envoy_quic_session_->GetNumActiveStreams());
@@ -577,13 +586,9 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
   EXPECT_NE(new_self_address->asString(), self_addr_->asString());
 
   // Send a STATELESS_RESET packet to the probing socket.
-  quic::StatelessResetToken reset_token =
-      GetQuicReloadableFlag(quic_check_alternate_reset_token)
-          ? frame.stateless_reset_token
-          : quic::QuicUtils::GenerateStatelessResetToken(quic::test::TestConnectionId());
   std::unique_ptr<quic::QuicEncryptedPacket> stateless_reset_packet =
-      quic::QuicFramer::BuildIetfStatelessResetPacket(frame.connection_id,
-                                                      /*received_packet_length*/ 1200, reset_token);
+      quic::QuicFramer::BuildIetfStatelessResetPacket(
+          frame.connection_id, /*received_packet_length*/ 1200, frame.stateless_reset_token);
   Buffer::RawSlice slice;
   slice.mem_ = const_cast<char*>(stateless_reset_packet->data());
   slice.len_ = stateless_reset_packet->length();
@@ -794,14 +799,13 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
   EXPECT_CALL(os_sys_calls, supportsUdpGro()).WillRepeatedly(Return(true));
   EXPECT_CALL(os_sys_calls, recvmmsg(_, _, _, _, _)).Times(0);
   EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
-      .WillOnce(
-          Invoke([&](os_fd_t /*socket*/, msghdr* /*msg*/, int /*flags*/) -> Api::SysCallSizeResult {
-            dispatcher_->exit();
-            // Return an error so IoSocketHandleImpl::recvmsg() exits early, instead of trying to
-            // use the msghdr that would normally have been populated by recvmsg but is not
-            // populated by this mock.
-            return {-1, SOCKET_ERROR_AGAIN};
-          }));
+      .WillOnce([&](os_fd_t /*socket*/, msghdr* /*msg*/, int /*flags*/) -> Api::SysCallSizeResult {
+        dispatcher_->exit();
+        // Return an error so IoSocketHandleImpl::recvmsg() exits early, instead of trying to
+        // use the msghdr that would normally have been populated by recvmsg but is not
+        // populated by this mock.
+        return {-1, SOCKET_ERROR_AGAIN};
+      });
 
   peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
 
@@ -815,6 +819,67 @@ TEST_P(EnvoyQuicClientSessionTest, SetSocketOption) {
   absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
 
   EXPECT_FALSE(envoy_quic_session_->setSocketOption(sockopt_name, sockopt_val));
+}
+
+class EnvoyQuicClientSessionZeroStreamLimitTest : public EnvoyQuicClientSessionTest {
+public:
+  void SetUp() override {
+    received_max_bidirectional_streams_ = 0;
+    EXPECT_CALL(http_connection_callbacks_, onMaxStreamsChanged(0)).Times(testing::AtLeast(1));
+    EnvoyQuicClientSessionTest::SetUp();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionZeroStreamLimitTests,
+                         EnvoyQuicClientSessionZeroStreamLimitTest,
+                         testing::Combine(testing::ValuesIn(quic::CurrentSupportedHttp3Versions()),
+                                          testing::Bool()));
+
+// A peer limit of zero does not raise the outgoing stream limit in QUICHE, so it never calls
+// OnCanCreateNewOutgoingStream(). The pool must still learn the limit, because during 0-RTT it
+// would otherwise keep its optimistic capacity and attach a stream QUICHE has no ID for.
+TEST_P(EnvoyQuicClientSessionZeroStreamLimitTest, ReportsZeroStreamLimitOnConfigNegotiated) {
+  testing::Mock::VerifyAndClearExpectations(&http_connection_callbacks_);
+}
+
+class EnvoyQuicClientSessionZeroStreamLimitGuardDisabledTest : public EnvoyQuicClientSessionTest {
+public:
+  void SetUp() override {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.quic_report_zero_stream_limit_before_handshake", "false"}});
+    received_max_bidirectional_streams_ = 0;
+    EXPECT_CALL(http_connection_callbacks_, onMaxStreamsChanged(0)).Times(0);
+    EnvoyQuicClientSessionTest::SetUp();
+  }
+
+private:
+  TestScopedRuntime scoped_runtime_;
+};
+
+INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionZeroStreamLimitGuardDisabledTests,
+                         EnvoyQuicClientSessionZeroStreamLimitGuardDisabledTest,
+                         testing::Combine(testing::ValuesIn(quic::CurrentSupportedHttp3Versions()),
+                                          testing::Bool()));
+
+TEST_P(EnvoyQuicClientSessionZeroStreamLimitGuardDisabledTest, DoesNotReportZeroStreamLimit) {
+  testing::Mock::VerifyAndClearExpectations(&http_connection_callbacks_);
+}
+
+class EnvoyQuicClientSessionNonZeroStreamLimitTest : public EnvoyQuicClientSessionTest {
+public:
+  void SetUp() override {
+    EXPECT_CALL(http_connection_callbacks_, onMaxStreamsChanged(0)).Times(0);
+    EnvoyQuicClientSessionTest::SetUp();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionNonZeroStreamLimitTests,
+                         EnvoyQuicClientSessionNonZeroStreamLimitTest,
+                         testing::Combine(testing::ValuesIn(quic::CurrentSupportedHttp3Versions()),
+                                          testing::Bool()));
+
+TEST_P(EnvoyQuicClientSessionNonZeroStreamLimitTest, DoesNotReportZeroStreamLimit) {
+  testing::Mock::VerifyAndClearExpectations(&http_connection_callbacks_);
 }
 
 class EnvoyQuicClientSessionDisallowMmsgTest : public EnvoyQuicClientSessionTest {
@@ -867,14 +932,13 @@ TEST_P(EnvoyQuicClientSessionDisallowMmsgTest, UsesRecvMsgWhenNoGro) {
   // Uses `recvmsg`, not `recvmmsg`.
   EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _)).Times(0);
   EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _))
-      .WillOnce(
-          Invoke([&](os_fd_t /*socket*/, msghdr* /*msg*/, int /*flags*/) -> Api::SysCallSizeResult {
-            dispatcher_->exit();
-            // Return an error so IoSocketHandleImpl::recvmsg() exits early, instead of trying to
-            // use the msghdr that would normally have been populated by recvmsg but is not
-            // populated by this mock.
-            return {-1, SOCKET_ERROR_AGAIN};
-          }));
+      .WillOnce([&](os_fd_t /*socket*/, msghdr* /*msg*/, int /*flags*/) -> Api::SysCallSizeResult {
+        dispatcher_->exit();
+        // Return an error so IoSocketHandleImpl::recvmsg() exits early, instead of trying to
+        // use the msghdr that would normally have been populated by recvmsg but is not
+        // populated by this mock.
+        return {-1, SOCKET_ERROR_AGAIN};
+      });
 
   peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
 
@@ -921,12 +985,12 @@ TEST_P(EnvoyQuicClientSessionAllowMmsgTest, UsesRecvMmsgWhenNoGroAndMmsgAllowed)
   EXPECT_CALL(os_sys_calls_, supportsUdpGro()).WillRepeatedly(Return(false));
   EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _)).Times(0);
   EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _))
-      .WillRepeatedly(Invoke([&](os_fd_t, struct mmsghdr*, unsigned int, int,
-                                 struct timespec*) -> Api::SysCallIntResult {
+      .WillRepeatedly([&](os_fd_t, struct mmsghdr*, unsigned int, int,
+                          struct timespec*) -> Api::SysCallIntResult {
         dispatcher_->exit();
         // EAGAIN should be returned with -1 but returning 0 here shouldn't cause busy looping.
         return {0, SOCKET_ERROR_AGAIN};
-      }));
+      });
 
   peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
 

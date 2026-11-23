@@ -1,3 +1,4 @@
+//go:generate mockgen -source=early_header_mutation_api.go -destination=mocks/mock_early_header_mutation_api.go -package=mocks
 package shared
 
 // EarlyHeaderMutation is the interface to implement your own early header

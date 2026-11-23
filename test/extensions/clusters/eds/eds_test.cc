@@ -7,6 +7,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/config/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/eds/eds.h"
@@ -621,6 +622,34 @@ TEST_F(EdsTest, EndpointMetadata) {
                                             Config::MetadataFilters::get().ENVOY_LB, "version")
                 .string_value(),
             "v3");
+}
+
+// Validate that onConfigUpdate() keeps the endpoint metadata when only the serialization of its Any
+// payload changes.
+TEST_F(EdsTest, EndpointMetadataWithReserializedAnyIsKept) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints();
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+  // The same struct with its two fields serialized in two orders.
+  Protobuf::Any& any =
+      (*endpoint->mutable_metadata()->mutable_typed_filter_metadata())["custom_namespace"];
+  any.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(0UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
+  const MetadataConstSharedPtr metadata =
+      cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->metadata();
+
+  any.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(1UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
+  EXPECT_EQ(metadata, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->metadata());
 }
 
 // Test verifies that updating metadata updates
@@ -2933,13 +2962,13 @@ class EdsAssignmentTimeoutTest : public EdsTest {
 public:
   EdsAssignmentTimeoutTest() {
     EXPECT_CALL(server_context_.dispatcher_, createTimer_(_))
-        .WillOnce(Invoke([this](Event::TimerCb cb) {
+        .WillOnce([this](Event::TimerCb cb) {
           timer_cb_ = cb;
           EXPECT_EQ(nullptr, interval_timer_);
           interval_timer_ = new Event::MockTimer();
           return interval_timer_;
-        }))
-        .WillRepeatedly(Invoke([](Event::TimerCb) { return new Event::MockTimer(); }));
+        })
+        .WillRepeatedly([](Event::TimerCb) { return new Event::MockTimer(); });
 
     resetCluster();
   }
@@ -3100,7 +3129,7 @@ public:
   EdsWithLedsTest() {
     ON_CALL(server_context_.cluster_manager_.subscription_factory_,
             collectionSubscriptionFromUrl(_, _, _, _, _, _))
-        .WillByDefault(Invoke(
+        .WillByDefault(
             [this](const xds::core::v3::ResourceLocator&,
                    const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
                    Envoy::Config::SubscriptionCallbacks& callbacks,
@@ -3108,7 +3137,7 @@ public:
               auto ret = std::make_unique<NiceMock<Config::MockSubscription>>();
               leds_callbacks_ = &callbacks;
               return ret;
-            }));
+            });
   }
 
   envoy::config::endpoint::v3::ClusterLoadAssignment
@@ -3180,20 +3209,20 @@ public:
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     server_context_.local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     EXPECT_CALL(server_context_.dispatcher_, createTimer_(_))
-        .WillOnce(Invoke([this](Event::TimerCb cb) {
+        .WillOnce([this](Event::TimerCb cb) {
           timer_cb_pre_ = cb;
           EXPECT_EQ(nullptr, interval_timer_pre_);
           interval_timer_pre_ = new Event::MockTimer();
           return interval_timer_pre_;
-        }))
-        .WillRepeatedly(Invoke([](Event::TimerCb) { return new Event::MockTimer(); }));
+        })
+        .WillRepeatedly([](Event::TimerCb) { return new Event::MockTimer(); });
 
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
                                                                true);
     ON_CALL(server_context_.cluster_manager_, edsResourcesCache())
         .WillByDefault(
-            Invoke([this]() -> Config::EdsResourcesCacheOptRef { return eds_resources_cache_; }));
+            [this]() -> Config::EdsResourcesCacheOptRef { return eds_resources_cache_; });
     cluster_pre_ = *EdsClusterImpl::create(eds_cluster_, factory_context);
     EXPECT_EQ(initialize_phase, cluster_pre_->initializePhase());
     eds_callbacks_pre_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
@@ -3224,13 +3253,13 @@ public:
   // that waits for EDS response.
   void updateCluster() {
     EXPECT_CALL(server_context_.dispatcher_, createTimer_(_))
-        .WillOnce(Invoke([this](Event::TimerCb cb) {
+        .WillOnce([this](Event::TimerCb cb) {
           timer_cb_post_ = cb;
           EXPECT_EQ(nullptr, interval_timer_post_);
           interval_timer_post_ = new Event::MockTimer();
           return interval_timer_post_;
-        }))
-        .WillRepeatedly(Invoke([](Event::TimerCb) { return new Event::MockTimer(); }));
+        })
+        .WillRepeatedly([](Event::TimerCb) { return new Event::MockTimer(); });
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
                                                                true);
@@ -3505,8 +3534,10 @@ public:
     // is set to true by default, this should be removed.
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.xdstp_based_config_singleton_subscriptions", "true"}});
-    ON_CALL(server_context_.xds_manager_, subscribeToSingletonResource(_, _, _, _, _, _, _))
-        .WillByDefault(Invoke(
+    ON_CALL(server_context_.xds_manager_,
+            subscribeToSingletonResource(_, _, _, _, testing::An<Config::SubscriptionCallbacks&>(),
+                                         _, _))
+        .WillByDefault(
             [this](absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
                    absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
                    Config::OpaqueResourceDecoderSharedPtr,
@@ -3515,7 +3546,7 @@ public:
               subscription_ = ret.get();
               eds_callbacks_ = &callbacks;
               return ret;
-            }));
+            });
     ON_CALL(server_context_.xds_manager_, subscriptionFactory())
         .WillByDefault(ReturnRef(server_context_.cluster_manager_.subscription_factory_));
     resetCluster();

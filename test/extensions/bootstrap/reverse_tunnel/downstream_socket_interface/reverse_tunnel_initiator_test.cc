@@ -15,6 +15,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -116,7 +117,8 @@ TEST_F(ReverseTunnelInitiatorTest, CreateBootstrapExtension) {
       DownstreamReverseConnectionSocketInterface config;
 
   auto extension = socket_interface_->createBootstrapExtension(config, context_);
-  EXPECT_NE(extension, nullptr);
+  ASSERT_OK(extension);
+  EXPECT_NE(*extension, nullptr);
 
   // Verify extension is stored in socket interface.
   EXPECT_NE(socket_interface_->getExtension(), nullptr);

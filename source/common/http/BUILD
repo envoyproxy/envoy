@@ -110,7 +110,6 @@ envoy_cc_library(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/network:filter_lib",
-        "//source/common/runtime:runtime_features_lib",
     ] + envoy_select_enable_http3([
         "//source/common/quic:client_codec_lib",
     ]),
@@ -271,6 +270,7 @@ envoy_cc_library(
         "//source/common/common:key_value_store_lib",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
+        "//source/common/protobuf:utility_lib",
         "@abseil-cpp//absl/container:linked_hash_map",
         "@envoy_api//envoy/config/common/key_value/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -731,6 +731,7 @@ envoy_cc_library(
         "//source/common/access_log:access_log_lib",
         "//source/common/common:assert_lib",
         "//source/common/quic:envoy_quic_clock_lib",
+        "//source/server:listener_stats",
         "@abseil-cpp//absl/container:btree",
         "@abseil-cpp//absl/container:node_hash_map",
         "@abseil-cpp//absl/time",

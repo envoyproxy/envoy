@@ -16,7 +16,7 @@ is being received) as well as during encoding (when the response is being sent).
 
 Envoy will always set the ``:scheme`` header while processing a request. It should always be available to filters, and should be forwarded upstream for HTTP/2 and HTTP/3, where :ref:`config_http_conn_man_headers_x-forwarded-proto` will be sent for HTTP/1.1.
 
-For HTTP/2, and HTTP/3, incoming ``:scheme`` headers are trusted and propogated through upstream.
+For HTTP/2, and HTTP/3, incoming ``:scheme`` headers are trusted and propagated through upstream.
 For HTTP/1, the ``:scheme`` header will be set
 1) From the absolute URL if present and valid. An invalid (not "http" or "https") scheme, or an https scheme over an unencrypted connection will result in Envoy rejecting the request. This is the only scheme validation Envoy performs as it avoids a HTTP/1.1-specific privilege escalation attack for edge Envoys [1]_ which doesn't have a comparable vector for HTTP/2 and above [2]_.
 2) From the value of the :ref:`config_http_conn_man_headers_x-forwarded-proto` header after sanitization (to valid ``x-forwarded-proto`` from trusted downstreams, otherwise based on downstream encryption level).
@@ -190,20 +190,21 @@ The following keys are supported:
 2. ``Hash`` The SHA 256 digest of the current client certificate.
 3. ``Cert`` The entire client certificate in URL encoded PEM format.
 4. ``Chain`` The entire client certificate chain (including the leaf certificate) in URL encoded PEM format. Note that this is not the validated chain; it is the original chain provided by the client which may include certificates not in the validated chain.
-5. ``Subject`` The Subject field of the current client certificate. The value is always double-quoted.
+5. ``Subject`` The Subject field of the current client certificate, formatted as an `RFC 2253`_ distinguished name string (for example ``CN=Test Client,OU=Lyft,L=San Francisco,ST=CA,C=US``). The value is always double-quoted.
 6. ``URI`` The URI type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple URI type Subject Alternative Names, each will be a separate key-value pair.
 7. ``DNS`` The DNS type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple DNS type Subject Alternative Names, each will be a separate key-value pair.
-8. ``Issuer`` The Issuer field of the current client certificate. The value is always double-quoted.
+8. ``Issuer`` The Issuer field of the current client certificate, formatted as an `RFC 2253`_ distinguished name string. The value is always double-quoted.
 
 A client certificate may contain multiple Subject Alternative Name types. For details on different Subject Alternative Name types, please refer `RFC 5280`_.
 
 .. _RFC 5280: https://tools.ietf.org/html/rfc5280#section-4.2.1.6
+.. _RFC 2253: https://tools.ietf.org/html/rfc2253
 
 Some examples of the XFCC header in text format are:
 
-1. For one client certificate with only URI type Subject Alternative Name: ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;Subject="/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test Client";URI=http://testclient.lyft.com``
+1. For one client certificate with only URI type Subject Alternative Name: ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;Subject="CN=Test Client,OU=Lyft,L=San Francisco,ST=CA,C=US";URI=http://testclient.lyft.com``
 2. For two client certificates with only URI type Subject Alternative Name: ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;URI=http://testclient.lyft.com,By=http://backend.lyft.com;Hash=9ba61d6425303443c0748a02dd8de688468ed33be74eee6556d90c0149c1309e;URI=http://frontend.lyft.com``
-3. For one client certificate with both URI type and DNS type Subject Alternative Name: ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;Subject="/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test Client";URI=http://testclient.lyft.com;DNS=lyft.com;DNS=www.lyft.com``
+3. For one client certificate with both URI type and DNS type Subject Alternative Name: ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;Subject="CN=Test Client,OU=Lyft,L=San Francisco,ST=CA,C=US";URI=http://testclient.lyft.com;DNS=lyft.com;DNS=www.lyft.com``
 
 .. _config_http_conn_man_headers_x-forwarded-client-cert_json:
 
@@ -227,7 +228,7 @@ An example of the XFCC header in JSON format:
 
 .. code-block:: json
 
-  [{"by":["http://frontend.lyft.com"],"hash":"468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688","subject":"/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test Client","uri":["http://testclient.lyft.com"],"dns":["lyft.com","www.lyft.com"]}]
+  [{"by":["http://frontend.lyft.com"],"hash":"468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688","subject":"CN=Test Client,OU=Lyft,L=San Francisco,ST=CA,C=US","uri":["http://testclient.lyft.com"],"dns":["lyft.com","www.lyft.com"]}]
 
 An example with two proxy hops:
 

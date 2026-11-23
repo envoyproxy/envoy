@@ -5,6 +5,8 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
     "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
     "envoy_extension_cc_test_library",
@@ -19,7 +21,17 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/stats:isolated_store_lib",
@@ -34,13 +46,11 @@ envoy_extension_cc_test_library(
     name = "filter_test_common_lib",
     srcs = ["filter_test_common.cc"],
     hdrs = ["filter_test_common.h"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = {"build": "linux_x64_small"},
     tags = ["skip_on_windows"],
     deps = [
         ":mock_server_lib",
@@ -83,14 +93,30 @@ envoy_extension_cc_test(
     name = "filter_test",
     size = "small",
     srcs = ["filter_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_medium",
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "gcc": {
+            "build": "linux_x64_large",
+            "test": "linux_x64_medium",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+    },
     shard_count = 8,
     tags = ["skip_on_windows"],
     deps = [
@@ -132,13 +158,21 @@ envoy_extension_cc_test(
     name = "filter_misc_test",
     size = "small",
     srcs = ["filter_misc_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":filter_test_common_lib",
@@ -160,13 +194,21 @@ envoy_extension_cc_test(
     name = "filter_local_reply_streaming_test",
     size = "small",
     srcs = ["filter_local_reply_streaming_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":filter_test_common_lib",
@@ -192,13 +234,21 @@ envoy_extension_cc_test(
     name = "filter_observability_test",
     size = "small",
     srcs = ["filter_observability_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":filter_test_common_lib",
@@ -218,14 +268,21 @@ envoy_extension_cc_test(
     name = "filter_full_duplex_test",
     size = "small",
     srcs = ["filter_full_duplex_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":filter_test_common_lib",
@@ -246,14 +303,21 @@ envoy_extension_cc_test(
     name = "mapped_attribute_builder_test",
     size = "small",
     srcs = ["mapped_attribute_builder_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/network:address_lib",
@@ -282,7 +346,6 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["state_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/ext_proc",
@@ -294,7 +357,17 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["ordering_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":mock_server_lib",
@@ -313,7 +386,10 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["client_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/http:header_map_lib",
@@ -330,14 +406,21 @@ envoy_extension_cc_test(
     name = "matching_utils_test",
     size = "small",
     srcs = ["matching_utils_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":utils_lib",
@@ -354,7 +437,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["save_processing_response_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
@@ -368,7 +451,6 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["logging_info_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/ext_proc",
@@ -381,7 +463,13 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["mutation_utils_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":utils_lib",
@@ -401,6 +489,7 @@ envoy_extension_cc_test_library(
     srcs = ["ext_proc_integration_common.cc"],
     hdrs = ["ext_proc_integration_common.h"],
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         ":ext_proc_test_filters_proto_cc_proto",
@@ -434,19 +523,46 @@ envoy_extension_cc_test(
     name = "ext_proc_integration_test",
     size = "large",  # This test can take a while under tsan.
     srcs = ["ext_proc_integration_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = [
         "envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder",
         "envoy.filters.http.ext_proc",
         # TODO(jbohanon) use a test filter here instead of production filter
         "envoy.filters.http.set_metadata",
     ],
-    rbe_pool = "linux_x64_large",
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "cto": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "openssl": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_large",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+    },
     shard_count = 8,
     tags = [
         "cpu:3",
@@ -494,18 +610,44 @@ envoy_extension_cc_test(
     name = "ext_proc_full_duplex_integration_test",
     size = "large",  # This test can take a while under tsan.
     srcs = ["ext_proc_full_duplex_integration_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = [
         "envoy.filters.http.ext_proc",
         # TODO(jbohanon) use a test filter here instead of production filter
         "envoy.filters.http.set_metadata",
     ],
-    rbe_pool = "linux_x64_large",
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "cto": {
+            "build": "default",
+            "test": "linux_x64_large",
+        },
+        "openssl": {
+            "build": "default",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_large",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "default",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+    },
     shard_count = 4,
     tags = [
         "cpu:3",
@@ -545,18 +687,44 @@ envoy_extension_cc_test(
     name = "ext_proc_observability_integration_test",
     size = "large",  # This test can take a while under tsan.
     srcs = ["ext_proc_observability_integration_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = [
         "envoy.filters.http.ext_proc",
         # TODO(jbohanon) use a test filter here instead of production filter
         "envoy.filters.http.set_metadata",
     ],
-    rbe_pool = "linux_x64_large",
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "cto": {
+            "build": "default",
+            "test": "linux_x64_large",
+        },
+        "openssl": {
+            "build": "default",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_large",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "build": "default",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "asan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+    },
     shard_count = 8,
     tags = [
         "cpu:3",
@@ -595,17 +763,21 @@ envoy_extension_cc_test(
     name = "ext_proc_local_reply_streaming_integration_test",
     size = "large",  # This test can take a while under tsan.
     srcs = ["ext_proc_local_reply_streaming_integration_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = [
         "envoy.filters.http.ext_proc",
         # TODO(jbohanon) use a test filter here instead of production filter
         "envoy.filters.http.set_metadata",
     ],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+        "asan": {"link": "linux_x64_small"},
+    },
     shard_count = 8,
     tags = [
         "cpu:3",
@@ -628,21 +800,37 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "ext_proc_misc_integration_test",
     srcs = ["ext_proc_misc_integration_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = [
         "envoy.filters.http.ext_proc",
     ],
-    rbe_pool = "linux_x64_large",
+    rbe_pool = {
+        "default": {"test": "linux_x64_large"},
+        "gcc": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "openssl": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+        "coverage": {
+            "link": "linux_x64_large",
+            "test": "linux_x64_large",
+        },
+        "tsan": {
+            "link": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+    },
     tags = [
         "cpu:3",
         "skip_on_windows",
     ],
     deps = [
+        ":ext_proc_integration_common_lib",
         "//source/extensions/filters/http/ext_proc:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
@@ -654,16 +842,37 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "ext_proc_misc_test",
     srcs = ["ext_proc_misc_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = [
         "envoy.filters.http.ext_proc",
     ],
-    rbe_pool = "linux_x64_medium",
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "cto": {
+            "build": "default",
+            "test": "linux_x64_medium",
+        },
+        "openssl": {
+            "build": "default",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "coverage": {
+            "build": "default",
+            "link": "linux_x64_large",
+            "test": "linux_x64_medium",
+        },
+        "tsan": {
+            "build": "default",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":utils_lib",
@@ -682,14 +891,18 @@ envoy_extension_cc_test(
     name = "streaming_integration_test",
     size = "large",
     srcs = ["streaming_integration_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "cto": {"link": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+        "asan": {"link": "linux_x64_small"},
+    },
     tags = [
         "cpu:3",
         "skip_on_windows",
@@ -798,6 +1011,8 @@ EXT_PROC_GRPC_FUZZ_TEST_DEPS = [
     "//test/fuzz:utility_lib",
     "//test/integration:http_integration_lib",
     "//test/test_common:utility_lib",
+    "@abseil-cpp//absl/base:core_headers",
+    "@abseil-cpp//absl/synchronization",
     "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
     "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
@@ -810,7 +1025,16 @@ envoy_extension_cc_fuzz_test(
     hdrs = ["ext_proc_grpc_fuzz.h"],
     corpus = "ext_proc_grpc_corpus",
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 11384MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "cto": {"link": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+        "asan": {"link": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_xlarge"},
+    },
     tags = ["skip_on_windows"],
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
 )
@@ -821,7 +1045,16 @@ envoy_extension_cc_fuzz_test(
     hdrs = ["ext_proc_grpc_fuzz.h"],
     corpus = "ext_proc_grpc_corpus",
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_small",
+    # linux_x64_xlarge: the fuzz coverage link peaks at 11385MB,
+    # over linux_x64_large (12288MiB) with headroom.
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "cto": {"link": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+        "asan": {"link": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_xlarge"},
+    },
     tags = ["skip_on_windows"],
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
 )
@@ -830,7 +1063,11 @@ envoy_extension_cc_test(
     name = "ext_proc_benchmark_test",
     srcs = ["ext_proc_benchmark_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "cto": {"link": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+    },
     tags = [
         "no_san",
         "nocoverage",
@@ -904,4 +1141,31 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/ext_proc:allowed_override_modes_set_lib",
     ],
+)
+
+envoy_extension_cc_benchmark_binary(
+    name = "filter_speed_test",
+    srcs = ["filter_speed_test.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "linux_x64_small",
+    tags = ["skip_on_windows"],
+    deps = [
+        ":mock_server_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/filters/common/expr:evaluator_lib",
+        "//source/extensions/filters/http/ext_proc",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:utility_lib",
+        "@benchmark",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_benchmark_test(
+    name = "filter_speed_test_benchmark_test",
+    benchmark_binary = "filter_speed_test",
+    extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "linux_x64_small",
+    tags = ["skip_on_windows"],
 )

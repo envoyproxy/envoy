@@ -1,7 +1,11 @@
+#include <algorithm>
+#include <array>
+
 #include "source/common/common/hex.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listener_filter_buffer_impl.h"
 #include "source/common/ssl/ssl.h"
+#include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -12,11 +16,12 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
+#include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
+#include "openssl/ssl.h"
 
 using testing::_;
 using testing::Eq;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::ReturnNew;
 using testing::ReturnRef;
@@ -256,6 +261,31 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
      SSL_SELECT("t13d1516bd_8daaf6152771_e5627efa2ab1", "t13d1515bd_8daaf6152771_de4a06bb82e3")},
+
+    // Regression coverage for the GREASE-in-signature_algorithms bug (see
+    // https://github.com/FoxIO-LLC/ja4/blob/main/technical_details/JA4.md). This is
+    // Browser-1's captured ClientHello with a single GREASE codepoint (0x0a0a)
+    // injected at the head of the signature_algorithms list. The trailing padding
+    // extension is shrunk by 2 bytes to keep outer record/handshake lengths intact.
+    //
+    // Since the ``JA4`` spec requires GREASE codepoints to be excluded everywhere they
+    // appear, the resulting fingerprint (including ``JA4_c``) must exactly match the
+    // baseline Browser-1 fingerprint above -- the GREASE sig-alg must not affect
+    // the hash. Without the fix, ``JA4_c`` would drift to a different value.
+    {"Browser-1-Grease-SigAlg",
+     "1603010200010001fc0303528b4e00213672e534980dfed836dd5b375ab164dcc65ba6a3c87e7e2a1f9d61201bf29"
+     "c9dffaa31ed2df524d3a113edb4e6fd3b7fb3d6d57d5d9aafb213e83c420020aaaa130113021303c02bc02fc02cc0"
+     "30cca9cca8c013c014009c009d002f0035010001936a6a0000000d001400120a0a040308040401050308050501080"
+     "60601000000170015000012656467652e6d6963726f736f66742e636f6d000a000a00084a4a001d00170018000500"
+     "050100000000000b00020100002b0007069a9a03040303001b0003020002ff010001000033002b00294a4a0001000"
+     "01d0020c4ce4268d58f0c703855163f4754b883742487a5ce87a6016a30208c18e07f69446900050003026832002d"
+     "000201010023000000170000001200000010000e000c02683208687474702f312e310a0a000100001500c30000000"
+     "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+     "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+     "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+     "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+     "00000000000",
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 };
 
 class TlsInspectorJA4Test
@@ -289,24 +319,24 @@ public:
   void mockSysCallForPeek(const std::vector<uint8_t>& client_hello) {
 #ifdef WIN32
     EXPECT_CALL(os_sys_calls_, readv(_, _, _))
-        .WillOnce(Invoke(
+        .WillOnce(
             [&client_hello](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
               const size_t amount_to_copy = std::min(iov->iov_len, client_hello.size());
               if (amount_to_copy > 0 && iov->iov_base != nullptr && !client_hello.empty()) {
                 memcpy(iov->iov_base, client_hello.data(), amount_to_copy);
               }
               return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
-            }));
+            });
 #else
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-        .WillOnce(Invoke(
+        .WillOnce(
             [&client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
               const size_t amount_to_copy = std::min(length, client_hello.size());
               if (amount_to_copy > 0 && buffer != nullptr && !client_hello.empty()) {
                 memcpy(buffer, client_hello.data(), amount_to_copy);
               }
               return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
-            }));
+            });
 #endif
   }
 
@@ -359,6 +389,61 @@ TEST_P(TlsInspectorJA4Test, JA4FingerprintFromCapturedClientHello) {
     EXPECT_EQ(1, cfg_->stats().tls_found_.value());
   }
 }
+
+// ``SSL_parse_client_hello`` is BoringSSL-only, so this suite is skipped on OpenSSL
+// builds. The ``protocol`` parameter is still covered there by the
+// ``ProtocolParameterControlsFirstCharacter`` test in ``ja4_fingerprint_test.cc``.
+#ifndef ENVOY_SSL_OPENSSL
+// ``JA4_TEST_VECTORS`` entries whose captured hex does not decode to a ClientHello
+// that ``SSL_parse_client_hello`` accepts. The ``JA4FingerprintFromCapturedClientHello``
+// suite tolerates these via ``Times(AtMost(1))`` on ``setJA4Hash``.
+constexpr std::array<absl::string_view, 3> UNPARSEABLE_JA4_TEST_VECTORS = {
+    "TLS-SNI-Facebook",
+    "Apple-Connection",
+    "Microsoft-Connection",
+};
+
+// Replays each captured ClientHello from ``JA4_TEST_VECTORS`` against
+// ``JA4Fingerprinter::create`` with every value of the ``Protocol`` enum and
+// asserts that the no-arg overload and ``Protocol::TLS`` both produce the pinned
+// fingerprint, and that ``Protocol::QUIC`` produces the pinned fingerprint with
+// its first character swapped to ``q``.
+class TlsInspectorJA4ProtocolArgTest
+    : public testing::TestWithParam<std::tuple<std::string, std::string, std::string>> {};
+
+INSTANTIATE_TEST_SUITE_P(JA4TestVectors, TlsInspectorJA4ProtocolArgTest,
+                         testing::ValuesIn(JA4_TEST_VECTORS));
+
+TEST_P(TlsInspectorJA4ProtocolArgTest, ProtocolArgSelectsFirstCharacter) {
+  const auto& [client_name, client_hello_hex, expected_ja4] = GetParam();
+  if (std::find(UNPARSEABLE_JA4_TEST_VECTORS.begin(), UNPARSEABLE_JA4_TEST_VECTORS.end(),
+                client_name) != UNPARSEABLE_JA4_TEST_VECTORS.end()) {
+    GTEST_SKIP() << client_name << ": captured hex is not a parseable ClientHello";
+  }
+
+  // Hand the ClientHello body (past the 5-byte TLS record header and 4-byte
+  // handshake header) to BoringSSL's parser.
+  const std::vector<uint8_t> wire = Hex::decode(client_hello_hex);
+  ASSERT_GT(wire.size(), 9u) << client_name;
+  const uint8_t* body = wire.data() + 9;
+  const size_t body_len = wire.size() - 9;
+
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_TRUE(ctx != nullptr);
+  bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
+  ASSERT_TRUE(ssl != nullptr);
+
+  SSL_CLIENT_HELLO client_hello;
+  ASSERT_EQ(1, SSL_parse_client_hello(ssl.get(), &client_hello, body, body_len)) << client_name;
+
+  EXPECT_EQ(JA4Fingerprinter::create(&client_hello), expected_ja4) << client_name;
+  EXPECT_EQ(JA4Fingerprinter::create(&client_hello, JA4Fingerprinter::Protocol::TLS), expected_ja4)
+      << client_name;
+  EXPECT_EQ(JA4Fingerprinter::create(&client_hello, JA4Fingerprinter::Protocol::QUIC),
+            "q" + expected_ja4.substr(1))
+      << client_name;
+}
+#endif
 
 TEST_F(TlsInspectorJA4Test, AlpnNonAlphanumericOldBehavior) {
   TestScopedRuntime scoped_runtime;

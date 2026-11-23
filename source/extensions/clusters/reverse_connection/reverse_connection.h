@@ -229,6 +229,7 @@ private:
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds cleanup_interval_;
   Event::TimerPtr cleanup_timer_;
+  Stats::Counter* upstream_rq_all_tunnels_draining_{nullptr};
   // Mutable so the const adminEndpoints() accessor can read host_map_ under the lock.
   mutable absl::Mutex host_map_lock_;
   absl::flat_hash_map<std::string, Upstream::HostSharedPtr> host_map_;

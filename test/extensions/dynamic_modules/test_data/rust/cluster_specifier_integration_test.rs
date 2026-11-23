@@ -30,8 +30,8 @@
 //!   `x-route-typed-meta`  a serialized `google.protobuf.Any` set as typed route metadata. A value
 //!                         of `throw` picks one the registered factory rejects.
 //!
-//! A scalar header holding `max` selects the largest value the SDK type can express, which exercises
-//! the saturating conversion at the ABI boundary.
+//! A scalar header holding `max` selects the largest value the SDK type can express, which
+//! exercises the saturating conversion at the ABI boundary.
 
 use envoy_proxy_dynamic_modules_rust_sdk::cluster_specifier::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;

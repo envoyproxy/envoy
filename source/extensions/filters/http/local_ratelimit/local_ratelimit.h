@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <queue>
 #include <string>
@@ -21,6 +22,8 @@
 #include "source/extensions/filters/common/ratelimit/ratelimit.h"
 #include "source/extensions/filters/common/ratelimit_config/ratelimit_config.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -94,6 +97,9 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   Filters::Common::LocalRateLimit::LocalRateLimiter::Result
   requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) const;
+  void consumeDescriptors(absl::Span<const RateLimit::Descriptor> descriptors) const {
+    rate_limiter_->consumeDescriptors(descriptors);
+  }
   bool enabled() const;
   bool enforced() const;
   LocalRateLimitStats& stats() const { return stats_; }
@@ -102,6 +108,7 @@ public:
   Http::Code status() const { return status_; }
   uint64_t stage() const { return stage_; }
   bool hasDescriptors() const { return has_descriptors_; }
+  bool hasStreamDoneActions() const { return has_stream_done_actions_; }
   const std::chrono::milliseconds& fillInterval() const { return fill_interval_; }
   uint32_t maxTokens() const { return max_tokens_; }
   uint32_t tokensPerFill() const { return tokens_per_fill_; }
@@ -117,6 +124,10 @@ public:
   envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions virtualHostRateLimits() const {
     return vh_rate_limits_;
   }
+  envoy::extensions::common::ratelimit::v3::RateLimitsOverrideOption
+  rateLimitsOverrideOption() const {
+    return rate_limits_override_option_;
+  }
   bool consumeDefaultTokenBucket() const { return always_consume_default_token_bucket_; }
   const std::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
     return rate_limited_grpc_status_;
@@ -128,13 +139,13 @@ public:
   }
 
   void populateDescriptors(const Http::RequestHeaderMap& headers,
+                           const Http::ResponseHeaderMap* response_headers,
                            const StreamInfo::StreamInfo& info,
-                           Filters::Common::RateLimit::RateLimitDescriptors& descriptors) const {
+                           Filters::Common::RateLimit::RateLimitDescriptors& descriptors,
+                           bool on_stream_done) const {
     ASSERT(rate_limit_config_ != nullptr);
-    // Local rate limiting runs on the decode path only; no response headers are available to the
-    // formatter (and %RESP()% in hits_addend.format resolves empty, as before).
-    rate_limit_config_->populateDescriptors(headers, /*response_headers=*/nullptr, info,
-                                            local_info_.clusterName(), descriptors);
+    rate_limit_config_->populateDescriptors(headers, response_headers, info,
+                                            local_info_.clusterName(), descriptors, on_stream_done);
   }
 
 private:
@@ -172,9 +183,12 @@ private:
   Router::HeaderParserPtr request_headers_parser_;
   const uint64_t stage_;
   const bool has_descriptors_;
+  const bool has_stream_done_actions_;
   const bool enable_x_rate_limit_headers_;
   const bool enable_retry_after_header_ = false;
   const envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions vh_rate_limits_;
+  const envoy::extensions::common::ratelimit::v3::RateLimitsOverrideOption
+      rate_limits_override_option_{};
   const std::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
 };
@@ -187,7 +201,10 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(FilterConfigSharedPtr config) : config_(config), used_config_(config_.get()) {}
+  Filter(FilterConfigSharedPtr config);
+
+  // Http::StreamFilterBase
+  void onDestroy() override;
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -200,6 +217,15 @@ public:
 private:
   friend class FilterTest;
 
+  // Resolves the configs and the rate limits override option of the current request.
+  void initializeUsedConfigs();
+  // The used configs applied based on the override option, from the most specific one.
+  absl::Span<const std::reference_wrapper<const FilterConfig>> appliedConfigs() const;
+  // Consumes the apply_on_stream_done descriptors of the applied configs at completion.
+  void consumeStreamDoneByConfigs();
+  // Applies the embedded rate limits of the used configs based on the override option.
+  Filters::Common::LocalRateLimit::LocalRateLimiter::Result
+  requestAllowedByConfigs(const Http::RequestHeaderMap& headers);
   void populateDescriptors(std::vector<RateLimit::Descriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
   void populateDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
@@ -220,10 +246,16 @@ private:
 
   FilterConfigSharedPtr config_;
   // Actual config used for the current request. Is config_ by default, but can be overridden by
-  // per-route config.
-  const FilterConfig* used_config_{};
+  // per-route config. Always points to the first of used_configs_ after decodeHeaders().
+  OptRef<const FilterConfig> used_config_;
+  // All configs of the current request, from the most specific to the least specific (filter
+  // level). The first one is the used config.
+  absl::InlinedVector<std::reference_wrapper<const FilterConfig>, 4> used_configs_;
+  envoy::extensions::common::ratelimit::v3::RateLimitsOverrideOption override_option_{};
   std::shared_ptr<const Filters::Common::LocalRateLimit::TokenBucketContext> token_bucket_context_;
   RateLimit::XRateLimitOption x_ratelimit_option_{};
+  // Whether decodeHeaders() ran with the filter enabled. Completion accounting respects it.
+  bool rate_limit_enabled_{false};
 
   VhRateLimitOptions vh_rate_limits_;
 };

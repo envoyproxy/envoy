@@ -8,6 +8,9 @@ repository = "https://github.com/envoyproxy/envoy"
 [dependencies]
 envoy-proxy-dynamic-modules-rust-sdk = { path = "../../../../../source/extensions/dynamic_modules/sdk/rust" }
 
+[dev-dependencies]
+envoy-proxy-dynamic-modules-rust-sdk = { path = "../../../../../source/extensions/dynamic_modules/sdk/rust", features = ["mock"] }
+
 [[example]]
 name = "no_op"
 path = "no_op.rs"
@@ -59,6 +62,12 @@ test = true
 [[example]]
 name = "bootstrap_function_registry_test"
 path = "bootstrap_function_registry_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "bootstrap_config_snapshot_test"
+path = "bootstrap_config_snapshot_test.rs"
 crate-type = ["cdylib"]
 test = true
 

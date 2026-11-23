@@ -158,6 +158,15 @@ typed_config:
     }
   }
 
+  // Waits for the next connection first, so a request that reuses the current one fails the wait.
+  void switchFakeUpstreamConnection(FakeUpstream& upstream) {
+    FakeHttpConnectionPtr next_connection;
+    ASSERT_TRUE(upstream.waitForHttpConnection(*dispatcher_, next_connection));
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    fake_upstream_connection_ = std::move(next_connection);
+  }
+
   void stripConnectUpgradeAndRespond(bool include_content_length = false) {
     // Strip the CONNECT upgrade - expect RFC 9110 compliant request with Host header.
     std::string prefix_data;
@@ -346,7 +355,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsAndEndpoints) {
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   // The request should be sent to fake upstream 2, due to the connect-proxy header.
-  ASSERT_TRUE(fake_upstreams_[2]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_NO_FATAL_FAILURE(switchFakeUpstreamConnection(*fake_upstreams_[2]));
   stripConnectUpgradeAndRespond();
 
   ASSERT_TRUE(fake_upstream_connection_->readDisable(false));
@@ -405,7 +414,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsSingleEndpoint) {
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   // The request should be sent to fake upstream 0.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_NO_FATAL_FAILURE(switchFakeUpstreamConnection(*fake_upstreams_[0]));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   // No encapsulation.
@@ -546,31 +555,6 @@ TEST_P(Http11ConnectHttpIntegrationTest, DfpWithProxyAddressAndContentLength) {
   // Wait for the encapsulated response to be received.
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
-}
-
-TEST_P(Http11ConnectHttpIntegrationTest, DfpWithProxyAddressLegacy) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests", "false");
-
-  addDfpConfig();
-
-  initialize();
-
-  // Point at the second fake upstream. Envoy doesn't actually know about this one.
-  absl::string_view second_upstream_address(fake_upstreams_[1]->localAddress()->asStringView());
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  // Set the host to a domain which does not exist.
-  default_request_headers_.setHost("doesnotexist.lyft.com");
-  // The connect-proxy header will be stripped by the header-to-proxy-filter and inserted as
-  // metadata.
-  default_request_headers_.setCopy(Envoy::Http::LowerCaseString("connect-proxy"),
-                                   second_upstream_address);
-
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-
-  // Wait for the encapsulated response to be received.
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 // Test sending a request to host with port.

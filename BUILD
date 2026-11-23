@@ -3,7 +3,9 @@ licenses(["notice"])  # Apache 2
 exports_files([
     "VERSION.txt",
     "API_VERSION.txt",
+    "MODULE.bazel",
     "MODULE.bazel.lock",
+    ".bazelrc",
     ".clang-format",
     "pytest.ini",
     ".coveragerc",
@@ -46,7 +48,10 @@ package_group(
         "//test/server",
         "//test/server/config_validation",
         "//test/tools/...",
+        "//tools/config_load_check",
         "//tools/extensions/...",
+        "//tools/router_check",
+        "//tools/schema_validator",
     ],
 )
 

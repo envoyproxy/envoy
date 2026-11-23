@@ -160,6 +160,7 @@ categories:
 - envoy.http.ext_proc.processing_request_modifiers
 - envoy.http.ext_proc.response_processors
 - envoy.http.ai_filters
+- envoy.ai_protocol_manager.external_buffer
 - envoy.router.cluster_specifier_plugin
 - envoy.router.route_specifiers
 - envoy.tap_sinks.udp_sink

@@ -20,6 +20,9 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
   _config: &[u8],
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
+    "downstream_direct_remote_address" => {
+      Some(Box::new(DownstreamDirectRemoteAddressFilterConfig {}))
+    },
     "stats_callbacks" => Some(Box::new(StatsCallbacksFilterConfig {
       streams_total: envoy_filter_config
         .define_counter("streams_total")
@@ -91,11 +94,39 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "cluster_callbacks" => Some(Box::new(ClusterCallbacksFilterConfig {})),
     "send_response" => Some(Box::new(SendResponseFilterConfig {})),
     "dynamic_metadata_callbacks" => Some(Box::new(DynamicMetadataCallbacksFilterConfig {})),
+    "nested_metadata_callbacks" => Some(Box::new(NestedMetadataCallbacksFilterConfig {})),
     "filter_state_callbacks" => Some(Box::new(FilterStateCallbacksFilterConfig {})),
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {})),
     "response_flags_callbacks" => Some(Box::new(ResponseFlagsCallbacksFilterConfig {})),
     "config_init_failure" => None,
     _ => panic!("Unknown filter name: {name}"),
+  }
+}
+
+struct DownstreamDirectRemoteAddressFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for DownstreamDirectRemoteAddressFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(DownstreamDirectRemoteAddressFilter {})
+  }
+}
+
+struct DownstreamDirectRemoteAddressFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DownstreamDirectRemoteAddressFilter {
+  fn on_request_headers(
+    &self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    let address = envoy_filter
+      .get_downstream_direct_remote_address()
+      .map(|address| address.as_slice().to_vec());
+    envoy_filter.set_request_header(
+      "x-downstream-peer",
+      address.as_deref().unwrap_or(b"unavailable"),
+    );
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 }
 
@@ -279,6 +310,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     envoy_filter.clear_route_cache();
     envoy_filter.clear_route_cluster_cache();
+    envoy_filter.drain_connection_upon_completion();
 
     // Test single getter API.
     let single_value = envoy_filter
@@ -837,6 +869,137 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ClusterCallbacksFilter {
   }
 }
 
+/// An HTTP filter configuration for testing nested metadata callbacks.
+struct NestedMetadataCallbacksFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for NestedMetadataCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(NestedMetadataCallbacksFilter {})
+  }
+}
+
+struct NestedMetadataCallbacksFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NestedMetadataCallbacksFilter {
+  fn on_request_headers(
+    &self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    use abi::envoy_dynamic_module_type_metadata_source::{Dynamic, Route};
+    let ns = "envoy.filters.http.jwt_authn";
+    // The returned buffer borrows Envoy's metadata, not the temporary path strings.
+    let subject = {
+      let payload_key = String::from("claims");
+      let claim_key = String::from("sub");
+      envoy_filter
+        .get_metadata_nested_string(Dynamic, ns, &metadata_path![&payload_key, &claim_key])
+        .unwrap()
+    };
+    assert_eq!(subject.as_slice(), b"user-123");
+    assert_eq!(
+      envoy_filter
+        .get_metadata_nested_string(Route, ns, &metadata_path!["claims", "sub"])
+        .unwrap()
+        .as_slice(),
+      b"route-subject"
+    );
+    assert_eq!(
+      envoy_filter
+        .get_metadata_nested_string(Dynamic, ns, &metadata_path!["claims", ""])
+        .unwrap()
+        .as_slice(),
+      b"empty-key"
+    );
+    // Nine components exercise the SDK's heap-backed path storage.
+    assert_eq!(
+      envoy_filter
+        .get_metadata_nested_string(
+          Dynamic,
+          ns,
+          &metadata_path!["claims", "a", "b", "c", "d", "e", "f", "g", "role.name"]
+        )
+        .unwrap()
+        .as_slice(),
+      b"admin"
+    );
+    assert_eq!(
+      envoy_filter.get_metadata_nested_number(Dynamic, ns, &metadata_path!["claims", "exp"]),
+      Some(123.0)
+    );
+    assert_eq!(
+      envoy_filter.get_metadata_nested_bool(Dynamic, ns, &metadata_path!["claims", "active"]),
+      Some(false)
+    );
+    assert_eq!(
+      envoy_filter.get_metadata_nested_bool(Dynamic, ns, &metadata_path!["claims", "verified"]),
+      Some(true)
+    );
+    let path = &metadata_path!["claims", "values"];
+    assert_eq!(
+      envoy_filter.get_metadata_nested_list_size(Dynamic, ns, path),
+      Some(4)
+    );
+    assert_eq!(
+      envoy_filter
+        .get_metadata_nested_string(Dynamic, ns, &metadata_path!["claims", "values", 0])
+        .unwrap()
+        .as_slice(),
+      b"admin"
+    );
+    assert_eq!(
+      envoy_filter.get_metadata_nested_number(Dynamic, ns, &metadata_path!["claims", "values", 1]),
+      Some(42.0)
+    );
+    assert_eq!(
+      envoy_filter.get_metadata_nested_bool(Dynamic, ns, &metadata_path!["claims", "values", 2]),
+      Some(false)
+    );
+    assert!(envoy_filter
+      .get_metadata_nested_string(Dynamic, ns, &metadata_path!["claims", "values", 1])
+      .is_none());
+    assert!(envoy_filter
+      .get_metadata_nested_number(Dynamic, ns, &metadata_path!["claims", "values", 2])
+      .is_none());
+    assert!(envoy_filter
+      .get_metadata_nested_bool(Dynamic, ns, &metadata_path!["claims", "values", 0])
+      .is_none());
+    assert_eq!(
+      envoy_filter
+        .get_metadata_nested_string(
+          Dynamic,
+          ns,
+          &metadata_path!["claims", "values", 3, "items", 0, 0]
+        )
+        .unwrap()
+        .as_slice(),
+      b"nested"
+    );
+    assert!(envoy_filter
+      .get_metadata_nested_string(Dynamic, ns, &metadata_path!["claims", "values", usize::MAX])
+      .is_none());
+    for path in [
+      &metadata_path![][..],
+      &metadata_path!["claims", "missing"],
+      &metadata_path!["claims", "sub", "child"],
+    ] {
+      assert!(envoy_filter
+        .get_metadata_nested_string(Dynamic, ns, path)
+        .is_none());
+      assert!(envoy_filter
+        .get_metadata_nested_number(Dynamic, ns, path)
+        .is_none());
+      assert!(envoy_filter
+        .get_metadata_nested_bool(Dynamic, ns, path)
+        .is_none());
+      assert!(envoy_filter
+        .get_metadata_nested_list_size(Dynamic, ns, path)
+        .is_none());
+    }
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+}
+
 /// A HTTP filter configuration that implements
 /// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to test the dynamic metadata related
 /// callbacks.
@@ -887,7 +1050,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
       .set_dynamic_metadata_string_batch("ns_req_header_batch", &[("k1", "v1"), ("k2", "v2")]);
     envoy_filter.set_dynamic_metadata_string_batch("ns_req_header_batch_empty", &[]);
 
-    // Set a non-UTF-8 byte value, asserted end-to-end by the C++ integration test in filter_test.cc.
+    // Set a non-UTF-8 byte value, asserted end-to-end by the C++ integration test in
+    // filter_test.cc.
     envoy_filter.set_dynamic_metadata_bytes("ns_req_header_bytes", "key", &[0xff, 0x00, 0xfe]);
 
     // Set a whole namespace from a serialized google.protobuf.Struct { "k": "v" }, asserted
@@ -1244,6 +1408,19 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateCallbacksFilter {
     let filter_state = envoy_filter.get_filter_state_bytes(b"req_header_key");
     assert!(filter_state.is_some());
     assert_eq!(filter_state.unwrap().as_slice(), b"req_header_value");
+    let ok = envoy_filter.set_filter_state_value(
+      b"shared_filter_state_key",
+      b"shared_filter_state_value",
+      abi::envoy_dynamic_module_type_filter_state_life_span::Connection,
+      abi::envoy_dynamic_module_type_filter_state_stream_sharing::SharedWithUpstreamConnection,
+    );
+    assert!(ok);
+    let shared_state = envoy_filter.get_filter_state_bytes(b"shared_filter_state_key");
+    assert!(shared_state.is_some());
+    assert_eq!(
+      shared_state.unwrap().as_slice(),
+      b"shared_filter_state_value"
+    );
     let filter_state = envoy_filter.get_filter_state_bytes(b"key");
     assert!(filter_state.is_none());
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
@@ -1386,7 +1563,7 @@ impl std::io::Read for BodyReader<'_> {
       let slice = self.data[self.vec_idx].as_slice();
       let remaining = slice.len() - self.buf_idx;
       let to_copy = std::cmp::min(remaining, buf.len() - n);
-      buf[n..n + to_copy].copy_from_slice(&slice[self.buf_idx..self.buf_idx + to_copy]);
+      buf[n .. n + to_copy].copy_from_slice(&slice[self.buf_idx .. self.buf_idx + to_copy]);
       n += to_copy;
       self.buf_idx += to_copy;
       if self.buf_idx >= slice.len() {
@@ -1417,9 +1594,7 @@ impl<'a, EHF: EnvoyHttpFilter> BodyWriter<'a, EHF> {
         envoy_filter.get_received_response_body()
       };
 
-      if optional_vec.is_some() {
-        let received_vec = optional_vec.unwrap();
-
+      if let Some(received_vec) = optional_vec {
         let buffer_bytes = received_vec
           .iter()
           .map(|buf| buf.as_slice().len())
@@ -1438,9 +1613,7 @@ impl<'a, EHF: EnvoyHttpFilter> BodyWriter<'a, EHF> {
         envoy_filter.get_buffered_response_body()
       };
 
-      if optional_vec.is_some() {
-        let buffered_vec = optional_vec.unwrap();
-
+      if let Some(buffered_vec) = optional_vec {
         let buffer_bytes = buffered_vec
           .iter()
           .map(|buf| buf.as_slice().len())
@@ -1497,11 +1670,11 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     {
       // Test reading new received request body.
       let body = envoy_filter.get_received_request_body();
-      if body.is_some() {
-        let mut reader = BodyReader::new(body.unwrap());
+      if let Some(body) = body {
+        let mut reader = BodyReader::new(body);
         let mut buf = vec![0; 1024];
         let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
-        self.request_body.borrow_mut().extend_from_slice(&buf[..n]);
+        self.request_body.borrow_mut().extend_from_slice(&buf[.. n]);
         // Drop the reader and try writing to the writer.
         drop(reader);
 
@@ -1516,11 +1689,11 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     {
       // Test reading old buffered request body.
       let body = envoy_filter.get_buffered_request_body();
-      if body.is_some() {
-        let mut reader = BodyReader::new(body.unwrap());
+      if let Some(body) = body {
+        let mut reader = BodyReader::new(body);
         let mut buf = vec![0; 1024];
         let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
-        self.request_body.borrow_mut().extend_from_slice(&buf[..n]);
+        self.request_body.borrow_mut().extend_from_slice(&buf[.. n]);
         // Drop the reader and try writing to the writer.
         drop(reader);
 
@@ -1544,8 +1717,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     {
       // Test reading new received response body.
       let body = envoy_filter.get_received_response_body();
-      if body.is_some() {
-        let mut reader = BodyReader::new(body.unwrap());
+      if let Some(body) = body {
+        let mut reader = BodyReader::new(body);
         let mut buffer = Vec::new();
         std::io::Read::read_to_end(&mut reader, &mut buffer).unwrap();
         self.response_body.borrow_mut().extend_from_slice(&buffer);
@@ -1563,8 +1736,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     {
       // Test reading old buffered response body.
       let body = envoy_filter.get_buffered_response_body();
-      if body.is_some() {
-        let mut reader = BodyReader::new(body.unwrap());
+      if let Some(body) = body {
+        let mut reader = BodyReader::new(body);
         let mut buffer = Vec::new();
         std::io::Read::read_to_end(&mut reader, &mut buffer).unwrap();
         self.response_body.borrow_mut().extend_from_slice(&buffer);

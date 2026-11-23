@@ -7,8 +7,13 @@ are:
 * [.github/](.github/): GitHub configuration including CI workflows, issue templates, and bot
   configuration.
 * [api/](api/): Envoy data plane API.
-* [bazel/](bazel/): Configuration for Envoy's use of [Bazel](https://bazel.build/).
-* [changelogs/](changelogs/): Release changelogs for each Envoy version.
+* [bazel/](bazel/): Configuration for Envoy's use of [Bazel](https://bazel.build/). Dependencies
+  are declared with bzlmod in the root [MODULE.bazel](MODULE.bazel) (with separate modules in
+  `api/` and `mobile/`) and resolved through the
+  [Envoy Bazel registry](https://github.com/envoyproxy/bazel-registry).
+* [changelogs/](changelogs/): Release changelogs for each Envoy version. Release note fragments for
+  the next release live in [changelogs/current/](changelogs/current/), grouped by section, with
+  valid sections and areas defined in [changelogs.yaml](changelogs/changelogs.yaml).
 * [ci/](ci/): Scripts used both during CI as well as to build Docker containers.
 * [compat/](compat/): OpenSSL compatibility layer.
 * [configs/](configs/): Example Envoy configurations.
@@ -23,7 +28,6 @@ are:
   the "public" headers, typically for performance reasons. Note that "core" includes some
   "extensions" such as the HTTP connection manager filter and associated functionality which are
   so fundamental to Envoy that they will likely never be optional from a compilation perspective.
-* [linux/](linux/): Linux platform-specific configuration (e.g., amd64).
 * [maintainer/](maintainer/): Release process documentation for maintainers.
 * [mobile/](mobile/): Envoy Mobile — library for using Envoy on iOS and Android platforms.
 * [restarter/](restarter/): Envoy's hot restart wrapper Python script.
@@ -81,6 +85,8 @@ code/extensions, and allows us specify extension owners in [CODEOWNERS](CODEOWNE
   that can be removed on a site specific basis. See [bazel/README.md](bazel/README.md) for how to
   compile out extensions on a site specific basis. Note that by default extensions should be
   removable from the build unless there is a very good reason.
+* Each extension's status, security posture and categories are recorded in
+  [extensions_metadata.yaml](source/extensions/extensions_metadata.yaml).
 * These are the top level extension directories and associated namespaces:
   * [access_loggers/](/source/extensions/access_loggers): Access log implementations which use
     the `Envoy::Extensions::AccessLoggers` namespace.
@@ -140,6 +146,8 @@ code/extensions, and allows us specify extension owners in [CODEOWNERS](CODEOWNE
     the `Envoy::Network` namespace.
   * [path/](/source/extensions/path): Path transformation extensions which use
     the `Envoy::Extensions::UriTemplate` namespace.
+  * [queue_policy/](/source/extensions/queue_policy): Queue policy extensions which use
+    the `Envoy::Extensions::QueuePolicy` namespace.
   * [quic/](/source/extensions/quic): QUIC extensions which use the `Envoy::Quic` namespace.
   * [rate_limit_descriptors/](/source/extensions/rate_limit_descriptors): Rate limit
     descriptor extensions use the `Envoy::Extensions::RateLimitDescriptors`
@@ -184,5 +192,11 @@ more information.
 * [contrib/exe/](contrib/exe/): The default executable for contrib. This is similar to the
   `envoy-static` target but also includes all contrib extensions, and is used to produce the
   contrib image targets.
-* [contrib/...](contrib/): The rest of this directory mirrors the [source/extensions](source/extensions/)
-  layout. Contrib extensions are placed here.
+* Contrib extensions are registered in
+  [contrib_build_config.bzl](contrib/contrib_build_config.bzl), and their metadata is recorded in
+  [contrib/extensions_metadata.yaml](contrib/extensions_metadata.yaml).
+* [contrib/...](contrib/): Each contrib extension (or family of extensions) has its own top level
+  directory, below which the [source/extensions](source/extensions/) type layout is mirrored, with
+  source and tests kept side by side. E.g.,
+  [contrib/checksum/filters/http/source/](contrib/checksum/filters/http/source/) and
+  [contrib/checksum/filters/http/test/](contrib/checksum/filters/http/test/).

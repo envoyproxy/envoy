@@ -1,8 +1,20 @@
 use crate::{
-  abi, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer, strs_to_module_buffers,
-  wrap_into_c_void_ptr, EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId,
-  EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId, NEW_LOAD_BALANCER_CONFIG_FUNCTION,
+  abi,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  str_to_module_buffer,
+  strs_to_module_buffers,
+  wrap_into_c_void_ptr,
+  EnvoyBuffer,
+  EnvoyCounterId,
+  EnvoyCounterVecId,
+  EnvoyGaugeId,
+  EnvoyGaugeVecId,
+  EnvoyHistogramId,
+  EnvoyHistogramVecId,
+  NEW_LOAD_BALANCER_CONFIG_FUNCTION,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::sync::Arc;
 
@@ -11,7 +23,7 @@ use std::sync::Arc;
 /// This trait provides access to both cluster/host information and request context.
 /// The cluster/host methods are always available, while the context methods are only
 /// valid during the [`LoadBalancer::choose_host`] callback.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyLoadBalancer {
   /// Returns the cluster name, or `None` if the name is empty.
   fn get_cluster_name<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
@@ -722,7 +734,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
 /// metrics. It can also be stored by the user and used at runtime (e.g., during host selection)
 /// to record metric values. The raw pointer is safe to store and use from any thread because the
 /// underlying C++ `DynamicModuleLbConfig` is thread-safe for metric operations.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyLbConfig: Send + Sync {
   // -------------------------------------------------------------------------

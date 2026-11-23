@@ -74,10 +74,13 @@ uint64_t Stats::totalCurrentlyReserved() {
   return value;
 #elif defined(JEMALLOC)
   refreshJemallocEpoch();
-  size_t mapped = 0;
+  size_t mapped = 0, retained = 0;
   size_t sz = sizeof(mapped);
   mallctl("stats.mapped", &mapped, &sz, nullptr, 0);
-  return mapped;
+  mallctl("stats.retained", &retained, &sz, nullptr, 0);
+  // Include unmapped-but-retained pages in reserved memory, matching tcmalloc semantics.
+  // This makes reserved - unmapped yield mapped memory instead of underflowing.
+  return mapped + retained;
 #else
   return 0;
 #endif

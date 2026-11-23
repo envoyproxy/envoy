@@ -63,6 +63,8 @@ areas:
 
   basic_auth:
     title: basic_auth
+  bootstrap:
+    title: bootstrap
   build:
     title: build
 
@@ -87,8 +89,12 @@ areas:
   credential_injector:
     title: credential_injector
 
+  decompression:
+    title: decompression
   dns:
     title: dns
+  dns_cluster:
+    title: dns_cluster
   dns_resolver:
     title: dns_resolver
   drain:
@@ -98,11 +104,15 @@ areas:
   dynamic_modules:
     title: dynamic_modules
 
+  ecds:
+    title: ecds
   ext_authz:
     title: ext_authz
   ext_proc:
     title: ext_proc
 
+  fault:
+    title: fault
   filter_chain:
     title: filter_chain
   formatter:
@@ -120,9 +130,17 @@ areas:
     title: grpc_field_extraction
   grpc_http1_reverse_bridge:
     title: grpc_http1_reverse_bridge
+  grpc_sidestream:
+    title: grpc_sidestream
+  grpc_web:
+    title: grpc_web
 
   happy_eyeballs:
     title: happy_eyeballs
+  header_mutation:
+    title: header_mutation
+  health_check:
+    title: health_check
   http:
     title: http
   http2:
@@ -163,6 +181,8 @@ areas:
     title: mcp_router
   mcp_transcoder:
     title: mcp_transcoder
+  memory:
+    title: memory
   mysql_proxy:
     title: mysql_proxy
 
@@ -206,6 +226,8 @@ areas:
     title: reverse_tunnel
   router:
     title: router
+  runtime_features:
+    title: runtime_features
 
   safe_regex:
     title: safe_regex
@@ -213,6 +235,8 @@ areas:
     title: sds
   server:
     title: server
+  set_filter_state:
+    title: set_filter_state
   set_metadata_filter:
     title: set_metadata_filter
   sockets:

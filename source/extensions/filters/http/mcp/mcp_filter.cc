@@ -40,13 +40,11 @@ using FilterStateObject = Filters::Common::Mcp::FilterStateObject;
 
 namespace {
 const Http::LowerCaseString kMcpSessionId{
-    std::string(Filters::Common::Mcp::McpConstants::MCP_SESSION_ID_HEADER)};
+    Filters::Common::Mcp::McpConstants::MCP_SESSION_ID_HEADER};
 
-const Http::LowerCaseString kMcpMethod{
-    std::string(Filters::Common::Mcp::McpConstants::MCP_METHOD_HEADER)};
+const Http::LowerCaseString kMcpMethod{Filters::Common::Mcp::McpConstants::MCP_METHOD_HEADER};
 
-const Http::LowerCaseString kMcpName{
-    std::string(Filters::Common::Mcp::McpConstants::MCP_NAME_HEADER)};
+const Http::LowerCaseString kMcpName{Filters::Common::Mcp::McpConstants::MCP_NAME_HEADER};
 
 const Http::LowerCaseString kMcpProtocolVersion{
     Filters::Common::Mcp::McpConstants::MCP_PROTOCOL_VERSION_HEADER};
@@ -102,7 +100,7 @@ void setNestedStringValue(Protobuf::Struct& metadata, absl::string_view path,
   }
 
   if (!segments.empty()) {
-    (*current->mutable_fields())[std::string(segments.back())].set_string_value(std::string(value));
+    (*current->mutable_fields())[std::string(segments.back())].set_string_value(value);
   }
 }
 
@@ -183,7 +181,7 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
           proto_config.has_max_supported_protocol_version()
               ? std::optional<std::string>(proto_config.max_supported_protocol_version().value())
               : std::nullopt),
-      metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
+      metadata_namespace_(Filters::Common::Mcp::McpConstants::McpfilterNamespace),
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
                          : McpParserConfig::createDefault()),
@@ -243,14 +241,16 @@ bool McpFilter::isValidMcpSseRequest(const Http::RequestHeaderMap& headers) cons
 bool McpFilter::isValidMcpPostRequest(const Http::RequestHeaderMap& headers) const {
   // Check if this is a POST request with JSON content.
   // Content-Type is JSON if it is exactly "application/json" or starts with
-  // "application/json" followed by ';' or ' ' (for parameters like charset).
+  // "application/json" (case-insensitively) followed by ';', ' ', '\t', or ','
+  // (for parameters like charset or coalesced Content-Type headers).
   // This rejects related but distinct types like application/json-patch+json.
   const absl::string_view content_type = headers.getContentTypeValue();
   const auto& json_ct = Http::Headers::get().ContentTypeValues.Json;
   bool is_json_content_type =
-      absl::StartsWith(content_type, json_ct) &&
+      absl::StartsWithIgnoreCase(content_type, json_ct) &&
       (content_type.size() == json_ct.size() || content_type[json_ct.size()] == ';' ||
-       content_type[json_ct.size()] == ' ');
+       content_type[json_ct.size()] == ' ' || content_type[json_ct.size()] == '\t' ||
+       content_type[json_ct.size()] == ',');
   bool is_post_request =
       headers.getMethodValue() == Http::Headers::get().MethodValues.Post && is_json_content_type;
 
@@ -314,8 +314,8 @@ uint32_t McpFilter::getMaxRequestBodySize() const {
 bool McpFilter::clearRouteCache() const {
   const auto* override_config = routeOverride();
 
-  if (override_config) {
-    return override_config->clearRouteCache();
+  if (override_config && override_config->clearRouteCache().has_value()) {
+    return *override_config->clearRouteCache();
   }
 
   return config_->clearRouteCache();
@@ -324,8 +324,8 @@ bool McpFilter::clearRouteCache() const {
 const ParserConfig& McpFilter::parserConfig() const {
   const auto* override_config = routeOverride();
 
-  if (override_config) {
-    return override_config->parserConfig();
+  if (override_config && override_config->parserConfig().has_value()) {
+    return *override_config->parserConfig();
   }
 
   return config_->parserConfig();
@@ -334,10 +334,10 @@ const ParserConfig& McpFilter::parserConfig() const {
 bool McpFilter::shouldStoreToDynamicMetadata() const {
   const auto* override_config = routeOverride();
 
-  if (override_config) {
+  if (override_config && override_config->requestStorageMode() !=
+                             envoy::extensions::filters::http::mcp::v3::Mcp::MODE_UNSPECIFIED) {
     const auto mode = override_config->requestStorageMode();
-    return mode == envoy::extensions::filters::http::mcp::v3::Mcp::MODE_UNSPECIFIED ||
-           mode == envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA ||
+    return mode == envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA ||
            mode ==
                envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE;
   }
@@ -348,7 +348,8 @@ bool McpFilter::shouldStoreToDynamicMetadata() const {
 bool McpFilter::shouldStoreToFilterState() const {
   const auto* override_config = routeOverride();
 
-  if (override_config) {
+  if (override_config && override_config->requestStorageMode() !=
+                             envoy::extensions::filters::http::mcp::v3::Mcp::MODE_UNSPECIFIED) {
     const auto mode = override_config->requestStorageMode();
     return mode == envoy::extensions::filters::http::mcp::v3::Mcp::FILTER_STATE ||
            mode ==
@@ -361,8 +362,8 @@ bool McpFilter::shouldStoreToFilterState() const {
 bool McpFilter::rejectDuplicateKeys() const {
   const auto* override_config = routeOverride();
 
-  if (override_config) {
-    return override_config->rejectDuplicateKeys();
+  if (override_config && override_config->rejectDuplicateKeys().has_value()) {
+    return *override_config->rejectDuplicateKeys();
   }
 
   return config_->rejectDuplicateKeys();
@@ -553,7 +554,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
 
       // Set the buffer limit.
       const uint32_t max_size = getMaxRequestBodySize();
-      if (max_size > 0) {
+      if (max_size > decoder_callbacks_->bufferLimit()) {
         decoder_callbacks_->setBufferLimit(max_size);
         ENVOY_LOG(debug, "set decoder buffer limit to {} bytes", max_size);
       }
@@ -690,7 +691,7 @@ void McpFilter::recordErrorState(absl::string_view error_msg, Filters::Common::M
                                                                 is_exceeding_limit_, status_);
 
     decoder_callbacks_->streamInfo().filterState()->setData(
-        std::string(FilterStateObject::FilterStateKey), std::move(filter_state_obj),
+        FilterStateObject::FilterStateKey, std::move(filter_state_obj),
         StreamInfo::FilterState::LifeSpan::Request,
         StreamInfo::StreamSharingMayImpactPooling::None);
   }
@@ -850,7 +851,7 @@ McpFilter::ProtocolVersionValidationResult McpFilter::validateProtocolVersion() 
   }
 
   const Protobuf::Value* meta =
-      parser_->getNestedValue(std::string(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META));
+      parser_->getNestedValue(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META);
 
   if (meta == nullptr || meta->kind_case() != Protobuf::Value::kStructValue) {
     return ProtocolVersionValidationResult::Missing;
@@ -865,7 +866,7 @@ McpFilter::ProtocolVersionValidationResult McpFilter::validateProtocolVersion() 
   }
 
   if (it->second.kind_case() != Protobuf::Value::kStringValue) {
-    return ProtocolVersionValidationResult::Mismatch;
+    return ProtocolVersionValidationResult::Invalid;
   }
 
   if (it->second.string_value() != *protocol_version_) {
@@ -920,6 +921,17 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     }
   }
 
+  if (shouldRejectRequest() &&
+      (version_validation == ProtocolVersionValidationResult::Invalid ||
+       (version_validation == ProtocolVersionValidationResult::Missing && !parser_->isResponse() &&
+        parser_->getNestedValue(Filters::Common::Mcp::McpConstants::ID_FIELD) != nullptr))) {
+    sendJsonRpcErrorReply(
+        Filters::Common::Mcp::McpConstants::JSONRPC_INVALID_PARAMS_ERROR_CODE,
+        absl::StrCat("Missing or invalid params._meta field: ",
+                     Filters::Common::Mcp::McpConstants::MCP_META_PROTOCOL_VERSION_FIELD));
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
   if (shouldRejectRequest() && !hasRequiredClientCapabilities()) {
     sendJsonRpcErrorReply(
         Filters::Common::Mcp::McpConstants::JSONRPC_INVALID_PARAMS_ERROR_CODE,
@@ -954,7 +966,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   // router can identify and dispatch them.
   if (is_mcp_request_ && parser_->isResponse()) {
     (*metadata.mutable_fields())["method"].set_string_value(
-        std::string(Filters::Common::Mcp::McpConstants::Methods::JSONRPC_RESPONSE));
+        Filters::Common::Mcp::McpConstants::Methods::JSONRPC_RESPONSE);
   }
 
   const ParserConfig& active_parser_config = parserConfig();
@@ -967,8 +979,8 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
   // Handle tracing field extraction and header injection.
   if (config_->propagateTraceContext().has_value() || config_->propagateBaggage().has_value()) {
-    const Protobuf::Value* meta_value = parser_->getNestedValue(
-        std::string(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META));
+    const Protobuf::Value* meta_value =
+        parser_->getNestedValue(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META);
     auto headers = decoder_callbacks_->requestHeaders();
     if (meta_value != nullptr && meta_value->has_struct_value() && headers.has_value()) {
       const auto& meta_fields = meta_value->struct_value().fields();
@@ -991,7 +1003,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
       auto filter_state_obj = std::make_shared<FilterStateObject>(
           effective_method, metadata, is_mcp_request_, is_exceeding_limit_, status_);
       decoder_callbacks_->streamInfo().filterState()->setData(
-          std::string(FilterStateObject::FilterStateKey), std::move(filter_state_obj),
+          FilterStateObject::FilterStateKey, std::move(filter_state_obj),
           StreamInfo::FilterState::LifeSpan::Request,
           StreamInfo::StreamSharingMayImpactPooling::None);
     }
@@ -1036,7 +1048,7 @@ void McpFilter::populateMetadataFromHeaders() {
         header_method_, metadata, is_mcp_request_, is_exceeding_limit_, status_);
 
     decoder_callbacks_->streamInfo().filterState()->setData(
-        std::string(FilterStateObject::FilterStateKey), std::move(filter_state_obj),
+        FilterStateObject::FilterStateKey, std::move(filter_state_obj),
         StreamInfo::FilterState::LifeSpan::Request,
         StreamInfo::StreamSharingMayImpactPooling::None);
   }
@@ -1055,7 +1067,7 @@ void McpFilter::populateMetadataFromHeaders() {
 
 void McpFilter::setDynamicMetadataStatus(Protobuf::Struct metadata) {
   (*metadata.mutable_fields())[Filters::Common::Mcp::McpConstants::STATUS].set_string_value(
-      std::string(statusToString(status_)));
+      statusToString(status_));
   (*metadata.mutable_fields())[Filters::Common::Mcp::McpConstants::IS_MCP_REQUEST].set_bool_value(
       is_mcp_request_);
   if (is_exceeding_limit_) {
@@ -1064,7 +1076,7 @@ void McpFilter::setDynamicMetadataStatus(Protobuf::Struct metadata) {
   }
   if (passthrough_reason_.has_value()) {
     (*metadata.mutable_fields())[Filters::Common::Mcp::McpConstants::PASSTHROUGH_REASON]
-        .set_string_value(std::string(statusToString(passthrough_reason_.value())));
+        .set_string_value(statusToString(passthrough_reason_.value()));
   }
   decoder_callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(), metadata);
   ENVOY_STREAM_LOG(debug, "MCP filter set dynamic metadata: {}", *decoder_callbacks_,

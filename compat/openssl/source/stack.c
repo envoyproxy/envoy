@@ -276,7 +276,7 @@ int OPENSSL_sk_is_sorted(const _STACK *sk) {
     // it has a comparison function and a size of 0 or 1
     ossl_OPENSSL_sk_compfunc compfunc = ossl.ossl_OPENSSL_sk_set_cmp_func((_STACK*)sk, NULL);
     if (compfunc) {
-      sorted = (sk_num(sk) < 2);
+      sorted = (OPENSSL_sk_num(sk) < 2);
       ossl.ossl_OPENSSL_sk_set_cmp_func((_STACK*)sk, compfunc);
     }
   }

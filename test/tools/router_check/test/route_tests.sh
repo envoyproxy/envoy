@@ -5,7 +5,7 @@ set -e
 ENVOY_SRCDIR="${TEST_SRCDIR}/${TEST_WORKSPACE}"
 
 # Router_check_tool binary path
-PATH_BIN="${ENVOY_SRCDIR}"/test/tools/router_check/router_check_tool
+PATH_BIN="${ENVOY_SRCDIR}"/tools/router_check/router_check_tool
 
 # Config json path
 PATH_CONFIG="${ENVOY_SRCDIR}"/test/tools/router_check/test/config

@@ -17,13 +17,27 @@
 
 #include "absl/container/node_hash_map.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Config {
 
-using ConstMetadataSharedPoolSharedPtr =
-    std::shared_ptr<SharedPool::ObjectSharedPool<const envoy::config::core::v3::Metadata,
-                                                 MessageUtil, MessageUtil>>;
+// Hashes and compares metadata by its deterministic serialization, without reflection. Some equal
+// metadata compares unequal, such as metadata whose google.protobuf.Any payloads were serialized
+// differently.
+struct SerializedMetadataHash {
+  size_t operator()(const envoy::config::core::v3::Metadata& metadata) const;
+};
+
+struct SerializedMetadataEqual {
+  bool operator()(const envoy::config::core::v3::Metadata& lhs,
+                  const envoy::config::core::v3::Metadata& rhs) const;
+};
+
+using ConstMetadataSharedPool =
+    SharedPool::ObjectSharedPool<const envoy::config::core::v3::Metadata, SerializedMetadataHash,
+                                 SerializedMetadataEqual>;
+using ConstMetadataSharedPoolSharedPtr = std::shared_ptr<ConstMetadataSharedPool>;
 
 /**
  * PathSegment represents one segment in a metadata access path.
@@ -108,7 +122,7 @@ public:
    * @return Protobuf::Value&. A Value message is created if not found.
    */
   static Protobuf::Value& mutableMetadataValue(envoy::config::core::v3::Metadata& metadata,
-                                               const std::string& filter, const std::string& key);
+                                               absl::string_view filter, absl::string_view key);
 
   using LabelSet = std::vector<std::pair<std::string, Protobuf::Value>>;
 

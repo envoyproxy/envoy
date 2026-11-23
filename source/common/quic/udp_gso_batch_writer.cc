@@ -41,7 +41,10 @@ Api::IoCallUint64Result convertQuicWriteResult(quic::WriteResult quic_result, si
 
 // Initialize QuicGsoBatchWriter, set io_handle_ and stats_
 UdpGsoBatchWriter::UdpGsoBatchWriter(Network::IoHandle& io_handle, Stats::Scope& scope)
-    : quic::QuicGsoBatchWriter(io_handle.fdDoNotUse()), stats_(generateStats(scope)) {}
+    : quic::QuicGsoBatchWriter(io_handle.fdDoNotUse()), stats_(generateStats(scope)),
+      default_writer_(io_handle) {}
+
+UdpGsoBatchWriter::~UdpGsoBatchWriter() { stats_.internal_buffer_size_.sub(buffered_bytes_); }
 
 Api::IoCallUint64Result
 UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
@@ -53,14 +56,28 @@ UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Ad
     return Api::ioCallUint64ResultNoError();
   }
 
-  // A zero-length datagram cannot share a GSO batch: it contributes no segment bytes and would be
-  // consumed without being emitted. Flush older packets first to preserve datagram ordering.
-  if (payload_len == 0 && !buffered_writes().empty()) {
+  if (isWriteBlocked()) {
+    return {0, Network::IoSocketError::getIoSocketEagainError()};
+  }
+
+  // GSO requires contiguous payloads within its packet size limit. Empty datagrams must also be
+  // sent separately. Flush older packets first to preserve datagram ordering in both cases.
+  const bool use_default_writer =
+      payload_len > getMaxPacketSize(peer_address) || buffer.getRawSlices(2).size() > 1;
+  if ((payload_len == 0 || use_default_writer) && !buffered_writes().empty()) {
     quic::WriteResult flush_result = Flush();
     updateUdpGsoBatchWriterStats(flush_result);
     if (flush_result.status != quic::WRITE_STATUS_OK) {
       return convertQuicWriteResult(flush_result, /*payload_len=*/0);
     }
+  }
+
+  if (use_default_writer) {
+    auto result = default_writer_.writePacket(buffer, local_ip, peer_address);
+    if (result.ok()) {
+      stats_.total_bytes_sent_.add(result.return_value_);
+    }
+    return result;
   }
 
   // Convert received parameters to relevant forms
@@ -112,7 +129,13 @@ void UdpGsoBatchWriter::updateUdpGsoBatchWriterStats(quic::WriteResult quic_resu
     }
     stats_.total_bytes_sent_.add(quic_result.bytes_written);
   }
-  stats_.internal_buffer_size_.set(batch_buffer().SizeInUse());
+  const uint64_t buffered_bytes = batch_buffer().SizeInUse();
+  if (buffered_bytes >= buffered_bytes_) {
+    stats_.internal_buffer_size_.add(buffered_bytes - buffered_bytes_);
+  } else {
+    stats_.internal_buffer_size_.sub(buffered_bytes_ - buffered_bytes);
+  }
+  buffered_bytes_ = buffered_bytes;
   gso_size_ = buffered_writes().empty() ? 0u : buffered_writes().front().buf_len;
 }
 

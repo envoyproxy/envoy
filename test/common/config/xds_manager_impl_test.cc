@@ -1,3 +1,6 @@
+#include <array>
+
+#include "envoy/common/exception.h"
 #include "envoy/config/config_validator.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/registry/registry.h"
@@ -35,7 +38,7 @@ class MockGrpcMuxFactory : public MuxFactory {
 public:
   MockGrpcMuxFactory(absl::string_view name = "envoy.config_mux.grpc_mux_factory") : name_(name) {
     ON_CALL(*this, create(_, _, _, _, _, _, _, _, _, _, _, _))
-        .WillByDefault(Invoke(
+        .WillByDefault(
             [](std::shared_ptr<Grpc::RawAsyncClient>&&, std::shared_ptr<Grpc::RawAsyncClient>&&,
                Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
                const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
@@ -44,7 +47,7 @@ public:
                std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
                 -> std::shared_ptr<Config::GrpcMux> {
               return std::make_shared<NiceMock<MockGrpcMux>>();
-            }));
+            });
   }
 
   std::string name() const override { return name_; }
@@ -124,6 +127,23 @@ public:
     ASSERT_OK(xds_manager_impl_.initialize(server_.bootstrap_, &cm_));
   }
 
+  void initializeWithTracker() {
+    auto* ads_config = server_.bootstrap_.mutable_dynamic_resources()->mutable_ads_config();
+    ads_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    ads_config->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("ads_cluster");
+    NiceMock<MockGrpcMuxFactory> mux_factory;
+    Registry::InjectFactory<Config::MuxFactory> registration(mux_factory);
+    EXPECT_CALL(mux_factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
+        .WillOnce(testing::WithArg<9>([this](XdsConfigTrackerOptRef tracker) {
+          tracker_ = tracker;
+          return std::make_shared<NiceMock<MockGrpcMux>>();
+        }));
+    initialize();
+    ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+    ASSERT_TRUE(tracker_.has_value());
+  }
+
+  XdsConfigTrackerOptRef tracker_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore& stats_ = server_context_.store_;
@@ -139,6 +159,351 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(XdsManagerImplTest, XdsManagerImplTest,
                          ::testing::ValuesIn({false, true}));
+
+class ObservingTrackerFactory : public MockXdsConfigTrackerFactory {
+public:
+  XdsConfigTrackerPtr createXdsConfigTracker(const Protobuf::Any&,
+                                             ProtobufMessage::ValidationVisitor&, Api::Api&,
+                                             Event::Dispatcher&) override {
+    auto tracker = std::make_unique<testing::StrictMock<MockXdsConfigTracker>>();
+    tracker_ = tracker.get();
+    return tracker;
+  }
+  MockXdsConfigTracker* tracker_ = nullptr;
+};
+
+TEST_P(XdsManagerImplTest, ConfigTrackersPreserveNativeTrackerAndUnregister) {
+  ObservingTrackerFactory factory;
+  Registry::InjectFactory<XdsConfigTrackerFactory> registration(factory);
+  auto* tracker_config = server_.bootstrap_.mutable_xds_config_tracker_extension();
+  tracker_config->set_name(factory.name());
+  ASSERT_TRUE(tracker_config->mutable_typed_config()->PackFrom(Protobuf::Empty{}));
+  initializeWithTracker();
+  ASSERT_NE(factory.tracker_, nullptr);
+  EXPECT_TRUE(tracker_->enabled());
+  testing::StrictMock<MockXdsConfigTracker> first;
+  testing::StrictMock<MockXdsConfigTracker> second;
+  auto first_handle = xds_manager_impl_.addXdsConfigTracker(first);
+  auto second_handle = xds_manager_impl_.addXdsConfigTracker(second);
+
+  const std::vector<DecodedResourcePtr> resources;
+  envoy::service::discovery::v3::Resource added_resource;
+  std::vector<const envoy::service::discovery::v3::Resource*> added_resources{&added_resource};
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  removed_resources.Add("removed");
+  envoy::service::discovery::v3::DiscoveryResponse sotw;
+  sotw.set_type_url("test-type");
+  envoy::service::discovery::v3::DeltaDiscoveryResponse delta;
+  delta.set_type_url("test-type");
+  const testing::Matcher<const envoy::service::discovery::v3::DiscoveryResponse&> sotw_message =
+      testing::Ref(sotw);
+  const testing::Matcher<const envoy::service::discovery::v3::DeltaDiscoveryResponse&>
+      delta_message = testing::Ref(delta);
+  const std::array<MockXdsConfigTracker*, 3> trackers{factory.tracker_, &first, &second};
+  for (auto* tracker : trackers) {
+    EXPECT_CALL(*tracker, onConfigAccepted("test-type", testing::Ref(resources)));
+    EXPECT_CALL(*tracker, onConfigAccepted("test-type", testing::ElementsAre(&added_resource),
+                                           testing::Ref(removed_resources)));
+    EXPECT_CALL(*tracker, onConfigRejected(sotw_message, "sotw rejected"));
+    EXPECT_CALL(*tracker, onConfigRejected(delta_message, "delta rejected"));
+    EXPECT_CALL(*tracker, onResourceUnsubscribed("test-type", "resource"));
+  }
+  tracker_->onConfigAccepted("test-type", resources);
+  tracker_->onConfigAccepted("test-type", added_resources, removed_resources);
+  tracker_->onConfigRejected(sotw, "sotw rejected");
+  tracker_->onConfigRejected(delta, "delta rejected");
+  tracker_->onResourceUnsubscribed("test-type", "resource");
+
+  first_handle.reset();
+  EXPECT_CALL(*factory.tracker_, onResourceUnsubscribed("test-type", "resource"));
+  EXPECT_CALL(second, onResourceUnsubscribed("test-type", "resource"));
+  tracker_->onResourceUnsubscribed("test-type", "resource");
+
+  second_handle.reset();
+  EXPECT_TRUE(tracker_->enabled());
+  EXPECT_CALL(*factory.tracker_, onResourceUnsubscribed("test-type", "resource"));
+  tracker_->onResourceUnsubscribed("test-type", "resource");
+  factory.tracker_->enabled_ = false;
+  EXPECT_FALSE(tracker_->enabled());
+  tracker_->onResourceUnsubscribed("test-type", "resource");
+}
+
+TEST_P(XdsManagerImplTest, ConfigTrackersEnableTrackingWhileRegistered) {
+  initializeWithTracker();
+  EXPECT_FALSE(tracker_->enabled());
+  testing::StrictMock<MockXdsConfigTracker> first;
+  testing::StrictMock<MockXdsConfigTracker> second;
+  auto first_handle = xds_manager_impl_.addXdsConfigTracker(first);
+  auto second_handle = xds_manager_impl_.addXdsConfigTracker(second);
+  EXPECT_TRUE(tracker_->enabled());
+  first.enabled_ = false;
+  EXPECT_TRUE(tracker_->enabled());
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name"));
+  tracker_->onResourceUnsubscribed("type", "name");
+  second_handle.reset();
+  EXPECT_FALSE(tracker_->enabled());
+  first.enabled_ = true;
+  EXPECT_TRUE(tracker_->enabled());
+  first_handle.reset();
+  EXPECT_FALSE(tracker_->enabled());
+  first_handle = xds_manager_impl_.addXdsConfigTracker(first);
+  EXPECT_TRUE(tracker_->enabled());
+  first_handle.reset();
+  EXPECT_FALSE(tracker_->enabled());
+}
+
+TEST_P(XdsManagerImplTest, ConfigTrackersReachPerTypeGrpcSubscriptions) {
+  initialize();
+  class MockGrpcConfigSubscriptionFactory : public MockAdsConfigSubscriptionFactory {
+  public:
+    std::string name() const override { return "envoy.config_subscription.grpc"; }
+  };
+  NiceMock<MockGrpcConfigSubscriptionFactory> factory;
+  Registry::InjectFactory<ConfigSubscriptionFactory> registration(factory);
+  XdsConfigTrackerOptRef subscription_tracker;
+  EXPECT_CALL(factory, create(_))
+      .WillOnce([&](ConfigSubscriptionFactory::SubscriptionData& data) -> SubscriptionPtr {
+        subscription_tracker = data.xds_config_tracker_;
+        return std::make_unique<NiceMock<MockSubscription>>();
+      });
+  const Upstream::ClusterManager::ClusterSet primary_clusters{"xds_cluster"};
+  ON_CALL(cm_, primaryClusters()).WillByDefault(ReturnRef(primary_clusters));
+  envoy::config::core::v3::ConfigSource config;
+  auto* api_config = config.mutable_api_config_source();
+  api_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  api_config->set_transport_api_version(envoy::config::core::v3::V3);
+  api_config->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  auto subscription = xds_manager_impl_.subscribeToSingletonResource(
+      "resource", makeOptRef(config), "test-type", *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), {});
+  ASSERT_OK(subscription.status());
+  ASSERT_TRUE(subscription_tracker.has_value());
+  EXPECT_FALSE(subscription_tracker->enabled());
+  testing::StrictMock<MockXdsConfigTracker> observer;
+  auto handle = xds_manager_impl_.addXdsConfigTracker(observer);
+  EXPECT_TRUE(subscription_tracker->enabled());
+  EXPECT_CALL(observer, onResourceUnsubscribed("test-type", "resource"));
+  subscription_tracker->onResourceUnsubscribed("test-type", "resource");
+  handle.reset();
+  EXPECT_FALSE(subscription_tracker->enabled());
+}
+
+TEST_P(XdsManagerImplTest, ConfigTrackersReachXdstpAuthorityMux) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.unified_mux", "false"}});
+  auto* config_source = server_.bootstrap_.add_config_sources();
+  config_source->add_authorities()->set_name("test_authority");
+  auto* api_config = config_source->mutable_api_config_source();
+  api_config->set_api_type(envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
+  api_config->set_transport_api_version(envoy::config::core::v3::V3);
+  api_config->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<MuxFactory> registration(factory);
+  XdsConfigTrackerOptRef authority_tracker;
+  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
+      .WillOnce(testing::WithArg<9>([&](XdsConfigTrackerOptRef tracker) {
+        authority_tracker = tracker;
+        return std::make_shared<NiceMock<MockGrpcMux>>();
+      }));
+  initialize();
+  ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  ASSERT_TRUE(authority_tracker.has_value());
+  EXPECT_FALSE(authority_tracker->enabled());
+  testing::StrictMock<MockXdsConfigTracker> observer;
+  auto handle = xds_manager_impl_.addXdsConfigTracker(observer);
+  EXPECT_TRUE(authority_tracker->enabled());
+  EXPECT_CALL(observer, onResourceUnsubscribed("test-type", "resource"));
+  authority_tracker->onResourceUnsubscribed("test-type", "resource");
+  handle.reset();
+  EXPECT_FALSE(authority_tracker->enabled());
+}
+
+class MockResponseAwareXdsConfigTracker : public MockXdsConfigTracker {
+public:
+  MOCK_METHOD(void, onConfigAcceptedWithResponse,
+              (const envoy::service::discovery::v3::DiscoveryResponse& message,
+               const std::vector<DecodedResourcePtr>& resources),
+              (override));
+  MOCK_METHOD(void, onConfigAcceptedWithResponse,
+              (const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+               absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+               const Protobuf::RepeatedPtrField<std::string>& removed_resources),
+              (override));
+};
+
+TEST(XdsConfigTrackersTest, AcceptedResponsesReachExistingAndResponseAwareTrackersOnce) {
+  testing::StrictMock<MockXdsConfigTracker> existing;
+  testing::StrictMock<MockResponseAwareXdsConfigTracker> response_aware;
+  XdsConfigTrackers trackers;
+  auto existing_handle = trackers.add(existing);
+  auto response_aware_handle = trackers.add(response_aware);
+
+  const std::vector<DecodedResourcePtr> resources;
+  envoy::service::discovery::v3::DiscoveryResponse sotw;
+  sotw.set_type_url("test-type");
+  sotw.set_version_info("sotw-version");
+  sotw.set_nonce("sotw-nonce");
+  EXPECT_CALL(existing, onConfigAccepted("test-type", testing::Ref(resources)));
+  EXPECT_CALL(response_aware, onConfigAccepted(_, _)).Times(0);
+  EXPECT_CALL(response_aware,
+              onConfigAcceptedWithResponse(testing::Ref(sotw), testing::Ref(resources)));
+  trackers.onConfigAcceptedWithResponse(sotw, resources);
+
+  envoy::service::discovery::v3::DeltaDiscoveryResponse delta;
+  delta.set_type_url("test-type");
+  delta.set_system_version_info("delta-version");
+  delta.set_nonce("delta-nonce");
+  envoy::service::discovery::v3::Resource added_resource;
+  std::vector<const envoy::service::discovery::v3::Resource*> added_resources{&added_resource};
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  removed_resources.Add("removed");
+  EXPECT_CALL(existing, onConfigAccepted("test-type", testing::ElementsAre(&added_resource),
+                                         testing::Ref(removed_resources)));
+  EXPECT_CALL(response_aware, onConfigAccepted(_, _, _)).Times(0);
+  EXPECT_CALL(response_aware, onConfigAcceptedWithResponse(testing::Ref(delta),
+                                                           testing::ElementsAre(&added_resource),
+                                                           testing::Ref(removed_resources)));
+  trackers.onConfigAcceptedWithResponse(delta, added_resources, removed_resources);
+}
+
+TEST(XdsConfigTrackersTest, RegistrationMayOutliveManager) {
+  testing::StrictMock<MockXdsConfigTracker> tracker;
+  Common::CallbackHandlePtr handle;
+  {
+    XdsConfigTrackers trackers;
+    handle = trackers.add(tracker);
+  }
+  handle.reset();
+}
+
+TEST(XdsConfigTrackersTest, TrackerCanUnregisterItselfDuringCallback) {
+  XdsConfigTrackers trackers;
+  testing::StrictMock<MockXdsConfigTracker> first;
+  testing::StrictMock<MockXdsConfigTracker> second;
+  auto first_handle = trackers.add(first);
+  auto second_handle = trackers.add(second);
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    first_handle.reset();
+    EXPECT_TRUE(trackers.enabled());
+  });
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name"));
+  trackers.onResourceUnsubscribed("type", "name");
+  EXPECT_TRUE(trackers.enabled());
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    second_handle.reset();
+    EXPECT_FALSE(trackers.enabled());
+  });
+  trackers.onResourceUnsubscribed("type", "name");
+  EXPECT_FALSE(trackers.enabled());
+}
+
+TEST(XdsConfigTrackersTest, RemovedTrackersAreSkippedDuringCallback) {
+  XdsConfigTrackers trackers;
+  testing::StrictMock<MockXdsConfigTracker> first;
+  auto second = std::make_unique<testing::StrictMock<MockXdsConfigTracker>>();
+  testing::StrictMock<MockXdsConfigTracker> third;
+  auto first_handle = trackers.add(first);
+  auto second_handle = trackers.add(*second);
+  auto third_handle = trackers.add(third);
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    second_handle.reset();
+    second.reset();
+  });
+  EXPECT_CALL(third, onResourceUnsubscribed("type", "name"));
+  trackers.onResourceUnsubscribed("type", "name");
+}
+
+TEST(XdsConfigTrackersTest, NewTrackersWaitUntilNextUpdate) {
+  XdsConfigTrackers trackers;
+  testing::StrictMock<MockXdsConfigTracker> first;
+  testing::StrictMock<MockXdsConfigTracker> second;
+  testing::StrictMock<MockXdsConfigTracker> third;
+  auto first_handle = trackers.add(first);
+  auto second_handle = trackers.add(second);
+  Common::CallbackHandlePtr third_handle;
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    third_handle = trackers.add(third);
+  });
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name"));
+  trackers.onResourceUnsubscribed("type", "name");
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "name"));
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name"));
+  EXPECT_CALL(third, onResourceUnsubscribed("type", "name"));
+  trackers.onResourceUnsubscribed("type", "name");
+}
+
+TEST(XdsConfigTrackersTest, ReregisteredTrackersWaitUntilNextUpdate) {
+  XdsConfigTrackers trackers;
+  testing::StrictMock<MockXdsConfigTracker> first;
+  testing::StrictMock<MockXdsConfigTracker> second;
+  auto first_handle = trackers.add(first);
+  auto second_handle = trackers.add(second);
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    first_handle.reset();
+    first_handle = trackers.add(first);
+  });
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    second_handle.reset();
+    second_handle = trackers.add(second);
+  });
+  trackers.onResourceUnsubscribed("type", "name");
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "name"));
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name"));
+  trackers.onResourceUnsubscribed("type", "name");
+}
+
+TEST(XdsConfigTrackersTest, DuplicateRegistrationsAreIndependent) {
+  XdsConfigTrackers trackers;
+  testing::StrictMock<MockXdsConfigTracker> tracker;
+  auto first_handle = trackers.add(tracker);
+  auto second_handle = trackers.add(tracker);
+  EXPECT_CALL(tracker, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    second_handle.reset();
+  });
+  trackers.onResourceUnsubscribed("type", "name");
+  EXPECT_TRUE(trackers.enabled());
+  first_handle.reset();
+  EXPECT_FALSE(trackers.enabled());
+}
+
+TEST(XdsConfigTrackersTest, NestedCallbacksDeferCompactionUntilOuterDispatchCompletes) {
+  XdsConfigTrackers trackers;
+  testing::StrictMock<MockXdsConfigTracker> first;
+  testing::StrictMock<MockXdsConfigTracker> second;
+  testing::StrictMock<MockXdsConfigTracker> third;
+  auto first_handle = trackers.add(first);
+  auto second_handle = trackers.add(second);
+  auto third_handle = trackers.add(third);
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "outer")).WillOnce([&] {
+    trackers.onResourceUnsubscribed("type", "inner");
+  });
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "inner")).WillOnce([&] {
+    second_handle.reset();
+  });
+  EXPECT_CALL(third, onResourceUnsubscribed("type", "inner"));
+  EXPECT_CALL(third, onResourceUnsubscribed("type", "outer"));
+  trackers.onResourceUnsubscribed("type", "outer");
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "next"));
+  EXPECT_CALL(third, onResourceUnsubscribed("type", "next"));
+  trackers.onResourceUnsubscribed("type", "next");
+}
+
+TEST(XdsConfigTrackersTest, TrackersRemainUsableAfterCallbackThrows) {
+  XdsConfigTrackers trackers;
+  testing::StrictMock<MockXdsConfigTracker> first;
+  testing::StrictMock<MockXdsConfigTracker> second;
+  auto first_handle = trackers.add(first);
+  auto second_handle = trackers.add(second);
+  EXPECT_CALL(first, onResourceUnsubscribed("type", "name")).WillOnce([&] {
+    first_handle.reset();
+    throw EnvoyException("tracker callback failed");
+  });
+  EXPECT_THROW(trackers.onResourceUnsubscribed("type", "name"), EnvoyException);
+  EXPECT_CALL(second, onResourceUnsubscribed("type", "name"));
+  trackers.onResourceUnsubscribed("type", "name");
+  second_handle.reset();
+  EXPECT_FALSE(trackers.enabled());
+}
 
 // Validates that a call to shutdown succeeds.
 TEST_P(XdsManagerImplTest, ShutdownSuccessful) {
@@ -194,20 +559,19 @@ TEST_P(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
   std::shared_ptr<NiceMock<MockGrpcMux>> ads_mux_shared(std::make_shared<NiceMock<MockGrpcMux>>());
   NiceMock<Config::MockGrpcMux>& ads_mux(*ads_mux_shared);
   EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Invoke(
-          [&ads_mux_shared](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                            std::shared_ptr<Grpc::RawAsyncClient>&& failover_async_client,
-                            Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
-                            const envoy::config::core::v3::ApiConfigSource&,
-                            const LocalInfo::LocalInfo&,
-                            std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-                            OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                            std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
-              -> std::shared_ptr<Config::GrpcMux> {
-            EXPECT_NE(primary_async_client, nullptr);
-            EXPECT_EQ(failover_async_client, nullptr);
-            return ads_mux_shared;
-          }));
+      .WillOnce([&ads_mux_shared](
+                    std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                    std::shared_ptr<Grpc::RawAsyncClient>&& failover_async_client,
+                    Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
+                    const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
+                    std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
+                    OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
+                    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+                    -> std::shared_ptr<Config::GrpcMux> {
+        EXPECT_NE(primary_async_client, nullptr);
+        EXPECT_EQ(failover_async_client, nullptr);
+        return ads_mux_shared;
+      });
 
   // Start with 2 static clusters, and set the first to be the ADS cluster.
   initialize(R"EOF(
@@ -262,15 +626,14 @@ TEST_P(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
 
   Grpc::RawAsyncClientSharedPtr failover_client;
   EXPECT_CALL(ads_mux, updateMuxSource(_, _, _, _, ProtoEq(new_ads_config), _))
-      .WillOnce(
-          Invoke([](Grpc::RawAsyncClientSharedPtr&& primary_async_client,
-                    Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope&,
-                    BackOffStrategyPtr&&, const envoy::config::core::v3::ApiConfigSource&,
-                    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>) -> absl::Status {
-            EXPECT_NE(primary_async_client, nullptr);
-            EXPECT_EQ(failover_async_client, nullptr);
-            return absl::OkStatus();
-          }));
+      .WillOnce([](Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                   Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope&,
+                   BackOffStrategyPtr&&, const envoy::config::core::v3::ApiConfigSource&,
+                   std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>) -> absl::Status {
+        EXPECT_NE(primary_async_client, nullptr);
+        EXPECT_EQ(failover_async_client, nullptr);
+        return absl::OkStatus();
+      });
   const auto res = xds_manager_impl_.setAdsConfigSource(new_ads_config);
   EXPECT_OK(res);
 }
@@ -286,20 +649,19 @@ TEST_P(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
       std::make_shared<NiceMock<Config::MockGrpcMux>>());
   NiceMock<Config::MockGrpcMux>& ads_mux(*ads_mux_shared);
   EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Invoke(
-          [&ads_mux_shared](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                            std::shared_ptr<Grpc::RawAsyncClient>&& failover_async_client,
-                            Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
-                            const envoy::config::core::v3::ApiConfigSource&,
-                            const LocalInfo::LocalInfo&,
-                            std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-                            OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                            std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
-              -> std::shared_ptr<Config::GrpcMux> {
-            EXPECT_NE(primary_async_client, nullptr);
-            EXPECT_NE(failover_async_client, nullptr);
-            return ads_mux_shared;
-          }));
+      .WillOnce([&ads_mux_shared](
+                    std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                    std::shared_ptr<Grpc::RawAsyncClient>&& failover_async_client,
+                    Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
+                    const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
+                    std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
+                    OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
+                    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+                    -> std::shared_ptr<Config::GrpcMux> {
+        EXPECT_NE(primary_async_client, nullptr);
+        EXPECT_NE(failover_async_client, nullptr);
+        return ads_mux_shared;
+      });
 
   // Start with 2 static clusters, and set the first to be the ADS cluster.
   initialize(R"EOF(
@@ -358,15 +720,14 @@ TEST_P(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
 
   Grpc::RawAsyncClientSharedPtr failover_client;
   EXPECT_CALL(ads_mux, updateMuxSource(_, _, _, _, ProtoEq(new_ads_config), _))
-      .WillOnce(
-          Invoke([](Grpc::RawAsyncClientSharedPtr&& primary_async_client,
-                    Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope&,
-                    BackOffStrategyPtr&&, const envoy::config::core::v3::ApiConfigSource&,
-                    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>) -> absl::Status {
-            EXPECT_NE(primary_async_client, nullptr);
-            EXPECT_NE(failover_async_client, nullptr);
-            return absl::OkStatus();
-          }));
+      .WillOnce([](Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                   Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope&,
+                   BackOffStrategyPtr&&, const envoy::config::core::v3::ApiConfigSource&,
+                   std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>) -> absl::Status {
+        EXPECT_NE(primary_async_client, nullptr);
+        EXPECT_NE(failover_async_client, nullptr);
+        return absl::OkStatus();
+      });
   const auto res = xds_manager_impl_.setAdsConfigSource(new_ads_config);
   EXPECT_OK(res);
 }
@@ -898,48 +1259,48 @@ public:
 
     if (enable_authority_a) {
       EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _))
-          .WillOnce(Invoke(
-              [&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                  std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
-                  Random::RandomGenerator&, Stats::Scope&,
-                  const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
-                  std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-                  OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
-                  -> std::shared_ptr<Config::GrpcMux> {
-                EXPECT_NE(primary_async_client, nullptr);
-                return authority_A_mux_;
-              }));
+          .WillOnce([&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                        std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
+                        Random::RandomGenerator&, Stats::Scope&,
+                        const envoy::config::core::v3::ApiConfigSource&,
+                        const LocalInfo::LocalInfo&,
+                        std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
+                        OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
+                        std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+                        -> std::shared_ptr<Config::GrpcMux> {
+            EXPECT_NE(primary_async_client, nullptr);
+            return authority_A_mux_;
+          });
     }
     if (enable_authority_b) {
       EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _))
-          .WillOnce(Invoke(
-              [&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                  std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
-                  Random::RandomGenerator&, Stats::Scope&,
-                  const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
-                  std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-                  OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
-                  -> std::shared_ptr<Config::GrpcMux> {
-                EXPECT_NE(primary_async_client, nullptr);
-                return authority_B_mux_;
-              }));
+          .WillOnce([&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                        std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
+                        Random::RandomGenerator&, Stats::Scope&,
+                        const envoy::config::core::v3::ApiConfigSource&,
+                        const LocalInfo::LocalInfo&,
+                        std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
+                        OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
+                        std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+                        -> std::shared_ptr<Config::GrpcMux> {
+            EXPECT_NE(primary_async_client, nullptr);
+            return authority_B_mux_;
+          });
     }
     if (enable_default_authority) {
       EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _))
-          .WillOnce(Invoke(
-              [&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                  std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
-                  Random::RandomGenerator&, Stats::Scope&,
-                  const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
-                  std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-                  OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
-                  -> std::shared_ptr<Config::GrpcMux> {
-                EXPECT_NE(primary_async_client, nullptr);
-                return default_mux_;
-              }));
+          .WillOnce([&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                        std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
+                        Random::RandomGenerator&, Stats::Scope&,
+                        const envoy::config::core::v3::ApiConfigSource&,
+                        const LocalInfo::LocalInfo&,
+                        std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
+                        OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
+                        std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+                        -> std::shared_ptr<Config::GrpcMux> {
+            EXPECT_NE(primary_async_client, nullptr);
+            return default_mux_;
+          });
     }
 
     ASSERT_OK(xds_manager_impl_.initialize(server_.bootstrap_, &cm_));
@@ -1260,18 +1621,17 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceDeltaGrpc) {
   NiceMock<MockGrpcMuxFactory> factory("envoy.config_mux.new_grpc_mux_factory");
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
   EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(
-          Invoke([&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                     std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
-                     Random::RandomGenerator&, Stats::Scope&,
-                     const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
-                     std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-                     OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                     std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
-                     -> std::shared_ptr<Config::GrpcMux> {
-            EXPECT_NE(primary_async_client, nullptr);
-            return authority_A_mux_;
-          }));
+      .WillOnce([&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                    std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
+                    Random::RandomGenerator&, Stats::Scope&,
+                    const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
+                    std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
+                    OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
+                    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>)
+                    -> std::shared_ptr<Config::GrpcMux> {
+        EXPECT_NE(primary_async_client, nullptr);
+        return authority_A_mux_;
+      });
 
   // Have a single config_source with two authorities in it.
   initialize(R"EOF(
@@ -1537,13 +1897,12 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, SubscribeSingleValidConfigSource) {
   testing::NiceMock<MockSubscription>* mock_subscription =
       new testing::NiceMock<MockSubscription>();
   ON_CALL(config_sub_factory, create(_))
-      .WillByDefault(testing::Invoke(
-          [this, &mock_subscription](
-              ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
-            EXPECT_EQ(data.ads_grpc_mux_, authority_A_mux_);
-            SubscriptionPtr mock_subscription_ptr(mock_subscription);
-            return mock_subscription_ptr;
-          }));
+      .WillByDefault([this, &mock_subscription](ConfigSubscriptionFactory::SubscriptionData& data)
+                         -> Config::SubscriptionPtr {
+        EXPECT_EQ(data.ads_grpc_mux_, authority_A_mux_);
+        SubscriptionPtr mock_subscription_ptr(mock_subscription);
+        return mock_subscription_ptr;
+      });
 
   auto result = xds_manager_impl_.subscribeToSingletonResource(
       resource_name, {}, type_url, *stats_.rootScope(), callbacks,
@@ -1620,14 +1979,13 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesUseFirstConfig
   testing::NiceMock<MockSubscription>* mock_subscription =
       new testing::NiceMock<MockSubscription>();
   ON_CALL(config_sub_factory, create(_))
-      .WillByDefault(testing::Invoke(
-          [this, &mock_subscription](
-              ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
-            // Expect the subscription to use authority_A_mux_.
-            EXPECT_EQ(data.ads_grpc_mux_, authority_A_mux_);
-            SubscriptionPtr mock_subscription_ptr(mock_subscription);
-            return mock_subscription_ptr;
-          }));
+      .WillByDefault([this, &mock_subscription](ConfigSubscriptionFactory::SubscriptionData& data)
+                         -> Config::SubscriptionPtr {
+        // Expect the subscription to use authority_A_mux_.
+        EXPECT_EQ(data.ads_grpc_mux_, authority_A_mux_);
+        SubscriptionPtr mock_subscription_ptr(mock_subscription);
+        return mock_subscription_ptr;
+      });
 
   auto result = xds_manager_impl_.subscribeToSingletonResource(
       resource_name, {}, type_url, *stats_.rootScope(), callbacks,
@@ -1705,14 +2063,13 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesUseSecondConfi
   testing::NiceMock<MockSubscription>* mock_subscription =
       new testing::NiceMock<MockSubscription>();
   ON_CALL(config_sub_factory, create(_))
-      .WillByDefault(testing::Invoke(
-          [this, &mock_subscription](
-              ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
-            // Expect the subscription to use authority_B_mux_.
-            EXPECT_EQ(data.ads_grpc_mux_, authority_B_mux_);
-            SubscriptionPtr mock_subscription_ptr(mock_subscription);
-            return mock_subscription_ptr;
-          }));
+      .WillByDefault([this, &mock_subscription](ConfigSubscriptionFactory::SubscriptionData& data)
+                         -> Config::SubscriptionPtr {
+        // Expect the subscription to use authority_B_mux_.
+        EXPECT_EQ(data.ads_grpc_mux_, authority_B_mux_);
+        SubscriptionPtr mock_subscription_ptr(mock_subscription);
+        return mock_subscription_ptr;
+      });
 
   auto result = xds_manager_impl_.subscribeToSingletonResource(
       resource_name, {}, type_url, *stats_.rootScope(), callbacks,
@@ -1789,14 +2146,13 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesNonMatching) {
   testing::NiceMock<MockSubscription>* mock_subscription =
       new testing::NiceMock<MockSubscription>();
   ON_CALL(config_sub_factory, create(_))
-      .WillByDefault(testing::Invoke(
-          [&mock_subscription](
-              ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
-            // Expect the subscription to create the non-grpc_mux version.
-            EXPECT_EQ(data.ads_grpc_mux_, nullptr);
-            SubscriptionPtr mock_subscription_ptr(mock_subscription);
-            return mock_subscription_ptr;
-          }));
+      .WillByDefault([&mock_subscription](ConfigSubscriptionFactory::SubscriptionData& data)
+                         -> Config::SubscriptionPtr {
+        // Expect the subscription to create the non-grpc_mux version.
+        EXPECT_EQ(data.ads_grpc_mux_, nullptr);
+        SubscriptionPtr mock_subscription_ptr(mock_subscription);
+        return mock_subscription_ptr;
+      });
 
   envoy::config::core::v3::ConfigSource config_source_proto;
   // For this test, we'll use a basic ADS config source.
@@ -1807,6 +2163,69 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesNonMatching) {
       std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
   EXPECT_OK(result.status());
   EXPECT_EQ(result.value().get(), mock_subscription);
+}
+
+// Validates that subscribeToSingletonResource with SingletonSubscriptionCallbacks succeeds with
+// authority.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, SingletonSubscriptionSuccessWithAuthority) {
+  initialize(R"EOF(
+  config_sources:
+  - authorities:
+    - name: authority_A.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source_A_cluster
+  static_resources:
+    clusters:
+    - name: config_source_A_cluster
+      connect_timeout: 0.250s
+      type: static
+  )EOF",
+             true);
+
+  NiceMock<MockSingletonSubscriptionCallbacks> callbacks;
+  SubscriptionOptions options;
+  const std::string resource_name = "xdstp://authority_A.com/some/resource";
+  const std::string type_url = "type.googleapis.com/some.Type";
+
+  NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
+  Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
+  auto* mock_subscription = new testing::NiceMock<MockSubscription>();
+  EXPECT_CALL(config_sub_factory, create(_))
+      .WillOnce([this, mock_subscription](
+                    ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
+        EXPECT_EQ(data.ads_grpc_mux_, authority_A_mux_);
+        return SubscriptionPtr(mock_subscription);
+      });
+
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      resource_name, {}, type_url, *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
+  EXPECT_OK(result.status());
+  EXPECT_NE(result.value(), nullptr);
+}
+
+// Validates that a non-xDS-TP singleton subscription without config fails.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, SingletonSubscriptionNonXdstpWithoutConfigFails) {
+  initialize();
+  NiceMock<MockSingletonSubscriptionCallbacks> callbacks;
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      "non_xdstp_resource", {}, "type_url", *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), {});
+  EXPECT_THAT(result.status(), StatusCodeIs(absl::StatusCode::kInvalidArgument));
+}
+
+// Validates that an invalid xDS-TP URN fails.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, SingletonSubscriptionInvalidXdstpUrnFails) {
+  initialize();
+  NiceMock<MockSingletonSubscriptionCallbacks> callbacks;
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      "xdstp://", {}, "type_url", *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), {});
+  EXPECT_THAT(result.status(), StatusCodeIs(absl::StatusCode::kInvalidArgument));
 }
 
 // Validates that when config_sources is empty and a valid default_config_source is provided,
@@ -1856,14 +2275,13 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultSourceUsedWhenConfigSourcesI
   testing::NiceMock<MockSubscription>* mock_subscription =
       new testing::NiceMock<MockSubscription>();
   ON_CALL(config_sub_factory, create(_))
-      .WillByDefault(testing::Invoke(
-          [this, &mock_subscription](
-              ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
-            // Expect the subscription to use default_mux_
-            EXPECT_EQ(data.ads_grpc_mux_, default_mux_);
-            SubscriptionPtr mock_subscription_ptr(mock_subscription);
-            return mock_subscription_ptr;
-          }));
+      .WillByDefault([this, &mock_subscription](ConfigSubscriptionFactory::SubscriptionData& data)
+                         -> Config::SubscriptionPtr {
+        // Expect the subscription to use default_mux_
+        EXPECT_EQ(data.ads_grpc_mux_, default_mux_);
+        SubscriptionPtr mock_subscription_ptr(mock_subscription);
+        return mock_subscription_ptr;
+      });
 
   auto result = xds_manager_impl_.subscribeToSingletonResource(
       resource_name, {}, type_url, *stats_.rootScope(), callbacks,
@@ -1963,14 +2381,13 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultSourceUsedWhenAllConfigSourc
   testing::NiceMock<MockSubscription>* mock_subscription =
       new testing::NiceMock<MockSubscription>();
   ON_CALL(config_sub_factory, create(_))
-      .WillByDefault(testing::Invoke(
-          [this, &mock_subscription](
-              ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
-            // Expect the subscription to use default_mux_.
-            EXPECT_EQ(data.ads_grpc_mux_, default_mux_);
-            SubscriptionPtr mock_subscription_ptr(mock_subscription);
-            return mock_subscription_ptr;
-          }));
+      .WillByDefault([this, &mock_subscription](ConfigSubscriptionFactory::SubscriptionData& data)
+                         -> Config::SubscriptionPtr {
+        // Expect the subscription to use default_mux_.
+        EXPECT_EQ(data.ads_grpc_mux_, default_mux_);
+        SubscriptionPtr mock_subscription_ptr(mock_subscription);
+        return mock_subscription_ptr;
+      });
 
   auto result = xds_manager_impl_.subscribeToSingletonResource(
       resource_name, {}, type_url, *stats_.rootScope(), callbacks,
@@ -2118,15 +2535,14 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonXdstpResourceSubscription) {
       new testing::NiceMock<MockSubscription>();
 
   EXPECT_CALL(ads_sub_factory, create(_))
-      .WillOnce(
-          Invoke([&](ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
-            EXPECT_EQ(data.config_.config_source_specifier_case(),
-                      envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds);
-            EXPECT_EQ(data.type_url_, type_url);
-            // Check other relevant fields if necessary, e.g., scope, callbacks, resource_decoder,
-            // options
-            return std::unique_ptr<MockSubscription>(mock_subscription);
-          }));
+      .WillOnce([&](ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
+        EXPECT_EQ(data.config_.config_source_specifier_case(),
+                  envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds);
+        EXPECT_EQ(data.type_url_, type_url);
+        // Check other relevant fields if necessary, e.g., scope, callbacks, resource_decoder,
+        // options
+        return std::unique_ptr<MockSubscription>(mock_subscription);
+      });
 
   auto result = xds_manager_impl_.subscribeToSingletonResource(
       resource_name, makeOptRef(config_source_proto), type_url, *stats_.rootScope(), callbacks,
@@ -2245,8 +2661,8 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest,
       new testing::NiceMock<MockSubscription>();
 
   EXPECT_CALL(config_sub_factory, create(_))
-      .WillOnce(Invoke([this, mock_subscription](ConfigSubscriptionFactory::SubscriptionData& data)
-                           -> Config::SubscriptionPtr {
+      .WillOnce([this, mock_subscription](
+                    ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
         // Expect the subscription to use default_mux_ (from bootstrap's default_config_source)
         EXPECT_EQ(data.ads_grpc_mux_, default_mux_);
         // The config used should be the one from the default_config_source in bootstrap.
@@ -2254,7 +2670,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest,
         EXPECT_EQ(data.config_.api_config_source().grpc_services(0).envoy_grpc().cluster_name(),
                   "default_cs_cluster");
         return SubscriptionPtr(mock_subscription);
-      }));
+      });
 
   auto result = xds_manager_impl_.subscribeToSingletonResource(
       resource_name, makeOptRef(peer_config_source), type_url, *stats_.rootScope(), callbacks,
@@ -2334,8 +2750,8 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest,
       new testing::NiceMock<MockSubscription>();
 
   EXPECT_CALL(config_sub_factory, create(_))
-      .WillOnce(Invoke([this, mock_subscription](ConfigSubscriptionFactory::SubscriptionData& data)
-                           -> Config::SubscriptionPtr {
+      .WillOnce([this, mock_subscription](
+                    ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
         // Expect the subscription to use default_mux_ from bootstrap
         EXPECT_EQ(data.ads_grpc_mux_, default_mux_);
         // The config used should be the one from the default_config_source in bootstrap,
@@ -2344,7 +2760,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest,
         EXPECT_EQ(data.config_.api_config_source().grpc_services(0).envoy_grpc().cluster_name(),
                   "default_config_source_cluster");
         return SubscriptionPtr(mock_subscription);
-      }));
+      });
 
   auto result = xds_manager_impl_.subscribeToSingletonResource(
       resource_name, makeOptRef(peer_config_source), type_url, *stats_.rootScope(), callbacks,
@@ -2467,17 +2883,15 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, PauseResume) {
     // and that resume() is invoked when the cleanup object goes out of scope.
     {
       EXPECT_CALL(*authority_A_mux_, pause(types))
-          .WillOnce(testing::Invoke(
-              [&authority_a_resumed](const std::vector<std::string>) -> ScopedResume {
-                return std::make_unique<Cleanup>(
-                    [&authority_a_resumed]() { authority_a_resumed = true; });
-              }));
+          .WillOnce([&authority_a_resumed](const std::vector<std::string>) -> ScopedResume {
+            return std::make_unique<Cleanup>(
+                [&authority_a_resumed]() { authority_a_resumed = true; });
+          });
       EXPECT_CALL(*default_mux_, pause(types))
-          .WillOnce(testing::Invoke(
-              [&default_authority_resumed](const std::vector<std::string>) -> ScopedResume {
-                return std::make_unique<Cleanup>(
-                    [&default_authority_resumed]() { default_authority_resumed = true; });
-              }));
+          .WillOnce([&default_authority_resumed](const std::vector<std::string>) -> ScopedResume {
+            return std::make_unique<Cleanup>(
+                [&default_authority_resumed]() { default_authority_resumed = true; });
+          });
       ScopedResume pause_object = xds_manager_impl_.pause(type_url);
 
       // When the pause object gets out of scope, the resume should be invoked.
@@ -2501,17 +2915,15 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, PauseResume) {
     // and that resume() is invoked when the cleanup object goes out of scope.
     {
       EXPECT_CALL(*authority_A_mux_, pause(types))
-          .WillOnce(testing::Invoke(
-              [&authority_a_resumed](const std::vector<std::string>) -> ScopedResume {
-                return std::make_unique<Cleanup>(
-                    [&authority_a_resumed]() { authority_a_resumed = true; });
-              }));
+          .WillOnce([&authority_a_resumed](const std::vector<std::string>) -> ScopedResume {
+            return std::make_unique<Cleanup>(
+                [&authority_a_resumed]() { authority_a_resumed = true; });
+          });
       EXPECT_CALL(*default_mux_, pause(types))
-          .WillOnce(testing::Invoke(
-              [&default_authority_resumed](const std::vector<std::string>) -> ScopedResume {
-                return std::make_unique<Cleanup>(
-                    [&default_authority_resumed]() { default_authority_resumed = true; });
-              }));
+          .WillOnce([&default_authority_resumed](const std::vector<std::string>) -> ScopedResume {
+            return std::make_unique<Cleanup>(
+                [&default_authority_resumed]() { default_authority_resumed = true; });
+          });
       ScopedResume pause_object = xds_manager_impl_.pause(types);
 
       // When the pause object gets out of scope, the resume should be invoked.

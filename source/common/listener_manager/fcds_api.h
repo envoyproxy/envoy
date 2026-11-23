@@ -20,6 +20,7 @@
 #include "source/common/config/resource_type_helper.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -83,7 +84,8 @@ public:
 using FcdsApiPtr = std::unique_ptr<FcdsApi>;
 
 /**
- * FCDS API implementation that fetches via Config::Subscription.
+ * FCDS API implementation that fetches via Config::Subscription, or that a local caller updates
+ * without a subscription.
  */
 class FcdsApiImpl : public FcdsApi, Logger::Loggable<Logger::Id::upstream> {
 public:
@@ -92,6 +94,7 @@ public:
               Upstream::ClusterManager& cm, Stats::Scope& scope,
               const Config::ResourceTypeHelper<FilterChainProto>& resource_type_helper,
               absl::Status& creation_status);
+  FcdsApiImpl(const std::string& filter_chain_name, FilterChainUpdateCallbacks& callbacks);
   ~FcdsApiImpl() override;
 
   // FcdsApi
@@ -102,6 +105,22 @@ public:
   const Network::DrainableFilterChainSharedPtr& filterChain() const override {
     return filter_chain_;
   }
+
+  /**
+   * Updates the filter chain as an FCDS update does.
+   * @return false when the filter chain is unchanged, or an error when it cannot be built.
+   */
+  absl::StatusOr<bool> update(const FilterChainProto& filter_chain);
+
+  /**
+   * Removes the filter chain as an FCDS update does.
+   */
+  void remove();
+
+  /**
+   * @return whether the filter chain comes from an FCDS subscription.
+   */
+  bool hasSubscription() const { return subscription_ != nullptr; }
 
 private:
   // Config::SubscriptionCallbacks
@@ -132,6 +151,12 @@ public:
                                     const FilterChainProto& filter_chain);
   void initialize(std::function<void()> completion);
 
+  // The context of the transport socket, whose init targets, such as SDS secrets, warm the filter
+  // chain.
+  Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() {
+    return transport_socket_factory_context_;
+  }
+
   // DrainDecision
   bool drainClose(Network::DrainDirection) const override;
   Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection, DrainCloseCb) const override;
@@ -154,6 +179,7 @@ private:
   Stats::ScopeSharedPtr scope_;
   Stats::ScopeSharedPtr prefixed_scope_;
   Init::ManagerImpl init_manager_;
+  Configuration::TransportSocketFactoryContextImpl transport_socket_factory_context_;
   std::atomic<bool> is_draining_{false};
   std::unique_ptr<Init::WatcherImpl> init_watcher_;
 };
