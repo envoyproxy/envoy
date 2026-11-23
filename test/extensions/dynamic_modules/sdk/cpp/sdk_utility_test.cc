@@ -42,8 +42,7 @@ TEST(HeaderValidityTest, EveryByte) {
         (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
         std::string_view("!#$%&'*+-.^_`|~").find(static_cast<char>(c)) != std::string_view::npos;
     EXPECT_EQ(isValidHeaderName(std::string(1, static_cast<char>(c))), token) << c;
-    // Sizes that take each branch of the value check, and positions in its whole blocks and in
-    // the bytes it reads again at the end.
+    // Positions in the vector part of the loop and in its scalar remainder, for several sizes.
     const bool allowed = c == '\t' || (c >= ' ' && c != 0x7f);
     for (const size_t size : {3, 5, 12, 40, 67}) {
       for (const size_t position : {size_t{0}, size / 2, size - 1}) {
