@@ -179,6 +179,26 @@ TEST_F(BodySizeLimitFilterTest, UpgradeLimitedWhenRefused) {
   EXPECT_EQ(1, counter("rq_body_too_large"));
 }
 
+// A failed handshake that keeps the upgrade headers is a tunnel to the connection manager, but
+// the upstream refused it, so the body stays limited.
+TEST_F(BodySizeLimitFilterTest, UpgradeLimitedAfter4xxWithUpgradeHeaders) {
+  auto small_config = setupConfig(5);
+  BodySizeLimitFilter small_filter(small_config);
+  small_filter.setDecoderFilterCallbacks(callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {"upgrade", "websocket"}, {"connection", "upgrade"}};
+  setRequestHeaders(headers);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, small_filter.decodeHeaders(headers, false));
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "403"}, {"upgrade", "websocket"}, {"connection", "upgrade"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            small_filter.encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl data("Hello, world!");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, small_filter.decodeData(data, false));
+  EXPECT_EQ(1, counter("rq_body_too_large"));
+}
+
 TEST_F(BodySizeLimitFilterTest, PlainRequestStillLimitedAfterResponse) {
   auto small_config = setupConfig(5);
   BodySizeLimitFilter small_filter(small_config);
@@ -209,6 +229,22 @@ TEST_F(BodySizeLimitFilterTest, ConnectNotLimitedAfterAccepted) {
   Buffer::OwnedImpl data("Hello, world!");
   EXPECT_EQ(Http::FilterDataStatus::Continue, small_filter.decodeData(data, false));
   EXPECT_EQ(0, counter("rq_body_too_large"));
+}
+
+TEST_F(BodySizeLimitFilterTest, ConnectLimitedWhenRefused) {
+  auto small_config = setupConfig(5);
+  BodySizeLimitFilter small_filter(small_config);
+  small_filter.setDecoderFilterCallbacks(callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":authority", "host:443"}};
+  setRequestHeaders(headers);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, small_filter.decodeHeaders(headers, false));
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            small_filter.encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl data("Hello, world!");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, small_filter.decodeData(data, false));
+  EXPECT_EQ(1, counter("rq_body_too_large"));
 }
 
 // A later filter that strips the upgrade headers makes the router forward a plain request, so even

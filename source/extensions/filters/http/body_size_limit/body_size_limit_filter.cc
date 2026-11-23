@@ -80,9 +80,11 @@ Http::FilterHeadersStatus BodySizeLimitFilter::encodeHeaders(Http::ResponseHeade
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Follow the connection manager's rule for when a stream becomes a tunnel: a CONNECT answered
-  // with a 200, or an upgrade answered with a 101 that carries upgrade headers. The codecs turn an
-  // HTTP/2 or HTTP/3 upstream's 200 into such a 101, and local replies carry no upgrade headers.
+  // Stop counting only once the upstream accepts: a CONNECT answered with a 200, or an upgrade
+  // answered with a 101 that carries upgrade headers. The connection manager also treats a failed
+  // handshake that keeps the upgrade headers as a tunnel, but nothing was tunneled, since the
+  // router doesn't send the body upstream until the upstream accepts. So the body stays limited.
+  // The codecs turn an HTTP/2 or HTTP/3 upstream's 200 into a 101.
   const bool connect_accepted =
       Http::HeaderUtility::isConnectResponse(request_headers.ptr(), headers);
   const bool upgrade_accepted =
