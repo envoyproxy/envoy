@@ -94,7 +94,7 @@ void refreshReloadableFlags(const Snapshot::EntryMap& flag_map,
   markRuntimeInitialized();
 }
 
-constexpr std::string_view FrozenRestartFeaturesLayerName = "frozen_restart_features";
+constexpr absl::string_view FrozenRestartFeaturesLayerName = "frozen_restart_features";
 
 class FrozenRestartFeaturesLayer : public OverrideLayerImpl {
 public:
