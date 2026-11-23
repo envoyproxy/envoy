@@ -37,7 +37,7 @@ def get_field_counts():
     """
     Generate argument counts that should be processed by composite deserializers.
     """
-    return range(1, 13)
+    return range(1, 21)
 
 
 class RenderingHelper:
