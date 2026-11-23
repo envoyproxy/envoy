@@ -17,9 +17,12 @@
 #include "source/common/config/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_selectors/on_demand/config.h"
 
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/status_utility.h"
@@ -209,6 +212,213 @@ TEST_F(OnDemandTest, StaleQueuedRemovalDoesNotEraseReinsertedEntry) {
   queued_posts[0]();
   EXPECT_EQ(0, gauge_value("on_demand_secret.cert_active"));
   EXPECT_EQ(0, gauge_value("on_demand_secret.cert_pending"));
+}
+
+class FakeAsyncContext : public AsyncContext {
+public:
+  explicit FakeAsyncContext(Stats::Scope& scope) : AsyncContext(scope) {}
+  Ssl::ServerContextConfig::OcspStaplePolicy ocspStaplePolicy() const override {
+    return Ssl::ServerContextConfig::OcspStaplePolicy::LenientStapling;
+  }
+  const Ssl::TlsContext& tlsContext() const override { return tls_context_; }
+
+private:
+  Ssl::TlsContext tls_context_;
+};
+
+class MockCertificateSelectionCallback : public Ssl::CertificateSelectionCallback {
+public:
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(void, onCertificateSelectionResult,
+              (OptRef<const Ssl::TlsContext> selected_ctx, bool staple));
+};
+
+std::string boundedConfig() {
+  return R"EOF(
+    config_source:
+      ads: {}
+    certificate_mapper:
+      name: static-name
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+        name: server
+    max_active_secrets: 2
+    max_pending_secrets: 2
+  )EOF";
+}
+
+TEST_F(OnDemandTest, UpdateAndRemoveUnknownSecretAreNoops) {
+  envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
+  TestUtility::loadFromYaml(defaultConfig(), config);
+
+  std::vector<Event::PostCb> queued_posts;
+  EXPECT_CALL(factory_context_.server_context_.dispatcher_, post(_))
+      .WillRepeatedly([&queued_posts](Event::PostCb cb) { queued_posts.push_back(std::move(cb)); });
+
+  auto secret_manager = std::make_shared<SecretManager>(
+      config, factory_context_,
+      [](Stats::Scope& scope, Server::Configuration::ServerFactoryContext&,
+         const Ssl::TlsCertificateConfig&,
+         absl::Status&) { return std::make_shared<FakeAsyncContext>(scope); });
+
+  NiceMock<Ssl::MockTlsCertificateConfig> cert_config;
+  EXPECT_OK(secret_manager->updateCertificate("unknown.com", cert_config));
+  EXPECT_FALSE(secret_manager->getContext("unknown.com").has_value());
+
+  EXPECT_OK(secret_manager->removeCertificateConfig("unknown.com"));
+  ASSERT_EQ(1, queued_posts.size());
+  queued_posts[0]();
+  EXPECT_EQ(0, factory_context_.store_
+                   .gauge("on_demand_secret.cert_active", Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+}
+
+TEST_F(OnDemandTest, MainThreadFetchOfActiveSecretNotifiesImmediately) {
+  envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
+  TestUtility::loadFromYaml(boundedConfig(), config);
+
+  std::vector<Event::PostCb> queued_posts;
+  auto& dispatcher = factory_context_.server_context_.dispatcher_;
+  EXPECT_CALL(dispatcher, post(_)).WillRepeatedly([&queued_posts](Event::PostCb cb) {
+    queued_posts.push_back(std::move(cb));
+  });
+
+  auto secret_manager = std::make_shared<SecretManager>(
+      config, factory_context_,
+      [](Stats::Scope& scope, Server::Configuration::ServerFactoryContext&,
+         const Ssl::TlsCertificateConfig&,
+         absl::Status&) { return std::make_shared<FakeAsyncContext>(scope); });
+  EXPECT_TRUE(secret_manager->trackingEnabled());
+
+  // Activate the secret via a prefetch-style subscription.
+  secret_manager->addCertificateConfig("example.com", nullptr, {});
+  NiceMock<Ssl::MockTlsCertificateConfig> cert_config;
+  EXPECT_OK(secret_manager->updateCertificate("example.com", cert_config));
+  ASSERT_TRUE(secret_manager->getContext("example.com").has_value());
+
+  // A main-thread fetch for an already active secret (e.g. a worker missed the thread local
+  // update) records a hit and notifies the handle without starting a new subscription.
+  auto cb = std::make_unique<NiceMock<MockCertificateSelectionCallback>>();
+  ON_CALL(*cb, dispatcher()).WillByDefault(::testing::ReturnRef(dispatcher));
+  EXPECT_CALL(
+      *cb, onCertificateSelectionResult(
+               ::testing::Truly([](OptRef<const Ssl::TlsContext> ctx) { return ctx.has_value(); }),
+               false));
+  auto handle = std::make_shared<Handle>(std::move(cb), false);
+  queued_posts.clear();
+  secret_manager->addCertificateConfig("example.com", handle, {},
+                                       FairSieve::computeTenantId("tenant-a"));
+  ASSERT_EQ(1, queued_posts.size());
+  queued_posts[0]();
+
+  EXPECT_EQ(1, factory_context_.store_.counter("on_demand_secret.cert_requested").value());
+  EXPECT_EQ(1, factory_context_.store_
+                   .gauge("on_demand_secret.cert_active", Stats::Gauge::ImportMode::Accumulate)
+                   .value());
+}
+
+TEST_F(OnDemandTest, DownstreamTenantExtraction) {
+  std::vector<Event::PostCb> queued_posts;
+  EXPECT_CALL(factory_context_.server_context_.dispatcher_, post(_))
+      .WillRepeatedly([&queued_posts](Event::PostCb cb) { queued_posts.push_back(std::move(cb)); });
+
+  auto factory = create(boundedConfig());
+  ASSERT_OK(factory);
+  auto selector = factory.value()->create(selector_context_);
+
+  auto select = [&](SSL* ssl) {
+    SSL_CLIENT_HELLO hello{};
+    hello.ssl = ssl;
+    auto result = selector->selectTlsContext(
+        hello, std::make_unique<NiceMock<MockCertificateSelectionCallback>>());
+    EXPECT_EQ(Ssl::SelectionResult::SelectionStatus::Pending, result.status);
+  };
+
+  // No SSL object.
+  select(nullptr);
+
+  // SSL object without transport socket callbacks.
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
+  select(ssl.get());
+
+  // Transport socket callbacks without a filter state.
+  NiceMock<Network::MockTransportSocketCallbacks> callbacks;
+  ASSERT_EQ(1, SSL_set_ex_data(ssl.get(), ContextImpl::sslSocketIndex(), &callbacks));
+  callbacks.connection_.stream_info_.filter_state_ = nullptr;
+  select(ssl.get());
+
+  // Filter state without and with a tenant identifier.
+  callbacks.connection_.stream_info_.filter_state_ =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  select(ssl.get());
+  callbacks.connection_.stream_info_.filter_state_->setData(
+      TenantIdFilterStateKey, std::make_shared<Router::StringAccessorImpl>("tenant-a"),
+      StreamInfo::FilterState::LifeSpan::Connection);
+  select(ssl.get());
+  SSL_set_ex_data(ssl.get(), ContextImpl::sslSocketIndex(), nullptr);
+
+  EXPECT_EQ(5, queued_posts.size());
+}
+
+TEST_F(OnDemandTest, UpstreamTenantExtraction) {
+  std::vector<Event::PostCb> queued_posts;
+  EXPECT_CALL(factory_context_.server_context_.dispatcher_, post(_))
+      .WillRepeatedly([&queued_posts](Event::PostCb cb) { queued_posts.push_back(std::move(cb)); });
+
+  envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
+  TestUtility::loadFromYaml(R"EOF(
+    config_source:
+      ads: {}
+    certificate_mapper:
+      name: filter-state-override
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config
+        default_value: server
+    max_pending_secrets: 4
+  )EOF",
+                            config);
+  Ssl::UpstreamTlsCertificateSelectorConfigFactory& provider_factory =
+      Config::Utility::getAndCheckFactoryByName<Ssl::UpstreamTlsCertificateSelectorConfigFactory>(
+          "envoy.tls.certificate_selectors.on_demand_secret");
+  NiceMock<Ssl::MockClientContextConfig> client_context;
+  auto factory = provider_factory.createUpstreamTlsCertificateSelectorFactory(
+      config, factory_context_, client_context);
+  ASSERT_OK(factory);
+  auto selector = factory.value()->createUpstreamTlsCertificateSelector(selector_context_);
+
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
+  auto select = [&](const Network::TransportSocketOptionsConstSharedPtr& options) {
+    auto result = selector->selectTlsContext(
+        *ssl, options, std::make_unique<NiceMock<MockCertificateSelectionCallback>>());
+    EXPECT_EQ(Ssl::SelectionResult::SelectionStatus::Pending, result.status);
+  };
+
+  // No transport socket options: fall back to the SSL object.
+  select(nullptr);
+
+  // Shared tenant object of an unexpected type: fall back to the SSL object.
+  {
+    StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+    filter_state.setData(TenantIdFilterStateKey,
+                         std::make_shared<StreamInfo::UInt32AccessorImpl>(42),
+                         StreamInfo::FilterState::LifeSpan::Connection,
+                         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+    select(Network::TransportSocketOptionsUtility::fromFilterState(filter_state));
+  }
+
+  // Shared string tenant object.
+  {
+    StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+    filter_state.setData(TenantIdFilterStateKey,
+                         std::make_shared<Router::StringAccessorImpl>("tenant-a"),
+                         StreamInfo::FilterState::LifeSpan::Connection,
+                         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+    select(Network::TransportSocketOptionsUtility::fromFilterState(filter_state));
+  }
+
+  EXPECT_EQ(3, queued_posts.size());
 }
 
 TEST(FilterStateMapper, Derivation) {
