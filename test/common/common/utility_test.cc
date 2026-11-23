@@ -479,6 +479,93 @@ TEST(StringUtil, StringViewFindToken) {
   EXPECT_TRUE(StringUtil::findToken("A=5", ".", "A=5"));
 }
 
+TEST(StringUtil, FindTokenEdgeCases) {
+  // Empty value.
+  EXPECT_FALSE(StringUtil::findToken("", ",", "close"));
+  EXPECT_TRUE(StringUtil::findToken("", ",", ""));
+  EXPECT_FALSE(StringUtil::findToken("", ",", "", false));
+  EXPECT_FALSE(StringUtil::caseFindToken("", ",", "close"));
+
+  // Leading and trailing whitespace.
+  EXPECT_TRUE(StringUtil::findToken("  close  ", ",", "close"));
+  EXPECT_FALSE(StringUtil::findToken("  close  ", ",", "close", false));
+  EXPECT_TRUE(StringUtil::findToken(" keep-alive ,\tclose ", ",", "close"));
+  EXPECT_TRUE(StringUtil::caseFindToken(" Keep-Alive , Upgrade ", ",", "upgrade"));
+  EXPECT_FALSE(StringUtil::caseFindToken(" Keep-Alive , Upgrade ", ",", "upgrade", false));
+  EXPECT_TRUE(StringUtil::findToken("keep-alive, close", ",", " close", false));
+
+  // Repeated delimiters.
+  EXPECT_TRUE(StringUtil::findToken(",,,close,,", ",", "close"));
+  EXPECT_TRUE(StringUtil::findToken(",,,close,,", ",", "close", false));
+  EXPECT_TRUE(StringUtil::findToken(",,", ",", ""));
+  EXPECT_TRUE(StringUtil::findToken("a, ,b", ",", ""));
+  EXPECT_FALSE(StringUtil::findToken(",,", ",", "", false));
+  EXPECT_TRUE(StringUtil::findToken("a=1;;b", "=;", "1"));
+
+  // Case.
+  EXPECT_FALSE(StringUtil::findToken("Close", ",", "close"));
+  EXPECT_TRUE(StringUtil::caseFindToken("Close", ",", "close"));
+  EXPECT_TRUE(StringUtil::caseFindToken("KEEP-ALIVE, UPGRADE", ",", "upgrade"));
+
+  // A token that is a prefix or suffix of another token.
+  EXPECT_FALSE(StringUtil::findToken("closed", ",", "close"));
+  EXPECT_FALSE(StringUtil::findToken("close", ",", "closed"));
+  EXPECT_FALSE(StringUtil::findToken("unclose", ",", "close"));
+  EXPECT_FALSE(StringUtil::caseFindToken("keep-alive, upgrade-h2c", ",", "UPGRADE"));
+  EXPECT_TRUE(StringUtil::findToken("no-transform-x, no-transform", ",", "no-transform"));
+}
+
+// Reference for findToken and caseFindToken that materializes every token with splitToken
+// before matching.
+bool findTokenBySplitting(absl::string_view source, absl::string_view delimiters,
+                          absl::string_view key_token, bool trim_whitespace, bool ignore_case) {
+  for (absl::string_view token :
+       StringUtil::splitToken(source, delimiters, /*keep_empty_string=*/trim_whitespace)) {
+    if (trim_whitespace) {
+      token = StringUtil::trim(token);
+    }
+    if (ignore_case ? absl::EqualsIgnoreCase(key_token, token) : key_token == token) {
+      return true;
+    }
+  }
+  return false;
+}
+
+TEST(StringUtil, FindTokenMatchesSplitToken) {
+  const std::vector<absl::string_view> sources = {"",
+                                                  " ",
+                                                  ",",
+                                                  ",,",
+                                                  " , ",
+                                                  "close",
+                                                  " close ",
+                                                  "Close",
+                                                  "closed",
+                                                  "keep-alive, Upgrade",
+                                                  "a,,b",
+                                                  " a , ,b ",
+                                                  "a=1; b",
+                                                  "private, max-age=300, no-transform",
+                                                  "\tclose\t,keep-alive"};
+  const std::vector<absl::string_view> delimiter_sets = {",", ", ", "=;", ""};
+  const std::vector<absl::string_view> keys = {"",  " ", "close", "CLOSE",  "upgrade", "a",
+                                               "b", "1", "clo",   "closed", "a=1",     " close"};
+  for (const absl::string_view source : sources) {
+    for (const absl::string_view delimiters : delimiter_sets) {
+      for (const absl::string_view key : keys) {
+        for (const bool trim : {true, false}) {
+          SCOPED_TRACE(absl::StrCat("source='", source, "' delimiters='", delimiters, "' key='",
+                                    key, "' trim=", trim));
+          EXPECT_EQ(findTokenBySplitting(source, delimiters, key, trim, false),
+                    StringUtil::findToken(source, delimiters, key, trim));
+          EXPECT_EQ(findTokenBySplitting(source, delimiters, key, trim, true),
+                    StringUtil::caseFindToken(source, delimiters, key, trim));
+        }
+      }
+    }
+  }
+}
+
 TEST(StringUtil, StringViewCaseInsensitiveHash) {
   EXPECT_EQ(13876786532495509697U, StringUtil::CaseInsensitiveHash()("hello world"));
 }
