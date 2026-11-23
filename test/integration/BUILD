@@ -1545,6 +1545,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_protocol_integration_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
