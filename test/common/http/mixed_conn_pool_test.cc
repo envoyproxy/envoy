@@ -20,6 +20,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
+using testing::Property;
 using testing::Return;
 
 namespace Envoy {
@@ -108,6 +110,11 @@ void MixedConnPoolImplTest::testAlpnHandshake(std::optional<Protocol> protocol) 
   conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   connection->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_cx_total_.value());
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(0, cluster_->trafficStats()->upstream_cx_active_.value());
+  EXPECT_EQ(cluster_->trafficStats()->upstream_cx_total_.value(),
+            cluster_->trafficStats()->upstream_cx_destroy_.value());
   conn_pool_.reset();
 }
 
@@ -140,6 +147,87 @@ TEST_F(MixedConnPoolImplTest, HandshakeWithCachedLimitCapped) {
 TEST_F(MixedConnPoolImplTest, Http1AlpnHandshake) { testAlpnHandshake(Protocol::Http11); }
 
 TEST_F(MixedConnPoolImplTest, Http2AlpnHandshake) { testAlpnHandshake(Protocol::Http2); }
+
+TEST_F(MixedConnPoolImplTest, HandoverConnectionTimingAndStats) {
+  // Verify that upstream_cx_connect_ms and upstream_cx_length_ms are each delivered to sinks
+  // exactly once with their true durations.
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), 15))
+      .Times(1);
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), 40))
+      .Times(1);
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), _))
+      .Times(1);
+
+  NiceMock<ConnPoolCallbacks> callbacks_;
+  auto* connection = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection));
+  NiceMock<MockResponseDecoder> decoder;
+  conn_pool_->newStream(decoder, callbacks_, {false, true});
+
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_cx_total_.value());
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_cx_active_.value());
+
+  EXPECT_CALL(*connection, nextProtocol()).WillOnce(Return(Http::Utility::AlpnNames::get().Http2));
+
+  // Advance time during connection establishment.
+  conn_pool_->simTime().setMonotonicTime(conn_pool_->simTime().monotonicTime() +
+                                         std::chrono::milliseconds(15));
+  connection->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // During handover, active connection count must stay at 1 (not spike to 2) and
+  // upstream_cx_total must remain 1 (not double).
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_cx_total_.value());
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_cx_active_.value());
+  EXPECT_EQ(Protocol::Http2, conn_pool_->protocol());
+
+  // Advance time during HTTP stream processing.
+  conn_pool_->simTime().setMonotonicTime(conn_pool_->simTime().monotonicTime() +
+                                         std::chrono::milliseconds(25));
+
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+  connection->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+
+  // After teardown, upstream_cx_total must equal upstream_cx_destroy, and active must be 0.
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_cx_total_.value());
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(0, cluster_->trafficStats()->upstream_cx_active_.value());
+  EXPECT_EQ(cluster_->trafficStats()->upstream_cx_total_.value(),
+            cluster_->trafficStats()->upstream_cx_destroy_.value());
+
+  conn_pool_.reset();
+}
+
+TEST_F(MixedConnPoolImplTest, LegacyHandoverWhenRuntimeFlagDisabled) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.mixed_conn_pool_handover_stats", "false"}});
+
+  NiceMock<ConnPoolCallbacks> callbacks_;
+  auto* connection = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection));
+  NiceMock<MockResponseDecoder> decoder;
+  conn_pool_->newStream(decoder, callbacks_, {false, true});
+
+  EXPECT_CALL(*connection, nextProtocol()).WillOnce(Return(Http::Utility::AlpnNames::get().Http11));
+  connection->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // When flag is disabled, legacy behavior increments upstream_cx_total again upon handover.
+  EXPECT_EQ(2, cluster_->trafficStats()->upstream_cx_total_.value());
+
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+  connection->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(2, cluster_->trafficStats()->upstream_cx_total_.value());
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_NE(cluster_->trafficStats()->upstream_cx_total_.value(),
+            cluster_->trafficStats()->upstream_cx_destroy_.value());
+
+  conn_pool_.reset();
+}
 
 } // namespace
 } // namespace Http

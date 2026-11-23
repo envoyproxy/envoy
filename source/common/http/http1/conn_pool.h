@@ -17,7 +17,8 @@ namespace Http1 {
  */
 class ActiveClient : public Envoy::Http::ActiveClient {
 public:
-  ActiveClient(HttpConnPoolImplBase& parent, OptRef<Upstream::Host::CreateConnectionData> data);
+  ActiveClient(HttpConnPoolImplBase& parent, OptRef<Upstream::Host::CreateConnectionData> data,
+               Envoy::ConnectionPool::ActiveClient* handoff_client = nullptr);
   ~ActiveClient() override;
 
   // ConnPoolImplBase::ActiveClient
