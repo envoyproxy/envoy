@@ -36,6 +36,7 @@
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Server {
@@ -207,9 +208,6 @@ class FilterChainManagerImpl : public Network::FilterChainManager,
                                public FilterChainFactoryContextCreator,
                                Logger::Loggable<Logger::Id::config> {
 public:
-  using FcContextMap =
-      absl::flat_hash_map<envoy::config::listener::v3::FilterChain,
-                          Network::DrainableFilterChainSharedPtr, MessageUtil, MessageUtil>;
   FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
                          Configuration::FactoryContext& factory_context,
                          Init::Manager& init_manager)
@@ -246,9 +244,6 @@ public:
     return draining_filter_chains_;
   }
 
-  const std::optional<envoy::config::listener::v3::FilterChain>& defaultFilterChainMessage() const {
-    return default_filter_chain_message_;
-  }
   const Network::DrainableFilterChainSharedPtr& defaultFilterChain() const {
     return default_filter_chain_;
   }
@@ -396,13 +391,29 @@ private:
   findFilterChainForSourceIpAndPort(const SourceIPsTrie& source_ips_trie,
                                     const Network::ConnectionSocket& socket) const;
 
-  const FilterChainManagerImpl* getOriginFilterChainManager() { return origin_.value(); }
-  // Duplicate the inherent factory context if any.
-  Network::DrainableFilterChainSharedPtr
-  findExistingFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain_message);
+  // A filter chain with MessageUtil::hash() of its message.
+  struct FcContext {
+    std::size_t message_hash{};
+    Network::DrainableFilterChainSharedPtr filter_chain;
+  };
+  using FcContextMap = absl::flat_hash_map<std::string, FcContext>;
+  // The origin filter chains by MessageUtil::hash(), to find equal messages that serialize
+  // differently. Filter chains that differ can share a hash, so each hash keeps all of them.
+  using FcContextsByMessageHash =
+      absl::flat_hash_map<std::size_t, absl::InlinedVector<const FcContextMap::value_type*, 1>>;
 
-  // Mapping from filter chain message to filter chain. This is used by LDS response handler to
-  // detect the filter chains in the intersection of existing listener and new listener.
+  const FilterChainManagerImpl* getOriginFilterChainManager() { return origin_.value(); }
+  // Returns the context of an origin filter chain that serializes to the same bytes as the message
+  // or is equal to it. On a miss, the returned context has the hash of the message and no filter
+  // chain.
+  FcContext
+  findExistingFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain_message,
+                          const std::string& serialized_message,
+                          const FcContextsByMessageHash& origin_fc_contexts);
+
+  // Mapping from the deterministic serialization of filter chain messages to filter chains. This is
+  // used by LDS response handler to detect the filter chains in the intersection of existing
+  // listener and new listener.
   FcContextMap fc_contexts_;
 
   std::optional<envoy::config::listener::v3::FilterChain> default_filter_chain_message_;

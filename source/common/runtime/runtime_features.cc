@@ -86,6 +86,9 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_send_rst_on_user_space_socket);
 // Ignore the automated "remove this flag" issue: never remove this before 2027/10. Confirm with
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
+// Ignore the automated "remove this flag" issue: do not remove this before
+// envoy.reloadable_features.filter_manager_per_filter_buffer is removed, since it is
+// still used when that flag is disabled.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_not_send_empty_data_with_false_eos);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_report_client_creation_error);
@@ -104,6 +107,16 @@ RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_added_data_on_con
 // every later filter, instead of dispatching them from the adding filter at the end of the data
 // pass.
 RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_held_trailers);
+// When resuming filter chain iteration, compute end_stream from whether the end of the stream has
+// reached the resuming filter, instead of from the stream-level flag. When enabled,
+// envoy.reloadable_features.ext_proc_inject_data_with_state_update is ignored.
+// Also buffer the body data stopped at each filter in that filter's own buffer instead of the
+// buffer shared by the whole stream. decodingBuffer()/encodingBuffer() then only return the data
+// held by the calling filter.
+// Disabled by default because out-of-tree extensions may read the body buffered by other filters
+// through decodingBuffer()/encodingBuffer(), which no longer return it when this is enabled.
+// TODO(wbpcode): flip to true once those extensions have had time to adapt.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_filter_manager_per_filter_buffer);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
 RUNTIME_GUARD(envoy_reloadable_features_geoip_sanitize_geo_headers);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
@@ -113,6 +126,7 @@ RUNTIME_GUARD(envoy_reloadable_features_health_check_after_cluster_warming);
 RUNTIME_GUARD(envoy_reloadable_features_hide_transport_failure_reason_in_response_body);
 RUNTIME_GUARD(envoy_reloadable_features_hot_restart_propagate_stat_tags);
 RUNTIME_GUARD(envoy_reloadable_features_http1_allow_query_method);
+RUNTIME_GUARD(envoy_reloadable_features_http1_skip_delayed_close_on_idle_drain);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_fix_goaway_loadshed_point);
 RUNTIME_GUARD(envoy_reloadable_features_http2_flood_protection_active_streams);
@@ -246,6 +260,9 @@ RUNTIME_GUARD(envoy_restart_features_defer_worker_routing_init);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
 
+// Opt in to reverse-tunnel listener drain handling and responder exclusion of draining nodes.
+// TODO: flip to true after operators have validated the new drain behavior.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_reverse_tunnel_listener_drain);
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_srds_partial_acceptance);
@@ -323,6 +340,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_async_client_downstream_flow_contr
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_rx_queue_overflow_socket_options);
 // TODO(abeyad): Flip to true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_ip_packet_info_socket_options);
+// When enabled, the admin filter returns to the event loop between the chunks of a response.
+// TODO(wbpcode): flip to true after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_admin_filter_yield_between_chunks);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
@@ -448,7 +468,10 @@ bool isLegacyRuntimeFeature(absl::string_view feature) {
 }
 
 bool runtimeFeatureEnabled(absl::string_view feature) {
-  absl::CommandLineFlag* flag = RuntimeFeaturesDefaults::get().getFlag(feature);
+  return runtimeFeatureEnabled(RuntimeFeaturesDefaults::get().getFlag(feature), feature);
+}
+
+bool runtimeFeatureEnabled(absl::CommandLineFlag* flag, absl::string_view feature) {
   if (flag == nullptr) {
     IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", feature));
     return false;

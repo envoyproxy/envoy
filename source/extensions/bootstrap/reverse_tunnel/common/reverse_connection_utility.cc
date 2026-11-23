@@ -173,6 +173,28 @@ uint64_t ReverseConnectionUtility::diffMs(const Envoy::MonotonicTime& start,
   return ms.count();
 }
 
+Http::MetadataMapVector ReverseConnectionUtility::createDrainMetadata() {
+  Http::MetadataMap metadata_map;
+  metadata_map.emplace(DRAIN_METADATA_KEY, DRAIN_METADATA_VALUE);
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::make_unique<Http::MetadataMap>(std::move(metadata_map)));
+
+  return metadata_map_vector;
+}
+
+bool ReverseConnectionUtility::eraseDrainMetadata(Http::MetadataMap& metadata_map) {
+  auto it = metadata_map.find(DRAIN_METADATA_KEY);
+  if (it == metadata_map.end()) {
+    return false;
+  }
+  if (it->second != DRAIN_METADATA_VALUE) {
+    return false;
+  }
+
+  metadata_map.erase(it);
+  return true;
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions

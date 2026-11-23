@@ -277,22 +277,22 @@ int ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
     return 1;
   }
 
-  // Create a dynamic message and unpack the Any into it
-  Protobuf::DynamicMessageFactory factory;
-  const Protobuf::Message* prototype = factory.GetPrototype(descriptor);
+  // unpack the Any into its concrete message type
+  const Protobuf::Message* prototype =
+      Protobuf::MessageFactory::generated_factory()->GetPrototype(descriptor);
   if (prototype == nullptr) {
     lua_pushnil(state);
     return 1;
   }
 
-  std::unique_ptr<Protobuf::Message> dynamic_message(prototype->New());
-  if (!any_message.UnpackTo(dynamic_message.get())) {
+  std::unique_ptr<Protobuf::Message> typed_message(prototype->New());
+  if (!any_message.UnpackTo(typed_message.get())) {
     lua_pushnil(state);
     return 1;
   }
 
   // Convert the unpacked message to Lua table
-  pushLuaTableFromMessage(state, *dynamic_message);
+  pushLuaTableFromMessage(state, *typed_message);
   return 1;
 }
 

@@ -49,8 +49,8 @@ The session outcome is taken from the
 
 * an ``OK`` status allows the session.
 * a denied response (non-``OK`` status, no ``error_response``) drops the session.
-* an error (a gRPC failure or timeout, or a response carrying an ``error_response``) drops the
-  session unless :ref:`failure_mode_allow
+* an error (a gRPC failure or timeout, or a non-``OK`` status with an ``error_response``) drops
+  the session unless :ref:`failure_mode_allow
   <envoy_v3_api_field_extensions.filters.udp.udp_proxy.session.ext_authz.v3.FilterConfig.failure_mode_allow>`
   is set.
 
