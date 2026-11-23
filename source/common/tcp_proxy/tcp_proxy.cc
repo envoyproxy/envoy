@@ -1404,6 +1404,11 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
       upstream_.reset();
     }
 
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.tcp_proxy_keep_idle_timer_on_upstream_close")) {
+      disableIdleTimer();
+    }
+
     if (connecting) {
       if (event == Network::ConnectionEvent::RemoteClose) {
         getStreamInfo().setResponseFlag(StreamInfo::UpstreamConnectionFailure);
@@ -1429,7 +1434,10 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         if (upstream_detected_close_type == StreamInfo::DetectedCloseType::RemoteReset) {
           ENVOY_CONN_LOG(trace, "TCP:onUpstreamEvent(): propagating upstream RST to downstream",
                          read_callbacks_->connection());
-          disableIdleTimer();
+          if (Runtime::runtimeFeatureEnabled(
+                  "envoy.reloadable_features.tcp_proxy_keep_idle_timer_on_upstream_close")) {
+            disableIdleTimer();
+          }
           getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRemoteReset);
           read_callbacks_->connection().close(Network::ConnectionCloseType::AbortReset);
         } else {

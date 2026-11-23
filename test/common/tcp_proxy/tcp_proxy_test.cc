@@ -1685,6 +1685,24 @@ TEST_P(TcpProxyTest, IdleTimerDisabledDownstreamClose) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Tests that the idle timer is disabled when the upstream connection is closed and the runtime
+// guard to keep it armed is disabled.
+TEST_P(TcpProxyTest, IdleTimerDisabledUpstreamClose) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.tcp_proxy_keep_idle_timer_on_upstream_close", "false"}});
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(1);
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  setup(1, config);
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(*idle_timer, disableTimer());
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // Tests that the idle timer stays armed after the upstream closes, so it bounds the FlushWrite
 // close of a downstream that stops reading.
 TEST_P(TcpProxyTest, IdleTimerBoundsFlushAfterUpstreamRemoteClose) {
