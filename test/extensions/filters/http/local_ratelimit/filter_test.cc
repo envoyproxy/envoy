@@ -1215,18 +1215,36 @@ TEST_F(DescriptorFilterTest, NoStopOnMatchConsumesAllBuckets) {
   decoder_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.emplace_back(
       second_route_rate_limit);
 
-  const std::vector<RateLimit::Descriptor> ten_token_descriptor{
-      {{{"hello", "world"}, {"foo", "bar"}}}};
+  // Append rather than replace, so both descriptors reach the limiter.
+  const RateLimit::Descriptor ten_token_descriptor{{{"hello", "world"}, {"foo", "bar"}}};
+  std::vector<std::vector<RateLimit::Descriptor>> seen;
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
-      .WillRepeatedly(testing::SetArgReferee<0>(ten_token_descriptor));
+      .WillRepeatedly(
+          Invoke([&](std::vector<RateLimit::Descriptor>& descriptors, const std::string&,
+                     const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&) {
+            descriptors.push_back(ten_token_descriptor);
+          }));
   EXPECT_CALL(second_route_rate_limit, populateDescriptors(_, _, _, _))
-      .WillRepeatedly(testing::SetArgReferee<0>(descriptor_));
+      .WillRepeatedly(
+          Invoke([&](std::vector<RateLimit::Descriptor>& descriptors, const std::string&,
+                     const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&) {
+            descriptors.push_back(descriptor_[0]);
+            seen.push_back(descriptors);
+          }));
 
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+
+  // Both entries contributed a descriptor to each request.
+  ASSERT_EQ(2U, seen.size());
+  for (const auto& descriptors : seen) {
+    ASSERT_EQ(2U, descriptors.size());
+    EXPECT_EQ(ten_token_descriptor.entries_, descriptors[0].entries_);
+    EXPECT_EQ(descriptor_[0].entries_, descriptors[1].entries_);
+  }
 }
 
 // A route entry with stop_on_match that produces a descriptor ends the search before the virtual

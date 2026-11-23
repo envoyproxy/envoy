@@ -154,8 +154,9 @@ configuration makes the filter skip all later configurations once that configura
 descriptor. Earlier configurations still apply, so configurations that should always count must be
 placed before the first one with the flag. Configurations that
 :ref:`apply on stream done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` are
-evaluated separately, so a stop at request time does not affect them. Only later configurations of
-the same :ref:`stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>` are skipped.
+evaluated separately, so a stop at request time does not affect them. For the deprecated route and
+virtual host ``rate_limits``, only later configurations of the same
+:ref:`stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>` are skipped.
 
 The search stops only within one ``rate_limits`` list. When
 :ref:`rate_limits_override_option <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits_override_option>`
@@ -168,7 +169,8 @@ virtual host configurations.
 A configuration matches when all of its actions populate and the resulting descriptor has at least
 one entry. If an action cannot populate, for example because a required header is missing, the
 configuration does not stop the search. The same holds when every action is skipped through
-``skip_if_absent``, because the resulting descriptor is empty. A configuration whose
+``skip_if_absent``, because the resulting descriptor is empty. In the embedded ``rate_limits``, a
+configuration whose
 :ref:`hits_addend <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` fails to evaluate,
 for example because the header it reads is missing or not a number, does not match either, so the
 request falls through to later configurations.

@@ -173,7 +173,8 @@ configuration with the flag also skips the virtual host configurations.
 
 A configuration matches when every one of its ``actions`` populates and the resulting descriptor
 has at least one entry, so a configuration whose actions are all skipped through
-``skip_if_absent`` does not stop the search. A configuration whose
+``skip_if_absent`` does not stop the search. In the embedded ``rate_limits``, a configuration
+whose
 :ref:`hits_addend <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` fails to evaluate
 does not stop the search either, so the request falls through to later configurations. A match does
 not require a configured descriptor with a token bucket for it, so a configuration that always

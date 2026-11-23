@@ -2872,16 +2872,17 @@ message RateLimit {
   // <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` are evaluated
   // separately from the request-time configurations, so each phase stops on its own.
   //
-  // Only later configurations of the same :ref:`stage
-  // <envoy_v3_api_field_config.route.v3.RateLimit.stage>` are skipped, since each filter only
-  // evaluates the configurations of its own stage.
+  // For the deprecated route and virtual host ``rate_limits``, only later configurations of the
+  // same :ref:`stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>` are skipped, since each
+  // filter only evaluates the configurations of its own stage.
   //
   // A configuration matches when all of its actions populate and the resulting descriptor has at
   // least one entry. A configuration whose actions are all skipped through ``skip_if_absent`` does
-  // not match and does not stop the search. Neither does a configuration whose
-  // :ref:`hits_addend <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` fails to
-  // evaluate, so such a request falls through to later configurations. For the HTTP local rate
-  // limit filter a match does not require a configured token bucket for the descriptor.
+  // not match and does not stop the search. In the filters' embedded ``rate_limits``, neither does
+  // a configuration whose :ref:`hits_addend
+  // <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` fails to evaluate, so such a
+  // request falls through to later configurations. For the HTTP local rate limit filter a match
+  // does not require a configured token bucket for the descriptor.
   //
   // Currently, this is only supported by the HTTP global and local rate limit filters. Other
   // filters that use this message, such as the Thrift rate limit filter, ignore it.
