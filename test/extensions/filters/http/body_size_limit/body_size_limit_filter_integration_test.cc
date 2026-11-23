@@ -1,3 +1,4 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/http/body_size_limit/v3/body_size_limit.pb.h"
 #include "envoy/extensions/filters/http/filter_chain/v3/filter_chain.pb.h"
@@ -9,6 +10,35 @@ namespace Envoy {
 namespace {
 
 using BodySizeLimitIntegrationTest = UpstreamDownstreamIntegrationTest;
+
+// WebSocket over HTTP/2 and HTTP/3 uses extended CONNECT, which is off by default on both sides.
+void allowExtendedConnect(ConfigHelper& config_helper, Http::CodecType downstream,
+                          Http::CodecType upstream) {
+  if (upstream != Http::CodecType::HTTP1) {
+    config_helper.addConfigModifier([upstream](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      auto* http_config = protocol_options.mutable_explicit_http_config();
+      if (upstream == Http::CodecType::HTTP2) {
+        http_config->mutable_http2_protocol_options()->set_allow_connect(true);
+      } else {
+        http_config->mutable_http3_protocol_options()->set_allow_extended_connect(true);
+      }
+      ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                       protocol_options);
+    });
+  }
+  if (downstream != Http::CodecType::HTTP1) {
+    config_helper.addConfigModifier(
+        [downstream](envoy::extensions::filters::network::http_connection_manager::v3::
+                         HttpConnectionManager& hcm) {
+          if (downstream == Http::CodecType::HTTP2) {
+            hcm.mutable_http2_protocol_options()->set_allow_connect(true);
+          } else {
+            hcm.mutable_http3_protocol_options()->set_allow_extended_connect(true);
+          }
+        });
+  }
+}
 
 INSTANTIATE_TEST_SUITE_P(
     Protocols, BodySizeLimitIntegrationTest,
@@ -119,10 +149,7 @@ TEST_P(BodySizeLimitIntegrationTest, RouterHeaderRequestSizeLimitExceeded) {
 
 // Test that bytes sent on an upgraded WebSocket connection are not counted toward the limit.
 TEST_P(BodySizeLimitIntegrationTest, WebSocketTrafficNotLimited) {
-  if (!testing_downstream_filter_ || downstreamProtocol() != Http::CodecType::HTTP1 ||
-      upstreamProtocol() != Http::CodecType::HTTP1) {
-    return;
-  }
+  allowExtendedConnect(config_helper_, downstreamProtocol(), upstreamProtocol());
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.add_upgrade_configs()->set_upgrade_type("websocket"); });
@@ -156,11 +183,13 @@ TEST_P(BodySizeLimitIntegrationTest, WebSocketTrafficNotLimited) {
   codec_client_->sendData(*request_encoder_, payload, false);
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, payload));
   EXPECT_FALSE(response->complete());
-  EXPECT_EQ(0,
-            test_server_->counter("http.config_test.body_size_limit.rq_body_too_large")->value());
+  // The filter's counters only exist under this name in the downstream filter chain.
+  if (testing_downstream_filter_) {
+    EXPECT_EQ(0,
+              test_server_->counter("http.config_test.body_size_limit.rq_body_too_large")->value());
+  }
 
-  codec_client_->close();
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  cleanupUpstreamAndDownstream();
 }
 
 // Test that upgrade headers alone don't lift the limit: bytes sent before the upstream accepts
@@ -201,8 +230,7 @@ TEST_P(BodySizeLimitIntegrationTest, UpgradeRequestBodyLimitedBeforeAccepted) {
 
 // Test that bytes sent on an accepted CONNECT tunnel are not counted toward the limit.
 TEST_P(BodySizeLimitIntegrationTest, ConnectTunnelTrafficNotLimited) {
-  if (downstreamProtocol() == Http::CodecType::HTTP3 ||
-      upstreamProtocol() != Http::CodecType::HTTP1) {
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
     return;
   }
   config_helper_.addConfigModifier(
@@ -236,8 +264,7 @@ TEST_P(BodySizeLimitIntegrationTest, ConnectTunnelTrafficNotLimited) {
               test_server_->counter("http.config_test.body_size_limit.rq_body_too_large")->value());
   }
 
-  codec_client_->close();
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(BodySizeLimitIntegrationTest, RouteDisabled) {
