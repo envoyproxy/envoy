@@ -76,6 +76,8 @@ Http::FilterHeadersStatus BodySizeLimitFilter::encodeHeaders(Http::ResponseHeade
   // Read the request headers the router forwarded rather than the ones this filter saw, so a
   // later filter that strips the upgrade headers also keeps the body limited.
   const auto request_headers = decoder_callbacks_->requestHeaders();
+  // A malformed HTTP/1 request gets its error reply through this filter before any request headers
+  // exist.
   if (!request_headers.has_value()) {
     return Http::FilterHeadersStatus::Continue;
   }

@@ -29,8 +29,9 @@ void allowExtendedConnect(ConfigHelper& config_helper, Http::CodecType downstrea
   }
   if (downstream != Http::CodecType::HTTP1) {
     config_helper.addConfigModifier(
-        [downstream](envoy::extensions::filters::network::http_connection_manager::v3::
-                         HttpConnectionManager& hcm) {
+        [downstream](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
           if (downstream == Http::CodecType::HTTP2) {
             hcm.mutable_http2_protocol_options()->set_allow_connect(true);
           } else {
@@ -78,6 +79,22 @@ TEST_P(BodySizeLimitIntegrationTest, RouterRequestAndResponseWithZeroByteBodyBuf
   config_helper_.prependFilter(ConfigHelper::defaultBodySizeLimitFilter(),
                                testing_downstream_filter_);
   testRouterRequestAndResponseWithBody(0, 0, false);
+}
+
+// A malformed HTTP/1 request gets its error reply through the filter before any request headers
+// exist, so the filter must not read them.
+TEST_P(BodySizeLimitIntegrationTest, MalformedHttp1RequestRejected) {
+  if (!testing_downstream_filter_ || downstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  config_helper_.prependFilter(ConfigHelper::smallBodySizeLimitFilter(),
+                               testing_downstream_filter_);
+  initialize();
+
+  std::string response;
+  sendRawHttpAndWaitForResponse(
+      lookupPort("http"), "POST / HTTP/1.1\r\nHost: host\r\nbad header\r\n\r\n", &response, false);
+  EXPECT_THAT(response, testing::StartsWith("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 TEST_P(BodySizeLimitIntegrationTest, RouterRequestSizeLimitExceeded) {
