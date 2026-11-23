@@ -12,7 +12,7 @@ bazel_dep(name = "abseil-cpp", version = "20260817.0")
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "boringssl", version = "0.20260929.0")
-bazel_dep(name = "envoy_toolshed", version = "0.5.24.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.26.envoy")
 bazel_dep(name = "gazelle", version = "0.54.0")
 bazel_dep(name = "googleapis", version = "0.0.0-20251003-2193a2bf")
 bazel_dep(name = "googleapis-cc", version = "1.0.0")
@@ -30,7 +30,7 @@ bazel_dep(name = "rules_go", version = "0.63.0")
 bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_jvm_external", version = "7.2")
 bazel_dep(name = "rules_proto", version = "7.1.0")
-bazel_dep(name = "rules_python", version = "2.4.5")
+bazel_dep(name = "rules_python", version = "2.5.1")
 bazel_dep(name = "xds", version = "0.0.0-20251210-ee656c7")
 bazel_dep(name = "yq.bzl", version = "0.4.0")
 bazel_dep(name = "zipkin-api", version = "1.0.0.bcr.1")
@@ -96,12 +96,12 @@ register_toolchains(
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.download(
     sdks = {
-        "linux_amd64": ("go1.27.3.linux-amd64.tar.gz", "65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40"),
-        "linux_arm64": ("go1.27.3.linux-arm64.tar.gz", "a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49"),
-        "darwin_arm64": ("go1.27.3.darwin-arm64.tar.gz", "dd3908cf20959d798c1e06ebe5b72213f0505ce01373b40ce3110975a6cd99c2"),
-        "darwin_amd64": ("go1.27.3.darwin-amd64.tar.gz", "b6f8e931e4ab497fcde6da8ae4499a58f9d258e55c8a80824a516eae5950a750"),
+        "linux_amd64": ("go1.27.4.linux-amd64.tar.gz", "7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840"),
+        "linux_arm64": ("go1.27.4.linux-arm64.tar.gz", "3392582988a273a87ab5043ee1b2c9c17a2c3c00580bf9326c47a2e0aaaeac92"),
+        "darwin_arm64": ("go1.27.4.darwin-arm64.tar.gz", "91a44a2b8a716600ad94a4f143e156116620db8828086a6e3602291be9bd0bb4"),
+        "darwin_amd64": ("go1.27.4.darwin-amd64.tar.gz", "2b799377704ef12db39bd254995d5c348c9cc8d86562ca817724390e56c38f43"),
     },
-    version = "1.27.3",
+    version = "1.27.4",
 )
 use_repo(
     go_sdk,

@@ -345,7 +345,7 @@ following are the command line options that Envoy supports.
 
 .. option:: --reject-unknown-dynamic-fields
 
-  *(optional)* This flag disables validation of protobuf configuration for unknown fields in
+  *(optional)* This flag enables validation of protobuf configuration for unknown fields in
   dynamic configuration. By default, this flag is set false, disabling validation for fields beyond
   bootstrap. This allows newer xDS configurations to be delivered to older Envoys. This can be set
   true for strict dynamic checking when this behavior is not wanted but the default should be

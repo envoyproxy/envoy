@@ -43,6 +43,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/body_size_limit:config",
         "//source/extensions/filters/http/filter_chain:config",
         "//test/integration:http_protocol_integration_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/body_size_limit/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/filter_chain/v3:pkg_cc_proto",

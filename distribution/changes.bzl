@@ -1,14 +1,12 @@
 """In-graph handling of per-distro Debian `.changes` files for central release signing.
 
-The per-arch `packages.<arch>.tar.gz` artifacts (built by `ci/do_ci.sh distribution`,
-see `//distribution:packages`) bundle *unsigned* `.deb`/`.changes` files under a
-`deb/` prefix. Central release signing (`//distribution:signed`) needs each
-multi-distro `.changes` file split into one file per distro (most apt tooling
-expects a single `Distribution:` per file) and clearsigned. The split+sign is
-delegated to the toolshed `pgp_sign_changes_split` macro.
+The release build (see `//distribution:packages`) builds *unsigned* `.deb`/`.changes` files.
+Central release signing (`//distribution:signed`) needs each multi-distro `.changes` file split
+into one file per distro (most apt tooling expects a single `Distribution:` per file) and
+clearsigned. The split+sign is delegated to the toolshed `pgp_sign_changes_split` macro.
 """
 
-load("@envoy_toolshed//pgp:defs.bzl", "changes_from_tarball", "pgp_sign_changes_split")
+load("@envoy_toolshed//pgp:defs.bzl", "pgp_sign_changes_split")
 
 # Keep in sync with `supported_distributions` in `distribution/debian/packages.bzl`
 # and `distribution/distros.yaml`.
@@ -48,19 +46,15 @@ def _package_names(release_version):
         "envoy-contrib-%s" % release_version,
     ]
 
-def envoy_signed_changes(name, arch_packages, arch_debs, version, release_version, distros = DISTROS):
-    """Extract, split-per-distro, and clearsign the bundled `.changes` files.
+def envoy_signed_changes(name, arch_debs, version, release_version, distros = DISTROS):
+    """Split-per-distro, and clearsign the `.changes` files.
 
     Output basenames reproduce what `envoy.gpg.sign`/debsign emitted into
     `bin/debs.tar.gz`.
 
     Args:
         name: Prefix for generated targets.
-        arch_packages: dict of arch name -> label of the `packages.<arch>.tar.gz`
-            tarball (containing a `deb/` prefix with the `.deb`/`.changes` files).
-        arch_debs: dict of arch name -> label of the `.deb`/`.changes` files themselves,
-            used instead with `//distribution:signing-inputs=debs` (eg when built in
-            the same invocation).
+        arch_debs: dict of arch name -> label of the `.deb`/`.changes` files of the arch.
         version: Full package version from `pkg_deb`.
         release_version: The `<major>.<minor>` release version used to name the
             minor-version package/`.changes` files.
@@ -71,36 +65,15 @@ def envoy_signed_changes(name, arch_packages, arch_debs, version, release_versio
     """
     names = _package_names(release_version)
     signed = []
-    for arch, packages in arch_packages.items():
+    for arch, debs in arch_debs.items():
         deb_arch = DEB_ARCH[arch]
         for pkg in names:
             changes_basename = "%s_%s_%s" % (pkg, version, deb_arch)
-            extract_name = "%s-%s-%s-extract" % (name, arch, pkg)
-            changes_from_tarball(
-                name = extract_name,
-                tarball = packages,
-                package = pkg,
-                prefix = "deb",
-                out = "%s/%s/%s.changes" % (name, arch, changes_basename),
-                # Reads the release packages (new with every commit, and large), locally.
-                tags = [
-                    "manual",
-                    "no-remote",
-                ],
-            )
             debian_files(
-                name = "%s-%s-%s-deb" % (name, arch, pkg),
-                srcs = [arch_debs[arch]],
+                name = "%s-%s-%s-changes" % (name, arch, pkg),
+                srcs = [debs],
                 basename = "%s.changes" % changes_basename,
                 suffix = ".changes",
-                tags = ["manual"],
-            )
-            native.alias(
-                name = "%s-%s-%s-changes" % (name, arch, pkg),
-                actual = select({
-                    "//distribution:signing_inputs_debs": ":%s-%s-%s-deb" % (name, arch, pkg),
-                    "//conditions:default": ":%s" % extract_name,
-                }),
                 tags = ["manual"],
             )
             for label, distro in pgp_sign_changes_split(

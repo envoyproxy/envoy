@@ -63,24 +63,17 @@ public:
                      "ratelimit_cluster", fake_upstreams_.back()->localAddress());
       proto_config_.mutable_rate_limit_service()->set_transport_api_version(
           envoy::config::core::v3::ApiVersion::V3);
+      if (proto_config_.rate_limits().empty()) {
+        auto* rate_limit = proto_config_.add_rate_limits();
+        rate_limit->add_actions()->mutable_destination_cluster();
+        rate_limit->set_x_ratelimit_option(per_descriptor_x_ratelimit_option_);
+      }
 
       envoy::config::listener::v3::Filter ratelimit_filter;
       ratelimit_filter.set_name("envoy.filters.http.ratelimit");
       std::ignore = ratelimit_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ratelimit_filter));
     });
-    config_helper_.addConfigModifier(
-        [this](
-            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) {
-          auto* rate_limit = hcm.mutable_route_config()
-                                 ->mutable_virtual_hosts(0)
-                                 ->mutable_routes(0)
-                                 ->mutable_route()
-                                 ->add_rate_limits();
-          rate_limit->add_actions()->mutable_destination_cluster();
-          rate_limit->set_x_ratelimit_option(per_descriptor_x_ratelimit_option_);
-        });
     HttpIntegrationTest::initialize();
   }
 
@@ -708,21 +701,21 @@ envoy.xxx:
   test: foo
 )EOF");
 
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) {
-        auto* rate_limit = hcm.mutable_route_config()
-                               ->mutable_virtual_hosts(0)
-                               ->mutable_routes(0)
-                               ->mutable_route()
-                               ->add_rate_limits();
-        auto* action = rate_limit->add_actions()->mutable_metadata();
-        action->set_source(envoy::config::route::v3::RateLimit::Action::MetaData::CLUSTER_ENTRY);
-        action->set_descriptor_key("cluster_metadata");
-        auto* metadata_key = action->mutable_metadata_key();
-        metadata_key->set_key("envoy.xxx");
-        metadata_key->add_path()->set_key("test");
-      });
+  base_filter_config_ = R"EOF(
+    domain: some_domain
+    timeout: 0.5s
+    rate_limits:
+    - actions:
+      - metadata:
+          descriptor_key: cluster_metadata
+          metadata_key:
+            key: envoy.xxx
+            path:
+            - key: test
+          source: CLUSTER_ENTRY
+    - actions:
+      - destination_cluster: {}
+  )EOF";
 
   initialize();
   initiateClientConnection();
@@ -777,25 +770,23 @@ TEST_P(RatelimitIntegrationTest, ClusterLocalityEntry) {
     TestUtility::loadFromYaml(metadata_yaml, *locality->mutable_metadata());
   });
 
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) {
-        auto* rate_limit = hcm.mutable_route_config()
-                               ->mutable_virtual_hosts(0)
-                               ->mutable_routes(0)
-                               ->mutable_route()
-                               ->add_rate_limits();
-        // Apply rate limit when stream is complete and the host is available to
-        // get locality metadata.
-        rate_limit->set_apply_on_stream_done(true);
-        auto* action = rate_limit->add_actions()->mutable_metadata();
-        action->set_source(
-            envoy::config::route::v3::RateLimit::Action::MetaData::CLUSTER_LOCALITY_ENTRY);
-        action->set_descriptor_key("cluster_locality_metadata");
-        auto* metadata_key = action->mutable_metadata_key();
-        metadata_key->set_key("envoy.xxx");
-        metadata_key->add_path()->set_key("test");
-      });
+  // Applied when the stream is complete so the host is available to get locality metadata.
+  base_filter_config_ = R"EOF(
+    domain: some_domain
+    timeout: 0.5s
+    rate_limits:
+    - actions:
+      - metadata:
+          descriptor_key: cluster_locality_metadata
+          metadata_key:
+            key: envoy.xxx
+            path:
+            - key: test
+          source: CLUSTER_LOCALITY_ENTRY
+      apply_on_stream_done: true
+    - actions:
+      - destination_cluster: {}
+  )EOF";
 
   initialize();
   initiateClientConnection();
