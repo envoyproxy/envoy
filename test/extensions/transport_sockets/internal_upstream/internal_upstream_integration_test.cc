@@ -11,6 +11,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
@@ -353,4 +354,156 @@ TEST_F(InternalUpstreamIntegrationTest, TcpProxyHalfCloseLeak) {
 }
 
 } // namespace
+// End-to-end topology: outer HTTP router -> internal TCP proxy -> CONNECT -> HTTP application.
+class InternalTunnelResponseStateIntegrationTest : public Event::TestUsingSimulatedTime,
+                                                   public testing::Test,
+                                                   public HttpIntegrationTest {
+public:
+  InternalTunnelResponseStateIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, TestEnvironment::getIpVersionsForTest().front(),
+                            ConfigHelper::httpProxyConfig()) {}
+
+  void initializeTunnel(bool publish = true) {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+    config_helper_.addConfigModifier([publish](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* extension = bootstrap.add_bootstrap_extensions();
+      extension->set_name("envoy.bootstrap.internal_listener");
+      envoy::extensions::bootstrap::internal_listener::v3::InternalListener config;
+      extension->mutable_typed_config()->PackFrom(config);
+      auto* resources = bootstrap.mutable_static_resources();
+      auto* cluster = resources->add_clusters();
+      cluster->set_name("tunnel_loopback");
+      cluster->mutable_connect_timeout()->set_seconds(5);
+      cluster->mutable_load_assignment()->set_cluster_name("tunnel_loopback");
+      cluster->mutable_load_assignment()
+          ->add_endpoints()
+          ->add_lb_endpoints()
+          ->mutable_endpoint()
+          ->mutable_address()
+          ->mutable_envoy_internal_address()
+          ->set_server_listener_name("tunnel");
+      auto* listener = resources->add_listeners();
+      listener->set_name("tunnel");
+      listener->mutable_internal_listener();
+      auto* filter = listener->add_filter_chains()->add_filters();
+      filter->set_name("envoy.filters.network.tcp_proxy");
+      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy;
+      proxy.set_stat_prefix("tunnel");
+      proxy.set_cluster("cluster_0");
+      proxy.mutable_tunneling_config()->set_hostname("customer.example:80");
+      proxy.mutable_tunneling_config()->set_propagate_response_headers_to_upstream_connection(
+          publish);
+      filter->mutable_typed_config()->PackFrom(proxy);
+    });
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_routes(0)
+              ->mutable_route()
+              ->set_cluster("tunnel_loopback");
+        });
+    log_path_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+    config_helper_.setAccessLog(log_path_, "%UPSTREAM_FILTER_STATE(envoy.tcp_proxy.propagate_"
+                                           "response_headers:FIELD:x-destination-ip)%|"
+                                           "%RESP(x-destination-ip)%\n");
+    HttpIntegrationTest::initialize();
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+  }
+
+  void acceptTunnel(const Http::TestResponseHeaderMapImpl& headers) {
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+    EXPECT_EQ("CONNECT", upstream_request_->headers().getMethodValue());
+    upstream_request_->encodeHeaders(headers, false);
+  }
+
+  void respondToRequest(const std::string& path, IntegrationStreamDecoder& response) {
+    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, [path](const std::string& data) {
+      return data.find("GET " + path + " HTTP/1.1") != std::string::npos;
+    }));
+    upstream_request_->encodeData(
+        "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nx-destination-ip: 198.51.100.9\r\n\r\nOK", false);
+    ASSERT_TRUE(response.waitForEndStream());
+    EXPECT_EQ("200", response.headers().getStatusValue());
+    EXPECT_EQ("198.51.100.9", response.headers()
+                                  .get(Http::LowerCaseString("x-destination-ip"))[0]
+                                  ->value()
+                                  .getStringView());
+  }
+
+  std::string log_path_;
+};
+
+TEST_F(InternalTunnelResponseStateIntegrationTest, ReusedTunnelKeepsItsDestinationAcrossRequests) {
+  initializeTunnel();
+  default_request_headers_.setPath("/first");
+  auto first = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  acceptTunnel(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"x-destination-ip", "192.0.2.7"}});
+  respondToRequest("/first", *first);
+  EXPECT_EQ("192.0.2.7|198.51.100.9", waitForAccessLog(log_path_));
+
+  // A second application request travels on the existing CONNECT stream; PNG sends no new headers.
+  default_request_headers_.setPath("/second");
+  auto second = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  respondToRequest("/second", *second);
+  EXPECT_EQ("192.0.2.7|198.51.100.9", waitForAccessLog(log_path_, 1));
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_F(InternalTunnelResponseStateIntegrationTest, DisabledPublicationDoesNotUseApplicationHeader) {
+  initializeTunnel(false);
+  default_request_headers_.setPath("/disabled");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  acceptTunnel(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"x-destination-ip", "192.0.2.7"}});
+  respondToRequest("/disabled", *response);
+  EXPECT_EQ("-|198.51.100.9", waitForAccessLog(log_path_));
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_F(InternalTunnelResponseStateIntegrationTest, MissingTunnelHeaderDoesNotUseApplicationHeader) {
+  initializeTunnel();
+  default_request_headers_.setPath("/missing");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  acceptTunnel(Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  respondToRequest("/missing", *response);
+  EXPECT_EQ("-|198.51.100.9", waitForAccessLog(log_path_));
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_F(InternalTunnelResponseStateIntegrationTest, PeriodicAndFinalLogsReadTheSameTunnel) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_access_log_options()->mutable_access_log_flush_interval()->set_seconds(1);
+      });
+  initializeTunnel();
+  default_request_headers_.setPath("/periodic");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  acceptTunnel(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"x-destination-ip", "192.0.2.7"}});
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, [](const std::string& data) {
+    return data.find("GET /periodic HTTP/1.1") != std::string::npos;
+  }));
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  EXPECT_EQ("192.0.2.7|-", waitForAccessLog(log_path_));
+  respondToRequest("/periodic", *response);
+  EXPECT_EQ("192.0.2.7|198.51.100.9", waitForAccessLog(log_path_, 1));
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_F(InternalTunnelResponseStateIntegrationTest, FailedTunnelDoesNotPublishItsHeader) {
+  initializeTunnel();
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  acceptTunnel(
+      Http::TestResponseHeaderMapImpl{{":status", "503"}, {"x-destination-ip", "192.0.2.7"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("-|-", waitForAccessLog(log_path_));
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace Envoy

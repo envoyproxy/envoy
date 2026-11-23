@@ -3,6 +3,8 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 
+#include "source/common/stream_info/connection_state_publisher.h"
+#include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/tcp_proxy/upstream.h"
 
@@ -47,6 +49,17 @@ public:
     }
     EXPECT_CALL(stream_encoder_options_, enableHalfClose()).Times(AnyNumber());
     tcp_proxy_.mutable_tunneling_config()->set_hostname("default.host.com:443");
+  }
+
+  StreamInfo::FilterStateSharedPtr enableResponsePublication() {
+    tcp_proxy_.mutable_tunneling_config()->set_propagate_response_headers_to_upstream_connection(
+        true);
+    auto state = std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::Connection);
+    downstream_stream_info_.filterState()->setData(
+        StreamInfo::ConnectionStatePublisher::key(),
+        std::make_shared<StreamInfo::ConnectionStatePublisher>(state),
+        StreamInfo::FilterState::Connection);
+    return state;
   }
 
   void setupUpstream() {
@@ -100,17 +113,91 @@ TEST_P(HttpUpstreamTest, WriteDownstream) {
 }
 
 TEST_P(HttpUpstreamTest, InvalidUpgradeWithEarlyFin) {
+  auto client_state = enableResponsePublication();
   this->setupUpstream();
   EXPECT_CALL(this->callbacks_, onEvent(_));
   Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
   this->upstream_->responseDecoder().decodeHeaders(std::move(headers), true);
+  EXPECT_FALSE(client_state->hasDataWithName(TunnelResponseHeaders::key()));
 }
 
 TEST_P(HttpUpstreamTest, InvalidUpgradeWithNon200) {
+  auto client_state = enableResponsePublication();
   this->setupUpstream();
   EXPECT_CALL(this->callbacks_, onEvent(_));
   Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "301"}}};
   this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  EXPECT_FALSE(client_state->hasDataWithName(TunnelResponseHeaders::key()));
+}
+
+// The outer request uses the client side of an internal connection. Only a successful,
+// still-open tunnel may publish information to that connection's access logs.
+TEST_P(HttpUpstreamTest, PublishesEstablishedTunnelHeaders) {
+  auto client_state = enableResponsePublication();
+  setupUpstream();
+  Http::ResponseHeaderMapPtr headers{
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"x-destination-ip", "192.0.2.1"}}};
+  upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  const auto* result =
+      client_state->getDataReadOnly<TunnelResponseHeaders>(TunnelResponseHeaders::key());
+  ASSERT_NE(nullptr, result);
+  EXPECT_EQ("192.0.2.1", absl::get<absl::string_view>(result->getField("X-Destination-IP")));
+  EXPECT_FALSE(
+      downstream_stream_info_.filterState()->hasDataWithName(TunnelResponseHeaders::key()));
+}
+
+TEST_P(HttpUpstreamTest, DoesNotPublishTunnelHeadersByDefault) {
+  auto client_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  downstream_stream_info_.filterState()->setData(
+      StreamInfo::ConnectionStatePublisher::key(),
+      std::make_shared<StreamInfo::ConnectionStatePublisher>(client_state),
+      StreamInfo::FilterState::LifeSpan::Connection);
+  setupUpstream();
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
+  upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  EXPECT_FALSE(client_state->hasDataWithName(TunnelResponseHeaders::key()));
+}
+
+TEST(TunnelResponseHeadersTest, MissingAndRepeatedFieldsAreAbsent) {
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{
+      {":status", "200"}, {"x-ip", "192.0.2.1"}, {"x-ip", "192.0.2.2"}, {"x-empty", ""}}};
+  TunnelResponseHeaders response(std::move(headers));
+  EXPECT_TRUE(response.hasFieldSupport());
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(response.getField("missing")));
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(response.getField("x-ip")));
+  EXPECT_EQ("", absl::get<absl::string_view>(response.getField("x-empty")));
+}
+
+TEST(TunnelingConfigHelperImplTest, SharesTheHeaderObjectAndPreservesFailureDiagnostics) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Stats::MockStore> store;
+  TcpProxy config;
+  auto* tunneling = config.mutable_tunneling_config();
+  tunneling->set_hostname("example.com:443");
+  tunneling->set_propagate_response_headers(true);
+  tunneling->set_propagate_response_headers_to_upstream_connection(true);
+  TunnelingConfigHelperImpl helper(store.mockScope(), config, context);
+  auto client = std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::Connection);
+  auto server = std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::Connection);
+
+  // The option is harmless on a normal TCP listener, which has no return path.
+  Http::ResponseHeaderMapPtr ordinary{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
+  helper.propagateResponseHeaders(std::move(ordinary), server, true);
+  EXPECT_TRUE(server->hasDataWithName(TunnelResponseHeaders::key()));
+  server->setData(StreamInfo::ConnectionStatePublisher::key(),
+                  std::make_shared<StreamInfo::ConnectionStatePublisher>(client),
+                  StreamInfo::FilterState::Connection);
+  Http::ResponseHeaderMapPtr failed{new Http::TestResponseHeaderMapImpl{{":status", "503"}}};
+  helper.propagateResponseHeaders(std::move(failed), server, false);
+  EXPECT_FALSE(client->hasDataWithName(TunnelResponseHeaders::key()));
+  EXPECT_EQ("503", absl::get<absl::string_view>(
+                       server->getDataReadOnly<TunnelResponseHeaders>(TunnelResponseHeaders::key())
+                           ->getField(":status")));
+  Http::ResponseHeaderMapPtr accepted{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
+  helper.propagateResponseHeaders(std::move(accepted), server, true);
+  EXPECT_EQ(client->getDataReadOnlyGeneric(TunnelResponseHeaders::key()),
+            server->getDataReadOnlyGeneric(TunnelResponseHeaders::key()));
 }
 
 TEST_P(HttpUpstreamTest, ReadDisable) {
@@ -738,6 +825,17 @@ public:
     tcp_proxy_.mutable_tunneling_config()->set_hostname("default.host.com:443");
   }
 
+  StreamInfo::FilterStateSharedPtr enableResponsePublication() {
+    tcp_proxy_.mutable_tunneling_config()->set_propagate_response_headers_to_upstream_connection(
+        true);
+    auto state = std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::Connection);
+    downstream_stream_info_.filterState()->setData(
+        StreamInfo::ConnectionStatePublisher::key(),
+        std::make_shared<StreamInfo::ConnectionStatePublisher>(state),
+        StreamInfo::FilterState::Connection);
+    return state;
+  }
+
   void setup() {
     tunnel_config_ = std::make_unique<TunnelingConfigHelperImpl>(scope_, tcp_proxy_, context_);
     conn_pool_ = std::make_unique<HttpConnPool>(nullptr, cluster_, &lb_context_, *tunnel_config_,
@@ -846,17 +944,35 @@ TEST_F(CombinedUpstreamTest, WriteDownstream) {
 }
 
 TEST_F(CombinedUpstreamTest, InvalidUpgradeWithEarlyFin) {
+  auto client_state = enableResponsePublication();
   this->setup();
   EXPECT_CALL(this->callbacks_, onEvent(_));
   Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
   this->upstream_->responseDecoder().decodeHeaders(std::move(headers), true);
+  EXPECT_FALSE(client_state->hasDataWithName(TunnelResponseHeaders::key()));
 }
 
 TEST_F(CombinedUpstreamTest, InvalidUpgradeWithNon200) {
+  auto client_state = enableResponsePublication();
   this->setup();
   EXPECT_CALL(this->callbacks_, onEvent(_));
   Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "301"}}};
   this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  EXPECT_FALSE(client_state->hasDataWithName(TunnelResponseHeaders::key()));
+}
+
+TEST_F(CombinedUpstreamTest, PublishesEstablishedTunnelHeaders) {
+  auto client_state = enableResponsePublication();
+  setup();
+  Http::ResponseHeaderMapPtr headers{
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"x-destination-ip", "192.0.2.1"}}};
+  upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  const auto* result =
+      client_state->getDataReadOnly<TunnelResponseHeaders>(TunnelResponseHeaders::key());
+  ASSERT_NE(nullptr, result);
+  EXPECT_EQ("192.0.2.1", absl::get<absl::string_view>(result->getField("X-Destination-IP")));
+  EXPECT_FALSE(
+      downstream_stream_info_.filterState()->hasDataWithName(TunnelResponseHeaders::key()));
 }
 
 TEST_F(CombinedUpstreamTest, ReadDisable) {

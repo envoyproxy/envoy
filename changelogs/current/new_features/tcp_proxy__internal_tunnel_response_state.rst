@@ -1,0 +1,1 @@
+tcp_proxy: added opt-in publication of established tunnel response headers to the client side of an internal connection, readable through ``UPSTREAM_FILTER_STATE`` and a new dynamic access logger string-field accessor.

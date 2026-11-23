@@ -120,7 +120,7 @@ message TcpProxy {
   // Configuration for tunneling TCP over other transports or application layers.
   // Tunneling is supported over HTTP/1.1 and HTTP/2. The upstream protocol is
   // determined by the cluster configuration.
-  // [#next-free-field: 11]
+  // [#next-free-field: 12]
   message TunnelingConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.TunnelingConfig";
@@ -207,6 +207,18 @@ message TcpProxy {
     // See the formatters extensions documentation for details.
     // [#extension-category: envoy.formatter]
     repeated config.core.v3.TypedExtensionConfig formatters = 10;
+
+    // For an internal listener, publish the headers of an established tunnel to the client
+    // side of the internal connection. Requests using that connection can read them via
+    // ``UPSTREAM_FILTER_STATE(envoy.tcp_proxy.propagate_response_headers:FIELD:<header-name>)``.
+    // Header names are case-insensitive; missing or repeated headers have no field value.
+    // No headers are inserted into application requests or responses.
+    //
+    // Defaults to false. This retains the response headers for the lifetime of the internal
+    // connection and any requests still referencing it, without copying headers per request.
+    // This is independent of ``propagate_response_headers``. Failed or immediately closed
+    // tunnel responses are not published. Has no effect on non-internal connections.
+    bool propagate_response_headers_to_upstream_connection = 11;
   }
 
   message OnDemand {

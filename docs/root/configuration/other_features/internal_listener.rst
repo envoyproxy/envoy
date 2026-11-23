@@ -87,6 +87,35 @@ Meanwhile, another internal listener binding to the above listener address inclu
 
 A sample config can be found :repo:`here <configs/encapsulate_http_in_http2_connect.yaml>`
 
+Logging tunnel response information
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The CONNECT response is consumed by the internal listener's TCP proxy. It is separate from the
+application HTTP responses seen by the outer HTTP connection manager. To make tunnel response
+information available to the outer request's access logger, enable
+``propagate_response_headers_to_upstream_connection`` in the internal TCP proxy's ``tunneling_config``.
+The option defaults to false and is independent of ``propagate_response_headers``.
+
+For example, if the tunnel proxy reports its destination in ``x-destination-ip``, the outer access
+log can use::
+
+  %UPSTREAM_FILTER_STATE(envoy.tcp_proxy.propagate_response_headers:FIELD:x-destination-ip)%
+
+The headers are published once, when a response establishes an open tunnel. Each request using that
+internal connection reads the same immutable header object through its upstream connection's filter
+state. This also works when an access log retains the connection state after the connection closes.
+No application HTTP headers are added or changed. A different upstream connection has independent
+state, including when a request is retried.
+
+Before the tunnel is established, or if the header is missing or repeated, the field is absent.
+Rejected responses and responses that immediately end the tunnel are not published. Existing
+downstream ``propagate_response_headers`` behavior, including failure diagnostics, is unchanged.
+
+Dynamic access logger modules can read the same string field with
+``envoy_dynamic_module_callback_access_logger_get_upstream_filter_state_string_field``. The Rust SDK
+exposes ``LogContext::get_upstream_filter_state_string_field(key, field)``. Returned buffers are
+borrowed for the current log callback and must be copied if retained asynchronously.
+
 Decapsulate the CONNECT requests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

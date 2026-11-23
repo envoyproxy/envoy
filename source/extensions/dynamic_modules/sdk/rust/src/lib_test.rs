@@ -16281,3 +16281,55 @@ mod xds_tests {
     );
   }
 }
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_access_logger_get_upstream_filter_state_string_field(
+  logger: abi::envoy_dynamic_module_type_access_logger_envoy_ptr,
+  key: abi::envoy_dynamic_module_type_module_buffer,
+  field: abi::envoy_dynamic_module_type_module_buffer,
+  result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  assert!(!logger.is_null());
+  if module_buffer_to_string(key) != "envoy.tcp_proxy.propagate_response_headers"
+    || module_buffer_to_string(field) != "x-destination-ip"
+  {
+    unsafe {
+      *result = abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+    }
+    return false;
+  }
+  let value = unsafe { &*(logger as *const String) };
+  unsafe {
+    *result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: value.as_ptr() as *const _,
+      length: value.len(),
+    };
+  }
+  true
+}
+
+#[test]
+fn test_access_logger_upstream_connection_field() {
+  let key = "envoy.tcp_proxy.propagate_response_headers";
+  for ip in ["192.0.2.7", "2001:db8::7", ""] {
+    let mut value = ip.to_owned();
+    let ctx = access_log::LogContext::new(
+      &mut value as *mut String as *mut std::ffi::c_void,
+      access_log::AccessLogType::DownstreamEnd,
+    );
+    let result = ctx
+      .get_upstream_filter_state_string_field(key, "x-destination-ip")
+      .unwrap();
+    assert_eq!(ip.as_bytes(), result.as_slice());
+    assert_eq!(value.as_ptr(), result.as_slice().as_ptr());
+    assert!(ctx
+      .get_upstream_filter_state_string_field(key, "missing")
+      .is_none());
+    assert!(ctx
+      .get_upstream_filter_state_string_field("missing", "x-destination-ip")
+      .is_none());
+  }
+}

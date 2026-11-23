@@ -122,6 +122,8 @@ envoy_cc_test(
     },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
+        "//source/common/stream_info:connection_state_publisher_lib",
+        "//source/common/stream_info:filter_state_lib",
         "//source/common/tcp_proxy",
         "//test/common/formatter:command_extension_lib",
         "//test/common/memory:memory_test_utility_lib",
