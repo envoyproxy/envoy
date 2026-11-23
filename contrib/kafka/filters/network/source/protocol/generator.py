@@ -167,7 +167,9 @@ class StatefulProcessor:
                     # Kafka 4.0 removed the old ZooKeeper-era controller APIs (LeaderAndIsr,
                     # StopReplica, UpdateMetadata, ControlledShutdown); their specs are retained
                     # with validVersions "none" and have no versions to generate, so skip them.
-                    if api_key not in [71, 72] and message_spec.get('validVersions') != 'none':
+                    # 88/89/93 are the Kafka 4.x Streams group APIs (KIP-1071), not supported yet.
+                    if api_key not in [71, 72, 88, 89, 93] \
+                            and message_spec.get('validVersions') != 'none':
                         message = self.parse_top_level_element(message_spec)
                         messages.append(message)
             except Exception as e:
