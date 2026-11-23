@@ -590,8 +590,6 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessing) {
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp();
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received",
-                               testing::Ge(total_req_body_msg + 1));
   // The ext_proc_server_0 now sends back the last chunk of the body responses.
   serverSendBodyRespDuplexStreamed(1, processor_stream_, /*end_stream*/ true, false, "");
 
@@ -643,8 +641,6 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessing) {
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp(true, true);
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received",
-                               testing::Ge(total_resp_body_msg + 1));
   // The ext_proc_server_0 now sends back the last chunk of the body responses.
   serverSendBodyRespDuplexStreamed(1, processor_stream_, /*end_stream*/ true, /*response*/ true,
                                    "");

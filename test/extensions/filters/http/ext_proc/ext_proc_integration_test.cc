@@ -803,14 +803,16 @@ TEST_P(ExtProcIntegrationTest, ResponseFromExtProcServerTooLarge) {
 
   std::string body_str = std::string(64 * 1024, 'a');
   auto response = sendDownstreamRequestWithBody("Replace this!", std::nullopt);
-  processRequestBodyMessage(
-      *grpc_upstreams_[0], true, [&body_str](const HttpBody& body, BodyResponse& body_resp) {
-        EXPECT_TRUE(body.end_of_stream());
-        // Send the over-limit response from ext_proc server.
-        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-        body_mut->set_body(body_str);
-        return true;
-      });
+  processRequestBodyMessage(*grpc_upstreams_[0], true, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_TRUE(body.end_of_stream());
+    return false;
+  });
+  // The gRPC client rejects this response before delivering a processing callback, so wait for
+  // the downstream error below instead of acknowledging the message.
+  ProcessingResponse processing_response;
+  processing_response.mutable_request_body()->mutable_response()->mutable_body_mutation()->set_body(
+      body_str);
+  processor_stream_->sendGrpcMessage(processing_response);
 
   verifyDownstreamResponse(*response, 500);
 }
@@ -1883,7 +1885,6 @@ public:
     }
     EXPECT_TRUE(upstream_request_->complete());
     processResponseHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
-    test_server_->waitForCounter("cluster.cluster_0.upstream_rq_retry", Ge(1));
     // The first retry is jittered below the configured 1s base interval; 1s covers every delay.
     simTime().advanceTimeWait(1s);
     // Upstream receives a retry request and returns a 200 response, which should not trigger a
@@ -2580,16 +2581,14 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithLogging) {
   initializeConfig(config_option);
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(std::nullopt);
-  processRequestHeadersMessage(
-      *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse&) {
-        // Logging expects the gRPC response headers to have arrived.
-        if (IsEnvoyGrpc()) {
-          test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_200", Ge(1));
-        }
-        // 400ms is twice the configured 200ms message timeout, safely past its deadline.
-        simTime().advanceTimeWait(400ms);
-        return false;
-      });
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // The helper has waited for the gRPC response headers to arrive.
+                                 // 400ms is twice the configured 200ms message timeout, safely past
+                                 // its deadline.
+                                 simTime().advanceTimeWait(400ms);
+                                 return false;
+                               });
 
   // We should immediately have an error response now
   verifyDownstreamResponse(*response, 504);
@@ -2697,15 +2696,15 @@ TEST_P(ExtProcIntegrationTest, ResponseMessageTimeoutDownstreamDisconnect) {
   auto response = sendDownstreamRequest(std::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
   handleUpstreamRequest();
-  processResponseHeadersMessage(
-      *grpc_upstreams_[0], false, [this](const HttpHeaders&, HeadersResponse&) {
-        // Downstream disconnect
-        codec_client_->close();
-        test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
-        // 400ms passes the former 200ms message deadline to exercise cleanup after disconnect.
-        simTime().advanceTimeWait(400ms);
-        return false;
-      });
+  processResponseHeadersMessage(*grpc_upstreams_[0], false,
+                                [this](const HttpHeaders&, HeadersResponse&) {
+                                  // Downstream disconnect
+                                  destroyFilter([&] { codec_client_->close(); });
+                                  // 400ms passes the former 200ms message deadline to exercise
+                                  // cleanup after disconnect.
+                                  simTime().advanceTimeWait(400ms);
+                                  return false;
+                                });
 
   ASSERT_TRUE(response->waitForReset());
 }
@@ -3248,7 +3247,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNoMutationMultipleNewTimeout) {
                                  // Send the 2nd 10ms new timeout update.
                                  // The update is ignored by Envoy. No timeout event
                                  // happened and the traffic went through fine.
-                                 serverSendNewTimeout(10, /*ignored=*/true);
+                                 serverSendNewTimeout(10);
                                  // Another 300ms passes both the ignored 10ms timeout and the
                                  // original 200ms timeout, but not the first, extended timeout.
                                  simTime().advanceTimeWait(300ms);
@@ -4437,9 +4436,11 @@ TEST_P(ExtProcIntegrationTest, RetryOnResponseError) {
       Http::TestResponseHeaderMapImpl{{":status", "500"}, {"grpc-status", "8"}, {"foo", "bar"}},
       true);
   ASSERT_TRUE(processor_stream_->waitForReset());
-  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_retry", Ge(1));
-  // 100ms covers the default first-retry delay of less than 25ms, below the 5s message timeout.
-  simTime().advanceTimeWait(100ms);
+  // Drain the reset callback before advancing time, so retry backoff is already armed.
+  test_server_->waitForWorkerThreads();
+  // Core gRPC retry policies default to a jittered 1s base interval. Cover that whole interval
+  // while staying below the 5s message timeout.
+  simTime().advanceTimeWait(1s);
   // Retry happens in a new stream.
   ProcessingRequest request_headers_msg2;
   ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
@@ -4506,9 +4507,11 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
       Http::TestResponseHeaderMapImpl{{":status", "500"}, {"grpc-status", "8"}, {"foo", "bar"}},
       true);
   ASSERT_TRUE(processor_stream_->waitForReset());
-  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_retry", Ge(1));
-  // 100ms covers the default first-retry delay of less than 25ms, below the 5s message timeout.
-  simTime().advanceTimeWait(100ms);
+  // Drain the reset callback before advancing time, so retry backoff is already armed.
+  test_server_->waitForWorkerThreads();
+  // Core gRPC retry policies default to a jittered 1s base interval. Cover that whole interval
+  // while staying below the 5s message timeout.
+  simTime().advanceTimeWait(1s);
   FakeHttpConnectionPtr processor_connection_2;
   int host_id_2;
   ASSERT_OK_AND_ASSIGN(host_id_2, FakeUpstream::waitForHttpConnection(
@@ -4582,7 +4585,8 @@ TEST_P(ExtProcIntegrationTest, RetryStatsVerification) {
   processor_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "500"}, {"grpc-status", "8"}}, true);
   ASSERT_TRUE(processor_stream_->waitForReset());
-  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_retry", Ge(1));
+  // Drain the reset callback before advancing time, so retry backoff is already armed.
+  test_server_->waitForWorkerThreads();
   // 100ms covers the configured 100ms backoff cap, below the 5s message timeout.
   simTime().advanceTimeWait(100ms);
 
@@ -4596,7 +4600,8 @@ TEST_P(ExtProcIntegrationTest, RetryStatsVerification) {
   processor_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "500"}, {"grpc-status", "14"}}, true);
   ASSERT_TRUE(processor_stream_->waitForReset());
-  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_retry", Ge(2));
+  // Drain the reset callback before advancing time, so retry backoff is already armed.
+  test_server_->waitForWorkerThreads();
   // 100ms also covers the second retry under the same 100ms cap, below the 5s message timeout.
   simTime().advanceTimeWait(100ms);
 
@@ -4662,7 +4667,8 @@ TEST_P(ExtProcIntegrationTest, RetryOnDeadlineExceeded) {
   processor_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "500"}, {"grpc-status", "4"}}, true);
   ASSERT_TRUE(processor_stream_->waitForReset());
-  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_retry", Ge(1));
+  // Drain the reset callback before advancing time, so retry backoff is already armed.
+  test_server_->waitForWorkerThreads();
   // 100ms covers the configured 100ms backoff cap, below the 5s message timeout.
   simTime().advanceTimeWait(100ms);
 
@@ -5501,18 +5507,14 @@ TEST_P(ExtProcIntegrationTest, RequestTimeoutWhileWaitingForGracefulClose) {
   // Reset the client stream. It will put the stream in waiting for graceful close state.
   // TODO(yavlasov): add ability to detect that the stream
   // was reset and reset the side stream in this case.
-  codec_client_->sendReset(*request_encoder_);
-
-  // Wait for filter teardown to half-close the side stream and arm its timers. The downstream
-  // reset counter is incremented before teardown and does not guarantee that the timers exist.
-  test_server_->waitForCounter("http.config_test.ext_proc.streams_closed", Ge(1));
+  // Wait for teardown itself, so the side stream's timers are armed before advancing time.
+  destroyFilter([&] { codec_client_->sendReset(*request_encoder_); });
   ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
 
   // Without any activity side stream should hit per try timeout and try to send error response,
   // but since the stream is waiting for graceful close, it will get reset.
   // 2s reaches the side stream's configured per-try deadline, before the 60s remote-close timer.
   simTime().advanceTimeWait(2s);
-  test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_per_try_timeout", Ge(1));
   EXPECT_TRUE(processor_stream_->waitForReset());
 }
 
@@ -5960,17 +5962,14 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamed) {
   // The ext_proc_server_0 sends back the header response.
   serverSendHeaderResp();
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(1));
   codec_client_->sendData(*request_encoder_, "sss", false);
   processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(2));
   // The ext_proc_server_1 receives the headers.
   server1ReceiveHeaderReq(header_request);
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp();
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(3));
   codec_client_->sendData(*request_encoder_, "xxx", true);
   // The ext_proc_server_0 now sends back the last chunk of the body responses.
   processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
@@ -6017,16 +6016,13 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessingStreamed) {
   // The ext_proc_server_0 sends back the header response.
   serverSendHeaderResp(true, true);
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(1));
   upstream_request_->encodeData("mmmmm", false);
   processResponseBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(2));
   // The ext_proc_server_1 receives the headers.
   server1ReceiveHeaderReq(header_request, true, true);
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp(true, true);
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(3));
   response->waitForBodyData(5);
   EXPECT_FALSE(response->complete());
   upstream_request_->encodeData("nnnn", true);
@@ -6073,17 +6069,14 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamedWithT
   // The ext_proc_server_0 sends back the header response.
   serverSendHeaderResp();
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(1));
   codec_client_->sendData(*request_encoder_, "sss", false);
   processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(2));
   // The ext_proc_server_1 receives the headers.
   server1ReceiveHeaderReq(header_request);
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp();
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(3));
   codec_client_->sendData(*request_encoder_, "xxx", false);
   Http::TestRequestTrailerMapImpl request_trailers{{"x-request-trailer-foo", "yes"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
@@ -6433,10 +6426,7 @@ TEST_P(ExtProcIntegrationTest, ThreeExtProcFiltersInRequestProcessingStreamed) {
   ASSERT_TRUE(processor_stream_1_->waitForGrpcMessage(*dispatcher_, body_request));
   ASSERT_TRUE(body_request.has_request_body());
   EXPECT_FALSE(body_request.request_body().end_of_stream());
-  processor_stream_1_->sendGrpcMessage(body_response);
-  // Wait for both header responses and both responses for the first body chunk before sending
-  // end_stream. Advancing simulated time does not ensure these responses have been processed.
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(4));
+  sendGrpcResponse(*processor_stream_1_, body_response);
 
   // "xxx" with end_stream goes through filter-0 and is held by filter-1.
   codec_client_->sendData(*request_encoder_, "xxx", true);
@@ -6500,7 +6490,6 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamedWithP
   // The ext_proc_server_0 sends back the header response.
   serverSendHeaderResp();
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(1));
   codec_client_->sendData(*request_encoder_, "sss", false);
   processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
     EXPECT_EQ(body.body(), "sss");
@@ -6508,13 +6497,11 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamedWithP
     return true;
   });
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(2));
   // The ext_proc_server_1 receives the headers.
   server1ReceiveHeaderReq(header_request);
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp();
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(3));
   // Send the final chunk only after processing the first one, so the two chunks cannot coalesce.
   codec_client_->sendData(*request_encoder_, "xxx", true);
   processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {

@@ -350,13 +350,6 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLogging) {
       [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
-  // In observability mode the main stream does not wait for the ext_proc stream, so wait until
-  // Envoy has processed the ext_proc server's response headers before letting the main response
-  // complete and consume the side stream's logging info. upstream_rq_200 is charged in the same
-  // router callback that sets "via_upstream".
-  if (IsEnvoyGrpc()) {
-    test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_200", Ge(1));
-  }
   handleUpstreamRequest();
   processResponseHeadersMessage(*grpc_upstreams_[0], false, std::nullopt);
   verifyDownstreamResponse(*response, 200);

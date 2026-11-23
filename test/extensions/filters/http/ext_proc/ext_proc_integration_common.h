@@ -46,6 +46,10 @@ using envoy::service::ext_proc::v3::TrailersResponse;
 using Extensions::HttpFilters::ExternalProcessing::TestOnProcessingResponseFactory;
 using test::integration::filters::LoggingTestFilterConfig;
 
+class ProcessingEventObserver;
+class ObservedFilterFactoryRegistration;
+enum class ProcessingEvent { InitialMetadata, Message, RemoteClose, FilterDestroyed };
+
 struct ConfigOptions {
   enum class FilterSetup {
     // NOLINTNEXTLINE(readability-identifier-naming)
@@ -109,7 +113,17 @@ class ExtProcIntegrationTest : public Event::TestUsingSimulatedTime,
                                public HttpIntegrationTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 protected:
-  ExtProcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
+  ExtProcIntegrationTest();
+  ~ExtProcIntegrationTest() override;
+
+  // Wait for the real processing callback without advancing simulated deadlines during I/O.
+  void waitForProcessingEvent(FakeStream& stream, ProcessingEvent event,
+                              const std::function<void()>& action,
+                              const ProcessingResponse* response = nullptr);
+  void sendGrpcResponse(FakeStream& stream, const ProcessingResponse& response);
+  void startGrpcStream(FakeStream& stream, bool send_headers = true);
+  void finishGrpcStream(FakeStream& stream, Grpc::Status::GrpcStatus status);
+  void destroyFilter(const std::function<void()>& action);
 
   void createUpstreams() override;
 
@@ -188,7 +202,7 @@ protected:
 
   // ext_proc server sends back a response to tell Envoy to stop the
   // original timer and start a new timer.
-  void serverSendNewTimeout(const uint64_t timeout_ms, bool ignored = false);
+  void serverSendNewTimeout(const uint64_t timeout_ms);
 
   // The new timeout message is ignored by Envoy due to different reasons, like
   // new_timeout setting is out-of-range, or max_message_timeout is not configured.
@@ -237,6 +251,9 @@ protected:
   void serverSendTrailerRespDuplexStreamed(FakeStreamPtr& processor_stream, bool response = false);
   void initializeLogConfig(std::string& access_log_path);
   void prependExtProcCompositeFilter(const Protobuf::Message& match_input);
+
+  std::shared_ptr<ProcessingEventObserver> processing_events_;
+  std::unique_ptr<ObservedFilterFactoryRegistration> observed_filter_factory_;
 
   std::unique_ptr<UniqueSimpleFilterConfig<
       DynamicMetadataToHeadersFilter,
