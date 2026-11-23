@@ -104,14 +104,6 @@ void ExtProcIntegrationTest::initializeConfig(
       }
     }
 
-    // The filter's default message timeout (200ms) is shorter than a round trip through the
-    // fake ext_proc server can take under the sanitizers. A timeout fails the request with a 504
-    // (or passes it through unprocessed with failure_mode_allow), and the test then fails on
-    // whatever it expected next. Tests of the timeout itself set their own.
-    if (!proto_config_.has_message_timeout()) {
-      proto_config_.mutable_message_timeout()->set_seconds(5);
-    }
-
     const std::string valid_grpc_cluster_name = "ext_proc_server_0";
     std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
     if (!two_ext_proc_filters_) {
@@ -644,7 +636,12 @@ void ExtProcIntegrationTest::packTwoResponsesInOneMessage(
 
 // ext_proc server sends back a response to tell Envoy to stop the
 // original timer and start a new timer.
-void ExtProcIntegrationTest::serverSendNewTimeout(const uint64_t timeout_ms) {
+void ExtProcIntegrationTest::serverSendNewTimeout(const uint64_t timeout_ms, bool ignored) {
+  const std::string counter_name =
+      ignored ? "http.config_test.ext_proc.override_message_timeout_ignored"
+              : "http.config_test.ext_proc.override_message_timeout_received";
+  const auto counter = test_server_->counter(counter_name);
+  const uint64_t expected_count = counter ? counter->value() + 1 : 1;
   ProcessingResponse response;
   if (timeout_ms < 1000) {
     response.mutable_override_message_timeout()->set_nanos(timeout_ms * 1000000);
@@ -652,6 +649,8 @@ void ExtProcIntegrationTest::serverSendNewTimeout(const uint64_t timeout_ms) {
     response.mutable_override_message_timeout()->set_seconds(timeout_ms / 1000);
   }
   processor_stream_->sendGrpcMessage(response);
+  // Wait for Envoy to handle the update before advancing the simulated clock.
+  test_server_->waitForCounter(counter_name, testing::Eq(expected_count));
 }
 
 void ExtProcIntegrationTest::newTimeoutWrongConfigTest(const uint64_t timeout_ms) {
@@ -671,10 +670,10 @@ void ExtProcIntegrationTest::newTimeoutWrongConfigTest(const uint64_t timeout_ms
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
                                [&](const HttpHeaders&, HeadersResponse&) {
-                                 serverSendNewTimeout(timeout_ms);
-                                 // ext_proc server stays idle for 300ms before sending back the
-                                 // response.
-                                 timeSystem().advanceTimeWaitImpl(300ms);
+                                 serverSendNewTimeout(timeout_ms, /*ignored=*/true);
+                                 // 300ms passes the original 200ms deadline; an ignored override
+                                 // must not extend it.
+                                 simTime().advanceTimeWait(300ms);
                                  return true;
                                });
   // Verify the new timer is not started and the original timer timeouts,
@@ -1204,7 +1203,9 @@ void ExtProcIntegrationTest::performStandAloneModeOverrideNormal(
   EXPECT_TRUE(request.request_body().end_of_stream());
 
   if (delay_header_response) {
-    timeSystem().advanceTimeWaitImpl(400ms);
+    // 400ms is twice the caller's 200ms timeout: FULL_DUPLEX_STREAMED must have disabled
+    // the message timer even while the header response is still pending.
+    simTime().advanceTimeWait(400ms);
   }
 
   // The server sends back the header response first:

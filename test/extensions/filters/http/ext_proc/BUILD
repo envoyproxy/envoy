@@ -503,6 +503,7 @@ envoy_extension_cc_test_library(
         "//test/integration:http_integration_lib",
         "//test/integration/filters:common_lib",
         "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",

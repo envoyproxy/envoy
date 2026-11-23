@@ -448,11 +448,14 @@ TEST_P(ExtProcLocalReplyStreamingIntegrationTest, TimeoutWaitingForLocalResponse
                           return true;
                         });
 
+  response->waitForHeaders();
+
   // Do not send local response body with end_of_stream=true.
 
   // HCM stream_idle_timeout is triggered, and downstream stream is reset, because
-  // headers were already sent.
-  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(12000));
+  // headers were already sent. 12s exceeds the configured 10s idle timeout without depending
+  // on behavior exactly at the deadline.
+  simTime().advanceTimeWait(std::chrono::seconds(12));
 
   ASSERT_TRUE(response->waitForReset());
 }

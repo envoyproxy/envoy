@@ -397,7 +397,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitTooLongBeforeSendRespDuplexStreamed) {
   serverReceiveHeaderReq(header_request);
   serverReceiveBodyDuplexStreamed(body_sent, processor_stream_);
 
-  // The ext_proc server waits for 12s before sending any response.
+  // 12s exceeds the configured 10s idle timeout without relying on the exact deadline.
   // HCM stream_idle_timeout is triggered, and local reply is sent to downstream.
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(12000));
   verifyDownstreamResponse(*response, 504);
@@ -590,7 +590,8 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessing) {
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp();
 
-  timeSystem().advanceTimeWaitImpl(20ms);
+  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received",
+                               testing::Ge(total_req_body_msg + 1));
   // The ext_proc_server_0 now sends back the last chunk of the body responses.
   serverSendBodyRespDuplexStreamed(1, processor_stream_, /*end_stream*/ true, false, "");
 
@@ -642,7 +643,8 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessing) {
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp(true, true);
 
-  timeSystem().advanceTimeWaitImpl(20ms);
+  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received",
+                               testing::Ge(total_resp_body_msg + 1));
   // The ext_proc_server_0 now sends back the last chunk of the body responses.
   serverSendBodyRespDuplexStreamed(1, processor_stream_, /*end_stream*/ true, /*response*/ true,
                                    "");
