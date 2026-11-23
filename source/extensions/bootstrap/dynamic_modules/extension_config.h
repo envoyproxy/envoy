@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/common/optref.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/watcher.h"
 #include "envoy/http/async_client.h"
@@ -18,6 +19,9 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/init/target_impl.h"
 #include "source/extensions/bootstrap/dynamic_modules/cluster_writer.h"
+#include "source/extensions/bootstrap/dynamic_modules/config_snapshot.h"
+#include "source/extensions/bootstrap/dynamic_modules/extension_config_subscription.h"
+#include "source/extensions/bootstrap/dynamic_modules/filter_chain_config_writer.h"
 #include "source/extensions/bootstrap/dynamic_modules/listener_writer.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
@@ -66,6 +70,8 @@ using OnBootstrapExtensionListenerAddOrUpdateType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update);
 using OnBootstrapExtensionListenerRemovalType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_removal);
+using OnBootstrapExtensionXdsUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_xds_update);
 using OnBootstrapExtensionWorkerEventType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_worker_event);
 using OnBootstrapExtensionRunOnAllWorkersDoneType =
@@ -74,6 +80,16 @@ using OnBootstrapExtensionClusterWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done);
 using OnBootstrapExtensionListenerWriterUpdateDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done);
+using OnBootstrapExtensionFilterChainConfigWriterUpdateDoneType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done);
+using OnBootstrapExtensionEcdsUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_ecds_update);
+using OnBootstrapExtensionRuntimeBoolUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update);
+using OnBootstrapExtensionRuntimeIntUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_int_update);
+using OnBootstrapExtensionRuntimeNumberUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_number_update);
 
 class DynamicModuleBootstrapExtension;
 
@@ -85,6 +101,7 @@ class DynamicModuleBootstrapExtensionConfig
     : public std::enable_shared_from_this<DynamicModuleBootstrapExtensionConfig>,
       public Upstream::ClusterUpdateCallbacks,
       public Server::ListenerUpdateCallbacks,
+      public Config::XdsConfigTracker,
       public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
   /**
@@ -156,6 +173,17 @@ public:
    */
   bool enableClusterLifecycle();
 
+  /**
+   * Subscribes once to a named ECDS configuration after server initialization.
+   */
+  bool subscribeEcds(absl::string_view name, absl::string_view source_json);
+
+  /**
+   * Collects and redacts the selected configuration providers on the main thread.
+   */
+  absl::StatusOr<std::unique_ptr<ConfigSnapshot>>
+  getConfigSnapshot(absl::Span<const absl::string_view> providers, absl::string_view name_regex);
+
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
                             Upstream::ThreadLocalClusterCommand& get_cluster) override;
@@ -175,6 +203,9 @@ public:
     if (listener_writer_ != nullptr) {
       listener_writer_->onServerInitialized(listener_manager);
     }
+    if (filter_chain_config_writer_ != nullptr) {
+      filter_chain_config_writer_->onServerInitialized(listener_manager);
+    }
   }
 
   /**
@@ -193,6 +224,31 @@ public:
   void onListenerAddOrUpdate(absl::string_view listener_name,
                              const Network::ListenerConfig& listener_config) override;
   void onListenerRemoval(const std::string& listener_name) override;
+
+  /**
+   * Registers or unregisters xDS notifications on the main thread.
+   */
+  bool setXdsNotifications(bool enabled);
+
+  // Config::XdsConfigTracker
+  void onConfigAccepted(absl::string_view type_url,
+                        const std::vector<Config::DecodedResourcePtr>& resources) override;
+  void
+  onConfigAccepted(absl::string_view type_url,
+                   absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+                   const Protobuf::RepeatedPtrField<std::string>& removed_resources) override;
+  void
+  onConfigAcceptedWithResponse(const envoy::service::discovery::v3::DiscoveryResponse& message,
+                               const std::vector<Config::DecodedResourcePtr>& resources) override;
+  void onConfigAcceptedWithResponse(
+      const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+      absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources) override;
+  void onConfigRejected(const envoy::service::discovery::v3::DiscoveryResponse& message,
+                        absl::string_view error_detail) override;
+  void onConfigRejected(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+                        absl::string_view error_detail) override;
+  void onResourceUnsubscribed(absl::string_view type_url, absl::string_view resource) override;
 
   /**
    * Enumerates the names of the currently active resources of a single kind: the active listeners'
@@ -237,6 +293,13 @@ public:
   bool enableListenerWriter();
 
   /**
+   * Creates the filter chain config writer, which lets the module add, update and remove filter
+   * chains. Must be called on the main thread.
+   * @return false if the filter chain config writer already exists or shutdown began.
+   */
+  bool enableFilterChainConfigWriter();
+
+  /**
    * Called on the main thread once Envoy finished initializing, right before it starts its
    * workers.
    */
@@ -253,6 +316,11 @@ public:
    * before its bootstrap extensions, so the callbacks that use the context stop working.
    */
   void onExtensionDestroyed();
+
+  /**
+   * Whether the server began to shut down or the extension was destroyed.
+   */
+  bool shutdownStarted() const { return shutdown_started_; }
 
   /**
    * Returns the admin server, or nothing once the extension is destroyed.
@@ -286,6 +354,8 @@ public:
   OnBootstrapExtensionListenerRemovalType on_bootstrap_extension_listener_removal_ = nullptr;
 
   // The following hooks are optional and stay nullptr when the module does not implement them.
+  OnBootstrapExtensionXdsUpdateType on_bootstrap_extension_xds_update_ = nullptr;
+  OnBootstrapExtensionEcdsUpdateType on_bootstrap_extension_ecds_update_ = nullptr;
   OnBootstrapExtensionWorkerEventType on_bootstrap_extension_worker_event_ = nullptr;
   OnBootstrapExtensionRunOnAllWorkersDoneType on_bootstrap_extension_run_on_all_workers_done_ =
       nullptr;
@@ -293,6 +363,12 @@ public:
       on_bootstrap_extension_cluster_writer_update_done_ = nullptr;
   OnBootstrapExtensionListenerWriterUpdateDoneType
       on_bootstrap_extension_listener_writer_update_done_ = nullptr;
+  OnBootstrapExtensionFilterChainConfigWriterUpdateDoneType
+      on_bootstrap_extension_filter_chain_config_writer_update_done_ = nullptr;
+  OnBootstrapExtensionRuntimeBoolUpdateType on_bootstrap_extension_runtime_bool_update_ = nullptr;
+  OnBootstrapExtensionRuntimeIntUpdateType on_bootstrap_extension_runtime_int_update_ = nullptr;
+  OnBootstrapExtensionRuntimeNumberUpdateType on_bootstrap_extension_runtime_number_update_ =
+      nullptr;
 
   // The name of the extension.
   const std::string extension_name_;
@@ -343,8 +419,15 @@ public:
   DynamicModuleClusterWriterPtr cluster_writer_;
   // The listener writer, or nullptr until the module enables it.
   DynamicModuleListenerWriterPtr listener_writer_;
+  // The filter chain config writer, or nullptr until the module enables it.
+  DynamicModuleFilterChainConfigWriterPtr filter_chain_config_writer_;
 
 private:
+  void notifyXdsUpdate(absl::string_view type_url,
+                       envoy_dynamic_module_type_bootstrap_xds_update_status status,
+                       absl::string_view error_detail, absl::string_view version,
+                       absl::string_view nonce, absl::string_view resource_name);
+
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
    * callout from the parent bootstrap extension config.
@@ -393,6 +476,8 @@ private:
   Server::ServerLifecycleNotifier::HandlePtr cluster_lifecycle_shutdown_handle_;
   bool cluster_lifecycle_enabled_ = false;
 
+  std::unique_ptr<ExtensionConfigSubscription> extension_config_subscription_;
+
   // True once the server is initialized, set when the listener manager is provided during
   // onServerInitialized. The cluster manager is only safe to access after this point.
   bool server_initialized_ = false;
@@ -408,6 +493,9 @@ private:
   // Handle for the shutdown lifecycle callback that cleans up listener_update_callbacks_handle_.
   Server::ServerLifecycleNotifier::HandlePtr listener_lifecycle_shutdown_handle_;
   bool listener_lifecycle_enabled_ = false;
+
+  Common::CallbackHandlePtr xds_update_handle_;
+  uint64_t xds_notifications_generation_ = 0;
 
   // Thread-local slot that carries the worker events. Allocated on the first runOnAllWorkers().
   ThreadLocal::TypedSlotPtr<> worker_slot_;

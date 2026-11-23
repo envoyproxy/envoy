@@ -499,6 +499,8 @@ private:
   absl::flat_hash_set<DynamicFilterConfigProviderImplBase*> filter_config_providers_;
   friend class DynamicFilterConfigProviderImplBase;
 
+  std::unique_ptr<Cleanup> ecds_name_reservation_;
+
   // This must be the last since its destructor may call out to stats to report
   // on draining requests.
   std::unique_ptr<Config::Subscription> subscription_;

@@ -62,8 +62,8 @@ ConfigTraitsImpl::createConfig(const Protobuf::Message& rc,
 
 absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
                                                         const std::string& version_info) {
-  uint64_t new_hash = base_.getHash(rc);
-  if (!base_.checkHash(new_hash)) {
+  const std::optional<Rds::ConfigHashes> new_hashes = base_.changedConfigHashes(rc);
+  if (!new_hashes.has_value()) {
     // The route configuration is unchanged, so there is nothing to build, warm up or publish. An
     // update that is still warming up is deliberately left alone.
     return absl::OkStatus();
@@ -136,7 +136,7 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
   // update the state and start warming up.
   Protobuf::Any route_config_any;
   MessageUtil::packFrom(route_config_any, *new_route_config);
-  base_.updateState(std::move(route_config_any), new_route_config->name(), new_hash, version_info,
+  base_.updateState(std::move(route_config_any), new_route_config->name(), new_hashes, version_info,
                     std::move(config), std::move(update_init_manager), std::move(update_id));
 
   // Now, the state is updated and previous warming update is aborted (if any), we can update the

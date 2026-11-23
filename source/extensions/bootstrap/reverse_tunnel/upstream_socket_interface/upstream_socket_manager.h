@@ -14,6 +14,7 @@
 #include "source/common/common/random_generator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_lifecycle_info.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
 
@@ -50,13 +51,15 @@ public:
    * @param tenant_id tenant identifier supplied by the peer.
    * @param initiator_worker_id the initiator worker (dispatcher name) that opened the tunnel.
    * @param initiator_connection_id the initiator's per-connection identifier.
+   * @param counted_for_rebalancing true if the picker already reserved a count for this socket.
    */
   void addConnectionSocket(const std::string& node_id, const std::string& cluster_id,
                            Network::ConnectionSocketPtr socket,
                            const std::chrono::seconds& ping_interval, bool rebalanced = true,
                            absl::string_view tenant_id = {},
                            absl::string_view initiator_worker_id = {},
-                           absl::string_view initiator_connection_id = {});
+                           absl::string_view initiator_connection_id = {},
+                           bool counted_for_rebalancing = false);
 
   /**
    * Returns true if a new reverse connection can be accepted for the given node, scoped by tenant
@@ -97,6 +100,12 @@ public:
    * @param fd the FD for the socket to be marked dead.
    */
   void markSocketDead(const int fd);
+
+  /**
+   * Exclude a socket from new stream selection without changing its lifetime or ownership.
+   * @param fd the FD for the socket that is draining.
+   */
+  void markSocketDraining(int fd);
 
   /**
    * @return lifecycle metadata for a tracked reverse-tunnel socket, or nullptr if none exists.
@@ -163,12 +172,14 @@ public:
   ReverseTunnelAcceptorExtension* getUpstreamExtension() const { return extension_; }
 
   /**
-   * Get a node that has a socket (idle or used) for the given key.
-   * If the key is found in the cluster_to_node_info_map_, assume it is the cluster ID and return a
-   * node in that cluster in a round-robin manner. If the key is not found in the
-   * cluster_to_node_info_map_, assume it is the node ID and return it as-is.
+   * Get a node that has a non-draining socket (idle or used) for the given key.
+   * If the key is found in the cluster_to_node_info_map_, assume it is the cluster ID and return an
+   * eligible node in that cluster in a round-robin manner, preferring nodes with an idle socket.
+   * If none have idle sockets, return the next eligible node with a socket already in use.
+   * Otherwise, treat the key as a node ID and check its eligibility if it is known to this worker.
    * @param key the cluster ID or node ID to lookup.
-   * @return the node ID, or the key itself if it cannot be resolved.
+   * @return the node ID, empty if the known node or cluster has no non-draining sockets, or the key
+   * itself if it cannot be resolved.
    */
   std::string getNodeWithSocket(const std::string& key);
 
@@ -202,6 +213,8 @@ private:
    */
   bool hasAnySocketsForNode(const std::string& node_id);
 
+  bool hasSelectableSocketsForNode(const std::string& node_id) const;
+
   /**
    * Compute the ping interval in milliseconds with 15% jitter applied.
    * @return jittered interval in milliseconds.
@@ -217,6 +230,12 @@ private:
 
   OptRef<const MonotonicTime> findStartTime(int fd) const;
 
+  /**
+   * Drop one idle socket of the node from node_to_conn_count_map_ under socket_manager_lock.
+   * @param node_id the node ID whose socket left the idle pool.
+   */
+  void decrementIdleCount(const std::string& node_id);
+
   // Thread local dispatcher instance.
   Event::Dispatcher& dispatcher_;
   Random::RandomGeneratorPtr random_generator_;
@@ -231,6 +250,9 @@ private:
 
   // Map from FD to its iterator in accepted_reverse_connections_, used to avoid linear scans.
   absl::flat_hash_map<int, std::list<Network::ConnectionSocketPtr>::iterator> fd_to_socket_it_map_;
+
+  // Idle sockets included in node_to_conn_count_map_. Listeners that skip rebalancing bypass it.
+  absl::flat_hash_set<int> counted_idle_fds_;
 
   // Map from file descriptor to cluster ID. An entry is added when a reverse tunnel is accepted
   // from a node and is removed when the socket dies.
@@ -278,12 +300,17 @@ private:
   // Per node counter for total active FDs.
   absl::flat_hash_map<std::string, uint32_t> node_to_active_fd_count_;
 
+  // Draining sockets remain live for existing streams but cannot receive new streams.
+  absl::flat_hash_set<int> draining_fds_;
+  absl::flat_hash_map<std::string, uint32_t> node_to_selectable_fd_count_;
+
   // Upstream extension for stats integration.
   ReverseTunnelAcceptorExtension* extension_;
 
-  // Map of node IDs to the number of total accepted reverse connections
-  // for the node. This is used to rebalance a request to accept reverse
-  // connections to a different worker thread.
+  // Map of node IDs to the number of idle sockets this worker holds for the node in
+  // accepted_reverse_connections_, plus sockets already picked for it and in flight to its
+  // dispatcher. Requests only take idle sockets from their own worker, so new sockets go to the
+  // worker with the fewest. Guarded by socket_manager_lock since other workers read and write it.
   absl::flat_hash_map<std::string, int> node_to_conn_count_map_;
 
   bool tenant_isolation_enabled_{false};

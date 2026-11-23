@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <list>
 #include <memory>
 #include <string>
 
@@ -230,6 +231,7 @@ public:
   Stats::Scope& getRootScope() override;
   void countDeprecatedFeatureUse() const override;
   absl::Status onWorkerThreadsRegistered() override;
+  Common::CallbackHandlePtr addUpdateCallback(UpdateCallback callback) override;
 
 private:
   friend RtdsSubscription;
@@ -265,6 +267,11 @@ private:
 
   absl::Mutex snapshot_mutex_;
   SnapshotConstSharedPtr thread_safe_snapshot_ ABSL_GUARDED_BY(snapshot_mutex_);
+
+  // Each handle returned by addUpdateCallback() holds a weak reference, since it can outlive the
+  // loader. Common::CallbackManager is not used because its library depends on the runtime.
+  const std::shared_ptr<std::list<UpdateCallback>> update_callbacks_{
+      std::make_shared<std::list<UpdateCallback>>()};
 };
 
 } // namespace Runtime

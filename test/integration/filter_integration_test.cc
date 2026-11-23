@@ -3,6 +3,8 @@
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/logging.h"
 
+#include "absl/strings/ascii.h"
+
 namespace Envoy {
 namespace {
 
@@ -40,6 +42,7 @@ public:
   void testNonTerminalEncodingFilterWithCompleteRequest();
   void testNonTerminalEncodingFilterWithIncompleteRequest();
   void testFilterAddsDataAndTrailersToHeaderOnlyRequest();
+  void testStopAllDecoderFilterRebuffersBody(bool async_lb);
 
   const int count_ = 70;
   const int size_ = 1000;
@@ -654,10 +657,11 @@ static Registry::RegisterFactory<StopAllRebufferDecoderFilterFactory,
 // decodeData(false) with StopIterationAndBuffer, and returning Continue from decodeTrailers():
 // commonHandleAfterTrailersCallback() clears iterate_from_current_filter_ so the nested
 // continuation forwards the body and trailers once.
-TEST_P(FilterIntegrationTest, StopAllDecoderFilterRebuffersBodyUntilRequestTrailers) {
+void FilterIntegrationTest::testStopAllDecoderFilterRebuffersBody(bool async_lb) {
   if (!testing_downstream_filter_) {
     return;
   }
+  async_lb_ = async_lb;
   auto& counters = StopAllRebufferDecoderFilterFactory::counters();
   counters.decode_trailers_calls.store(0);
   counters.decode_complete_calls.store(0);
@@ -689,6 +693,18 @@ typed_config:
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// The router takes the body straight from the filter. With async host resolution the router's own
+// replay of the buffered body would hide a body that the filter failed to forward.
+TEST_P(FilterIntegrationTest, StopAllDecoderFilterRebuffersBodyUntilRequestTrailers) {
+  testStopAllDecoderFilterRebuffersBody(false);
+}
+
+// The router is stopped on all frames too when the filter continues, and replays the body and
+// trailers once a host is selected.
+TEST_P(FilterIntegrationTest, StopAllDecoderFilterRebuffersBodyUntilRequestTrailersAsyncLb) {
+  testStopAllDecoderFilterRebuffersBody(true);
 }
 
 // Tests missing headers needed for H/1 codec first line.
@@ -1936,6 +1952,116 @@ TEST_P(FilterIntegrationTest, EncodeMetadataOnLocalReply) {
     ASSERT_FALSE(it == response->metadataMap().end()) << "key: " << key;
     EXPECT_EQ(response->metadataMap().find(key)->second, key);
   }
+}
+
+static std::string hold_end_stream_filter = R"EOF(
+name: hold-end-stream-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.HoldEndStreamFilterConfig
+)EOF";
+
+static std::string uppercase_buffer_filter = R"EOF(
+name: uppercase-buffer-filter
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.UppercaseBufferFilterConfig
+)EOF";
+
+TEST_P(FilterIntegrationTest, PerFilterBufferRequestBodyBufferedAtTwoFilters) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.filter_manager_per_filter_buffer",
+                                    "true");
+  // Decoding order: hold-end-stream-filter, uppercase-buffer-filter.
+  prependFilter(uppercase_buffer_filter);
+  prependFilter(hold_end_stream_filter);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto response = std::move(encoder_decoder.second);
+  // "aaa" is buffered at uppercase-buffer-filter while "bbb" is held by hold-end-stream-filter.
+  codec_client_->sendData(encoder_decoder.first, "aaa", false);
+  codec_client_->sendData(encoder_decoder.first, "bbb", true);
+
+  waitForNextUpstreamRequest();
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  // "bbb" still goes through uppercase-buffer-filter.
+  EXPECT_EQ("AAABBB", upstream_request_->body().toString());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(FilterIntegrationTest, PerFilterBufferRequestTrailersHeldByEarlierFilter) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.filter_manager_per_filter_buffer",
+                                    "true");
+  prependFilter(uppercase_buffer_filter);
+  prependFilter(hold_end_stream_filter);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(encoder_decoder.first, "aaa", false);
+  codec_client_->sendTrailers(encoder_decoder.first,
+                              Http::TestRequestTrailerMapImpl{{"trailer", "value"}});
+
+  waitForNextUpstreamRequest();
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ("AAA", upstream_request_->body().toString());
+  ASSERT_NE(nullptr, upstream_request_->trailers());
+  // The trailers went through uppercase-buffer-filter after hold-end-stream-filter released them.
+  EXPECT_EQ("seen", upstream_request_->trailers()
+                        ->get(Http::LowerCaseString("uppercase-filter"))[0]
+                        ->value()
+                        .getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(FilterIntegrationTest, PerFilterBufferResponseBodyBufferedAtTwoFilters) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.filter_manager_per_filter_buffer",
+                                    "true");
+  // Encoding order: hold-end-stream-filter, uppercase-buffer-filter.
+  prependFilter(hold_end_stream_filter);
+  prependFilter(uppercase_buffer_filter);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData("aaa", false);
+  upstream_request_->encodeData("bbb", true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("AAABBB", response->body());
+}
+
+TEST_P(FilterIntegrationTest, PerFilterBufferResponseTrailersHeldByEarlierFilter) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.filter_manager_per_filter_buffer",
+                                    "true");
+  prependFilter(hold_end_stream_filter);
+  prependFilter(uppercase_buffer_filter);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData("aaa", false);
+  upstream_request_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"trailer", "value"}});
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("AAA", response->body());
+  ASSERT_NE(nullptr, response->trailers());
+  EXPECT_EQ("seen", response->trailers()
+                        ->get(Http::LowerCaseString("uppercase-filter"))[0]
+                        ->value()
+                        .getStringView());
 }
 
 TEST_P(MultiProtocolFilterIntegrationTest, AddedResponseTrailersReachLaterBufferingFilter) {

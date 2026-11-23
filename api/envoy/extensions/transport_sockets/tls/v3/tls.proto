@@ -184,7 +184,7 @@ message TlsKeyLog {
 }
 
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
 
@@ -368,4 +368,11 @@ message CommonTlsContext {
 
   // TLS key log configuration
   TlsKeyLog key_log = 15;
+
+  // The maximum plaintext size, in bytes, of each TLS record sent, handshake records included.
+  // Must be 512 to 16384 inclusive, and defaults to 16384. Applies to every certificate in the
+  // context. Smaller values send more records, which costs CPU, socket writes and bytes on the
+  // wire. This field has no effect on QUIC.
+  google.protobuf.UInt32Value max_send_fragment = 17
+      [(validate.rules).uint32 = {lte: 16384 gte: 512}];
 }

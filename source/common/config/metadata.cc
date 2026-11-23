@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
 
+#include "source/common/common/hash.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -168,14 +169,21 @@ bool Metadata::metadataLabelMatch(const LabelSet& label_set,
   return true;
 }
 
+size_t SerializedMetadataHash::operator()(const envoy::config::core::v3::Metadata& metadata) const {
+  return HashUtil::xxHash64(MessageUtil::serializeDeterministically(metadata));
+}
+
+bool SerializedMetadataEqual::operator()(const envoy::config::core::v3::Metadata& lhs,
+                                         const envoy::config::core::v3::Metadata& rhs) const {
+  return MessageUtil::serializeDeterministically(lhs) ==
+         MessageUtil::serializeDeterministically(rhs);
+}
+
 ConstMetadataSharedPoolSharedPtr
 Metadata::getConstMetadataSharedPool(Singleton::Manager& manager, Event::Dispatcher& dispatcher) {
-  return manager.getTyped<SharedPool::ObjectSharedPool<const envoy::config::core::v3::Metadata,
-                                                       MessageUtil, MessageUtil>>(
-      SINGLETON_MANAGER_REGISTERED_NAME(const_metadata_shared_pool), [&dispatcher] {
-        return std::make_shared<SharedPool::ObjectSharedPool<
-            const envoy::config::core::v3::Metadata, MessageUtil, MessageUtil>>(dispatcher);
-      });
+  return manager.getTyped<ConstMetadataSharedPool>(
+      SINGLETON_MANAGER_REGISTERED_NAME(const_metadata_shared_pool),
+      [&dispatcher] { return std::make_shared<ConstMetadataSharedPool>(dispatcher); });
 }
 
 } // namespace Config

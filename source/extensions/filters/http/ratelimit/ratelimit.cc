@@ -89,23 +89,31 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
     return;
   }
   if (!on_stream_done) {
-    route_config_ =
-        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks_);
+    initializeRouteConfigs();
     initializeVirtualHostRateLimitOption(route_entry);
   }
 
-  // The the embedded rate limits is set in the typed_per_filter_config, use it and ignore the
-  // rate limits of route.
-  if (route_config_ != nullptr && route_config_->hasRateLimitConfigs()) {
-    route_config_->populateDescriptors(headers, response_headers, callbacks_->streamInfo(),
+  const bool all_levels = override_option_ == envoy::extensions::common::ratelimit::v3::ALL_LEVELS;
+
+  // The embedded rate limits in the typed_per_filter_config take precedence over the filter level
+  // and the route rate limits. Only the most specific one is used unless all levels are applied.
+  bool populated = false;
+  for (const FilterConfigPerRoute& route_config :
+       absl::MakeConstSpan(route_configs_).subspan(0, all_levels ? route_configs_.size() : 1)) {
+    if (route_config.hasRateLimitConfigs()) {
+      route_config.populateDescriptors(headers, response_headers, callbacks_->streamInfo(),
                                        descriptors, on_stream_done);
-    return;
+      populated = true;
+    }
   }
 
-  // Rate Limit config in typed_per_filter_config takes precedence over route's rate limit.
-  if (config_->hasRateLimitConfigs()) {
+  // The filter level embedded rate limits take precedence over the route rate limits.
+  if ((!populated || all_levels) && config_->hasRateLimitConfigs()) {
     config_->populateDescriptors(headers, response_headers, callbacks_->streamInfo(), descriptors,
                                  on_stream_done);
+    populated = true;
+  }
+  if (populated) {
     return;
   }
 
@@ -372,8 +380,8 @@ void Filter::initializeVirtualHostRateLimitOption(const Router::RouteEntry* rout
   if (route_entry->includeVirtualHostRateLimits()) {
     vh_rate_limits_ = VhRateLimitOptions::Include;
   } else {
-    if (route_config_ != nullptr) {
-      switch (route_config_->virtualHostRateLimits()) {
+    if (!route_configs_.empty()) {
+      switch (route_configs_[0].get().virtualHostRateLimits()) {
       case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE:
         vh_rate_limits_ = VhRateLimitOptions::Include;
         break;
@@ -390,9 +398,28 @@ void Filter::initializeVirtualHostRateLimitOption(const Router::RouteEntry* rout
   }
 }
 
+void Filter::initializeRouteConfigs() {
+  route_configs_.clear();
+  // In ascending order of specificity. Reverse it to put the most specific one first.
+  const auto all_configs = Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(callbacks_);
+  for (auto it = all_configs.rbegin(); it != all_configs.rend(); ++it) {
+    route_configs_.push_back(*it);
+  }
+
+  // The most specific set option wins and the filter level config is the least specific one.
+  override_option_ = config_->rateLimitsOverrideOption();
+  for (const FilterConfigPerRoute& route_config : route_configs_) {
+    if (route_config.rateLimitsOverrideOption() !=
+        envoy::extensions::common::ratelimit::v3::RATE_LIMITS_OVERRIDE_OPTION_UNSPECIFIED) {
+      override_option_ = route_config.rateLimitsOverrideOption();
+      break;
+    }
+  }
+}
+
 std::string Filter::getDomain() {
-  if (route_config_ != nullptr && !route_config_->domain().empty()) {
-    return route_config_->domain();
+  if (!route_configs_.empty() && !route_configs_[0].get().domain().empty()) {
+    return route_configs_[0].get().domain();
   }
   return config_->domain();
 }

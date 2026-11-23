@@ -290,13 +290,13 @@ The following core load shed points are supported:
 
   * - envoy.load_shed_points.hcm_ondata_creating_codec
     - Envoy will close the connections before creating codec if Envoy is under
-      pressure, typically memory. This happens once geting data from the
+      pressure, typically memory. This happens once getting data from the
       connection.
 
   * - envoy.load_shed_points.http_downstream_filter_check
     - Envoy will send local reply directly before creating an upstream request in
       the router if Envoy is under resource pressure, typically memory. This change
-      makes load shed check availabe in HTTP decoder filters.
+      makes load shed check available in HTTP decoder filters.
 
   * - envoy.load_shed_points.connection_pool_new_connection
     - Envoy will stop creating new connections in the connection pool when

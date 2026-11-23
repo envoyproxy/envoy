@@ -67,9 +67,9 @@ public:
                             true, inline_entry.version(), std::nullopt, std::nullopt, arena) {}
   DecodedResourceImpl(Protobuf::Arena::UniquePtr<Protobuf::Message> resource,
                       const std::string& name, const std::vector<std::string>& aliases,
-                      const std::string& version)
+                      const std::string& version, bool from_cache = false)
       : resource_(std::move(resource)), has_resource_(true), name_(name), aliases_(aliases),
-        version_(version), ttl_(std::nullopt), metadata_(std::nullopt) {}
+        version_(version), ttl_(std::nullopt), metadata_(std::nullopt), from_cache_(from_cache) {}
 
   // Config::DecodedResource
   const std::string& name() const override { return name_; }
@@ -81,6 +81,7 @@ public:
   const OptRef<const envoy::config::core::v3::Metadata> metadata() const override {
     return metadata_.has_value() ? makeOptRef(metadata_.value()) : std::nullopt;
   }
+  bool fromCache() const override { return from_cache_; }
 
 private:
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder, std::optional<std::string> name,
@@ -105,6 +106,7 @@ private:
   // This is the metadata info under the Resource wrapper.
   // It is intended to be consumed in the xds_config_tracker extension.
   const std::optional<envoy::config::core::v3::Metadata> metadata_;
+  const bool from_cache_{false};
 };
 
 struct DecodedResourcesWrapper {
