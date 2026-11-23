@@ -4907,6 +4907,102 @@ TEST_F(FilterManagerPerFilterBufferTest, AddedReplayedDataIsForwardedOnContinueW
   filter_manager_->destroyFilters();
 }
 
+TEST_F(FilterManagerPerFilterBufferTest,
+       BodyAddedWhileResumingHeadersIsSentWithResumingFilterBody) {
+  initializeChain(true);
+  records_[0].decode_headers = [this](bool) {
+    Buffer::OwnedImpl data("aa");
+    filters_[0]->decoder_callbacks_->addDecodedData(data, false);
+    return FilterHeadersStatus::StopIteration;
+  };
+  records_[1].decode_headers = [this](bool) {
+    Buffer::OwnedImpl data("bb");
+    filters_[1]->decoder_callbacks_->addDecodedData(data, false);
+    return FilterHeadersStatus::Continue;
+  };
+
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  EXPECT_TRUE(records_[1].decoded_headers.empty());
+
+  // Filter 1 adds its body while filter 0 resumes the headers.
+  filters_[0]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((std::vector<bool>{false}), records_[1].decoded_headers);
+  EXPECT_EQ((std::vector<bool>{false}), records_[2].decoded_headers);
+  EXPECT_EQ((Chunks{{"aabb", true}}), records_[1].decoded_data);
+  EXPECT_EQ((Chunks{{"aabb", true}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, BodyAddedWhileResumingHeadersIsSentWithStreamBuffer) {
+  initializeChain(false);
+  records_[0].decode_headers = [this](bool) {
+    Buffer::OwnedImpl data("aa");
+    filters_[0]->decoder_callbacks_->addDecodedData(data, false);
+    return FilterHeadersStatus::StopIteration;
+  };
+  records_[1].decode_headers = [this](bool) {
+    Buffer::OwnedImpl data("bb");
+    filters_[1]->decoder_callbacks_->addDecodedData(data, false);
+    return FilterHeadersStatus::Continue;
+  };
+
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  EXPECT_TRUE(records_[1].decoded_headers.empty());
+
+  // Filter 1 adds its body while filter 0 resumes the headers.
+  filters_[0]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((std::vector<bool>{false}), records_[1].decoded_headers);
+  EXPECT_EQ((std::vector<bool>{false}), records_[2].decoded_headers);
+  EXPECT_EQ((Chunks{{"aabb", true}}), records_[1].decoded_data);
+  EXPECT_EQ((Chunks{{"aabb", true}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest,
+       ResponseBodyAddedWhileResumingHeadersIsSentWithResumingFilterBody) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[2].encode_headers = [this](bool) {
+    Buffer::OwnedImpl data("aa");
+    filters_[2]->encoder_callbacks_->addEncodedData(data, false);
+    return FilterHeadersStatus::StopIteration;
+  };
+  records_[1].encode_headers = [this](bool) {
+    Buffer::OwnedImpl data("bb");
+    filters_[1]->encoder_callbacks_->addEncodedData(data, false);
+    return FilterHeadersStatus::Continue;
+  };
+
+  encodeHeaders(true);
+  EXPECT_TRUE(records_[1].encoded_headers.empty());
+
+  // Filter 1 adds its body while filter 2 resumes the headers.
+  filters_[2]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ((std::vector<bool>{false}), sent_headers_);
+  EXPECT_EQ((Chunks{{"aabb", true}}), records_[1].encoded_data);
+  EXPECT_EQ((Chunks{{"aabb", true}}), sent_data_);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, ModifyBufferWithoutBufferedDataIsEnvoyBug) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  encodeHeaders(false);
+
+  // Filter 1 holds nothing of its own.
+  EXPECT_ENVOY_BUG(filters_[1]->decoder_callbacks_->modifyDecodingBuffer(
+                       [](Buffer::Instance& buffer) { buffer.add("!"); }),
+                   "modifyDecodingBuffer() called by a filter that holds no buffered data");
+  EXPECT_ENVOY_BUG(filters_[1]->encoder_callbacks_->modifyEncodingBuffer(
+                       [](Buffer::Instance& buffer) { buffer.add("!"); }),
+                   "modifyEncodingBuffer() called by a filter that holds no buffered data");
+
+  filter_manager_->destroyFilters();
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy

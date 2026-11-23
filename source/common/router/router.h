@@ -314,7 +314,7 @@ public:
   Filter(const FilterConfigSharedPtr& config, FilterStats& stats)
       : config_(config), stats_(stats),
         reject_early_connect_data_enabled_(config->reject_connect_request_early_data_),
-        drain_kept_body_on_overflow_(ENVOY_RUNTIME_FEATURE_ENABLED(
+        drop_kept_body_(ENVOY_RUNTIME_FEATURE_ENABLED(
             "envoy.reloadable_features.filter_manager_per_filter_buffer")) {}
 
   ~Filter() override;
@@ -568,6 +568,8 @@ protected:
   }
 
   uint64_t calculateEffectiveBufferLimit() const;
+  // Drops the request body kept for retries and internal redirects once they are given up.
+  void dropKeptBody(const Buffer::Instance* decoding_buffer, const Buffer::Instance& data);
 
 private:
   friend class UpstreamRequest;
@@ -704,6 +706,8 @@ private:
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
+  // Bytes this filter added to the decoding buffer to keep the request body. See dropKeptBody().
+  uint64_t kept_body_length_{};
   uint32_t attempt_count_{0};
   uint32_t pending_retries_{0};
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
@@ -728,10 +732,11 @@ private:
   // Cached runtime flag value for reject_early_connect_data to avoid evaluating it on every data
   // chunk.
   bool reject_early_connect_data_enabled_ : 1 = false;
-  // Latched with the filter manager's per-filter buffer flag at stream creation. With per-filter
-  // buffers, the body kept for retries stays in the router's own buffer and counts towards the
-  // stream buffer limit until it is dropped.
-  bool drain_kept_body_on_overflow_ : 1 = false;
+  // Latched from the per-filter buffer flag when the router is created, which may differ from the
+  // value the filter manager latched for the stream. With per-filter buffers, the body kept for
+  // retries stays in the router's own buffer and counts towards the stream buffer limit until it is
+  // dropped. See dropKeptBody().
+  bool drop_kept_body_ : 1 = false;
   bool saw_local_reply_ : 1 = false;
 };
 

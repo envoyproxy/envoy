@@ -201,9 +201,9 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // Buffer that body data stopped at this filter is buffered into, and that
   // decodingBuffer()/encodingBuffer(), addDecodedData()/addEncodedData() and
   // modifyDecodingBuffer()/modifyEncodingBuffer() operate on. This is the stream-level buffer
-  // shared by all filters, owned by the latest filter that data has reached. With per-filter
-  // buffer enabled, it is the filter's own buffer, which only holds the data stopped at this
-  // filter, so a filter never sees, changes or replays the data held by other filters.
+  // shared by all filters. With per-filter buffer enabled, it is the filter's own buffer, which
+  // only holds the data stopped at this filter, so a filter never sees, changes or replays the
+  // data held by other filters.
   virtual Buffer::InstancePtr& bufferedData() PURE;
   // Whether the end of the stream has been observed, used for the end_stream flag when resuming
   // iteration. With per-filter observed end stream enabled, this is whether the end-of-stream

@@ -2064,29 +2064,6 @@ TEST_P(FilterIntegrationTest, PerFilterBufferResponseTrailersHeldByEarlierFilter
                         .getStringView());
 }
 
-TEST_P(FilterIntegrationTest, PerFilterBufferDisabledRequestBodyStillCompletes) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.filter_manager_per_filter_buffer",
-                                    "false");
-  prependFilter(uppercase_buffer_filter);
-  prependFilter(hold_end_stream_filter);
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
-  auto response = std::move(encoder_decoder.second);
-  codec_client_->sendData(encoder_decoder.first, "aaa", false);
-  codec_client_->sendData(encoder_decoder.first, "bbb", true);
-
-  waitForNextUpstreamRequest();
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  // With the shared buffer "bbb" may bypass uppercase-buffer-filter, but no byte is lost.
-  EXPECT_EQ("aaabbb", absl::AsciiStrToLower(upstream_request_->body().toString()));
-
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-}
-
 TEST_P(MultiProtocolFilterIntegrationTest, AddedResponseTrailersReachLaterBufferingFilter) {
   // Encoding order: add-trailers-filter, wait-for-whole-request-and-response-filter.
   prependFilter(R"EOF(

@@ -59,16 +59,19 @@ void finalizeHeaders(FilterManagerCallbacks& callbacks, StreamInfo::StreamInfo& 
   }
 }
 
-// With per-filter buffer, a body added while the headers of a header-only stream pass through the
-// chain is moved into the buffer of the first filter that added one, so the whole body is sent
-// once from there, as with the shared buffer.
+// With per-filter buffer, a body added while the headers pass through the chain is moved into the
+// buffer of the filter that sends it on, so the whole body is sent once from there, as with the
+// shared buffer. That is the first filter that added a body to a header-only stream, or the filter
+// whose continuation resumed the headers.
 template <class Iterator>
-void coalesceBodyAddedInHeaders(Iterator first_adder, Iterator current, Iterator end) {
-  if (first_adder == end || first_adder == current || (*current)->buffered_data_ == nullptr) {
+void coalesceBodyAddedInHeaders(Iterator sender, Iterator current, Iterator end) {
+  if (sender == end || sender == current || (*current)->buffered_data_ == nullptr) {
     return;
   }
-  ASSERT((*first_adder)->buffered_data_ != nullptr);
-  (*first_adder)->buffered_data_->move(*(*current)->buffered_data_);
+  if ((*sender)->buffered_data_ == nullptr) {
+    (*sender)->buffered_data_ = (*sender)->createBuffer();
+  }
+  (*sender)->buffered_data_->move(*(*current)->buffered_data_);
   (*current)->buffered_data_.reset();
 }
 
@@ -671,6 +674,10 @@ void ActiveStreamDecoderFilter::modifyDecodingBuffer(
   PerFilterBufferTracker::ActiveFilterScope buffer_scope(parent_.request_buffer_tracker_, *this);
   // With per-filter buffer, the filter only modifies the data it holds itself.
   ASSERT(parent_.per_filter_buffer_ || parent_.state_.latest_data_decoding_filter_ == this);
+  if (parent_.per_filter_buffer_ && bufferedData() == nullptr) {
+    IS_ENVOY_BUG("modifyDecodingBuffer() called by a filter that holds no buffered data");
+    return;
+  }
   callback(*bufferedData());
 }
 
@@ -775,6 +782,10 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   StreamDecoderFilters::Iterator entry =
       commonDecodePrefix(filter, FilterIterationStartState::AlwaysStartFromNext);
   StreamDecoderFilters::Iterator continue_data_entry = decoder_filters_.end();
+  // When a continuation resumes the headers without the end of stream, the resuming filter sends
+  // its body on after the headers, so it also sends a body added by later filters.
+  const StreamDecoderFilters::Iterator resumed_entry =
+      (filter != nullptr && !end_stream) ? filter->entry() : decoder_filters_.end();
   bool terminal_filter_decoded_end_stream = false;
   ASSERT(!state_.decoder_filter_chain_complete_ || entry == decoder_filters_.end() ||
          (*entry)->end_stream_);
@@ -813,7 +824,9 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
 
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
     if (per_filter_buffer_) {
-      coalesceBodyAddedInHeaders(continue_data_entry, entry, decoder_filters_.end());
+      coalesceBodyAddedInHeaders(continue_data_entry != decoder_filters_.end() ? continue_data_entry
+                                                                               : resumed_entry,
+                                 entry, decoder_filters_.end());
     }
     ENVOY_BUG(!continue_iteration || !stopDecoderFilterChain(),
               fmt::format(
@@ -1550,6 +1563,9 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   StreamEncoderFilters::Iterator entry =
       commonEncodePrefix(filter, end_stream, FilterIterationStartState::AlwaysStartFromNext);
   StreamEncoderFilters::Iterator continue_data_entry = encoder_filters_.end();
+  // See decodeHeaders().
+  const StreamEncoderFilters::Iterator resumed_entry =
+      (filter != nullptr && !end_stream) ? filter->entry() : encoder_filters_.end();
 
   for (; entry != encoder_filters_.end(); entry++) {
     ENVOY_EXECUTION_SCOPE(trackedStream(), &(*entry)->filter_context_);
@@ -1584,7 +1600,9 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
 
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
     if (per_filter_buffer_) {
-      coalesceBodyAddedInHeaders(continue_data_entry, entry, encoder_filters_.end());
+      coalesceBodyAddedInHeaders(continue_data_entry != encoder_filters_.end() ? continue_data_entry
+                                                                               : resumed_entry,
+                                 entry, encoder_filters_.end());
     }
 
     // If this filter ended the stream, encodeComplete() should be called for it.
@@ -2396,6 +2414,10 @@ void ActiveStreamEncoderFilter::modifyEncodingBuffer(
   PerFilterBufferTracker::ActiveFilterScope buffer_scope(parent_.response_buffer_tracker_, *this);
   // With per-filter buffer, the filter only modifies the data it holds itself.
   ASSERT(parent_.per_filter_buffer_ || parent_.state_.latest_data_encoding_filter_ == this);
+  if (parent_.per_filter_buffer_ && bufferedData() == nullptr) {
+    IS_ENVOY_BUG("modifyEncodingBuffer() called by a filter that holds no buffered data");
+    return;
+  }
   callback(*bufferedData());
 }
 

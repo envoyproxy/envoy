@@ -160,6 +160,12 @@ enum class FilterDataStatus {
   // Note that if a local reply was sent, no further iteration for either data or trailers
   // for the current filter and the filters following will happen. A local reply can be
   // triggered via sendLocalReply() or encodeHeaders().
+  //
+  // When the runtime guard ``envoy.reloadable_features.filter_manager_per_filter_buffer`` is
+  // enabled, the filter is treated as having consumed the frame: whatever it leaves in a frame
+  // that was replayed from an earlier filter's buffer is dropped, as it is for a frame that came
+  // from the codec. A filter that wants to keep the data must move it out of the frame (e.g. with
+  // addDecodedData()/addEncodedData()). A frame replayed from the filter's own buffer is kept.
   StopIterationNoBuffer
 };
 
