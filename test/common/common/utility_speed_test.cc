@@ -154,6 +154,42 @@ static void bmFindToken(benchmark::State& state) {
 }
 BENCHMARK(bmFindToken);
 
+static void bmFindTokenFirst(benchmark::State& state) {
+  const absl::string_view cache_control(CacheControl, CacheControlLength);
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    RELEASE_ASSERT(Envoy::StringUtil::findToken(cache_control, ",", "private"), "");
+  }
+}
+BENCHMARK(bmFindTokenFirst);
+
+static void bmFindTokenMissing(benchmark::State& state) {
+  const absl::string_view cache_control(CacheControl, CacheControlLength);
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    RELEASE_ASSERT(!Envoy::StringUtil::findToken(cache_control, ",", "no-store"), "");
+  }
+}
+BENCHMARK(bmFindTokenMissing);
+
+static void bmCaseFindTokenSingleTokenMissing(benchmark::State& state) {
+  const absl::string_view connection("keep-alive");
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    RELEASE_ASSERT(!Envoy::StringUtil::caseFindToken(connection, ",", "close"), "");
+  }
+}
+BENCHMARK(bmCaseFindTokenSingleTokenMissing);
+
+static void bmCaseFindTokenLast(benchmark::State& state) {
+  const absl::string_view connection("keep-alive, Upgrade");
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    RELEASE_ASSERT(Envoy::StringUtil::caseFindToken(connection, ",", "upgrade"), "");
+  }
+}
+BENCHMARK(bmCaseFindTokenLast);
+
 static bool nextToken(absl::string_view& str, char delim, bool strip_whitespace,
                       absl::string_view* token) {
   while (!str.empty()) {
