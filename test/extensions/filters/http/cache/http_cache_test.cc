@@ -131,6 +131,62 @@ public:
                             /*response_date=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::RequiresValidation,
                             /*expected_age=*/"501"},
+                           {"zero_max_age",
+                            /*request_cache_control=*/"",
+                            /*response_cache_control=*/"public, max-age=0",
+                            /*request_time=*/currentTime(),
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"0"},
+                           {"zero_s_maxage",
+                            /*request_cache_control=*/"",
+                            /*response_cache_control=*/"public, max-age=3600, s-maxage=0",
+                            /*request_time=*/currentTime(),
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"0"},
+                           {"fresh_before_expiry",
+                            /*request_cache_control=*/"",
+                            /*response_cache_control=*/"public, max-age=1000",
+                            /*request_time=*/currentTime() + Seconds(999),
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::Ok,
+                            /*expected_age=*/"999"},
+                           {"expired_at_max_age",
+                            /*request_cache_control=*/"",
+                            /*response_cache_control=*/"public, max-age=1000",
+                            /*request_time=*/currentTime() + Seconds(1000),
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1000"},
+                           {"expired_at_max_age_with_zero_max_stale",
+                            /*request_cache_control=*/"max-stale=0",
+                            /*response_cache_control=*/"public, max-age=1000",
+                            /*request_time=*/currentTime() + Seconds(1000),
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1000"},
+                           {"expired_at_max_age_but_max_stale_satisfied",
+                            /*request_cache_control=*/"max-stale=1",
+                            /*response_cache_control=*/"public, max-age=1000",
+                            /*request_time=*/currentTime() + Seconds(1000),
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::Ok,
+                            /*expected_age=*/"1000"},
+                           {"expired_at_max_age_with_must_revalidate",
+                            /*request_cache_control=*/"max-stale=1",
+                            /*response_cache_control=*/"public, max-age=1000, must-revalidate",
+                            /*request_time=*/currentTime() + Seconds(1000),
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1000"},
+                           {"expired_at_s_maxage",
+                            /*request_cache_control=*/"max-stale=1",
+                            /*response_cache_control=*/"public, max-age=3600, s-maxage=1000",
+                            /*request_time=*/currentTime() + Seconds(1000),
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1000"},
                            {"expired",
                             /*request_cache_control=*/"",
                             /*response_cache_control=*/"public, max-age=1000",
@@ -252,6 +308,17 @@ TEST_F(LookupRequestTest, ExpiredViaFallbackheader) {
   const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"expires", formatter_.fromTime(currentTime() - Seconds(5))},
+       {"date", formatter_.fromTime(currentTime())}});
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
+}
+
+TEST_F(LookupRequestTest, ExpiredAtExpiresHeader) {
+  const LookupRequest lookup_request(request_headers_, currentTime() + Seconds(5),
+                                     vary_allow_list_);
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"expires", formatter_.fromTime(currentTime() + Seconds(5))},
        {"date", formatter_.fromTime(currentTime())}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
 

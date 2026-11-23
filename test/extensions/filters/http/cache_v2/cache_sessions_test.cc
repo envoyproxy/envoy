@@ -1391,6 +1391,44 @@ TEST_F(CacheSessionsTest, ValidationResetPreservesHitWithCacheReadInFlight) {
   EXPECT_EQ(subscribers.value().get().value(), 0);
 }
 
+TEST_F(CacheSessionsTest, FreshnessBoundaryRequiresValidation) {
+  const struct {
+    std::string request_cache_control;
+    std::string response_cache_control;
+    int age;
+    bool requires_validation;
+  } test_cases[] = {
+      {"", "public, max-age=0", 0, true},
+      {"", "public, max-age=3600, s-maxage=0", 0, true},
+      {"", "public, max-age=1000", 999, false},
+      {"", "public, max-age=1000", 1000, true},
+      {"", "public, max-age=1000", 1001, true},
+      {"max-stale=0", "public, max-age=1000", 1000, true},
+      {"max-stale=1", "public, max-age=1000", 1000, false},
+      {"max-stale=1", "public, max-age=1000, must-revalidate", 1000, true},
+      {"max-stale=1", "public, max-age=3600, s-maxage=1000", 1000, true},
+  };
+  for (const auto& test_case : test_cases) {
+    SCOPED_TRACE(testing::Message()
+                 << test_case.request_cache_control << "; " << test_case.response_cache_control
+                 << "; age=" << test_case.age);
+    auto headers = requestHeaders("/a");
+    headers.addCopy("cache-control", test_case.request_cache_control);
+    const auto lookup = testLookupRequest(headers);
+    const Http::TestResponseHeaderMapImpl response_headers{
+        {"cache-control", test_case.response_cache_control}, {"date", dateNow()}};
+    EXPECT_EQ(test_case.requires_validation,
+              lookup->requiresValidation(response_headers, std::chrono::seconds(test_case.age)));
+  }
+}
+
+TEST_F(CacheSessionsTest, ExpiredAtExpiresHeaderRequiresValidation) {
+  const auto lookup = testLookupRequest("/a");
+  const Http::TestResponseHeaderMapImpl response_headers{{"expires", dateNow()},
+                                                         {"date", dateNow()}};
+  EXPECT_TRUE(lookup->requiresValidation(response_headers, std::chrono::seconds(0)));
+}
+
 TEST_F(CacheSessionsTest, ExpiredSMaxageRequiresValidationEvenWhenRequestAllowsMaxStale) {
   auto headers = requestHeaders("/a");
   headers.addCopy("cache-control", "max-stale=500");
