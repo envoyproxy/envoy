@@ -2868,9 +2868,12 @@ message RateLimit {
   // cap, always apply. The deprecated route and virtual host ``rate_limits`` are the exception:
   // a match on a route configuration with this field set also skips the virtual host ones.
   //
-  // Configurations with :ref:`apply_on_stream_done
-  // <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` are evaluated
-  // separately from the request-time configurations, so each phase stops on its own.
+  // Where :ref:`apply_on_stream_done
+  // <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` is supported, those
+  // configurations are evaluated separately from the request-time ones, so each phase stops on its
+  // own. The HTTP local rate limit filter ignores ``apply_on_stream_done`` for the deprecated route
+  // and virtual host ``rate_limits`` and evaluates them all at request time, so there a stream-done
+  // configuration with this field set can stop the request-time search.
   //
   // For the deprecated route and virtual host ``rate_limits``, only later configurations of the
   // same :ref:`stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>` are skipped, since each

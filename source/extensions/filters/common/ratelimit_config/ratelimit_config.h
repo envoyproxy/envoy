@@ -59,7 +59,8 @@ public:
 
   // `headers` (request headers) is always present. `response_headers` is optional: it is only set
   // on the apply_on_stream_done path and is nullptr on the request path; it lets a `hits_addend`
-  // format resolve `%RESP()%` substitutions.
+  // format resolve `%RESP()%` substitutions. Evaluation stops after the first matching policy
+  // with stop_on_match, so later policies of the same phase may not produce descriptors.
   void populateDescriptors(const Http::RequestHeaderMap& headers,
                            const Http::ResponseHeaderMap* response_headers,
                            const StreamInfo::StreamInfo& info,
