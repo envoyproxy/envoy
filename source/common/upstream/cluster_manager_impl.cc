@@ -1044,18 +1044,18 @@ absl::StatusOr<ClusterManagerImpl::ClusterDataPtr> ClusterManagerImpl::loadClust
   ClusterDataPtr result;
   auto cluster_entry_it = cluster_map.find(cluster_info->name());
   if (cluster_entry_it != cluster_map.end()) {
-    result = std::exchange(cluster_entry_it->second,
-                           std::make_unique<ClusterData>(std::move(cluster_any), cluster_hash,
-                                                         serialized_cluster_hash, version_info, added_via_api,
-                                                         required_for_ads, std::move(new_cluster),
-                                                         time_source_, avoid_cds_removal));
+    result = std::exchange(
+        cluster_entry_it->second,
+        std::make_unique<ClusterData>(std::move(cluster_any), cluster_hash, serialized_cluster_hash,
+                                      version_info, added_via_api, required_for_ads,
+                                      std::move(new_cluster), time_source_, avoid_cds_removal));
   } else {
     bool inserted = false;
     std::tie(cluster_entry_it, inserted) = cluster_map.emplace(
         cluster_info->name(),
-        std::make_unique<ClusterData>(std::move(cluster_any), cluster_hash, serialized_cluster_hash, version_info,
-                                      added_via_api, required_for_ads, std::move(new_cluster),
-                                      time_source_, avoid_cds_removal));
+        std::make_unique<ClusterData>(std::move(cluster_any), cluster_hash, serialized_cluster_hash,
+                                      version_info, added_via_api, required_for_ads,
+                                      std::move(new_cluster), time_source_, avoid_cds_removal));
     ASSERT(inserted);
   }
 

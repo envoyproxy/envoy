@@ -848,10 +848,9 @@ private:
 
   struct ClusterData : public ClusterManagerCluster {
     ClusterData(Protobuf::Any&& cluster_config_any, const uint64_t cluster_config_hash,
-                const uint64_t serialized_cluster_config_hash,
-                const std::string& version_info, bool added_via_api, bool required_for_ads,
-                ClusterSharedPtr&& cluster, TimeSource& time_source,
-                const bool avoid_cds_removal = false)
+                const uint64_t serialized_cluster_config_hash, const std::string& version_info,
+                bool added_via_api, bool required_for_ads, ClusterSharedPtr&& cluster,
+                TimeSource& time_source, const bool avoid_cds_removal = false)
         : cluster_config_any_(std::move(cluster_config_any)), config_hash_(cluster_config_hash),
           serialized_config_hash_(serialized_cluster_config_hash), version_info_(version_info),
           cluster_(std::move(cluster)), last_updated_(time_source.systemTime()),
