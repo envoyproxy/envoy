@@ -211,7 +211,7 @@ void DynamicModuleClusterWriter::loseOwnership(absl::string_view cluster_name,
                                                absl::string_view error_details) {
   ENVOY_LOG(warn, "dynamic module cluster writer {} no longer owns cluster {}: {}", config_name_,
             cluster_name, error_details);
-  stats_.ownership_lost_.inc();
+  stats_.ownership_lost_->inc();
   completeWarmingUpdate(cluster_name, state, WriteOutcome::OwnershipLost, error_details);
   setOwned(state, false);
   eraseIfUnused(cluster_name);

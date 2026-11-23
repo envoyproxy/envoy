@@ -18,7 +18,7 @@ Http::FilterFactoryCb createFilterFactory(
   auto filter_config =
       std::make_shared<BodySizeLimitFilterConfig>(proto_config, scope, stats_prefix);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_shared<BodySizeLimitFilter>(filter_config));
+    callbacks.addStreamFilter(std::make_shared<BodySizeLimitFilter>(filter_config));
   };
 }
 } // namespace

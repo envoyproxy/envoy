@@ -100,7 +100,6 @@ jobs:
           "OUTPUT=$(./ci/dependency/update.sh \(.task | @sh) \(.dependency // "" | @sh) \(.version // "" | @sh))"
           | bash::output
       env:
-        ENVOY_DOCKER_CI: 1
         ENVOY_REGISTRY_HASH: ${{ inputs.task == 'registry' && inputs.version || '' }}
         ENVOY_REGISTRY_ALLOW_UNSAFE: ${{ inputs.task == 'registry' && inputs.wip && '1' || '' }}
         ENVOY_ACTIONS_ALLOW_UNSAFE: ${{ inputs.task == 'actions' && inputs.wip && '1' || '' }}
@@ -196,8 +195,6 @@ jobs:
             sed -E 's/^== (.*) ==$/### \1/' "${RUNNER_TEMP}/deps-report.md"
         } >> "$GITHUB_STEP_SUMMARY"
       shell: bash
-      env:
-        ENVOY_DOCKER_CI: 1
     - name: Upload dependency report
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:

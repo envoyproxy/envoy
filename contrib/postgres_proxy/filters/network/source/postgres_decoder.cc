@@ -15,11 +15,9 @@ namespace PostgresProxy {
 
 constexpr absl::string_view FRONTEND = "Frontend";
 constexpr absl::string_view BACKEND = "Backend";
-
 void DecoderImpl::initialize() {
   // Special handler for first message of the transaction.
-  first_ =
-      MessageProcessor{"Startup", BODY_FORMAT(Int32, Repeated<String>), {&DecoderImpl::onStartup}};
+  first_ = MessageProcessor{"Startup", BODY_FORMAT(Int32, Repeated<String>), {}};
 
   // Frontend messages.
   FE_messages_.direction_ = FRONTEND;
@@ -184,6 +182,9 @@ void DecoderImpl::initialize() {
 */
 Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
   switch (state_) {
+  case State::RejectedState:
+    data.drain(data.length());
+    return Decoder::Result::Stopped;
   case State::InitState:
     return onDataInit(data, frontend);
   case State::OutOfSyncState:
@@ -191,6 +192,8 @@ Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
     return onDataIgnore(data, frontend);
   case State::InSyncState:
     return onDataInSync(data, frontend);
+  case State::AwaitingSSLPassthroughReply:
+    return onDataAwaitingSSLPassthroughReply(data, frontend);
   case State::NegotiatingUpstreamSSL:
     return onDataInNegotiating(data, frontend);
   default:
@@ -200,57 +203,172 @@ Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
 
 /* Handler for messages when decoder is in Init State. There are very few message types which
    are allowed in this state.
-   If the initial message has the correct syntax and  indicates that session should be in
-   clear-text, the decoder will move to InSyncState. If the initial message has the correct syntax
-   and indicates that session should be encrypted, the decoder stays in InitState, because the
-   initial message will be received again after transport socket negotiates SSL. If the message
-   syntax is incorrect, the decoder will move to OutOfSyncState, in which messages are not parsed.
+   If the initial message has the correct syntax and indicates that the session should be in
+   clear-text, the decoder will move to InSyncState after any required upstream SSL negotiation.
+   The decoder stays in InitState after local SSL termination or a local GSS refusal. With
+   enforcing rules, SSL passthrough waits for the server's reply and returns to InitState after N.
+   Malformed messages normally move the decoder to OutOfSyncState, in which messages are not
+   parsed. With enforcing RBAC rules, invalid startup lengths or failed body validation instead
+   reject the connection.
 */
-Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
+Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool frontend) {
   ASSERT(state_ == State::InitState);
+
+  // Only client packets can initiate negotiation or supply metadata for authorization.
+  if (!frontend && callbacks_->authorizationEnabled()) {
+    return onDataIgnore(data, frontend);
+  }
 
   // In Init state the minimum size of the message sufficient for parsing is 4 bytes.
   if (data.length() < 4) {
     // Not enough data in the buffer. Stop to avoid forwarding partial
     // initial message to the next filter.
-    return Decoder::Result::Stopped;
+    return Decoder::Result::NeedMoreStartupData;
   }
 
-  // Validate the message before processing.
-  const MsgBodyReader& f = std::get<1>(first_);
-  const auto msgParser = f();
+  const bool enforce = callbacks_->authorizationEnforced();
   // Run the validation.
   message_len_ = data.peekBEInt<uint32_t>(0);
-  if (message_len_ > Postgres::Protocol::MAX_STARTUP_PACKET_LENGTH) {
-    // Message does not conform to the expected format. Move to out-of-sync state.
+  if (message_len_ > Postgres::Protocol::MAX_STARTUP_PACKET_LENGTH ||
+      (enforce && message_len_ < Postgres::Protocol::STARTUP_HEADER_SIZE)) {
     data.drain(data.length());
+    if (enforce) {
+      state_ = State::RejectedState;
+      callbacks_->rejectInvalidStartup();
+      return Decoder::Result::Stopped;
+    }
     state_ = State::OutOfSyncState;
     return Decoder::Result::ReadyForNext;
   }
 
-  Message::ValidationResult validationResult = msgParser->validate(data, 4, message_len_ - 4);
+  const uint32_t code =
+      data.length() >= Postgres::Protocol::STARTUP_HEADER_SIZE ? data.peekBEInt<uint32_t>(4) : 0;
+  const bool ssl_request = code == Postgres::Protocol::SSL_REQUEST_CODE;
+  const bool cancel_request = code == Postgres::Protocol::CANCEL_REQUEST_CODE;
+  const bool gss_request = code == Postgres::Protocol::GSSAPI_ENC_REQUEST_CODE;
+  if (enforce && gss_request) {
+    // Decline GSS encryption so the client's next startup packet can be inspected.
+    if (gss_declined_ || message_len_ != Postgres::Protocol::GSSAPI_ENC_REQUEST_MESSAGE_SIZE ||
+        data.length() != message_len_) {
+      return rejectEncryptionNegotiation(data, "invalid GSSENCRequest");
+    }
+    gss_declined_ = true;
+    data.drain(message_len_);
+    callbacks_->incMessagesFrontend();
+    callbacks_->declineGSSEncryption();
+    return Decoder::Result::Stopped;
+  }
+
+  if (enforce && ssl_request &&
+      (ssl_passthrough_requested_ || message_len_ != Postgres::Protocol::SSL_REQUEST_MESSAGE_SIZE ||
+       data.length() != message_len_)) {
+    return rejectEncryptionNegotiation(data, "invalid SSLRequest");
+  }
+  if (enforce && code >= Postgres::Protocol::ENCRYPTION_REQUEST_BASE_CODE && !ssl_request &&
+      !cancel_request) {
+    return rejectEncryptionNegotiation(data, "unrecognized startup request code");
+  }
+
+  // Validate the message before processing.
+  const auto msgParser = std::get<1>(first_)();
+  Message::ValidationResult validationResult;
+  if (cancel_request) {
+    // CancelRequest contains binary PID and secret key fields, not startup attributes.
+    if (message_len_ < Postgres::Protocol::CANCEL_REQUEST_MIN_SIZE ||
+        message_len_ > Postgres::Protocol::CANCEL_REQUEST_MAX_SIZE) {
+      validationResult = Message::ValidationFailed;
+    } else {
+      validationResult =
+          data.length() < message_len_ ? Message::ValidationNeedMoreData : Message::ValidationOK;
+    }
+  } else {
+    validationResult = msgParser->validate(data, 4, message_len_ - 4);
+  }
 
   if (validationResult == Message::ValidationNeedMoreData) {
     // Incomplete message. Stop to avoid forwarding partial initial message
     // to the next filter.
-    return Decoder::Result::Stopped;
+    return Decoder::Result::NeedMoreStartupData;
   }
 
   if (validationResult == Message::ValidationFailed) {
-    // Message does not conform to the expected format. Move to out-of-sync state.
     data.drain(data.length());
+    if (enforce) {
+      state_ = State::RejectedState;
+      callbacks_->rejectInvalidStartup();
+      return Decoder::Result::Stopped;
+    }
+    // Message does not conform to the expected format. Move to out-of-sync state.
     state_ = State::OutOfSyncState;
     return Decoder::Result::ReadyForNext;
   }
 
   Decoder::Result result = Decoder::Result::ReadyForNext;
-  uint32_t code = data.peekBEInt<uint32_t>(4);
+  const bool startup_message = code < Postgres::Protocol::ENCRYPTION_REQUEST_BASE_CODE;
+  if (startup_message) {
+    if (!callbacks_->verifyDownstreamSSL()) {
+      data.drain(data.length());
+      state_ = State::RejectedState;
+      return Decoder::Result::Stopped;
+    }
+    message_.resize(message_len_ - 4);
+    data.copyOut(4, message_.size(), message_.data());
+    onStartup();
+    message_.clear();
+  }
+
+  const bool ssl_passthrough = ssl_request && callbacks_->shouldPassthroughSSL();
+  // Perform RBAC on StartupMessage, CancelRequest, and SSL passthrough connections.
+  // Only LOG rules evaluate GSSENCRequest.
+  if (callbacks_->authorizationEnabled() &&
+      (startup_message || cancel_request || ssl_passthrough || gss_request)) {
+    auto packet_type = DecoderCallbacks::StartupPacketType::StartupMessage;
+    if (cancel_request) {
+      packet_type = DecoderCallbacks::StartupPacketType::CancelRequest;
+    } else if (ssl_passthrough) {
+      packet_type = DecoderCallbacks::StartupPacketType::SSLRequest;
+    } else if (gss_request) {
+      packet_type = DecoderCallbacks::StartupPacketType::GSSENCRequest;
+    }
+    if (!callbacks_->authorizeStartup(packet_type)) {
+      data.drain(data.length());
+      state_ = State::RejectedState;
+      return Decoder::Result::Stopped;
+    }
+  }
+
+  if (cancel_request) {
+    callbacks_->incMessagesFrontend();
+    // The server processes cancellation and closes this separate connection without a reply.
+    if (callbacks_->shouldEncryptUpstream()) {
+      temp_storage_.move(data, message_len_);
+      data.drain(data.length());
+      sendUpstreamSSLRequest(State::OutOfSyncState);
+      return Decoder::Result::Stopped;
+    }
+    state_ = State::OutOfSyncState;
+    data.drain(message_len_);
+    return Decoder::Result::ReadyForNext;
+  }
+
+  if (enforce && ssl_passthrough) {
+    ssl_passthrough_requested_ = true;
+    state_ = State::AwaitingSSLPassthroughReply;
+    callbacks_->incMessagesFrontend();
+    data.drain(message_len_);
+    return Decoder::Result::ReadyForNext;
+  }
+
   // Startup message with 1234 in the most significant 16 bits indicate request to encrypt.
   if (code >= Postgres::Protocol::ENCRYPTION_REQUEST_BASE_CODE) {
     encrypted_ = true;
     // Handler for SSLRequest.
     // See details in https://www.postgresql.org/docs/current/protocol-message-formats.html.
-    if (code == Postgres::Protocol::SSL_REQUEST_CODE) {
+    if (ssl_request) {
+      // Reject if plaintext StartupMessage is pipelined after the SSLRequest
+      if (!ssl_passthrough && data.length() > message_len_) {
+        return rejectEncryptionNegotiation(data, "extra data after SSLRequest");
+      }
       // Notify the filter that `SSLRequest` message was decoded.
       // If the filter returns true, it means to pass the message upstream
       // to the server. If it returns false it means, that filter will try
@@ -270,20 +388,12 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
       // Stay in InitState. After switch to SSL, another init packet will be sent.
     }
   } else {
-    callbacks_->verifyDownstreamSSL();
-
     ENVOY_LOG(debug, "Detected version {}.{} of Postgres", code >> 16, code & 0x0000FFFF);
     if (callbacks_->shouldEncryptUpstream()) {
       // Copy the received initial request.
-      temp_storage_.add(data.linearize(data.length()), data.length());
-      // Send SSL request to upstream.
-      Buffer::OwnedImpl ssl_request;
-      ssl_request.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_MESSAGE_SIZE);
-      ssl_request.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_CODE);
-
-      callbacks_->sendUpstream(ssl_request);
+      temp_storage_.add(data);
+      sendUpstreamSSLRequest(State::InSyncState);
       result = Decoder::Result::Stopped;
-      state_ = State::NegotiatingUpstreamSSL;
     } else {
       state_ = State::InSyncState;
     }
@@ -291,7 +401,10 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
   data.drain(4);
 
   processMessageBody(data, FRONTEND, message_len_ - 4, first_, msgParser);
-  data.drain(message_len_);
+  if (result == Decoder::Result::Stopped) {
+    // Any remaining bytes belong to the locally consumed or retained initial exchange.
+    data.drain(data.length());
+  }
   return result;
 }
 
@@ -406,6 +519,39 @@ Decoder::Result DecoderImpl::onDataIgnore(Buffer::Instance& data, bool) {
   return Decoder::Result::ReadyForNext;
 }
 
+Decoder::Result DecoderImpl::rejectEncryptionNegotiation(Buffer::Instance& data,
+                                                         absl::string_view reason) {
+  data.drain(data.length());
+  state_ = State::RejectedState;
+  callbacks_->rejectEncryptionNegotiation(reason);
+  return Decoder::Result::Stopped;
+}
+
+Decoder::Result DecoderImpl::onDataAwaitingSSLPassthroughReply(Buffer::Instance& data,
+                                                               bool frontend) {
+  if (frontend) {
+    return rejectEncryptionNegotiation(data, "client data before the server's SSL response");
+  }
+  if (data.length() != 1) {
+    return rejectEncryptionNegotiation(data, "invalid server SSL response length");
+  }
+  switch (data.peekBEInt<char>(0)) {
+  case 'S':
+    encrypted_ = true;
+    incSessionsEncrypted();
+    state_ = State::EncryptedState;
+    break;
+  case 'N':
+    state_ = State::InitState;
+    break;
+  default:
+    return rejectEncryptionNegotiation(data, "invalid server SSL response");
+  }
+  // Drain only the inspection copy so the original response reaches the client.
+  data.drain(1);
+  return Decoder::Result::ReadyForNext;
+}
+
 // Method is called when C (CommandComplete) message has been
 // decoded. It extracts the keyword from message's payload
 // and updates stats associated with that keyword.
@@ -431,42 +577,38 @@ void DecoderImpl::decodeBackendStatements() {
   }
 }
 
+void DecoderImpl::sendUpstreamSSLRequest(State state_after_ssl) {
+  state_after_upstream_ssl_ = state_after_ssl;
+  state_ = State::NegotiatingUpstreamSSL;
+  // Send SSL request to upstream.
+  Buffer::OwnedImpl request;
+  request.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_MESSAGE_SIZE);
+  request.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_CODE);
+  callbacks_->sendUpstream(request);
+}
+
 Decoder::Result DecoderImpl::onDataInNegotiating(Buffer::Instance& data, bool frontend) {
   if (frontend) {
     // No data from downstream is allowed when negotiating upstream SSL
     // with the server.
-    data.drain(data.length());
-    state_ = State::OutOfSyncState;
-    return Decoder::Result::ReadyForNext;
+    temp_storage_.drain(temp_storage_.length());
+    return rejectEncryptionNegotiation(data, "client data while negotiating upstream SSL");
   }
 
   // This should be reply from the server indicating if it accepted
   // request to use SSL. It is only one character long packet, where
   // 'S' means use SSL, 'N' means do not use.
   // See details in https://www.postgresql.org/docs/current/protocol-flow.html#PROTOCOL-FLOW-SSL
-
-  // Indicate to the filter, the response and give the initial
-  // packet temporarily buffered to be sent upstream.
-  bool upstreamSSL = false;
-  state_ = State::InitState;
-  if (data.length() == 1) {
-    const char c = data.peekInt<char, ByteOrder::Host, 1>(0);
-    if (c == 'S') {
-      upstreamSSL = true;
-    } else {
-      if (c != 'N') {
-        state_ = State::OutOfSyncState;
-      }
-    }
-  } else {
-    state_ = State::OutOfSyncState;
-  }
-
+  const bool upstream_accepted = data.length() == 1 && data.peekBEInt<char>(0) == 'S';
   data.drain(data.length());
 
-  if (callbacks_->encryptUpstream(upstreamSSL, temp_storage_)) {
-    state_ = State::InSyncState;
+  state_ = upstream_accepted ? state_after_upstream_ssl_ : State::RejectedState;
+  // Indicate to the filter, the response and give the initial
+  // packet temporarily buffered to be sent upstream.
+  if (!callbacks_->encryptUpstream(upstream_accepted, temp_storage_)) {
+    state_ = State::RejectedState;
   }
+  temp_storage_.drain(temp_storage_.length());
 
   return Decoder::Result::Stopped;
 }
@@ -551,10 +693,30 @@ void DecoderImpl::onQuery() { callbacks_->processQuery(message_); }
 // The message format is continuous string of the following format:
 // user<username>database<database-name>application_name<application>encoding<encoding-type>
 void DecoderImpl::onStartup() {
-  // First 4 bytes of startup message contains version code.
-  // It is skipped. After that message contains attributes.
-  attributes_ = absl::StrSplit(message_.substr(4), absl::ByChar('\0'), absl::SkipEmpty());
-
+  if (callbacks_->authorizationEnabled()) {
+    // keep key/value pair for empty values
+    attributes_ = absl::StrSplit(message_.substr(4), absl::ByChar('\0'));
+    // The final packet terminator does not represent a startup attribute.
+    attributes_.erase("");
+    // Match the effective names used by PostgreSQL: default the database when it is empty.
+    if (attributes_.contains("user") &&
+        (!attributes_.contains("database") || attributes_.at("database").empty())) {
+      // Copy before insertion, which may invalidate references into the attribute map.
+      const std::string database = attributes_.at("user");
+      attributes_["database"] = database;
+    }
+    for (const auto* name : {"user", "database"}) {
+      const auto attribute = attributes_.find(name);
+      if (attribute != attributes_.end() &&
+          attribute->second.size() > Postgres::Protocol::MAX_NAME_LENGTH) {
+        attribute->second.resize(Postgres::Protocol::MAX_NAME_LENGTH);
+      }
+    }
+  } else {
+    // First 4 bytes of startup message contains version code.
+    // It is skipped. After that message contains attributes.
+    attributes_ = absl::StrSplit(message_.substr(4), absl::ByChar('\0'), absl::SkipEmpty());
+  }
   // If "database" attribute is not found, default it to "user" attribute.
   if (!attributes_.contains("database") && attributes_.contains("user")) {
     attributes_["database"] = attributes_["user"];

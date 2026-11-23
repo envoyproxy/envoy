@@ -12,6 +12,7 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 
 #include "absl/strings/string_view.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -64,42 +65,52 @@ UpstreamSocketManager::UpstreamSocketManager(Event::Dispatcher& dispatcher,
 UpstreamSocketManager&
 UpstreamSocketManager::pickLeastLoadedSocketManager(const std::string& node_id,
                                                     const std::string& cluster_id) {
-  absl::WriterMutexLock wlock(UpstreamSocketManager::socket_manager_lock);
-
-  // Assume that this worker is the best candidate for sending the reverse.
-  // connection socket.
   UpstreamSocketManager* target_socket_manager = this;
   const std::string source_worker = this->dispatcher_.name();
-
-  // Contains the value that we assume to be the minimum value so far.
-  int min_node_count = target_socket_manager->node_to_conn_count_map_[node_id];
-
-  // Iterate over UpstreamSocketManager instances of all threads to check.
-  // if any of them have a lower number of accepted reverse tunnels for.
-  // the node 'node_id'.
-  for (UpstreamSocketManager* socket_manager : socket_managers_) {
-    int node_count = socket_manager->node_to_conn_count_map_[node_id];
-
-    if (node_count < min_node_count) {
-      target_socket_manager = socket_manager;
-      min_node_count = node_count;
+  std::string dest_worker;
+  int min_node_count;
+  {
+    absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);
+    const auto count_for_node = [&node_id](const UpstreamSocketManager& manager) {
+      auto it = manager.node_to_conn_count_map_.find(node_id);
+      return it == manager.node_to_conn_count_map_.end() ? 0 : it->second;
+    };
+    min_node_count = count_for_node(*this);
+    for (UpstreamSocketManager* socket_manager : socket_managers_) {
+      if (socket_manager->extension_ != extension_) {
+        continue;
+      }
+      const int node_count = count_for_node(*socket_manager);
+      if (node_count < min_node_count) {
+        target_socket_manager = socket_manager;
+        min_node_count = node_count;
+      }
     }
+    target_socket_manager->node_to_conn_count_map_[node_id] = min_node_count + 1;
+    dest_worker = target_socket_manager->dispatcher_.name();
   }
 
-  const std::string dest_worker = target_socket_manager->dispatcher_.name();
-
-  // Increment the reverse connection count of the chosen handler.
   if (source_worker != dest_worker) {
     ENVOY_LOG(info,
               "reverse_tunnel: Rebalancing socket from worker {} to worker {} with min "
               "count {} for node {} cluster {}",
-              source_worker, dest_worker, target_socket_manager->node_to_conn_count_map_[node_id],
-              node_id, cluster_id);
+              source_worker, dest_worker, min_node_count, node_id, cluster_id);
   }
-  target_socket_manager->node_to_conn_count_map_[node_id]++;
   ENVOY_LOG(debug, "reverse_tunnel: Incremented count for node {}: {}", node_id,
-            target_socket_manager->node_to_conn_count_map_[node_id]);
+            min_node_count + 1);
   return *target_socket_manager;
+}
+
+void UpstreamSocketManager::decrementIdleCount(const std::string& node_id) {
+  absl::WriterMutexLock wlock(UpstreamSocketManager::socket_manager_lock);
+  auto it = node_to_conn_count_map_.find(node_id);
+  if (it == node_to_conn_count_map_.end()) {
+    IS_ENVOY_BUG(fmt::format("reverse_tunnel: no idle count to decrement for node {}", node_id));
+    return;
+  }
+  if (--it->second == 0) {
+    node_to_conn_count_map_.erase(it);
+  }
 }
 
 void UpstreamSocketManager::onGoAway(int fd) {
@@ -129,14 +140,23 @@ void UpstreamSocketManager::handoffSocketToWorker(
                     socket = std::move(socket)]() mutable -> void {
     this->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval,
                               true /* rebalanced */, tenant_id, initiator_worker_id,
-                              initiator_connection_id);
+                              initiator_connection_id, true /* counted_for_rebalancing */);
   });
 }
 
 void UpstreamSocketManager::addConnectionSocket(
     const std::string& node_id, const std::string& cluster_id, Network::ConnectionSocketPtr socket,
     const std::chrono::seconds& ping_interval, bool rebalanced, absl::string_view tenant_id,
-    absl::string_view initiator_worker_id, absl::string_view initiator_connection_id) {
+    absl::string_view initiator_worker_id, absl::string_view initiator_connection_id,
+    bool counted_for_rebalancing) {
+  // Both node_id and cluster_id are mandatory for consistent state management and stats tracking.
+  if (node_id.empty() || cluster_id.empty()) {
+    ENVOY_LOG(error,
+              "reverse_tunnel: node_id or cluster_id cannot be empty. node: '{}', cluster: '{}'.",
+              node_id, cluster_id);
+    return;
+  }
+
   const std::string scoped_node_id =
       maybeBuildTenantScopedIdentifier(tenant_isolation_enabled_, tenant_id, node_id);
   const std::string scoped_cluster_id =
@@ -155,18 +175,11 @@ void UpstreamSocketManager::addConnectionSocket(
                                            tenant_id, initiator_worker_id, initiator_connection_id);
       return;
     }
+    counted_for_rebalancing = true;
   }
 
   ENVOY_LOG(debug, "reverse_tunnel: adding connection for node: {}, cluster: {}.", node_id,
             cluster_id);
-
-  // Both node_id and cluster_id are mandatory for consistent state management and stats tracking.
-  if (node_id.empty() || cluster_id.empty()) {
-    ENVOY_LOG(error,
-              "reverse_tunnel: node_id or cluster_id cannot be empty. node: '{}', cluster: '{}'.",
-              node_id, cluster_id);
-    return;
-  }
 
   const int fd = socket->ioHandle().fdDoNotUse();
   const std::string& connectionKey = socket->connectionInfoProvider().localAddress()->asString();
@@ -201,6 +214,9 @@ void UpstreamSocketManager::addConnectionSocket(
 
   accepted_reverse_connections_[scoped_node_id].push_back(std::move(socket));
   fd_to_socket_it_map_[fd] = std::prev(accepted_reverse_connections_[scoped_node_id].end());
+  if (counted_for_rebalancing) {
+    counted_idle_fds_.insert(fd);
+  }
   Network::ConnectionSocketPtr& socket_ref = accepted_reverse_connections_[scoped_node_id].back();
 
   // Update stats registry.
@@ -282,6 +298,9 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
   node_sockets_it->second.pop_front();
 
   const int fd = socket->ioHandle().fdDoNotUse();
+  if (counted_idle_fds_.erase(fd) != 0) {
+    decrementIdleCount(node_id);
+  }
   const std::string& remoteConnectionKey =
       socket->connectionInfoProvider().remoteAddress()->asString();
 
@@ -487,6 +506,9 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
     ::shutdown(fd, ENVOY_SHUT_RDWR);
     accepted_reverse_connections_[node_id].erase(socket_it->second);
     fd_to_socket_it_map_.erase(socket_it);
+    if (counted_idle_fds_.erase(fd) != 0) {
+      decrementIdleCount(node_id);
+    }
 
     fd_to_event_map_.erase(fd);
     fd_to_timer_map_.erase(fd);
@@ -740,6 +762,14 @@ void UpstreamSocketManager::rearmPingSendTimer(int fd) {
 UpstreamSocketManager::~UpstreamSocketManager() {
   ENVOY_LOG(debug, "reverse_tunnel: destructor called.");
 
+  {
+    absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);
+    auto it = std::find(socket_managers_.begin(), socket_managers_.end(), this);
+    if (it != socket_managers_.end()) {
+      socket_managers_.erase(it);
+    }
+  }
+
   // Clean up all active file events and timers first.
   for (auto& [fd, event] : fd_to_event_map_) {
     ENVOY_LOG(trace, "reverse_tunnel: cleaning up file event. fd: {}.", fd);
@@ -796,13 +826,6 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   fd_to_cluster_map_.clear();
   fd_to_lifecycle_info_.clear();
   fd_to_socket_it_map_.clear();
-
-  // Remove this instance from the global socket managers list.
-  absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);
-  auto it = std::find(socket_managers_.begin(), socket_managers_.end(), this);
-  if (it != socket_managers_.end()) {
-    socket_managers_.erase(it);
-  }
 }
 
 OptRef<const MonotonicTime> UpstreamSocketManager::findStartTime(int fd) const {

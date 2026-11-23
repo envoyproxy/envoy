@@ -1,14 +1,11 @@
 #include "source/server/admin/config_dump_handler.h"
 
-#include "envoy/config/core/v3/health_check.pb.h"
-#include "envoy/config/endpoint/v3/endpoint.pb.h"
-
 #include "source/common/common/matchers.h"
 #include "source/common/common/regex.h"
 #include "source/common/common/statusor.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
-#include "source/common/network/utility.h"
+#include "source/common/upstream/endpoint_config_dump.h"
 #include "source/server/admin/utils.h"
 
 namespace Envoy {
@@ -94,18 +91,17 @@ bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
     const Protobuf::FieldDescriptor* any_field = descriptor->FindFieldByName(any_field_name);
     if (reflection->HasField(message, any_field)) {
       ASSERT(any_field != nullptr);
-      // Unpack to a DynamicMessage.
+      // unpack the Any resource
       Protobuf::Any any_message;
       any_message.MergeFrom(reflection->GetMessage(message, any_field));
-      Protobuf::DynamicMessageFactory dmf;
       const absl::string_view inner_type_name =
           TypeUtil::typeUrlToDescriptorFullName(any_message.type_url());
       const Protobuf::Descriptor* inner_descriptor =
           Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
               static_cast<std::string>(inner_type_name));
       ASSERT(inner_descriptor != nullptr);
-      std::unique_ptr<Protobuf::Message> inner_message;
-      inner_message.reset(dmf.GetPrototype(inner_descriptor)->New());
+      std::unique_ptr<Protobuf::Message> inner_message(
+          Protobuf::MessageFactory::generated_factory()->GetPrototype(inner_descriptor)->New());
       if (!MessageUtil::unpackTo(any_message, *inner_message).ok()) {
         return false;
       }
@@ -195,7 +191,7 @@ std::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResource
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
     if (server_.clusterManager().hasActiveClusters()) {
       callbacks_map.emplace("endpoint", [this](const Matchers::StringMatcher& name_matcher) {
-        return dumpEndpointConfigs(name_matcher);
+        return Upstream::dumpEndpointConfigs(server_.clusterManager(), name_matcher);
       });
     }
   }
@@ -254,7 +250,7 @@ std::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConfi
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
     if (server_.clusterManager().hasActiveClusters()) {
       callbacks_map.emplace("endpoint", [this](const Matchers::StringMatcher& name_matcher) {
-        return dumpEndpointConfigs(name_matcher);
+        return Upstream::dumpEndpointConfigs(server_.clusterManager(), name_matcher);
       });
     }
   }
@@ -283,119 +279,6 @@ std::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConfi
         absl::StrCat("FieldMask ", *mask, " could not be successfully applied to any configs."))};
   }
   return std::nullopt;
-}
-
-ProtobufTypes::MessagePtr
-ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_matcher) const {
-  auto endpoint_config_dump = std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
-  // TODO(mattklein123): Add ability to see warming clusters in admin output.
-  server_.clusterManager().forEachActiveCluster([&](const Upstream::Cluster& cluster) {
-    Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
-    envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
-
-    if (!cluster_info->edsServiceName().empty()) {
-      cluster_load_assignment.set_cluster_name(cluster_info->edsServiceName());
-    } else {
-      cluster_load_assignment.set_cluster_name(cluster_info->name());
-    }
-    if (!name_matcher.match(cluster_load_assignment.cluster_name())) {
-      return;
-    }
-    auto& policy = *cluster_load_assignment.mutable_policy();
-
-    // Using MILLION as denominator in config dump.
-    float value = cluster.dropOverload().value() * 1000000;
-    if (value > 0) {
-      auto* drop_overload = policy.add_drop_overloads();
-      drop_overload->set_category(cluster.dropCategory());
-      auto* percent = drop_overload->mutable_drop_percentage();
-      percent->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
-      percent->set_numerator(uint32_t(value));
-    }
-
-    for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
-      policy.mutable_overprovisioning_factor()->set_value(host_set->overprovisioningFactor());
-
-      if (!host_set->hostsPerLocality().get().empty()) {
-        for (int index = 0; index < static_cast<int>(host_set->hostsPerLocality().get().size());
-             index++) {
-          auto locality_host_set = host_set->hostsPerLocality().get()[index];
-
-          if (!locality_host_set.empty()) {
-            auto& locality_lb_endpoint = *cluster_load_assignment.mutable_endpoints()->Add();
-            locality_lb_endpoint.mutable_locality()->MergeFrom(locality_host_set[0]->locality());
-            locality_lb_endpoint.set_priority(locality_host_set[0]->priority());
-            if (host_set->localityWeights() != nullptr && !host_set->localityWeights()->empty()) {
-              locality_lb_endpoint.mutable_load_balancing_weight()->set_value(
-                  (*host_set->localityWeights())[index]);
-            }
-
-            for (auto& host : locality_host_set) {
-              addLbEndpoint(host, locality_lb_endpoint);
-            }
-          }
-        }
-      } else {
-        for (auto& host : host_set->hosts()) {
-          auto& locality_lb_endpoint = *cluster_load_assignment.mutable_endpoints()->Add();
-          locality_lb_endpoint.mutable_locality()->MergeFrom(host->locality());
-          locality_lb_endpoint.set_priority(host->priority());
-          addLbEndpoint(host, locality_lb_endpoint);
-        }
-      }
-    }
-    if (cluster_info->addedViaApi()) {
-      auto& dynamic_endpoint = *endpoint_config_dump->mutable_dynamic_endpoint_configs()->Add();
-      std::ignore = dynamic_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
-    } else {
-      auto& static_endpoint = *endpoint_config_dump->mutable_static_endpoint_configs()->Add();
-      std::ignore = static_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
-    }
-  });
-  return endpoint_config_dump;
-}
-
-void ConfigDumpHandler::addLbEndpoint(
-    const Upstream::HostSharedPtr& host,
-    envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) const {
-  auto& lb_endpoint = *locality_lb_endpoint.mutable_lb_endpoints()->Add();
-  if (host->metadata() != nullptr) {
-    lb_endpoint.mutable_metadata()->MergeFrom(*host->metadata());
-  }
-  lb_endpoint.mutable_load_balancing_weight()->set_value(host->weight());
-
-  switch (host->coarseHealth()) {
-  case Upstream::Host::Health::Healthy:
-    lb_endpoint.set_health_status(envoy::config::core::v3::HealthStatus::HEALTHY);
-    break;
-  case Upstream::Host::Health::Unhealthy:
-    lb_endpoint.set_health_status(envoy::config::core::v3::HealthStatus::UNHEALTHY);
-    break;
-  case Upstream::Host::Health::Degraded:
-    lb_endpoint.set_health_status(envoy::config::core::v3::HealthStatus::DEGRADED);
-    break;
-  default:
-    lb_endpoint.set_health_status(envoy::config::core::v3::HealthStatus::UNKNOWN);
-  }
-
-  auto& endpoint = *lb_endpoint.mutable_endpoint();
-  endpoint.set_hostname(host->hostname());
-  Network::Utility::addressToProtobufAddress(*host->address(), *endpoint.mutable_address());
-  if (host->addressListOrNull() != nullptr) {
-    const auto& address_list = *host->addressListOrNull();
-    if (address_list.size() > 1) {
-      // skip first address of the list as the default address is not an additional one.
-      for (auto it = std::next(address_list.begin()); it != address_list.end(); ++it) {
-        auto& new_address = *endpoint.mutable_additional_addresses()->Add();
-        Network::Utility::addressToProtobufAddress(**it, *new_address.mutable_address());
-      }
-    }
-  }
-  auto& health_check_config = *endpoint.mutable_health_check_config();
-  health_check_config.set_hostname(host->hostnameForHealthChecks());
-  if (host->healthCheckAddress()->asString() != host->address()->asString()) {
-    health_check_config.set_port_value(host->healthCheckAddress()->ip()->port());
-  }
 }
 
 } // namespace Server
