@@ -316,6 +316,7 @@ envoy_cc_test(
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )
 
