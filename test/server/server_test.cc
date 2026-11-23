@@ -1698,7 +1698,7 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
           ctx.clusterManager().clusters();
         });
         EXPECT_CALL(*mock_extension, onWorkerThreadInitialized());
-        return mock_extension;
+        return BootstrapExtensionPtr{std::move(mock_extension)};
       });
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
@@ -1715,8 +1715,8 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensionsThrowingError) {
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
       .WillOnce([](const Protobuf::Message&,
-                   Configuration::ServerFactoryContext&) -> BootstrapExtensionPtr {
-        throw EnvoyException("Unable to initiate mock_bootstrap_extension.");
+                   Configuration::ServerFactoryContext&) -> BootstrapExtensionCreationResult {
+        return absl::InvalidArgumentError("Unable to initiate mock_bootstrap_extension.");
       });
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(

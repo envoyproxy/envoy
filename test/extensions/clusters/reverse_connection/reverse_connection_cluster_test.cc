@@ -1,6 +1,7 @@
 #include <chrono>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "envoy/common/callback.h"
@@ -33,6 +34,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -78,6 +80,14 @@ public:
 
 class ReverseConnectionClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
+  std::unique_ptr<TestScopedStaticReloadableFeaturesRuntime> listener_drain_runtime_;
+
+  void setListenerDrainGuard(bool enabled) {
+    listener_drain_runtime_.reset();
+    listener_drain_runtime_ = std::make_unique<TestScopedStaticReloadableFeaturesRuntime>(
+        std::vector<std::pair<std::string, bool>>{{"reverse_tunnel_listener_drain", enabled}});
+  }
+
   ReverseConnectionClusterTest() {
     // Set up the stats scope.
     stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
@@ -210,7 +220,7 @@ public:
   }
 
   // Helper to add a socket to the manager for testing.
-  void addTestSocket(const std::string& node_id, const std::string& cluster_id) {
+  void addTestSocket(const std::string& node_id, const std::string& cluster_id, int fd = 123) {
     if (!socket_interface_) {
       return;
     }
@@ -223,7 +233,7 @@ public:
     // Create a mock socket. Timer and file event creation will use the ON_CALL defaults.
     auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
-    EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
+    EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(fd));
     EXPECT_CALL(*socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
     socket->io_handle_ = std::move(mock_io_handle);
 
@@ -348,6 +358,25 @@ TEST_F(ReverseConnectionClusterTest, BadConfigWithWrongLbPolicy) {
                             "cluster: LB policy ROUND_ROBIN is not valid for Cluster type "
                             "envoy.clusters.reverse_connection. Only 'CLUSTER_PROVIDED' is allowed "
                             "with cluster type 'REVERSE_CONNECTION'");
+}
+
+TEST_F(ReverseConnectionClusterTest, BadConfigFromBaseClusterInitialization) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    eds_cluster_config:
+      service_name: service_foo
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(setupFromYaml(yaml, false), EnvoyException,
+                            "eds_cluster_config set in a non-EDS cluster");
 }
 
 TEST_F(ReverseConnectionClusterTest, BasicSetup) {
@@ -581,7 +610,7 @@ TEST_F(ReverseConnectionClusterTest, SocketInterfaceWrongType) {
       return "envoy.bootstrap.reverse_tunnel.upstream_socket_interface";
     }
 
-    Server::BootstrapExtensionPtr
+    Server::BootstrapExtensionCreationResult
     createBootstrapExtension(const Protobuf::Message&,
                              Server::Configuration::ServerFactoryContext&) override {
       return nullptr;
@@ -791,6 +820,69 @@ TEST_F(ReverseConnectionClusterTest, HostReuse) {
     EXPECT_NE(result2.host, nullptr);
     EXPECT_EQ(result1.host, result2.host);
   }
+}
+
+TEST_F(ReverseConnectionClusterTest, DrainingNodeCannotReuseCachedHost) {
+  setListenerDrainGuard(true);
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  addTestSocket("test-node", "test-cluster");
+  auto* socket_manager = socket_interface_->getLocalRegistry()->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  auto draining_socket = socket_manager->getConnectionSocket("test-node");
+  ASSERT_NE(draining_socket, nullptr);
+
+  EXPECT_CALL(server_context_.dispatcher_, post(_));
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection, "x-remote-node-id", "test-cluster");
+  auto original_host = lb.chooseHost(&lb_context).host;
+  ASSERT_NE(original_host, nullptr);
+  auto& all_tunnels_draining =
+      cluster_->info()->statsScope().counterFromString("upstream_rq_all_tunnels_draining");
+  EXPECT_EQ(all_tunnels_draining.value(), 0);
+
+  socket_manager->markSocketDraining(123);
+  EXPECT_EQ(lb.chooseHost(&lb_context).host, nullptr);
+  EXPECT_EQ(all_tunnels_draining.value(), 1);
+  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "test-node"}}};
+  EXPECT_EQ(lb.chooseHost(&lb_context).host, nullptr);
+  EXPECT_EQ(all_tunnels_draining.value(), 2);
+  EXPECT_NE(socket_manager->getLifecycleInfo(123), nullptr);
+
+  // Disabling the guard restores cached-host selection, without counting a draining-node miss.
+  setListenerDrainGuard(false);
+  EXPECT_EQ(lb.chooseHost(&lb_context).host, original_host);
+  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "test-cluster"}}};
+  EXPECT_EQ(lb.chooseHost(&lb_context).host, original_host);
+  EXPECT_EQ(all_tunnels_draining.value(), 2);
+  setListenerDrainGuard(true);
+
+  // A healthy replacement may reuse the host while the original tunnel is still draining.
+  addTestSocket("test-node", "test-cluster", 124);
+  EXPECT_EQ(lb.chooseHost(&lb_context).host, original_host);
+  EXPECT_EQ(all_tunnels_draining.value(), 2);
+
+  // Unknown keys still create a fallback host and must not count as an all-draining miss.
+  EXPECT_CALL(server_context_.dispatcher_, post(_));
+  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "unknown-node"}}};
+  EXPECT_NE(lb.chooseHost(&lb_context).host, nullptr);
+  EXPECT_EQ(all_tunnels_draining.value(), 2);
 }
 
 // Test different hosts for different UUIDs.

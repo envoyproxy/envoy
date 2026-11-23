@@ -2,6 +2,7 @@ load("@base_pip3//:requirements.bzl", "requirement")
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@envoy_toolshed//:utils.bzl", "json_merge")
+load("@envoy_toolshed//dependency:macros.bzl", "release_date_updater")
 load("@envoy_toolshed//dependency:reachability.bzl", "dependency_reachability")
 load("@envoy_toolshed//dependency/cve:macros.bzl", "cve_scan")
 load("@rules_python//python:defs.bzl", "py_test")
@@ -43,18 +44,72 @@ json_merge(
     visibility = ["//visibility:public"],
 )
 
+# Metadata-only repositories absent from the resolved module graph have no
+# version to check.
+# TODO(phlax): Skip nested archive tags until envoy.dependency.check can parse nested tag names.
+json_merge(
+    name = "check-dependencies",
+    srcs = [":filtered-dependencies"],
+    filter = """
+    .[0]
+    | with_entries(
+        select(.value.version != null)
+        | .value |= (
+            .source as $source
+            | if $source.url then
+                .urls = ([
+                    $source.url
+                    | sub("^(?<archive>https://github.com/[^/]+/[^/]+/archive/)refs/tags/(?<tag>.+[.](tar[.]gz|zip))$";
+                          "\\(.archive)\\(.tag)")
+                ] + ($source.mirror_urls // []))
+              else . end
+            | .sha256 = ($source.integrity // "")
+        )
+        | select((.value.urls[0] // ""
+                  | test("^https://github.com/[^/]+/[^/]+/archive/.*/.*[.](tar[.]gz|zip)$")) | not)
+      )
+    """,
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "check_dependencies_test",
+    srcs = ["check_dependencies_test.py"],
+    args = [
+        "$(location :filtered-dependencies)",
+        "$(location :check-dependencies)",
+    ],
+    data = [
+        ":check-dependencies",
+        ":filtered-dependencies",
+    ],
+)
+
 py_console_script_binary(
     name = "check",
     args = [
-        "--repository_locations=$(location :filtered-dependencies)",
+        "--repository_locations=$(location :check-dependencies)",
     ],
     data = [
-        ":filtered-dependencies",
+        ":check-dependencies",
     ],
     pkg = "@base_pip3//envoy_dependency_check",
     script = "envoy.dependency.check",
     visibility = ["//visibility:public"],
     deps = [requirement("orjson")],
+)
+
+# Fix the release dates of dependencies in the metadata (`bazel/deps.yaml`, `api/bazel/deps.yaml`),
+# with the dates that `:check` looks up for them. Requires `GITHUB_TOKEN`.
+#   bazel run //tools/dependency:release_dates -- <name>...
+release_date_updater(
+    name = "release_dates",
+    check = ":check",
+    dependencies = ":check-dependencies",
+    metadata = [
+        "//bazel:deps.yaml",
+        "@envoy_api//bazel:deps.yaml",
+    ],
 )
 
 py_console_script_binary(
@@ -158,7 +213,10 @@ sh_binary(
 
 filegroup(
     name = "cve-data-dir",
-    srcs = glob(["cve_data/*.json"]),
+    srcs = glob([
+        "cve_data/*.json",
+        "cve_data/cvelist/*.json",
+    ]),
     visibility = ["//visibility:public"],
 )
 

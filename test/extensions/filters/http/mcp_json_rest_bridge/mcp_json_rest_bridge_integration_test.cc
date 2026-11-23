@@ -1,13 +1,11 @@
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
 #include "envoy/http/codec.h"
-#include "envoy/network/address.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/protobuf/utility.h"
 
 #include "test/integration/fake_access_log.h"
-#include "test/integration/http_integration.h"
-#include "test/test_common/environment.h"
+#include "test/integration/http_protocol_integration.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -34,22 +32,20 @@ void expectJsonRpcParseErrorResponse(IntegrationStreamDecoder& response) {
           R"json({"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"JSON parse error"}})json"));
 }
 
-class McpJsonRestBridgeIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                         public HttpIntegrationTest {
+class McpJsonRestBridgeIntegrationTest : public HttpProtocolIntegrationTest {
 public:
-  McpJsonRestBridgeIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {}
-
-  void SetUp() override { setUpstreamProtocol(Http::CodecType::HTTP2); }
-
   void initializeFilter(const std::string& config) {
     config_helper_.prependFilter(config);
     initialize();
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, McpJsonRestBridgeIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, McpJsonRestBridgeIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             /*downstream_protocols=*/{Http::CodecType::HTTP1,
+                                                       Http::CodecType::HTTP2},
+                             /*upstream_protocols=*/{Http::CodecType::HTTP2})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(McpJsonRestBridgeIntegrationTest, InitializeSuccess) {
   const std::string config = R"EOF(
@@ -133,7 +129,12 @@ TEST_P(McpJsonRestBridgeIntegrationTest, InitializedSuccess) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers().getStatusValue(), StrEq("202"));
   EXPECT_THAT(response->headers().getContentTypeValue(), IsEmpty());
-  EXPECT_THAT(response->headers().getContentLengthValue(), IsEmpty());
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    // The HTTP/1 codec frames a headers-only response with an explicit "Content-Length: 0".
+    EXPECT_THAT(response->headers().getContentLengthValue(), StrEq("0"));
+  } else {
+    EXPECT_THAT(response->headers().getContentLengthValue(), IsEmpty());
+  }
   EXPECT_THAT(response->body(), IsEmpty());
 }
 
@@ -3037,49 +3038,9 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallIgnoresRestrictedHeaders) {
   EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
 }
 
-class McpJsonRestBridgeHttp1IntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
-      public HttpIntegrationTest {
-public:
-  McpJsonRestBridgeHttp1IntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
-
-  void initializeFilter(const std::string& config) {
-    config_helper_.prependFilter(config);
-    initialize();
-  }
-};
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, McpJsonRestBridgeHttp1IntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
-
-TEST_P(McpJsonRestBridgeHttp1IntegrationTest, InitializedAckHasContentLengthZero) {
-  initializeFilter(R"EOF(
-    name: envoy.filters.http.mcp_json_rest_bridge
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
-  )EOF");
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":path", "/mcp"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"},
-                                     {"content-type", "application/json"}},
-      R"({"jsonrpc": "2.0", "method": "notifications/initialized"})");
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_THAT(response->headers().getStatusValue(), StrEq("202"));
-  EXPECT_THAT(response->headers().getContentLengthValue(), StrEq("0"));
-  EXPECT_THAT(response->body(), IsEmpty());
-}
-
-// An HTTP/1 POST request with "Content-Length: 0" has no body, so the codec ends the request at the
+// A POST request with "Content-Length: 0" has no body, so the codec ends the request at the
 // headers and the filter never sees decodeData().
-TEST_P(McpJsonRestBridgeHttp1IntegrationTest, ContentLengthZeroPostReturnsParseError) {
+TEST_P(McpJsonRestBridgeIntegrationTest, ContentLengthZeroPostReturnsParseError) {
   initializeFilter(R"EOF(
     name: envoy.filters.http.mcp_json_rest_bridge
     typed_config:

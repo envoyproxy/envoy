@@ -31,7 +31,7 @@ class UpstreamCodecFilter : public Http::StreamDecoderFilter,
                             public Http::DownstreamWatermarkCallbacks,
                             public Http::UpstreamCallbacks {
 public:
-  UpstreamCodecFilter() : bridge_(*this), deferred_reset_status_(absl::OkStatus()) {}
+  UpstreamCodecFilter() : bridge_(*this) {}
 
   // Http::DownstreamWatermarkCallbacks
   void onBelowWriteBufferLowWatermark() override;
@@ -42,7 +42,7 @@ public:
   void onUpstreamConnectionEstablished() override;
 
   // Http::StreamFilterBase
-  void onDestroy() override { callbacks_->removeDownstreamWatermarkCallbacks(*this); }
+  void onDestroy() override;
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -95,15 +95,29 @@ public:
   Http::StreamDecoderFilterCallbacks* callbacks_;
   CodecBridge bridge_;
   OptRef<Http::RequestHeaderMap> latched_headers_;
-  absl::Status deferred_reset_status_;
+  struct DeferredReset {
+    Http::StreamResetReason reason;
+    std::string transport_failure_reason;
+  };
+  std::optional<DeferredReset> deferred_reset_;
   std::optional<bool> latched_end_stream_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  bool calling_encode_headers_ = false;
+  bool calling_encode_ = false;
+  // True once the codec delivered end of stream or reset; the stream must not be touched after.
+  bool codec_stream_complete_ = false;
 
 private:
+  struct ScopedEncodingTracker {
+    ScopedEncodingTracker(UpstreamCodecFilter* filter);
+    ~ScopedEncodingTracker();
+    UpstreamCodecFilter* filter_;
+  };
+
   StreamInfo::UpstreamTiming& upstreamTiming() {
     return callbacks_->upstreamCallbacks()->upstreamStreamInfo().upstreamInfo()->upstreamTiming();
   }
+  bool maybeHandleDeferredReset();
+  std::string deferredResetDetails() const;
 };
 
 class UpstreamCodecFilterFactory

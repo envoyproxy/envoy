@@ -27,6 +27,8 @@ Currently, dynamic modules are supported at the following extension points:
 * As a :ref:`formatter <envoy_v3_api_msg_extensions.formatter.dynamic_modules.v3.DynamicModuleFormatter>`.
 * As a :ref:`stats sink <envoy_v3_api_msg_extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink>`
   (:ref:`configuration <config_stat_sinks_dynamic_modules>`).
+* As a :ref:`resource monitor <envoy_v3_api_msg_extensions.resource_monitors.dynamic_modules.v3.DynamicModuleResourceMonitor>`
+  (:ref:`configuration <config_overload_manager_dynamic_modules>`).
 * As a :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`.
 * As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`.
 * As an :ref:`HTTP early header mutation <envoy_v3_api_msg_extensions.http.early_header_mutation.dynamic_modules.v3.DynamicModuleEarlyHeaderMutation>`.
@@ -79,29 +81,6 @@ The SDK's init macros use the same prefix in the module crate. Hand-written ABI 
 instead of ``#[no_mangle]``. Rust handles platform-specific symbol decoration, including the
 leading underscore on macOS. Shared modules and ordinary Cargo SDK builds keep unprefixed hook
 names by default.
-
-HTTP stream timing
-------------------
-
-HTTP filters can read stream timing through ``TimingInfo`` in the C++, Go, and Rust SDKs. The
-:repo:`ABI header <source/extensions/dynamic_modules/abi/abi.h>` lists the markers in
-``envoy_dynamic_module_type_timing_info_v2``. Access loggers can read these markers with
-``envoy_dynamic_module_callback_access_logger_get_timing_info_v2``. The original
-``envoy_dynamic_module_callback_access_logger_get_timing_info`` remains available without the new
-markers.
-
-``start_time_unix_ns`` is a Unix timestamp in nanoseconds. The other numeric timing fields are
-nanosecond offsets from the request's monotonic start time. Check the ``has_*`` fields in the C ABI
-or ``Has*`` fields in Go to distinguish recorded values from unavailable markers. When a flag is
-false, its numeric field contains ``-1``. C++ and Rust use optional values instead. Zero and
-negative offsets are valid.
-
-``last_downstream_header_rx_byte_received_ns`` marks receipt of all request headers, while
-``last_downstream_rx_byte_received_ns`` marks receipt of the full request. For a header-only
-request, the latter is recorded when the headers end the stream. Envoy records
-``downstream_connection_end_ns`` only if the request is active when the connection closes. It
-records ``last_downstream_ack_received_ns`` when it tracks the final ACK, currently for QUIC. The
-markers do not by themselves measure body buffering or processing.
 
 Compatibility
 --------------------------
@@ -200,7 +179,7 @@ Statistics
 
 Dynamic-module extension types that receive a factory context emit the following statistics in the shared ``dynamic_modules.`` namespace.
 These stats track failures encountered while loading the extension's configuration. Extension points created without a factory context, such
-as config validators and the upstream HTTP TCP bridge, cannot emit these shared counters. Each one is tagged with
+as config validators, resource monitors and the upstream HTTP TCP bridge, cannot emit these shared counters. Each one is tagged with
 ``config_name``, set to the configured name of the dynamic-module extension instance — for example the
 :ref:`filter_name
 <envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter.filter_name>`

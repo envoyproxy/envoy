@@ -15,6 +15,10 @@ namespace Envoy {
 class IntegrationAdminTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
+    // Exercise graceful draining without waiting for the default five-second HTTP drain period.
+    config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+      *hcm.mutable_drain_timeout() = ProtobufUtil::TimeUtil::MillisecondsToDuration(100);
+    });
     config_helper_.addConfigModifier(
         [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           auto listener_config = bootstrap.mutable_static_resources()->mutable_listeners(0);

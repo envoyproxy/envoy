@@ -1031,7 +1031,7 @@ constexpr absl::string_view kUpstreamSocketInterfaceName =
 class NonSocketInterfaceFactory : public Server::Configuration::BootstrapExtensionFactory {
 public:
   std::string name() const override { return std::string(kUpstreamSocketInterfaceName); }
-  Server::BootstrapExtensionPtr
+  Server::BootstrapExtensionCreationResult
   createBootstrapExtension(const Protobuf::Message&,
                            Server::Configuration::ServerFactoryContext&) override {
     return nullptr;
@@ -1054,7 +1054,7 @@ public:
     return nullptr;
   }
   bool ipFamilySupported(int) override { return false; }
-  Server::BootstrapExtensionPtr
+  Server::BootstrapExtensionCreationResult
   createBootstrapExtension(const Protobuf::Message&,
                            Server::Configuration::ServerFactoryContext&) override {
     return nullptr;

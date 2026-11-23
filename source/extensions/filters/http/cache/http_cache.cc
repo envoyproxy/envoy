@@ -11,6 +11,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/deterministic_hash.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 
@@ -58,6 +59,8 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
 // the same result, or a way must be provided to deal with a complete cache
 // flush.
 size_t stableHashKey(const Key& key) { return DeterministicProtoHash::hash(key); }
+
+SerializedKey serializeKey(const Key& key) { return MessageUtil::serializeDeterministically(key); }
 
 void LookupRequest::initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers) {
   const absl::string_view cache_control =

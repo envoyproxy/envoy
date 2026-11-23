@@ -28,7 +28,7 @@ jobs:
       id: vars
       run: |
         echo "cve-data-path=${{ inputs.cve-data-path }}" > $GITHUB_OUTPUT
-    - uses: envoyproxy/toolshed/actions/gcp/setup@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+    - uses: envoyproxy/toolshed/actions/gcp/setup@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
       name: Setup GCP
       with:
         key: ${{ secrets.gcs-cve-key }}
@@ -37,7 +37,7 @@ jobs:
         mkdir -p ${{ steps.vars.outputs.cve-data-path }}
     - name: Download (sync) from GCS bucket
       run: |
-        gsutil -mq rsync \
+        gsutil -mq rsync -r \
           "gs://${{ vars.GCS_CVE_BUCKET }}" \
           "${{ steps.vars.outputs.cve-data-path }}"
     - name: Run CVE dependency scanner

@@ -20,9 +20,11 @@ envoy_cc_library(
     ],
     deps = [
         ":persistent_host_set_lib",
+        "//envoy/event:dispatcher_thread_deletable",
         "//envoy/http:async_client_interface",
         "//envoy/stats:stats_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/http:message_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",

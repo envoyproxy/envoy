@@ -18,7 +18,13 @@ envoy_extension_cc_test(
         "envoy.load_balancing_policies.host_allowlist",
         "envoy.load_balancing_policies.round_robin",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/config:utility_lib",
         "//source/extensions/load_balancing_policies/host_allowlist:config",
@@ -41,7 +47,13 @@ envoy_extension_cc_test(
         "envoy.load_balancing_policies.host_allowlist",
         "envoy.load_balancing_policies.round_robin",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/http:codes_interface",
         "//source/common/config:metadata_lib",
@@ -71,7 +83,12 @@ envoy_extension_cc_test(
         "envoy.load_balancing_policies.round_robin",
         "envoy.filters.http.set_metadata",
     ],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/filters/http/set_metadata:config",
         "//source/extensions/load_balancing_policies/host_allowlist:config",

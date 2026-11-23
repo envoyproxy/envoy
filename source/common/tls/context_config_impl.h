@@ -62,6 +62,7 @@ public:
   }
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
+  std::optional<uint32_t> maxSendFragment() const override { return max_send_fragment_; }
   const Network::Address::IpList& tlsKeyLogLocal() const override { return *tls_keylog_local_; };
   const Network::Address::IpList& tlsKeyLogRemote() const override { return *tls_keylog_remote_; };
   const std::string& tlsKeyLogPath() const override { return tls_keylog_path_; };
@@ -129,6 +130,7 @@ private:
   Envoy::Common::CallbackHandlePtr cvc_validation_callback_handle_;
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
+  const std::optional<uint32_t> max_send_fragment_;
 
   Ssl::HandshakerFactoryCb handshaker_factory_cb_;
   Ssl::HandshakerCapabilities capabilities_;

@@ -186,9 +186,8 @@ void DynamicModuleListenerFilter::HttpCalloutCallback::onSuccess(
 
 void DynamicModuleListenerFilter::HttpCalloutCallback::onFailure(
     const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason reason) {
-  // Copy the filter shared_ptr and callout id to the local scope since
-  // on_listener_filter_http_callout_done_ might cause destruction of the filter. That eventually
-  // ends up deallocating this callback itself.
+  // Copy the filter shared_ptr and callout id to the local scope since removing the callout below
+  // frees this callback.
   DynamicModuleListenerFilterSharedPtr filter = filter_.lock();
   uint64_t callout_id = callout_id_;
   // request_ is set only after the async client accepts the callout. Gating on it avoids a
@@ -210,10 +209,17 @@ void DynamicModuleListenerFilter::HttpCalloutCallback::onFailure(
       break;
     }
 
-    DynamicModuleListenerFilter::HookScope hook_scope(*filter);
-    filter->config_->on_listener_filter_http_callout_done_(filter->thisAsVoidPtr(),
-                                                           filter->in_module_filter_, callout_id,
-                                                           result, nullptr, 0, nullptr, 0);
+    // This can run inside a cluster manager update, so report it from a posted callback.
+    filter->dispatcher()->post([weak_filter = filter_, callout_id, result]() {
+      DynamicModuleListenerFilterSharedPtr filter = weak_filter.lock();
+      if (filter == nullptr || filter->in_module_filter_ == nullptr) {
+        return;
+      }
+      DynamicModuleListenerFilter::HookScope hook_scope(*filter);
+      filter->config_->on_listener_filter_http_callout_done_(filter->thisAsVoidPtr(),
+                                                             filter->in_module_filter_, callout_id,
+                                                             result, nullptr, 0, nullptr, 0);
+    });
   }
 
   // Remove the callout from the map.

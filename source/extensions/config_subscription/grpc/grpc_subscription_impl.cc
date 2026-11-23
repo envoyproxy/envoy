@@ -17,6 +17,18 @@ namespace Config {
 
 constexpr std::chrono::milliseconds UpdateDurationLogThreshold = std::chrono::milliseconds(50);
 
+namespace {
+
+// A replay of cached resources is delivered on its own, never mixed with a server response.
+bool replayedFromCache(const std::vector<Config::DecodedResourceRef>& resources) {
+  if (resources.empty()) {
+    return false;
+  }
+  return resources.front().get().fromCache();
+}
+
+} // namespace
+
 GrpcSubscriptionImpl::GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux,
                                            SubscriptionCallbacks& callbacks,
                                            OpaqueResourceDecoderSharedPtr resource_decoder,
@@ -95,7 +107,13 @@ void GrpcSubscriptionImpl::accept(const absl::flat_hash_set<std::string>& patter
 absl::Status
 GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                      const std::string& version_info) {
-  disableInitFetchTimeoutTimer();
+  // A rejected server response is NACKed and stops the timer in onConfigUpdateFailed(), but a
+  // rejected replay is not, and the server will not resend an unchanged resource. Keep the
+  // initial fetch timeout running until a replayed update is accepted.
+  const bool from_cache = replayedFromCache(resources);
+  if (!from_cache) {
+    disableInitFetchTimeoutTimer();
+  }
   // TODO(mattklein123): In the future if we start tracking per-resource versions, we need to
   // supply those versions to onConfigUpdate() along with the xDS response ("system")
   // version_info. This way, both types of versions can be tracked and exposed for debugging by
@@ -104,6 +122,9 @@ GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRe
   absl::Status status = callbacks_.onConfigUpdate(resources, version_info);
   if (!status.ok()) {
     return status;
+  }
+  if (from_cache) {
+    disableInitFetchTimeoutTimer();
   }
   std::chrono::milliseconds update_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       dispatcher_.timeSource().monotonicTime() - start);
@@ -127,13 +148,20 @@ absl::Status GrpcSubscriptionImpl::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
-  disableInitFetchTimeoutTimer();
+  // See the state-of-the-world overload above.
+  const bool from_cache = replayedFromCache(added_resources);
+  if (!from_cache) {
+    disableInitFetchTimeoutTimer();
+  }
   stats_.update_attempt_.inc();
   auto start = dispatcher_.timeSource().monotonicTime();
   absl::Status status =
       callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   if (!status.ok()) {
     return status;
+  }
+  if (from_cache) {
+    disableInitFetchTimeoutTimer();
   }
   std::chrono::milliseconds update_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       dispatcher_.timeSource().monotonicTime() - start);

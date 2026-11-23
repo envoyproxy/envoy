@@ -263,6 +263,8 @@ private:
 
   // True if H2 and H3 connections may be reused across different origins.
   const bool allow_coalesced_connections_;
+  // True if a host address change is applied in place rather than by replacing the host.
+  const bool skip_draining_on_resolution_;
 
   mutable absl::Mutex host_map_lock_;
   HostInfoMap host_map_ ABSL_GUARDED_BY(host_map_lock_);

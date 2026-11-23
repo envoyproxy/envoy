@@ -133,6 +133,60 @@ entry properties. Module selected route metadata can change authorization decisi
 descriptors and access log fields, so the override set is static configuration chosen by trusted in
 process code.
 
+Virtual clusters
+----------------
+
+A virtual host matches a request against its
+:ref:`virtual_clusters <envoy_v3_api_field_config.route.v3.VirtualHost.virtual_clusters>` in order,
+and the router counts the request in the
+:ref:`statistics <config_http_filters_router_vcluster_stats>` of the first one that matches. A
+module that knows which virtual cluster a request belongs to can select it with
+``set_virtual_cluster`` from the names that :ref:`virtual_cluster_override
+<envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.virtual_cluster_override>`
+declares. The selected virtual cluster uses the statistics of the virtual cluster of the same name
+on the virtual host, so the statistics keep their names when the module takes over.
+
+When :ref:`prefer_selection
+<envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.VirtualClusterOverride.prefer_selection>`
+is ``true``, the router counts the request in the selected virtual cluster, which
+``%VIRTUAL_CLUSTER_NAME%`` reports, and with a chance of one in :ref:`verify_one_in
+<envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.VirtualClusterOverride.verify_one_in>`
+also compares it with the one the virtual host matches. Otherwise the router counts the request in
+the virtual cluster the virtual host matches and compares the two. A virtual host without virtual
+clusters leaves nothing to compare with, so in either mode the router counts the request in the
+selected one. ``other`` selects the catch all virtual cluster, which counts the requests that match
+none of the virtual clusters of the virtual host and reports no name. Selecting ``other`` also
+agrees with a virtual cluster the virtual host itself names ``other``, since both count in the
+same statistics, but such a request reports no name once the selection is preferred. An empty name
+selects none, which leaves the request to the virtual host and is never compared. A request whose
+route carries no selection is counted in none of ``virtual_cluster_selected``,
+``virtual_cluster_none``, ``virtual_cluster_agree`` and ``virtual_cluster_disagree``. The module
+selects from the request as route matching saw it, while the virtual host matches the request as it
+reaches the router, so a filter that changes a header the selection depends on must clear the route
+cache.
+
+Like the recorded overrides, the selection takes effect only when the decision is left
+``Unspecified``. ``PassThrough`` ignores it, so a module that only selects a virtual cluster leaves
+the decision ``Unspecified``. A route reused with ``ReusePrevious`` keeps the selection it was built
+with. A selection is dropped without failing the decision when there is no route or when the route
+answers the request directly, and a selected virtual cluster is also dropped when the route belongs
+to a virtual host other than ``virtual_host_name``, which is counted in
+``virtual_cluster_vhost_mismatch``. A route the built route cache holds keeps the selection it was
+built with, so the key must also determine the selection. Only one route specifier in a chain should
+select a virtual cluster, since a later one that consults the virtual host does so through an
+earlier one, which then counts the request too.
+
+Before setting ``prefer_selection``, check that ``virtual_cluster_selected``,
+``virtual_cluster_disagree``, ``virtual_cluster_unknown`` and ``virtual_cluster_vhost_mismatch``
+do not grow while ``virtual_cluster_agree`` does. Envoy logs each disagreement with the method and
+path of the request at debug level, and at most one of them every 10 seconds at warning level, on
+the ``dynamic_modules`` logger. It also warns on that logger at the same rate about a selection
+dropped for another virtual host. A rejected selection is logged at debug level on the ``misc``
+logger. Once ``prefer_selection`` is set, the virtual clusters of the virtual host only decide the
+requests whose route carries no selection or a selection of none, so set it back to ``false`` before
+changing them or the selections of the module. Keep ``verify_one_in`` above zero so that
+``virtual_cluster_agree`` keeps growing and ``virtual_cluster_disagree`` keeps showing a difference.
+
 Rewriting the path
 ------------------
 
@@ -247,6 +301,12 @@ of the specifier, sharing the ``metrics_namespace`` of the module-defined metric
   built_route_cache_verify, Counter, Built route cache hits verified against what the module recorded.
   built_route_cache_verify_mismatch, Counter, Verified hits that evicted the cached route.
   built_route_cache_evict, Counter, Cached routes evicted because a worker was full or the route was idle for longer than ``max_idle_time``.
+  virtual_cluster_selected, Counter, Requests the router counted in the selected virtual cluster without comparing it with the virtual host.
+  virtual_cluster_none, Counter, Requests for which the module selected none and that the virtual host then matched against its virtual clusters.
+  virtual_cluster_agree, Counter, Compared requests whose selection agreed with the virtual cluster the virtual host matched.
+  virtual_cluster_disagree, Counter, Compared requests whose selection disagreed with the virtual cluster the virtual host matched.
+  virtual_cluster_unknown, Counter, Virtual cluster selections rejected because the name is not declared or the buffer is null with a non-zero length. Nothing is counted when ``virtual_cluster_override`` is not set.
+  virtual_cluster_vhost_mismatch, Counter, Virtual cluster selections dropped because the route belongs to a virtual host other than ``virtual_host_name``.
   built_route_cache_entries, Gauge, Routes cached by the workers of the specifiers that share the stat prefix.
   on_route_duration, Histogram, Time in microseconds the module spent deciding.
   specifier_duration, Histogram, Time in microseconds the specifier spent on a request that ``runtime_fraction`` does not skip.

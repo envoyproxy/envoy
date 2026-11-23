@@ -7,6 +7,8 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/common/callback_impl.h"
+
 #include "test/mocks/stats/mocks.h"
 
 #include "absl/container/node_hash_map.h"
@@ -69,11 +71,14 @@ public:
   MOCK_METHOD(void, startRtdsSubscriptions, (ReadyCallback));
   MOCK_METHOD(Stats::Scope&, getRootScope, ());
   MOCK_METHOD(void, countDeprecatedFeatureUse, (), (const));
+  MOCK_METHOD(Common::CallbackHandlePtr, addUpdateCallback, (UpdateCallback));
 
   SnapshotConstSharedPtr threadsafe_snapshot_{
       std::make_shared<const testing::NiceMock<MockSnapshot>>()};
   testing::NiceMock<MockSnapshot> snapshot_;
   testing::NiceMock<Stats::MockStore> store_;
+  // Backs the default addUpdateCallback() action. Run its callbacks to simulate a new snapshot.
+  Common::CallbackManager<void> update_callbacks_;
 };
 
 class MockOverrideLayer : public Snapshot::OverrideLayer {

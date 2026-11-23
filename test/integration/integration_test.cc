@@ -27,6 +27,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -1970,8 +1971,8 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
   // With no delayed close processing, Envoy will close the connection immediately after flushing
-  // and this should instead return true.
-  EXPECT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
+  // and this should instead return true. Keep the wait below the one-second close timeout.
+  EXPECT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(100)));
 
   // Issue a local close and check that the client did not pick up a remote close which can happen
   // when delayed close semantics are disabled.
@@ -2015,6 +2016,64 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
   // close.
   EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
   EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
+}
+
+class IntegrationTestWithSimulatedTime : public Event::TestUsingSimulatedTime,
+                                         public IntegrationTest {
+protected:
+  static constexpr std::chrono::seconds kIdleTimeout{1};
+  static constexpr std::chrono::seconds kDrainTimeout{1};
+  static constexpr std::chrono::seconds kDelayedCloseTimeout{100};
+
+  // Serves one request, then lets the idle timeout start a drain sequence and runs it to its end.
+  void idleTimeoutThroughDrain() {
+    autonomous_upstream_ = true;
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          hcm.mutable_common_http_protocol_options()->mutable_idle_timeout()->set_seconds(
+              kIdleTimeout.count());
+          hcm.mutable_drain_timeout()->set_seconds(kDrainTimeout.count());
+          hcm.mutable_delayed_close_timeout()->set_seconds(kDelayedCloseTimeout.count());
+        });
+    initialize();
+
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+    test_server_->waitForCounter("http.config_test.downstream_rq_completed", Eq(1));
+
+    timeSystem().advanceTimeWait(kIdleTimeout);
+    test_server_->waitForCounter("http.config_test.downstream_cx_idle_timeout", Eq(1));
+    timeSystem().advanceTimeWait(kDrainTimeout);
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTestWithSimulatedTime,
+                         ValuesIn(TestEnvironment::getIpVersionsForTest()), testParamToString);
+
+// A connection closed by the idle timeout has no response in flight, so it is closed as soon as the
+// drain sequence ends rather than after the delayed close timeout.
+TEST_P(IntegrationTestWithSimulatedTime, IdleTimeoutSkipsDelayedClose) {
+  idleTimeoutThroughDrain();
+
+  // Waiting on a counter advances simulated time, so a delayed close would eventually fire too.
+  test_server_->waitForCounter("http.config_test.downstream_cx_destroy_local", Eq(1));
+  EXPECT_EQ(0,
+            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_P(IntegrationTestWithSimulatedTime, IdleTimeoutDelayedCloseWithRuntimeGuardOff) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http1_skip_delayed_close_on_idle_drain", "false");
+  idleTimeoutThroughDrain();
+
+  timeSystem().advanceTimeWait(kDelayedCloseTimeout);
+  test_server_->waitForCounter("http.config_test.downstream_cx_delayed_close_timeout", Eq(1));
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 // Test that if the route cache is cleared, it doesn't cause problems.

@@ -236,15 +236,22 @@ TEST_F(CacheFilterTest, FilterDestroyedBeforeLookupCompletesAbortsTheLookupCallb
   captured_lookup_callback_(nullptr);
 }
 
-TEST_F(CacheFilterTest, ResetDuringLookupResetsDownstream) {
-  CacheFilterSharedPtr filter = makeFilter(mock_cache_);
-  EXPECT_CALL(*mock_cache_, lookup);
-  EXPECT_THAT(filter->decodeHeaders(request_headers_, true),
-              Eq(Http::FilterHeadersStatus::StopIteration));
-  EXPECT_CALL(decoder_callbacks_, resetStream);
-  captured_lookup_callback_(std::make_unique<ActiveLookupResult>(
-      ActiveLookupResult{nullptr, CacheEntryStatus::LookupError}));
-  EXPECT_THAT(decoder_callbacks_.details(), Eq("cache.aborted_lookup"));
+TEST_F(CacheFilterTest, ResetDuringLookupCountsUpstreamResetAndResetsDownstream) {
+  for (CacheEntryStatus status : {CacheEntryStatus::LookupError, CacheEntryStatus::UpstreamReset}) {
+    SCOPED_TRACE(cacheEntryStatusString(status));
+    CacheFilterSharedPtr filter = makeFilter(mock_cache_);
+    EXPECT_CALL(*mock_cache_, lookup);
+    EXPECT_THAT(filter->decodeHeaders(request_headers_, true),
+                Eq(Http::FilterHeadersStatus::StopIteration));
+    {
+      testing::InSequence sequence;
+      EXPECT_CALL(stats(), incForStatus(CacheEntryStatus::UpstreamReset));
+      EXPECT_CALL(decoder_callbacks_, resetStream);
+    }
+    captured_lookup_callback_(
+        std::make_unique<ActiveLookupResult>(ActiveLookupResult{nullptr, status}));
+    EXPECT_THAT(decoder_callbacks_.details(), Eq("cache.aborted_lookup"));
+  }
 }
 
 TEST_F(CacheFilterTest, ResetDuringGetHeadersResetsDownstream) {

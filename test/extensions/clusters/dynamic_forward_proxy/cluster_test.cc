@@ -359,10 +359,8 @@ TEST_F(ClusterTest, BasicFlow) {
   EXPECT_EQ("1.2.3.4:0",
             lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
 
-  // After changing the address, the host is replaced with a new instance and the change is
-  // published as a regular membership update. LB will immediately resolve the new address.
+  // After changing the address, LB will immediately resolve the new address with a refresh.
   updateTestHostAddress("host1:0", "2.3.4.5");
-  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(1)));
   EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("2.3.4.5:0",
@@ -1060,8 +1058,20 @@ TEST(ObjectFactory, DynamicPort) {
   ASSERT_EQ(nullptr, factory->createFromBytes("blah"));
 }
 
-TEST_F(ClusterTest, HostReplacedOnAddressChange) {
-  initialize(default_yaml_config_, false);
+TEST_F(ClusterTest, HostReplacedOnAddressChangeWhenSkipDrainingDisabled) {
+  initialize(R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    skip_draining_on_resolution: false
+    dns_cache_config:
+      name: foo
+      dns_lookup_family: AUTO
+)EOF",
+             false);
   makeTestHost("host1:0", "1.2.3.4");
   InSequence s;
 
@@ -1089,13 +1099,7 @@ TEST_F(ClusterTest, HostReplacedOnAddressChange) {
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
 }
 
-// With the runtime guard disabled, the legacy behavior is retained: the address is swapped in
-// place on the existing host instance and no membership update is published.
-TEST_F(ClusterTest, LegacyInPlaceAddressUpdate) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.dfp_cluster_replace_host_on_address_change", "false"}});
-
+TEST_F(ClusterTest, AddressChangeUpdatesHostInPlaceByDefault) {
   initialize(default_yaml_config_, false);
   makeTestHost("host1:0", "1.2.3.4");
   InSequence s;

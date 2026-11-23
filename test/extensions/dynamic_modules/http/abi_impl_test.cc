@@ -1,11 +1,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <initializer_list>
 #include <iterator>
 #include <limits>
 #include <memory>
 #include <set>
 #include <thread>
+#include <utility>
+#include <vector>
 
 #include "envoy/common/logger.h"
 #include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
@@ -22,6 +25,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -1367,6 +1371,93 @@ TEST(ABIImpl, metadata_bool) {
       &result_bool));
 }
 
+// The batch and bool setters replace the whole value under each key they write, whatever kind of
+// value the key held, and leave every other key in the namespace as it was.
+TEST(ABIImpl, metadata_setters_replace_values_of_every_kind) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  Protobuf::Struct seed;
+  TestUtility::loadFromYaml(R"EOF(
+struct: {inner: old}
+list: [old]
+number: 7
+string: old
+bool: true
+none: null
+untouched: {keep: me}
+)EOF",
+                            seed);
+  ASSERT_EQ(seed.fields().at("bool").kind_case(), Protobuf::Value::kBoolValue);
+  ASSERT_EQ(seed.fields().at("none").kind_case(), Protobuf::Value::kNullValue);
+  std::string serialized;
+  ASSERT_TRUE(seed.SerializeToString(&serialized));
+  const std::string batch_ns = "batch_ns";
+  const std::string bool_ns = "bool_ns";
+  for (const std::string& ns : {batch_ns, bool_ns}) {
+    envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+        &filter, {ns.data(), ns.size()}, {serialized.data(), serialized.size()});
+  }
+
+  // The second entry for "struct" wins over the first.
+  std::vector<envoy_dynamic_module_type_module_key_value_pair> entries = {
+      {"struct", 6, "first", 5}, {"list", 4, "l1", 2}, {"number", 6, "n1", 2},
+      {"string", 6, "s1", 2},    {"bool", 4, "b1", 2}, {"none", 4, "z1", 2},
+      {"struct", 6, "last", 4},  {"new", 3, "v1", 2},
+  };
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+      &filter, {batch_ns.data(), batch_ns.size()}, entries.data(), entries.size());
+  Protobuf::Struct expected_batch;
+  TestUtility::loadFromYaml(R"EOF(
+struct: last
+list: l1
+number: n1
+string: s1
+bool: b1
+none: z1
+new: v1
+untouched: {keep: me}
+)EOF",
+                            expected_batch);
+  EXPECT_THAT(metadata.filter_metadata().at(batch_ns), ProtoEq(expected_batch));
+
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+      &filter, {bool_ns.data(), bool_ns.size()}, {"struct", 6}, true);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+      &filter, {bool_ns.data(), bool_ns.size()}, {"list", 4}, false);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+      &filter, {bool_ns.data(), bool_ns.size()}, {"number", 6}, true);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+      &filter, {bool_ns.data(), bool_ns.size()}, {"string", 6}, false);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+      &filter, {bool_ns.data(), bool_ns.size()}, {"bool", 4}, false);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+      &filter, {bool_ns.data(), bool_ns.size()}, {"none", 4}, true);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+      &filter, {bool_ns.data(), bool_ns.size()}, {"new", 3}, true);
+  Protobuf::Struct expected_bool;
+  TestUtility::loadFromYaml(R"EOF(
+struct: true
+list: false
+number: true
+string: false
+bool: false
+none: true
+new: true
+untouched: {keep: me}
+)EOF",
+                            expected_bool);
+  EXPECT_THAT(metadata.filter_metadata().at(bool_ns), ProtoEq(expected_bool));
+}
+
 TEST(ABIImpl, metadata_keys) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
@@ -1606,6 +1697,205 @@ TEST(ABIImpl, metadata_string_batch) {
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
       {"num", 3}, &result_buffer));
   EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "str");
+}
+
+TEST(ABIImpl, NestedMetadata) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  const absl::string_view namespace_name = "envoy.filters.http.jwt_authn";
+  const envoy_dynamic_module_type_module_buffer ns = {namespace_name.data(), namespace_name.size()};
+  const auto source = envoy_dynamic_module_type_metadata_source_Dynamic;
+  using PathComponent = envoy_dynamic_module_type_module_metadata_path_component;
+  constexpr auto Key = envoy_dynamic_module_type_metadata_path_component_kind_Key;
+  constexpr auto Index = envoy_dynamic_module_type_metadata_path_component_kind_Index;
+  auto make_path = [](std::initializer_list<absl::string_view> keys) {
+    std::vector<PathComponent> path;
+    for (auto key : keys) {
+      path.push_back({Key, {key.data(), key.size()}, 0});
+    }
+    return path;
+  };
+  double number = -1;
+  bool boolean = true;
+  size_t size = 99;
+  envoy_dynamic_module_type_envoy_buffer str = {"sentinel", 8};
+
+  // Every failure must leave the output arguments untouched.
+  auto expect_failure = [&](const std::vector<PathComponent>& path) {
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+        &filter, source, ns, path.data(), path.size(), &str));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_number(
+        &filter, source, ns, path.data(), path.size(), &number));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+        &filter, source, ns, path.data(), path.size(), &boolean));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+        &filter, source, ns, path.data(), path.size(), &size));
+    EXPECT_EQ(number, -1);
+    EXPECT_TRUE(boolean);
+    EXPECT_EQ(size, 99);
+    EXPECT_EQ(absl::string_view(str.ptr, str.length), "sentinel");
+  };
+  expect_failure({});
+  expect_failure(make_path({"claims", "sub"})); // No callbacks.
+
+  testing::StrictMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  testing::StrictMock<StreamInfo::MockStreamInfo> stream_info;
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(callbacks, dispatcher()).WillRepeatedly(testing::ReturnRef(callbacks.dispatcher_));
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  filter.setDecoderFilterCallbacks(callbacks);
+  expect_failure(make_path({"claims", "sub"})); // Missing namespace.
+
+  TestUtility::loadFromJson(R"EOF({
+    "claims": {
+      "sub": "user-123", "exp": 123, "active": false, "verified": true,
+      "profile": {"role.name": "admin", "": "empty-key", "0": "numeric-key"},
+      "values": ["admin", 42, false, {"items": [["nested"]]}, null, []],
+      "empty": [], "null": null
+    },
+    "claims.sub": "literal", "top": "top-level", "": "empty-key"
+  })EOF",
+                            (*metadata.mutable_filter_metadata())["envoy.filters.http.jwt_authn"]);
+
+  for (const auto& keys :
+       {make_path({"claims"}), make_path({"claims", "null"}), make_path({"missing"}),
+        make_path({"missing", "sub"}), make_path({"claims", "missing"}),
+        make_path({"claims", "sub", "child"}), make_path({"claims", "values", "0"}),
+        make_path({"claims", "null", "child"})}) {
+    expect_failure(keys);
+  }
+  expect_failure({});
+
+  auto path = make_path({"claims", "sub"});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+      &filter, source, ns, path.data(), path.size(), &str));
+  EXPECT_EQ(absl::string_view(str.ptr, str.length), "user-123");
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_number(
+      &filter, source, ns, path.data(), path.size(), &number));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+      &filter, source, ns, path.data(), path.size(), &boolean));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+      &filter, source, ns, path.data(), path.size(), &size));
+
+  path = make_path({"claims", "exp"});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_number(
+      &filter, source, ns, path.data(), path.size(), &number));
+  EXPECT_EQ(number, 123);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+      &filter, source, ns, path.data(), path.size(), &str));
+  path = make_path({"claims", "active"});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+      &filter, source, ns, path.data(), path.size(), &boolean));
+  EXPECT_FALSE(boolean);
+  path = make_path({"claims", "verified"});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+      &filter, source, ns, path.data(), path.size(), &boolean));
+  EXPECT_TRUE(boolean);
+
+  const absl::string_view role_key = absl::string_view("role.name.suffix").substr(0, 9);
+  const absl::string_view empty_key;
+  for (const auto& entry : std::vector<std::pair<std::vector<PathComponent>, absl::string_view>>{
+           {make_path({"claims", "profile", role_key}), "admin"},
+           {make_path({"claims", "profile", ""}), "empty-key"},
+           {make_path({"claims", "profile", empty_key}), "empty-key"},
+           {make_path({"claims", "profile", "0"}), "numeric-key"},
+           {make_path({"claims.sub"}), "literal"},
+           {make_path({"top"}), "top-level"},
+           {make_path({empty_key}), "empty-key"}}) {
+    EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+        &filter, source, ns, entry.first.data(), entry.first.size(), &str));
+    EXPECT_EQ(absl::string_view(str.ptr, str.length), entry.second);
+  }
+
+  path = make_path({"claims", "values"});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+      &filter, source, ns, path.data(), path.size(), &size));
+  EXPECT_EQ(size, 6);
+  path.push_back({Index, {"unused", 6}, 0});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+      &filter, source, ns, path.data(), path.size(), &str));
+  EXPECT_EQ(absl::string_view(str.ptr, str.length), "admin");
+  path.back().index = 1;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_number(
+      &filter, source, ns, path.data(), path.size(), &number));
+  EXPECT_EQ(number, 42);
+  path.back().index = 2;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+      &filter, source, ns, path.data(), path.size(), &boolean));
+  EXPECT_FALSE(boolean);
+
+  for (size_t index : {size_t{0}, size_t{1}, size_t{2}, size_t{3}, size_t{4}, size_t{5}, size_t{6},
+                       std::numeric_limits<size_t>::max()}) {
+    path.back().index = index;
+    if (index != 0) {
+      EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+          &filter, source, ns, path.data(), path.size(), &str));
+    }
+    if (index != 1) {
+      EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_number(
+          &filter, source, ns, path.data(), path.size(), &number));
+    }
+    if (index != 2) {
+      EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+          &filter, source, ns, path.data(), path.size(), &boolean));
+    }
+  }
+
+  // Traverse a struct in a list, then a list in that struct, then another list.
+  path.back().index = 3;
+  path.push_back({Key, {"items", 5}, 99});
+  path.push_back({Index, {}, 0});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+      &filter, source, ns, path.data(), path.size(), &size));
+  EXPECT_EQ(size, 1);
+  path.push_back({Index, {}, 0});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+      &filter, source, ns, path.data(), path.size(), &str));
+  EXPECT_EQ(absl::string_view(str.ptr, str.length), "nested");
+
+  // Invalid traversal leaves every output unchanged.
+  number = -1;
+  boolean = true;
+  size = 99;
+  str = {"sentinel", 8};
+  expect_failure({{Index, {}, 0}}); // Namespace is a struct.
+  path = make_path({"claims", "sub"});
+  const auto unknown_kind = static_cast<envoy_dynamic_module_type_metadata_path_component_kind>(2);
+  path.insert(path.begin() + 1, {unknown_kind, {}, 0});
+  expect_failure(path);
+  for (const auto& keys :
+       {make_path({"claims"}), make_path({"claims", "sub"}), make_path({"claims", "empty"})}) {
+    path = keys;
+    path.push_back({Index, {}, 0});
+    expect_failure(path);
+  }
+  path = make_path({"claims", "values"});
+  path.push_back({Index, {}, std::numeric_limits<size_t>::max()});
+  expect_failure(path);
+  path.back().index = 4; // A null value cannot be traversed.
+  path.push_back({Index, {}, 0});
+  expect_failure(path);
+
+  path = make_path({"claims", "empty"});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+      &filter, source, ns, path.data(), path.size(), &size));
+  EXPECT_EQ(size, 0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_string(&filter, source, ns,
+                                                                             nullptr, 0, &str));
+
+  // Nested traversal applies to route metadata as well as dynamic metadata.
+  auto route = std::make_shared<testing::StrictMock<Router::MockRoute>>();
+  TestUtility::loadFromJson(R"EOF({"claims":{"sub":"route-subject"}})EOF",
+                            (*route->metadata_.mutable_filter_metadata())[namespace_name]);
+  EXPECT_CALL(stream_info, route())
+      .WillRepeatedly(testing::Return(OptRef<const Router::Route>(*route)));
+  EXPECT_CALL(*route, metadata()).WillRepeatedly(testing::ReturnRef(route->metadata_));
+  path = make_path({"claims", "sub"});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Route, ns, path.data(), path.size(),
+      &str));
+  EXPECT_EQ(absl::string_view(str.ptr, str.length), "route-subject");
 }
 
 TEST(ABIImpl, metadata_list) {
@@ -1954,7 +2244,7 @@ TEST(ABIImpl, filter_state_value_conflicting_life_span) {
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
   filter.setDecoderFilterCallbacks(callbacks);
 
-  const std::string key_str = "envoy.test.bytes";
+  const std::string key_str = "envoy.test.http_typed_object";
   const std::string val1 = "val1";
   const std::string val2 = "val2";
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_value(
@@ -1962,18 +2252,20 @@ TEST(ABIImpl, filter_state_value_conflicting_life_span) {
       envoy_dynamic_module_type_filter_state_life_span_Request,
       envoy_dynamic_module_type_filter_state_stream_sharing_None));
 
+  // The key is held at Request, so storing it at any other life span fails and keeps the value.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_value(
+      &filter, {key_str.data(), key_str.size()}, {val2.data(), val2.size()},
+      envoy_dynamic_module_type_filter_state_life_span_Connection,
+      envoy_dynamic_module_type_filter_state_stream_sharing_None));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_bytes(
+      &filter, {key_str.data(), key_str.size()}, {val2.data(), val2.size()}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_typed(
+      &filter, {key_str.data(), key_str.size()}, {val2.data(), val2.size()}));
+
   envoy_dynamic_module_type_envoy_buffer result_buffer = {nullptr, 0};
-  EXPECT_ENVOY_BUG(
-      {
-        EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_value(
-            &filter, {key_str.data(), key_str.size()}, {val2.data(), val2.size()},
-            envoy_dynamic_module_type_filter_state_life_span_Connection,
-            envoy_dynamic_module_type_filter_state_stream_sharing_None));
-        EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
-            &filter, {key_str.data(), key_str.size()}, &result_buffer));
-        EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), val1);
-      },
-      "conflicting life_span");
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
+      &filter, {key_str.data(), key_str.size()}, &result_buffer));
+  EXPECT_EQ(std::string(result_buffer.ptr, result_buffer.length), val1);
 }
 
 TEST(ABIImpl, filter_state_value_unknown_enums) {
@@ -2335,20 +2627,14 @@ TEST(ABIImpl, filter_state_object_conflicting_life_span) {
       &filter, {key_str.data(), key_str.size()}, first, filterStateObjectDestructor,
       envoy_dynamic_module_type_filter_state_life_span_Request));
 
-  // Re-storing the same key at a different life_span does not store (an ENVOY_BUG in FilterState).
-  // The new object is freed, the call reports failure, and the original entry is untouched. All
-  // assertions live inside EXPECT_ENVOY_BUG because in debug the ENVOY_BUG aborts inside setData,
-  // so the graceful-return path only exists in release/coverage where the macro runs in-process.
-  EXPECT_ENVOY_BUG(
-      {
-        EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_object(
-            &filter, {key_str.data(), key_str.size()}, new int(2), filterStateObjectDestructor,
-            envoy_dynamic_module_type_filter_state_life_span_Connection));
-        EXPECT_EQ(1, filter_state_object_destructor_calls);
-        EXPECT_EQ(first, envoy_dynamic_module_callback_http_get_filter_state_object(
-                             &filter, {key_str.data(), key_str.size()}));
-      },
-      "conflicting life_span");
+  // Re-storing the same key at a different life_span does not store. The new object is freed, the
+  // call reports failure, and the original entry is untouched.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_object(
+      &filter, {key_str.data(), key_str.size()}, new int(2), filterStateObjectDestructor,
+      envoy_dynamic_module_type_filter_state_life_span_Connection));
+  EXPECT_EQ(1, filter_state_object_destructor_calls);
+  EXPECT_EQ(first, envoy_dynamic_module_callback_http_get_filter_state_object(
+                       &filter, {key_str.data(), key_str.size()}));
 }
 
 TEST(ABIImpl, filter_state_object_no_filter_state) {
@@ -3770,6 +4056,35 @@ TEST_F(ABIImplGenericSecretTest, ReadUnknownId) {
   // 0 is never a valid ID, and IDs past the end are unknown.
   EXPECT_EQ(getSecret(0), std::nullopt);
   EXPECT_EQ(getSecret(id + 1), std::nullopt);
+}
+
+TEST(ABIImpl, GetLoadShedPoint) {
+  Stats::TestUtil::TestStore stats_store;
+  Stats::TestUtil::TestScope stats_scope{"", stats_store};
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  testing::StrictMock<Server::MockOverloadManager> overload_manager;
+  auto filter_config = std::make_shared<DynamicModuleHttpFilterConfig>(
+      "some_name", "some_config", DefaultMetricsNamespace, nullptr, stats_scope, context,
+      std::nullopt, overload_manager);
+
+  testing::StrictMock<Server::MockLoadShedPoint> load_shed_point;
+  EXPECT_CALL(overload_manager, getLoadShedPoint(absl::string_view("some_point")))
+      .WillOnce(testing::Return(&load_shed_point));
+  const std::string name = "some_point";
+  EXPECT_EQ(&load_shed_point, envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+                                  filter_config.get(), {name.data(), name.size()}));
+}
+
+TEST(ABIImpl, GetLoadShedPointWithoutProvider) {
+  Stats::TestUtil::TestStore stats_store;
+  Stats::TestUtil::TestScope stats_scope{"", stats_store};
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto filter_config = std::make_shared<DynamicModuleHttpFilterConfig>(
+      "some_name", "some_config", DefaultMetricsNamespace, nullptr, stats_scope, context);
+
+  const std::string name = "some_point";
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_http_filter_config_get_load_shed_point(
+                         filter_config.get(), {name.data(), name.size()}));
 }
 
 TEST(ABIImpl, Stats) {

@@ -18,7 +18,10 @@ envoy_extension_cc_test(
     name = "tap_config_impl_test",
     srcs = ["tap_config_impl_test.cc"],
     extension_names = ["envoy.transport_sockets.tap"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/transport_sockets/tap:tap_config_impl",
         "//test/extensions/common/tap:common",
@@ -31,6 +34,7 @@ envoy_extension_cc_benchmark_binary(
     name = "tap_socket_speed_test",
     srcs = envoy_select_admin_functionality(["tap_socket_speed_test.cc"]),
     extension_names = ["envoy.transport_sockets.tap"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/stats:isolated_store_lib",
@@ -54,7 +58,12 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.transport_sockets.tap"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/network:connection_lib",
         "//source/extensions/transport_sockets/tap:config",

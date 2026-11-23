@@ -410,7 +410,22 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
     SET_AND_RETURN_IF_NOT_OK(mutations_or_error.status(), creation_status);
     request_headers_mutations_ = std::move(mutations_or_error.value());
   }
+
+  if (!config.stat_prefix().empty()) {
+    // mirror.(<stat_prefix>.)*
+    auto holder =
+        std::make_shared<ShadowPolicyStatsHolder>(factory_context.scope().createScopeWithTaggedName(
+            "mirror",
+            {Stats::TagStringView{Envoy::Config::TagNames::get().MIRROR_PREFIX,
+                                  config.stat_prefix()}},
+            absl::StrCat("mirror.", config.stat_prefix())));
+    // Share ownership with the holder so that the scope outlives in-flight mirror requests.
+    stats_ = ShadowPolicyStatsSharedPtr(holder, &holder->stats_);
+  }
 }
+
+ShadowPolicyImpl::ShadowPolicyStatsHolder::ShadowPolicyStatsHolder(Stats::ScopeSharedPtr scope)
+    : scope_(std::move(scope)), stats_{ALL_SHADOW_POLICY_STATS(POOL_COUNTER(*scope_))} {}
 
 const Http::HeaderEvaluator& ShadowPolicyImpl::headerEvaluator() const {
   if (request_headers_mutations_) {
@@ -1236,7 +1251,15 @@ absl::StatusOr<RetryPolicyConstSharedPtr> RouteEntryImplBase::buildRetryPolicy(
     const envoy::config::route::v3::RouteAction& route_config,
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::CommonFactoryContext& factory_context) const {
+  if (route_config.has_retry_policy() && route_config.has_retry_policy_typed_config()) {
+    return absl::InvalidArgumentError(
+        "Cannot set both retry_policy and retry_policy_typed_config in RouteAction.");
+  }
   // Route specific policy wins, if available.
+  if (route_config.has_retry_policy_typed_config()) {
+    return RetryPolicyImpl::createFromTypedConfig(route_config.retry_policy_typed_config(),
+                                                  validation_visitor, factory_context);
+  }
   if (route_config.has_retry_policy()) {
     return RetryPolicyImpl::create(route_config.retry_policy(), validation_visitor,
                                    factory_context);
@@ -1694,7 +1717,17 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
   }
 
   // Retry and Hedge policies must be set before routes, since they may use them.
-  if (virtual_host.has_retry_policy()) {
+  if (virtual_host.has_retry_policy() && virtual_host.has_retry_policy_typed_config()) {
+    creation_status = absl::InvalidArgumentError(
+        "Cannot set both retry_policy and retry_policy_typed_config in VirtualHost.");
+    return;
+  }
+  if (virtual_host.has_retry_policy_typed_config()) {
+    auto policy_or_error = RetryPolicyImpl::createFromTypedConfig(
+        virtual_host.retry_policy_typed_config(), validator, factory_context);
+    SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
+    retry_policy_ = std::move(policy_or_error.value());
+  } else if (virtual_host.has_retry_policy()) {
     auto policy_or_error =
         RetryPolicyImpl::create(virtual_host.retry_policy(), validator, factory_context);
     SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
@@ -2122,8 +2155,7 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
 
 const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMap& headers) const {
   // Fast path the case where we only have a default virtual host.
-  if (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
-      wildcard_virtual_host_prefixes_.empty()) {
+  if (hasOnlyDefaultVirtualHost()) {
     return default_virtual_host_.get();
   }
 
@@ -2143,12 +2175,24 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
     host_header_value = headers.getHostValue();
   }
 
+  return findVirtualHostInternal(host_header_value);
+}
+
+const VirtualHostImpl* RouteMatcher::findVirtualHost(absl::string_view host) const {
+  // Fast path the case where we only have a default virtual host.
+  if (hasOnlyDefaultVirtualHost()) {
+    return default_virtual_host_.get();
+  }
+
+  return findVirtualHostInternal(host);
+}
+
+const VirtualHostImpl* RouteMatcher::findVirtualHostInternal(absl::string_view host) const {
   // If 'ignore_port_in_host_matching' is set, ignore the port number in the host header(if any).
   if (ignorePortInHostMatching()) {
-    if (const absl::string_view::size_type port_start =
-            Http::HeaderUtility::getPortStart(host_header_value);
+    if (const absl::string_view::size_type port_start = Http::HeaderUtility::getPortStart(host);
         port_start != absl::string_view::npos) {
-      host_header_value = host_header_value.substr(0, port_start);
+      host = host.substr(0, port_start);
     }
   }
   // TODO (@rshriram) Match Origin header in WebSocket
@@ -2157,11 +2201,10 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   // are overwhelmingly lower-case already (DNS names normalize to lower-case per RFC 3986 3.2.2),
   // so scan first and only build a lower-cased copy when an upper-case byte is present. This keeps
   // the common path allocation-free instead of always constructing a std::string.
-  absl::string_view host = host_header_value;
   std::string lowercase_host;
-  if (std::any_of(host_header_value.begin(), host_header_value.end(),
+  if (std::any_of(host.begin(), host.end(),
                   [](char c) { return absl::ascii_isupper(static_cast<unsigned char>(c)); })) {
-    lowercase_host = absl::AsciiStrToLower(host_header_value);
+    lowercase_host = absl::AsciiStrToLower(host);
     host = lowercase_host;
   }
   const auto iter = virtual_hosts_.find(host);

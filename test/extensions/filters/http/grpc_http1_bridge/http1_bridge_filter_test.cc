@@ -264,10 +264,11 @@ TEST_F(GrpcHttp1BridgeFilterTest, ProtobufUpgradedToGrpc) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, request_headers.getContentTypeValue());
 
-  EXPECT_CALL(decoder_callbacks_,
-              addDecodedData(_, true)) // todo: find a better way of testing this
-      .WillOnce([&](Buffer::Instance& d, bool) { ASSERT_EQ(data.length(), d.length()); });
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
+  // The whole body in one frame is framed in place.
+  Buffer::OwnedImpl request_data("helloworld");
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_data, true));
+  EXPECT_EQ(std::string("\0\0\0\0\x0a", 5) + "helloworld", request_data.toString());
   Http::TestRequestTrailerMapImpl request_trailers{{"hello", "world"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
@@ -305,6 +306,40 @@ TEST_F(GrpcHttp1BridgeFilterTest, QueryParamsIgnored) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("/v1/spotify.Concat/Concat", request_headers.getPathValue());
+}
+
+TEST_F(GrpcHttp1BridgeFilterTest, ProtobufUpgradedToGrpcEmptyBody) {
+  initialize(true);
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/x-protobuf"},
+                                                 {":path", "/v1/spotify.Concat/Concat"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  // E.g. a chunked HTTP/1.1 request with only the last chunk.
+  Buffer::OwnedImpl data;
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
+  EXPECT_EQ(std::string(5, '\0'), data.toString());
+}
+
+TEST_F(GrpcHttp1BridgeFilterTest, ProtobufUpgradedToGrpcBufferedBody) {
+  initialize(true);
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/x-protobuf"},
+                                                 {":path", "/v1/spotify.Concat/Concat"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl buffered;
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+      .Times(2)
+      .WillRepeatedly([&](Buffer::Instance& d, bool) { buffered.move(d); });
+  Buffer::OwnedImpl first("hello");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(first, false));
+
+  // The header is prepended to the whole buffered body.
+  EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
+      .WillOnce([&](std::function<void(Buffer::Instance&)> callback) { callback(buffered); });
+  Buffer::OwnedImpl last("world");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(last, true));
+  EXPECT_EQ(std::string("\0\0\0\0\x0a", 5) + "helloworld", buffered.toString());
 }
 
 } // namespace
