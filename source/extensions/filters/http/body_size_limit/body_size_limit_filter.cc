@@ -29,7 +29,6 @@ Http::FilterHeadersStatus BodySizeLimitFilter::decodeHeaders(Http::RequestHeader
                                                              bool end_stream) {
   if (end_stream) {
     // Header-only request, nothing to limit.
-    request_complete_ = true;
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -51,8 +50,7 @@ Http::FilterHeadersStatus BodySizeLimitFilter::decodeHeaders(Http::RequestHeader
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterDataStatus BodySizeLimitFilter::decodeData(Buffer::Instance& data, bool end_stream) {
-  request_complete_ = end_stream;
+Http::FilterDataStatus BodySizeLimitFilter::decodeData(Buffer::Instance& data, bool) {
   if (tunnel_established_ || config_->maxRequestBytes() == 0) {
     return Http::FilterDataStatus::Continue;
   }
@@ -69,8 +67,7 @@ Http::FilterDataStatus BodySizeLimitFilter::decodeData(Buffer::Instance& data, b
 
 Http::FilterHeadersStatus BodySizeLimitFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                              bool) {
-  // Nothing is left to count once the request has ended, so most requests skip the checks below.
-  if (tunnel_established_ || request_complete_ || config_->maxRequestBytes() == 0) {
+  if (tunnel_established_ || config_->maxRequestBytes() == 0) {
     return Http::FilterHeadersStatus::Continue;
   }
   // Read the request headers the router forwarded rather than the ones this filter saw, so a

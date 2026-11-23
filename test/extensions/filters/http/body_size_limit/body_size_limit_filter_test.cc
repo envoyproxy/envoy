@@ -269,17 +269,6 @@ TEST_F(BodySizeLimitFilterTest, UpgradeLimitedWhenLaterFilterStripsUpgrade) {
   EXPECT_EQ(1, counter("rq_body_too_large"));
 }
 
-// Once the request has ended there is nothing left to count, so the response skips the checks.
-TEST_F(BodySizeLimitFilterTest, ResponseSkipsChecksAfterRequestComplete) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
-  Buffer::OwnedImpl data("Hello");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, true));
-  EXPECT_CALL(callbacks_, requestHeaders()).Times(0);
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
-}
-
 TEST_F(BodySizeLimitFilterTest, Unlimited) {
   auto zero_config = setupConfig(0);
   BodySizeLimitFilter zero_filter(zero_config);

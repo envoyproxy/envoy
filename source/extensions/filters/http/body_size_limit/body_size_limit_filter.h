@@ -71,8 +71,6 @@ private:
 
   BodySizeLimitFilterConfigSharedPtr config_;
   uint64_t bytes_received_{};
-  // Set once the client has sent the whole request.
-  bool request_complete_{false};
   // Set once the upstream accepts an upgrade or CONNECT. Later bytes are not counted.
   bool tunnel_established_{false};
 };
