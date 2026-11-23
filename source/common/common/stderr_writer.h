@@ -1,6 +1,10 @@
 #pragma once
 
+#ifdef WIN32
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
 
 #include <algorithm>
 #include <cerrno>
@@ -9,6 +13,20 @@
 #include "absl/strings/str_format.h"
 
 namespace Envoy {
+
+namespace StderrWriterInternal {
+
+// Raw write to the stderr file descriptor, bypassing stdio buffering.
+inline ptrdiff_t writeRaw(const char* data, size_t size) {
+#ifdef WIN32
+  // `size` never exceeds the stack buffer in `writeStderr()`, so it fits in an unsigned int.
+  return ::_write(2, data, static_cast<unsigned int>(size));
+#else
+  return ::write(STDERR_FILENO, data, size);
+#endif
+}
+
+} // namespace StderrWriterInternal
 
 /**
  * Format into a buffer on the stack and write it to stderr with write(2), for use where
@@ -24,7 +42,7 @@ void writeStderr(const absl::FormatSpec<Args...>& format, const Args&... args) {
   size_t remaining = size > 0 ? std::min<size_t>(size, sizeof(buffer) - 1) : 0;
   // Short and interrupted writes are continued. There is nowhere to report any other failure.
   while (remaining > 0) {
-    const ssize_t rc = ::write(STDERR_FILENO, data, remaining);
+    const ptrdiff_t rc = StderrWriterInternal::writeRaw(data, remaining);
     if (rc > 0) {
       data += rc;
       remaining -= static_cast<size_t>(rc);

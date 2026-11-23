@@ -21,8 +21,12 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/stats_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/flat_hash_set.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
 using testing::NiceMock;
 using testing::Ref;
@@ -139,6 +143,13 @@ protected:
     textReadouts_.clear();
     endpoints_helper_.reset();
     EXPECT_EQ(num_base_symbols_, symbol_table_->numSymbols());
+  }
+
+  // Unsorted output can come in any order, so compare the sorted lines.
+  static std::vector<std::string> sortedLines(absl::string_view output) {
+    std::vector<std::string> lines = absl::StrSplit(output, '\n');
+    std::sort(lines.begin(), lines.end());
+    return lines;
   }
 
   Stats::TestUtil::TestSymbolTable symbol_table_;
@@ -3167,6 +3178,88 @@ TEST_F(NativeHistogramBucketIndexTest, IntegerValuesMatchPrometheusClient) {
 // indices.
 TEST_F(NativeHistogramBucketIndexTest, PercentValuesMatchPrometheusClient) {
   verifyBucketIndices(Stats::Histogram::Unit::Percent, kPercentBucketIndexCases);
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputUnordered) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  for (const char* cluster : {"ccc", "aaa", "bbb"}) {
+    const Stats::StatNameTagVector tags{{makeStat("cluster"), makeStat(cluster)}};
+    addCounter("cluster.upstream_cx_total", tags);
+    addCounter("cluster.upstream_cx_connect_fail", tags);
+    addGauge("cluster.upstream_cx_active", tags);
+  }
+  addClusterEndpoints("cluster1", 2, {{"a.tag-name", "a.tag-value"}});
+
+  Buffer::OwnedImpl sorted_response;
+  PrometheusStatsFormatter::statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                                                  endpoints_helper_->cm_, sorted_response,
+                                                  StatsParams(), custom_namespaces);
+
+  StatsParams params;
+  Buffer::OwnedImpl parse_response;
+  ASSERT_EQ(Http::Code::OK, params.parse("", parse_response));
+  Buffer::OwnedImpl response;
+  PrometheusStatsFormatter::statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                                                  endpoints_helper_->cm_, response, params,
+                                                  custom_namespaces);
+
+  EXPECT_EQ(sortedLines(sorted_response.toString()), sortedLines(response.toString()));
+
+  std::vector<std::string> lines = absl::StrSplit(response.toString(), '\n');
+
+  // Each family is still one contiguous group led by its TYPE line.
+  absl::flat_hash_set<std::string> families;
+  std::string family;
+  for (const std::string& line : lines) {
+    if (line.empty()) {
+      continue;
+    }
+    if (absl::StartsWith(line, "# TYPE ")) {
+      std::vector<std::string> parts = absl::StrSplit(line, ' ');
+      ASSERT_EQ(4, parts.size());
+      family = parts[2];
+      EXPECT_TRUE(families.insert(family).second) << "family split: " << family;
+      continue;
+    }
+    EXPECT_TRUE(absl::StartsWith(line, family)) << line << " is outside of family " << family;
+  }
+  EXPECT_GT(families.size(), 3);
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputSortedWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.prometheus_stats_unsorted", "false"}});
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  for (const char* cluster : {"ccc", "aaa", "bbb"}) {
+    const Stats::StatNameTagVector tags{{makeStat("cluster"), makeStat(cluster)}};
+    addCounter("cluster.upstream_cx_total", tags);
+    addCounter("cluster.upstream_cx_connect_fail", tags);
+    addGauge("cluster.upstream_cx_active", tags);
+  }
+
+  StatsParams params;
+  Buffer::OwnedImpl parse_response;
+  ASSERT_EQ(Http::Code::OK, params.parse("", parse_response));
+  EXPECT_FALSE(params.unordered_);
+  Buffer::OwnedImpl response;
+  PrometheusStatsFormatter::statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                                                  endpoints_helper_->cm_, response, params,
+                                                  custom_namespaces);
+
+  EXPECT_EQ(R"EOF(# TYPE envoy_cluster_upstream_cx_connect_fail counter
+envoy_cluster_upstream_cx_connect_fail{cluster="aaa"} 0
+envoy_cluster_upstream_cx_connect_fail{cluster="bbb"} 0
+envoy_cluster_upstream_cx_connect_fail{cluster="ccc"} 0
+# TYPE envoy_cluster_upstream_cx_total counter
+envoy_cluster_upstream_cx_total{cluster="aaa"} 0
+envoy_cluster_upstream_cx_total{cluster="bbb"} 0
+envoy_cluster_upstream_cx_total{cluster="ccc"} 0
+# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{cluster="aaa"} 0
+envoy_cluster_upstream_cx_active{cluster="bbb"} 0
+envoy_cluster_upstream_cx_active{cluster="ccc"} 0
+)EOF",
+            response.toString());
 }
 
 } // namespace Server

@@ -1171,8 +1171,7 @@ TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlAny) {
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
-// Deeply-nested opaque protos (`Any` and `TypedStruct`), which are reified using the
-// `DynamicMessageFactory`, should be redacted correctly.
+// deeply nested Any and TypedStruct fields can also arrive in dynamic messages
 TEST_F(ProtobufUtilityTest, RedactDeeplyNestedOpaqueProtos) {
   envoy::test::Sensitive actual, expected;
   TestUtility::loadFromYaml(R"EOF(
@@ -1219,6 +1218,14 @@ insensitive_typed_struct:
         sensitive_string: '[redacted]'
 )EOF",
                             expected);
+  Protobuf::DynamicMessageFactory message_factory;
+  auto reflectable_message = createReflectableMessage(actual);
+  std::unique_ptr<Protobuf::Message> dynamic_message(
+      message_factory.GetPrototype(reflectable_message->GetDescriptor())->New());
+  ASSERT_TRUE(dynamic_message->ParseFromString(actual.SerializeAsString()));
+  MessageUtil::redact(*dynamic_message);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, *dynamic_message));
+
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }

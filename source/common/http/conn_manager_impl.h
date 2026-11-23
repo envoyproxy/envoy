@@ -702,6 +702,8 @@ private:
   bool proactive_drain_{false};
   // When set to true, add Connection:close response header to nudge downstream client to reconnect.
   bool soft_drain_http1_{false};
+  // Whether the connection has carried no stream since the drain sequence started.
+  bool idle_since_drain_start_{false};
   Random::RandomGenerator& random_generator_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;

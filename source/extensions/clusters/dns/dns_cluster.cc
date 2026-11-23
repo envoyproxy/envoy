@@ -163,7 +163,9 @@ DnsClusterImpl::DnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
       respect_dns_ttl_(dns_cluster.respect_dns_ttl()),
       dns_lookup_family_(
           Envoy::DnsUtils::getDnsLookupFamilyFromEnum(dns_cluster.dns_lookup_family())),
-      all_addresses_in_single_endpoint_(dns_cluster.all_addresses_in_single_endpoint()) {
+      all_addresses_in_single_endpoint_(dns_cluster.all_addresses_in_single_endpoint()),
+      skip_draining_on_resolution_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(dns_cluster, skip_draining_on_resolution, true)) {
   failure_backoff_strategy_ = Config::Utility::prepareDnsRefreshStrategy(
       dns_cluster, dns_refresh_rate_ms_.count(),
       context.serverFactoryContext().api().randomGenerator());
@@ -280,30 +282,10 @@ bool DnsClusterImpl::ResolveTarget::isSuccessfulResponse(
   }
 }
 
-absl::StatusOr<DnsClusterImpl::ResolveTarget::ParsedHosts>
-DnsClusterImpl::ResolveTarget::createLogicalDnsHosts(
-    const std::list<Network::DnsResponse>& response) {
-  ParsedHosts result;
-  const auto& addrinfo = response.front().addrInfo();
-  Network::Address::InstanceConstSharedPtr new_address =
-      Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
-  auto address_list = DnsUtils::generateAddressList(response, port_);
-  auto logical_host_or_error =
-      LogicalHost::create(parent_.info_, hostname_, new_address, address_list,
-                          locality_lb_endpoints_, lb_endpoint_, nullptr);
-
-  RETURN_IF_NOT_OK(logical_host_or_error.status());
-
-  result.hosts.emplace_back(std::move(logical_host_or_error.value()));
-  result.host_addresses.emplace(new_address->asString());
-  result.ttl_refresh_rate = min(result.ttl_refresh_rate, addrinfo.ttl_);
-  return result;
-}
-
-absl::StatusOr<DnsClusterImpl::ResolveTarget::ParsedHosts>
-DnsClusterImpl::ResolveTarget::createStrictDnsHosts(
-    const std::list<Network::DnsResponse>& response) {
-  ParsedHosts result;
+DnsClusterImpl::ResolveTarget::ParsedDnsResponse
+DnsClusterImpl::ResolveTarget::parseDnsResponse(const std::list<Network::DnsResponse>& response) {
+  ParsedDnsResponse result;
+  result.address_list.reserve(response.size());
   for (const auto& resp : response) {
     const auto& addrinfo = resp.addrInfo();
     // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
@@ -312,10 +294,58 @@ DnsClusterImpl::ResolveTarget::createStrictDnsHosts(
     // better for SRV.
     ASSERT(addrinfo.address_ != nullptr);
     auto address = Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
-    if (result.host_addresses.count(address->asString()) > 0) {
+    if (result.host_addresses.insert(address->asString()).second) {
+      result.ttl_refresh_rate = std::min(result.ttl_refresh_rate, addrinfo.ttl_);
+    }
+    result.address_list.push_back(std::move(address));
+  }
+  if (!result.address_list.empty()) {
+    result.primary_address = result.address_list.front();
+    // Logical DNS only respects the TTL of the primary address.
+    if (parent_.all_addresses_in_single_endpoint_) {
+      result.ttl_refresh_rate = response.front().addrInfo().ttl_;
+    }
+  }
+  return result;
+}
+
+absl::Status DnsClusterImpl::ResolveTarget::updateLogicalDnsHosts(const ParsedDnsResponse& parsed) {
+  ASSERT(parsed.primary_address != nullptr);
+  if (logic_dns_cached_address_ != nullptr &&
+      *parsed.primary_address == *logic_dns_cached_address_ &&
+      !DnsUtils::listChanged(logic_dns_cached_address_list_, parsed.address_list)) {
+    parent_.info_->configUpdateStats().update_no_rebuild_.inc();
+    return absl::OkStatus();
+  }
+
+  ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
+  if (parent_.skip_draining_on_resolution_ && logical_host_ != nullptr) {
+    // Update the existing logical host in place to avoid draining its connection pools.
+    logical_host_->setNewAddresses(parsed.primary_address, parsed.address_list, lb_endpoint_);
+  } else {
+    auto logical_host_or_error =
+        LogicalHost::create(parent_.info_, hostname_, parsed.primary_address, parsed.address_list,
+                            locality_lb_endpoints_, lb_endpoint_, nullptr);
+    RETURN_IF_NOT_OK(logical_host_or_error.status());
+    logical_host_ = std::move(logical_host_or_error.value());
+    const HostVector previous_hosts = std::move(hosts_);
+    hosts_ = {logical_host_};
+    // For logical DNS, we remove the unique logical host, and add the new one.
+    parent_.updateAllHosts(hosts_, previous_hosts, locality_lb_endpoints_.priority());
+  }
+  logic_dns_cached_address_ = parsed.primary_address;
+  logic_dns_cached_address_list_ = parsed.address_list;
+  return absl::OkStatus();
+}
+
+absl::Status DnsClusterImpl::ResolveTarget::updateStrictDnsHosts(const ParsedDnsResponse& parsed) {
+  HostVector new_hosts;
+  new_hosts.reserve(parsed.host_addresses.size());
+  absl::flat_hash_set<std::string> created_addresses;
+  for (const auto& address : parsed.address_list) {
+    if (!created_addresses.insert(address->asString()).second) {
       continue;
     }
-
     auto host_or_error = HostImpl::create(
         parent_.info_, hostname_, address,
         // TODO(zyfjeff): Created through metadata shared pool
@@ -326,46 +356,19 @@ DnsClusterImpl::ResolveTarget::createStrictDnsHosts(
         parent_.constLocalitySharedPool()->getObject(locality_lb_endpoints_.locality()),
         lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints_.priority(),
         lb_endpoint_.health_status());
-
     RETURN_IF_NOT_OK(host_or_error.status());
-
-    result.hosts.emplace_back(std::move(host_or_error.value()));
-    result.host_addresses.emplace(address->asString());
-    result.ttl_refresh_rate = min(result.ttl_refresh_rate, addrinfo.ttl_);
+    new_hosts.emplace_back(std::move(host_or_error.value()));
   }
-  return result;
-}
 
-void DnsClusterImpl::ResolveTarget::updateLogicalDnsHosts(
-    const std::list<Network::DnsResponse>& response, const ParsedHosts& new_hosts) {
-  Network::Address::InstanceConstSharedPtr primary_address =
-      Network::Utility::getAddressWithPort(*(response.front().addrInfo().address_), port_);
-  auto all_addresses = DnsUtils::generateAddressList(response, port_);
-  if (!logic_dns_cached_address_ ||
-      (*primary_address != *logic_dns_cached_address_ ||
-       DnsUtils::listChanged(logic_dns_cached_address_list_, all_addresses))) {
-    logic_dns_cached_address_ = primary_address;
-    logic_dns_cached_address_list_ = std::move(all_addresses);
-    ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
-    const auto previous_hosts = std::move(hosts_);
-    hosts_ = std::move(new_hosts.hosts);
-    // For logical DNS, we remove the unique logical host, and add the new one.
-    parent_.updateAllHosts(new_hosts.hosts, previous_hosts, locality_lb_endpoints_.priority());
-  } else {
-    parent_.info_->configUpdateStats().update_no_rebuild_.inc();
-  }
-}
-
-void DnsClusterImpl::ResolveTarget::updateStrictDnsHosts(const ParsedHosts& new_hosts) {
   HostVector hosts_added;
   HostVector hosts_removed;
   if (parent_.updateDynamicHostList(
-          new_hosts.hosts, hosts_, hosts_added, hosts_removed,
+          new_hosts, hosts_, hosts_added, hosts_removed,
           [this](const std::string& address) -> HostSharedPtr {
             const auto it = all_hosts_.find(address);
             return it != all_hosts_.end() ? it->second : nullptr;
           },
-          new_hosts.host_addresses)) {
+          parsed.host_addresses)) {
     ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
     ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
       return host->priority() == locality_lb_endpoints_.priority();
@@ -383,6 +386,7 @@ void DnsClusterImpl::ResolveTarget::updateStrictDnsHosts(const ParsedHosts& new_
   } else {
     parent_.info_->configUpdateStats().update_no_rebuild_.inc();
   }
+  return absl::OkStatus();
 }
 
 void DnsClusterImpl::ResolveTarget::startResolve() {
@@ -401,37 +405,25 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
         if (isSuccessfulResponse(response, status)) {
           parent_.info_->configUpdateStats().update_success_.inc();
 
-          absl::StatusOr<ParsedHosts> new_hosts_or_error;
-
-          if (parent_.all_addresses_in_single_endpoint_) {
-            new_hosts_or_error = createLogicalDnsHosts(response);
-          } else {
-            new_hosts_or_error = createStrictDnsHosts(response);
-          }
-
-          if (!new_hosts_or_error.ok()) {
+          const ParsedDnsResponse parsed = parseDnsResponse(response);
+          const absl::Status update_status = parent_.all_addresses_in_single_endpoint_
+                                                 ? updateLogicalDnsHosts(parsed)
+                                                 : updateStrictDnsHosts(parsed);
+          if (!update_status.ok()) {
             ENVOY_LOG(error, "Failed to process DNS response for {} with error: {}", dns_address_,
-                      new_hosts_or_error.status().message());
+                      update_status.message());
             parent_.info_->configUpdateStats().update_failure_.inc();
             return;
-          }
-
-          const auto& new_hosts = new_hosts_or_error.value();
-
-          if (parent_.all_addresses_in_single_endpoint_) {
-            updateLogicalDnsHosts(response, new_hosts);
-          } else {
-            updateStrictDnsHosts(new_hosts);
           }
 
           // reset failure backoff strategy because there was a success.
           parent_.failure_backoff_strategy_->reset();
 
           if (!response.empty() && parent_.respect_dns_ttl_ &&
-              new_hosts.ttl_refresh_rate != std::chrono::seconds(0)) {
-            final_refresh_rate = std::max(std::chrono::milliseconds(new_hosts.ttl_refresh_rate),
+              parsed.ttl_refresh_rate != std::chrono::seconds(0)) {
+            final_refresh_rate = std::max(std::chrono::milliseconds(parsed.ttl_refresh_rate),
                                           parent_.dns_min_refresh_rate_ms_);
-            ASSERT(new_hosts.ttl_refresh_rate != std::chrono::seconds::max() &&
+            ASSERT(parsed.ttl_refresh_rate != std::chrono::seconds::max() &&
                    final_refresh_rate.count() > 0);
           }
           if (parent_.dns_jitter_ms_.count() > 0) {

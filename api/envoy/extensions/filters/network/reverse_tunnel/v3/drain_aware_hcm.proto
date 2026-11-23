@@ -28,19 +28,33 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // the fields below are set: a soft GOAWAY (shutdown notice) is sent when the
 // drain starts, and the final GOAWAY follows after ``hcm_config.drain_timeout``,
 // extended by ``hcm_config.drain_timeout_jitter`` if set. With
-// ``enable_drain_with_goaway``, a reverse tunnel instead dials a replacement
-// when the drain starts and sends the soft GOAWAY and an optional METADATA frame
-// at the configured delays before the final GOAWAY. Without
-// ``shutdown_notice_delay``, such a tunnel receives no GOAWAY until the final
-// one, so it keeps serving while the replacement is established.
+// ``enable_drain_with_goaway``, a reverse tunnel instead sends the soft GOAWAY and an optional
+// METADATA frame at the configured delays before the final GOAWAY. Without
+// ``shutdown_notice_delay``, such a tunnel receives no GOAWAY until the final one. On
+// any local drain of an established HTTP/2 tunnel (including connection rotation, filter-chain
+// updates and admin listener drains), such a tunnel requests a replacement unless the listener has
+// stopped tunnel initiation. This applies with either value of the runtime guard below.
+// The runtime guard ``envoy.reloadable_features.reverse_tunnel_listener_drain`` defaults to false.
+// When enabled, whole-listener draining stops pending handshakes and replacement dials regardless of
+// ``enable_drain_with_goaway``. With that option also enabled, idle tunnels request replacements
+// during in-place filter-chain updates while retaining HCM's existing drain grace. Admin listener
+// drains close unused tunnels without replacements. Full listener replacement and hot restart
+// retain the existing grace for unused tunnels so the successor can establish its tunnels.
 message DrainAwareHttpConnectionManager {
   // The underlying HCM configuration to apply.
   http_connection_manager.v3.HttpConnectionManager hcm_config = 1;
 
-  // When true, a peer-initiated GOAWAY on a reverse tunnel makes the initiator drop the draining
-  // tunnel and dial a replacement, so capacity is restored before the old tunnel closes while its
-  // in-flight streams finish. Default false, so the behavior is opt-in and unconfigured listeners
-  // are unaffected. Required by ``metadata_delay`` and ``shutdown_notice_delay``.
+  // When true, a peer-initiated GOAWAY, connection-level METADATA frame carrying
+  // ``envoy.reverse_tunnel.drain: true``, or any local drain of an established HTTP/2 tunnel retires
+  // the reverse tunnel and requests a replacement while in-flight streams finish, unless the
+  // listener has stopped tunnel initiation. Receiving the METADATA frame requires
+  // ``hcm_config.http2_protocol_options.allow_metadata`` to be true. Local drains include connection
+  // rotation, filter-chain updates and admin listener drains, with either value of the runtime guard
+  // below. Default false. Required by ``metadata_delay`` and ``shutdown_notice_delay``.
+  // With ``envoy.reloadable_features.reverse_tunnel_listener_drain`` enabled, unused tunnels also
+  // request replacements during in-place filter-chain updates without shortening their drain grace.
+  // The runtime guard separately stops tunnel initiation on whole-listener drains, even when this
+  // option is false.
   bool enable_drain_with_goaway = 2;
 
   // Delay from the start of a reverse tunnel drain until a METADATA frame carrying

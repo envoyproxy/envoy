@@ -3,6 +3,7 @@
 #include <functional>
 #include <list>
 
+#include "envoy/event/schedulable_cb.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/admin.h"
 
@@ -64,10 +65,30 @@ private:
    * Called when an admin request has been completely received.
    */
   void onComplete();
+
+  /**
+   * Encodes the next chunk of request_.
+   * @return true if there are more chunks to encode and the stream is still alive.
+   */
+  bool encodeNextChunk();
+
+  /**
+   * Schedules encodeNextChunk() on the next event loop iteration, so a large response does not
+   * block the main thread.
+   */
+  void scheduleNextChunk();
+
   const Admin& admin_;
+  // Latched at construction so the runtime guard is not re-read for every request chunk.
+  const bool yield_between_chunks_;
   Http::RequestHeaderMap* request_headers_{};
   std::list<std::function<void()>> on_destroy_callbacks_;
   bool end_stream_on_complete_ = true;
+
+  // The request whose response is still being streamed, if any.
+  Admin::RequestPtr request_;
+  Event::SchedulableCallbackPtr next_chunk_cb_;
+  bool destroyed_{false};
 };
 
 } // namespace Server

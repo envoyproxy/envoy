@@ -1,3 +1,5 @@
+#include "source/common/config/decoded_resource_impl.h"
+
 #include "test/common/config/grpc_subscription_test_harness.h"
 
 #include "gtest/gtest.h"
@@ -107,6 +109,53 @@ TEST_P(GrpcSubscriptionImplTest, UpdateTimeChangedOnUpdateSuccess) {
   simTime().setSystemTime(SystemTime(std::chrono::milliseconds(TEST_TIME_MILLIS + 1)));
   deliverConfigUpdate({"cluster0", "cluster2"}, "0", true);
   EXPECT_TRUE(statsAre(2, 2, 0, 0, 0, TEST_TIME_MILLIS + 1, 7148434200721666028, "0"));
+}
+
+class GrpcSubscriptionImplInitFetchTimeoutTest : public testing::TestWithParam<LegacyOrUnified>,
+                                                 public GrpcSubscriptionTestHarness {
+public:
+  GrpcSubscriptionImplInitFetchTimeoutTest()
+      : GrpcSubscriptionTestHarness(GetParam(), std::chrono::milliseconds(1000)) {}
+};
+
+INSTANTIATE_TEST_SUITE_P(GrpcSubscriptionImplInitFetchTimeoutTest,
+                         GrpcSubscriptionImplInitFetchTimeoutTest,
+                         testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
+
+DecodedResourcePtr replayedClusterLoadAssignment(const std::string& name) {
+  auto cla =
+      Protobuf::Arena::MakeUnique<envoy::config::endpoint::v3::ClusterLoadAssignment>(nullptr);
+  cla->set_cluster_name(name);
+  return std::make_unique<DecodedResourceImpl>(std::move(cla), name, std::vector<std::string>{},
+                                               "v1", /*from_cache=*/true);
+}
+
+TEST_P(GrpcSubscriptionImplInitFetchTimeoutTest, RejectedReplayKeepsInitFetchTimeout) {
+  expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
+  startSubscription({"cluster0"});
+
+  DecodedResourcePtr replayed = replayedClusterLoadAssignment("cluster0");
+  const std::vector<DecodedResourceRef> refs{*replayed};
+  EXPECT_CALL(*init_timeout_timer_, disableTimer()).Times(0);
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, "v1"))
+      .WillOnce(Return(absl::InvalidArgumentError("rejected")));
+  EXPECT_FALSE(subscription_->onConfigUpdate(refs, "v1").ok());
+
+  // The server will not resend the resource, so the timeout must still fire.
+  expectDisableInitFetchTimeoutTimer();
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(ConfigUpdateFailureReason::FetchTimedout, nullptr));
+  callInitFetchTimeoutCb();
+}
+
+TEST_P(GrpcSubscriptionImplInitFetchTimeoutTest, AcceptedReplayDisablesInitFetchTimeout) {
+  expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
+  startSubscription({"cluster0"});
+
+  DecodedResourcePtr replayed = replayedClusterLoadAssignment("cluster0");
+  const std::vector<DecodedResourceRef> refs{*replayed};
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, "v1")).WillOnce(Return(absl::OkStatus()));
+  expectDisableInitFetchTimeoutTimer();
+  EXPECT_TRUE(subscription_->onConfigUpdate(refs, "v1").ok());
 }
 
 } // namespace
