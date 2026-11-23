@@ -13,6 +13,7 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 
 #include "absl/strings/string_view.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -77,6 +78,9 @@ UpstreamSocketManager::pickLeastLoadedSocketManager(const std::string& node_id,
     };
     min_node_count = count_for_node(*this);
     for (UpstreamSocketManager* socket_manager : socket_managers_) {
+      if (socket_manager->extension_ != extension_) {
+        continue;
+      }
       const int node_count = count_for_node(*socket_manager);
       if (node_count < min_node_count) {
         target_socket_manager = socket_manager;
@@ -101,7 +105,10 @@ UpstreamSocketManager::pickLeastLoadedSocketManager(const std::string& node_id,
 void UpstreamSocketManager::decrementIdleCount(const std::string& node_id) {
   absl::WriterMutexLock wlock(UpstreamSocketManager::socket_manager_lock);
   auto it = node_to_conn_count_map_.find(node_id);
-  ASSERT(it != node_to_conn_count_map_.end() && it->second > 0);
+  if (it == node_to_conn_count_map_.end()) {
+    IS_ENVOY_BUG(fmt::format("reverse_tunnel: no idle count to decrement for node {}", node_id));
+    return;
+  }
   if (--it->second == 0) {
     node_to_conn_count_map_.erase(it);
   }
@@ -791,6 +798,14 @@ void UpstreamSocketManager::rearmPingSendTimer(int fd) {
 UpstreamSocketManager::~UpstreamSocketManager() {
   ENVOY_LOG(debug, "reverse_tunnel: destructor called.");
 
+  {
+    absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);
+    auto it = std::find(socket_managers_.begin(), socket_managers_.end(), this);
+    if (it != socket_managers_.end()) {
+      socket_managers_.erase(it);
+    }
+  }
+
   // Clean up all active file events and timers first.
   for (auto& [fd, event] : fd_to_event_map_) {
     ENVOY_LOG(trace, "reverse_tunnel: cleaning up file event. fd: {}.", fd);
@@ -847,13 +862,6 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   fd_to_cluster_map_.clear();
   fd_to_lifecycle_info_.clear();
   fd_to_socket_it_map_.clear();
-
-  // Remove this instance from the global socket managers list.
-  absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);
-  auto it = std::find(socket_managers_.begin(), socket_managers_.end(), this);
-  if (it != socket_managers_.end()) {
-    socket_managers_.erase(it);
-  }
 }
 
 OptRef<const MonotonicTime> UpstreamSocketManager::findStartTime(int fd) const {

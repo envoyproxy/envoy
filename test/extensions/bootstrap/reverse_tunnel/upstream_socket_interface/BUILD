@@ -116,6 +116,7 @@ envoy_extension_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",
     ],
 )

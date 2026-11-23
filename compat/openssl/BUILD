@@ -725,6 +725,7 @@ mapping_func_filegroup(
         "SSL_CTX_set_ex_data",
         "SSL_CTX_set_keylog_callback",
         "SSL_CTX_set_max_proto_version",
+        "SSL_CTX_set_max_send_fragment",
         "SSL_CTX_set_min_proto_version",
         "SSL_CTX_set_next_proto_select_cb",
         "SSL_CTX_set_next_protos_advertised_cb",
