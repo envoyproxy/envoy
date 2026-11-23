@@ -24,6 +24,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/dependent_type_urls.h"
 #include "source/common/config/null_grpc_mux_impl.h"
@@ -73,6 +74,23 @@ void addOptionsIfNotNull(Network::Socket::OptionsSharedPtr& options,
   if (to_add != nullptr) {
     Network::Socket::appendOptions(options, to_add);
   }
+}
+
+// When the cluster selects its transport socket from downstream filter state, the transport socket
+// is resolved per connection. Fold the selected match name into the pool hash key so that requests
+// resolving to different matches never share a pool, regardless of whether the filter state
+// objects implement Hashable.
+void addFilterStateTransportSocketMatchToHashKey(
+    std::vector<uint8_t>& hash_key, const Host& host,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options) {
+  const auto& matcher = host.cluster().transportSocketMatcher();
+  if (!matcher.usesFilterState() || transport_socket_options == nullptr ||
+      transport_socket_options->downstreamSharedFilterStateObjects().empty()) {
+    return;
+  }
+  const auto match = matcher.resolve(host.metadata().get(), host.localityMetadata().get(),
+                                     transport_socket_options);
+  pushScalarToByteVector(absl::Hash<std::string>()(match.name_), hash_key);
 }
 
 // Helper function to make sure each protocol in expected_protocols is present
@@ -2257,6 +2275,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   bool have_transport_socket_options = false;
   if (context && context->upstreamTransportSocketOptions()) {
     host->transportSocketFactory().hashKey(hash_key, context->upstreamTransportSocketOptions());
+    addFilterStateTransportSocketMatchToHashKey(hash_key, *host,
+                                                context->upstreamTransportSocketOptions());
     have_transport_socket_options = true;
   }
 
@@ -2399,6 +2419,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl
   if (context != nullptr && context->upstreamTransportSocketOptions() != nullptr) {
     have_transport_socket_options = true;
     host->transportSocketFactory().hashKey(hash_key, context->upstreamTransportSocketOptions());
+    addFilterStateTransportSocketMatchToHashKey(hash_key, *host,
+                                                context->upstreamTransportSocketOptions());
   }
 
   auto container_iter = parent_.host_tcp_conn_pool_map_.find(host);
