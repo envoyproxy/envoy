@@ -183,7 +183,9 @@ AbstractResponseSharedPtr FetchRequestHolder::computeAnswer() const {
     absl::MutexLock lock(state_mutex_);
     responses = converter_.convert(messages_);
   }
-  const FetchResponse data = {responses};
+  // Fetch v0-3 were removed in Kafka 4.0, so the lowest FetchResponse constructor now
+  // takes throttle_time_ms as well; higher-version fields default to 0.
+  const FetchResponse data = {0, responses};
   return std::make_shared<Response<FetchResponse>>(metadata, data);
 }
 

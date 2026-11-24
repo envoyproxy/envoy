@@ -11,6 +11,9 @@
 constexpr int16_t {{ complex_type.name | camel_case_to_snake_case | upper }}_API_KEY =
   {{ complex_type.get_extra('api_key') }};
 
+constexpr int16_t {{ complex_type.name | camel_case_to_snake_case | upper }}_MIN_VERSION =
+  {{ complex_type.versions[0] }};
+
 constexpr int16_t {{ complex_type.name | camel_case_to_snake_case | upper }}_MAX_VERSION =
   {{ complex_type.versions[-1] }};
 

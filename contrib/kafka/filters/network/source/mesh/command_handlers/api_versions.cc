@@ -15,6 +15,10 @@ namespace Mesh {
 // going to handle only produce requests with versions higher than 5.
 constexpr int16_t MIN_PRODUCE_SUPPORTED = 5;
 constexpr int16_t MAX_PRODUCE_SUPPORTED = PRODUCE_REQUEST_MAX_VERSION; /* Generated value. */
+// Kafka 4.0 removed Fetch versions 0-3, so the codec no longer parses them: advertise only from
+// the lowest generated version, otherwise a client could negotiate a version we cannot handle.
+constexpr int16_t MIN_FETCH_SUPPORTED = FETCH_REQUEST_MIN_VERSION;   /* Generated value. */
+constexpr int16_t MAX_FETCH_SUPPORTED = FETCH_REQUEST_MAX_VERSION;   /* Generated value. */
 // List-offsets version 0 uses old-style offsets.
 constexpr int16_t MIN_LIST_OFFSETS_SUPPORTED = 1;
 constexpr int16_t MAX_LIST_OFFSETS_SUPPORTED =
@@ -44,7 +48,7 @@ AbstractResponseSharedPtr ApiVersionsRequestHolder::computeAnswer() const {
   const int16_t error_code = 0;
   const ApiVersion produce_entry = {PRODUCE_REQUEST_API_KEY, MIN_PRODUCE_SUPPORTED,
                                     MAX_PRODUCE_SUPPORTED};
-  const ApiVersion fetch_entry = {FETCH_REQUEST_API_KEY, 0, FETCH_REQUEST_MAX_VERSION};
+  const ApiVersion fetch_entry = {FETCH_REQUEST_API_KEY, MIN_FETCH_SUPPORTED, MAX_FETCH_SUPPORTED};
   const ApiVersion list_offsets_entry = {LIST_OFFSETS_REQUEST_API_KEY, MIN_LIST_OFFSETS_SUPPORTED,
                                          MAX_LIST_OFFSETS_SUPPORTED};
   const ApiVersion metadata_entry = {METADATA_REQUEST_API_KEY, MIN_METADATA_SUPPORTED,

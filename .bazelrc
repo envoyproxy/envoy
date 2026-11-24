@@ -27,6 +27,8 @@ common --legacy_external_runfiles
 
 common --registry=https://bcr.bazel.build/
 common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/d72a2528f930f8cdcd3b0f04e30b258e169bd91f
+# WIP: kafka 4.4.0.envoy lives only on the fork until envoyproxy/bazel-registry#<PR> merges; revert to the envoyproxy pin then.
+common --registry=https://raw.githubusercontent.com/phlax/bazel-registry/37fa41023beb078ef604994255ad16c9ed4e8d0b
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off

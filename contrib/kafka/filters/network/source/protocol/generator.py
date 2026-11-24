@@ -164,7 +164,12 @@ class StatefulProcessor:
                     message_spec = json.loads(amended)
                     api_key = message_spec['apiKey']
                     # (adam.kotwasinski) Telemetry is not supported for now.
-                    if api_key not in [71, 72]:
+                    # Kafka 4.0 removed the old ZooKeeper-era controller APIs (LeaderAndIsr,
+                    # StopReplica, UpdateMetadata, ControlledShutdown); their specs are retained
+                    # with validVersions "none" and have no versions to generate, so skip them.
+                    # 88/89/93 are the Kafka 4.x Streams group APIs (KIP-1071), not supported yet.
+                    if api_key not in [71, 72, 88, 89, 93] \
+                            and message_spec.get('validVersions') != 'none':
                         message = self.parse_top_level_element(message_spec)
                         messages.append(message)
             except Exception as e:
@@ -189,12 +194,13 @@ class StatefulProcessor:
         flexible_versions_string = spec.get('flexibleVersions', 'none')
         if 'none' != flexible_versions_string:
             flexible_versions = Statics.parse_version_string(flexible_versions_string, versions[-1])
+            # Kafka 4.x can drop old request/response versions while leaving the original
+            # flexibleVersions floor in place (e.g. validVersions "2-3" with flexibleVersions
+            # "0+"), so the flexible range may extend below the lowest valid version. Those
+            # versions no longer exist, so keep only the flexible versions that are still valid.
+            flexible_versions = [x for x in flexible_versions if x in versions]
         else:
             flexible_versions = []
-
-        # Sanity check - all flexible versions need to be versioned.
-        if [x for x in flexible_versions if x not in versions]:
-            raise ValueError('invalid flexible versions')
 
         # Initialize the context that will be shared for this file's processing.
         self.context = MessageContext(spec.get('name'), versions, spec.get('commonStructs'))
@@ -420,7 +426,13 @@ class FieldSpec:
 
     def default_value(self):
         if self.is_nullable():
-            type_default_value = self.type.default_value()
+            # Complex (struct) types have no literal default; nullable complex fields in Kafka
+            # specs default to null (e.g. Kafka 4.x StreamsGroupDescribe), so fall back to an
+            # empty optional rather than failing to synthesize a default.
+            try:
+                type_default_value = self.type.default_value()
+            except NotImplementedError:
+                return 'std::nullopt'
             # For nullable fields, it's possible to have (Java) null as default value.
             if type_default_value != 'null':
                 return '{%s}' % type_default_value
