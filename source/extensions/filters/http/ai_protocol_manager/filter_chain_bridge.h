@@ -36,7 +36,7 @@ public:
   public:
     virtual ~Client() = default;
     virtual void onBridgeDetached() PURE;
-    virtual void onIngestPaused() {}
+    virtual void onIngestPaused() PURE;
   };
 
   // `buffer_limit` is the chain's ingest high watermark (the configured decoder/encoder buffer

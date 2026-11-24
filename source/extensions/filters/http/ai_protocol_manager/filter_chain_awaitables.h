@@ -22,6 +22,8 @@ namespace AiProtocolManager {
 class ReusableSchedulableCallback {
 public:
   explicit ReusableSchedulableCallback(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+  ReusableSchedulableCallback(const ReusableSchedulableCallback&) = delete;
+  ReusableSchedulableCallback& operator=(const ReusableSchedulableCallback&) = delete;
 
   void scheduleCurrentIteration(absl::AnyInvocable<void()> fn);
   void scheduleNextIteration(absl::AnyInvocable<void()> fn);
