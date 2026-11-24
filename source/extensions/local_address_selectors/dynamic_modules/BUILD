@@ -19,6 +19,8 @@ envoy_cc_library(
     deps = [
         "//envoy/network:address_interface",
         "//envoy/network:socket_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
         "//envoy/upstream:upstream_interface",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",

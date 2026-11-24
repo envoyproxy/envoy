@@ -28,7 +28,7 @@ DynamicModuleLocalAddressSelectorFactory::createLocalAddressSelector(
 absl::StatusOr<Upstream::UpstreamLocalAddressSelectorConstSharedPtr>
 DynamicModuleLocalAddressSelectorFactory::createLocalAddressSelectorWithConfig(
     const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context,
-    std::vector<Upstream::UpstreamLocalAddress> upstream_local_addresses,
+    Stats::Scope& stats_scope, std::vector<Upstream::UpstreamLocalAddress> upstream_local_addresses,
     std::optional<std::string> cluster_name) const {
   const auto& proto_config = MessageUtil::downcastAndValidate<const ProtoConfig&>(
       config, context.messageValidationVisitor());
@@ -81,7 +81,8 @@ DynamicModuleLocalAddressSelectorFactory::createLocalAddressSelectorWithConfig(
   }
 
   return std::make_shared<const DynamicModuleLocalAddressSelector>(
-      std::move(selector_module_config.value()), std::move(default_selector.value()));
+      std::move(selector_module_config.value()), std::move(default_selector.value()),
+      generateDynamicModuleLocalAddressSelectorStats(stats_scope));
 }
 
 REGISTER_FACTORY(DynamicModuleLocalAddressSelectorFactory,

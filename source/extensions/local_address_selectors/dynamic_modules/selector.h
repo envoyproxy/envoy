@@ -5,6 +5,8 @@
 
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
@@ -90,6 +92,24 @@ public:
 };
 
 /**
+ * All dynamic module local address selector stats. @see stats_macros.h
+ */
+#define ALL_DYNAMIC_MODULE_LOCAL_ADDRESS_SELECTOR_STATS(COUNTER)                                   \
+  COUNTER(default)                                                                                 \
+  COUNTER(failed)                                                                                  \
+  COUNTER(selected)
+
+/**
+ * Counts the result of each selection, in the cluster's stats scope.
+ */
+struct DynamicModuleLocalAddressSelectorStats {
+  ALL_DYNAMIC_MODULE_LOCAL_ADDRESS_SELECTOR_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+DynamicModuleLocalAddressSelectorStats
+generateDynamicModuleLocalAddressSelectorStats(Stats::Scope& scope);
+
+/**
  * Local address selector that asks a dynamic module for the source address of each connection.
  * The module can also defer to the default selection over the bind config, or fail the connection.
  */
@@ -98,7 +118,8 @@ class DynamicModuleLocalAddressSelector : public Upstream::UpstreamLocalAddressS
 public:
   DynamicModuleLocalAddressSelector(
       DynamicModuleLocalAddressSelectorConfigSharedPtr config,
-      Upstream::UpstreamLocalAddressSelectorConstSharedPtr default_selector);
+      Upstream::UpstreamLocalAddressSelectorConstSharedPtr default_selector,
+      DynamicModuleLocalAddressSelectorStats stats);
 
   Upstream::UpstreamLocalAddress getUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& endpoint_address,
@@ -115,6 +136,7 @@ private:
 
   const DynamicModuleLocalAddressSelectorConfigSharedPtr config_;
   const Upstream::UpstreamLocalAddressSelectorConstSharedPtr default_selector_;
+  const DynamicModuleLocalAddressSelectorStats stats_;
 };
 
 } // namespace DynamicModules

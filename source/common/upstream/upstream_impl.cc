@@ -428,7 +428,7 @@ createUpstreamLocalAddressSelector(
     const envoy::config::cluster::v3::Cluster& cluster_config,
     const std::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config,
     Server::Configuration::ServerFactoryContext& server_context,
-    ProtobufMessage::ValidationVisitor& validation_visitor) {
+    ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Scope& stats_scope) {
 
   // Use the cluster bind config if specified. This completely overrides the
   // bootstrap bind config when present.
@@ -523,7 +523,7 @@ createUpstreamLocalAddressSelector(
         local_address_selector_config->typed_config(), validation_visitor, *selector_config));
   }
   auto selector_or_error = local_address_selector_factory->createLocalAddressSelectorWithConfig(
-      *selector_config, server_context, config_or_error.value(), cluster_name);
+      *selector_config, server_context, stats_scope, config_or_error.value(), cluster_name);
   RETURN_IF_NOT_OK_REF(selector_or_error.status());
   return selector_or_error.value();
 }
@@ -1414,7 +1414,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       upstream_local_address_selector_(THROW_OR_RETURN_VALUE(
           createUpstreamLocalAddressSelector(config, bind_config, server_context,
-                                             factory_context.messageValidationVisitor()),
+                                             factory_context.messageValidationVisitor(),
+                                             *stats_scope_),
           Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr)),
       upstream_config_(config.has_upstream_config()
                            ? std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(

@@ -29,6 +29,7 @@ envoy_extension_cc_dyn_module_test(
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:socket_option_factory_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/local_address_selectors/dynamic_modules:config",
         "//source/extensions/local_address_selectors/dynamic_modules:selector_lib",
         "//test/extensions/dynamic_modules:util",
@@ -47,6 +48,7 @@ envoy_extension_cc_dyn_module_test(
     srcs = ["integration_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:local_address_selector",
+        "//test/extensions/dynamic_modules/test_data/rust:local_address_selector_integration_test",
     ],
     extension_names = ["envoy.upstream.local_address_selector.dynamic_modules"],
     rbe_pool = {

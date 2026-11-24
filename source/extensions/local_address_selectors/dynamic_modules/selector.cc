@@ -80,10 +80,18 @@ bool FailConnectionSocketOption::setOption(
   return state != envoy::config::core::v3::SocketOption::STATE_PREBIND;
 }
 
+DynamicModuleLocalAddressSelectorStats
+generateDynamicModuleLocalAddressSelectorStats(Stats::Scope& scope) {
+  return {ALL_DYNAMIC_MODULE_LOCAL_ADDRESS_SELECTOR_STATS(
+      POOL_COUNTER_PREFIX(scope, "dynamic_module_local_address_selector."))};
+}
+
 DynamicModuleLocalAddressSelector::DynamicModuleLocalAddressSelector(
     DynamicModuleLocalAddressSelectorConfigSharedPtr config,
-    Upstream::UpstreamLocalAddressSelectorConstSharedPtr default_selector)
-    : config_(std::move(config)), default_selector_(std::move(default_selector)) {}
+    Upstream::UpstreamLocalAddressSelectorConstSharedPtr default_selector,
+    DynamicModuleLocalAddressSelectorStats stats)
+    : config_(std::move(config)), default_selector_(std::move(default_selector)),
+      stats_(std::move(stats)) {}
 
 Upstream::UpstreamLocalAddress DynamicModuleLocalAddressSelector::getUpstreamLocalAddress(
     const Network::Address::InstanceConstSharedPtr& endpoint_address,
@@ -98,32 +106,20 @@ Upstream::UpstreamLocalAddress DynamicModuleLocalAddressSelector::getUpstreamLoc
 
   const std::string& endpoint_ip = endpoint_address->ip()->addressAsString();
   LocalAddressSelection selection;
-  const envoy_dynamic_module_type_local_address_selector_result result =
-      config_->on_select_(config_->in_module_config_, static_cast<void*>(&selection),
-                          {endpoint_ip.data(), endpoint_ip.size()}, endpoint_address->ip()->port());
-
-  switch (result) {
-  case envoy_dynamic_module_type_local_address_selector_result_UseDefault:
-    return default_address;
-  case envoy_dynamic_module_type_local_address_selector_result_UseSelected:
-    if (selection.selected_address_ == nullptr) {
-      ENVOY_LOG(debug,
-                "dynamic module local address selector returned UseSelected for {} without "
-                "setting an address, failing the connection",
-                endpoint_address->asStringView());
-      return failConnection(default_address);
-    }
-    return useSelected(default_address, selection.selected_address_);
-  case envoy_dynamic_module_type_local_address_selector_result_Fail:
+  if (!config_->on_select_(config_->in_module_config_, static_cast<void*>(&selection),
+                           {endpoint_ip.data(), endpoint_ip.size()},
+                           endpoint_address->ip()->port())) {
+    stats_.failed_.inc();
     ENVOY_LOG(debug, "dynamic module local address selector failed the connection to {}",
               endpoint_address->asStringView());
     return failConnection(default_address);
   }
-  ENVOY_LOG(debug,
-            "dynamic module local address selector returned unknown result {} for {}, failing "
-            "the connection",
-            static_cast<int>(result), endpoint_address->asStringView());
-  return failConnection(default_address);
+  if (selection.selected_address_ == nullptr) {
+    stats_.default_.inc();
+    return default_address;
+  }
+  stats_.selected_.inc();
+  return useSelected(default_address, selection.selected_address_);
 }
 
 Upstream::UpstreamLocalAddress DynamicModuleLocalAddressSelector::useSelected(

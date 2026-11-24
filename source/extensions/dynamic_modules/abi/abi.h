@@ -21345,22 +21345,6 @@ typedef const void* envoy_dynamic_module_type_local_address_selector_config_modu
  */
 typedef void* envoy_dynamic_module_type_local_address_selector_envoy_ptr;
 
-/**
- * envoy_dynamic_module_type_local_address_selector_result is the result of
- * envoy_dynamic_module_on_local_address_selector_select.
- */
-typedef enum envoy_dynamic_module_type_local_address_selector_result {
-  // Use the address that the default local address selector picks from the bind config, as if no
-  // local address selector were configured.
-  envoy_dynamic_module_type_local_address_selector_result_UseDefault = 0,
-  // Use the address recorded with envoy_dynamic_module_callback_local_address_selector_set_address.
-  // If the module recorded no address, Envoy fails the connection.
-  envoy_dynamic_module_type_local_address_selector_result_UseSelected = 1,
-  // Fail the connection. Envoy closes it before connecting, and the connection pool counts it as a
-  // connect failure.
-  envoy_dynamic_module_type_local_address_selector_result_Fail = 2,
-} envoy_dynamic_module_type_local_address_selector_result;
-
 // =============================================================================
 // Local Address Selector Event Hooks
 // =============================================================================
@@ -21402,7 +21386,17 @@ void envoy_dynamic_module_on_local_address_selector_config_destroy(
  * Envoy only calls this hook for IP endpoints. A non-IP endpoint uses the default selection.
  *
  * To use its own address, the module calls
- * envoy_dynamic_module_callback_local_address_selector_set_address and returns UseSelected.
+ * envoy_dynamic_module_callback_local_address_selector_set_address and returns true. Returning true
+ * without setting an address keeps the address that the default local address selector picks from
+ * the bind config.
+ *
+ * Returning false fails the connection. Envoy closes it before it connects, and the connection pool
+ * handles it as a local origin connect failure of the host. The pool counts
+ * upstream_cx_connect_fail and fails the requests waiting for a connection to the host, unless
+ * another connection that is being established can serve them. Outlier detection counts the
+ * failure against the host. Unless the cluster's outlier detection sets
+ * split_external_local_origin_errors, it counts as a 503 response, so failing connections for an
+ * endpoint can eject a healthy host.
  *
  * @param config_module_ptr is the pointer to the in-module selector configuration.
  * @param selector_envoy_ptr is the pointer to the Envoy selection context. It is only valid during
@@ -21410,10 +21404,9 @@ void envoy_dynamic_module_on_local_address_selector_config_destroy(
  * @param endpoint_address is the IP address of the upstream endpoint, without brackets for IPv6.
  *        The buffer is owned by Envoy and is only valid during this call.
  * @param endpoint_port is the port of the upstream endpoint.
- * @return the selection result.
+ * @return true to create the connection, false to fail it.
  */
-envoy_dynamic_module_type_local_address_selector_result
-envoy_dynamic_module_on_local_address_selector_select(
+bool envoy_dynamic_module_on_local_address_selector_select(
     envoy_dynamic_module_type_local_address_selector_config_module_ptr config_module_ptr,
     envoy_dynamic_module_type_local_address_selector_envoy_ptr selector_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer endpoint_address, uint32_t endpoint_port);
@@ -21424,14 +21417,13 @@ envoy_dynamic_module_on_local_address_selector_select(
 
 /**
  * envoy_dynamic_module_callback_local_address_selector_set_address records the source address of
- * the connection being selected. It takes effect when the select hook returns UseSelected. A later
- * call replaces an earlier one.
+ * the connection being selected. It takes effect when the select hook returns true. A later call
+ * replaces an earlier one.
  *
  * The address must have the same IP family as the endpoint. Otherwise binding the socket fails and
  * Envoy fails the connection. When the port is 0, the kernel picks the port at connect time, as for
- * a ``source_address`` with port 0.
- * Envoy keeps the socket options of the bind config, so options such as freebind and keepalive
- * still apply.
+ * a ``source_address`` with port 0. Envoy keeps the socket options of the bind config, so options
+ * such as freebind and keepalive still apply.
  *
  * @param selector_envoy_ptr is the pointer to the Envoy selection context.
  * @param address is the source IP address, without brackets for IPv6. The buffer is owned by the

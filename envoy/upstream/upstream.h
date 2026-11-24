@@ -143,16 +143,19 @@ public:
                              std::optional<std::string> cluster_name) const PURE;
 
   /**
-   * Like createLocalAddressSelector(), but also receives the selector's typed config and the server
-   * context. Envoy always calls this one. Override it when the selector needs its configuration.
-   * The default ignores both and calls createLocalAddressSelector().
+   * Like createLocalAddressSelector(), but also receives the selector's typed config, the server
+   * context and the cluster's stats scope. Envoy always calls this one. Override it when the
+   * selector needs any of them. The default ignores them and calls createLocalAddressSelector().
    * @param config is ``local_address_selector.typed_config`` unpacked into the message returned by
    *   createEmptyConfigProto(). It is not unpacked if that message is ``google.protobuf.Empty``.
    * @param context is the server factory context.
+   * @param stats_scope is the stats scope of the cluster that the selector is created for. It
+   *   outlives the selector.
    */
   virtual absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>
   createLocalAddressSelectorWithConfig(const Protobuf::Message& /*config*/,
                                        Server::Configuration::ServerFactoryContext& /*context*/,
+                                       Stats::Scope& /*stats_scope*/,
                                        std::vector<UpstreamLocalAddress> upstream_local_addresses,
                                        std::optional<std::string> cluster_name) const {
     return createLocalAddressSelector(std::move(upstream_local_addresses), std::move(cluster_name));

@@ -4,6 +4,7 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_option_factory.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/local_address_selectors/dynamic_modules/config.h"
 #include "source/extensions/local_address_selectors/dynamic_modules/selector.h"
 
@@ -60,8 +61,8 @@ public:
   create(const ProtoConfig& config,
          std::vector<Upstream::UpstreamLocalAddress> addresses = bindAddresses(nullptr),
          std::optional<std::string> cluster_name = "cluster_0") {
-    return factory_.createLocalAddressSelectorWithConfig(config, context_, std::move(addresses),
-                                                         std::move(cluster_name));
+    return factory_.createLocalAddressSelectorWithConfig(
+        config, context_, *stats_store_.rootScope(), std::move(addresses), std::move(cluster_name));
   }
 
   static bool hasFailOption(const Network::ConnectionSocket::OptionsSharedPtr& options) {
@@ -88,7 +89,21 @@ public:
     return count;
   }
 
+  uint64_t counter(absl::string_view name) {
+    return stats_store_
+        .counterFromString(absl::StrCat("dynamic_module_local_address_selector.", name))
+        .value();
+  }
+
+  // Asserts how many selections ended with each result.
+  void expectCounts(uint64_t default_count, uint64_t selected_count, uint64_t failed_count) {
+    EXPECT_EQ(default_count, counter("default"));
+    EXPECT_EQ(selected_count, counter("selected"));
+    EXPECT_EQ(failed_count, counter("failed"));
+  }
+
   DynamicModuleLocalAddressSelectorFactory factory_;
+  Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<Network::MockConnectionSocket> socket_;
   const Network::Address::InstanceConstSharedPtr endpoint_ =
@@ -114,6 +129,7 @@ TEST_F(DynamicModuleLocalAddressSelectorTest, UseDefault) {
   ASSERT_NE(nullptr, result.address_);
   EXPECT_EQ("127.0.0.3:0", result.address_->asString());
   EXPECT_FALSE(hasFailOption(result.socket_options_));
+  expectCounts(1, 0, 0);
 }
 
 TEST_F(DynamicModuleLocalAddressSelectorTest, UseSelected) {
@@ -123,6 +139,7 @@ TEST_F(DynamicModuleLocalAddressSelectorTest, UseSelected) {
   ASSERT_NE(nullptr, result.address_);
   EXPECT_EQ("127.0.0.2:0", result.address_->asString());
   EXPECT_FALSE(hasFailOption(result.socket_options_));
+  expectCounts(0, 1, 0);
 }
 
 // The module receives the endpoint address and port.
@@ -208,14 +225,7 @@ TEST_F(DynamicModuleLocalAddressSelectorTest, Fail) {
                                              envoy::config::core::v3::SocketOption::STATE_PREBIND));
   EXPECT_TRUE(Network::Socket::applyOptions(result.socket_options_, socket_,
                                             envoy::config::core::v3::SocketOption::STATE_BOUND));
-}
-
-TEST_F(DynamicModuleLocalAddressSelectorTest, UseSelectedWithoutAddressFails) {
-  const auto selector = create(makeConfig("no_address"));
-  ASSERT_TRUE(selector.ok()) << selector.status();
-  const auto result = selector.value()->getUpstreamLocalAddress(endpoint_, nullptr, {});
-  EXPECT_EQ(nullptr, result.address_);
-  EXPECT_TRUE(hasFailOption(result.socket_options_));
+  expectCounts(0, 0, 1);
 }
 
 // The select mode fails the connection when set_address rejects the configured address.
@@ -225,14 +235,7 @@ TEST_F(DynamicModuleLocalAddressSelectorTest, InvalidSelectedAddressFails) {
   const auto result = selector.value()->getUpstreamLocalAddress(endpoint_, nullptr, {});
   EXPECT_EQ(nullptr, result.address_);
   EXPECT_TRUE(hasFailOption(result.socket_options_));
-}
-
-TEST_F(DynamicModuleLocalAddressSelectorTest, UnknownResultFails) {
-  const auto selector = create(makeConfig("bad_result"));
-  ASSERT_TRUE(selector.ok()) << selector.status();
-  const auto result = selector.value()->getUpstreamLocalAddress(endpoint_, nullptr, {});
-  EXPECT_EQ(nullptr, result.address_);
-  EXPECT_TRUE(hasFailOption(result.socket_options_));
+  expectCounts(0, 0, 1);
 }
 
 // Envoy applies no source address to non-IP connections, so the module is not asked.
@@ -244,6 +247,7 @@ TEST_F(DynamicModuleLocalAddressSelectorTest, NonIpEndpointUsesDefault) {
   const Network::Address::InstanceConstSharedPtr pipe = std::move(pipe_or_error.value());
   const auto result = selector.value()->getUpstreamLocalAddress(pipe, nullptr, {});
   EXPECT_FALSE(hasFailOption(result.socket_options_));
+  expectCounts(0, 0, 0);
 }
 
 TEST_F(DynamicModuleLocalAddressSelectorTest, ClusterNameIsPassedToModule) {

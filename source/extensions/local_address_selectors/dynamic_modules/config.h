@@ -27,6 +27,7 @@ public:
   absl::StatusOr<Upstream::UpstreamLocalAddressSelectorConstSharedPtr>
   createLocalAddressSelectorWithConfig(
       const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context,
+      Stats::Scope& stats_scope,
       std::vector<Upstream::UpstreamLocalAddress> upstream_local_addresses,
       std::optional<std::string> cluster_name) const override;
 

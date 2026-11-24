@@ -4539,13 +4539,13 @@ public:
     return absl::InternalError("createLocalAddressSelectorWithConfig was not called");
   }
 
-  absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>
-  createLocalAddressSelectorWithConfig(const Protobuf::Message& config,
-                                       Server::Configuration::ServerFactoryContext& context,
-                                       std::vector<UpstreamLocalAddress> upstream_local_addresses,
-                                       std::optional<std::string> cluster_name) const override {
+  absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr> createLocalAddressSelectorWithConfig(
+      const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context,
+      Stats::Scope& stats_scope, std::vector<UpstreamLocalAddress> upstream_local_addresses,
+      std::optional<std::string> cluster_name) const override {
     config_value_ = dynamic_cast<const Protobuf::StringValue&>(config).value();
     context_ = &context;
+    stats_scope_ = &stats_scope;
     cluster_name_ = cluster_name;
     return TestUpstreamLocalAddressSelectorFactory().createLocalAddressSelector(
         std::move(upstream_local_addresses), std::move(cluster_name));
@@ -4559,11 +4559,12 @@ public:
 
   mutable std::string config_value_;
   mutable Server::Configuration::ServerFactoryContext* context_{};
+  mutable Stats::Scope* stats_scope_{};
   mutable std::optional<std::string> cluster_name_;
 };
 
 // A selector factory that overrides createLocalAddressSelectorWithConfig() gets its unpacked
-// typed_config, the server context, and the cluster name.
+// typed_config, the server context, the cluster's stats scope, and the cluster name.
 TEST_F(StaticClusterImplTest, LocalAddressSelectorReceivesConfig) {
   ConfigRecordingLocalAddressSelectorFactory factory;
   Registry::InjectFactory<UpstreamLocalAddressSelectorFactory> registration(factory);
@@ -4584,6 +4585,7 @@ TEST_F(StaticClusterImplTest, LocalAddressSelectorReceivesConfig) {
 
   EXPECT_EQ("selector-config", factory.config_value_);
   EXPECT_EQ(&server_context_, factory.context_);
+  EXPECT_EQ(&cluster->info()->statsScope(), factory.stats_scope_);
   EXPECT_EQ("staticcluster", factory.cluster_name_);
   Network::Address::InstanceConstSharedPtr remote_address =
       std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
