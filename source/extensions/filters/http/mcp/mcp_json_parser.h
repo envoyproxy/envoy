@@ -14,6 +14,8 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 
+#include "nlohmann/json_fwd.hpp"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -260,6 +262,10 @@ public:
 
   // Finish parsing
   absl::Status finishParse();
+
+  // Extracts from a document another parser already read. Returns false if that parser left a
+  // value out of the document, marked by a node that is not JSON: the value reads as absent.
+  bool parseDocument(const nlohmann::json& document);
 
   // Check if this is a valid MCP request
   bool isValidMcpRequest() const;

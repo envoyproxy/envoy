@@ -12,6 +12,10 @@ The MCP HTTP filter enables native Model Context Protocol support within Envoy.
 
    The MCP filter is actively under development.
 
+The same inspection is available as the ``envoy.http.ai_filters.mcp`` :ref:`AI filter
+<config_http_filters_ai_protocol_manager_mcp>` of the AI Protocol Manager, which takes the same
+configuration.
+
 This filter allows Envoy to function as an MCP gateway, enabling two deployment patterns:
 
 Pass-Through MCP Gateway

@@ -11,6 +11,7 @@
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -2301,6 +2302,66 @@ TEST(McpJsonParserMemoryTest, HeavyObjectFieldsUnorderedMethod) {
 
     EXPECT_LT(heap_bytes, static_cast<int64_t>(body.size() * 2));
   }
+}
+
+// A parsed document yields what the streaming parser reads from the same bytes.
+TEST_F(McpJsonParserTest, ParseDocumentMatchesStreamingParse) {
+  McpParserConfig config = McpParserConfig::createDefault();
+  config.addMethodConfig("custom/method", {McpParserConfig::AttributeExtractionRule("params.flag"),
+                                           McpParserConfig::AttributeExtractionRule("params.big"),
+                                           McpParserConfig::AttributeExtractionRule("params.ratio"),
+                                           McpParserConfig::AttributeExtractionRule("params.none"),
+                                           McpParserConfig::AttributeExtractionRule("params.ref")});
+  for (const std::string json : {
+           R"({"jsonrpc":"2.0","id":-3,"method":"custom/method","params":{"flag":true,)"
+           R"("big":18446744073709551615,"ratio":0.5,"none":null,"ref":{"type":"x"},)"
+           R"("list":[{"name":"skipped"}],"_meta":{"traceparent":"t"}}})",
+           R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"tool"}})",
+           R"({"jsonrpc":"2.0","method":"notifications/initialized"})",
+           R"({"jsonrpc":"2.0","id":1,"result":{"content":[]}})",
+           R"({"jsonrpc":"1.0","id":1,"method":"tools/list"})",
+           R"({"":{"jsonrpc":"2.0"},"method":"tools/list"})",
+           R"([{"jsonrpc":"2.0","id":1,"method":"tools/list"}])",
+           R"("tools/list")",
+       }) {
+    SCOPED_TRACE(json);
+    McpJsonParser streaming(config);
+    EXPECT_OK(streaming.parse(json));
+    EXPECT_OK(streaming.finishParse());
+
+    McpJsonParser document(config);
+    EXPECT_TRUE(document.parseDocument(nlohmann::json::parse(json)));
+
+    EXPECT_EQ(document.isValidMcpRequest(), streaming.isValidMcpRequest());
+    EXPECT_EQ(document.isResponse(), streaming.isResponse());
+    EXPECT_EQ(document.getMethod(), streaming.getMethod());
+    EXPECT_EQ(document.hasAllRequiredFields(), streaming.hasAllRequiredFields());
+    EXPECT_FALSE(document.hasDuplicateKeys());
+    EXPECT_TRUE(TestUtility::protoEqual(document.metadata(), streaming.metadata()))
+        << document.metadata().DebugString() << streaming.metadata().DebugString();
+  }
+}
+
+// A node that is not JSON stands for a value the document's parser left out.
+TEST_F(McpJsonParserTest, ParseDocumentReportsValuesLeftOut) {
+  nlohmann::json document =
+      nlohmann::json::parse(R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{}})");
+  document["params"]["name"] = nlohmann::json::binary({0x01});
+  document["params"]["arguments"] = nlohmann::json(nlohmann::json::value_t::discarded);
+
+  EXPECT_FALSE(parser_->parseDocument(document));
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), "tools/call");
+  EXPECT_EQ(parser_->getNestedValue("params.name"), nullptr);
+}
+
+TEST_F(McpJsonParserTest, ParseDocumentReplacesAnEarlierParse) {
+  parseJson(R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"first"}})");
+
+  EXPECT_TRUE(parser_->parseDocument(
+      nlohmann::json::parse(R"({"jsonrpc":"2.0","id":2,"method":"tools/list"})")));
+  EXPECT_EQ(parser_->getMethod(), "tools/list");
+  EXPECT_EQ(parser_->getNestedValue("params.name"), nullptr);
 }
 
 } // namespace

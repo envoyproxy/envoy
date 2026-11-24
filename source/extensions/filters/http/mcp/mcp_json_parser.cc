@@ -4,6 +4,7 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,6 +12,53 @@ namespace HttpFilters {
 namespace Mcp {
 
 using namespace Filters::Common::Mcp::McpConstants;
+
+namespace {
+
+// Replays `value` to `extractor` as a streaming parser would report it. Returns false if `value`
+// holds a node that is not JSON.
+bool renderJson(absl::string_view name, const nlohmann::json& value, McpFieldExtractor& extractor) {
+  switch (value.type()) {
+  case nlohmann::json::value_t::object: {
+    bool complete = true;
+    extractor.StartObject(name);
+    for (const auto& [key, member] : value.items()) {
+      complete = renderJson(key, member, extractor) && complete;
+    }
+    extractor.EndObject();
+    return complete;
+  }
+  case nlohmann::json::value_t::array:
+    // The extractor reads nothing inside an array.
+    extractor.StartList(name);
+    extractor.EndList();
+    break;
+  case nlohmann::json::value_t::string:
+    extractor.RenderString(name, value.get_ref<const std::string&>());
+    break;
+  case nlohmann::json::value_t::boolean:
+    extractor.RenderBool(name, value.get<bool>());
+    break;
+  case nlohmann::json::value_t::number_integer:
+    extractor.RenderInt64(name, value.get<int64_t>());
+    break;
+  case nlohmann::json::value_t::number_unsigned:
+    extractor.RenderUint64(name, value.get<uint64_t>());
+    break;
+  case nlohmann::json::value_t::number_float:
+    extractor.RenderDouble(name, value.get<double>());
+    break;
+  case nlohmann::json::value_t::null:
+    extractor.RenderNull(name);
+    break;
+  case nlohmann::json::value_t::binary:
+  case nlohmann::json::value_t::discarded:
+    return false;
+  }
+  return true;
+}
+
+} // namespace
 
 void McpParserConfig::addMethodConfig(absl::string_view method,
                                       std::vector<AttributeExtractionRule> fields) {
@@ -871,6 +919,16 @@ absl::Status McpJsonParser::finishParse() {
   auto status = stream_parser_->FinishParse();
   extractor_->finalizeExtraction();
   return status;
+}
+
+bool McpJsonParser::parseDocument(const nlohmann::json& document) {
+  reset();
+  extractor_ = std::make_unique<McpFieldExtractor>(metadata_, config_);
+  const bool complete = renderJson("", document, *extractor_);
+  if (!extractor_->shouldStopParsing()) {
+    extractor_->finalizeExtraction();
+  }
+  return complete;
 }
 
 bool McpJsonParser::isValidMcpRequest() const { return extractor_ && extractor_->isValidMcp(); }
