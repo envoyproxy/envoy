@@ -672,8 +672,9 @@ bool ActiveStreamDecoderFilter::shouldLoadShed() const { return parent_.shouldLo
 void ActiveStreamDecoderFilter::modifyDecodingBuffer(
     std::function<void(Buffer::Instance&)> callback) {
   PerFilterBufferTracker::ActiveFilterScope buffer_scope(parent_.request_buffer_tracker_, *this);
-  // With per-filter buffer, the filter only modifies the data it holds itself.
-  ASSERT(parent_.per_filter_buffer_ || parent_.state_.latest_data_decoding_filter_ == this);
+  // With the per-filter buffer each filter only modifies the data it holds itself. The legacy
+  // shared-buffer model has no single owner - any filter in the chain may modify the shared
+  // buffer (e.g. a Wasm filter via getBuffer()), so no latest-data-filter constraint applies.
   if (parent_.per_filter_buffer_ && bufferedData() == nullptr) {
     IS_ENVOY_BUG("modifyDecodingBuffer() called by a filter that holds no buffered data");
     return;
@@ -2444,8 +2445,9 @@ const Buffer::Instance* ActiveStreamEncoderFilter::encodingBuffer() { return buf
 void ActiveStreamEncoderFilter::modifyEncodingBuffer(
     std::function<void(Buffer::Instance&)> callback) {
   PerFilterBufferTracker::ActiveFilterScope buffer_scope(parent_.response_buffer_tracker_, *this);
-  // With per-filter buffer, the filter only modifies the data it holds itself.
-  ASSERT(parent_.per_filter_buffer_ || parent_.state_.latest_data_encoding_filter_ == this);
+  // With the per-filter buffer each filter only modifies the data it holds itself. The legacy
+  // shared-buffer model has no single owner - any filter in the chain may modify the shared
+  // buffer, so no latest-data-filter constraint applies.
   if (parent_.per_filter_buffer_ && bufferedData() == nullptr) {
     IS_ENVOY_BUG("modifyEncodingBuffer() called by a filter that holds no buffered data");
     return;
