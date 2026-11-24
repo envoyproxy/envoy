@@ -918,7 +918,10 @@ public:
    * This routine is called by StreamFilterSidestreamWatermarkCallbacks to stop subscribing a
    * side-stream to watermark events on the downstream stream and downstream connection.
    *
-   * It is not safe to call this from under the stack of a DownstreamWatermarkCallbacks callback.
+   * It is not safe to call this from within onAboveWriteBufferHighWatermark() or
+   * onBelowWriteBufferLowWatermark() of a registered sidestream callback, as FilterManager
+   * iterates sidestream_watermark_callbacks_ directly and removal also synchronously unwinds
+   * outstanding low-watermark callbacks.
    */
   virtual void removeSidestreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) {}
 
