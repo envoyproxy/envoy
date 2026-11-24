@@ -12,7 +12,10 @@ envoy_cc_test(
     name = "reverse_connection_utility_test",
     size = "medium",
     srcs = ["reverse_connection_utility_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:connection_lib",

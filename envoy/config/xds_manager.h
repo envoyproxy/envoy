@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -11,6 +12,7 @@
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -62,6 +64,14 @@ public:
    * `default_config_source` in the bootstrap.
    */
   virtual void startXdstpAdsMuxes() PURE;
+
+  /**
+   * Registers a tracker alongside the bootstrap-configured tracker. Destroying the returned handle
+   * unregisters it. Both operations run on the main thread. The tracker must outlive the handle.
+   * Trackers removed during a callback are skipped; new trackers wait until the next notification.
+   */
+  ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
+  addXdsConfigTracker(XdsConfigTracker& tracker) PURE;
 
   /**
    * Subscription to a singleton resource.

@@ -15,7 +15,7 @@ envoy_cc_test(
         ":configs",
     ],
     deps = [
-        "//test/tools/schema_validator:schema_validator_lib",
+        "//tools/schema_validator:schema_validator_lib",
     ],
 )
 

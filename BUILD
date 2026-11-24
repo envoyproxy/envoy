@@ -48,7 +48,10 @@ package_group(
         "//test/server",
         "//test/server/config_validation",
         "//test/tools/...",
+        "//tools/config_load_check",
         "//tools/extensions/...",
+        "//tools/router_check",
+        "//tools/schema_validator",
     ],
 )
 

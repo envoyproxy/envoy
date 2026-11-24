@@ -143,6 +143,7 @@ envoy_cc_library(
         "//source/common/network:connection_socket_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/network:filter_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tls:ssl_handshaker_lib",

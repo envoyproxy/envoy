@@ -72,7 +72,7 @@ public:
     TRY_ASSERT_MAIN_THREAD { handleGoodResponse(response); }
     END_TRY
     CATCH(const EnvoyException& e, {
-      if (xds_config_tracker_.has_value()) {
+      if (xds_config_tracker_.has_value() && xds_config_tracker_->enabled()) {
         xds_config_tracker_->onConfigRejected(response,
                                               Config::Utility::truncateGrpcStatusMessage(e.what()));
       }

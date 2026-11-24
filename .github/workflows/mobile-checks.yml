@@ -1,0 +1,185 @@
+name: Mobile/Checks
+
+permissions:
+  contents: read
+
+on:
+  workflow_run:
+    workflows:
+    - Request
+    types:
+    - completed
+
+concurrency:
+  group: >-
+    ${{ ((github.event.workflow_run.head_branch == 'main'
+          || startsWith(github.event.workflow_run.head_branch, 'release/v'))
+          && github.event.repository.full_name == github.repository)
+        && github.run_id
+        || github.event.workflow_run.head_branch }}-${{ github.event.repository.full_name }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+
+jobs:
+  load:
+    secrets:
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
+    if: |
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.repository.full_name == github.repository
+      && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+    uses: ./.github/workflows/_load.yml
+    with:
+      check-name: mobile-checks
+
+  checks:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    name: Mobile checks (${{ matrix.name }})
+    uses: ./.github/workflows/_mobile_container_ci.yml
+    if: >-
+      ${{ needs.load.outputs.request
+          && (fromJSON(needs.load.outputs.request).run.mobile-asan
+              || fromJSON(needs.load.outputs.request).run.mobile-cc
+              || fromJSON(needs.load.outputs.request).run.mobile-coverage
+              || fromJSON(needs.load.outputs.request).run.mobile-format
+              || fromJSON(needs.load.outputs.request).run.mobile-python
+              || fromJSON(needs.load.outputs.request).run.mobile-tsan) }}
+    needs: load
+    with:
+      args: ${{ matrix.args }}
+      bind-mount: ${{ ! matrix.no-bind-mount }}
+      command: ${{ matrix.command || 'bazel' }}
+      container: ${{ matrix.container }}
+      request: ${{ needs.load.outputs.request }}
+      skip: ${{ ! fromJSON(needs.load.outputs.request).run[matrix.run] }}
+      source: ${{ matrix.source }}
+      steps-post: ${{ matrix.steps-post }}
+      target: ${{ matrix.target }}
+      timeout-minutes: ${{ matrix.timeout-minutes || 60 }}
+      uploads: ${{ matrix.uploads }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: asan
+          args: >-
+            test
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-asan
+            //test/common/...
+          no-bind-mount: true
+          run: mobile-asan
+          target: asan
+          timeout-minutes: 180
+        - name: cc-tests
+          args: >-
+            test
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-cc
+            //test/cc/... //test/common/...
+          no-bind-mount: true
+          run: mobile-cc
+          target: cc-tests
+        - name: cc-xds-integration-tests
+          args: >-
+            test
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-cc-xds-enabled
+            //test/common/integration/...
+          run: mobile-cc
+          target: cc-xds-integration-tests
+        - name: Running mobile coverage
+          args: >-
+            //test/common/...
+            //test/cc/...
+          command: ../test/run_envoy_bazel_coverage.sh
+          run: mobile-coverage
+          source: |
+            export BAZEL_BUILD_OPTION_LIST="--config=ci --config=mobile-rbe --config=mobile-coverage"
+          steps-post: |
+            - name: Package coverage
+              shell: bash
+              run: |
+                cd mobile
+                tar -czf coverage.tar.gz generated/coverage
+          target: mobile-coverage
+          timeout-minutes: 120
+          uploads: |
+            coverage.tar.gz: {path: ${{ github.workspace }}/mobile/coverage.tar.gz, compression-level: 0}
+        - name: Format all
+          args: check
+          command: ./tools/check_format.sh
+          run: mobile-format
+          target: format-all
+          timeout-minutes: 45
+        - name: Swift lint
+          args: >-
+            lint
+            --strict
+          command: swiftlint
+          container: >-
+            ghcr.io/realm/swiftlint:0.50.3
+          run: mobile-format
+          target: swift-lint
+          timeout-minutes: 45
+        - name: python-tests
+          args: >-
+            test
+            --config=ci
+            --config=mobile-rbe
+            //test/python/...
+          no-bind-mount: true
+          run: mobile-python
+          target: python-tests
+        - name: tsan
+          args: >-
+            test
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-tsan
+            //test/common/...
+            //test/cc/...
+          run: mobile-tsan
+          target: tsan
+          timeout-minutes: 90
+
+  request:
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    if: |
+      always()
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.repository.full_name == github.repository
+      && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      && needs.load.outputs.request
+      && (fromJSON(needs.load.outputs.request).run.mobile-asan
+          || fromJSON(needs.load.outputs.request).run.mobile-cc
+          || fromJSON(needs.load.outputs.request).run.mobile-coverage
+          || fromJSON(needs.load.outputs.request).run.mobile-format
+          || fromJSON(needs.load.outputs.request).run.mobile-python
+          || fromJSON(needs.load.outputs.request).run.mobile-tsan)
+    needs:
+    - load
+    - checks
+    uses: ./.github/workflows/_finish.yml
+    with:
+      needs: ${{ toJSON(needs) }}

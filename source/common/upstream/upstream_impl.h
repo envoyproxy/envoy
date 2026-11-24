@@ -183,7 +183,10 @@ public:
     return endpoint_metadata_;
   }
   std::size_t metadataHash() const override {
-    absl::ReaderMutexLock lock(metadata_mutex_);
+    absl::MutexLock lock(metadata_mutex_);
+    if (endpoint_metadata_hash_ == 0 && endpoint_metadata_ != nullptr) {
+      endpoint_metadata_hash_ = MessageUtil::hash(*endpoint_metadata_);
+    }
     return endpoint_metadata_hash_;
   }
   void metadata(MetadataConstSharedPtr new_metadata) override {
@@ -191,7 +194,7 @@ public:
     {
       absl::WriterMutexLock lock(metadata_mutex_);
       endpoint_metadata_ = new_metadata;
-      endpoint_metadata_hash_ = new_metadata ? MessageUtil::hash(*new_metadata) : 0;
+      endpoint_metadata_hash_ = 0;
       // Update data members dependent on metadata.
       socket_factory_ = new_socket_factory;
     }
@@ -300,7 +303,8 @@ private:
   std::atomic<bool> canary_;
   mutable absl::Mutex metadata_mutex_;
   MetadataConstSharedPtr endpoint_metadata_ ABSL_GUARDED_BY(metadata_mutex_);
-  std::size_t endpoint_metadata_hash_ ABSL_GUARDED_BY(metadata_mutex_){0};
+  // Zero until metadataHash() computes it.
+  mutable std::size_t endpoint_metadata_hash_ ABSL_GUARDED_BY(metadata_mutex_){0};
   const MetadataConstSharedPtr locality_metadata_;
   const std::shared_ptr<const envoy::config::core::v3::Locality> locality_;
   Stats::StatNameDynamicStorage locality_zone_stat_name_;

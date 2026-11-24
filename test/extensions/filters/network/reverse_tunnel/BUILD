@@ -21,7 +21,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.reverse_tunnel"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/common:cleanup_lib",
         "//source/extensions/filters/network/reverse_tunnel:config",
@@ -38,7 +44,14 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.reverse_tunnel"],
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     shard_count = 4,
     deps = [
@@ -84,13 +97,16 @@ envoy_extension_cc_test(
         "envoy.bootstrap.internal_listener",
         "envoy.resolvers.reverse_connection",
         "envoy.filters.network.echo",
+        "envoy.upstreams.http.reverse_tunnel",
     ],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         ":jwt_test_data_lib",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
@@ -102,11 +118,14 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/reverse_tunnel/drain_aware_hcm:drain_aware_config",
         "//source/extensions/filters/network/set_filter_state:config",
         "//source/extensions/transport_sockets/internal_upstream:config",
+        "//source/extensions/upstreams/http/reverse_tunnel:config",
         "//test/common/http/http2:http2_frame",
         "//test/integration:integration_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",

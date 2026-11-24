@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 35]
+// [#next-free-field: 36]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -317,6 +317,26 @@ message ExtAuthz {
   // It is set to ``false`` by default for backwards compatibility.
   bool encode_raw_headers = 23;
 
+  // Whether to read header values from :ref:`HeaderValue.raw_value
+  // <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` in gRPC authorization responses
+  // (:ref:`CheckResponse <envoy_v3_api_msg_service.auth.v3.CheckResponse>`).
+  //
+  // When set to ``true``, each header value in gRPC ``OK``, ``denied``, and ``error`` responses is
+  // read from ``HeaderValue.raw_value`` when non-empty, falling back to
+  // :ref:`HeaderValue.value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` when
+  // ``raw_value`` is empty. This allows gRPC authorization servers to return non-UTF-8 header
+  // values while remaining compatible with servers that populate ``value``.
+  //
+  // When set to ``false``, only ``HeaderValue.value`` is read and ``HeaderValue.raw_value`` is
+  // ignored.
+  //
+  // .. note::
+  //   This field applies exclusively to the gRPC ext_authz service and has no effect on the HTTP
+  //   service.
+  //
+  // Defaults to ``false``.
+  bool read_raw_header_value = 35;
+
   // Rules for what modifications an ext_authz server may make to the request headers before
   // continuing decoding or forwarding upstream.
   //
@@ -451,7 +471,10 @@ message ShadowDecision {
 
   // Response headers the auth server asked to set on a denied response
   // (e.g. ``WWW-Authenticate``, ``Set-Cookie``). Populated for ``DENIED`` only.
-  // Preserves ordering and duplicate header names.
+  // Preserves ordering and duplicate header names. For each header,
+  // :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` is populated for valid
+  // UTF-8 values, and :ref:`raw_value
+  // <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` is populated for non-UTF-8 values.
   repeated config.core.v3.HeaderValue response_headers = 3;
 }
 

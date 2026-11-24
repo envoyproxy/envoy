@@ -361,7 +361,7 @@ void DynamicModuleListenerWriter::loseOwnership(absl::string_view listener_name,
                                                 absl::string_view error_details) {
   ENVOY_LOG(warn, "dynamic module listener writer {} no longer owns listener {}: {}", config_name_,
             listener_name, error_details);
-  stats_.ownership_lost_.inc();
+  stats_.ownership_lost_->inc();
   completeWarmingUpdate(listener_name, state, WriteOutcome::OwnershipLost, error_details);
   forgetListener(listener_name, state);
 }

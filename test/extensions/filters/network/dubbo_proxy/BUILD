@@ -71,7 +71,11 @@ envoy_extension_cc_test(
     name = "dubbo_protocol_impl_test",
     srcs = ["dubbo_protocol_impl_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         ":mocks_lib",
         ":utility_lib",
@@ -85,8 +89,8 @@ envoy_extension_cc_test(
     srcs = ["dubbo_hessian2_serializer_impl_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
     },
     deps = [
         ":mocks_lib",
@@ -101,7 +105,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":mocks_lib",
         ":utility_lib",
@@ -129,7 +139,13 @@ envoy_extension_cc_test(
     name = "route_matcher_test",
     srcs = ["route_matcher_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
         "//source/extensions/filters/network/dubbo_proxy/router:route_matcher",
@@ -142,7 +158,13 @@ envoy_extension_cc_test(
     name = "router_test",
     srcs = ["router_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":mocks_lib",
         ":utility_lib",
@@ -160,7 +182,10 @@ envoy_extension_cc_test(
     name = "app_exception_test",
     srcs = ["app_exception_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":mocks_lib",
         ":utility_lib",
@@ -176,7 +201,10 @@ envoy_extension_cc_test(
     name = "heartbeat_response_test",
     srcs = ["heartbeat_response_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":mocks_lib",
         ":utility_lib",
@@ -191,7 +219,13 @@ envoy_extension_cc_test(
     name = "router_filter_config_test",
     srcs = ["router_filter_config_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":mocks_lib",
         "//source/extensions/filters/network/dubbo_proxy/router:config",
@@ -204,7 +238,10 @@ envoy_extension_cc_test(
     name = "decoder_test",
     srcs = ["decoder_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":mocks_lib",
         ":utility_lib",
@@ -217,7 +254,17 @@ envoy_extension_cc_test(
     name = "conn_manager_test",
     srcs = ["conn_manager_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":mocks_lib",
         ":utility_lib",

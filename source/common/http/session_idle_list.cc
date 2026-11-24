@@ -25,8 +25,8 @@ void SessionIdleList::RemoveSession(IdleSessionInterface& session) {
 void SessionIdleList::MaybeTerminateIdleSessions(bool is_saturated) {
   const size_t max_sessions_to_terminate =
       std::min(MaxSessionsToTerminateInOneRound(is_saturated), idle_sessions_.size());
-  size_t num_terminated;
-  for (num_terminated = 0; num_terminated < max_sessions_to_terminate; ++num_terminated) {
+  size_t num_terminated = 0;
+  for (; num_terminated < max_sessions_to_terminate; ++num_terminated) {
     IdleSessionInterface& next_session = idle_sessions_.next_session_to_terminate();
     absl::Duration time_since_enqueue = absl::FromChrono(
         dispatcher_.approximateMonotonicTime() - idle_sessions_.GetEnqueueTime(next_session));
@@ -37,6 +37,9 @@ void SessionIdleList::MaybeTerminateIdleSessions(bool is_saturated) {
     // The class implementing IdleSessionInterface may or may not remove itself
     // from the idle list. We remove it here to be sure.
     idle_sessions_.RemoveSessionFromList(next_session);
+  }
+  if (num_terminated > 0) {
+    stats_.downstream_cx_overload_close_idle_.add(num_terminated);
   }
   ENVOY_LOG(debug, "Terminated {} idle sessions.", num_terminated);
 };

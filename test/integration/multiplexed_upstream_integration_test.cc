@@ -4,6 +4,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/http/header_map_impl.h"
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/envoy_quic_server_crypto_stream_factory.h"
@@ -17,6 +18,7 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/match.h"
 #include "gtest/gtest.h"
 
 using testing::Eq;
@@ -601,7 +603,45 @@ TEST_P(MultiplexedUpstreamIntegrationTest, NoInitialStreams) {
   envoy::config::listener::v3::QuicProtocolOptions options;
   options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(0);
   mergeOptions(options);
+  // The retries below can open further HTTP/3 connections, which resume with 0-RTT. Until its
+  // handshake completes, such a connection is ready for early data without knowing the cached
+  // stream limit of 0, so a retry landing then is sent beyond the limit and fails a QUICHE_BUG.
+  // Disable early data, so that the retries wait for the handshake.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* early_data_policy = hcm.mutable_route_config()
+                                      ->mutable_virtual_hosts(0)
+                                      ->mutable_routes(0)
+                                      ->mutable_route()
+                                      ->mutable_early_data_policy();
+        envoy::extensions::early_data::v3::DefaultEarlyDataPolicy config;
+        early_data_policy->set_name("envoy.route.early_data_policy.default");
+        std::ignore = early_data_policy->mutable_typed_config()->PackFrom(config);
+      });
   initialize();
+
+  // This test flakes, rarely and so far only in CI: the client gets a 504, or no response, after
+  // the upstream has answered. If it fails, print the upstream cluster's stats, which say how many
+  // connections (and 0-RTT connections) were opened, and how the tries ended.
+  Cleanup print_stats_on_failure([this]() {
+    if (!HasFailure() || test_server_ == nullptr) {
+      return;
+    }
+    const std::string prefix = "cluster.cluster_0.";
+    std::cerr << "NoInitialStreams failed, with the stats (non-zero) of the upstream cluster:"
+              << std::endl;
+    for (const auto& counter : test_server_->counters()) {
+      if (counter->value() != 0 && absl::StartsWith(counter->name(), prefix)) {
+        std::cerr << "  counter " << counter->name() << ": " << counter->value() << std::endl;
+      }
+    }
+    for (const auto& gauge : test_server_->gauges()) {
+      if (gauge->value() != 0 && absl::StartsWith(gauge->name(), prefix)) {
+        std::cerr << "  gauge " << gauge->name() << ": " << gauge->value() << std::endl;
+      }
+    }
+  });
 
   // Create the client connection and send a request.
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
@@ -800,6 +840,150 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DefaultAllowsUpstreamSafeRequestsUsin
   }
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response2->waitForEndStream());
+}
+
+// Verifies that when a 0-RTT upstream HTTP/3 connection attaches an early-data request that
+// exhausts its cached initial_max_streams_bidi (driving Http3::ActiveClient into State::Busy) and
+// the upstream subsequently advertises a higher initial_max_streams_bidi during FinishHandshake
+// before Connected is raised, Envoy transitions the client back to ReadyForEarlyData without
+// triggering an ENVOY_BUG or dispatching queued early-data requests ahead of earlier non-early-data
+// requests.
+TEST_P(MultiplexedUpstreamIntegrationTest, ZeroRttBusyClientCapacityIncreasedBeforeHandshake) {
+#ifdef WIN32
+  // TODO: debug why waiting on the 2nd upstream connection times out on Windows.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
+    return;
+  }
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* thresholds = bootstrap.mutable_static_resources()
+                           ->mutable_clusters(0)
+                           ->mutable_circuit_breakers()
+                           ->add_thresholds();
+    thresholds->set_priority(envoy::config::core::v3::RoutingPriority::DEFAULT);
+    thresholds->mutable_max_connections()->set_value(1);
+  });
+  upstreamConfig()
+      .quic_options_.mutable_quic_protocol_options()
+      ->mutable_max_concurrent_streams()
+      ->set_value(1);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Connection 1 (warm-up): populate Envoy's QUIC session cache with a ticket and cached transport
+  // parameters advertising initial_max_streams_bidi = 1.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  upstream_request_.reset();
+
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  fake_upstream_connection_.reset();
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+
+  // Replace the FakeUpstream on the same port with one advertising initial_max_streams_bidi = 2 so
+  // Envoy resumes the cached session for 0-RTT, enters State::Busy on cached max_streams = 1, and
+  // then receives max_streams = 2 during FinishHandshake before OnTlsHandshakeComplete raises
+  // Connected.
+  const uint32_t port = fake_upstreams_[0]->localAddress()->ip()->port();
+  fake_upstreams_[0].reset();
+  upstreamConfig()
+      .quic_options_.mutable_quic_protocol_options()
+      ->mutable_max_concurrent_streams()
+      ->set_value(2);
+  fake_upstreams_[0] = std::make_unique<FakeUpstream>(createUpstreamTlsContext(upstreamConfig()),
+                                                      port, version_, upstreamConfig());
+
+  IntegrationStreamDecoderPtr response_early_get;
+  IntegrationStreamDecoderPtr response_queued_post;
+  IntegrationStreamDecoderPtr response_queued_get;
+  {
+    // Hold the FakeUpstream lock so Connection 2's handshake cannot complete while we stage the
+    // 0-RTT stream (exhausting cached max_streams = 1 -> Busy) and queue [POST, GET] behind it.
+    absl::MutexLock l(fake_upstreams_[0]->lock());
+    response_early_get = codec_client_->makeHeaderOnlyRequest(
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", "/test/long/url"},
+                                       {":scheme", "http"},
+                                       {":authority", "sni.lyft.com"},
+                                       {"x-request-order", "1-early-get"}});
+    test_server_->waitForCounter("cluster.cluster_0.upstream_rq_total", Eq(2));
+    EXPECT_EQ(1u,
+              test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+    EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+
+    response_queued_post = codec_client_->makeHeaderOnlyRequest(
+        Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                       {":path", "/test/long/url"},
+                                       {":scheme", "http"},
+                                       {":authority", "sni.lyft.com"},
+                                       {"x-request-order", "2-queued-post"}});
+    test_server_->waitForGauge("cluster.cluster_0.upstream_rq_pending_active", Eq(1));
+
+    response_queued_get = codec_client_->makeHeaderOnlyRequest(
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", "/test/long/url"},
+                                       {":scheme", "http"},
+                                       {":authority", "sni.lyft.com"},
+                                       {"x-request-order", "3-queued-get"}});
+    test_server_->waitForGauge("cluster.cluster_0.upstream_rq_pending_active", Eq(2));
+  }
+
+  // Releasing the lock completes the handshake with max_streams = 2 (+1 slot). The queued POST
+  // must win that slot in FIFO order ahead of the later queued GET, without incrementing
+  // upstream_rq_0rtt.
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_total", Eq(3));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_pending_active", Eq(1));
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+
+  waitForNextUpstreamConnection(std::vector<uint64_t>{0}, TestUtility::DefaultTimeout,
+                                fake_upstream_connection_);
+  FakeStreamPtr upstream_stream1;
+  FakeStreamPtr upstream_stream2;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_stream1));
+  ASSERT_TRUE(upstream_stream1->waitForEndStream(*dispatcher_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_stream2));
+  ASSERT_TRUE(upstream_stream2->waitForEndStream(*dispatcher_));
+
+  const auto order1 = upstream_stream1->headers()
+                          .get(Http::LowerCaseString("x-request-order"))[0]
+                          ->value()
+                          .getStringView();
+  const auto order2 = upstream_stream2->headers()
+                          .get(Http::LowerCaseString("x-request-order"))[0]
+                          ->value()
+                          .getStringView();
+  // Because fake_upstreams_[0] was recreated with a fresh TLS session ticket key, 1-early-get's
+  // 0-RTT packet is rejected and retransmitted in 1-RTT alongside 2-queued-post, so the two active
+  // streams may arrive at FakeUpstream in either order while 3-queued-get remains queued.
+  EXPECT_THAT((std::vector<absl::string_view>{order1, order2}),
+              testing::UnorderedElementsAre("1-early-get", "2-queued-post"));
+
+  upstream_stream1->encodeHeaders(default_response_headers_, true);
+  upstream_stream2->encodeHeaders(default_response_headers_, true);
+
+  FakeStreamPtr upstream_stream3;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_stream3));
+  ASSERT_TRUE(upstream_stream3->waitForEndStream(*dispatcher_));
+  EXPECT_EQ("3-queued-get", upstream_stream3->headers()
+                                .get(Http::LowerCaseString("x-request-order"))[0]
+                                ->value()
+                                .getStringView());
+  upstream_stream3->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response_early_get->waitForEndStream());
+  ASSERT_TRUE(response_queued_post->waitForEndStream());
+  ASSERT_TRUE(response_queued_get->waitForEndStream());
+  EXPECT_EQ("200", response_early_get->headers().getStatusValue());
+  EXPECT_EQ("200", response_queued_post->headers().getStatusValue());
+  EXPECT_EQ("200", response_queued_get->headers().getStatusValue());
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+  EXPECT_EQ(0u, test_server_->counter("server.envoy_bug_failures")->value());
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {

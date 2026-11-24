@@ -8,7 +8,8 @@ debugging failures that involve) those areas:
 | Guide | Covers |
 |-------|--------|
 | `compat/openssl/AGENTS.md` | The OpenSSL compatibility layer (`bssl-compat`) and `--config=openssl` build failures |
-| `.github/copilot-instructions.md` | GitHub Copilot cloud agent environment setup |
+| `api/AGENTS.md` | Changing the xDS API protos, with links to the API style guide and review checklist |
+| `.github/instructions/cloud-agent.instructions.md` | GitHub Copilot cloud agent environment setup |
 
 ## Critical rules
 
