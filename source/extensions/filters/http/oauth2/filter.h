@@ -270,6 +270,7 @@ public:
   }
   FilterStats& stats() const { return stats_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
+  const std::vector<std::string>& resources() const { return resources_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
   const std::string& cookieDomain() const { return cookie_domain_; }
   // The ";domain=<cookie_domain>" cookie attribute, or empty when no cookie domain is configured.
@@ -357,6 +358,7 @@ private:
   mutable FilterStats stats_;
   const std::string encoded_auth_scopes_;
   const std::string encoded_resource_query_params_;
+  const std::vector<std::string> resources_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> pass_through_header_matchers_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> deny_redirect_header_matchers_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> allow_failed_header_matchers_;

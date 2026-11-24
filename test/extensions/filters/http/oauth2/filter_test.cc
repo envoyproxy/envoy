@@ -7922,6 +7922,16 @@ TEST_F(OAuth2ParRedirectTest, RequestIsNotForwardedUpstream) {
   filter_->onPushAuthorizationRequestSuccess();
 }
 
+// RFC 8707 resource indicators are sent to the PAR endpoint, not dropped.
+TEST_F(OAuth2ParRedirectTest, ResourcesArePushedToParEndpoint) {
+  auto p = parProtoConfig();
+  p.add_resources("https://api.example.com");
+  initPar(p);
+
+  const OAuth2Client::FormParams pushed = startParFlow();
+  EXPECT_THAT(pushed, testing::Contains(Pair("resource", "https://api.example.com")));
+}
+
 // A second success callback must not send a second response.
 TEST_F(OAuth2ParRedirectTest, RepeatedSuccessCallbackSendsOneRedirect) {
   initPar(parProtoConfig());

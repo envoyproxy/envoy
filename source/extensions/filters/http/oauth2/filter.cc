@@ -798,6 +798,7 @@ FilterConfig::FilterConfig(
       signout_path_(proto_config.signout_path(), context), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
       encoded_resource_query_params_(encodeResourceList(proto_config.resources())),
+      resources_(proto_config.resources().begin(), proto_config.resources().end()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher(), context)),
       deny_redirect_header_matchers_(headerMatchers(proto_config.deny_redirect_matcher(), context)),
       allow_failed_header_matchers_(headerMatchers(proto_config.allow_failed_matcher(), context)),
@@ -1567,6 +1568,11 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
         // values, so send the raw value here.
         par_params.emplace_back(key, key == queryParamsRedirectUri ? redirect_uri : value);
       }
+    }
+    // RFC 8707 resource indicators go to the PAR endpoint, since the browser redirect carries
+    // only client_id and request_uri.
+    for (const auto& resource : config_->resources()) {
+      par_params.emplace_back("resource", resource);
     }
     pending_par_response_headers_ = std::move(response_headers);
     oauthClient().asyncPushAuthorizationRequest(par_params, config_->clientId(),

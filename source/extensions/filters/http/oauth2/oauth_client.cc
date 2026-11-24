@@ -312,7 +312,8 @@ void OAuth2ClientImpl::handleRefreshTokenFailure(bool is_request_dispatched) {
     if (result == Http::FilterHeadersStatus::Continue) {
       decoder_callbacks_->continueDecoding();
     }
-  } else {
+  } else if (state_ != OAuthState::PendingPushedAuthorizationRequest) {
+    // With PAR the redirect was already started inline and state_ must stay pending.
     state_ = (result == Http::FilterHeadersStatus::Continue) ? OAuthState::FailureContinue
                                                              : OAuthState::FailureStop;
   }
