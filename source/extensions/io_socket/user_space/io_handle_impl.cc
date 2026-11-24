@@ -128,10 +128,10 @@ Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlic
   if (!isOpen()) {
     return {0, Network::IoSocketError::create(SOCKET_ERROR_BADF)};
   }
-  if (receive_data_reset_) {
-    return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
-  }
   if (pending_received_data_.length() == 0) {
+    if (receive_data_reset_) {
+      return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
+    }
     if (receive_data_end_stream_) {
       return {0, Api::IoError::none()};
     } else {
@@ -165,10 +165,10 @@ Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
   if (!isOpen()) {
     return {0, Network::IoSocketError::create(SOCKET_ERROR_BADF)};
   }
-  if (receive_data_reset_) {
-    return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
-  }
   if (pending_received_data_.length() == 0) {
+    if (receive_data_reset_) {
+      return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
+    }
     if (receive_data_end_stream_) {
       return {0, Api::IoError::none()};
     } else {
@@ -281,11 +281,11 @@ Api::IoCallUint64Result IoHandleImpl::recv(void* buffer, size_t length, int flag
   if (!isOpen()) {
     return {0, Network::IoSocketError::getIoSocketEbadfError()};
   }
-  if (receive_data_reset_) {
-    return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
-  }
   // No data and the writer closed.
   if (pending_received_data_.length() == 0) {
+    if (receive_data_reset_) {
+      return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
+    }
     if (receive_data_end_stream_) {
       return {0, Api::IoError::none()};
     } else {

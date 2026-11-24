@@ -1501,6 +1501,119 @@ TEST_F(IoHandleImplTest, ResetCloseEmitsEofOnReadGuardDisabled) {
   EXPECT_EQ(nullptr, read_res.err_);
 }
 
+TEST_F(IoHandleImplTest, ResetCloseDrainsPendingDataBeforeConnectionResetOnRead) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+
+  Buffer::OwnedImpl buf_to_write("hello world");
+  ASSERT_TRUE(io_handle_peer_->write(buf_to_write).ok());
+  io_handle_peer_->setAbortiveClose();
+  io_handle_peer_->close();
+
+  Buffer::OwnedImpl read_buf;
+  auto first_res = io_handle_->read(read_buf, 5);
+  EXPECT_TRUE(first_res.ok());
+  EXPECT_EQ(5, first_res.return_value_);
+  EXPECT_EQ("hello", read_buf.toString());
+
+  auto second_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(second_res.ok());
+  EXPECT_EQ(6, second_res.return_value_);
+  EXPECT_EQ("hello world", read_buf.toString());
+
+  auto reset_res = io_handle_->read(read_buf, 1024);
+  EXPECT_FALSE(reset_res.ok());
+  EXPECT_EQ(0, reset_res.return_value_);
+  ASSERT_NE(nullptr, reset_res.err_);
+  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, reset_res.err_->getErrorCode());
+}
+
+TEST_F(IoHandleImplTest, ResetCloseDrainsPendingDataBeforeConnectionResetOnReadv) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+
+  Buffer::OwnedImpl buf_to_write("hello world");
+  ASSERT_TRUE(io_handle_peer_->write(buf_to_write).ok());
+  io_handle_peer_->setAbortiveClose();
+  io_handle_peer_->close();
+
+  auto [guard1, slice1] = allocateOneSlice(5);
+  auto first_res = io_handle_->readv(5, &slice1, 1);
+  EXPECT_TRUE(first_res.ok());
+  EXPECT_EQ(5, first_res.return_value_);
+  EXPECT_EQ("hello", absl::string_view(static_cast<const char*>(slice1.mem_), 5));
+
+  auto [guard2, slice2] = allocateOneSlice(1024);
+  auto second_res = io_handle_->readv(1024, &slice2, 1);
+  EXPECT_TRUE(second_res.ok());
+  EXPECT_EQ(6, second_res.return_value_);
+  EXPECT_EQ(" world", absl::string_view(static_cast<const char*>(slice2.mem_), 6));
+
+  auto reset_res = io_handle_->readv(1024, &slice2, 1);
+  EXPECT_FALSE(reset_res.ok());
+  EXPECT_EQ(0, reset_res.return_value_);
+  ASSERT_NE(nullptr, reset_res.err_);
+  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, reset_res.err_->getErrorCode());
+}
+
+TEST_F(IoHandleImplTest, ResetCloseDrainsPendingDataBeforeConnectionResetOnRecv) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+
+  Buffer::OwnedImpl buf_to_write("hello world");
+  ASSERT_TRUE(io_handle_peer_->write(buf_to_write).ok());
+  io_handle_peer_->setAbortiveClose();
+  io_handle_peer_->close();
+
+  auto peek_res = io_handle_->recv(buf_.data(), 5, MSG_PEEK);
+  EXPECT_TRUE(peek_res.ok());
+  EXPECT_EQ(5, peek_res.return_value_);
+  EXPECT_EQ("hello", absl::string_view(buf_.data(), 5));
+
+  auto first_res = io_handle_->recv(buf_.data(), 5, 0);
+  EXPECT_TRUE(first_res.ok());
+  EXPECT_EQ(5, first_res.return_value_);
+  EXPECT_EQ("hello", absl::string_view(buf_.data(), 5));
+
+  auto second_res = io_handle_->recv(buf_.data(), buf_.size(), 0);
+  EXPECT_TRUE(second_res.ok());
+  EXPECT_EQ(6, second_res.return_value_);
+  EXPECT_EQ(" world", absl::string_view(buf_.data(), 6));
+
+  auto reset_res = io_handle_->recv(buf_.data(), buf_.size(), 0);
+  EXPECT_FALSE(reset_res.ok());
+  EXPECT_EQ(0, reset_res.return_value_);
+  ASSERT_NE(nullptr, reset_res.err_);
+  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, reset_res.err_->getErrorCode());
+}
+
+TEST_F(IoHandleImplTest, ResetCloseAfterShutdownWriteDrainsPendingDataBeforeConnectionReset) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+
+  io_handle_->shutdown(ENVOY_SHUT_WR);
+  Buffer::OwnedImpl buf_to_write("response");
+  ASSERT_TRUE(io_handle_peer_->write(buf_to_write).ok());
+  io_handle_peer_->setAbortiveClose();
+  io_handle_peer_->close();
+
+  Buffer::OwnedImpl read_buf;
+  auto read_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(read_res.ok());
+  EXPECT_EQ(8, read_res.return_value_);
+  EXPECT_EQ("response", read_buf.toString());
+
+  auto reset_res = io_handle_->read(read_buf, 1024);
+  EXPECT_FALSE(reset_res.ok());
+  EXPECT_EQ(0, reset_res.return_value_);
+  ASSERT_NE(nullptr, reset_res.err_);
+  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, reset_res.err_->getErrorCode());
+}
+
 } // namespace
 } // namespace UserSpace
 } // namespace IoSocket
