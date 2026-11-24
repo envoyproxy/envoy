@@ -22,6 +22,7 @@
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
@@ -918,12 +919,19 @@ public:
         {":method", "GET"}, {":path", "/chunks"}, {":scheme", "http"}, {":authority", "admin"}});
   }
 
-  void waitForAllChunksProduced() {
-    const MonotonicTime deadline = timeSystem().monotonicTime() + TestUtility::DefaultTimeout;
-    while (produced_.load() < NumChunks && timeSystem().monotonicTime() < deadline) {
-      timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
+  // Blocks until the main thread has run a posted callback, i.e. finished an event loop iteration.
+  void waitForMainThreadIteration() {
+    absl::Notification done;
+    test_server_->server().dispatcher().post([&done]() { done.Notify(); });
+    done.WaitForNotification();
+  }
+
+  // An unpaused response produces a chunk per event loop iteration, so this many iterations are
+  // enough to produce all of it.
+  void waitForMainThreadIterations(uint32_t iterations) {
+    for (uint32_t i = 0; i < iterations; ++i) {
+      waitForMainThreadIteration();
     }
-    ASSERT_EQ(NumChunks, produced_.load());
   }
 
   std::atomic<uint32_t> produced_{0};
@@ -941,8 +949,8 @@ TEST_P(AdminFlowControlIntegrationTest, StalledClientStopsAdminResponseProductio
 
   test_server_->waitForGauge("http.admin.downstream_cx_tx_bytes_buffered",
                              testing::Ge(BufferLimit));
-  // Give the main thread time to keep producing if nothing stopped it.
-  timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(100));
+  // Without flow control these iterations would produce the whole response.
+  waitForMainThreadIterations(2 * NumChunks);
   // A chunk is as large as the limit, so the first one already raises the high watermark.
   EXPECT_LE(produced_.load(), 2u);
   EXPECT_LE(test_server_->gauge("http.admin.downstream_cx_tx_bytes_buffered")->value(),
@@ -959,8 +967,10 @@ TEST_P(AdminFlowControlIntegrationTest, NoBufferLimitProducesWholeResponse) {
   initializeWithBufferLimit(0);
   IntegrationStreamDecoderPtr response = startStalledRequest();
 
+  test_server_->waitForGauge("http.admin.downstream_cx_tx_bytes_buffered", testing::Ge(ChunkSize));
   // Without a limit the whole response is produced even though nothing is written.
-  waitForAllChunksProduced();
+  waitForMainThreadIterations(2 * NumChunks);
+  EXPECT_EQ(NumChunks, produced_.load());
 
   write_matcher_->setResumeWrites();
   ASSERT_TRUE(response->waitForEndStream());
