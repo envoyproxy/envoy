@@ -1,6 +1,13 @@
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
+#include "envoy/api/io_error.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/event/file_event.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/router/string_accessor.h"
 #include "envoy/stream_info/stream_info.h"
@@ -15,6 +22,7 @@
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/network/io_handle.h"
 #include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
@@ -2571,6 +2579,77 @@ TEST_F(TestUpstreamSocketManager, DestructorSkipsDeferredCloseLogsWhenThreadLoca
 
   socket_manager_.reset(); // Triggers destructor.
   extension_->setTestOnlyAccessLogs({});
+}
+
+TEST_F(TestUpstreamSocketManager, OnPingResponseRearmsEmulatedEdgeReadEvent) {
+  auto* file_event = new NiceMock<Event::MockFileEvent>();
+  EXPECT_CALL(dispatcher_, createFileEvent_(123, _, Event::PlatformDefaultTriggerType, _))
+      .WillOnce(Return(file_event));
+
+  auto socket = createMockSocket(123);
+  socket_manager_->addConnectionSocket("test-node", "test-cluster", std::move(socket),
+                                       std::chrono::seconds(30));
+
+  auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
+
+  // Valid RPING, partial ping, and non-fatal invalid response all re-arm Read on emulated edge.
+  EXPECT_CALL(*mock_io_handle, read(_, _))
+      .WillOnce([](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        buffer.add("RPING");
+        return Api::IoCallUint64Result{5, Api::IoError::none()};
+      })
+      .WillOnce([](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        buffer.add("RP");
+        return Api::IoCallUint64Result{2, Api::IoError::none()};
+      })
+      .WillOnce([](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+        buffer.add("INVALID");
+        return Api::IoCallUint64Result{7, Api::IoError::none()};
+      })
+      .WillOnce(Return(Api::IoCallUint64Result{0, Api::IoError::none()}));
+
+  EXPECT_CALL(*file_event, registerEventIfEmulatedEdge(Event::FileReadyType::Read)).Times(3);
+
+  socket_manager_->onPingResponse(*mock_io_handle);
+  socket_manager_->onPingResponse(*mock_io_handle);
+  socket_manager_->onPingResponse(*mock_io_handle);
+  // Graceful close tears down the socket without re-arming.
+  socket_manager_->onPingResponse(*mock_io_handle);
+  EXPECT_FALSE(verifyFDToNodeMap(123));
+}
+
+TEST_F(TestUpstreamSocketManager, OnPingResponseStopsRearmingWhenMissThresholdMarksSocketDead) {
+  auto* file_event = new NiceMock<Event::MockFileEvent>();
+  EXPECT_CALL(dispatcher_, createFileEvent_(123, _, Event::PlatformDefaultTriggerType, _))
+      .WillOnce(Return(file_event));
+
+  auto socket = createMockSocket(123);
+  socket_manager_->addConnectionSocket("test-node", "test-cluster", std::move(socket),
+                                       std::chrono::seconds(30));
+
+  auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
+
+  // Default miss_threshold_ is 3: the first two invalid payloads re-arm Read, while the third
+  // triggers markSocketDead (erasing fd_to_event_map_[123]) so rearm_read_event is a safe no-op.
+  EXPECT_CALL(*mock_io_handle, read(_, _))
+      .Times(3)
+      .WillRepeatedly(
+          [](Buffer::Instance& buffer, std::optional<uint64_t>) -> Api::IoCallUint64Result {
+            buffer.add("WRONG");
+            return Api::IoCallUint64Result{5, Api::IoError::none()};
+          });
+
+  EXPECT_CALL(*file_event, registerEventIfEmulatedEdge(Event::FileReadyType::Read)).Times(2);
+
+  socket_manager_->onPingResponse(*mock_io_handle);
+  EXPECT_TRUE(verifyFDToEventMap(123));
+  socket_manager_->onPingResponse(*mock_io_handle);
+  EXPECT_TRUE(verifyFDToEventMap(123));
+  socket_manager_->onPingResponse(*mock_io_handle);
+  EXPECT_FALSE(verifyFDToEventMap(123));
+  EXPECT_FALSE(verifyFDToNodeMap(123));
 }
 
 TEST_F(TestUpstreamSocketManager, FindStartTimeReturnsNulloptIfNotFound) {
