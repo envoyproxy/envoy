@@ -7811,23 +7811,31 @@ TEST_F(OAuth2ParRedirectTest, OmittedParametersWerePushed) {
 
 // request_uri values with reserved characters are percent-encoded like other Envoy-built query
 // values (everything except ALPHA / DIGIT / "*" / "-" / "." / "_"), and decode back unchanged.
-TEST_F(OAuth2ParRedirectTest, RequestUriIsPercentEncoded) {
-  const std::vector<std::pair<std::string, std::string>> cases = {
-      {std::string(kRequestUri), std::string(kEncodedRequestUri)},
-      {"https://as.example.com/par/requests?id=a1&x=y#frag",
-       "https%3A%2F%2Fas.example.com%2Fpar%2Frequests%3Fid%3Da1%26x%3Dy%23frag"},
-      {"urn:example:100%25 off+plus=/~", "urn%3Aexample%3A100%2525%20off%2Bplus%3D%2F%7E"},
-  };
-  for (const auto& [request_uri, encoded] : cases) {
-    SCOPED_TRACE(request_uri);
-    initPar(parProtoConfig());
-    const std::string location = redirectLocationFor(request_uri);
-    EXPECT_EQ(absl::StrCat("https://auth.example.com/oauth/authorize/?client_id=", TEST_CLIENT_ID,
-                           "&request_uri=", encoded),
-              location);
-    const auto params = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(location);
-    EXPECT_EQ(request_uri, params.getFirstValue("request_uri").value_or(""));
-  }
+// Each case is its own test so the filter is initialized once per test.
+void expectEncodedRequestUriRedirect(OAuth2ParRedirectTest& test, const std::string& request_uri,
+                                     const std::string& encoded) {
+  test.initPar(test.parProtoConfig());
+  const std::string location = test.redirectLocationFor(request_uri);
+  EXPECT_EQ(absl::StrCat("https://auth.example.com/oauth/authorize/?client_id=", TEST_CLIENT_ID,
+                         "&request_uri=", encoded),
+            location);
+  const auto params = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(location);
+  EXPECT_EQ(request_uri, params.getFirstValue("request_uri").value_or(""));
+}
+
+TEST_F(OAuth2ParRedirectTest, RequestUriEncodesUrnColons) {
+  expectEncodedRequestUriRedirect(*this, std::string(kRequestUri), std::string(kEncodedRequestUri));
+}
+
+TEST_F(OAuth2ParRedirectTest, RequestUriEncodesUrlQueryAndFragment) {
+  expectEncodedRequestUriRedirect(
+      *this, "https://as.example.com/par/requests?id=a1&x=y#frag",
+      "https%3A%2F%2Fas.example.com%2Fpar%2Frequests%3Fid%3Da1%26x%3Dy%23frag");
+}
+
+TEST_F(OAuth2ParRedirectTest, RequestUriEncodesPercentSpacePlusAndTilde) {
+  expectEncodedRequestUriRedirect(*this, "urn:example:100%25 off+plus=/~",
+                                  "urn%3Aexample%3A100%2525%20off%2Bplus%3D%2F%7E");
 }
 
 // client_id is percent-encoded as well.
@@ -7936,7 +7944,11 @@ TEST_F(OAuth2ParRedirectTest, EmptyRequestUriFailsClosed) {
   EXPECT_CALL(*oauth_client_, pushedRequestUri()).WillRepeatedly(ReturnRef(empty));
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _,
                                                  "PAR response did not provide a request_uri"));
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce([](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("401", headers.getStatusValue());
+        EXPECT_EQ("", headers.getLocationValue());
+      });
 
   filter_->onPushAuthorizationRequestSuccess();
   EXPECT_EQ(0, config_->stats().oauth_unauthorized_rq_.value());
