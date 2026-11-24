@@ -18,6 +18,7 @@ package(default_visibility = [
     "//test/extensions/http/early_header_mutation/dynamic_modules:__pkg__",
     "//test/extensions/http/header_formatters/dynamic_modules:__pkg__",
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
+    "//test/extensions/local_address_selectors/dynamic_modules:__pkg__",
     "//test/extensions/matching/http/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
     "//test/extensions/network/dns_resolver/hickory:__pkg__",
@@ -277,6 +278,10 @@ test_program(name = "lb_no_choose_host")
 test_program(name = "lb_invalid_host_index")
 
 test_program(name = "lb_invalid_priority")
+
+test_program(name = "local_address_selector")
+
+test_program(name = "local_address_selector_missing_select")
 
 test_program(name = "matcher_no_op")
 

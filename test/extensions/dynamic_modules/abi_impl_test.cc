@@ -1178,6 +1178,10 @@ WEAK_STUB(MatcherGetHeaderValue,
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
               nullptr, 0, nullptr))
 WEAK_STUB(MatcherSetError, envoy_dynamic_module_callback_matcher_set_error(nullptr))
+
+WEAK_STUB(LocalAddressSelectorSetAddress,
+          envoy_dynamic_module_callback_local_address_selector_set_address(nullptr, {nullptr, 0},
+                                                                           0))
 WEAK_STUB(MatcherDataInputGetHeaderValue,
           envoy_dynamic_module_callback_matcher_data_input_get_header_value(
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},

@@ -4530,6 +4530,69 @@ TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {
                              .address_->asString());
 }
 
+// Records what createLocalAddressSelectorWithConfig() receives.
+class ConfigRecordingLocalAddressSelectorFactory : public UpstreamLocalAddressSelectorFactory {
+public:
+  absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>
+  createLocalAddressSelector(std::vector<UpstreamLocalAddress>,
+                             std::optional<std::string>) const override {
+    return absl::InternalError("createLocalAddressSelectorWithConfig was not called");
+  }
+
+  absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>
+  createLocalAddressSelectorWithConfig(const Protobuf::Message& config,
+                                       Server::Configuration::ServerFactoryContext& context,
+                                       std::vector<UpstreamLocalAddress> upstream_local_addresses,
+                                       std::optional<std::string> cluster_name) const override {
+    config_value_ = dynamic_cast<const Protobuf::StringValue&>(config).value();
+    context_ = &context;
+    cluster_name_ = cluster_name;
+    return TestUpstreamLocalAddressSelectorFactory().createLocalAddressSelector(
+        std::move(upstream_local_addresses), std::move(cluster_name));
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::StringValue>();
+  }
+
+  std::string name() const override { return "test.config.recording.local.address.selector"; }
+
+  mutable std::string config_value_;
+  mutable Server::Configuration::ServerFactoryContext* context_{};
+  mutable std::optional<std::string> cluster_name_;
+};
+
+// A selector factory that overrides createLocalAddressSelectorWithConfig() gets its unpacked
+// typed_config, the server context, and the cluster name.
+TEST_F(StaticClusterImplTest, LocalAddressSelectorReceivesConfig) {
+  ConfigRecordingLocalAddressSelectorFactory factory;
+  Registry::InjectFactory<UpstreamLocalAddressSelectorFactory> registration(factory);
+  envoy::config::cluster::v3::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+  auto* bind_config = config.mutable_upstream_bind_config();
+  bind_config->mutable_source_address()->set_address("1.2.3.5");
+  auto* selector_config = bind_config->mutable_local_address_selector();
+  selector_config->set_name("test.config.recording.local.address.selector");
+  Protobuf::StringValue value;
+  value.set_value("selector-config");
+  std::ignore = selector_config->mutable_typed_config()->PackFrom(value);
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
+
+  EXPECT_EQ("selector-config", factory.config_value_);
+  EXPECT_EQ(&server_context_, factory.context_);
+  EXPECT_EQ("staticcluster", factory.cluster_name_);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+  EXPECT_EQ("1.2.3.5:0", cluster->info()
+                             ->getUpstreamLocalAddressSelector()
+                             ->getUpstreamLocalAddress(remote_address, nullptr, {})
+                             .address_->asString());
+}
+
 TEST_F(StaticClusterImplTest, HappyEyeballsConfig) {
   const std::string yaml = R"EOF(
     name: name

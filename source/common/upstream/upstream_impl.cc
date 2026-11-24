@@ -426,7 +426,9 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
 absl::StatusOr<Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr>
 createUpstreamLocalAddressSelector(
     const envoy::config::cluster::v3::Cluster& cluster_config,
-    const std::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config) {
+    const std::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config,
+    Server::Configuration::ServerFactoryContext& server_context,
+    ProtobufMessage::ValidationVisitor& validation_visitor) {
 
   // Use the cluster bind config if specified. This completely overrides the
   // bootstrap bind config when present.
@@ -509,8 +511,19 @@ createUpstreamLocalAddressSelector(
           buildClusterSocketOptions(cluster_config, bootstrap_bind_config.value_or(
                                                         envoy::config::core::v3::BindConfig{})));
   RETURN_IF_NOT_OK_REF(config_or_error.status());
-  auto selector_or_error = local_address_selector_factory->createLocalAddressSelector(
-      config_or_error.value(), cluster_name);
+
+  ProtobufTypes::MessagePtr selector_config =
+      local_address_selector_factory->createEmptyConfigProto();
+  RELEASE_ASSERT(selector_config != nullptr, "");
+  // Factories that declare google.protobuf.Empty take no config, and the typed_config was only
+  // used to look them up, so there is nothing to unpack.
+  if (local_address_selector_config != nullptr &&
+      selector_config->GetTypeName() != "google.protobuf.Empty") {
+    RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+        local_address_selector_config->typed_config(), validation_visitor, *selector_config));
+  }
+  auto selector_or_error = local_address_selector_factory->createLocalAddressSelectorWithConfig(
+      *selector_config, server_context, config_or_error.value(), cluster_name);
   RETURN_IF_NOT_OK_REF(selector_or_error.status());
   return selector_or_error.value();
 }
@@ -1399,9 +1412,10 @@ ClusterInfoImpl::ClusterInfoImpl(
           factory_context.serverFactoryContext().clusterManager().clusterCircuitBreakersStatNames(),
           factory_context.serverFactoryContext().mainThreadDispatcher()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
-      upstream_local_address_selector_(
-          THROW_OR_RETURN_VALUE(createUpstreamLocalAddressSelector(config, bind_config),
-                                Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr)),
+      upstream_local_address_selector_(THROW_OR_RETURN_VALUE(
+          createUpstreamLocalAddressSelector(config, bind_config, server_context,
+                                             factory_context.messageValidationVisitor()),
+          Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr)),
       upstream_config_(config.has_upstream_config()
                            ? std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
                                  config.upstream_config())

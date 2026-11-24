@@ -57,6 +57,12 @@ using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
 class RetryPolicy;
 } // namespace Router
 
+namespace Server {
+namespace Configuration {
+class ServerFactoryContext;
+} // namespace Configuration
+} // namespace Server
+
 namespace Upstream {
 
 /**
@@ -135,6 +141,22 @@ public:
   virtual absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>
   createLocalAddressSelector(std::vector<UpstreamLocalAddress> upstream_local_addresses,
                              std::optional<std::string> cluster_name) const PURE;
+
+  /**
+   * Like createLocalAddressSelector(), but also receives the selector's typed config and the server
+   * context. Envoy always calls this one. Override it when the selector needs its configuration.
+   * The default ignores both and calls createLocalAddressSelector().
+   * @param config is ``local_address_selector.typed_config`` unpacked into the message returned by
+   *   createEmptyConfigProto(). It is not unpacked if that message is ``google.protobuf.Empty``.
+   * @param context is the server factory context.
+   */
+  virtual absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>
+  createLocalAddressSelectorWithConfig(const Protobuf::Message& /*config*/,
+                                       Server::Configuration::ServerFactoryContext& /*context*/,
+                                       std::vector<UpstreamLocalAddress> upstream_local_addresses,
+                                       std::optional<std::string> cluster_name) const {
+    return createLocalAddressSelector(std::move(upstream_local_addresses), std::move(cluster_name));
+  }
 
   std::string category() const override { return "envoy.upstream.local_address_selector"; }
 };

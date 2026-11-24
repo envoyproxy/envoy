@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package envoy.extensions.local_address_selectors.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.local_address_selectors.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/local_address_selectors/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Modules Local Address Selector]
+// [#extension: envoy.upstream.local_address_selector.dynamic_modules]
+
+// Configuration for a local address selector implemented in a dynamic module. The module picks the
+// source address of each upstream connection of the cluster, for example from a mapping that only
+// the local host knows.
+//
+// The selector must be set in the cluster's
+// :ref:`upstream_bind_config <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_bind_config>`.
+// It can also be set in the bootstrap bind config, in which case the module receives an empty
+// cluster name.
+//
+// For each connection the module returns one of three results:
+//
+// * Use the address that the :ref:`default selector
+//   <extension_envoy.upstream.local_address_selector.default_local_address_selector>` picks from the
+//   bind config.
+// * Use an IP address and port chosen by the module. A port of 0 lets the kernel pick the port at
+//   connect time, as a ``source_address`` with port 0 does.
+// * Fail the connection. Envoy closes it before connecting, and the connection pool counts it as a
+//   connect failure.
+message DynamicModuleLocalAddressSelector {
+  // Specifies the shared-object level configuration. This field is required.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name of the selector implementation inside the module. If not specified, defaults to an
+  // empty string. Envoy passes it to the module together with ``selector_config`` when the cluster
+  // is created, so one module can provide several selectors.
+  string selector_name = 2;
+
+  // The configuration for the selector chosen by ``selector_name``. If not specified, an empty
+  // configuration is passed to the module.
+  //
+  // ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly
+  // without the wrapper.
+  google.protobuf.Any selector_config = 3;
+}
