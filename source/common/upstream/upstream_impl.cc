@@ -1910,22 +1910,7 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
         if (!hosts_added.empty() || !hosts_removed.empty()) {
           info_->endpointStats().membership_change_.inc();
         }
-
-        uint32_t healthy_hosts = 0;
-        uint32_t degraded_hosts = 0;
-        uint32_t excluded_hosts = 0;
-        uint32_t hosts = 0;
-        for (const auto& host_set : prioritySet().hostSetsPerPriority()) {
-          const HostCounts counts = host_set->hostCounts();
-          hosts += counts.hosts;
-          healthy_hosts += counts.healthy;
-          degraded_hosts += counts.degraded;
-          excluded_hosts += counts.excluded;
-        }
-        info_->endpointStats().membership_total_.set(hosts);
-        info_->endpointStats().membership_healthy_.set(healthy_hosts);
-        info_->endpointStats().membership_degraded_.set(degraded_hosts);
-        info_->endpointStats().membership_excluded_.set(excluded_hosts);
+        updateMembershipStats();
       });
   // Drop overload configuration parsing.
   SET_AND_RETURN_IF_NOT_OK(parseDropOverloadConfig(cluster.load_assignment()), creation_status);
@@ -2065,9 +2050,33 @@ void ClusterImplBase::finishInitialization() {
     reloadHealthyHosts(nullptr);
   }
 
+  // The membership gauges are shared with any earlier cluster of the same name and are only
+  // written when the host set changes. A replacement cluster whose host set never changed while
+  // warming (for example, still empty after a failed first DNS lookup) would otherwise keep
+  // reporting the old cluster's values. Write them now, right before this cluster goes active.
+  updateMembershipStats();
+
   if (snapped_callback != nullptr) {
     THROW_IF_NOT_OK(snapped_callback());
   }
+}
+
+void ClusterImplBase::updateMembershipStats() {
+  uint32_t healthy_hosts = 0;
+  uint32_t degraded_hosts = 0;
+  uint32_t excluded_hosts = 0;
+  uint32_t hosts = 0;
+  for (const auto& host_set : prioritySet().hostSetsPerPriority()) {
+    const HostCounts counts = host_set->hostCounts();
+    hosts += counts.hosts;
+    healthy_hosts += counts.healthy;
+    degraded_hosts += counts.degraded;
+    excluded_hosts += counts.excluded;
+  }
+  info_->endpointStats().membership_total_.set(hosts);
+  info_->endpointStats().membership_healthy_.set(healthy_hosts);
+  info_->endpointStats().membership_degraded_.set(degraded_hosts);
+  info_->endpointStats().membership_excluded_.set(excluded_hosts);
 }
 
 absl::Status ClusterImplBase::parseDropOverloadConfig(
