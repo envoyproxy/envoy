@@ -130,19 +130,19 @@ The following lists the filter state object keys used by the Envoy extensions to
 
 ``envoy.ai.llm_protocol.response``
   Names the backend's wire API to the :ref:`transcoder AI filter
-  <config_http_filters_ai_protocol_manager_transcoder_instructions>` and to response token-usage
+  <config_http_ai_filters_transcoder_instructions>` and to response token-usage
   extraction, ahead of the route's ``response`` declaration. Accepts an :ref:`LLMProtocol
   <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` enum-value name as a constructor, e.g.
   "GEMINI_GENERATE_CONTENT". Supports field access with ``llm_protocol``.
 
 ``envoy.ai.binding.request``
-  The :ref:`binding <config_http_filters_ai_protocol_manager_transcoder_instructions>` the
+  The :ref:`binding <config_http_ai_filters_transcoder_instructions>` the
   client's request arrived in, under which the transcoder's ``TO_IR`` leg reads its path and
   body. Accepts a URI pattern (``/...``) or an :ref:`LLMBinding
   <envoy_v3_api_msg_type.ai.v3.LLMBinding>` in JSON (``{...}``) as a constructor.
 
 ``envoy.ai.binding.response``
-  The :ref:`binding <config_http_filters_ai_protocol_manager_transcoder_instructions>` the
+  The :ref:`binding <config_http_ai_filters_transcoder_instructions>` the
   backend expects, which the transcoder's ``FROM_IR`` leg renders into the request's ``:path``
   and applies to its body. Accepts a URI pattern or an :ref:`LLMBinding
   <envoy_v3_api_msg_type.ai.v3.LLMBinding>` in JSON as a constructor.
