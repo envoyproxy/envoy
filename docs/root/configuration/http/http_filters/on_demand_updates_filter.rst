@@ -43,7 +43,9 @@ The :ref:`mirror_odcds
 discovery for missing mirror clusters. Mirrored requests are buffered during discovery while
 the primary request continues. If this field is omitted, mirrors to missing clusters are skipped.
 
-To reuse the primary discovery settings, set ``inherit_primary: true``:
+``mirror_odcds`` accepts the same settings as ``odcds`` but does not inherit them. To discover
+mirror clusters from the same source as primary clusters, repeat the source. The timeout can
+differ:
 
 .. code-block:: yaml
 
@@ -51,17 +53,12 @@ To reuse the primary discovery settings, set ``inherit_primary: true``:
     source:
       ads: {}
   mirror_odcds:
-    inherit_primary: true
+    source:
+      ads: {}
+    timeout: 2s
 
-To configure mirror discovery independently, use ``mirror_odcds.config``:
-
-.. code-block:: yaml
-
-  mirror_odcds:
-    config:
-      source:
-        ads: {}
-      timeout: 2s
+Primary and mirror discovery with the same ``source`` and ``resources_locator`` share one
+subscription.
 
 These settings apply to all sampled mirror policies, including those using
 :ref:`cluster_header

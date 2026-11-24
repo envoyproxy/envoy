@@ -132,21 +132,14 @@ absl::StatusOr<DecodeHeadersBehaviorPtr> createDecodeHeadersBehavior(
 }
 
 absl::StatusOr<Upstream::OdCdsContextSharedPtr> createMirrorContext(
-    const envoy::extensions::filters::http::on_demand::v3::MirrorOnDemandCds& config,
-    OptRef<const envoy::extensions::filters::http::on_demand::v3::OnDemandCds> primary,
+    OptRef<const envoy::extensions::filters::http::on_demand::v3::OnDemandCds> odcds_config,
     Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor& visitor) {
-  OptRef<const envoy::extensions::filters::http::on_demand::v3::OnDemandCds> odcds_config;
-  if (config.inherit_primary()) {
-    odcds_config = primary;
-  } else if (config.has_config()) {
-    odcds_config = config.config();
-  }
   if (!odcds_config.has_value()) {
     return Upstream::OdCdsContextSharedPtr{};
   }
   // Mirror requests own their configuration independently of primary discovery. Allocating
-  // another handle with the same configuration reuses ClusterManager's existing subscription.
+  // a handle with the same source as primary discovery reuses ClusterManager's subscription.
   auto& cm = context.clusterManager();
   auto odcds = createOdCdsApi(*odcds_config, cm, visitor);
   RETURN_IF_NOT_OK_REF(odcds.status());
@@ -165,6 +158,15 @@ getOdCdsConfig(const ProtoConfig& proto_config) {
     return std::nullopt;
   }
   return proto_config.odcds();
+}
+
+template <typename ProtoConfig>
+OptRef<const envoy::extensions::filters::http::on_demand::v3::OnDemandCds>
+getMirrorOdCdsConfig(const ProtoConfig& proto_config) {
+  if (!proto_config.has_mirror_odcds()) {
+    return std::nullopt;
+  }
+  return proto_config.mirror_odcds();
 }
 
 } // namespace
@@ -192,8 +194,8 @@ OnDemandFilterConfig::OnDemandFilterConfig(
                                                  context.clusterManager(), validation_visitor);
   SET_AND_RETURN_IF_NOT_OK(behavior_or.status(), creation_status);
   behavior_ = std::move(behavior_or.value());
-  auto mirror_or = createMirrorContext(proto_config.mirror_odcds(), getOdCdsConfig(proto_config),
-                                       context, validation_visitor);
+  auto mirror_or =
+      createMirrorContext(getMirrorOdCdsConfig(proto_config), context, validation_visitor);
   SET_AND_RETURN_IF_NOT_OK(mirror_or.status(), creation_status);
   mirror_discovery_context_ = std::move(*mirror_or);
 }
@@ -215,8 +217,8 @@ OnDemandFilterConfig::OnDemandFilterConfig(
                                                  context.clusterManager(), validation_visitor);
   SET_AND_RETURN_IF_NOT_OK(behavior_or.status(), creation_status);
   behavior_ = std::move(behavior_or.value());
-  auto mirror_or = createMirrorContext(proto_config.mirror_odcds(), getOdCdsConfig(proto_config),
-                                       context, validation_visitor);
+  auto mirror_or =
+      createMirrorContext(getMirrorOdCdsConfig(proto_config), context, validation_visitor);
   SET_AND_RETURN_IF_NOT_OK(mirror_or.status(), creation_status);
   mirror_discovery_context_ = std::move(*mirror_or);
 }

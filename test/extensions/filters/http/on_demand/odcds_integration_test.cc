@@ -971,9 +971,8 @@ protected:
 
   void enableMirrorDiscovery() {
     OdCdsIntegrationHelper::PerRouteConfig config;
-    *config.mutable_mirror_odcds()->mutable_config() =
-        OdCdsIntegrationHelper::createOnDemandCdsConfig(
-            OdCdsIntegrationHelper::createAdsOdCdsConfigSource(), 10000);
+    *config.mutable_mirror_odcds() = OdCdsIntegrationHelper::createOnDemandCdsConfig(
+        OdCdsIntegrationHelper::createAdsOdCdsConfigSource(), 10000);
     auto* route = routes_.mutable_virtual_hosts(0)->mutable_routes(0);
     std::ignore =
         (*route->mutable_typed_per_filter_config())[Extensions::HttpFilters::HttpFilterNames::get()

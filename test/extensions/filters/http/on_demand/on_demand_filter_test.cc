@@ -739,6 +739,37 @@ TEST(OnDemandConfigTest, Basic) {
   EXPECT_THAT(status4, IsOk());
 }
 
+TEST(OnDemandConfigTest, MirrorDiscoverySettings) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ProtobufMessage::StrictValidationVisitorImpl visitor;
+  envoy::extensions::filters::http::on_demand::v3::OnDemand config;
+  config.mutable_odcds()->mutable_timeout()->set_seconds(1);
+  const auto mirror_context = [&]() {
+    absl::Status status = absl::OkStatus();
+    OnDemandFilterConfig filter_config(config, context, visitor, status);
+    EXPECT_THAT(status, IsOk());
+    return filter_config.mirrorDiscoveryContextSharedPtr();
+  };
+
+  // Primary discovery does not enable mirror discovery.
+  EXPECT_EQ(nullptr, mirror_context());
+
+  // Mirror settings do not inherit the primary timeout.
+  config.mutable_mirror_odcds();
+  auto default_timeout = mirror_context();
+  ASSERT_NE(nullptr, default_timeout);
+  EXPECT_EQ(std::chrono::milliseconds(5000), default_timeout->timeout());
+
+  config.mutable_mirror_odcds()->mutable_timeout()->set_seconds(2);
+  auto configured_timeout = mirror_context();
+  ASSERT_NE(nullptr, configured_timeout);
+  EXPECT_EQ(std::chrono::milliseconds(2000), configured_timeout->timeout());
+
+  // Mirror discovery does not require primary discovery.
+  config.clear_odcds();
+  EXPECT_NE(nullptr, mirror_context());
+}
+
 } // namespace OnDemand
 } // namespace HttpFilters
 } // namespace Extensions
