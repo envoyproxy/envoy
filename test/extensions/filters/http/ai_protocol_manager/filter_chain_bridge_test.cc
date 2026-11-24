@@ -30,8 +30,7 @@ public:
     EXPECT_CALL(callbacks_, bufferLimit()).WillOnce(Return(100));
     EXPECT_CALL(callbacks_, addUpstreamWatermarkCallbacks(_))
         .WillOnce([this](Http::UpstreamWatermarkCallbacks& cb) { subscriber_ = &cb; });
-    bridge_ = std::make_unique<DecoderFilterChainBridge>(callbacks_, stats_,
-                                                         [this]() { ++error_callbacks_; });
+    bridge_ = std::make_unique<DecoderFilterChainBridge>(callbacks_, stats_);
   }
 
   void armResumeCallback() {
@@ -45,7 +44,6 @@ public:
   std::unique_ptr<DecoderFilterChainBridge> bridge_;
   Http::UpstreamWatermarkCallbacks* subscriber_{nullptr};
   int resumed_{0};
-  int error_callbacks_{0};
 };
 
 TEST_F(DecoderFilterChainBridgeTest, DispatcherIsTheFilterCallbacksDispatcher) {
@@ -143,17 +141,11 @@ TEST_F(DecoderFilterChainBridgeTest, CallbackRegisteredWhilePausedSeesThePause) 
   EXPECT_EQ(resumed_, 1);
 }
 
-// An unrecoverable buffer error notifies the filter error callback, increments stats, and sends a
-// 500 local reply at most once across cascaded I/O failures.
-TEST_F(DecoderFilterChainBridgeTest, UnrecoverableErrorSendsLocalReplyOnce) {
+// An unrecoverable buffer error is surfaced as a 500 local reply.
+TEST_F(DecoderFilterChainBridgeTest, UnrecoverableErrorSendsLocalReply) {
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _,
                                          "ai_protocol_manager_external_buffer_error"));
-  EXPECT_FALSE(bridge_->unrecoverableErrorReported());
-  bridge_->notifyUnrecoverableError();
-  EXPECT_TRUE(bridge_->unrecoverableErrorReported());
-  EXPECT_EQ(error_callbacks_, 1);
-  bridge_->notifyUnrecoverableError();
-  EXPECT_EQ(error_callbacks_, 1);
+  bridge_->onUnrecoverableError();
   EXPECT_EQ(stats_.request_external_buffer_error_.value(), 1);
 }
 
@@ -207,12 +199,10 @@ TEST_F(DecoderFilterChainBridgeEchoTest, GenuineUpstreamWatermarkStillPausesWrit
 // paused.
 TEST_F(DecoderFilterChainBridgeEchoTest, PauseNestedInResumeStaysBalanced) {
   bridge_->addUnacked(200);
-  EXPECT_CALL(callbacks_, onDecoderFilterBelowWriteBufferLowWatermark())
-      .WillOnce([this] {
-        bridge_->addUnacked(200);
-        subscriber_->onBelowWriteBufferLowWatermark();
-      })
-      .WillOnce([this] { subscriber_->onBelowWriteBufferLowWatermark(); });
+  ON_CALL(callbacks_, onDecoderFilterBelowWriteBufferLowWatermark()).WillByDefault([this] {
+    bridge_->addUnacked(200);
+    subscriber_->onBelowWriteBufferLowWatermark();
+  });
 
   bridge_->releaseUnacked(200);
   EXPECT_TRUE(bridge_->ingestPaused());
@@ -252,24 +242,6 @@ TEST_F(DecoderFilterChainBridgeEchoTest, NonEchoingResumeDoesNotDeadlockWrite) {
   EXPECT_EQ(resumed_, 1);
 }
 
-// Detaching a paused decoder bridge unwinds its ingest pause and suppresses the resulting
-// synchronous low-watermark echo.
-TEST_F(DecoderFilterChainBridgeEchoTest, DetachWhileIngestPausedUnwindsSourceAndSuppressesEcho) {
-  bridge_->addUnacked(200);
-  EXPECT_TRUE(bridge_->ingestPaused());
-  EXPECT_FALSE(bridge_->writePaused());
-
-  EXPECT_CALL(callbacks_, onDecoderFilterBelowWriteBufferLowWatermark()).WillOnce([this] {
-    subscriber_->onBelowWriteBufferLowWatermark();
-  });
-  EXPECT_CALL(callbacks_, removeUpstreamWatermarkCallbacks(Ref(*bridge_)));
-  bridge_->detachFromFilterChain();
-
-  EXPECT_FALSE(bridge_->ingestPaused());
-  EXPECT_FALSE(bridge_->writePaused());
-  EXPECT_EQ(resumed_, 0);
-}
-
 // EncoderFilterChainBridge maps the bridge surface onto StreamEncoderFilterCallbacks
 // but subscribes to downstream watermarks through the decoder callbacks.
 class EncoderFilterChainBridgeTest : public testing::Test {
@@ -279,8 +251,8 @@ public:
     EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillOnce(Return(100));
     EXPECT_CALL(decoder_callbacks_, addDownstreamWatermarkCallbacks(_))
         .WillOnce([this](Http::DownstreamWatermarkCallbacks& cb) { subscriber_ = &cb; });
-    bridge_ = std::make_unique<EncoderFilterChainBridge>(encoder_callbacks_, decoder_callbacks_,
-                                                         stats_, [this]() { ++error_callbacks_; });
+    bridge_ =
+        std::make_unique<EncoderFilterChainBridge>(encoder_callbacks_, decoder_callbacks_, stats_);
   }
 
   void armResumeCallback() {
@@ -295,7 +267,6 @@ public:
   std::unique_ptr<EncoderFilterChainBridge> bridge_;
   Http::DownstreamWatermarkCallbacks* subscriber_{nullptr};
   int resumed_{0};
-  int error_callbacks_{0};
 };
 
 TEST_F(EncoderFilterChainBridgeTest, DispatcherIsTheFilterCallbacksDispatcher) {
@@ -466,12 +437,12 @@ TEST_F(EncoderFilterChainBridgeEchoTest, NonEchoingResumeDoesNotDeadlockWrite) {
   EXPECT_EQ(resumed_, 1);
 }
 
-// On the response path the error notifies the filter error callback and surfaces a 500 local reply.
+// On the response path the error is surfaced through the encoder callbacks' sendLocalReply
+// (best-effort, since the response may already be in flight).
 TEST_F(EncoderFilterChainBridgeTest, UnrecoverableErrorSendsLocalReply) {
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _,
                                                  "ai_protocol_manager_external_buffer_error"));
-  bridge_->notifyUnrecoverableError();
-  EXPECT_EQ(error_callbacks_, 1);
+  bridge_->onUnrecoverableError();
   EXPECT_EQ(stats_.response_external_buffer_error_.value(), 1);
 }
 

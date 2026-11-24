@@ -61,16 +61,6 @@ public:
   // Fails the stream after an unrecoverable external-buffer error.
   virtual void onUnrecoverableError() PURE;
 
-  // Reports an unrecoverable external-buffer error to the bridge at most once per stream.
-  void notifyUnrecoverableError() {
-    if (!unrecoverable_error_reported_) {
-      unrecoverable_error_reported_ = true;
-      onUnrecoverableError();
-    }
-  }
-
-  bool unrecoverableErrorReported() const { return unrecoverable_error_reported_; }
-
   // Reports bytes an ingest client has accepted but not yet made durable. The bridge sums them
   // across clients and pauses the data source once the total reaches high_watermark_.
   void addUnacked(uint64_t bytes);
@@ -149,8 +139,6 @@ private:
 
   virtual void resumeSource() PURE;
 
-  virtual bool unwindSourcePauseOnDetach() const { return false; }
-
   // Unsubscribes *this from the path's Envoy watermark callbacks. The adapter subscribes in its
   // constructor, for the bridge's whole life.
   virtual void unsubscribeWriteWatermarks() PURE;
@@ -169,7 +157,6 @@ private:
   // Tracked so each crossing pauses or resumes the source exactly once.
   bool source_paused_{false};
   bool detached_{false};
-  bool unrecoverable_error_reported_{false};
 
   // Depth of unmatched write high-watermark callbacks. The connection manager may raise the
   // watermark more than once (stream and connection), so injection resumes only when this returns
@@ -192,14 +179,11 @@ using FilterChainBridgePtr = std::unique_ptr<FilterChainBridge>;
 // flow control.
 class DecoderFilterChainBridge : public FilterChainBridge, public Http::UpstreamWatermarkCallbacks {
 public:
-  using ErrorCallback = absl::AnyInvocable<void()>;
-
   // Subscribes for the bridge's whole life rather than per write: the filter manager replays the
   // current high-watermark depth to every new subscriber, so re-subscribing double-counts.
   DecoderFilterChainBridge(Http::StreamDecoderFilterCallbacks& callbacks,
-                           AiProtocolManagerStats& stats, ErrorCallback on_error = nullptr)
-      : FilterChainBridge(callbacks.decoderBufferLimit()), callbacks_(callbacks), stats_(stats),
-        on_error_(std::move(on_error)) {
+                           AiProtocolManagerStats& stats)
+      : FilterChainBridge(callbacks.decoderBufferLimit()), callbacks_(callbacks), stats_(stats) {
     callbacks_.addUpstreamWatermarkCallbacks(*this);
   }
 
@@ -220,12 +204,10 @@ private:
   // FilterChainBridge
   void pauseSource() override { callbacks_.onDecoderFilterAboveWriteBufferHighWatermark(); }
   void resumeSource() override { callbacks_.onDecoderFilterBelowWriteBufferLowWatermark(); }
-  bool unwindSourcePauseOnDetach() const override { return true; }
   void unsubscribeWriteWatermarks() override { callbacks_.removeUpstreamWatermarkCallbacks(*this); }
 
   Http::StreamDecoderFilterCallbacks& callbacks_;
   AiProtocolManagerStats& stats_;
-  ErrorCallback on_error_;
 };
 
 // FilterChainBridge for the encode (response) path. Maps the bridge methods onto
@@ -234,14 +216,12 @@ private:
 class EncoderFilterChainBridge : public FilterChainBridge,
                                  public Http::DownstreamWatermarkCallbacks {
 public:
-  using ErrorCallback = absl::AnyInvocable<void()>;
-
   EncoderFilterChainBridge(Http::StreamEncoderFilterCallbacks& encoder_callbacks,
                            Http::StreamDecoderFilterCallbacks& decoder_callbacks,
-                           AiProtocolManagerStats& stats, ErrorCallback on_error = nullptr)
+                           AiProtocolManagerStats& stats)
       : FilterChainBridge(encoder_callbacks.encoderBufferLimit()),
-        encoder_callbacks_(encoder_callbacks), decoder_callbacks_(decoder_callbacks), stats_(stats),
-        on_error_(std::move(on_error)) {
+        encoder_callbacks_(encoder_callbacks), decoder_callbacks_(decoder_callbacks),
+        stats_(stats) {
     decoder_callbacks_.addDownstreamWatermarkCallbacks(*this);
   }
 
@@ -269,7 +249,6 @@ private:
   Http::StreamEncoderFilterCallbacks& encoder_callbacks_;
   Http::StreamDecoderFilterCallbacks& decoder_callbacks_;
   AiProtocolManagerStats& stats_;
-  ErrorCallback on_error_;
 };
 
 } // namespace AiProtocolManager

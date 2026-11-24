@@ -73,18 +73,13 @@ void FilterChainBridge::updateIngestBackpressure() {
 
 void FilterChainBridge::detachFromFilterChain() {
   if (!detached_) {
-    const bool should_resume_source = source_paused_ && unwindSourcePauseOnDetach();
-    source_paused_ = false;
     detached_ = true;
-    if (should_resume_source) {
-      const uint32_t prev_expected_echoes = expected_low_watermark_echoes_++;
-      resumeSource();
-      expected_low_watermark_echoes_ =
-          std::min(expected_low_watermark_echoes_, prev_expected_echoes);
-    }
     unsubscribeWriteWatermarks();
   }
   write_resume_cb_ = nullptr;
+  // Client::onBridgeDetached() unregisters the client, erasing it from registered_clients_.
+  // Re-querying begin() on each iteration avoids holding an iterator across flat_hash_set
+  // mutations.
   while (!registered_clients_.empty()) {
     (*registered_clients_.begin())->onBridgeDetached();
   }
@@ -126,20 +121,12 @@ bool FilterChainBridge::tryConsumeInjectBudget() {
 void FilterChainBridge::resetInjectBudget() { inject_budget_used_ = 0; }
 
 void DecoderFilterChainBridge::onUnrecoverableError() {
-  if (on_error_ != nullptr) {
-    ErrorCallback cb = std::exchange(on_error_, nullptr);
-    cb();
-  }
   stats_.request_external_buffer_error_.inc();
   callbacks_.sendLocalReply(Http::Code::InternalServerError, "AI protocol buffer error", nullptr,
                             std::nullopt, "ai_protocol_manager_external_buffer_error");
 }
 
 void EncoderFilterChainBridge::onUnrecoverableError() {
-  if (on_error_ != nullptr) {
-    ErrorCallback cb = std::exchange(on_error_, nullptr);
-    cb();
-  }
   stats_.response_external_buffer_error_.inc();
   // On the response path the headers (and possibly some body) may already be in flight.
   // sendLocalReply handles this best-effort: if the response has not started it generates a local
