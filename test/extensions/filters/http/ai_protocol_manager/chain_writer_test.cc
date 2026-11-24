@@ -177,10 +177,27 @@ TEST_F(ChainWriterTest, CancelUnwindsBudgetYieldedInject) {
   EXPECT_EQ(bridge_.inject_calls_, 8);
 }
 
-// Re-entrant cancellation inside bridge_.injectData() is observed on the next loop iteration's
-// FilterChainWritable awaitable without emitting further chunks.
+// Re-entrant cancellation inside bridge_.injectData() resolves InjectChunk with CancelledError
+// without emitting further chunks.
 TEST_F(ChainWriterTest, ReentrantCancelDuringInjectStopsImmediately) {
   Buffer::OwnedImpl data(std::string(3 * ChainWriter::WriteChunkSize, 'z'));
+  std::optional<Coroutine::DetachedHandle> handle;
+  bridge_.on_inject_ = [&]() {
+    if (handle.has_value()) {
+      handle->cancel();
+    }
+  };
+  handle = launch(inject(data));
+  drain();
+
+  EXPECT_EQ(result_.code(), absl::StatusCode::kCancelled);
+  EXPECT_EQ(bridge_.inject_calls_, 1);
+}
+
+// Even when on-stack cancellation occurs during the final (or only) chunk of inject(), InjectChunk
+// surfaces CancelledError rather than returning OkStatus().
+TEST_F(ChainWriterTest, ReentrantCancelOnFinalChunkReturnsCancelled) {
+  Buffer::OwnedImpl data("single-chunk");
   std::optional<Coroutine::DetachedHandle> handle;
   bridge_.on_inject_ = [&]() {
     if (handle.has_value()) {

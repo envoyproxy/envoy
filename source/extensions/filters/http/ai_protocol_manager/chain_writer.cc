@@ -25,6 +25,31 @@ namespace HttpFilters {
 namespace AiProtocolManager {
 namespace {
 
+// Injects a single chunk into the filter chain via `bridge`, checking cancellation both before
+// (via LeafAwaitable::await_ready()) and after the synchronous `injectData()` call so an on-stack
+// local reply or stream reset that cancels the coroutine resolves with CancelledError rather than
+// returning OkStatus().
+class InjectChunk : public Coroutine::LeafAwaitable<absl::Status> {
+public:
+  InjectChunk(FilterChainBridge* bridge, Buffer::Instance& chunk)
+      : bridge_(bridge), chunk_(chunk) {}
+
+protected:
+  std::optional<absl::Status> tryImmediate() override {
+    bridge_->injectData(chunk_);
+    if (context().cancellation()->cancelled()) {
+      return absl::CancelledError("coroutine cancelled");
+    }
+    return absl::OkStatus();
+  }
+  void onStart() override {}
+  void onCancel() override {}
+
+private:
+  FilterChainBridge* bridge_;
+  Buffer::Instance& chunk_;
+};
+
 // Consumes one chunk of the bridge's per-iteration inject budget immediately when available, or
 // yields to the next event-loop iteration using `budget_cb` before refilling and consuming one
 // unit.
@@ -161,7 +186,7 @@ Coroutine::Task<absl::Status> ChainWriter::inject(Buffer::Instance& data) {
     const uint64_t to_inject = std::min(WriteChunkSize, static_cast<uint64_t>(owned.length()));
     Buffer::OwnedImpl chunk;
     chunk.move(owned, to_inject);
-    bridge->injectData(chunk);
+    CO_RETURN_IF_ERROR(co_await InjectChunk(bridge, chunk));
   }
 
   co_return absl::OkStatus();
