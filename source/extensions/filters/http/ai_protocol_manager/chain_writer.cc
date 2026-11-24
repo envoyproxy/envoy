@@ -26,8 +26,8 @@ Coroutine::Task<absl::Status> ChainWriter::inject(Buffer::Instance& data) {
   CO_RETURN_IF_ERROR(co_await Coroutine::yield());
 
   while (owned.length() > 0) {
-    CO_RETURN_IF_ERROR(co_await FilterChainWritable(bridge_, write_resume_cb_));
     CO_RETURN_IF_ERROR(co_await InjectionBudgetAvailable(bridge_, budget_cb_));
+    CO_RETURN_IF_ERROR(co_await FilterChainWritable(bridge_, write_resume_cb_));
 
     const uint64_t to_inject = std::min(WriteChunkSize, static_cast<uint64_t>(owned.length()));
     Buffer::OwnedImpl chunk;

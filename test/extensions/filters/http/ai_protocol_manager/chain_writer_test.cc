@@ -176,6 +176,30 @@ TEST_F(ChainWriterTest, CancelUnwindsBudgetYieldedInject) {
   EXPECT_EQ(bridge_.inject_calls_, 8);
 }
 
+// If the write watermark rises while parked on a next-iteration budget yield, inject() pauses on
+// FilterChainWritable rather than emitting the next chunk into a write-paused chain.
+TEST_F(ChainWriterTest, PausesWhenWatermarkRisesDuringBudgetYield) {
+  Buffer::OwnedImpl data(std::string(9 * ChainWriter::WriteChunkSize, 'w'));
+  bridge_.on_inject_ = [&]() {
+    if (bridge_.inject_calls_ == 8) {
+      // Current-iteration post runs after chunk 9 parks on budget_cb_ (next iteration) and before
+      // budget_cb_ executes in the next loop iteration.
+      dispatcher_->post([&]() { bridge_.raiseWriteWatermark(); });
+    }
+  };
+  Coroutine::DetachedHandle handle = launch(inject(data));
+  drain();
+
+  EXPECT_EQ(bridge_.inject_calls_, 8);
+  EXPECT_EQ(result_.code(), absl::StatusCode::kUnknown);
+
+  bridge_.lowerWriteWatermark();
+  drain();
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(bridge_.inject_calls_, 9);
+}
+
 // Re-entrant cancellation inside bridge_.injectData() resolves InjectChunk with CancelledError
 // without emitting further chunks.
 TEST_F(ChainWriterTest, ReentrantCancelDuringInjectStopsImmediately) {

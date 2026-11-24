@@ -487,6 +487,35 @@ TEST_F(BufferManagerTest, ManagersTakeTheBridgeReplaySlotInTurn) {
   EXPECT_EQ(bridge_->injected_.toString(), "firstsecond");
 }
 
+// Destroying an idle sibling BufferManager on the same bridge must not clear the active manager's
+// write-resume callback while it is paused on write back-pressure.
+TEST_F(BufferManagerTest, DestroyingIdleSiblingDoesNotClearActiveWriteResumeCallback) {
+  bridge_->raiseWriteWatermark();
+
+  Buffer::OwnedImpl body("active");
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+  drain();
+  ASSERT_FALSE(replay_done_);
+  ASSERT_EQ(bridge_->injected_.toString(), "");
+
+  {
+    BufferManager idle_sibling(manager_config_, factory_, *bridge_);
+    Buffer::OwnedImpl other("idle");
+    idle_sibling.onData(other);
+    idle_sibling.endStream();
+    drain();
+  } // ~BufferManager() -> onDestroy() -> cancelReplay() while manager_ owns write_resume_cb_.
+
+  bridge_->lowerWriteWatermark();
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+  drain();
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), "active");
+}
+
 // With no body offloaded the manager reports empty(), so the caller knows there is
 // nothing to replay (a trailer-only request lets its trailers flow without calling
 // endStream()/replay()).

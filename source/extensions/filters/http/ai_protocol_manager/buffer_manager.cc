@@ -18,7 +18,6 @@ BufferManager::BufferManager(Config config, ExternalBufferFactory& buffer_factor
 }
 
 void BufferManager::armWriteResumeCallback() {
-  bridge_.clearWriteResumeCallback();
   bridge_.setWriteResumeCallback([this]() { onWriteResumed(); });
 }
 
@@ -149,8 +148,9 @@ void BufferManager::inject(Buffer::Instance& data, ReplayDoneCallback done) {
 void BufferManager::cancelReplay() {
   replay_cancelled_ = true;
   replay_requested_ = false;
-  replaying_ = false;
-  bridge_.clearWriteResumeCallback();
+  if (std::exchange(replaying_, false)) {
+    bridge_.clearWriteResumeCallback();
+  }
   replay_source_ = ReplaySource::None;
   replay_done_ = nullptr;
   inject_data_.drain(inject_data_.length());
