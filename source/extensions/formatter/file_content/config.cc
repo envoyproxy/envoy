@@ -89,16 +89,39 @@ public:
     ASSERT_IS_MAIN_OR_TEST_THREAD();
 
     envoy::config::core::v3::DataSource source;
-    // Split subcommand on ':' to extract filename and optional watch directory.
+    // Split subcommand on ':' to extract filename and optional watch directory,
+    // preserving Windows drive prefixes such as "C:\" or "C:/".
     // Format: /path/to/file or /path/to/file:/path/to/watch
-    const auto parts = StringUtil::splitToken(subcommand, ":", /*keep_empty_string=*/false);
-    if (parts.empty() || parts.size() > 2) {
+    auto find_delimiter = [&](size_t start) -> size_t {
+      size_t pos = start;
+      if (pos + 2 < subcommand.size()) {
+        const char drive = subcommand[pos];
+        const bool is_ascii_alpha =
+            (drive >= 'A' && drive <= 'Z') || (drive >= 'a' && drive <= 'z');
+        if (is_ascii_alpha && subcommand[pos + 1] == ':' &&
+            (subcommand[pos + 2] == '\\' || subcommand[pos + 2] == '/')) {
+          pos += 2;
+        }
+      }
+      return subcommand.find(':', pos);
+    };
+
+    const size_t first_colon = find_delimiter(0);
+    if (subcommand.empty() || first_colon == 0) {
       throw EnvoyException(fmt::format(
           "FILE_CONTENT: expected format 'path' or 'path:watch_directory', got '{}'", subcommand));
     }
-    source.set_filename(parts[0]);
-    if (parts.size() == 2) {
-      source.mutable_watched_directory()->set_path(parts[1]);
+    if (first_colon == absl::string_view::npos) {
+      source.set_filename(subcommand);
+    } else {
+      const absl::string_view watch_dir = subcommand.substr(first_colon + 1);
+      if (watch_dir.empty() || find_delimiter(first_colon + 1) != absl::string_view::npos) {
+        throw EnvoyException(
+            fmt::format("FILE_CONTENT: expected format 'path' or 'path:watch_directory', got '{}'",
+                        subcommand));
+      }
+      source.set_filename(subcommand.substr(0, first_colon));
+      source.mutable_watched_directory()->set_path(watch_dir);
     }
     const Config::DataSource::ProviderOptions options{.allow_empty = true, .modify_watch = true};
 
