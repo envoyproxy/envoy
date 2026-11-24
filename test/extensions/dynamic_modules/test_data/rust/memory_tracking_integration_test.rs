@@ -22,7 +22,9 @@ fn init() -> bool {
 }
 
 /// Creates a monitor that reports the memory of the module against the heap size in bytes that the
-/// configuration holds.
+/// configuration holds. A second number in the configuration sets a hard limit in bytes, which the
+/// allocator enforces. Without it, the monitor removes the limit that an earlier monitor set, since
+/// the module stays loaded between the tests of a test binary.
 fn new_resource_monitor_fn(
   name: &str,
   config: &[u8],
@@ -31,7 +33,16 @@ fn new_resource_monitor_fn(
   if name != "memory" {
     return None;
   }
-  let max_heap_size_bytes: NonZeroU64 = std::str::from_utf8(config).ok()?.parse().ok()?;
+  let mut sizes = std::str::from_utf8(config).ok()?.split_whitespace();
+  let max_heap_size_bytes: NonZeroU64 = sizes.next()?.parse().ok()?;
+  match sizes.next() {
+    Some(hard_limit_bytes) => {
+      if !ALLOCATOR.set_limit(hard_limit_bytes.parse().ok()?) {
+        return None;
+      }
+    },
+    None => ALLOCATOR.remove_limit(),
+  }
   Some(Box::new(MemoryResourceMonitor::new(
     &ALLOCATOR,
     max_heap_size_bytes,
@@ -61,7 +72,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for MemoryFilterConfig {
 }
 
 /// Retains the number of bytes in the `x-retain-bytes` request header, releases all the retained
-/// memory when the `x-release` request header is present, and replies without an upstream.
+/// memory when the `x-release` request header is present, and replies without an upstream. A
+/// retention that the memory limit refuses is replied to with a 507.
 struct MemoryFilter {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for MemoryFilter {
@@ -79,7 +91,13 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for MemoryFilter {
           .ok()
       });
     if let Some(bytes) = retain_bytes {
-      RETAINED.lock().unwrap().push(vec![1; bytes]);
+      let mut memory = Vec::new();
+      if memory.try_reserve_exact(bytes).is_err() {
+        envoy_filter.send_response(507, &[], None, None);
+        return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
+      }
+      memory.resize(bytes, 1);
+      RETAINED.lock().unwrap().push(memory);
     }
     if envoy_filter.get_request_header_value("x-release").is_some() {
       // Replacing the vector frees its buffer as well, which would otherwise outlive the module.

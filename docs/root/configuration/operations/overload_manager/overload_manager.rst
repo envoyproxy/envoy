@@ -129,7 +129,11 @@ resource monitor must load the same shared object as the filters of the module, 
 local file name, since a module loaded from another file is a separate instance with an allocator of
 its own. A module whose global allocator is another one reports failed updates, which the
 ``failed_updates`` statistic of the resource counts. On Linux, a module that uses the allocator
-stays loaded, so a new build of the module needs a new path.
+stays loaded, so a new build of the module needs a new path. The module can also give its allocator
+a hard limit, for example from the configuration of its resource monitor. A refused allocation
+aborts Envoy unless the module makes it with a fallible API such as ``Vec::try_reserve``, so the
+hard limit should leave room above the budget of the resource monitor for the overload manager to
+act first.
 
 The following configuration reports the pressure of the module ``my_module`` in the
 ``overload.my_module_memory.pressure`` gauge, for a module whose ``memory`` resource monitor takes
