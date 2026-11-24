@@ -158,10 +158,12 @@ pub fn is_valid_header_name(name: impl AsRef<[u8]>) -> bool {
 /// header and start another on an HTTP/1 connection, so a module that copies request data or
 /// other untrusted input into a header should check it with this first.
 pub fn is_valid_header_value(value: impl AsRef<[u8]>) -> bool {
-  // A fold rather than all(): without an early exit, the compiler can vectorize the loop.
-  value.as_ref().iter().fold(true, |valid, &c| {
-    valid & ((c >= b' ' && c != 0x7f) | (c == b'\t'))
-  })
+  // c ^ 0x16 maps tab to 0x1f and every other control character below it. A fold rather than
+  // all() has no early exit, so the compiler can vectorize it.
+  value
+    .as_ref()
+    .iter()
+    .fold(true, |valid, &c| valid & ((c ^ 0x16) >= 0x1f) & (c != 0x7f))
 }
 
 /// The bytes of an HTTP token (RFC 9110), which is what a header name is.
@@ -468,6 +470,7 @@ mod tests {
       b"a\0b",
       b"bell\x07",
       b"del\x7f",
+      b"\t\x1f",
       b"value\r\nx-injected: 1",
     ] {
       assert!(!is_valid_header_value(value), "{value:?}");
@@ -479,16 +482,18 @@ mod tests {
     for c in 0 ..= u8::MAX {
       let token = c.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&c);
       assert_eq!(is_valid_header_name([c]), token, "{c:#x}");
-      // In the middle and at the end of a value long enough for the compiler to vectorize.
+      // Positions in the vector part of the loop and in its scalar remainder, for several sizes.
       let allowed = c == b'\t' || (c >= b' ' && c != 0x7f);
-      for position in [40, 66] {
-        let mut value = [b'v'; 67];
-        value[position] = c;
-        assert_eq!(
-          is_valid_header_value(value),
-          allowed,
-          "{c:#x} at {position}"
-        );
+      for size in [3, 5, 12, 40, 67] {
+        for position in [0, size / 2, size - 1] {
+          let mut value = vec![b'v'; size];
+          value[position] = c;
+          assert_eq!(
+            is_valid_header_value(&value),
+            allowed,
+            "{c:#x} at {position} of {size}"
+          );
+        }
       }
     }
   }
