@@ -182,7 +182,7 @@ TEST_F(GetAddrInfoDnsImplTest, Failure) {
                          [this](DnsResolver::ResolutionStatus status, absl::string_view details,
                                 std::list<DnsResponse>&& response) {
                            EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
-                           EXPECT_EQ("Non-recoverable failure in name resolution", details);
+                           EXPECT_EQ(gai_strerror(EAI_FAIL), details);
                            EXPECT_TRUE(response.empty());
                            std::vector<std::string> traces =
                                absl::StrSplit(active_dns_query_->getTraces(), ',');

@@ -20,8 +20,8 @@ namespace {
 
 using testing::ElementsAre;
 
-constexpr absl::string_view ClaudeModel = "claude-sonnet-4-5@20250929";
-constexpr absl::string_view GeminiModel = "gemini-2.5-flash";
+constexpr char ClaudeModel[] = "claude-sonnet-4-5@20250929";
+constexpr char GeminiModel[] = "gemini-2.5-flash";
 constexpr absl::string_view VertexClaudePath =
     "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/claude-sonnet-4-5@20250929";
 constexpr absl::string_view VertexGeminiPath =

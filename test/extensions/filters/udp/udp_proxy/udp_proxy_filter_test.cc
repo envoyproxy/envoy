@@ -730,6 +730,9 @@ INSTANTIATE_TEST_SUITE_P(Errors, UdpProxyUpstreamWriterFallbackTest,
                                          SOCKET_ERROR_MSG_SIZE, EIO));
 
 TEST_F(UdpProxyUpstreamWriterTest, TransparentSourceAddressIsPreserved) {
+  if (!isTransparentSocketOptionsSupported()) {
+    GTEST_SKIP();
+  }
   auto config = writerConfig();
   config.set_use_original_src_ip(true);
   EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_));
@@ -754,6 +757,9 @@ TEST_F(UdpProxyUpstreamWriterTest, TransparentSourceAddressIsPreserved) {
 }
 
 TEST_F(UdpProxyUpstreamWriterTest, TransparentIpv6SourceAddressIsPreserved) {
+  if (!isTransparentSocketOptionsSupported()) {
+    GTEST_SKIP();
+  }
   // Address construction may probe IPv6 support once per process.
   EXPECT_CALL(os_sys_calls_, socket(AF_INET6, SOCK_STREAM, 0))
       .Times(testing::AtMost(1))
@@ -804,6 +810,9 @@ TEST_F(UdpProxyUpstreamWriterTest, TransparentPipeHostFailsWithoutCreatingWriter
 }
 
 TEST_F(UdpProxyUpstreamWriterTest, TransparentBindFailureDoesNotCreateWriterOrRetry) {
+  if (!isTransparentSocketOptionsSupported()) {
+    GTEST_SKIP();
+  }
   auto config = writerConfig();
   config.set_use_original_src_ip(true);
   EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_));

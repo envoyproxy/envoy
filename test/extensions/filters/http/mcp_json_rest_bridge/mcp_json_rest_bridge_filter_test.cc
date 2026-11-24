@@ -466,7 +466,7 @@ protected:
               Http::FilterDataStatus::StopIterationNoBuffer);
 
     const auto result = nlohmann::json::parse(local_reply_body)["result"];
-    EXPECT_EQ(result["cacheScope"], expected_cache_scope);
+    EXPECT_EQ(result["cacheScope"].get<std::string>(), expected_cache_scope);
     EXPECT_EQ(result["ttlMs"], expected_ttl_ms);
   }
 };

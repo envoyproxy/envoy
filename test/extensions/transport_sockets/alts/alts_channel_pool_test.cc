@@ -119,7 +119,7 @@ TEST_P(AltsChannelPoolTest, SuccessWithDefaultChannels) {
 TEST_P(AltsChannelPoolTest, SuccessWithDefaultChannelsWithKeepAliveParams) {
   startFakeHandshakerService();
 
-  setenv("GRPC_EXPERIMENTAL_ALTS_HANDSHAKER_KEEPALIVE_PARAMS", "true", 1);
+  TestEnvironment::setEnvVar("GRPC_EXPERIMENTAL_ALTS_HANDSHAKER_KEEPALIVE_PARAMS", "true", 1);
   // Create a channel pool and check that it has the correct dimensions.
   auto channel_pool = AltsChannelPool::create(serverAddress());
   EXPECT_THAT(channel_pool, NotNull());
@@ -139,7 +139,7 @@ TEST_P(AltsChannelPoolTest, SuccessWithDefaultChannelsWithKeepAliveParams) {
     EXPECT_TRUE(stream->Read(&response));
   }
 
-  unsetenv("GRPC_EXPERIMENTAL_ALTS_HANDSHAKER_KEEPALIVE_PARAMS");
+  TestEnvironment::unsetEnvVar("GRPC_EXPERIMENTAL_ALTS_HANDSHAKER_KEEPALIVE_PARAMS");
 }
 
 } // namespace

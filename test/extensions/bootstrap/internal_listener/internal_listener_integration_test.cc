@@ -1,3 +1,4 @@
+#include "envoy/common/platform.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
@@ -111,6 +112,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, InternalListenerIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
 class InternalListenerResetIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public BaseIntegrationTest {
@@ -201,7 +203,6 @@ public:
   std::string internal_access_log_path_;
 };
 
-#if ENVOY_PLATFORM_ENABLE_SEND_RST
 // Verifies that downstream RST sent to the real listener propagates across the internal listener
 // to the upstream connection as an RST.
 TEST_P(InternalListenerResetIntegrationTest, DownstreamRstPropagation) {
@@ -309,11 +310,11 @@ TEST_P(InternalListenerResetIntegrationTest, DownstreamHalfClosePreservesNormalC
   auto real_log = waitForAccessLog(real_access_log_path_);
   EXPECT_THAT(real_log, testing::Eq("Normal"));
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, InternalListenerResetIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+#endif
 
 void configureInternalTlsPair(envoy::config::cluster::v3::Cluster& internal_cluster,
                               envoy::config::listener::v3::FilterChain& internal_chain) {
