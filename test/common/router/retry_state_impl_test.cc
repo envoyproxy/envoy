@@ -1528,7 +1528,6 @@ TEST_F(RouterRetryStateImplTest, DefaultHooksAreNoOps) {
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   state_->onRetryAttempt(request_headers, stream_info);
-  state_->onRetryRequestHeaders(request_headers);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   state_->onResponseHeaders(response_headers, stream_info);

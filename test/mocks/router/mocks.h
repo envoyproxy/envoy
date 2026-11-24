@@ -259,7 +259,6 @@ public:
   MOCK_METHOD(void, onRetryAttempt,
               (Http::RequestHeaderMap & request_headers,
                StreamInfo::StreamInfo& downstream_stream_info));
-  MOCK_METHOD(void, onRetryRequestHeaders, (Http::RequestHeaderMap & request_headers));
   MOCK_METHOD(void, onResponseHeaders,
               (Http::ResponseHeaderMap & response_headers, StreamInfo::StreamInfo& stream_info));
   MOCK_METHOD(void, onRetryComplete, (StreamInfo::StreamInfo & stream_info));
