@@ -198,12 +198,6 @@ public:
     return compressor_factory_.get();
   }
 
-  // Returns the content encoding for the per-route compressor if configured.
-  std::optional<std::string> contentEncoding() const {
-    return compressor_factory_ ? std::make_optional(compressor_factory_->contentEncoding())
-                               : std::nullopt;
-  }
-
 private:
   std::optional<bool> response_compression_enabled_;
   std::optional<bool> remove_accept_encoding_header_;
