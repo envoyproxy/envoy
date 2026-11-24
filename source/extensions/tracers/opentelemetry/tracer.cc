@@ -103,17 +103,23 @@ void Span::updateParent(const Tracing::TraceContext& trace_context, bool preserv
   setTraceId(context->traceId());
   setParentId(context->spanId());
 
-  // Replace the span's tracestate with the incoming context's tracestate, if
-  // it's non-empty. This might clobber the sampler-selected tracestate.
-  if (!context->tracestate().empty()) {
-    setTracestate(context->tracestate());
-  }
-
-  if (resample_on_update_parent_) {
-    SamplerSharedPtr sampler = parent_tracer_.sampler();
-    callSampler(sampler, stream_info_,
+  // Resample now that we have the correct trace context.
+  if (resample_on_update_parent_ && parent_tracer_.sampler() != nullptr) {
+    ENVOY_LOG(debug, "Resampling in updateParent");
+    callSampler(parent_tracer_.sampler(), stream_info_,
                 /*span_context=*/*context,
                 /*new_span=*/*this, std::string(name()), trace_context);
+    return;
+  }
+
+  ENVOY_LOG(debug, "Not resampling in updateParent");
+  setSampled(context->sampled());
+  // Don't let a route refresh reset the sampled flag. See
+  // `ConnectionManagerImpl::ActiveStream::refreshTracing()`.
+  disableLocalDecision();
+
+  if (!context->tracestate().empty()) {
+    setTracestate(context->tracestate());
   }
 }
 

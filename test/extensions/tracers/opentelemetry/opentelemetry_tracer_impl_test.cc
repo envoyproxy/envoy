@@ -33,6 +33,7 @@ using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 
 class MockResourceProvider : public ResourceProvider {
 public:
@@ -881,8 +882,8 @@ TEST_F(OpenTelemetryDriverTest, UpdateParentPreserveHeadersPropagatesToChildSpan
 }
 
 TEST_F(OpenTelemetryDriverTest, UpdateParentCallsSampler) {
-  auto mock_sampler = std::make_shared<NiceMock<MockSampler>>();
-  NiceMock<MockSamplerFactory> mock_sampler_factory;
+  auto mock_sampler = std::make_shared<StrictMock<MockSampler>>();
+  StrictMock<MockSamplerFactory> mock_sampler_factory;
   Registry::InjectFactory<SamplerFactory> sampler_factory_registration(mock_sampler_factory);
   EXPECT_CALL(mock_sampler_factory, createSampler(_, _)).WillOnce(Return(mock_sampler));
 
@@ -916,13 +917,15 @@ TEST_F(OpenTelemetryDriverTest, UpdateParentCallsSampler) {
             EXPECT_TRUE(parent_context.has_value());
             EXPECT_EQ(parent_context->spanId(), "bbbbbbbbbbbbbbbb");
             EXPECT_EQ(parent_context->tracestate(), "foobar=123");
-            return SamplingResult{Decision::RecordAndSample, nullptr, "foobar=123"};
+            return SamplingResult{Decision::RecordAndSample, nullptr,
+                                  std::string(parent_context->tracestate())};
           }));
   Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
   ASSERT_TRUE(testing::Mock::VerifyAndClearExpectations(mock_sampler.get()));
 
   EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
+  EXPECT_FALSE(span->useLocalDecision());
   EXPECT_EQ(span->getTracestate(), "foobar=123");
 
   request_headers.remove(OpenTelemetryConstants::get().TRACE_STATE.key());
@@ -934,19 +937,97 @@ TEST_F(OpenTelemetryDriverTest, UpdateParentCallsSampler) {
 
   EXPECT_CALL(*mock_sampler,
               shouldSample(_, _, "cccccccccccccccccccccccccccccccc", operation_name_, _, _, _))
-      .WillOnce(
-          Invoke([](const StreamInfo::StreamInfo&, const std::optional<SpanContext> parent_context,
-                    const std::string&, const std::string&, OTelSpanKind,
-                    OptRef<const Tracing::TraceContext>, const std::vector<SpanContext>&) {
-            EXPECT_TRUE(parent_context.has_value());
-            EXPECT_EQ(parent_context->spanId(), "dddddddddddddddd");
-            EXPECT_EQ(parent_context->tracestate(), "baz=456");
-            return SamplingResult{Decision::Drop, nullptr, ""};
-          }));
+      .WillOnce(Invoke([](const StreamInfo::StreamInfo&,
+                          const std::optional<SpanContext> parent_context, const std::string&,
+                          const std::string&, OTelSpanKind, OptRef<const Tracing::TraceContext>,
+                          const std::vector<SpanContext>&) {
+        EXPECT_TRUE(parent_context.has_value());
+        EXPECT_EQ(parent_context->spanId(), "dddddddddddddddd");
+        EXPECT_EQ(parent_context->tracestate(), "baz=456");
+        return SamplingResult{Decision::Drop, nullptr, std::string(parent_context->tracestate())};
+      }));
   span->updateParent(request_headers, /*preserve_headers=*/false);
 
   EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+  EXPECT_FALSE(span->useLocalDecision());
   EXPECT_EQ(span->getTracestate(), "baz=456");
+}
+
+TEST_F(OpenTelemetryDriverTest, UpdateParentResamplesWithoutSampler) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    resample_on_update_parent: true
+  )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+  setup(opentelemetry_config);
+
+  // Sampled local root span adopts unsampled decision from new parent and disables local decision.
+  {
+    Tracing::TestTraceContextImpl request_headers{
+        {":authority", "test.com"}, {":path", "/"}, {":method", "POST"}};
+    Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                               operation_name_, {Tracing::Reason::Sampling, true});
+    EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
+    EXPECT_TRUE(span->useLocalDecision());
+
+    // Malformed traceparent is a no-op and preserves the local decision.
+    request_headers.set(OpenTelemetryConstants::get().TRACE_PARENT.key(), "invalid-traceparent");
+    span->updateParent(request_headers, /*preserve_headers=*/false);
+    EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
+    EXPECT_TRUE(span->useLocalDecision());
+
+    request_headers.set(OpenTelemetryConstants::get().TRACE_PARENT.key(),
+                        "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-00");
+    request_headers.set(OpenTelemetryConstants::get().TRACE_STATE.key(), "baz=456");
+    span->updateParent(request_headers, /*preserve_headers=*/false);
+
+    EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+    EXPECT_FALSE(span->useLocalDecision());
+    EXPECT_EQ(span->getTraceId(), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    EXPECT_EQ(span->getTracestate(), "baz=456");
+  }
+
+  // Unsampled local root span adopts sampled decision from new parent and disables local decision.
+  {
+    Tracing::TestTraceContextImpl request_headers{
+        {":authority", "test.com"}, {":path", "/"}, {":method", "POST"}};
+    Tracing::SpanPtr span =
+        driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
+                           {Tracing::Reason::NotTraceable, false});
+    EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+    EXPECT_TRUE(span->useLocalDecision());
+
+    request_headers.set(OpenTelemetryConstants::get().TRACE_PARENT.key(),
+                        "00-cccccccccccccccccccccccccccccccc-dddddddddddddddd-01");
+    span->updateParent(request_headers, /*preserve_headers=*/false);
+
+    EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
+    EXPECT_FALSE(span->useLocalDecision());
+    EXPECT_EQ(span->getTraceId(), "cccccccccccccccccccccccccccccccc");
+  }
+}
+
+TEST_F(OpenTelemetryDriverTest, UpdateParentKeepsLocalDecisionWithoutSamplerByDefault) {
+  setupValidDriver();
+
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "POST"}};
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
+  EXPECT_TRUE(span->useLocalDecision());
+
+  request_headers.set(OpenTelemetryConstants::get().TRACE_PARENT.key(),
+                      "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-00");
+  span->updateParent(request_headers, /*preserve_headers=*/false);
+
+  EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+  EXPECT_FALSE(span->useLocalDecision());
+  EXPECT_EQ(span->getTraceId(), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 }
 
 // Verifies a span it not created when an invalid traceparent header is received
