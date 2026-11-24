@@ -17,10 +17,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-// Reuses a single lazily-allocated Event::SchedulableCallback across multiple one-shot
-// LeafAwaitables (Event::SchedulableCallback binds its std::function<void()> once at creation and
-// exposes no setCallback(), so capturing an awaitable's `this` directly at creation would dangle on
-// subsequent co_awaits).
+// Reuses a single lazily-allocated Event::SchedulableCallback (which binds its callback once at
+// creation and exposes no setCallback()) so each schedule*() call can invoke a different `fn`.
 class ReusableSchedulableCallback {
 public:
   explicit ReusableSchedulableCallback(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
