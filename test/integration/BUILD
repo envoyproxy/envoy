@@ -1374,6 +1374,7 @@ envoy_cc_test(
         "//test/integration/filters:metadata_control_filter_lib",
         "//test/integration/filters:non_terminal_encoding_filter_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
+        "//test/integration/filters:per_filter_buffer_test_filters_lib",
         "//test/integration/filters:remove_response_headers_lib",
         "//test/integration/filters:reset_stream_filter_config_lib",
         "//test/integration/filters:stop_iteration_and_continue",
@@ -1381,6 +1382,7 @@ envoy_cc_test(
         "//test/integration/filters:wait_for_whole_request_and_response_config_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -1543,6 +1545,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_protocol_integration_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",

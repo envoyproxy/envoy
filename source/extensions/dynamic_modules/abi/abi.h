@@ -867,6 +867,26 @@ uint64_t envoy_dynamic_module_callback_get_runtime_int(envoy_dynamic_module_type
 double envoy_dynamic_module_callback_get_runtime_number(envoy_dynamic_module_type_module_buffer key,
                                                         double default_value);
 
+/**
+ * envoy_dynamic_module_callback_get_runtime_string is called by the module to read a runtime value
+ * as a string, which is the text of the value in the topmost layer that sets the key. A number or a
+ * boolean has a text too, for example "80" or "true", so this reads a value of any type. Unlike the
+ * callbacks above it takes no default value: the result tells whether the key has a value.
+ *
+ * @param key is the runtime key to look up.
+ * @param result is the pointer to the buffer variable where the text of the value will be stored.
+ * It is left untouched when this returns false.
+ * @return true if the key has a value, false if the key does not exist or the runtime is not
+ * reachable from the calling thread.
+ *
+ * Note that the buffer stored in result is owned by Envoy, and it is guaranteed to be valid until
+ * the end of the current event hook. A module that needs the text for longer must copy it.
+ * As for the callbacks above, key must not name one of Envoy's own `envoy.reloadable_features.*`
+ * or `envoy.restart_features.*` guards.
+ */
+bool envoy_dynamic_module_callback_get_runtime_string(
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
 // ----------------------------- Function Registry -----------------------------
 
 /**
@@ -2366,6 +2386,12 @@ void envoy_dynamic_module_callback_http_send_response_trailers(
  * in the filter chain could modify the buffered body. That is say for a given filter X, filter X
  * can safely modify the buffered body if and only if the filters following filter X in the filter
  * chain have not yet accessed the body.
+ *
+ * NOTE: When the runtime guard ``envoy.reloadable_features.filter_manager_per_filter_buffer`` is
+ * enabled, each filter has its own buffer. The buffered body is then only the body held by this
+ * filter (what it buffered, or added), not the body buffered by other filters in the chain, and
+ * this filter can modify it whenever it holds it. The received_buffered_* callbacks then only
+ * return true when this filter is resumed with its own buffered body.
  */
 
 /**
@@ -10930,7 +10956,10 @@ void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names
 //    envoy_dynamic_module_on_bootstrap_extension_runtime_number_update. An integer is not reported
 //    as a boolean, though envoy_dynamic_module_callback_get_runtime_bool also reads it as one.
 //  * A boolean is reported through envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update.
-//  * Any other value, such as a string, counts as unset.
+//  * A non-empty string that reads as neither a number nor a boolean is reported through
+//    envoy_dynamic_module_on_bootstrap_extension_runtime_string_update. The text of a structured
+//    value that is not a fractional percent is unspecified.
+//  * Any other value, such as an empty string or null, counts as unset.
 //
 // Envoy loads a new runtime snapshot whenever a layer of the `layered_runtime` bootstrap option
 // changes, for example on an RTDS update, a disk layer update or a request to the admin
@@ -10986,6 +11015,17 @@ void envoy_dynamic_module_on_bootstrap_extension_runtime_number_update(
     envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr,
     envoy_dynamic_module_type_envoy_buffer key, double value, bool removed);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_runtime_string_update is called when a watched
+ * runtime key gets a new string value, or becomes unset after having one. The value is owned by
+ * Envoy and valid only for the duration of the call.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_runtime_string_update(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_envoy_buffer value,
+    bool removed);
 
 /**
  * envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update is called by the module

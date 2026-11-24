@@ -32,16 +32,17 @@ namespace AdaptiveWorkerCapacity {
 //   when uninitialized).
 // - onLoadAccepted() deducts tokens on the hot path.
 //
-// In the cold path:
-// - popBucketUtilization() computes the average fraction of consumed tokens over the time elapsed
-//   since the last pop:
+// In the cold path (taking a caller-provided monotonic snapshot timestamp now):
+// - popBucketUtilization(now) computes the average fraction of consumed tokens over the time
+//   elapsed since the last pop:
 //     utilization = accumulated_area / (delta_time * max_tokens)
 //   and resets the accumulated area.
-// - popTokenConsumptionRate() computes the rate of accepted tokens (tokens/sec) over the time
+// - popTokenConsumptionRate(now) computes the rate of accepted tokens (tokens/sec) over the time
 //   elapsed since the last pop and resets the count.
-// - setRefillRate() directly sets the token refill rate, updating burst capacity.
-// - scaleRefillRate() dynamically scales the refill rate and recomputes the burst capacity
-//   (max_tokens = bucket_size * refill_rate).
+// - setRefillRate(new_refill_rate, now) directly sets the token refill rate, updating burst
+//   capacity.
+// - scaleRefillRate(factor, now) dynamically scales the refill rate and recomputes the burst
+//   capacity (max_tokens = bucket_size * refill_rate).
 class DynamicTokenBucket {
 public:
   // Note: time_source must outlive the bucket, and bucket_size must be finite and positive.
@@ -54,24 +55,26 @@ public:
   Server::ResourceUsage getResourceUsage();
 
   // Called when load is accepted by a LoadShedPoint without shedding. Deducts a token from the
-  // bucket. Note that refill() (called during getResourceUsage() and popBucketUtilization())
+  // bucket. Note that refill() (called during getResourceUsage() and cold-path updates)
   // accumulates the consumed capacity area; onLoadAccepted() assumes getResourceUsage() was just
   // evaluated on the hot path by LoadShedPoint.
   void onLoadAccepted();
 
-  // Returns the bucket utilization over the interval since the previous call to
-  // popBucketUtilization() and resets the accumulated area. Range [0.0, 1.0].
-  double popBucketUtilization();
+  // Returns the bucket utilization over the interval ending at now (a monotonic timestamp obtained
+  // from time_source) since the previous sample and resets the accumulated area. Range [0.0, 1.0].
+  double popBucketUtilization(MonotonicTime now);
 
-  // Returns the rate of accepted tokens (tokens/sec) over the interval since the previous call to
-  // popTokenConsumptionRate() and resets the count.
-  double popTokenConsumptionRate();
+  // Returns the rate of accepted tokens (tokens/sec) over the interval ending at now (a monotonic
+  // timestamp obtained from time_source) since the previous sample and resets the count.
+  double popTokenConsumptionRate(MonotonicTime now);
 
-  // Directly sets the token refill rate (tokens/sec), updating burst capacity.
-  void setRefillRate(double new_refill_rate);
+  // Directly sets the token refill rate (tokens/sec) at monotonic timestamp now, updating burst
+  // capacity.
+  void setRefillRate(double new_refill_rate, MonotonicTime now);
 
-  // Scales the token refill rate by factor (> 0.0), updating burst capacity.
-  void scaleRefillRate(double factor);
+  // Scales the token refill rate by factor (> 0.0) at monotonic timestamp now, updating burst
+  // capacity.
+  void scaleRefillRate(double factor, MonotonicTime now);
 
   // Accessors for inspection and testing.
   double refillRate() const { return refill_rate_; }

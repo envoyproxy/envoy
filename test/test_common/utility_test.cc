@@ -161,4 +161,12 @@ TEST(JsonEquals, RootArray) {
                                            R"([{"a":"b"},{"c":"d"}])", true));
 }
 
+TEST(TraceContextTest, SetPreexistingKey) {
+  Tracing::TestTraceContextImpl trace_context;
+  trace_context.set("key", "foo");
+  EXPECT_EQ(trace_context.get("key"), "foo");
+  trace_context.set("key", "bar");
+  EXPECT_EQ(trace_context.get("key"), "bar");
+}
+
 } // namespace Envoy
