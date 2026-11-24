@@ -603,8 +603,8 @@ macro_rules! set_factory_once {
 /// The function signature for the program init function.
 ///
 /// This is called when the dynamic module is loaded, and it must return true on success, and false
-/// on failure. When it returns false, the dynamic module will not be loaded, and its next load calls
-/// it again.
+/// on failure. When it returns false, the dynamic module will not be loaded, and its next load
+/// calls it again.
 ///
 /// This is useful to perform any process-wide initialization that the dynamic module needs.
 pub type ProgramInitFunction = fn() -> bool;
