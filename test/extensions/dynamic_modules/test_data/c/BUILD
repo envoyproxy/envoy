@@ -48,7 +48,11 @@ test_program(name = "no_program_init")
 
 test_program(name = "program_init_assert")
 
+test_program(name = "program_init_count")
+
 test_program(name = "program_init_fail")
+
+test_program(name = "program_init_fail_once")
 
 test_program(name = "abi_version_mismatch")
 

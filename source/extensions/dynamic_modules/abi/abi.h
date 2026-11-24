@@ -702,8 +702,8 @@ typedef void* envoy_dynamic_module_type_load_shed_point_envoy_ptr;
 
 /**
  * envoy_dynamic_module_on_program_init is called by the main thread exactly when the module is
- * loaded. The function returns the ABI version of the dynamic module. If null is returned, the
- * module will be unloaded immediately.
+ * loaded. The function returns the ABI version of the dynamic module. If null is returned, the load
+ * fails, and the next load of the module calls this function again.
  *
  * For Envoy, the return value is recorded and logged for diagnostics only. Envoy does not
  * validate it against its own ABI version, so returning a version that differs from Envoy's does
@@ -717,7 +717,7 @@ typedef void* envoy_dynamic_module_type_load_shed_point_envoy_ptr;
  * report an error to Envoy.
  *
  * @return envoy_dynamic_module_type_abi_version_module_ptr is the ABI version the dynamic module
- * was built against. Null means the error and the module will be unloaded immediately.
+ * was built against. Null means the error and the load fails.
  */
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void);
 
