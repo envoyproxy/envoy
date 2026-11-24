@@ -9,6 +9,7 @@ import "google/protobuf/struct.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.fault.v3";
 option java_outer_classname = "FaultProto";
@@ -26,9 +27,13 @@ message FaultAbort {
   // The percentage of connections that will be aborted. Defaults to 0% if not specified.
   type.v3.FractionalPercent percentage = 1;
 
-  // If set to ``true``, the filter evaluates the abort percentage and records matching dry-run
-  // statistics (``aborts_dry_run``) and ``filter_metadata`` without closing the connection or
-  // setting the ``FI`` (``FaultInjected``) response flag. Defaults to ``false``.
+  // If set to ``true``, connections matching the abort fault will not be closed and the ``FI``
+  // (``FaultInjected``) response flag will not be set. Instead, the ``aborts_dry_run`` stat is
+  // incremented and ``{"dry_run_abort": true}`` is merged into the ``envoy.filters.network.fault``
+  // dynamic metadata namespace. User-configured :ref:`filter_metadata
+  // <envoy_v3_api_field_extensions.filters.network.fault.v3.NetworkFault.filter_metadata>` is not
+  // written for dry-run abort matches (any existing keys already stored under
+  // ``envoy.filters.network.fault`` are preserved). Defaults to ``false``.
   bool dry_run = 2;
 }
 
@@ -37,18 +42,22 @@ message NetworkFault {
   // If specified, the filter will abort incoming connections based on the values in the object.
   FaultAbort abort = 1;
 
-  // Optional prefix to use when emitting statistics. If specified, statistics are emitted with the
-  // prefix ``fault.<stat_prefix>.``; otherwise they are emitted with the prefix ``fault.``.
-  string stat_prefix = 2;
+  // The prefix to use when emitting :ref:`statistics
+  // <config_network_filters_fault_injection_stats>`. Statistics are emitted with the prefix
+  // ``fault.<stat_prefix>.``.
+  string stat_prefix = 2 [(validate.rules).string = {min_len: 1}];
 
   // The runtime key to override the abort percentage. The default is
   // ``fault.network.abort.abort_percent``.
   string abort_percent_runtime = 3;
 
-  // When an abort fault is executed (or matched in ``dry_run`` mode), the metadata struct provided
-  // here will be added to the connection's dynamic metadata under the namespace
-  // ``envoy.filters.network.fault``. This data can be logged as part of Access Logs using the
-  // :ref:`command operator <config_access_log_command_operators>`
-  // ``%DYNAMIC_METADATA(envoy.filters.network.fault)%``.
+  // When an abort fault is executed, the metadata struct provided here will be added to the
+  // connection's dynamic metadata under the namespace ``envoy.filters.network.fault``. This
+  // metadata is not written for :ref:`dry_run
+  // <envoy_v3_api_field_extensions.filters.network.fault.v3.FaultAbort.dry_run>` abort matches,
+  // which instead merge ``{"dry_run_abort": true}`` into the ``envoy.filters.network.fault``
+  // dynamic metadata namespace (``dry_run_abort`` is reserved for that marker). This data can be
+  // logged as part of Access Logs using the :ref:`command operator
+  // <config_access_log_command_operators>` ``%DYNAMIC_METADATA(envoy.filters.network.fault)%``.
   google.protobuf.Struct filter_metadata = 4;
 }

@@ -31,14 +31,18 @@ TEST(NetworkFaultFilterConfigTest, RegisteredByWellKnownName) {
   EXPECT_EQ("envoy.filters.network.fault", factory->name());
 }
 
-TEST(NetworkFaultFilterConfigTest, EmptyProto) {
+TEST(NetworkFaultFilterConfigTest, EmptyProtoFailsValidation) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FaultFilterFactory factory;
   ProtobufTypes::MessagePtr empty_proto = factory.createEmptyConfigProto();
-  ASSERT_NE(nullptr,
-            Envoy::Protobuf::DynamicCastMessage<
-                envoy::extensions::filters::network::fault::v3::NetworkFault>(empty_proto.get()));
+  auto* typed_proto = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::network::fault::v3::NetworkFault>(empty_proto.get());
+  ASSERT_NE(nullptr, typed_proto);
 
+  EXPECT_THROW(factory.createFilterFactoryFromProto(*empty_proto, context).IgnoreError(),
+               ProtoValidationException);
+
+  typed_proto->set_stat_prefix("my_tcp_fault");
   EXPECT_FALSE(factory.isTerminalFilterByProto(*empty_proto, context.serverFactoryContext()));
 
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*empty_proto, context).value();
@@ -53,7 +57,6 @@ stat_prefix: my_tcp_fault
 abort_percent_runtime: custom.runtime.key
 filter_metadata:
   experiment_name: "test_experiment"
-  dry_run: true
 abort:
   percentage:
     numerator: 50
@@ -76,6 +79,7 @@ TEST(NetworkFaultFilterConfigTest, ProtocolOptionsNotSupported) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FaultFilterFactory factory;
   envoy::extensions::filters::network::fault::v3::NetworkFault proto_config;
+  proto_config.set_stat_prefix("my_tcp_fault");
   auto status_or = factory.createProtocolOptionsConfig(proto_config, context);
   EXPECT_FALSE(status_or.ok());
 }

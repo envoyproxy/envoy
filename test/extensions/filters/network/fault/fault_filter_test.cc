@@ -2,6 +2,7 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/fault/v3/fault.pb.h"
+#include "envoy/extensions/filters/network/fault/v3/fault.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -33,9 +34,7 @@ class NetworkFaultFilterTest : public testing::Test {
 public:
   void setUpFilter(const std::string& yaml) {
     envoy::extensions::filters::network::fault::v3::NetworkFault proto_config;
-    if (!yaml.empty()) {
-      TestUtility::loadFromYaml(yaml, proto_config);
-    }
+    TestUtility::loadFromYamlAndValidate(yaml, proto_config);
     setUpFilter(proto_config);
   }
 
@@ -61,7 +60,9 @@ public:
 };
 
 TEST_F(NetworkFaultFilterTest, NoFaultConfiguredPassesThrough) {
-  setUpFilter("");
+  setUpFilter(R"EOF(
+stat_prefix: tcp
+)EOF");
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
@@ -77,6 +78,7 @@ TEST_F(NetworkFaultFilterTest, NoFaultConfiguredPassesThrough) {
 
 TEST_F(NetworkFaultFilterTest, ZeroPercentAbortPassesThrough) {
   setUpFilter(R"EOF(
+stat_prefix: tcp
 abort:
   percentage:
     numerator: 0
@@ -165,13 +167,13 @@ abort:
 
 TEST_F(NetworkFaultFilterTest, DryRunAbortContinuesWithoutClosingConnectionOrSettingResponseFlag) {
   setUpFilter(R"EOF(
+stat_prefix: tcp
 abort:
   percentage:
     numerator: 100
     denominator: HUNDRED
   dry_run: true
 filter_metadata:
-  dry_run: true
   experiment_name: "test_experiment"
   fault_name: "fault0"
 )EOF");
@@ -189,7 +191,7 @@ filter_metadata:
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
-  EXPECT_EQ("fault.aborts_dry_run", config_->stats().aborts_dry_run_.name());
+  EXPECT_EQ("fault.tcp.aborts_dry_run", config_->stats().aborts_dry_run_.name());
   EXPECT_EQ(0U, config_->stats().aborts_injected_.value());
   EXPECT_EQ(1U, config_->stats().aborts_dry_run_.value());
   EXPECT_FALSE(stream_info_.hasResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected));
@@ -199,13 +201,50 @@ filter_metadata:
   const auto& filter_meta = stream_info_.dynamicMetadata().filter_metadata();
   const auto it = filter_meta.find(NetworkFilterNames::get().Fault);
   ASSERT_NE(it, filter_meta.end());
-  EXPECT_TRUE(it->second.fields().at("dry_run").bool_value());
-  EXPECT_EQ("test_experiment", it->second.fields().at("experiment_name").string_value());
-  EXPECT_EQ("fault0", it->second.fields().at("fault_name").string_value());
+  EXPECT_EQ(1, it->second.fields_size());
+  ASSERT_TRUE(it->second.fields().contains("dry_run_abort"));
+  EXPECT_TRUE(it->second.fields().at("dry_run_abort").bool_value());
+  // User-configured filter_metadata must not be written for dry-run abort matches.
+  EXPECT_FALSE(it->second.fields().contains("experiment_name"));
+  EXPECT_FALSE(it->second.fields().contains("fault_name"));
+}
+
+TEST_F(NetworkFaultFilterTest, DryRunAbortMergesIntoExistingDynamicMetadata) {
+  setUpFilter(R"EOF(
+stat_prefix: tcp
+abort:
+  percentage:
+    numerator: 100
+    denominator: HUNDRED
+  dry_run: true
+filter_metadata:
+  experiment_name: "test_experiment"
+)EOF");
+
+  // Pre-populate dynamic metadata under the fault namespace (e.g., from another fault/filter).
+  auto& existing =
+      (*stream_info_.dynamicMetadata().mutable_filter_metadata())[NetworkFilterNames::get().Fault];
+  (*existing.mutable_fields())["existing_key"].set_string_value("existing_value");
+
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled(absl::string_view("fault.network.abort.abort_percent"),
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+      .WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  const auto& filter_meta = stream_info_.dynamicMetadata().filter_metadata();
+  const auto it = filter_meta.find(NetworkFilterNames::get().Fault);
+  ASSERT_NE(it, filter_meta.end());
+  EXPECT_EQ("existing_value", it->second.fields().at("existing_key").string_value());
+  EXPECT_TRUE(it->second.fields().at("dry_run_abort").bool_value());
+  EXPECT_FALSE(it->second.fields().contains("experiment_name"));
 }
 
 TEST_F(NetworkFaultFilterTest, CustomAbortPercentRuntimeKeyUsed) {
   setUpFilter(R"EOF(
+stat_prefix: tcp
 abort_percent_runtime: custom.fault.abort_percent
 abort:
   percentage:

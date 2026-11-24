@@ -22,6 +22,7 @@
 
 using testing::Eq;
 using testing::HasSubstr;
+using testing::Not;
 
 namespace Envoy {
 namespace Extensions {
@@ -46,6 +47,7 @@ public:
       - name: envoy.filters.network.fault
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.fault.v3.NetworkFault
+          stat_prefix: base_test
       - name: envoy.filters.network.echo
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo
@@ -108,7 +110,6 @@ typed_config:
       denominator: HUNDRED
     dry_run: true
   filter_metadata:
-    dry_run: true
     experiment_name: "test_experiment"
     fault_name: "fault0"
 )EOF");
@@ -123,11 +124,12 @@ typed_config:
   EXPECT_EQ(0U, test_server_->counter("fault.tcp_test.aborts_injected")->value());
 
   const std::string log_entry = waitForAccessLog(listener_access_log_name_);
-  // Response flags must not contain FI in dry_run mode.
+  // Response flags must not contain FI in dry_run mode, and dynamic metadata must contain the
+  // dry_run_abort marker instead of user-configured filter_metadata.
   EXPECT_THAT(log_entry, HasSubstr("-|-|-|-|"));
-  EXPECT_THAT(log_entry, HasSubstr("\"dry_run\":true"));
-  EXPECT_THAT(log_entry, HasSubstr("\"experiment_name\":\"test_experiment\""));
-  EXPECT_THAT(log_entry, HasSubstr("\"fault_name\":\"fault0\""));
+  EXPECT_THAT(log_entry, HasSubstr("\"dry_run_abort\":true"));
+  EXPECT_THAT(log_entry, Not(HasSubstr("experiment_name")));
+  EXPECT_THAT(log_entry, Not(HasSubstr("fault_name")));
 }
 
 TEST_P(NetworkFaultFilterIntegrationTest, ZeroPercentAbortAllowsTrafficWithoutMetadata) {
@@ -299,7 +301,6 @@ typed_config:
       denominator: HUNDRED
     dry_run: true
   filter_metadata:
-    dry_run: true
     experiment_name: "test_experiment"
     fault_name: "fault0"
 )EOF");
@@ -322,9 +323,9 @@ typed_config:
 
   const std::string log_entry = waitForAccessLog(tcp_proxy_access_log_name_);
   EXPECT_THAT(log_entry, HasSubstr("-|-|-|-|"));
-  EXPECT_THAT(log_entry, HasSubstr("\"dry_run\":true"));
-  EXPECT_THAT(log_entry, HasSubstr("\"experiment_name\":\"test_experiment\""));
-  EXPECT_THAT(log_entry, HasSubstr("\"fault_name\":\"fault0\""));
+  EXPECT_THAT(log_entry, HasSubstr("\"dry_run_abort\":true"));
+  EXPECT_THAT(log_entry, Not(HasSubstr("experiment_name")));
+  EXPECT_THAT(log_entry, Not(HasSubstr("fault_name")));
 }
 
 class NetworkFaultDownstreamTlsIntegrationTest
@@ -411,7 +412,6 @@ typed_config:
       denominator: HUNDRED
     dry_run: true
   filter_metadata:
-    dry_run: true
     experiment_name: "test_experiment"
     fault_name: "fault0"
 )EOF");
@@ -445,9 +445,9 @@ typed_config:
       waitForAccessLog(listener_access_log_name_, /*entry=*/0, /*allow_excess_entries=*/false,
                        /*client_connection=*/ssl_client.get());
   EXPECT_THAT(log_entry, HasSubstr("-|-|-|-|"));
-  EXPECT_THAT(log_entry, HasSubstr("\"dry_run\":true"));
-  EXPECT_THAT(log_entry, HasSubstr("\"experiment_name\":\"test_experiment\""));
-  EXPECT_THAT(log_entry, HasSubstr("\"fault_name\":\"fault0\""));
+  EXPECT_THAT(log_entry, HasSubstr("\"dry_run_abort\":true"));
+  EXPECT_THAT(log_entry, Not(HasSubstr("experiment_name")));
+  EXPECT_THAT(log_entry, Not(HasSubstr("fault_name")));
 }
 
 } // namespace

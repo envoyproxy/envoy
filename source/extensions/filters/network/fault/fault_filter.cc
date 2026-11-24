@@ -88,7 +88,13 @@ void FaultFilter::recordDynamicMetadata() {
 void FaultFilter::recordAbortDryRun() {
   ENVOY_CONN_LOG(debug, "network fault: dry-run abort matched", read_callbacks_->connection());
   config_->stats().aborts_dry_run_.inc();
-  recordDynamicMetadata();
+  // Merge the reserved `dry_run_abort` marker instead of writing user-configured filter_metadata,
+  // so dry-run matches are distinguishable from enforced faults and preserve sibling keys already
+  // recorded under the envoy.filters.network.fault namespace.
+  auto& dynamic_metadata = read_callbacks_->connection().streamInfo().dynamicMetadata();
+  auto& filter_metadata =
+      (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().Fault];
+  (*filter_metadata.mutable_fields())["dry_run_abort"].set_bool_value(true);
 }
 
 void FaultFilter::abortConnection() {

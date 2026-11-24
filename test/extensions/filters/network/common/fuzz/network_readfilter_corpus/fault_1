@@ -2,6 +2,7 @@ config {
   name: "envoy.filters.network.fault"
   typed_config {
     type_url: "type.googleapis.com/envoy.extensions.filters.network.fault.v3.NetworkFault"
+    value: "\022\004test"
   }
 }
 actions {

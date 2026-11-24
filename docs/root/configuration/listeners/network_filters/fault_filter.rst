@@ -28,10 +28,14 @@ Dry-Run Mode
 ------------
 
 When :ref:`dry_run <envoy_v3_api_field_extensions.filters.network.fault.v3.FaultAbort.dry_run>`
-is set to ``true``, the filter evaluates the abort percentage and records matching statistics
-(``aborts_dry_run``) and ``filter_metadata`` without closing the connection or setting the ``FI``
-response flag. This allows operators to validate fault match rates and access log visibility on
-live traffic before enforcing aborts.
+is set to ``true``, the filter evaluates the abort percentage without closing the connection or
+setting the ``FI`` response flag. Instead, it increments the ``aborts_dry_run`` stat and merges
+``{"dry_run_abort": true}`` into the ``envoy.filters.network.fault`` dynamic metadata namespace
+(preserving any other keys already present in that namespace). User-configured
+:ref:`filter_metadata <envoy_v3_api_field_extensions.filters.network.fault.v3.NetworkFault.filter_metadata>`
+is **not** written for dry-run matches, so access logs and dashboards can distinguish dry-run
+matches (via ``%DYNAMIC_METADATA(envoy.filters.network.fault:dry_run_abort)%``) from enforced
+fault aborts.
 
 Example
 -------
@@ -49,6 +53,7 @@ Example
             numerator: 5
             denominator: HUNDRED
           dry_run: true
+        # Written only when an abort is enforced (dry_run: false).
         filter_metadata:
           experiment_name: "my_experiment"
     - name: envoy.filters.network.tcp_proxy
@@ -77,9 +82,9 @@ fault.network.abort.abort_percent
 Statistics
 ----------
 
-The filter emits statistics under ``fault.<stat_prefix>.`` when
+The filter emits statistics under ``fault.<stat_prefix>.``, where
 :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.fault.v3.NetworkFault.stat_prefix>`
-is configured, or ``fault.`` otherwise:
+is the configured prefix:
 
 .. csv-table::
   :header: Name, Type, Description
