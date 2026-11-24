@@ -111,7 +111,8 @@ void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
     const bool should_dispatch_early_data = !early_data_capacity_initialized_;
     early_data_capacity_initialized_ = true;
     if (currentUnusedCapacity() == 0) {
-      // With HTTP/3 this can only happen during a rejected 0-RTT handshake.
+      // With HTTP/3 this happens on a rejected 0-RTT handshake, or on a stream limit of zero
+      // resumed from cached transport parameters.
       parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);
     } else if (should_dispatch_early_data &&
                Runtime::runtimeFeatureEnabled(

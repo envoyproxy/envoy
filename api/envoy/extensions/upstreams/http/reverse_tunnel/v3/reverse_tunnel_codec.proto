@@ -33,5 +33,12 @@ message ReverseTunnelUpstreamCodecOptions {
   // replacement connection; otherwise a worker already at the limit rejects it with HTTP 429 and
   // each refusal lengthens the initiator's backoff. Defaults to false, in which case the stock
   // HTTP/2 client codec is used unchanged.
+  //
+  // When this option and ``envoy.reloadable_features.reverse_tunnel_listener_drain`` are enabled,
+  // tunnels that have received GOAWAY or sent the final GOAWAY during a responder admin drain
+  // (``/reverse_tunnel/drain_clusters``) remain available to existing streams but are excluded from
+  // selection for new streams. Initiators whose remaining tunnels are all draining are skipped;
+  // requests with no eligible initiator fail as no healthy upstream (HTTP 503 with response flag
+  // ``UH`` for HTTP requests). The runtime guard defaults to false, preserving existing node selection.
   bool enable_drain_with_goaway = 1;
 }

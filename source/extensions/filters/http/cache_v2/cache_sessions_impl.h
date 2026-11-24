@@ -304,8 +304,7 @@ private:
   // their own mutex. Since it's only held for a short time and is related to
   // async operations, it seems unlikely that mutex contention would be a
   // significant bottleneck.
-  absl::flat_hash_map<Key, std::shared_ptr<CacheSession>, MessageUtil, MessageUtil>
-      entries_ ABSL_GUARDED_BY(mu_);
+  absl::flat_hash_map<SerializedKey, std::shared_ptr<CacheSession>> entries_ ABSL_GUARDED_BY(mu_);
 
   friend class CacheSession;
 };

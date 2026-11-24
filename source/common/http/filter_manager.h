@@ -63,6 +63,68 @@ private:
   const absl::string_view filter_config_name_;
 };
 
+// Per-filter buffer of the filter manager.
+class PerFilterBuffer;
+
+// Applies the stream buffer limit to the total bytes held by all per-filter buffers of one
+// direction, with the same hysteresis as Buffer::WatermarkBuffer: the high callback fires once the
+// total exceeds the limit, and the low callback fires once it drops back to half the limit.
+class PerFilterBufferTracker {
+public:
+  PerFilterBufferTracker(uint64_t limit, absl::AnyInvocable<void()> above_high_watermark,
+                         absl::AnyInvocable<void()> below_low_watermark)
+      : above_high_watermark_(std::move(above_high_watermark)),
+        below_low_watermark_(std::move(below_low_watermark)) {
+    setLimitOnly(limit);
+  }
+
+  // Updates the limit, firing any callback triggered by the change.
+  void setLimit(uint64_t limit) {
+    setLimitOnly(limit);
+    check();
+  }
+
+  // The filter whose processing is changing the buffers, or nullptr if none. Used as the owner of
+  // a local reply sent because the limit was exceeded.
+  ActiveStreamFilterBase* activeFilter() const { return active_filter_; }
+
+  // RAII recorder of the active filter, defined in filter_manager.cc.
+  class ActiveFilterScope;
+
+private:
+  friend class PerFilterBuffer;
+
+  // Accounts for the length change of the buffer since its last report.
+  void update(PerFilterBuffer& buffer);
+  // Removes the bytes of a destroyed buffer without firing callbacks, as a destroyed
+  // WatermarkBuffer does.
+  void release(uint64_t length) {
+    ASSERT(total_ >= length);
+    total_ -= length;
+  }
+  // Hold the threshold checks while bytes move between two buffers of this tracker, so the
+  // source being drained and the destination being filled are seen as one net change.
+  void deferChecks() { defer_depth_++; }
+  void resumeChecks() {
+    defer_depth_--;
+    check();
+  }
+  void setLimitOnly(uint64_t limit) {
+    high_watermark_ = limit;
+    low_watermark_ = limit / 2;
+  }
+  void check();
+
+  absl::AnyInvocable<void()> above_high_watermark_;
+  absl::AnyInvocable<void()> below_low_watermark_;
+  ActiveStreamFilterBase* active_filter_{};
+  uint64_t total_{};
+  uint64_t high_watermark_{};
+  uint64_t low_watermark_{};
+  uint32_t defer_depth_{};
+  bool above_high_watermark_called_{};
+};
+
 // TODO(wbpcode): Rather than allocating every filter with an unique pointer, we could
 // construct the filter in place in the vector. This should reduce the heap allocation and
 // memory fragmentation.
@@ -136,6 +198,12 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   void commonContinue();
   virtual bool canContinue() PURE;
   virtual Buffer::InstancePtr createBuffer() PURE;
+  // Buffer that body data stopped at this filter is buffered into, and that
+  // decodingBuffer()/encodingBuffer(), addDecodedData()/addEncodedData() and
+  // modifyDecodingBuffer()/modifyEncodingBuffer() operate on. This is the stream-level buffer
+  // shared by all filters. With per-filter buffer enabled, it is the filter's own buffer, which
+  // only holds the data stopped at this filter, so a filter never sees, changes or replays the
+  // data held by other filters.
   virtual Buffer::InstancePtr& bufferedData() PURE;
   // Whether the end of the stream has been observed, used for the end_stream flag when resuming
   // iteration. With per-filter observed end stream enabled, this is whether the end-of-stream
@@ -238,6 +306,12 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   IterationState iteration_state_{};
 
   const FilterContext filter_context_;
+
+  // Created on demand and only used with per-filter buffer enabled. See bufferedData().
+  // TODO(wbpcode): add new filter callback methods that take advantage of the per-filter buffer
+  // (e.g. access to the replayed frame and to the filter's own buffer separately), so filters
+  // do not need to rely on the legacy decodingBuffer()/addDecodedData() semantics.
+  Buffer::InstancePtr buffered_data_;
 
   // If the filter resumes iteration from a StopAllBuffer/Watermark state, the current filter
   // hasn't parsed data and trailers. As a result, the filter iteration should start with the
@@ -723,10 +797,18 @@ public:
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
         proxy_100_continue_(proxy_100_continue),
-        per_filter_buffer_(Runtime::runtimeFeatureEnabled(
+        per_filter_buffer_(ENVOY_RUNTIME_FEATURE_ENABLED(
             "envoy.reloadable_features.filter_manager_per_filter_buffer")),
-        inject_data_with_state_update_(Runtime::runtimeFeatureEnabled(
+        inject_data_with_state_update_(ENVOY_RUNTIME_FEATURE_ENABLED(
             "envoy.reloadable_features.ext_proc_inject_data_with_state_update")),
+        request_buffer_tracker_(
+            buffer_limit,
+            [this]() -> void { requestDataTooLarge(request_buffer_tracker_.activeFilter()); },
+            [this]() -> void { requestDataDrained(); }),
+        response_buffer_tracker_(
+            buffer_limit,
+            [this]() -> void { responseDataTooLarge(response_buffer_tracker_.activeFilter()); },
+            [this]() -> void { responseDataDrained(); }),
         forward_held_trailers_(Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.filter_manager_forward_held_trailers")),
         buffer_limit_(buffer_limit) {}
@@ -1247,6 +1329,14 @@ private:
   // consistent for the lifetime of the stream.
   const bool per_filter_buffer_;
   const bool inject_data_with_state_update_;
+  // Apply the buffer limit across the per-filter buffers. Declared before the filters so they
+  // outlive the buffers that report to them. The local reply for a too large body is owned by the
+  // filter whose processing exceeded the limit, if any.
+  // TODO(wbpcode): the streaming flag is stream-level and the limit is latched like a single
+  // WatermarkBuffer, so once a streaming filter raises the watermark, a later buffering filter
+  // growing past the limit is never escalated to a local reply. Same as the shared buffer path.
+  PerFilterBufferTracker request_buffer_tracker_;
+  PerFilterBufferTracker response_buffer_tracker_;
   // Runtime flag latched when the filter manager is created, so the trailers handling stays
   // consistent for the lifetime of the stream.
   const bool forward_held_trailers_;

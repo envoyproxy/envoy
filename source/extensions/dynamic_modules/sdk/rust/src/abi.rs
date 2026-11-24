@@ -986,6 +986,28 @@ unsafe extern "C" {
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
+    /** envoy_dynamic_module_callback_get_runtime_string is called by the module to read a runtime value
+ as a string, which is the text of the value in the topmost layer that sets the key. A number or a
+ boolean has a text too, for example "80" or "true", so this reads a value of any type. Unlike the
+ callbacks above it takes no default value: the result tells whether the key has a value.
+
+ @param key is the runtime key to look up.
+ @param result is the pointer to the buffer variable where the text of the value will be stored.
+ It is left untouched when this returns false.
+ @return true if the key has a value, false if the key does not exist or the runtime is not
+ reachable from the calling thread.
+
+ Note that the buffer stored in result is owned by Envoy, and it is guaranteed to be valid until
+ the end of the current event hook. A module that needs the text for longer must copy it.
+ As for the callbacks above, key must not name one of Envoy's own `envoy.reloadable_features.*`
+ or `envoy.restart_features.*` guards.*/
+    pub fn envoy_dynamic_module_callback_get_runtime_string(
+        key: envoy_dynamic_module_type_module_buffer,
+        result: *mut envoy_dynamic_module_type_envoy_buffer,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
     /** envoy_dynamic_module_callback_register_function registers an opaque function pointer under the
  given key in the process-wide function registry. This allows modules loaded in the same process
  to expose functions that other modules can resolve by name and call directly, enabling zero-copy
@@ -11384,6 +11406,19 @@ unsafe extern "C" {
         extension_module_ptr: envoy_dynamic_module_type_bootstrap_extension_module_ptr,
         key: envoy_dynamic_module_type_envoy_buffer,
         value: f64,
+        removed: bool,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_on_bootstrap_extension_runtime_string_update is called when a watched
+ runtime key gets a new string value, or becomes unset after having one. The value is owned by
+ Envoy and valid only for the duration of the call.*/
+    pub fn envoy_dynamic_module_on_bootstrap_extension_runtime_string_update(
+        extension_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+        extension_module_ptr: envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+        key: envoy_dynamic_module_type_envoy_buffer,
+        value: envoy_dynamic_module_type_envoy_buffer,
         removed: bool,
     );
 }

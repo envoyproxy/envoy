@@ -40,6 +40,12 @@ public:
   void onGoAway(Envoy::Http::GoAwayErrorCode error_code) override {
     ENVOY_LOG(debug, "reverse_tunnel upstream codec: observed peer GOAWAY (error_code={})",
               static_cast<int>(error_code));
+    // Early drain METADATA only notifies the reporter. Stop selecting this tunnel when the
+    // GOAWAY also tells the pool to stop opening streams, even if METADATA was already reported.
+    if (auto* socket_manager = Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension::
+            getThreadLocalSocketManager()) {
+      socket_manager->markSocketDraining(fd_);
+    }
     notifyReporter();
     inner_.onGoAway(error_code);
   }
@@ -63,7 +69,13 @@ public:
   // Drive onGoAway into the pool's active client so the pool drains THIS connection (no new
   // streams, in-flight finish, close when idle). Needed because our drain GOAWAY is emitted
   // out-of-band, so the pool would not otherwise stop multiplexing onto it.
-  void drainOwnPoolConnection() { inner_.onGoAway(Envoy::Http::GoAwayErrorCode::NoError); }
+  void drainOwnPoolConnection() {
+    if (auto* socket_manager = Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension::
+            getThreadLocalSocketManager()) {
+      socket_manager->markSocketDraining(fd_);
+    }
+    inner_.onGoAway(Envoy::Http::GoAwayErrorCode::NoError);
+  }
 
   void onMetadata(Envoy::Http::MetadataMapPtr&& metadata_map_ptr) override {
     if (Bootstrap::ReverseConnection::ReverseConnectionUtility::eraseDrainMetadata(

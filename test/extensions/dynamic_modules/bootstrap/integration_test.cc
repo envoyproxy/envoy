@@ -284,6 +284,45 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, BasicRust) {
   EXPECT_LOG_CONTAINS("info", "Bootstrap extension shutdown from Rust!", { test_server_.reset(); });
 }
 
+TEST_P(DynamicModulesBootstrapIntegrationTest, BasicGo) {
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"info", "Go bootstrap scheduled initialization"},
+                                  {"info", "Go bootstrap initialization complete"},
+                                  {"info", "Go bootstrap server initialized"},
+                                  {"info", "Go bootstrap workers initialized"}}),
+      initializeWithBootstrapExtension(testDataDir("go"), "bootstrap_integration_test", "test",
+                                       "normal", true));
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"info", "Go bootstrap asynchronous shutdown"},
+                                  {"info", "Go bootstrap instance destroyed"},
+                                  {"info", "Go bootstrap config destroyed"}}),
+      { test_server_.reset(); });
+}
+
+TEST_P(DynamicModulesBootstrapIntegrationTest, DefaultLifecycleGo) {
+  initializeWithBootstrapExtension(testDataDir("go"), "bootstrap_integration_test", "test",
+                                   "default", true);
+  test_server_.reset();
+}
+
+TEST_P(DynamicModulesBootstrapIntegrationTest, ShutdownPanicGo) {
+  initializeWithBootstrapExtension(testDataDir("go"), "bootstrap_integration_test", "test",
+                                   "shutdown_panic", true);
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"error", "bootstrap shutdown panic"}, {"info", "Go bootstrap config destroyed"}}),
+      { test_server_.reset(); });
+}
+
+TEST_P(DynamicModulesBootstrapIntegrationTest, DestroyPanicGo) {
+  initializeWithBootstrapExtension(testDataDir("go"), "bootstrap_integration_test", "test",
+                                   "destroy_panic", true);
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"error", "bootstrap instance destroy panic"},
+                                  {"error", "bootstrap config destroy panic"}}),
+      { test_server_.reset(); });
+}
+
 // This test verifies that the Rust bootstrap extension can access stats from the stats store
 // and define/update its own metrics (counters, gauges, histograms).
 TEST_P(DynamicModulesBootstrapIntegrationTest, StatsAccessRust) {
@@ -751,6 +790,7 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, RuntimeUpdateRust) {
       Envoy::ExpectedLogMessages(
           {{"info", "Runtime update enabled for dynamic_modules_test.number: true"},
            {"info", "Runtime update enabled for dynamic_modules_test.ratio: true"},
+           {"info", "Runtime update enabled for dynamic_modules_test.mapping: true"},
            {"info",
             "Runtime update enabled for envoy.reloadable_features.test_feature_true: true"}}),
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_runtime_update_test"));
@@ -767,11 +807,14 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, RuntimeUpdateRust) {
       Envoy::ExpectedLogMessages(
           {{"info", "Runtime update: dynamic_modules_test.number=Int(42), getter agrees: true"},
            {"info", "Runtime update: dynamic_modules_test.ratio=Number(0.25), getter agrees: true"},
+           {"info", "Runtime update: dynamic_modules_test.mapping=String(\"80:15100,8080:15101\"), "
+                    "getter agrees: true"},
            {"info", "Runtime update: envoy.reloadable_features.test_feature_true=Bool(false), "
                     "getter agrees: true"}}),
       runtime_modify(
-          "dynamic_modules_test.number=42&dynamic_modules_test.ratio=0.25&envoy."
-          "reloadable_features.test_feature_true=false&dynamic_modules_test.unwatched=1"));
+          "dynamic_modules_test.number=42&dynamic_modules_test.ratio=0.25&dynamic_modules_test."
+          "mapping=80:15100,8080:15101&envoy.reloadable_features.test_feature_true=false&"
+          "dynamic_modules_test.unwatched=1"));
 
   EXPECT_LOG_NOT_CONTAINS(
       "info", "Runtime update:",
@@ -783,9 +826,11 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, RuntimeUpdateRust) {
       Envoy::ExpectedLogMessages(
           {{"info", "Runtime update: dynamic_modules_test.number=Int(1), getter agrees: true"},
            {"info", "Runtime update: dynamic_modules_test.ratio removed"},
+           {"info", "Runtime update: dynamic_modules_test.mapping removed"},
            {"info", "Runtime update: envoy.reloadable_features.test_feature_true removed"}}),
-      runtime_modify("dynamic_modules_test.number=&dynamic_modules_test.ratio=&envoy.reloadable_"
-                     "features.test_feature_true="));
+      runtime_modify(
+          "dynamic_modules_test.number=&dynamic_modules_test.ratio=&dynamic_modules_test."
+          "mapping=&envoy.reloadable_features.test_feature_true="));
 }
 
 // This test verifies that a bootstrap extension can register a function in the process-wide
