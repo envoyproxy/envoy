@@ -125,6 +125,7 @@ void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_
 void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                                             const EnvoyException*) {
   ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
+  receiver_.onVhdsFailure();
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();

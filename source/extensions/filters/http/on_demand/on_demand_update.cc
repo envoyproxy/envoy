@@ -198,6 +198,10 @@ Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeader
                                                              bool end_stream) {
   downstream_end_stream_ = end_stream;
   request_headers_ = &headers;
+  if (!callbacks_->route().has_value()) {
+    callbacks_->downstreamCallbacks()->refreshRouteConfigSnapshot();
+    callbacks_->downstreamCallbacks()->clearRouteCache();
+  }
   auto config = getConfig();
 
   config->decodeHeadersBehavior().decodeHeaders(*this);
@@ -254,7 +258,9 @@ Http::FilterDataStatus OnDemandRouteUpdate::decodeData(Buffer::Instance&, bool e
 
 Http::FilterTrailersStatus OnDemandRouteUpdate::decodeTrailers(Http::RequestTrailerMap&) {
   downstream_end_stream_ = true;
-  return Http::FilterTrailersStatus::Continue;
+  return filter_iteration_state_ == Http::FilterHeadersStatus::StopIteration
+             ? Http::FilterTrailersStatus::StopIteration
+             : Http::FilterTrailersStatus::Continue;
 }
 
 void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {

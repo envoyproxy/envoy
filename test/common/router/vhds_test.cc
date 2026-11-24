@@ -4,11 +4,13 @@
 
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/init/manager_impl.h"
+#include "source/common/init/target_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
@@ -18,10 +20,13 @@
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/server/admin/admin.h"
 #endif
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/init/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -40,15 +45,6 @@ using ::testing::Not;
 class MockRouteConfigUpdateObserver : public Rds::RouteConfigUpdateObserver {
 public:
   MOCK_METHOD(void, onConfigWarmed, ());
-};
-
-class MockVhdsConfigUpdateReceiver : public VhdsConfigUpdateReceiver {
-public:
-  MOCK_METHOD(bool, onVhdsUpdate,
-              (const VirtualHostRefVector& added_vhosts, std::set<std::string>&& added_resource_ids,
-               const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-               const std::string& version_info),
-              (override));
 };
 
 class VhdsTest : public testing::Test {
@@ -99,6 +95,35 @@ vhds:
   RouteConfigUpdatePtr makeReceiver() {
     return std::make_unique<RouteConfigUpdateReceiverImpl>(proto_traits_, factory_context_,
                                                            context_, /*from_rds=*/false);
+  }
+
+  struct SkipInitialWarmingReceiver {
+    envoy::config::route::v3::RouteConfiguration route_config;
+    std::unique_ptr<NiceMock<MockRouteConfigUpdateObserver>> observer;
+    RouteConfigUpdatePtr receiver;
+    Envoy::Config::MockSubscription* subscription{nullptr};
+    Envoy::Config::SubscriptionCallbacks* callbacks{nullptr};
+  };
+
+  SkipInitialWarmingReceiver makeSkipInitialWarmingReceiver() {
+    SkipInitialWarmingReceiver setup;
+    setup.route_config =
+        TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
+    setup.route_config.mutable_vhds()->mutable_skip_initial_warming();
+    setup.observer = std::make_unique<NiceMock<MockRouteConfigUpdateObserver>>();
+    setup.receiver = makeReceiver();
+    setup.receiver->setObserver(*setup.observer);
+    ON_CALL(*setup.observer, onConfigWarmed()).WillByDefault([receiver = setup.receiver.get()]() {
+      receiver->onVhdsConfigPublished();
+    });
+
+    EXPECT_OK(setup.receiver->onRdsUpdate(setup.route_config, "1"));
+    EXPECT_FALSE(setup.receiver->configWarming());
+    setup.subscription = factory_context_.cluster_manager_.subscription_factory_.subscription_;
+    setup.callbacks = factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+    EXPECT_NE(nullptr, setup.subscription);
+    EXPECT_NE(nullptr, setup.callbacks);
+    return setup;
   }
 
   // Applies an RDS update, which is what creates the VHDS subscription of the route configuration.
@@ -1001,6 +1026,568 @@ TEST_F(VhdsTest, SecondRdsUpdateWhileWarmingAppliesSkipInitialWarmingImmediately
   EXPECT_OK(config_update_info->onRdsUpdate(route_config_with_skip, "2"));
   EXPECT_FALSE(config_update_info->configWarming());
   EXPECT_TRUE(routeConfiguration(*config_update_info).vhds().has_skip_initial_warming());
+}
+
+TEST_F(VhdsTest, SkipInitialWarmingInitialWildcardWakesMatchedAndFallsThroughUnmatched) {
+  auto setup = makeSkipInitialWarmingReceiver();
+
+  EXPECT_CALL(*setup.subscription, requestOnDemandUpdate(_)).Times(0);
+  testing::MockFunction<void(bool)> matched_cb_fn;
+  auto matched_cb =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(matched_cb_fn.AsStdFunction());
+  testing::MockFunction<void(bool)> missing_cb_fn;
+  auto missing_cb =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(missing_cb_fn.AsStdFunction());
+
+  EXPECT_CALL(matched_cb_fn, Call(_)).Times(0);
+  EXPECT_CALL(missing_cb_fn, Call(_)).Times(0);
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  setup.receiver->requestVirtualHostsUpdate("exact.example.com", worker_dispatcher, matched_cb);
+  setup.receiver->requestVirtualHostsUpdate("missing.com", worker_dispatcher, missing_cb);
+  ::testing::Mock::VerifyAndClearExpectations(setup.subscription);
+  ::testing::Mock::VerifyAndClearExpectations(&matched_cb_fn);
+  ::testing::Mock::VerifyAndClearExpectations(&missing_cb_fn);
+
+  // Initial wildcard response matches exact.example.com (waking it immediately without on-demand)
+  // while missing.com falls through to a single per-domain requestOnDemandUpdate().
+  EXPECT_CALL(matched_cb_fn, Call(true));
+  EXPECT_CALL(missing_cb_fn, Call(_)).Times(0);
+  EXPECT_CALL(*setup.subscription,
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"my_route/missing.com"}));
+  const auto initial_added =
+      buildAddedResources({buildVirtualHost("vhost_exact", "exact.example.com")});
+  const auto initial_decoded =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(initial_added);
+  EXPECT_OK(setup.callbacks->onConfigUpdate(initial_decoded.refvec_, {}, "1"));
+  ::testing::Mock::VerifyAndClearExpectations(setup.subscription);
+  ::testing::Mock::VerifyAndClearExpectations(&matched_cb_fn);
+  ::testing::Mock::VerifyAndClearExpectations(&missing_cb_fn);
+
+  // Per-domain response wakes missing.com with true.
+  auto missing_resources = buildAddedResources({buildVirtualHost("vhost_missing", "missing.com")});
+  missing_resources.Mutable(0)->add_aliases("my_route/missing.com");
+  const auto missing_decoded =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(missing_resources);
+  EXPECT_CALL(missing_cb_fn, Call(true));
+  EXPECT_OK(setup.callbacks->onConfigUpdate(missing_decoded.refvec_, {}, "2"));
+}
+
+TEST_F(VhdsTest, SkipInitialWarmingEmptyInitialResponseTriggersSingleOnDemandPerDomain) {
+  auto setup = makeSkipInitialWarmingReceiver();
+
+  // Two concurrent requests for the same missing domain + one for another missing domain.
+  EXPECT_CALL(*setup.subscription, requestOnDemandUpdate(_)).Times(0);
+  testing::MockFunction<void(bool)> missing_cb1_fn;
+  auto missing_cb1 =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(missing_cb1_fn.AsStdFunction());
+  testing::MockFunction<void(bool)> missing_cb2_fn;
+  auto missing_cb2 =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(missing_cb2_fn.AsStdFunction());
+  testing::MockFunction<void(bool)> unresolved_cb_fn;
+  auto unresolved_cb =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(unresolved_cb_fn.AsStdFunction());
+
+  EXPECT_CALL(missing_cb1_fn, Call(_)).Times(0);
+  EXPECT_CALL(missing_cb2_fn, Call(_)).Times(0);
+  EXPECT_CALL(unresolved_cb_fn, Call(_)).Times(0);
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  setup.receiver->requestVirtualHostsUpdate("missing.com", worker_dispatcher, missing_cb1);
+  setup.receiver->requestVirtualHostsUpdate("missing.com", worker_dispatcher, missing_cb2);
+  setup.receiver->requestVirtualHostsUpdate("unresolved.com", worker_dispatcher, unresolved_cb);
+  ::testing::Mock::VerifyAndClearExpectations(setup.subscription);
+
+  // Initial empty wildcard update must issue each missing alias once and keep callbacks queued.
+  EXPECT_CALL(*setup.subscription,
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"my_route/missing.com"}));
+  EXPECT_CALL(*setup.subscription,
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"my_route/unresolved.com"}));
+  const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> empty_added;
+  const auto empty_decoded =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(empty_added);
+  EXPECT_OK(setup.callbacks->onConfigUpdate(empty_decoded.refvec_, {}, "1"));
+  ::testing::Mock::VerifyAndClearExpectations(setup.subscription);
+  ::testing::Mock::VerifyAndClearExpectations(&missing_cb1_fn);
+  ::testing::Mock::VerifyAndClearExpectations(&missing_cb2_fn);
+  ::testing::Mock::VerifyAndClearExpectations(&unresolved_cb_fn);
+
+  // Per-domain response for missing.com wakes both queued callbacks with true.
+  auto missing_resources = buildAddedResources({buildVirtualHost("vhost_missing", "missing.com")});
+  missing_resources.Mutable(0)->add_aliases("my_route/missing.com");
+  const auto missing_decoded =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(missing_resources);
+  EXPECT_CALL(missing_cb1_fn, Call(true));
+  EXPECT_CALL(missing_cb2_fn, Call(true));
+  EXPECT_CALL(unresolved_cb_fn, Call(_)).Times(0);
+  EXPECT_OK(setup.callbacks->onConfigUpdate(missing_decoded.refvec_, {}, "2"));
+  ::testing::Mock::VerifyAndClearExpectations(&missing_cb1_fn);
+  ::testing::Mock::VerifyAndClearExpectations(&missing_cb2_fn);
+  ::testing::Mock::VerifyAndClearExpectations(&unresolved_cb_fn);
+
+  // Negative per-domain response for unresolved.com wakes its callback with false.
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> empty_alias_resource;
+  empty_alias_resource.Add()->set_name("my_route/unresolved.com");
+  const auto empty_alias_decoded =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(empty_alias_resource);
+  EXPECT_CALL(unresolved_cb_fn, Call(false));
+  EXPECT_OK(setup.callbacks->onConfigUpdate(empty_alias_decoded.refvec_, {}, "3"));
+}
+
+TEST_F(VhdsTest, SkipInitialWarmingFailureWakesLatchedRequestsWithFalse) {
+  // Case 1: initial fetch timeout while WaitingForResponse.
+  {
+    auto setup = makeSkipInitialWarmingReceiver();
+
+    EXPECT_CALL(*setup.subscription, requestOnDemandUpdate(_)).Times(0);
+    testing::MockFunction<void(bool)> timeout_cb_fn;
+    auto timeout_cb =
+        std::make_shared<Http::RouteConfigUpdatedCallback>(timeout_cb_fn.AsStdFunction());
+    NiceMock<Event::MockDispatcher> worker_dispatcher;
+    setup.receiver->requestVirtualHostsUpdate("timeout.com", worker_dispatcher, timeout_cb);
+    ::testing::Mock::VerifyAndClearExpectations(setup.subscription);
+
+    EXPECT_CALL(*setup.subscription, requestOnDemandUpdate(_)).Times(0);
+    EXPECT_CALL(timeout_cb_fn, Call(false));
+    setup.callbacks->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
+                                          nullptr);
+    ::testing::Mock::VerifyAndClearExpectations(setup.subscription);
+
+    // Subsequent on-demand requests after initial failure go directly to requestOnDemandUpdate.
+    EXPECT_CALL(*setup.subscription,
+                requestOnDemandUpdate(absl::flat_hash_set<std::string>{"my_route/after.com"}));
+    testing::MockFunction<void(bool)> after_cb_fn;
+    auto after_cb = std::make_shared<Http::RouteConfigUpdatedCallback>(after_cb_fn.AsStdFunction());
+    setup.receiver->requestVirtualHostsUpdate("after.com", worker_dispatcher, after_cb);
+  }
+
+  // Case 2: invalid initial VHDS response throws during config build and invokes
+  // onConfigUpdateFailed(UpdateRejected).
+  {
+    auto setup = makeSkipInitialWarmingReceiver();
+
+    EXPECT_CALL(*setup.subscription, requestOnDemandUpdate(_)).Times(0);
+    testing::MockFunction<void(bool)> rejected_cb_fn;
+    auto rejected_cb =
+        std::make_shared<Http::RouteConfigUpdatedCallback>(rejected_cb_fn.AsStdFunction());
+    NiceMock<Event::MockDispatcher> worker_dispatcher;
+    setup.receiver->requestVirtualHostsUpdate("rejected.com", worker_dispatcher, rejected_cb);
+    ::testing::Mock::VerifyAndClearExpectations(setup.subscription);
+
+    const auto invalid_vhost = TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
+      name: invalid_vhost
+      domains: ["invalid.example.com"]
+      routes:
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header
+              string_match:
+                safe_regex:
+                  regex: "(+invalid regex)"
+        route: { cluster: my_service }
+    )EOF");
+    const auto added_invalid = buildAddedResources({invalid_vhost});
+    const auto decoded_invalid =
+        TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_invalid);
+    EXPECT_THROW(std::ignore = setup.callbacks->onConfigUpdate(decoded_invalid.refvec_, {}, "1"),
+                 EnvoyException);
+
+    EXPECT_CALL(*setup.subscription, requestOnDemandUpdate(_)).Times(0);
+    EXPECT_CALL(rejected_cb_fn, Call(false));
+    EnvoyException exception("invalid weighted_clusters");
+    setup.callbacks->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
+                                          &exception);
+  }
+}
+
+TEST_F(VhdsTest, SkipInitialWarmingIntermediateRdsUpdatesAndVhdsRemoval) {
+  auto setup = makeSkipInitialWarmingReceiver();
+
+  EXPECT_CALL(*setup.subscription, requestOnDemandUpdate(_)).Times(0);
+  testing::MockFunction<void(bool)> rds_added_cb_fn;
+  auto rds_added_cb =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(rds_added_cb_fn.AsStdFunction());
+  testing::MockFunction<void(bool)> still_waiting_cb_fn;
+  auto still_waiting_cb =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(still_waiting_cb_fn.AsStdFunction());
+  testing::MockFunction<void(bool)> rds_missing_cb_fn;
+  auto rds_missing_cb =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(rds_missing_cb_fn.AsStdFunction());
+
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  setup.receiver->requestVirtualHostsUpdate("rds_added.com", worker_dispatcher, rds_added_cb);
+  setup.receiver->requestVirtualHostsUpdate("still_waiting.com", worker_dispatcher,
+                                            still_waiting_cb);
+
+  // Intermediate RDS update keeping VHDS adds rds_added.com, waking only its callback while keeping
+  // still_waiting.com latched.
+  auto intermediate_rds = setup.route_config;
+  *intermediate_rds.add_virtual_hosts() = buildVirtualHost("vhost_rds_added", "rds_added.com");
+  EXPECT_CALL(rds_added_cb_fn, Call(true));
+  EXPECT_CALL(still_waiting_cb_fn, Call(_)).Times(0);
+  EXPECT_OK(setup.receiver->onRdsUpdate(intermediate_rds, "2"));
+  ::testing::Mock::VerifyAndClearExpectations(&rds_added_cb_fn);
+  ::testing::Mock::VerifyAndClearExpectations(&still_waiting_cb_fn);
+
+  setup.receiver->requestVirtualHostsUpdate("rds_missing.com", worker_dispatcher, rds_missing_cb);
+
+  // An RDS update that removes VHDS completely resolves remaining latched callbacks against the
+  // updated RDS route configuration without stranding them.
+  envoy::config::route::v3::RouteConfiguration rds_without_vhds;
+  rds_without_vhds.set_name("my_route");
+  *rds_without_vhds.add_virtual_hosts() =
+      buildVirtualHost("vhost_still_waiting", "still_waiting.com");
+  EXPECT_CALL(still_waiting_cb_fn, Call(true));
+  EXPECT_CALL(rds_missing_cb_fn, Call(false));
+  EXPECT_OK(setup.receiver->onRdsUpdate(rds_without_vhds, "3"));
+}
+
+TEST_F(VhdsTest, SkipInitialWarmingRemovedByRdsUpdateFlushesLatchedCallbacks) {
+  auto setup = makeSkipInitialWarmingReceiver();
+
+  EXPECT_CALL(*setup.subscription, requestOnDemandUpdate(_)).Times(0);
+  testing::MockFunction<void(bool)> latched_cb_fn;
+  auto latched_cb =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(latched_cb_fn.AsStdFunction());
+  EXPECT_CALL(latched_cb_fn, Call(_)).Times(0);
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  setup.receiver->requestVirtualHostsUpdate("flushed.com", worker_dispatcher, latched_cb);
+
+  // Replace VHDS subscription with a new config_source without skip_initial_warming.
+  auto second_subscription = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
+  Envoy::Config::MockSubscription* second_subscription_ptr = second_subscription.get();
+  Envoy::Config::SubscriptionCallbacks* second_callbacks = nullptr;
+  EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
+      .WillOnce([&second_subscription,
+                 &second_callbacks](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                                    Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
+                                    Envoy::Config::OpaqueResourceDecoderSharedPtr,
+                                    const Envoy::Config::SubscriptionOptions&) {
+        second_callbacks = &callbacks;
+        return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(second_subscription));
+      });
+  {
+    testing::InSequence s;
+    EXPECT_CALL(*second_subscription_ptr, accept(absl::flat_hash_set<std::string>{"my_route/*"}));
+    EXPECT_CALL(*second_subscription_ptr, start(absl::flat_hash_set<std::string>{}));
+    EXPECT_CALL(*second_subscription_ptr,
+                requestOnDemandUpdate(absl::flat_hash_set<std::string>{"my_route/flushed.com"}));
+  }
+
+  const auto updated_route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: another_xds_cluster
+)EOF");
+  EXPECT_OK(setup.receiver->onRdsUpdate(updated_route_config, "2"));
+  ASSERT_NE(nullptr, second_callbacks);
+  ::testing::Mock::VerifyAndClearExpectations(&latched_cb_fn);
+
+  auto flushed_resources = buildAddedResources({buildVirtualHost("vhost_flushed", "flushed.com")});
+  flushed_resources.Mutable(0)->add_aliases("my_route/flushed.com");
+  const auto flushed_decoded =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(flushed_resources);
+  EXPECT_CALL(latched_cb_fn, Call(true));
+  EXPECT_OK(second_callbacks->onConfigUpdate(flushed_decoded.refvec_, {}, "1"));
+}
+
+TEST_F(VhdsTest, SkipInitialWarmingResolvesInFlightWorkerRequestsPostedBeforeWildcardPublish) {
+  std::vector<Event::PostCb> buffered_posts;
+  bool buffer_posts = false;
+  ON_CALL(factory_context_.dispatcher_, post(_))
+      .WillByDefault([&buffered_posts, &buffer_posts](Event::PostCb cb) {
+        if (buffer_posts) {
+          buffered_posts.push_back(std::move(cb));
+        } else {
+          cb();
+        }
+      });
+
+  std::function<void()> pending_thread_local_complete;
+  ON_CALL(factory_context_.thread_local_, runOnAllThreads(_, _))
+      .WillByDefault([&pending_thread_local_complete](std::function<void()> cb,
+                                                      std::function<void()> main_callback) {
+        cb();
+        pending_thread_local_complete = std::move(main_callback);
+      });
+
+  // Case 1: Initial wildcard publish delivers both an exact vhost and a catch-all '*' fallback.
+  // In-flight worker posts evaluated against the pre-VHDS TLS snapshot (queued before publish or
+  // posted while TLS updates are still propagating across workers) resolve locally with zero
+  // updateOnDemand() calls.
+  {
+    auto setup = makeSkipInitialWarmingReceiver();
+    NiceMock<Event::MockDispatcher> worker_dispatcher;
+
+    testing::MockFunction<void(bool)> pre_publish_exact_fn;
+    auto pre_publish_exact_cb =
+        std::make_shared<Http::RouteConfigUpdatedCallback>(pre_publish_exact_fn.AsStdFunction());
+    testing::MockFunction<void(bool)> pre_publish_wildcard_fn;
+    auto pre_publish_wildcard_cb =
+        std::make_shared<Http::RouteConfigUpdatedCallback>(pre_publish_wildcard_fn.AsStdFunction());
+
+    buffer_posts = true;
+    setup.receiver->requestVirtualHostsUpdate("pre-exact.example.com", worker_dispatcher,
+                                              pre_publish_exact_cb);
+    setup.receiver->requestVirtualHostsUpdate("pre-wildcard.example.com", worker_dispatcher,
+                                              pre_publish_wildcard_cb);
+    buffer_posts = false;
+    ASSERT_EQ(2, buffered_posts.size());
+
+    EXPECT_CALL(*setup.subscription, requestOnDemandUpdate(_)).Times(0);
+    EXPECT_CALL(pre_publish_exact_fn, Call(_)).Times(0);
+    EXPECT_CALL(pre_publish_wildcard_fn, Call(_)).Times(0);
+    const auto added_resources =
+        buildAddedResources({buildVirtualHost("vhost_exact", "pre-exact.example.com"),
+                             buildVirtualHost("vhost_wildcard", "\"*\"")});
+    const auto decoded_resources =
+        TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+    EXPECT_OK(setup.callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
+    ASSERT_TRUE(pending_thread_local_complete != nullptr);
+    ::testing::Mock::VerifyAndClearExpectations(&pre_publish_exact_fn);
+    ::testing::Mock::VerifyAndClearExpectations(&pre_publish_wildcard_fn);
+
+    EXPECT_CALL(pre_publish_exact_fn, Call(true));
+    EXPECT_CALL(pre_publish_wildcard_fn, Call(true));
+    for (auto& post : buffered_posts) {
+      post();
+    }
+    buffered_posts.clear();
+
+    testing::MockFunction<void(bool)> during_propagation_cb_fn;
+    auto during_propagation_cb = std::make_shared<Http::RouteConfigUpdatedCallback>(
+        during_propagation_cb_fn.AsStdFunction());
+    EXPECT_CALL(during_propagation_cb_fn, Call(true));
+    setup.receiver->requestVirtualHostsUpdate("during-prop.example.com", worker_dispatcher,
+                                              during_propagation_cb);
+    ::testing::Mock::VerifyAndClearExpectations(setup.subscription);
+
+    pending_thread_local_complete();
+    pending_thread_local_complete = nullptr;
+  }
+
+  // Case 2: Initial wildcard publish without catch-all '*' still forwards truly missing domains
+  // to updateOnDemand(), and an invalidating RDS update cancels an in-flight PropagatingToWorkers
+  // transition via the generation counter.
+  {
+    auto setup = makeSkipInitialWarmingReceiver();
+    NiceMock<Event::MockDispatcher> worker_dispatcher;
+
+    const auto exact_only_resources =
+        buildAddedResources({buildVirtualHost("vhost_exact", "exact.example.com")});
+    const auto exact_only_decoded =
+        TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(exact_only_resources);
+    EXPECT_OK(setup.callbacks->onConfigUpdate(exact_only_decoded.refvec_, {}, "1"));
+    ASSERT_TRUE(pending_thread_local_complete != nullptr);
+    auto stale_thread_local_complete = std::move(pending_thread_local_complete);
+    pending_thread_local_complete = nullptr;
+
+    testing::MockFunction<void(bool)> missing_cb_fn;
+    auto missing_cb =
+        std::make_shared<Http::RouteConfigUpdatedCallback>(missing_cb_fn.AsStdFunction());
+    EXPECT_CALL(*setup.subscription,
+                requestOnDemandUpdate(absl::flat_hash_set<std::string>{"my_route/missing.com"}));
+    EXPECT_CALL(missing_cb_fn, Call(_)).Times(0);
+    setup.receiver->requestVirtualHostsUpdate("missing.com", worker_dispatcher, missing_cb);
+    ::testing::Mock::VerifyAndClearExpectations(setup.subscription);
+
+    // Replace VHDS subscription with another skip_initial_warming config while
+    // stale_thread_local_complete is still pending; running stale_thread_local_complete afterwards
+    // must be ignored.
+    auto replacement_subscription = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
+    Envoy::Config::MockSubscription* replacement_subscription_ptr = replacement_subscription.get();
+    EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
+                subscriptionFromConfigSource(_, _, _, _, _, _))
+        .WillOnce([&replacement_subscription](const envoy::config::core::v3::ConfigSource&,
+                                              absl::string_view, Stats::Scope&,
+                                              Envoy::Config::SubscriptionCallbacks&,
+                                              Envoy::Config::OpaqueResourceDecoderSharedPtr,
+                                              const Envoy::Config::SubscriptionOptions&) {
+          return absl::StatusOr<Envoy::Config::SubscriptionPtr>(
+              std::move(replacement_subscription));
+        });
+    auto updated_route_config =
+        TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: another_xds_cluster
+  skip_initial_warming: {}
+)EOF");
+    EXPECT_OK(setup.receiver->onRdsUpdate(updated_route_config, "2"));
+    stale_thread_local_complete();
+
+    EXPECT_CALL(*replacement_subscription_ptr, requestOnDemandUpdate(_)).Times(0);
+    testing::MockFunction<void(bool)> new_latched_cb_fn;
+    auto new_latched_cb =
+        std::make_shared<Http::RouteConfigUpdatedCallback>(new_latched_cb_fn.AsStdFunction());
+    setup.receiver->requestVirtualHostsUpdate("new-latched.com", worker_dispatcher, new_latched_cb);
+  }
+}
+
+TEST_F(VhdsTest, SkipInitialWarmingDisabledOnSameConfigSourceFlushesLatchedCallbacks) {
+  auto setup = makeSkipInitialWarmingReceiver();
+
+  EXPECT_CALL(*setup.subscription, requestOnDemandUpdate(_)).Times(0);
+  testing::MockFunction<void(bool)> rds_covered_cb_fn;
+  auto rds_covered_cb =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(rds_covered_cb_fn.AsStdFunction());
+  testing::MockFunction<void(bool)> needs_on_demand_cb_fn;
+  auto needs_on_demand_cb =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(needs_on_demand_cb_fn.AsStdFunction());
+  EXPECT_CALL(rds_covered_cb_fn, Call(_)).Times(0);
+  EXPECT_CALL(needs_on_demand_cb_fn, Call(_)).Times(0);
+
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  setup.receiver->requestVirtualHostsUpdate("rds-covered.com", worker_dispatcher, rds_covered_cb);
+  setup.receiver->requestVirtualHostsUpdate("needs-on-demand.com", worker_dispatcher,
+                                            needs_on_demand_cb);
+  ::testing::Mock::VerifyAndClearExpectations(setup.subscription);
+  ::testing::Mock::VerifyAndClearExpectations(&rds_covered_cb_fn);
+  ::testing::Mock::VerifyAndClearExpectations(&needs_on_demand_cb_fn);
+
+  // Roll back skip_initial_warming via RDS keeping the same vhds.config_source. The existing
+  // subscription must survive and latched callbacks must flush immediately once RDS publishes.
+  EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
+      .Times(0);
+  EXPECT_CALL(rds_covered_cb_fn, Call(true));
+  EXPECT_CALL(*setup.subscription, requestOnDemandUpdate(absl::flat_hash_set<std::string>{
+                                       "my_route/needs-on-demand.com"}));
+  EXPECT_CALL(needs_on_demand_cb_fn, Call(_)).Times(0);
+
+  auto rollback_rds = setup.route_config;
+  rollback_rds.mutable_vhds()->clear_skip_initial_warming();
+  *rollback_rds.add_virtual_hosts() = buildVirtualHost("vhost_rds_covered", "rds-covered.com");
+  EXPECT_OK(setup.receiver->onRdsUpdate(rollback_rds, "2"));
+  ::testing::Mock::VerifyAndClearExpectations(setup.subscription);
+  ::testing::Mock::VerifyAndClearExpectations(&rds_covered_cb_fn);
+  ::testing::Mock::VerifyAndClearExpectations(&needs_on_demand_cb_fn);
+
+  auto on_demand_resources =
+      buildAddedResources({buildVirtualHost("vhost_on_demand", "needs-on-demand.com")});
+  on_demand_resources.Mutable(0)->add_aliases("my_route/needs-on-demand.com");
+  const auto on_demand_decoded =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(on_demand_resources);
+  EXPECT_CALL(needs_on_demand_cb_fn, Call(true));
+  EXPECT_OK(setup.callbacks->onConfigUpdate(on_demand_decoded.refvec_, {}, "1"));
+
+  EXPECT_CALL(*setup.subscription,
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"my_route/after.com"}));
+  testing::MockFunction<void(bool)> after_cb_fn;
+  auto after_cb = std::make_shared<Http::RouteConfigUpdatedCallback>(after_cb_fn.AsStdFunction());
+  setup.receiver->requestVirtualHostsUpdate("after.com", worker_dispatcher, after_cb);
+}
+
+TEST_F(VhdsTest, SkipInitialWarmingNoopVhdsUpdateWhileWarmingDefersCallbackResolution) {
+  class WarmingRouteFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+  public:
+    struct EmptyRouteSpecificFilterConfig : public RouteSpecificFilterConfig {};
+
+    WarmingRouteFilterConfig() : EmptyHttpFilterConfig("vhds.test.warming_filter") {}
+
+    absl::StatusOr<Http::FilterFactoryCb>
+    createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
+      PANIC("not implemented");
+    }
+    ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
+      return std::make_unique<Protobuf::Timestamp>();
+    }
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      return std::make_unique<Protobuf::Timestamp>();
+    }
+    std::set<std::string> configTypes() override { return {"google.protobuf.Timestamp"}; }
+    absl::StatusOr<RouteSpecificFilterConfigConstSharedPtr> createHttpFilterRouteConfig(
+        const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
+        Server::Configuration::ExtraFactoryContext& extra_context) override {
+      target_ = std::make_unique<Init::TargetImpl>("vhds_test_warming_filter", []() {});
+      if (extra_context.init_manager.has_value()) {
+        extra_context.init_manager->add(*target_);
+      }
+      return std::make_shared<EmptyRouteSpecificFilterConfig>();
+    }
+
+    void markReady() {
+      if (target_ != nullptr) {
+        target_->ready();
+      }
+    }
+
+  private:
+    std::unique_ptr<Init::TargetImpl> target_;
+  };
+
+  WarmingRouteFilterConfig warming_filter_factory;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registered_factory(
+      warming_filter_factory);
+
+  auto setup = makeSkipInitialWarmingReceiver();
+
+  EXPECT_CALL(*setup.subscription, requestOnDemandUpdate(_)).Times(0);
+  testing::MockFunction<void(bool)> warming_rds_cb_fn;
+  auto warming_rds_cb =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(warming_rds_cb_fn.AsStdFunction());
+  testing::MockFunction<void(bool)> still_missing_cb_fn;
+  auto still_missing_cb =
+      std::make_shared<Http::RouteConfigUpdatedCallback>(still_missing_cb_fn.AsStdFunction());
+  EXPECT_CALL(warming_rds_cb_fn, Call(_)).Times(0);
+  EXPECT_CALL(still_missing_cb_fn, Call(_)).Times(0);
+
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  setup.receiver->requestVirtualHostsUpdate("warming-rds.com", worker_dispatcher, warming_rds_cb);
+  setup.receiver->requestVirtualHostsUpdate("still-missing.com", worker_dispatcher,
+                                            still_missing_cb);
+  ::testing::Mock::VerifyAndClearExpectations(setup.subscription);
+  ::testing::Mock::VerifyAndClearExpectations(&warming_rds_cb_fn);
+  ::testing::Mock::VerifyAndClearExpectations(&still_missing_cb_fn);
+
+  // Start an RDS update adding warming-rds.com that stays warming via the filter init target.
+  auto warming_rds = setup.route_config;
+  auto* vhost = warming_rds.add_virtual_hosts();
+  *vhost = buildVirtualHost("vhost_warming_rds", "warming-rds.com");
+  Protobuf::Timestamp filter_config;
+  filter_config.set_seconds(1);
+  ASSERT_TRUE((*warming_rds.mutable_typed_per_filter_config())["vhds.test.warming_filter"].PackFrom(
+      filter_config));
+  EXPECT_CALL(*setup.observer, onConfigWarmed()).Times(0);
+  EXPECT_OK(setup.receiver->onRdsUpdate(warming_rds, "2"));
+  ASSERT_TRUE(setup.receiver->configWarming());
+  ::testing::Mock::VerifyAndClearExpectations(setup.observer.get());
+
+  // An empty no-op initial VHDS update arriving while warming must transition to WarmingResponse
+  // and defer latched callback resolution until the warming update publishes, rather than
+  // prematurely calling requestOnDemandUpdate() against the stale pre-warming config.
+  EXPECT_CALL(*setup.subscription, requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(warming_rds_cb_fn, Call(_)).Times(0);
+  EXPECT_CALL(still_missing_cb_fn, Call(_)).Times(0);
+  const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> empty_added;
+  const auto empty_decoded =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(empty_added);
+  EXPECT_OK(setup.callbacks->onConfigUpdate(empty_decoded.refvec_, {}, "1"));
+  ::testing::Mock::VerifyAndClearExpectations(setup.subscription);
+  ::testing::Mock::VerifyAndClearExpectations(&warming_rds_cb_fn);
+  ::testing::Mock::VerifyAndClearExpectations(&still_missing_cb_fn);
+
+  // Completing warming publishes the new RDS config and resolves latched callbacks against it.
+  EXPECT_CALL(*setup.observer, onConfigWarmed()).WillOnce([&]() {
+    setup.receiver->onVhdsConfigPublished();
+  });
+  EXPECT_CALL(warming_rds_cb_fn, Call(true));
+  EXPECT_CALL(*setup.subscription, requestOnDemandUpdate(absl::flat_hash_set<std::string>{
+                                       "my_route/still-missing.com"}));
+  EXPECT_CALL(still_missing_cb_fn, Call(_)).Times(0);
+  warming_filter_factory.markReady();
+  ASSERT_FALSE(setup.receiver->configWarming());
 }
 
 } // namespace

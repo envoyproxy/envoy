@@ -18,7 +18,7 @@ namespace Router {
 
 /**
  * The part of a route configuration receiver that a VHDS subscription drives. Split out so that the
- * subscription only depends on - and a test only has to mock - the one callback it uses.
+ * subscription only depends on - and a test only has to mock - the callbacks it uses.
  */
 class VhdsConfigUpdateReceiver {
 public:
@@ -39,6 +39,11 @@ public:
                             std::set<std::string>&& added_resource_ids,
                             const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                             const std::string& version_info) PURE;
+
+  /**
+   * Called when a VHDS config update fails (e.g., initial fetch timeout or rejected update).
+   */
+  virtual void onVhdsFailure() PURE;
 };
 
 /**

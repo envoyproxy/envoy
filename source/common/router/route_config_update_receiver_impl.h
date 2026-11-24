@@ -10,6 +10,7 @@
 #include "envoy/router/route_config_update_receiver.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/utility.h"
@@ -69,6 +70,7 @@ public:
                     std::set<std::string>&& added_resource_ids,
                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                     const std::string& version_info) override;
+  void onVhdsFailure() override;
   void onRdsFailure() override { base_.onRdsFailure(); }
   void setObserver(OptRef<Rds::RouteConfigUpdateObserver> observer) override {
     base_.warmer_.setObserver(observer);
@@ -109,9 +111,18 @@ public:
   void onVhdsConfigPublished() override;
 
 private:
+  enum class InitialVhdsState {
+    Complete,
+    WaitingForResponse,
+    WarmingResponse,
+    PropagatingToWorkers,
+  };
+
   static void notifyCallback(const ConfigImpl& config, const std::string& alias,
                              Event::Dispatcher& thread_local_dispatcher,
                              std::weak_ptr<Http::RouteConfigUpdatedCallback> cb);
+  void enterPropagatingToWorkers();
+  void resolveLatchedInitialVhdsCallbacks(bool failed);
 
   const Protobuf::Any& latestRouteConfigurationAny() const {
     return base_.warming_state_.route_config_any_.has_value()
@@ -147,6 +158,9 @@ private:
   // the server has answered each of them in a published update.
   absl::flat_hash_map<std::string, bool> requested_vhds_resource_ids_;
   std::list<UpdateOnDemandCallback> config_update_callbacks_;
+  InitialVhdsState initial_vhds_state_{InitialVhdsState::Complete};
+  uint64_t initial_vhds_generation_{0};
+  ThreadLocal::TypedSlotPtr<> tls_slot_;
   // A flag used to determine if this instance of RouteConfigUpdateReceiverImpl hasn't been
   // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.
   std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};

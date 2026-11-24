@@ -213,11 +213,14 @@ message Vhds {
   // If set, initial VHDS warming does not block listener or route configuration initialization;
   // the client marks initialization ready immediately upon starting the VHDS subscription while
   // the initial VHDS request remains in flight. Requests arriving before the initial VHDS update
-  // completes are routed against the route configuration's existing virtual hosts (or trigger
-  // per-domain on-demand VHDS discovery when the :ref:`on-demand HTTP filter
-  // <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` is configured). When unset,
-  // initial VHDS warming blocks listener and route configuration initialization until the initial
-  // VHDS update completes or fails.
+  // completes are routed against the route configuration's existing virtual hosts. When the
+  // :ref:`on-demand HTTP filter <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>`
+  // is configured, requests that miss route lookup while the initial VHDS request is in flight
+  // wait for the initial VHDS update to complete (resuming immediately if the initial update
+  // resolves a matching virtual host, falling through to per-domain on-demand VHDS discovery if
+  // still unmatched, or completing without route discovery if the initial VHDS fetch fails). When
+  // unset, initial VHDS warming blocks listener and route configuration initialization until the
+  // initial VHDS update completes or fails.
   SkipInitialWarming skip_initial_warming = 2
       [(xds.annotations.v3.field_status).work_in_progress = true];
 }
