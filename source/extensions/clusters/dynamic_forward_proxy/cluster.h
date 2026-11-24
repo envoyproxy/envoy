@@ -250,8 +250,9 @@ private:
   void updatePriorityState(const Upstream::HostVector& hosts_added,
                            const Upstream::HostVector& hosts_removed)
       ABSL_LOCKS_EXCLUDED(host_map_lock_);
-  // With dfp_cluster_coalesce_host_updates: queue a host-set change and publish all queued changes
-  // once per main-loop pass instead of once per DNS result.
+  // True if host-set changes are queued and published once per main-loop pass instead of once per
+  // DNS result (dfp_cluster_coalesce_host_updates). Creates the flush callback on first use.
+  bool coalesceHostUpdates();
   void queueHostUpdate(const Upstream::HostVector& hosts_added,
                        const Upstream::HostVector& hosts_removed);
   void flushHostUpdates() ABSL_LOCKS_EXCLUDED(host_map_lock_);
@@ -276,7 +277,7 @@ private:
   mutable absl::Mutex host_map_lock_;
   HostInfoMap host_map_ ABSL_GUARDED_BY(host_map_lock_);
 
-  // Main thread only. Set when dfp_cluster_coalesce_host_updates is on.
+  // Main thread only. Created lazily by coalesceHostUpdates().
   Event::SchedulableCallbackPtr host_update_flush_;
   absl::flat_hash_set<Upstream::HostSharedPtr> pending_hosts_added_;
   Upstream::HostVector pending_hosts_removed_;

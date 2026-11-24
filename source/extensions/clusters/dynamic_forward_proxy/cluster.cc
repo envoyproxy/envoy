@@ -91,11 +91,6 @@ Cluster::Cluster(
     idle_timer_ = main_thread_dispatcher_.createTimer([this]() { checkIdleSubCluster(); });
     idle_timer_->enableTimer(sub_cluster_ttl_);
   }
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.dfp_cluster_coalesce_host_updates")) {
-    host_update_flush_ =
-        main_thread_dispatcher_.createSchedulableCallback([this]() { flushHostUpdates(); });
-  }
 }
 
 Cluster::~Cluster() {
@@ -351,13 +346,25 @@ absl::Status Cluster::onDnsHostAddOrUpdate(
   Upstream::HostVector hosts_removed;
   RETURN_IF_NOT_OK(addOrUpdateHost(host, host_info, hosts_added, hosts_removed));
   if (!hosts_added.empty() || !hosts_removed.empty()) {
-    if (host_update_flush_ != nullptr) {
+    if (coalesceHostUpdates()) {
       queueHostUpdate(hosts_added, hosts_removed);
     } else {
       updatePriorityState(hosts_added, hosts_removed);
     }
   }
   return absl::OkStatus();
+}
+
+bool Cluster::coalesceHostUpdates() {
+  if (host_update_flush_ == nullptr) {
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.dfp_cluster_coalesce_host_updates")) {
+      return false;
+    }
+    host_update_flush_ =
+        main_thread_dispatcher_.createSchedulableCallback([this]() { flushHostUpdates(); });
+  }
+  return true;
 }
 
 void Cluster::queueHostUpdate(const Upstream::HostVector& hosts_added,
@@ -413,7 +420,7 @@ void Cluster::onDnsHostRemove(const std::string& host) {
     host_map_.erase(host);
     ENVOY_LOG(debug, "removing dfproxy cluster host '{}'", host);
   }
-  if (host_update_flush_ != nullptr) {
+  if (coalesceHostUpdates()) {
     queueHostUpdate({}, hosts_removed);
   } else {
     updatePriorityState({}, hosts_removed);
