@@ -123,6 +123,31 @@ The following configuration sheds new requests once the pressure that the module
            threshold:
              value: 0.9
 
+A module built with the Rust SDK can report the memory that its Rust code allocates this way, with
+the ``TrackingAllocator`` and ``MemoryResourceMonitor`` of the ``memory`` module of the SDK. The
+resource monitor must load the same shared object as the filters of the module, by the same name or
+local file name, since a module loaded from another file is a separate instance with an allocator of
+its own. A module whose global allocator is another one reports failed updates, which the
+``failed_updates`` statistic of the resource counts. On Linux, a module that uses the allocator
+stays loaded, so a new build of the module needs a new path.
+
+The following configuration reports the pressure of the module ``my_module`` in the
+``overload.my_module_memory.pressure`` gauge, for a module whose ``memory`` resource monitor takes
+its budget in bytes as its configuration, here 1 GiB.
+
+.. code-block:: yaml
+
+   resource_monitors:
+     - name: "my_module_memory"
+       typed_config:
+         "@type": type.googleapis.com/envoy.extensions.resource_monitors.dynamic_modules.v3.DynamicModuleResourceMonitor
+         dynamic_module_config:
+           name: "my_module"
+         resource_monitor_name: "memory"
+         resource_monitor_config:
+           "@type": type.googleapis.com/google.protobuf.StringValue
+           value: "1073741824"
+
 .. _config_overload_manager_triggers:
 
 Triggers

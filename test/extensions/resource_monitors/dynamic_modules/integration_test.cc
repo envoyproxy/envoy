@@ -15,6 +15,8 @@ namespace Envoy {
 namespace {
 
 using testing::Eq;
+using testing::Ge;
+using testing::Lt;
 
 constexpr absl::string_view PressureRuntimeKey = "test.dynamic_module_monitor.pressure";
 
@@ -42,6 +44,14 @@ public:
   void initializeOverloadManager(const std::string& resource_monitor_name,
                                  const std::string& resource_monitor_config,
                                  const std::string& overload_manager_fields) {
+    initializeOverloadManager("resource_monitor_test", resource_monitor_name,
+                              resource_monitor_config, overload_manager_fields);
+  }
+
+  void initializeOverloadManager(const std::string& module_name,
+                                 const std::string& resource_monitor_name,
+                                 const std::string& resource_monitor_config,
+                                 const std::string& overload_manager_fields) {
     const std::string yaml = absl::StrCat(R"EOF(
 refresh_interval: 0.01s
 resource_monitors:
@@ -49,7 +59,8 @@ resource_monitors:
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.resource_monitors.dynamic_modules.v3.DynamicModuleResourceMonitor
     dynamic_module_config:
-      name: resource_monitor_test
+      name: )EOF",
+                                          module_name, R"EOF(
       do_not_close: true
     resource_monitor_name: )EOF",
                                           resource_monitor_name, R"EOF(
@@ -81,6 +92,35 @@ resource_monitors:
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("503", response->headers().getStatusValue());
     EXPECT_EQ("envoy overloaded", response->body());
+    codec_client_->close();
+  }
+
+  // Monitors the memory of the given module with the given configuration of its memory monitor.
+  // The HTTP filter of the same module answers every request, so that the filters and the resource
+  // monitor share the module and its allocator.
+  void initializeMemoryMonitor(const std::string& module_name,
+                               const std::string& resource_monitor_config) {
+    config_helper_.prependFilter(fmt::format(R"EOF(
+name: envoy.extensions.filters.http.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+  dynamic_module_config:
+    name: {}
+  filter_name: memory
+)EOF",
+                                             module_name));
+    initializeOverloadManager(module_name, "memory", resource_monitor_config, "");
+  }
+
+  // Sends a request with the given header to the HTTP filter of the module and expects the reply to
+  // have the given status.
+  void expectReply(const std::string& header, const std::string& value, absl::string_view status) {
+    Http::TestRequestHeaderMapImpl headers = default_request_headers_;
+    headers.addCopy(header, value);
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    auto response = codec_client_->makeHeaderOnlyRequest(headers);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ(status, response->headers().getStatusValue());
     codec_client_->close();
   }
 };
@@ -154,6 +194,16 @@ loadshed_points:
       "overload.envoy.load_shed_points.http_connection_manager_decode_headers.shed_load_count",
       Eq(1));
   test_server_->waitForGauge("overload.dynamic_module_monitor.pressure", Eq(100));
+}
+
+TEST_P(DynamicModuleResourceMonitorIntegrationTest, ReportsMemoryRetainedByFilters) {
+  initializeMemoryMonitor("memory_tracking_integration_test", "1048576");
+
+  expectReply("x-retain-bytes", "786432", "200");
+  test_server_->waitForGauge("overload.dynamic_module_monitor.pressure", Ge(75));
+
+  expectReply("x-release", "true", "200");
+  test_server_->waitForGauge("overload.dynamic_module_monitor.pressure", Lt(10));
 }
 
 } // namespace
