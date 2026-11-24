@@ -1657,6 +1657,37 @@ TEST_F(FilterManagerPerFilterBufferTest, ModifyEncodingBufferModifiesOnlyOwnBuff
   filter_manager_->destroyFilters();
 }
 
+// Regression guard (#49585): in the legacy shared-buffer model (per_filter_buffer=false) a filter
+// other than the recorded latest data filter may modify the shared request buffer. Here the body
+// is buffered at filter 1 (the latest data filter) and modified from filter 0, which is not;
+// restoring the removed modifyDecodingBuffer() assert would fail this.
+TEST_F(FilterManagerPerFilterBufferTest, LegacySharedDecodingBufferModifiableByNonLatestFilter) {
+  initializeChain(false);
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndBuffer);
+
+  filters_[0]->decoder_callbacks_->modifyDecodingBuffer(
+      [](Buffer::Instance& buffer) { buffer.add("!"); });
+  EXPECT_EQ("aaabbb!", filters_[0]->decoder_callbacks_->decodingBuffer()->toString());
+  EXPECT_EQ("aaabbb!", filters_[1]->decoder_callbacks_->decodingBuffer()->toString());
+
+  filter_manager_->destroyFilters();
+}
+
+// As above for the response path: the shared encoding buffer is modified from filter 2, which is
+// not the latest data filter (the body is buffered at filter 1). Restoring the removed
+// modifyEncodingBuffer() assert would fail this.
+TEST_F(FilterManagerPerFilterBufferTest, LegacySharedEncodingBufferModifiableByNonLatestFilter) {
+  initializeChain(false);
+  bufferResponseBodyAtTwoFilters();
+
+  filters_[2]->encoder_callbacks_->modifyEncodingBuffer(
+      [](Buffer::Instance& buffer) { buffer.add("!"); });
+  EXPECT_EQ("aaabbb!", filters_[2]->encoder_callbacks_->encodingBuffer()->toString());
+  EXPECT_EQ("aaabbb!", filters_[1]->encoder_callbacks_->encodingBuffer()->toString());
+
+  filter_manager_->destroyFilters();
+}
+
 TEST_F(FilterManagerPerFilterBufferTest, StopAllBuffersRequestAtStoppedFilter) {
   initializeChain(true);
   records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
