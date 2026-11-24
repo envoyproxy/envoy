@@ -193,8 +193,7 @@ macro_rules! declare_init_functions {
 /// Get the concurrency from the server context options.
 /// # Safety
 ///
-/// This function must be called on the main thread, so the program init function cannot call it
-/// when a worker thread loads the module.
+/// This function must be called on the main thread.
 pub unsafe fn get_server_concurrency() -> u32 {
   unsafe { abi::envoy_dynamic_module_callback_get_concurrency() }
 }
@@ -603,10 +602,8 @@ macro_rules! set_factory_once {
 
 /// The function signature for the program init function.
 ///
-/// This is called when the dynamic module is loaded, on the thread that loads it, which can be a
-/// worker thread, and it must return true on success, and false on failure. When it returns false,
-/// the dynamic module will not be loaded, and its next load calls it again. Other loads of the
-/// module wait until it returns, and Envoy never runs it concurrently for the same module.
+/// This is called when the dynamic module is loaded, and it must return true on success, and false
+/// on failure. When it returns false, the dynamic module will not be loaded.
 ///
 /// This is useful to perform any process-wide initialization that the dynamic module needs.
 pub type ProgramInitFunction = fn() -> bool;

@@ -23,9 +23,8 @@ thread_local! {
 /// The module-side bridge configuration.
 ///
 /// This trait must be implemented by the module to handle bridge configuration.
-/// The object is created on each thread that uses the corresponding Envoy upstream config, usually
-/// a worker thread, the first time the thread uses it, or on its next use if the factory returned
-/// `None`, and it is dropped when that thread exits.
+/// The object is created when the corresponding Envoy upstream config is loaded, and
+/// it is dropped when the corresponding Envoy config is destroyed.
 ///
 /// Implementations must be `Send + Sync` since they may be accessed from multiple threads.
 pub trait UpstreamHttpTcpBridgeConfig: Send + Sync {

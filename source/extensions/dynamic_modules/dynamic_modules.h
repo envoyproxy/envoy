@@ -28,7 +28,8 @@ using ProtoDynamicModuleConfig = envoy::extensions::dynamic_modules::v3::Dynamic
  * (for dynamically loaded modules) or a statically-linked symbol namespace (for static modules).
  * When the DynamicModule object is destroyed, the dlopen handle is closed (if applicable).
  *
- * This class can be created on any thread and shared with other threads.
+ * This class is supposed to be initialized once in the main thread and can be shared with other
+ * threads.
  */
 class DynamicModule {
 public:
@@ -90,11 +91,6 @@ using DynamicModulePtr = std::unique_ptr<DynamicModule>;
  * The binding mode is not a parameter: the loader binds now (RTLD_NOW) by default and falls back to
  * lazy binding (RTLD_LAZY) when the ``envoy.reloadable_features.dynamic_modules_rtld_now`` runtime
  * guard is disabled.
- *
- * A call waits while another call runs the envoy_dynamic_module_on_program_init of the same module,
- * and runs it again if it failed while the module stayed loaded, unless the
- * ``envoy.reloadable_features.dynamic_modules_rerun_failed_program_init`` runtime guard is
- * disabled.
  */
 absl::StatusOr<DynamicModulePtr>
 newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,
@@ -133,8 +129,7 @@ newDynamicModuleByName(const absl::string_view module_name, const bool do_not_cl
  * Creates a new DynamicModule backed by symbols already present in the process binary (i.e.,
  * statically linked). No shared object file is loaded. Instead, symbols are resolved via
  * dlsym(RTLD_DEFAULT, ...) with the module name used as a prefix:
- * "<module_name>_<symbol_name>". Every call runs the envoy_dynamic_module_on_program_init of the
- * module, and waits while another call runs it.
+ * "<module_name>_<symbol_name>".
  * @param module_name the module name used to build the symbol prefix.
  */
 absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_name);

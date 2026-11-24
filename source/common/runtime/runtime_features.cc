@@ -60,11 +60,6 @@ RUNTIME_GUARD(envoy_reloadable_features_default_client_tls_max_version_is_1_3);
 RUNTIME_GUARD(envoy_reloadable_features_direct_local_reply_flush_saved_response_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_redirect_prefix_rewrite_with_path_match_policy);
-// When enabled, which is the default, a load of a dynamic module that is already loaded runs its
-// envoy_dynamic_module_on_program_init again if it failed before, for example on a module that
-// do_not_close keeps loaded. Disable to restore the previous behavior, in which such a load skips
-// the init function and uses the module without it.
-RUNTIME_GUARD(envoy_reloadable_features_dynamic_modules_rerun_failed_program_init);
 // When enabled, which is the default, dynamic modules are loaded with RTLD_NOW so that every
 // referenced symbol is resolved at load time instead of lazily on first use. A module that
 // references a symbol the main program does not provide then fails to load rather than crashing

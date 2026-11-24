@@ -16,22 +16,18 @@
 #include "envoy/init/manager.h"
 #include "envoy/server/factory_context.h"
 
-#include "source/common/common/cleanup.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/background_fetch_manager.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
-#include "source/extensions/dynamic_modules/module_init_registry.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/synchronization/mutex.h"
 #include "absl/types/span.h"
 #include "openssl/evp.h"
 #include "openssl/sha.h"
@@ -85,80 +81,54 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
   // imports at load time, so the RTLD_NOW / RTLD_LAZY runtime guard does not apply.
   UNREFERENCED_PARAMETER(load_globally);
 
-  // GetModuleHandleExW matches the names of the loaded modules, which use backslashes.
-  const std::wstring wide_path =
-      std::filesystem::path(object_file_absolute_path).make_preferred().wstring();
+  const std::wstring wide_path = object_file_absolute_path.wstring();
   const std::string path_string = object_file_absolute_path.string();
 
-  const bool rerun_failed_init = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.dynamic_modules_rerun_failed_program_init");
-  ModuleInitRegistry& init_registry = ModuleInitRegistry::get();
+  // GetModuleHandleExW without GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT returns the handle of
+  // an already resident module and increments its reference count, which mirrors
+  // dlopen(RTLD_NOLOAD). This avoids the duplicate call to the init function.
   HMODULE handle = nullptr;
-  bool must_init = false;
-  {
-    absl::MutexLock lock(init_registry.mutex());
-    // GetModuleHandleExW without GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT returns the handle
-    // of an already resident module and increments its reference count, which mirrors
-    // dlopen(RTLD_NOLOAD). The registry tracks the init function of such a module.
-    const bool already_loaded =
-        ::GetModuleHandleExW(0, wide_path.c_str(), &handle) && handle != nullptr;
-    if (!already_loaded) {
-      // LOAD_WITH_ALTERED_SEARCH_PATH makes the loader resolve the module's own dependencies from
-      // the module's directory. It is only defined for absolute paths; a bare module name is
-      // searched in the standard DLL search order instead.
-      const DWORD load_flags =
-          object_file_absolute_path.is_absolute() ? LOAD_WITH_ALTERED_SEARCH_PATH : 0;
-      // Suppress the system error dialog boxes that the loader may otherwise show for missing or
-      // corrupt images, so that a failure is reported only through the returned status.
-      DWORD previous_error_mode = 0;
-      const bool error_mode_set = ::SetThreadErrorMode(
-          SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX, &previous_error_mode);
-      handle = ::LoadLibraryExW(wide_path.c_str(), nullptr, load_flags);
-      const DWORD load_error = ::GetLastError();
-      if (error_mode_set) {
-        ::SetThreadErrorMode(previous_error_mode, nullptr);
-      }
-      if (handle == nullptr) {
-        const std::string reason = errorDetails(static_cast<int>(load_error));
-        logModuleLoadFailure(path_string, reason);
-        return absl::InvalidArgumentError(
-            absl::StrCat("Failed to load dynamic module: ", path_string, " : ", reason));
-      }
-      if (do_not_close) {
-        // Pin the module so that it stays loaded until the process exits, regardless of
-        // FreeLibrary calls. This is the equivalent of RTLD_NODELETE.
-        HMODULE pinned = nullptr;
-        if (!::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                                      GET_MODULE_HANDLE_EX_FLAG_PIN,
-                                  reinterpret_cast<LPCWSTR>(handle), &pinned)) {
-          const std::string reason = errorDetails(static_cast<int>(::GetLastError()));
-          ::FreeLibrary(handle);
-          logModuleLoadFailure(path_string, reason);
-          return absl::InvalidArgumentError(
-              absl::StrCat("Failed to pin dynamic module: ", path_string, " : ", reason));
-        }
-      }
-      // The probe did not find the module, so the init state of its handle belongs to a module that
-      // was unloaded, unless a load that reached it by another path runs its init function.
-      init_registry.forgetSharedObject(handle);
-    }
-    if (already_loaded && !rerun_failed_init) {
-      init_registry.waitForSharedObjectInit(handle);
-    } else {
-      must_init = init_registry.startSharedObjectInit(handle);
+  if (::GetModuleHandleExW(0, wide_path.c_str(), &handle) && handle != nullptr) {
+    return std::make_unique<DynamicModule>(handle);
+  }
+
+  // LOAD_WITH_ALTERED_SEARCH_PATH makes the loader resolve the module's own dependencies from the
+  // module's directory. It is only defined for absolute paths; a bare module name is searched in
+  // the standard DLL search order instead.
+  const DWORD load_flags =
+      object_file_absolute_path.is_absolute() ? LOAD_WITH_ALTERED_SEARCH_PATH : 0;
+  // Suppress the system error dialog boxes that the loader may otherwise show for missing or
+  // corrupt images, so that a failure is reported only through the returned status.
+  DWORD previous_error_mode = 0;
+  const bool error_mode_set =
+      ::SetThreadErrorMode(SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX, &previous_error_mode);
+  handle = ::LoadLibraryExW(wide_path.c_str(), nullptr, load_flags);
+  const DWORD load_error = ::GetLastError();
+  if (error_mode_set) {
+    ::SetThreadErrorMode(previous_error_mode, nullptr);
+  }
+  if (handle == nullptr) {
+    const std::string reason = errorDetails(static_cast<int>(load_error));
+    logModuleLoadFailure(path_string, reason);
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to load dynamic module: ", path_string, " : ", reason));
+  }
+  if (do_not_close) {
+    // Pin the module so that it stays loaded until the process exits, regardless of FreeLibrary
+    // calls. This is the equivalent of RTLD_NODELETE.
+    HMODULE pinned = nullptr;
+    if (!::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                                  GET_MODULE_HANDLE_EX_FLAG_PIN,
+                              reinterpret_cast<LPCWSTR>(handle), &pinned)) {
+      const std::string reason = errorDetails(static_cast<int>(::GetLastError()));
+      ::FreeLibrary(handle);
+      logModuleLoadFailure(path_string, reason);
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to pin dynamic module: ", path_string, " : ", reason));
     }
   }
 
   DynamicModulePtr dynamic_module = std::make_unique<DynamicModule>(handle);
-  if (!must_init) {
-    return dynamic_module;
-  }
-  // The init function runs without the lock, so that the loads of other modules do not wait for
-  // it, and the registry makes the other loads of this module wait.
-  bool init_succeeded = false;
-  Cleanup finish_init([&init_registry, handle, &init_succeeded] {
-    init_registry.finishSharedObjectInit(handle, init_succeeded);
-  });
 
   const auto init_function =
       dynamic_module->getFunctionPointer<decltype(&envoy_dynamic_module_on_program_init)>(
@@ -189,7 +159,6 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
                         "Dynamic module ABI version {} matched.", module_abi_version);
   }
-  init_succeeded = true;
   return dynamic_module;
 }
 
@@ -376,7 +345,7 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_vi
   }
   auto temp_file_path = moduleTempPath(sha256);
   // If the module was already loaded at this path, newDynamicModule's GetModuleHandleExW check
-  // returns the existing handle, whose init function runs again only if it failed.
+  // returns the existing handle without re-init.
   auto result = newDynamicModule(temp_file_path, do_not_close, load_globally);
   if (!result.ok()) {
     // Clean up the invalid file. Removal fails if the file is still mapped by the process, which
@@ -388,10 +357,6 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_vi
 }
 
 absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_name) {
-  ModuleInitRegistry& init_registry = ModuleInitRegistry::get();
-  init_registry.startStaticModuleInit(module_name);
-  Cleanup finish_init(
-      [&init_registry, module_name] { init_registry.finishStaticModuleInit(module_name); });
   auto dynamic_module = std::make_unique<DynamicModule>(module_name);
 
   const auto init_function =
