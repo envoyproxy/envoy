@@ -177,8 +177,8 @@ TEST_F(ChainWriterTest, CancelUnwindsBudgetYieldedInject) {
   EXPECT_EQ(bridge_.inject_calls_, 8);
 }
 
-// Re-entrant cancellation inside bridge_.injectData() unwinds immediately via CheckCancelled
-// without emitting further chunks.
+// Re-entrant cancellation inside bridge_.injectData() is observed on the next loop iteration's
+// FilterChainWritable awaitable without emitting further chunks.
 TEST_F(ChainWriterTest, ReentrantCancelDuringInjectStopsImmediately) {
   Buffer::OwnedImpl data(std::string(3 * ChainWriter::WriteChunkSize, 'z'));
   std::optional<Coroutine::DetachedHandle> handle;
