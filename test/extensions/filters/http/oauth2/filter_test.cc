@@ -7910,6 +7910,18 @@ TEST_F(OAuth2ParRedirectTest, InlineParSuccessSendsOneRedirect) {
   EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
 }
 
+// The request is never forwarded upstream: decoding stays stopped during PAR and after the
+// redirect is sent.
+TEST_F(OAuth2ParRedirectTest, RequestIsNotForwardedUpstream) {
+  initPar(parProtoConfig());
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  const std::string request_uri(kRequestUri);
+  startParFlow();
+  EXPECT_CALL(*oauth_client_, pushedRequestUri()).WillRepeatedly(ReturnRef(request_uri));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true));
+  filter_->onPushAuthorizationRequestSuccess();
+}
+
 // A second success callback must not send a second response.
 TEST_F(OAuth2ParRedirectTest, RepeatedSuccessCallbackSendsOneRedirect) {
   initPar(parProtoConfig());
