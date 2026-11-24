@@ -284,6 +284,45 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, BasicRust) {
   EXPECT_LOG_CONTAINS("info", "Bootstrap extension shutdown from Rust!", { test_server_.reset(); });
 }
 
+TEST_P(DynamicModulesBootstrapIntegrationTest, BasicGo) {
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"info", "Go bootstrap scheduled initialization"},
+                                  {"info", "Go bootstrap initialization complete"},
+                                  {"info", "Go bootstrap server initialized"},
+                                  {"info", "Go bootstrap workers initialized"}}),
+      initializeWithBootstrapExtension(testDataDir("go"), "bootstrap_integration_test", "test",
+                                       "normal", true));
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"info", "Go bootstrap asynchronous shutdown"},
+                                  {"info", "Go bootstrap instance destroyed"},
+                                  {"info", "Go bootstrap config destroyed"}}),
+      { test_server_.reset(); });
+}
+
+TEST_P(DynamicModulesBootstrapIntegrationTest, DefaultLifecycleGo) {
+  initializeWithBootstrapExtension(testDataDir("go"), "bootstrap_integration_test", "test",
+                                   "default", true);
+  test_server_.reset();
+}
+
+TEST_P(DynamicModulesBootstrapIntegrationTest, ShutdownPanicGo) {
+  initializeWithBootstrapExtension(testDataDir("go"), "bootstrap_integration_test", "test",
+                                   "shutdown_panic", true);
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"error", "bootstrap shutdown panic"}, {"info", "Go bootstrap config destroyed"}}),
+      { test_server_.reset(); });
+}
+
+TEST_P(DynamicModulesBootstrapIntegrationTest, DestroyPanicGo) {
+  initializeWithBootstrapExtension(testDataDir("go"), "bootstrap_integration_test", "test",
+                                   "destroy_panic", true);
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"error", "bootstrap instance destroy panic"},
+                                  {"error", "bootstrap config destroy panic"}}),
+      { test_server_.reset(); });
+}
+
 // This test verifies that the Rust bootstrap extension can access stats from the stats store
 // and define/update its own metrics (counters, gauges, histograms).
 TEST_P(DynamicModulesBootstrapIntegrationTest, StatsAccessRust) {
