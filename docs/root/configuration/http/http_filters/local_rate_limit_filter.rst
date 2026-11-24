@@ -162,7 +162,12 @@ By default, the token bucket of every matched descriptor is consumed. Setting
 :ref:`rate limit configuration <envoy_v3_api_msg_config.route.v3.RateLimit>` makes the filter skip
 all later configurations once that configuration has matched, so later buckets are not consumed.
 Earlier configurations still apply, so configurations that should always count must be placed
-before the first one with the flag.
+before the first one with the flag. For the deprecated route and virtual host ``rate_limits``,
+only later configurations of the same
+:ref:`stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>` are skipped. The filter also
+ignores :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>`
+for them and evaluates them all at request time, so a stream-done configuration with the flag can
+stop the search there.
 
 The search stops only within one ``rate_limits`` list. When
 :ref:`rate_limits_override_option <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limits_override_option>`
@@ -179,7 +184,9 @@ whose
 does not stop the search either, so the request falls through to later configurations. A match does
 not require a configured descriptor with a token bucket for it, so a configuration that always
 populates, such as one using ``request_headers`` on a header that is always present, stops the
-search even when its descriptor matches no bucket. The default token bucket is still consumed according to
+search even when its descriptor matches no bucket. What a configuration counts does not matter
+either: one whose ``hits_addend`` is zero or sets ``is_negative_hits`` still matches and stops the
+search. The default token bucket is still consumed according to
 :ref:`always_consume_default_token_bucket <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.always_consume_default_token_bucket>`.
 
 This makes tiered limits easy to express. In the following configuration, ``client-a`` consumes

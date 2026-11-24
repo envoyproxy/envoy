@@ -2855,42 +2855,15 @@ message RateLimit {
   // Descriptor level X-RateLimit headers options which may override the filter level setting.
   XRateLimitOption x_ratelimit_option = 7;
 
-  // If set to true and this configuration produces a descriptor for a request, no later
-  // configuration is evaluated for that request. Earlier configurations are not affected, so
-  // configurations that should always apply must be placed before the first one with this
-  // field set. This allows ordered, tiered limits: put the more specific configurations first,
-  // each with this field set, and a catch-all configuration last.
+  // If set to true and this configuration produces a descriptor for a request, later
+  // configurations in the same ``rate_limits`` list are skipped. Earlier configurations and other
+  // lists, such as a filter level list, still apply; the deprecated route and virtual host
+  // ``rate_limits`` count as one list. This allows ordered, tiered limits: put the more specific
+  // configurations first, each with this field set, and a catch-all configuration last. See the
+  // :ref:`rate limit <config_http_filters_rate_limit_stop_on_match>` and :ref:`local rate limit
+  // <config_http_filters_local_rate_limit_stop_on_match>` filter docs for the details.
   //
-  // The search stops only within one ``rate_limits`` list. When several lists apply to a request,
-  // for example per-route lists at more than one level with ``rate_limits_override_option`` set to
-  // ``ALL_LEVELS``, a stop in one list does not skip the others. Tiers that should exclude each
-  // other must therefore be in the same list, and lists at other levels, such as a filter level
-  // cap, always apply. The deprecated route and virtual host ``rate_limits`` are the exception:
-  // a match on a route configuration with this field set also skips the virtual host ones.
-  //
-  // Where :ref:`apply_on_stream_done
-  // <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` is supported, those
-  // configurations are evaluated separately from the request-time ones, so each phase stops on its
-  // own. The HTTP local rate limit filter ignores ``apply_on_stream_done`` for the deprecated route
-  // and virtual host ``rate_limits`` and evaluates them all at request time, so there a stream-done
-  // configuration with this field set can stop the request-time search.
-  //
-  // For the deprecated route and virtual host ``rate_limits``, only later configurations of the
-  // same :ref:`stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>` are skipped, since each
-  // filter only evaluates the configurations of its own stage.
-  //
-  // A configuration matches when all of its actions populate and the resulting descriptor has at
-  // least one entry. A configuration whose actions are all skipped through ``skip_if_absent`` does
-  // not match and does not stop the search. In the filters' embedded ``rate_limits``, neither does
-  // a configuration whose :ref:`hits_addend
-  // <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` fails to evaluate, so such a
-  // request falls through to later configurations. For the HTTP local rate limit filter a match
-  // does not require a configured token bucket for the descriptor. What a configuration counts
-  // does not matter either: one whose ``hits_addend`` is zero or sets ``is_negative_hits`` still
-  // matches and stops the search, so this field is usually left unset on such configurations.
-  //
-  // Currently, this is only supported by the HTTP global and local rate limit filters. Other
-  // filters that use this message, such as the Thrift rate limit filter, ignore it.
+  // Only supported by the HTTP rate limit and local rate limit filters.
   bool stop_on_match = 8;
 }
 

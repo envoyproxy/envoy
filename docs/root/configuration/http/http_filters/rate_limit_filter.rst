@@ -173,7 +173,9 @@ configuration does not stop the search. The same holds when every action is skip
 configuration whose
 :ref:`hits_addend <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` fails to evaluate,
 for example because the header it reads is missing or not a number, does not match either, so the
-request falls through to later configurations.
+request falls through to later configurations. What a configuration counts does not matter: one
+whose ``hits_addend`` is zero or sets ``is_negative_hits`` still matches and stops the search, so
+the flag is usually left unset on such configurations.
 
 With the following configuration, a request with ``x-user-id: client-a`` only produces the
 ``("tier", "client-a")`` descriptor, and a request with any other ``x-user-id`` value produces
