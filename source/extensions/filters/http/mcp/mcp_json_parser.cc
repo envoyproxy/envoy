@@ -1055,9 +1055,9 @@ absl::Status rewriteBuffer(Buffer::Instance& body, absl::Span<BufferEdit> edits)
     return a.target.start < b.target.start;
   });
   for (const BufferEdit& edit : edits) {
-    if (edit.target.end > body.length()) {
-      return absl::InvalidArgumentError("Invalid BufferEdit with end exceeding body length");
-    }
+    // If the edit is not within bounds, there's a bug in `TraceContextLocator` or
+    // `rewriteTraceContext()`.
+    ASSERT(edit.target.end <= body.length());
   }
 
   Buffer::OwnedImpl rewritten;
@@ -1110,14 +1110,9 @@ absl::Status McpJsonParser::rewriteTraceContext(Buffer::Instance& body,
     ts_range = locator.tracestateRange();
   }
 
-  static constexpr size_t kTraceparentSize = Tracing::W3cTraceConstants::kTraceparentHeaderSize;
-
-  if (tp_range.size() != kTraceparentSize) {
-    return absl::InvalidArgumentError("Parsed traceparent with wrong size");
-  }
   // The body's traceparent might straddle multiple slices. For simplicity, make
   // a contiguous copy.
-  std::array<char, kTraceparentSize> traceparent;
+  std::array<char, Tracing::W3cTraceConstants::kTraceparentHeaderSize> traceparent;
   if (tp_range.size() != traceparent.size()) {
     return absl::InvalidArgumentError(absl::StrCat("Parsed traceparent of size ", tp_range.size(),
                                                    ", but expected ", traceparent.size()));
@@ -1132,10 +1127,6 @@ absl::Status McpJsonParser::rewriteTraceContext(Buffer::Instance& body,
     RETURN_IF_NOT_OK(parsed.status());
     parsed->setSpanId(std::string(new_parent_id));
     new_traceparent = SpanContextExtractor::serializeTraceparent(*parsed);
-  }
-  if (new_traceparent.size() != traceparent.size()) {
-    return absl::InternalError(
-        "New traceparent's length unexpected differs from original traceparent");
   }
 
   // Build the sequence of edits that will replace the body's traceparent and

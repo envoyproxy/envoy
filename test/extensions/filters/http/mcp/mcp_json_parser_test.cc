@@ -9,6 +9,7 @@
 
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_replace.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -2445,6 +2446,78 @@ TEST_F(McpJsonParserTest, RewriteTraceparentInvalidJsonReturnsError) {
 
   ASSERT_THAT(McpJsonParser::rewriteTraceContext(buffer, kNewParentId, /*new_tracestate=*/""),
               Not(IsOk()));
+}
+
+TEST_F(McpJsonParserTest, RewriteTraceparentHandlesMissingMeta) {
+  static constexpr absl::string_view kJson =
+      R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test"
+    }
+  })";
+  static constexpr absl::string_view kNewParentId = "21b6bcb2a5588606";
+
+  EXPECT_OK(parser_->parse(kJson));
+  ASSERT_OK(parser_->finishParse());
+
+  Buffer::OwnedImpl buffer;
+  buffer.add(kJson);
+
+  ASSERT_THAT(McpJsonParser::rewriteTraceContext(buffer, kNewParentId, /*new_tracestate=*/""),
+              Not(IsOk()));
+}
+
+TEST_F(McpJsonParserTest, RewriteTraceparentHandlesMissingTraceparent) {
+  static constexpr absl::string_view kJson =
+      R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "_meta": {}
+    }
+  })";
+  static constexpr absl::string_view kNewParentId = "21b6bcb2a5588606";
+
+  EXPECT_OK(parser_->parse(kJson));
+  ASSERT_OK(parser_->finishParse());
+
+  Buffer::OwnedImpl buffer;
+  buffer.add(kJson);
+
+  ASSERT_THAT(McpJsonParser::rewriteTraceContext(buffer, kNewParentId, /*new_tracestate=*/""),
+              Not(IsOk()));
+}
+
+TEST_F(McpJsonParserTest, RewriteTraceparentWithAssortedJsonSyntax) {
+  static constexpr absl::string_view kJson =
+      R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rojo=123"
+      },
+      "teleport_goats": true,
+      "goat_destination": null,
+      "utf8_string": "🔥"
+    }
+  })";
+  static constexpr absl::string_view kNewParentId = "21b6bcb2a5588606";
+
+  EXPECT_OK(parser_->parse(kJson));
+  ASSERT_OK(parser_->finishParse());
+
+  Buffer::OwnedImpl buffer;
+  buffer.add(kJson);
+
+  ASSERT_OK(McpJsonParser::rewriteTraceContext(buffer, kNewParentId, /*new_tracestate=*/""));
+  EXPECT_EQ(buffer.toString(), absl::StrReplaceAll(kJson, {{"00f067aa0ba902b7", kNewParentId}}));
 }
 
 } // namespace
