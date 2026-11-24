@@ -365,6 +365,15 @@ TEST_F(ListenerFilterBufferImplTest, DrainMoreThanBufferedDataFails) {
   EXPECT_FALSE(listener_buffer_->drain(buffer_size_ / 2 + 1));
   EXPECT_FALSE(listener_buffer_->drain(buffer_size_ * 4));
   EXPECT_EQ(buffer_size_ / 2, listener_buffer_->rawSlice().len_);
+
+  // Draining exactly the buffered data still succeeds.
+  EXPECT_CALL(io_handle_, recv).WillOnce([&](void*, size_t length, int flags) {
+    EXPECT_EQ(0, flags);
+    EXPECT_EQ(buffer_size_ / 2, length);
+    return Api::IoCallUint64Result(length, Api::IoError::none());
+  });
+  EXPECT_TRUE(listener_buffer_->drain(buffer_size_ / 2));
+  EXPECT_EQ(0, listener_buffer_->rawSlice().len_);
 }
 
 TEST_F(ListenerFilterBufferImplTest, ResetCapacity) {

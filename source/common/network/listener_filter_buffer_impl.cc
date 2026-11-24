@@ -33,7 +33,8 @@ bool ListenerFilterBufferImpl::drain(uint64_t length) {
     return true;
   }
 
-  // Never recv past the peeked data, it would write beyond the end of buffer_.
+  // Draining more than was peeked could consume bytes no filter has inspected, wrap data_size_
+  // or write beyond the end of buffer_.
   if (length > data_size_) {
     ENVOY_LOG(debug, "drain length {} exceeds buffered data size {}", length, data_size_);
     return false;
