@@ -88,7 +88,7 @@ Meanwhile, another internal listener binding to the above listener address inclu
 A sample config can be found :repo:`here <configs/encapsulate_http_in_http2_connect.yaml>`
 
 Logging tunnel response information
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The CONNECT response is consumed by the internal listener's TCP proxy. It is separate from the
 application HTTP responses seen by the outer HTTP connection manager. To make tunnel response

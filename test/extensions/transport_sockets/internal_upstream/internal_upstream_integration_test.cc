@@ -369,7 +369,7 @@ public:
       auto* extension = bootstrap.add_bootstrap_extensions();
       extension->set_name("envoy.bootstrap.internal_listener");
       envoy::extensions::bootstrap::internal_listener::v3::InternalListener config;
-      extension->mutable_typed_config()->PackFrom(config);
+      ASSERT_TRUE(extension->mutable_typed_config()->PackFrom(config));
       auto* resources = bootstrap.mutable_static_resources();
       auto* cluster = resources->add_clusters();
       cluster->set_name("tunnel_loopback");
@@ -393,7 +393,7 @@ public:
       proxy.mutable_tunneling_config()->set_hostname("customer.example:80");
       proxy.mutable_tunneling_config()->set_propagate_response_headers_to_upstream_connection(
           publish);
-      filter->mutable_typed_config()->PackFrom(proxy);
+      ASSERT_TRUE(filter->mutable_typed_config()->PackFrom(proxy));
     });
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
