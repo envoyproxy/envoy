@@ -4,39 +4,17 @@
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/event/schedulable_cb.h"
 
 #include "source/common/coroutine/task.h"
+#include "source/extensions/filters/http/ai_protocol_manager/filter_chain_awaitables.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
 
-#include "absl/functional/any_invocable.h"
 #include "absl/status/status.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
-
-// Reuses a single lazily-allocated Event::SchedulableCallback across multiple one-shot
-// LeafAwaitables (Event::SchedulableCallback binds its std::function<void()> once at creation and
-// exposes no setCallback(), so capturing an awaitable's `this` directly at creation would dangle on
-// subsequent co_awaits).
-class ReusableSchedulableCallback {
-public:
-  explicit ReusableSchedulableCallback(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
-
-  void scheduleCurrentIteration(absl::AnyInvocable<void()> fn);
-  void scheduleNextIteration(absl::AnyInvocable<void()> fn);
-  void cancel();
-
-private:
-  Event::SchedulableCallback& ensureCallback();
-
-  Event::Dispatcher& dispatcher_;
-  absl::AnyInvocable<void()> fn_;
-  Event::SchedulableCallbackPtr cb_;
-};
 
 // Injects buffers into the Envoy filter chain via FilterChainBridge, pacing emission against
 // filter-chain write watermarks and the per-iteration chunk budget. Cancellation is driven by the

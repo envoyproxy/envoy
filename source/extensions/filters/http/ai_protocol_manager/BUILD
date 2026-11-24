@@ -82,20 +82,33 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "chain_writer_lib",
-    srcs = ["chain_writer.cc"],
-    hdrs = ["chain_writer.h"],
+    name = "filter_chain_awaitables_lib",
+    srcs = ["filter_chain_awaitables.cc"],
+    hdrs = ["filter_chain_awaitables.h"],
     deps = [
         ":filter_chain_bridge_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:schedulable_cb_interface",
-        "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/coroutine:leaf_awaitable_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
+    ],
+)
+
+envoy_cc_library(
+    name = "chain_writer_lib",
+    srcs = ["chain_writer.cc"],
+    hdrs = ["chain_writer.h"],
+    deps = [
+        ":filter_chain_awaitables_lib",
+        ":filter_chain_bridge_lib",
+        "//envoy/buffer:buffer_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/coroutine:leaf_awaitable_lib",
         "//source/common/coroutine:status_macros_lib",
         "//source/common/coroutine:task_lib",
-        "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/status",
     ],
 )
