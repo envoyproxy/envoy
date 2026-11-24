@@ -517,8 +517,9 @@ TEST(StringUtil, FindTokenEdgeCases) {
 
 // Reference for findToken and caseFindToken that materializes every token with splitToken
 // before matching.
-bool findTokenBySplitting(absl::string_view source, absl::string_view delimiters,
-                          absl::string_view key_token, bool trim_whitespace, bool ignore_case) {
+static bool findTokenBySplitting(absl::string_view source, absl::string_view delimiters,
+                                 absl::string_view key_token, bool trim_whitespace,
+                                 bool ignore_case) {
   for (absl::string_view token :
        StringUtil::splitToken(source, delimiters, /*keep_empty_string=*/trim_whitespace)) {
     if (trim_whitespace) {

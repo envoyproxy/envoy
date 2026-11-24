@@ -211,9 +211,9 @@ static bool nextToken(absl::string_view& str, char delim, bool strip_whitespace,
   return false;
 }
 
-// Experimental alternative implementation of StringUtil::findToken which doesn't create
-// a temp vector, but just iterates through the string_view, tokenizing, and matching against
-// the token we want. It appears to be about 2.5x to 3x faster on this testcase.
+// Experimental alternative implementation of StringUtil::findToken which scans for a single
+// delimiter character with absl::string_view::find rather than absl::StrSplit, and skips empty
+// tokens even when stripping whitespace.
 static bool findTokenWithoutSplitting(absl::string_view str, char delim, absl::string_view token,
                                       bool strip_whitespace) {
   for (absl::string_view tok; nextToken(str, delim, strip_whitespace, &tok);) {
