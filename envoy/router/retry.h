@@ -232,13 +232,6 @@ public:
                               StreamInfo::StreamInfo& /*downstream_stream_info*/) {}
 
   /**
-   * Invoked on each retry attempt after an upstream cluster and host have been selected and
-   * router retry headers have been populated, prior to encoding headers upstream.
-   * @param request_headers the request headers for the retry attempt.
-   */
-  virtual void onRetryRequestHeaders(Http::RequestHeaderMap& /*request_headers*/) {}
-
-  /**
    * Invoked on response headers prior to forwarding downstream (including immediate and deferred
    * local replies).
    * @param response_headers the response headers.

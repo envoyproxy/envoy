@@ -2630,9 +2630,6 @@ void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
   FilterUtility::setTimeoutHeaders(elapsed_time.count(), timeout_, *route_entry_,
                                    *downstream_headers_, !config_->suppress_envoy_headers_,
                                    grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
-  if (retry_state_) {
-    retry_state_->onRetryRequestHeaders(*downstream_headers_);
-  }
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);

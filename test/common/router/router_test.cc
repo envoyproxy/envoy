@@ -9489,12 +9489,6 @@ TEST_F(RouterTest, RetryStatePerAttemptHooksAndResponseHeaderModification) {
       .WillOnce([](Http::RequestHeaderMap& req_headers, StreamInfo::StreamInfo&) {
         req_headers.setCopy(Http::LowerCaseString("x-prepared"), "candidate-2");
       });
-  EXPECT_CALL(*router_->retry_state_, onRetryRequestHeaders(_))
-      .WillOnce([](Http::RequestHeaderMap& req_headers) {
-        EXPECT_EQ("2", req_headers.getEnvoyAttemptCountValue());
-        EXPECT_EQ("false", req_headers.getEnvoyIsTimeoutRetryValue());
-        req_headers.setCopy(Http::LowerCaseString("x-post-host"), "host-selected");
-      });
 
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
@@ -9503,12 +9497,11 @@ TEST_F(RouterTest, RetryStatePerAttemptHooksAndResponseHeaderModification) {
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
   EXPECT_CALL(encoder2, encodeHeaders(_, true))
       .WillOnce([](const Http::RequestHeaderMap& retry_headers, bool) -> Http::Status {
+        EXPECT_EQ("2", retry_headers.getEnvoyAttemptCountValue());
+        EXPECT_EQ("false", retry_headers.getEnvoyIsTimeoutRetryValue());
         EXPECT_EQ(
             "candidate-2",
             retry_headers.get(Http::LowerCaseString("x-prepared"))[0]->value().getStringView());
-        EXPECT_EQ(
-            "host-selected",
-            retry_headers.get(Http::LowerCaseString("x-post-host"))[0]->value().getStringView());
         return Http::okStatus();
       });
 
