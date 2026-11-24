@@ -310,6 +310,12 @@ public:
 
   static absl::string_view indexToName(FilterStateIndex index);
   static std::optional<FilterStateIndex> nameToIndex(absl::string_view name);
+
+  /**
+   * @return whether data is non-null, index is valid, and data points directly to the
+   * FilterState::Object base subobject of the canonical type bound to index (so static_cast to the
+   * bound type is valid without cross-cast adjustment).
+   */
   static bool isValidObjectForIndex(FilterStateIndex index, const Object* data);
 
   template <FilterStateIndex Index>
@@ -320,53 +326,91 @@ public:
     setIndexedDataGeneric(Index, std::move(data), life_span, stream_sharing);
   }
 
+  /**
+   * @return a const pointer to the canonical IndexedFilterStateType<Index> object, or nullptr if
+   * the key is unset or holds a non-canonical Object type (in which case hasIndexedData(Index) may
+   * still be true; use getDataReadOnly<T>() to read non-canonical types). Casts via static_cast
+   * relying on the getIndexedDataReadOnlyGeneric() contract.
+   */
   template <FilterStateIndex Index>
   const IndexedFilterStateType<Index>* getIndexedDataReadOnly() const {
     const Object* data = getIndexedDataReadOnlyGeneric(Index);
-    ASSERT(data == nullptr || dynamic_cast<const IndexedFilterStateType<Index>*>(data) != nullptr);
+    ASSERT(data == nullptr ||
+           static_cast<const Object*>(dynamic_cast<const IndexedFilterStateType<Index>*>(data)) ==
+               data);
     return static_cast<const IndexedFilterStateType<Index>*>(data);
   }
 
+  /**
+   * Implementations must return either nullptr or an Object* satisfying
+   * isValidObjectForIndex(index, ptr) (pointing directly to the bound type's own Object base
+   * subobject) so that getIndexedDataReadOnly<Index>() can safely static_cast the result.
+   * Non-canonical objects stored under index must not be returned here.
+   */
   virtual const Object* getIndexedDataReadOnlyGeneric(FilterStateIndex index) const PURE;
 
+  /**
+   * @return a mutable pointer to the canonical IndexedFilterStateType<Index> object, or nullptr if
+   * the key is unset or holds a non-canonical Object type. Casts via static_cast relying on the
+   * getIndexedDataMutableGeneric() contract.
+   */
   template <FilterStateIndex Index> IndexedFilterStateType<Index>* getIndexedDataMutable() {
     Object* data = getIndexedDataMutableGeneric(Index);
-    ASSERT(data == nullptr || dynamic_cast<IndexedFilterStateType<Index>*>(data) != nullptr);
+    ASSERT(data == nullptr ||
+           static_cast<const Object*>(dynamic_cast<IndexedFilterStateType<Index>*>(data)) == data);
     return static_cast<IndexedFilterStateType<Index>*>(data);
   }
 
   // Legacy runtime-indexed overloads retained for downstream migration compatibility; prefer the
   // compile-time <FilterStateIndex> templates above.
-  void setIndexedData(
+  virtual void setIndexedData(
       FilterStateIndex index, std::shared_ptr<Object> data,
       LifeSpan life_span = LifeSpan::FilterChain,
-      StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) {
-    if (isValidObjectForIndex(index, data.get())) {
-      setIndexedDataGeneric(index, std::move(data), life_span, stream_sharing);
-    }
-  }
+      StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
 
   template <typename T> const T* getIndexedDataReadOnly(FilterStateIndex index) const {
-    return dynamic_cast<const T*>(getIndexedDataReadOnlyGeneric(index));
+    return dynamic_cast<const T*>(getIndexedDataReadOnlyAnyType(index));
   }
 
   template <typename T> T* getIndexedDataMutable(FilterStateIndex index) {
-    return dynamic_cast<T*>(getIndexedDataMutableGeneric(index));
+    return dynamic_cast<T*>(getIndexedDataSharedMutableAnyType(index).get());
   }
 
+  /**
+   * Implementations must return either nullptr or an Object* satisfying
+   * isValidObjectForIndex(index, ptr) so that getIndexedDataMutable<Index>() can safely
+   * static_cast the result. Non-canonical objects stored under index must not be returned here.
+   */
   virtual Object* getIndexedDataMutableGeneric(FilterStateIndex index) PURE;
 
+  /**
+   * Same canonical-object contract as getIndexedDataMutableGeneric(), returning a shared_ptr.
+   */
   virtual std::shared_ptr<Object> getIndexedDataSharedMutableGeneric(FilterStateIndex index) PURE;
 
+  /**
+   * @return whether data of any Object type (canonical or non-canonical) exists under index,
+   * matching hasDataWithName(indexToName(index)).
+   */
   virtual bool hasIndexedData(FilterStateIndex index) const PURE;
 
 protected:
   friend class FilterStateImpl;
 
+  /**
+   * Stores an object already validated to satisfy isValidObjectForIndex(index, data.get()).
+   */
   virtual void setIndexedDataGeneric(
       FilterStateIndex index, std::shared_ptr<Object> data,
       LifeSpan life_span = LifeSpan::FilterChain,
       StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
+
+  /**
+   * Single-walk lookups returning any Object (canonical or non-canonical) stored under index,
+   * used by getData*Generic() and the legacy runtime-indexed getters.
+   */
+  virtual const Object* getIndexedDataReadOnlyAnyType(FilterStateIndex index) const PURE;
+  virtual std::shared_ptr<Object> getIndexedDataSharedMutableAnyType(FilterStateIndex index) PURE;
 };
 
 } // namespace StreamInfo

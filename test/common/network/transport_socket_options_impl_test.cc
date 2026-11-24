@@ -184,7 +184,8 @@ TEST_F(TransportSocketOptionsImplTest, NetworkNamespaceSharedWithUpstream) {
   const std::string network_namespace_filepath = "/var/run/netns/staging";
 
   // Set network namespace as shared with upstream connection via indexed API.
-  filter_state_.setIndexedData<StreamInfo::FilterStateIndex::NetworkNamespace>(
+  filter_state_.setIndexedData(
+      StreamInfo::FilterStateIndex::NetworkNamespace,
       std::make_unique<DownstreamNetworkNamespace>(network_namespace_filepath),
       StreamInfo::FilterState::LifeSpan::Connection,
       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
@@ -204,6 +205,30 @@ TEST_F(TransportSocketOptionsImplTest, NetworkNamespaceSharedWithUpstream) {
       dynamic_cast<const DownstreamNetworkNamespace*>(objects.at(0).data_.get());
   ASSERT_NE(nullptr, network_namespace_state);
   EXPECT_EQ(network_namespace_filepath, network_namespace_state->value());
+}
+
+TEST_F(TransportSocketOptionsImplTest, NetworkNamespaceTypedIndexedSharedWithUpstream) {
+  const std::string network_namespace_filepath = "/var/run/netns/staging";
+
+  // Set network namespace as shared with upstream connection via typed indexed API.
+  filter_state_.setIndexedData<StreamInfo::FilterStateIndex::NetworkNamespace>(
+      std::make_unique<DownstreamNetworkNamespace>(network_namespace_filepath),
+      StreamInfo::FilterState::LifeSpan::Connection,
+      StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+
+  EXPECT_TRUE(filter_state_.hasIndexedData(StreamInfo::FilterStateIndex::NetworkNamespace));
+  EXPECT_TRUE(filter_state_.hasDataWithName(DownstreamNetworkNamespace::key()));
+  const auto* typed_ns =
+      filter_state_.getIndexedDataReadOnly<StreamInfo::FilterStateIndex::NetworkNamespace>();
+  ASSERT_NE(nullptr, typed_ns);
+  EXPECT_EQ(network_namespace_filepath, typed_ns->value());
+
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  ASSERT_NE(nullptr, transport_socket_options);
+
+  auto objects = transport_socket_options->downstreamSharedFilterStateObjects();
+  EXPECT_EQ(1, objects.size());
+  EXPECT_EQ(DownstreamNetworkNamespace::key(), objects.at(0).name_);
 }
 
 TEST_F(TransportSocketOptionsImplTest, NetworkNamespaceDynamicObject) {

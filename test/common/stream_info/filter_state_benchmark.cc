@@ -100,6 +100,31 @@ static void BM_FilterStateIndexedUpstreamServerNameLookup(benchmark::State& stat
 }
 BENCHMARK(BM_FilterStateIndexedUpstreamServerNameLookup);
 
+static void BM_FilterStateThreeLevelWellKnownKeyNameMiss(benchmark::State& state) {
+  // Models an HTTP stream's three-level FilterState hierarchy (FilterChain -> Request ->
+  // Connection) when looking up an unset well-known indexed key by name.
+  auto connection_state = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
+  FilterStateImpl stream_state(connection_state, FilterState::LifeSpan::FilterChain);
+  const absl::string_view key = Network::UpstreamServerName::key();
+
+  for (auto _ : state) {
+    auto* obj = stream_state.getDataReadOnlyGeneric(key);
+    benchmark::DoNotOptimize(obj);
+  }
+}
+BENCHMARK(BM_FilterStateThreeLevelWellKnownKeyNameMiss);
+
+static void BM_FilterStateThreeLevelIndexedMiss(benchmark::State& state) {
+  auto connection_state = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
+  FilterStateImpl stream_state(connection_state, FilterState::LifeSpan::FilterChain);
+
+  for (auto _ : state) {
+    auto* obj = stream_state.getIndexedDataReadOnly<FilterStateIndex::UpstreamServerName>();
+    benchmark::DoNotOptimize(obj);
+  }
+}
+BENCHMARK(BM_FilterStateThreeLevelIndexedMiss);
+
 } // namespace
 } // namespace StreamInfo
 } // namespace Envoy

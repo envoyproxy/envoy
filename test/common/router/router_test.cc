@@ -261,6 +261,53 @@ TEST_F(RouterTest, DontUpdateServerNameFilterStateWhenExistsConnectionLifeSpan) 
                      StreamInfo::FilterState::LifeSpan::Connection);
 }
 
+TEST_F(RouterTest, DontUpdateAutoSniOrSanWhenNonCanonicalObjectExistsConnectionLifeSpan) {
+  auto dummy_option = std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+  dummy_option.value().set_auto_san_validation(true);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  cm_.thread_local_cluster_.cluster_.info_->upstream_http_protocol_options_ = dummy_option;
+  ON_CALL(callbacks_.stream_info_, filterState())
+      .WillByDefault(ReturnRef(stream_info.filterState()));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Return(&cancellable_));
+
+  // Pre-populate well-known auto_sni and auto_san_validation keys with non-canonical objects at a
+  // longer lifespan. Router's hasIndexedData() guards must observe them and skip FilterChain writes
+  // instead of triggering a conflicting-lifespan ENVOY_BUG.
+  stream_info.filterState()->setData(Network::UpstreamServerName::key(),
+                                     std::make_shared<StreamInfo::UInt32AccessorImpl>(11),
+                                     StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info.filterState()->setData(Network::UpstreamSubjectAltNames::key(),
+                                     std::make_shared<StreamInfo::UInt32AccessorImpl>(22),
+                                     StreamInfo::FilterState::LifeSpan::Connection);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  EXPECT_EQ(nullptr,
+            stream_info.filterState()
+                ->getIndexedDataReadOnly<StreamInfo::FilterStateIndex::UpstreamServerName>());
+  EXPECT_EQ(nullptr,
+            stream_info.filterState()
+                ->getIndexedDataReadOnly<StreamInfo::FilterStateIndex::UpstreamSubjectAltNames>());
+  const auto* server_name_obj =
+      stream_info.filterState()->getDataReadOnly<StreamInfo::UInt32AccessorImpl>(
+          Network::UpstreamServerName::key());
+  ASSERT_NE(nullptr, server_name_obj);
+  EXPECT_EQ(11u, server_name_obj->value());
+  const auto* san_obj = stream_info.filterState()->getDataReadOnly<StreamInfo::UInt32AccessorImpl>(
+      Network::UpstreamSubjectAltNames::key());
+  ASSERT_NE(nullptr, san_obj);
+  EXPECT_EQ(22u, san_obj->value());
+
+  EXPECT_CALL(cancellable_, cancel(_));
+  router_->onDestroy();
+}
+
 TEST_F(RouterTest, UpdateServerNameFilterStateWithHostHeaderOverride) {
   auto dummy_option = std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);

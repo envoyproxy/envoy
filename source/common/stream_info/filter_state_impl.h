@@ -45,6 +45,11 @@ public:
   bool hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) const override;
   FilterState::ObjectsPtr objectsSharedWithUpstreamConnection() const override;
 
+  using FilterState::setIndexedData;
+  void setIndexedData(
+      FilterStateIndex index, std::shared_ptr<Object> data,
+      FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain,
+      StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) override;
   const Object* getIndexedDataReadOnlyGeneric(FilterStateIndex index) const override;
   Object* getIndexedDataMutableGeneric(FilterStateIndex index) override;
   std::shared_ptr<Object> getIndexedDataSharedMutableGeneric(FilterStateIndex index) override;
@@ -58,6 +63,8 @@ protected:
       FilterStateIndex index, std::shared_ptr<Object> data,
       FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain,
       StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) override;
+  const Object* getIndexedDataReadOnlyAnyType(FilterStateIndex index) const override;
+  std::shared_ptr<Object> getIndexedDataSharedMutableAnyType(FilterStateIndex index) override;
 
 private:
   // This only checks the local data_storage_ for data_name existence.
@@ -69,10 +76,14 @@ private:
     StreamSharingMayImpactPooling stream_sharing_{StreamSharingMayImpactPooling::None};
   };
 
+  static_assert(FilterStateIndexCount <= 32,
+                "untyped_indexed_mask_ requires at most 32 FilterStateIndex entries");
   FilterStateSharedPtr parent_{};
   const FilterState::LifeSpan life_span_;
   absl::flat_hash_map<std::string, std::unique_ptr<FilterObject>> data_storage_;
   uint32_t indexed_count_{0};
+  // Bitmask of FilterStateIndex entries currently held as non-canonical objects in data_storage_.
+  uint32_t untyped_indexed_mask_{0};
   std::array<std::unique_ptr<IndexedFilterObject>, FilterStateIndexCount> indexed_data_storage_{};
 };
 

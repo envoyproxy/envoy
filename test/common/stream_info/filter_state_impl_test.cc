@@ -126,7 +126,7 @@ static_assert(!CanSetIndexedData<FilterStateIndex::OriginalConnectPort, SimpleTy
 template <FilterStateIndex Index> void expectMismatchedStringWriteRejected(FilterState& state) {
   const std::string name = std::string(FilterState::indexToName(Index));
   state.setData(name, std::make_shared<SimpleType>(91), FilterState::LifeSpan::FilterChain);
-  EXPECT_FALSE(state.hasIndexedData(Index));
+  EXPECT_TRUE(state.hasIndexedData(Index));
   EXPECT_EQ(nullptr, state.getIndexedDataReadOnly<Index>());
   EXPECT_EQ(nullptr, state.getIndexedDataMutable<Index>());
   ASSERT_NE(nullptr, state.getDataReadOnly<SimpleType>(name));
@@ -445,149 +445,81 @@ TEST_F(FilterStateImplTest, SetSameDataWithDifferentLifeSpan) {
 }
 
 TEST_F(FilterStateImplTest, IndexedFilterStateBasicCrud) {
-  const std::string name =
-      std::string(FilterState::indexToName(FilterStateIndex::OriginalConnectPort));
-
-  EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnly<FilterStateIndex::OriginalConnectPort>());
-  EXPECT_EQ(nullptr, filterState().getIndexedDataMutable<FilterStateIndex::OriginalConnectPort>());
-
-  // Nullptr setIndexedData is a no-op.
-  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
-      nullptr, FilterState::LifeSpan::FilterChain);
-  EXPECT_FALSE(filterState().hasIndexedData(FilterStateIndex::OriginalConnectPort));
+  const std::string name = std::string(FilterState::indexToName(FilterStateIndex::LocalReplyOwner));
 
   // Test basic set/get by index
-  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
-      std::make_shared<Router::OriginalConnectPort>(42), FilterState::LifeSpan::FilterChain);
-  EXPECT_TRUE(filterState().hasIndexedData(FilterStateIndex::OriginalConnectPort));
-  EXPECT_EQ(42u,
-            filterState().getIndexedDataReadOnly<FilterStateIndex::OriginalConnectPort>()->value());
-  EXPECT_EQ(42u,
-            filterState().getIndexedDataMutable<FilterStateIndex::OriginalConnectPort>()->value());
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(42),
+                               FilterState::LifeSpan::FilterChain);
+  EXPECT_TRUE(filterState().hasIndexedData(FilterStateIndex::LocalReplyOwner));
+  EXPECT_EQ(42, filterState()
+                    .getIndexedDataReadOnly<SimpleType>(FilterStateIndex::LocalReplyOwner)
+                    ->access());
+  EXPECT_EQ(
+      42,
+      filterState().getIndexedDataMutable<SimpleType>(FilterStateIndex::LocalReplyOwner)->access());
 
-  // Test set by name (legacy) with matching bound type and retrieve by index
+  // Test set by name (legacy) and retrieve by index (transparent optimization)
   resetFilterState();
-  filterState().setData(name, std::make_shared<Router::OriginalConnectPort>(100),
+  filterState().setData(name, std::make_shared<SimpleType>(100),
                         FilterState::LifeSpan::FilterChain);
-  EXPECT_TRUE(filterState().hasIndexedData(FilterStateIndex::OriginalConnectPort));
-  EXPECT_EQ(100u,
-            filterState().getIndexedDataReadOnly<FilterStateIndex::OriginalConnectPort>()->value());
+  EXPECT_TRUE(filterState().hasIndexedData(FilterStateIndex::LocalReplyOwner));
+  EXPECT_EQ(100, filterState()
+                     .getIndexedDataReadOnly<SimpleType>(FilterStateIndex::LocalReplyOwner)
+                     ->access());
 
   // Test set by index and retrieve by name (transparent optimization)
   resetFilterState();
-  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
-      std::make_shared<Router::OriginalConnectPort>(200), FilterState::LifeSpan::FilterChain);
-  EXPECT_TRUE(filterState().hasData<Router::OriginalConnectPort>(name));
-  EXPECT_EQ(200u, filterState().getDataReadOnly<Router::OriginalConnectPort>(name)->value());
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(200),
+                               FilterState::LifeSpan::FilterChain);
+  EXPECT_TRUE(filterState().hasData<SimpleType>(name));
+  EXPECT_EQ(200, filterState().getDataReadOnly<SimpleType>(name)->access());
 
   // Legacy Name-Based Mutable Retrieval of Indexed Data
   resetFilterState();
-  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
-      std::make_shared<Router::OriginalConnectPort>(500), FilterState::LifeSpan::FilterChain);
-  auto* obj_mutable = filterState().getDataMutable<Router::OriginalConnectPort>(name);
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(500),
+                               FilterState::LifeSpan::FilterChain);
+  auto* obj_mutable = filterState().getDataMutable<SimpleType>(name);
   ASSERT_NE(nullptr, obj_mutable);
-  EXPECT_EQ(500u, obj_mutable->value());
+  EXPECT_EQ(500, obj_mutable->access());
 
   // hasDataWithName legacy check with an indexed key name
   resetFilterState();
-  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
-      std::make_shared<Router::OriginalConnectPort>(42), FilterState::LifeSpan::FilterChain);
-  EXPECT_TRUE(filterState().hasDataWithName(name));
-
-  // Backwards-compatible runtime-indexed overloads accept canonical types and reject wrong types.
-  resetFilterState();
-  filterState().setIndexedData(FilterStateIndex::OriginalConnectPort,
-                               std::make_shared<SimpleType>(99),
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(42),
                                FilterState::LifeSpan::FilterChain);
-  EXPECT_FALSE(filterState().hasIndexedData(FilterStateIndex::OriginalConnectPort));
-  EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnly<Router::OriginalConnectPort>(
-                         FilterStateIndex::OriginalConnectPort));
-
-  filterState().setIndexedData(FilterStateIndex::OriginalConnectPort,
-                               std::make_shared<Router::OriginalConnectPort>(77),
-                               FilterState::LifeSpan::FilterChain);
-  EXPECT_EQ(77u, filterState()
-                     .getIndexedDataReadOnly<Router::OriginalConnectPort>(
-                         FilterStateIndex::OriginalConnectPort)
-                     ->value());
-  EXPECT_EQ(77u, filterState()
-                     .getIndexedDataMutable<Router::OriginalConnectPort>(
-                         FilterStateIndex::OriginalConnectPort)
-                     ->value());
-  EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnly<SimpleType>(
-                         FilterStateIndex::OriginalConnectPort));
-  EXPECT_EQ(nullptr,
-            filterState().getIndexedDataMutable<SimpleType>(FilterStateIndex::OriginalConnectPort));
-}
-
-TEST_F(FilterStateImplTest, IndexedFilterStateMismatchedStringWriteSafety) {
-  const std::string name =
-      std::string(FilterState::indexToName(FilterStateIndex::UpstreamServerName));
-
-  // Writing an unrelated Object subtype via string setData must NOT populate indexed_data_storage_,
-  // preventing static_cast type confusion on getIndexedDataReadOnly / getIndexedDataMutable.
-  filterState().setData(name, std::make_shared<SimpleType>(77), FilterState::LifeSpan::FilterChain);
-  EXPECT_FALSE(filterState().hasIndexedData(FilterStateIndex::UpstreamServerName));
-  EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnly<FilterStateIndex::UpstreamServerName>());
-  EXPECT_EQ(nullptr, filterState().getIndexedDataMutable<FilterStateIndex::UpstreamServerName>());
-
-  // Name-based lookup still sees the stored SimpleType object.
   EXPECT_TRUE(filterState().hasDataWithName(name));
-  ASSERT_NE(nullptr, filterState().getDataReadOnly<SimpleType>(name));
-  EXPECT_EQ(77, filterState().getDataReadOnly<SimpleType>(name)->access());
-  EXPECT_EQ(77, filterState().getDataMutable<SimpleType>(name)->access());
-
-  // Same-lifespan overwrite with the canonical indexed type migrates cleanly to indexed storage.
-  filterState().setIndexedData<FilterStateIndex::UpstreamServerName>(
-      std::make_shared<Network::UpstreamServerName>("example.com"),
-      FilterState::LifeSpan::FilterChain);
-  EXPECT_TRUE(filterState().hasIndexedData(FilterStateIndex::UpstreamServerName));
-  EXPECT_EQ("example.com",
-            filterState().getIndexedDataReadOnly<FilterStateIndex::UpstreamServerName>()->value());
-  EXPECT_EQ(nullptr, filterState().getDataReadOnly<SimpleType>(name));
-
-  // Same-lifespan overwrite back to an unrelated type clears the indexed slot cleanly.
-  filterState().setData(name, std::make_shared<SimpleType>(88), FilterState::LifeSpan::FilterChain);
-  EXPECT_FALSE(filterState().hasIndexedData(FilterStateIndex::UpstreamServerName));
-  EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnly<FilterStateIndex::UpstreamServerName>());
-  EXPECT_EQ(88, filterState().getDataReadOnly<SimpleType>(name)->access());
-
-  // Verify runtime mismatched-type string writes are kept out of indexed storage for every index.
-  resetFilterState();
-  expectMismatchedStringWriteRejected<FilterStateIndex::LocalReplyOwner>(filterState());
-  expectMismatchedStringWriteRejected<FilterStateIndex::UpstreamServerName>(filterState());
-  expectMismatchedStringWriteRejected<FilterStateIndex::UpstreamSocketOptions>(filterState());
-  expectMismatchedStringWriteRejected<FilterStateIndex::UpstreamSubjectAltNames>(filterState());
-  expectMismatchedStringWriteRejected<FilterStateIndex::NetworkNamespace>(filterState());
-  expectMismatchedStringWriteRejected<FilterStateIndex::OriginalConnectPort>(filterState());
 }
 
 TEST_F(FilterStateImplTest, IndexedFilterStateParentPropagation) {
+  const std::string name = std::string(FilterState::indexToName(FilterStateIndex::LocalReplyOwner));
+
   // Test parent propagation of indexed data (Read-only)
   auto parent_state = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
-  parent_state->setIndexedData<FilterStateIndex::OriginalConnectPort>(
-      std::make_shared<Router::OriginalConnectPort>(200), FilterState::LifeSpan::Connection);
+  parent_state->setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(200),
+                               FilterState::LifeSpan::Connection);
   auto child_state =
       std::make_shared<FilterStateImpl>(parent_state, FilterState::LifeSpan::FilterChain);
-  EXPECT_TRUE(child_state->hasIndexedData(FilterStateIndex::OriginalConnectPort));
-  EXPECT_EQ(200u,
-            child_state->getIndexedDataReadOnly<FilterStateIndex::OriginalConnectPort>()->value());
+  EXPECT_TRUE(child_state->hasIndexedData(FilterStateIndex::LocalReplyOwner));
+  EXPECT_EQ(
+      200,
+      child_state->getIndexedDataReadOnly<SimpleType>(FilterStateIndex::LocalReplyOwner)->access());
 
   // Test parent propagation of indexed data (Mutable/Shared)
   auto parent_shared = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
-  parent_shared->setIndexedData<FilterStateIndex::OriginalConnectPort>(
-      std::make_shared<Router::OriginalConnectPort>(600), FilterState::LifeSpan::Connection);
+  parent_shared->setIndexedData(FilterStateIndex::LocalReplyOwner,
+                                std::make_shared<SimpleType>(600),
+                                FilterState::LifeSpan::Connection);
   FilterStateImpl child_shared(parent_shared, FilterState::LifeSpan::FilterChain);
-  auto* child_mutable = child_shared.getIndexedDataMutable<FilterStateIndex::OriginalConnectPort>();
+  auto* child_mutable =
+      child_shared.getIndexedDataMutable<SimpleType>(FilterStateIndex::LocalReplyOwner);
   ASSERT_NE(nullptr, child_mutable);
-  EXPECT_EQ(600u, child_mutable->value());
+  EXPECT_EQ(600, child_mutable->access());
 
   // hasDataAtOrAboveLifeSpan parent traversal
   auto parent_state_2 = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
   FilterStateImpl child_state_2(parent_state_2, FilterState::LifeSpan::FilterChain);
   EXPECT_FALSE(child_state_2.hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::Connection));
-  parent_state_2->setIndexedData<FilterStateIndex::OriginalConnectPort>(
-      std::make_shared<Router::OriginalConnectPort>(1), FilterState::LifeSpan::Connection);
+  parent_state_2->setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(1),
+                                 FilterState::LifeSpan::Connection);
   EXPECT_TRUE(child_state_2.hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::Connection));
 }
 
@@ -595,83 +527,58 @@ TEST_F(FilterStateImplTest, IndexedFilterStateUpstreamSharing) {
   const std::string name = std::string(FilterState::indexToName(FilterStateIndex::LocalReplyOwner));
 
   // Test objectsSharedWithUpstreamConnection (SharedWithUpstreamConnection)
-  filterState().setIndexedData<FilterStateIndex::LocalReplyOwner>(
-      std::make_shared<Http::LocalReplyOwnerObject>("owner"), FilterState::LifeSpan::FilterChain,
-      StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(300),
+                               FilterState::LifeSpan::FilterChain,
+                               StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   auto shared_objects = filterState().objectsSharedWithUpstreamConnection();
   ASSERT_EQ(1u, shared_objects->size());
   EXPECT_EQ(name, shared_objects->at(0).name_);
 
   // Test objectsSharedWithUpstreamConnection (SharedWithUpstreamConnectionOnce)
   resetFilterState();
-  filterState().setIndexedData<FilterStateIndex::LocalReplyOwner>(
-      std::make_shared<Http::LocalReplyOwnerObject>("owner"), FilterState::LifeSpan::FilterChain,
-      StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce);
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(300),
+                               FilterState::LifeSpan::FilterChain,
+                               StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce);
   shared_objects = filterState().objectsSharedWithUpstreamConnection();
   ASSERT_EQ(1u, shared_objects->size());
   EXPECT_EQ(name, shared_objects->at(0).name_);
 
   // Test objectsSharedWithUpstreamConnection (None)
   resetFilterState();
-  filterState().setIndexedData<FilterStateIndex::LocalReplyOwner>(
-      std::make_shared<Http::LocalReplyOwnerObject>("owner"), FilterState::LifeSpan::FilterChain,
-      StreamSharingMayImpactPooling::None);
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(300),
+                               FilterState::LifeSpan::FilterChain,
+                               StreamSharingMayImpactPooling::None);
   shared_objects = filterState().objectsSharedWithUpstreamConnection();
   EXPECT_TRUE(shared_objects->empty());
 }
 
 TEST_F(FilterStateImplTest, IndexedFilterStateDoubleSetConflict) {
-  const std::string name =
-      std::string(FilterState::indexToName(FilterStateIndex::OriginalConnectPort));
-
   // 1. Conflict: parent/longer lifespan set first, then child/shorter lifespan set second
-  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
-      std::make_shared<Router::OriginalConnectPort>(1), FilterState::LifeSpan::Connection);
-  EXPECT_ENVOY_BUG(
-      filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
-          std::make_shared<Router::OriginalConnectPort>(2), FilterState::LifeSpan::FilterChain),
-      "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(1),
+                               FilterState::LifeSpan::Connection);
+  EXPECT_ENVOY_BUG(filterState().setIndexedData(FilterStateIndex::LocalReplyOwner,
+                                                std::make_shared<SimpleType>(2),
+                                                FilterState::LifeSpan::FilterChain),
+                   "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
 
   // 2. Conflict: with a real parent instance
   auto parent = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
-  parent->setIndexedData<FilterStateIndex::OriginalConnectPort>(
-      std::make_shared<Router::OriginalConnectPort>(1), FilterState::LifeSpan::Connection);
+  parent->setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(1),
+                         FilterState::LifeSpan::Connection);
   FilterStateImpl child(parent, FilterState::LifeSpan::FilterChain);
-  EXPECT_ENVOY_BUG(
-      child.setIndexedData<FilterStateIndex::OriginalConnectPort>(
-          std::make_shared<Router::OriginalConnectPort>(2), FilterState::LifeSpan::FilterChain),
-      "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
+  EXPECT_ENVOY_BUG(child.setIndexedData(FilterStateIndex::LocalReplyOwner,
+                                        std::make_shared<SimpleType>(2),
+                                        FilterState::LifeSpan::FilterChain),
+                   "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
 
   // 3. Conflict: child/shorter lifespan set first, then parent/longer lifespan set second
   resetFilterState();
-  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
-      std::make_shared<Router::OriginalConnectPort>(1), FilterState::LifeSpan::FilterChain);
-  EXPECT_ENVOY_BUG(
-      filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
-          std::make_shared<Router::OriginalConnectPort>(2), FilterState::LifeSpan::Connection),
-      "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
-
-  // 4. Cross-storage conflicts between untyped setData and typed setIndexedData
-  resetFilterState();
-  filterState().setData(name, std::make_shared<SimpleType>(1), FilterState::LifeSpan::FilterChain);
-  EXPECT_ENVOY_BUG(
-      filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
-          std::make_shared<Router::OriginalConnectPort>(2), FilterState::LifeSpan::Connection),
-      "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
-
-  resetFilterState();
-  filterState().setData(name, std::make_shared<SimpleType>(1), FilterState::LifeSpan::Connection);
-  EXPECT_ENVOY_BUG(
-      filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
-          std::make_shared<Router::OriginalConnectPort>(2), FilterState::LifeSpan::FilterChain),
-      "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
-
-  resetFilterState();
-  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
-      std::make_shared<Router::OriginalConnectPort>(1), FilterState::LifeSpan::FilterChain);
-  EXPECT_ENVOY_BUG(filterState().setData(name, std::make_shared<SimpleType>(2),
-                                         FilterState::LifeSpan::Connection),
-                   "FilterStateAccessViolation: FilterState::setData<T> called twice");
+  filterState().setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(1),
+                               FilterState::LifeSpan::FilterChain);
+  EXPECT_ENVOY_BUG(filterState().setIndexedData(FilterStateIndex::LocalReplyOwner,
+                                                std::make_shared<SimpleType>(2),
+                                                FilterState::LifeSpan::Connection),
+                   "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
 }
 
 TEST_F(FilterStateImplTest, IndexedFilterStateLazyAllocation) {
@@ -710,7 +617,311 @@ TEST_F(FilterStateImplTest, IndexedFilterStateUtilities) {
   EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnlyGeneric(invalid_index));
   EXPECT_EQ(nullptr, filterState().getIndexedDataSharedMutableGeneric(invalid_index));
 
-  // isValidObjectForIndex pairwise & negative checks across all default-enabled indices
+  // setIndexedData with invalid index should return immediately with no-op
+  filterState().setIndexedData(invalid_index, std::make_shared<SimpleType>(500),
+                               FilterState::LifeSpan::FilterChain);
+
+  // indexToName boundary checks
+  EXPECT_EQ("", FilterState::indexToName(invalid_index));
+  EXPECT_EQ("", FilterState::indexToName(static_cast<FilterStateIndex>(99)));
+
+  // nameToIndex direct checks for invalid keys
+  EXPECT_FALSE(FilterState::nameToIndex("non_existent_key").has_value());
+
+  // nameToIndex and indexToName mapping checks for NetworkNamespace
+  EXPECT_EQ(FilterStateIndex::NetworkNamespace,
+            FilterState::nameToIndex("envoy.network.network_namespace"));
+  EXPECT_EQ("envoy.network.network_namespace",
+            FilterState::indexToName(FilterStateIndex::NetworkNamespace));
+}
+
+TEST_F(FilterStateImplTest, TypedIndexedFilterStateBasicCrud) {
+  const std::string name =
+      std::string(FilterState::indexToName(FilterStateIndex::OriginalConnectPort));
+
+  EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnly<FilterStateIndex::OriginalConnectPort>());
+  EXPECT_EQ(nullptr, filterState().getIndexedDataMutable<FilterStateIndex::OriginalConnectPort>());
+  EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnly<Router::OriginalConnectPort>(
+                         FilterStateIndex::OriginalConnectPort));
+  EXPECT_EQ(nullptr, filterState().getIndexedDataMutable<Router::OriginalConnectPort>(
+                         FilterStateIndex::OriginalConnectPort));
+
+  // Nullptr setIndexedData is a no-op for both compile-time and legacy overloads.
+  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
+      nullptr, FilterState::LifeSpan::FilterChain);
+  filterState().setIndexedData(FilterStateIndex::OriginalConnectPort, nullptr,
+                               FilterState::LifeSpan::FilterChain);
+  EXPECT_FALSE(filterState().hasIndexedData(FilterStateIndex::OriginalConnectPort));
+
+  // Test basic set/get by compile-time index.
+  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
+      std::make_shared<Router::OriginalConnectPort>(42), FilterState::LifeSpan::FilterChain);
+  EXPECT_TRUE(filterState().hasIndexedData(FilterStateIndex::OriginalConnectPort));
+  EXPECT_EQ(42u,
+            filterState().getIndexedDataReadOnly<FilterStateIndex::OriginalConnectPort>()->value());
+  EXPECT_EQ(42u,
+            filterState().getIndexedDataMutable<FilterStateIndex::OriginalConnectPort>()->value());
+
+  // Test set by name (legacy) with matching bound type and retrieve by compile-time index.
+  resetFilterState();
+  filterState().setData(name, std::make_shared<Router::OriginalConnectPort>(100),
+                        FilterState::LifeSpan::FilterChain);
+  EXPECT_TRUE(filterState().hasIndexedData(FilterStateIndex::OriginalConnectPort));
+  EXPECT_EQ(100u,
+            filterState().getIndexedDataReadOnly<FilterStateIndex::OriginalConnectPort>()->value());
+
+  // Test set by compile-time index and retrieve by name (transparent optimization).
+  resetFilterState();
+  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
+      std::make_shared<Router::OriginalConnectPort>(200), FilterState::LifeSpan::FilterChain);
+  EXPECT_TRUE(filterState().hasData<Router::OriginalConnectPort>(name));
+  EXPECT_EQ(200u, filterState().getDataReadOnly<Router::OriginalConnectPort>(name)->value());
+
+  // Legacy name-based mutable retrieval of typed indexed data.
+  resetFilterState();
+  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
+      std::make_shared<Router::OriginalConnectPort>(500), FilterState::LifeSpan::FilterChain);
+  auto* obj_mutable = filterState().getDataMutable<Router::OriginalConnectPort>(name);
+  ASSERT_NE(nullptr, obj_mutable);
+  EXPECT_EQ(500u, obj_mutable->value());
+
+  // hasDataWithName legacy check with a typed indexed key.
+  resetFilterState();
+  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
+      std::make_shared<Router::OriginalConnectPort>(42), FilterState::LifeSpan::FilterChain);
+  EXPECT_TRUE(filterState().hasDataWithName(name));
+
+  // Backwards-compatible runtime-indexed overloads route canonical types to indexed storage and
+  // non-canonical types to map storage without corrupting compile-time typed getters.
+  resetFilterState();
+  filterState().setIndexedData(FilterStateIndex::OriginalConnectPort,
+                               std::make_shared<Router::OriginalConnectPort>(77),
+                               FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(77u,
+            filterState().getIndexedDataReadOnly<FilterStateIndex::OriginalConnectPort>()->value());
+  EXPECT_EQ(77u, filterState()
+                     .getIndexedDataReadOnly<Router::OriginalConnectPort>(
+                         FilterStateIndex::OriginalConnectPort)
+                     ->value());
+  EXPECT_EQ(77u, filterState()
+                     .getIndexedDataMutable<Router::OriginalConnectPort>(
+                         FilterStateIndex::OriginalConnectPort)
+                     ->value());
+  EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnly<SimpleType>(
+                         FilterStateIndex::OriginalConnectPort));
+  EXPECT_EQ(nullptr,
+            filterState().getIndexedDataMutable<SimpleType>(FilterStateIndex::OriginalConnectPort));
+
+  // Same-lifespan overwrite from canonical to non-canonical via legacy setIndexedData clears the
+  // indexed slot while remaining readable through legacy getters.
+  filterState().setIndexedData(FilterStateIndex::OriginalConnectPort,
+                               std::make_shared<SimpleType>(99),
+                               FilterState::LifeSpan::FilterChain);
+  EXPECT_TRUE(filterState().hasIndexedData(FilterStateIndex::OriginalConnectPort));
+  EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnly<FilterStateIndex::OriginalConnectPort>());
+  EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnly<Router::OriginalConnectPort>(
+                         FilterStateIndex::OriginalConnectPort));
+  ASSERT_NE(nullptr, filterState().getIndexedDataReadOnly<SimpleType>(
+                         FilterStateIndex::OriginalConnectPort));
+  EXPECT_EQ(99, filterState()
+                    .getIndexedDataReadOnly<SimpleType>(FilterStateIndex::OriginalConnectPort)
+                    ->access());
+}
+
+TEST_F(FilterStateImplTest, IndexedFilterStateMismatchedStringWriteSafety) {
+  const std::string name =
+      std::string(FilterState::indexToName(FilterStateIndex::UpstreamServerName));
+
+  // Writing an unrelated Object subtype via string setData must NOT populate indexed_data_storage_,
+  // preventing static_cast type confusion on getIndexedDataReadOnly / getIndexedDataMutable, while
+  // hasIndexedData still reports key occupancy consistently with hasDataWithName.
+  filterState().setData(name, std::make_shared<SimpleType>(77), FilterState::LifeSpan::FilterChain);
+  EXPECT_TRUE(filterState().hasIndexedData(FilterStateIndex::UpstreamServerName));
+  EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnly<FilterStateIndex::UpstreamServerName>());
+  EXPECT_EQ(nullptr, filterState().getIndexedDataMutable<FilterStateIndex::UpstreamServerName>());
+
+  // Name-based lookup still sees the stored SimpleType object.
+  EXPECT_TRUE(filterState().hasDataWithName(name));
+  ASSERT_NE(nullptr, filterState().getDataReadOnly<SimpleType>(name));
+  EXPECT_EQ(77, filterState().getDataReadOnly<SimpleType>(name)->access());
+  EXPECT_EQ(77, filterState().getDataMutable<SimpleType>(name)->access());
+
+  // Same-lifespan overwrite with the canonical indexed type migrates cleanly to indexed storage.
+  filterState().setIndexedData<FilterStateIndex::UpstreamServerName>(
+      std::make_shared<Network::UpstreamServerName>("example.com"),
+      FilterState::LifeSpan::FilterChain);
+  EXPECT_TRUE(filterState().hasIndexedData(FilterStateIndex::UpstreamServerName));
+  EXPECT_EQ("example.com",
+            filterState().getIndexedDataReadOnly<FilterStateIndex::UpstreamServerName>()->value());
+  EXPECT_EQ(nullptr, filterState().getDataReadOnly<SimpleType>(name));
+
+  // Same-lifespan overwrite back to an unrelated type clears the indexed slot cleanly while
+  // keeping hasIndexedData consistent with key occupancy.
+  filterState().setData(name, std::make_shared<SimpleType>(88), FilterState::LifeSpan::FilterChain);
+  EXPECT_TRUE(filterState().hasIndexedData(FilterStateIndex::UpstreamServerName));
+  EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnly<FilterStateIndex::UpstreamServerName>());
+  EXPECT_EQ(88, filterState().getDataReadOnly<SimpleType>(name)->access());
+
+  // A non-canonical object held at a longer lifespan must read as present to hasIndexedData() on
+  // shorter-lifespan children so guards like router auto_sni / auto_san_validation do not attempt
+  // a conflicting FilterChain write and trigger ENVOY_BUG.
+  auto parent = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
+  FilterStateImpl child(parent, FilterState::LifeSpan::FilterChain);
+  // Three-level miss (FilterChain -> Request -> Connection) on well-known keys returns nullptr.
+  EXPECT_EQ(nullptr, child.getDataReadOnlyGeneric(name));
+  EXPECT_EQ(nullptr, child.getDataSharedMutableGeneric(name));
+
+  parent->setData(name, std::make_shared<SimpleType>(55), FilterState::LifeSpan::Connection);
+  parent->setData(FilterState::indexToName(FilterStateIndex::UpstreamSubjectAltNames),
+                  std::make_shared<SimpleType>(56), FilterState::LifeSpan::Connection);
+  EXPECT_TRUE(child.hasIndexedData(FilterStateIndex::UpstreamServerName));
+  EXPECT_TRUE(child.hasIndexedData(FilterStateIndex::UpstreamSubjectAltNames));
+  EXPECT_EQ(nullptr, child.getIndexedDataReadOnly<FilterStateIndex::UpstreamServerName>());
+  EXPECT_EQ(nullptr, child.getIndexedDataReadOnly<FilterStateIndex::UpstreamSubjectAltNames>());
+  EXPECT_EQ(55, child.getDataReadOnly<SimpleType>(name)->access());
+  EXPECT_EQ(55, child.getDataMutable<SimpleType>(name)->access());
+  EXPECT_EQ(56, child
+                    .getDataReadOnly<SimpleType>(
+                        FilterState::indexToName(FilterStateIndex::UpstreamSubjectAltNames))
+                    ->access());
+  EXPECT_EQ(56, child
+                    .getDataMutable<SimpleType>(
+                        FilterState::indexToName(FilterStateIndex::UpstreamSubjectAltNames))
+                    ->access());
+
+  // Verify runtime mismatched-type string writes are kept out of indexed storage for every index.
+  resetFilterState();
+  expectMismatchedStringWriteRejected<FilterStateIndex::LocalReplyOwner>(filterState());
+  expectMismatchedStringWriteRejected<FilterStateIndex::UpstreamServerName>(filterState());
+  expectMismatchedStringWriteRejected<FilterStateIndex::UpstreamSocketOptions>(filterState());
+  expectMismatchedStringWriteRejected<FilterStateIndex::UpstreamSubjectAltNames>(filterState());
+  expectMismatchedStringWriteRejected<FilterStateIndex::NetworkNamespace>(filterState());
+  expectMismatchedStringWriteRejected<FilterStateIndex::OriginalConnectPort>(filterState());
+}
+
+TEST_F(FilterStateImplTest, TypedIndexedFilterStateParentPropagation) {
+  // Test parent propagation of typed indexed data (Read-only).
+  auto parent_state = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
+  parent_state->setIndexedData<FilterStateIndex::OriginalConnectPort>(
+      std::make_shared<Router::OriginalConnectPort>(200), FilterState::LifeSpan::Connection);
+  auto child_state =
+      std::make_shared<FilterStateImpl>(parent_state, FilterState::LifeSpan::FilterChain);
+  EXPECT_TRUE(child_state->hasIndexedData(FilterStateIndex::OriginalConnectPort));
+  EXPECT_EQ(200u,
+            child_state->getIndexedDataReadOnly<FilterStateIndex::OriginalConnectPort>()->value());
+
+  // Test parent propagation of typed indexed data (Mutable/Shared).
+  auto parent_shared = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
+  parent_shared->setIndexedData<FilterStateIndex::OriginalConnectPort>(
+      std::make_shared<Router::OriginalConnectPort>(600), FilterState::LifeSpan::Connection);
+  FilterStateImpl child_shared(parent_shared, FilterState::LifeSpan::FilterChain);
+  auto* child_mutable = child_shared.getIndexedDataMutable<FilterStateIndex::OriginalConnectPort>();
+  ASSERT_NE(nullptr, child_mutable);
+  EXPECT_EQ(600u, child_mutable->value());
+
+  // hasDataAtOrAboveLifeSpan parent traversal with typed indexed data.
+  auto parent_state_2 = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
+  FilterStateImpl child_state_2(parent_state_2, FilterState::LifeSpan::FilterChain);
+  EXPECT_FALSE(child_state_2.hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::Connection));
+  parent_state_2->setIndexedData<FilterStateIndex::OriginalConnectPort>(
+      std::make_shared<Router::OriginalConnectPort>(1), FilterState::LifeSpan::Connection);
+  EXPECT_TRUE(child_state_2.hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::Connection));
+}
+
+TEST_F(FilterStateImplTest, TypedIndexedFilterStateUpstreamSharing) {
+  const std::string name = std::string(FilterState::indexToName(FilterStateIndex::LocalReplyOwner));
+
+  filterState().setIndexedData<FilterStateIndex::LocalReplyOwner>(
+      std::make_shared<Http::LocalReplyOwnerObject>("owner"), FilterState::LifeSpan::FilterChain,
+      StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  auto shared_objects = filterState().objectsSharedWithUpstreamConnection();
+  ASSERT_EQ(1u, shared_objects->size());
+  EXPECT_EQ(name, shared_objects->at(0).name_);
+
+  resetFilterState();
+  filterState().setIndexedData<FilterStateIndex::LocalReplyOwner>(
+      std::make_shared<Http::LocalReplyOwnerObject>("owner"), FilterState::LifeSpan::FilterChain,
+      StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce);
+  shared_objects = filterState().objectsSharedWithUpstreamConnection();
+  ASSERT_EQ(1u, shared_objects->size());
+  EXPECT_EQ(name, shared_objects->at(0).name_);
+
+  resetFilterState();
+  filterState().setIndexedData<FilterStateIndex::LocalReplyOwner>(
+      std::make_shared<Http::LocalReplyOwnerObject>("owner"), FilterState::LifeSpan::FilterChain,
+      StreamSharingMayImpactPooling::None);
+  shared_objects = filterState().objectsSharedWithUpstreamConnection();
+  EXPECT_TRUE(shared_objects->empty());
+}
+
+TEST_F(FilterStateImplTest, TypedIndexedFilterStateDoubleSetConflict) {
+  const std::string name =
+      std::string(FilterState::indexToName(FilterStateIndex::OriginalConnectPort));
+
+  // 1. Conflict: parent/longer lifespan set first, then child/shorter lifespan set second.
+  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
+      std::make_shared<Router::OriginalConnectPort>(1), FilterState::LifeSpan::Connection);
+  EXPECT_ENVOY_BUG(
+      filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
+          std::make_shared<Router::OriginalConnectPort>(2), FilterState::LifeSpan::FilterChain),
+      "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
+
+  // 2. Conflict: with a real parent instance.
+  auto parent = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
+  parent->setIndexedData<FilterStateIndex::OriginalConnectPort>(
+      std::make_shared<Router::OriginalConnectPort>(1), FilterState::LifeSpan::Connection);
+  FilterStateImpl child(parent, FilterState::LifeSpan::FilterChain);
+  EXPECT_ENVOY_BUG(
+      child.setIndexedData<FilterStateIndex::OriginalConnectPort>(
+          std::make_shared<Router::OriginalConnectPort>(2), FilterState::LifeSpan::FilterChain),
+      "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
+
+  // 3. Conflict: child/shorter lifespan set first, then parent/longer lifespan set second.
+  resetFilterState();
+  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
+      std::make_shared<Router::OriginalConnectPort>(1), FilterState::LifeSpan::FilterChain);
+  EXPECT_ENVOY_BUG(
+      filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
+          std::make_shared<Router::OriginalConnectPort>(2), FilterState::LifeSpan::Connection),
+      "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
+
+  // 4. Cross-storage conflicts between untyped setData/setIndexedData and typed setIndexedData.
+  resetFilterState();
+  filterState().setData(name, std::make_shared<SimpleType>(1), FilterState::LifeSpan::FilterChain);
+  EXPECT_ENVOY_BUG(
+      filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
+          std::make_shared<Router::OriginalConnectPort>(2), FilterState::LifeSpan::Connection),
+      "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
+
+  resetFilterState();
+  filterState().setData(name, std::make_shared<SimpleType>(1), FilterState::LifeSpan::Connection);
+  EXPECT_ENVOY_BUG(
+      filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
+          std::make_shared<Router::OriginalConnectPort>(2), FilterState::LifeSpan::FilterChain),
+      "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
+
+  resetFilterState();
+  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
+      std::make_shared<Router::OriginalConnectPort>(1), FilterState::LifeSpan::FilterChain);
+  EXPECT_ENVOY_BUG(filterState().setData(name, std::make_shared<SimpleType>(2),
+                                         FilterState::LifeSpan::Connection),
+                   "FilterStateAccessViolation: FilterState::setData<T> called twice");
+
+  resetFilterState();
+  filterState().setIndexedData<FilterStateIndex::OriginalConnectPort>(
+      std::make_shared<Router::OriginalConnectPort>(1), FilterState::LifeSpan::FilterChain);
+  EXPECT_ENVOY_BUG(filterState().setIndexedData(FilterStateIndex::OriginalConnectPort,
+                                                std::make_shared<SimpleType>(2),
+                                                FilterState::LifeSpan::Connection),
+                   "FilterStateAccessViolation: FilterState::setIndexedData<T> called twice");
+}
+
+TEST_F(FilterStateImplTest, IndexedFilterStateTypeValidationUtilities) {
+  const FilterStateIndex invalid_index = static_cast<FilterStateIndex>(FilterStateIndexCount);
+  EXPECT_EQ(nullptr, filterState().getIndexedDataReadOnly<SimpleType>(invalid_index));
+  EXPECT_EQ(nullptr, filterState().getIndexedDataMutable<SimpleType>(invalid_index));
+
+  // isValidObjectForIndex pairwise & negative checks across all default-enabled indices.
   const SimpleType wrong_type(1);
   const Http::LocalReplyOwnerObject local_reply_owner("filter");
   const Network::UpstreamServerName upstream_server_name("example.com");
@@ -738,13 +949,6 @@ TEST_F(FilterStateImplTest, IndexedFilterStateUtilities) {
     }
   }
 
-  // indexToName boundary checks
-  EXPECT_EQ("", FilterState::indexToName(invalid_index));
-  EXPECT_EQ("", FilterState::indexToName(static_cast<FilterStateIndex>(99)));
-
-  // nameToIndex direct checks for invalid keys
-  EXPECT_FALSE(FilterState::nameToIndex("non_existent_key").has_value());
-
   // Verify indexToName and nameToIndex match each canonical class's key definition.
   const std::array<std::pair<FilterStateIndex, absl::string_view>, 6> expected_keys = {{
       {FilterStateIndex::LocalReplyOwner, Http::LocalReplyFilterStateKey},
@@ -758,6 +962,88 @@ TEST_F(FilterStateImplTest, IndexedFilterStateUtilities) {
     EXPECT_EQ(key, FilterState::indexToName(index));
     EXPECT_EQ(index, FilterState::nameToIndex(key));
   }
+}
+
+TEST_F(FilterStateImplTest, IndexedFilterStateDualObjectBaseCanonicalization) {
+  class DualObjectPrefix : public FilterState::Object {
+  public:
+    explicit DualObjectPrefix(int prefix_value) : prefix_value_(prefix_value) {}
+    int prefixValue() const { return prefix_value_; }
+
+  private:
+    int prefix_value_;
+  };
+
+  class DualObjectUpstreamServerName : public DualObjectPrefix, public Network::UpstreamServerName {
+  public:
+    DualObjectUpstreamServerName(int prefix_value, absl::string_view server_name, bool& destroyed)
+        : DualObjectPrefix(prefix_value), Network::UpstreamServerName(server_name),
+          destroyed_(destroyed) {}
+    ~DualObjectUpstreamServerName() override { destroyed_ = true; }
+
+  private:
+    bool& destroyed_;
+  };
+
+  const absl::string_view key = Network::UpstreamServerName::key();
+  bool destroyed = false;
+
+  {
+    auto dual = std::make_shared<DualObjectUpstreamServerName>(42, "dual.example.com", destroyed);
+    const auto* expected_sni = static_cast<const Network::UpstreamServerName*>(dual.get());
+    const auto* expected_prefix = static_cast<const DualObjectPrefix*>(dual.get());
+
+    std::shared_ptr<FilterState::Object> via_other_base(dual,
+                                                        static_cast<DualObjectPrefix*>(dual.get()));
+    std::shared_ptr<FilterState::Object> via_canonical_base(
+        dual, static_cast<Network::UpstreamServerName*>(dual.get()));
+    ASSERT_NE(via_other_base.get(), via_canonical_base.get());
+
+    // isValidObjectForIndex requires the pointer to already refer to T's Object base subobject.
+    EXPECT_FALSE(FilterState::isValidObjectForIndex(FilterStateIndex::UpstreamServerName,
+                                                    via_other_base.get()));
+    EXPECT_TRUE(FilterState::isValidObjectForIndex(FilterStateIndex::UpstreamServerName,
+                                                   via_canonical_base.get()));
+
+    // 1. Insert via string setData through the non-canonical Object base; FilterStateImpl must
+    // re-alias to UpstreamServerName's Object base so typed static_cast getters return the exact
+    // UpstreamServerName subobject.
+    filterState().setData(key, via_other_base, FilterState::LifeSpan::FilterChain);
+    EXPECT_TRUE(filterState().hasIndexedData(FilterStateIndex::UpstreamServerName));
+    const auto* ro_sni =
+        filterState().getIndexedDataReadOnly<FilterStateIndex::UpstreamServerName>();
+    ASSERT_EQ(expected_sni, ro_sni);
+    EXPECT_EQ("dual.example.com", ro_sni->value());
+    auto* mut_sni = filterState().getIndexedDataMutable<FilterStateIndex::UpstreamServerName>();
+    ASSERT_EQ(expected_sni, mut_sni);
+    EXPECT_EQ("dual.example.com", mut_sni->value());
+
+    // Both bases remain reachable via dynamic_cast-based lookups.
+    const auto* ro_prefix = filterState().getDataReadOnly<DualObjectPrefix>(key);
+    ASSERT_EQ(expected_prefix, ro_prefix);
+    EXPECT_EQ(42, ro_prefix->prefixValue());
+    EXPECT_EQ(expected_sni, filterState().getDataReadOnly<Network::UpstreamServerName>(key));
+    EXPECT_EQ(expected_prefix, filterState().getIndexedDataReadOnly<DualObjectPrefix>(
+                                   FilterStateIndex::UpstreamServerName));
+    EXPECT_EQ(expected_prefix, filterState().getIndexedDataMutable<DualObjectPrefix>(
+                                   FilterStateIndex::UpstreamServerName));
+
+    // 2. Insert via legacy runtime-indexed setIndexedData through the non-canonical Object base.
+    resetFilterState();
+    filterState().setIndexedData(FilterStateIndex::UpstreamServerName, via_other_base,
+                                 FilterState::LifeSpan::FilterChain);
+    const auto* legacy_ro_sni =
+        filterState().getIndexedDataReadOnly<FilterStateIndex::UpstreamServerName>();
+    ASSERT_EQ(expected_sni, legacy_ro_sni);
+    EXPECT_EQ("dual.example.com", legacy_ro_sni->value());
+    EXPECT_EQ(expected_prefix, filterState().getDataReadOnly<DualObjectPrefix>(key));
+
+    // Verify ownership is retained by the aliased shared_ptr inside FilterStateImpl.
+    EXPECT_FALSE(destroyed);
+  }
+  EXPECT_FALSE(destroyed);
+  resetFilterState();
+  EXPECT_TRUE(destroyed);
 }
 
 } // namespace StreamInfo
