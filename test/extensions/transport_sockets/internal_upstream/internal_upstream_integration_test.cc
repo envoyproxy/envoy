@@ -405,9 +405,9 @@ public:
               ->set_cluster("tunnel_loopback");
         });
     log_path_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
-    config_helper_.setAccessLog(log_path_, "%UPSTREAM_FILTER_STATE(envoy.tcp_proxy.propagate_"
-                                           "response_headers:FIELD:x-destination-ip)%|"
-                                           "%RESP(x-destination-ip)%\n");
+    ASSERT_TRUE(config_helper_.setAccessLog(
+        log_path_, "%UPSTREAM_FILTER_STATE(envoy.tcp_proxy.propagate_"
+                   "response_headers:FIELD:x-destination-ip)%|%RESP(x-destination-ip)%"));
     HttpIntegrationTest::initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
   }
@@ -434,6 +434,14 @@ public:
                                   .getStringView());
   }
 
+  std::string waitForTunnelAccessLog(uint32_t entry = 0) {
+    // Finish logging on the workers before firing the integration server's 50ms file flush timer.
+    // waitForAccessLog() waits in real time and cannot advance a simulated flush timer itself.
+    test_server_->waitForWorkerThreads();
+    simTime().advanceTimeWait(std::chrono::milliseconds(50));
+    return waitForAccessLog(log_path_, entry);
+  }
+
   std::string log_path_;
 };
 
@@ -444,13 +452,13 @@ TEST_F(InternalTunnelResponseStateIntegrationTest, ReusedTunnelKeepsItsDestinati
   acceptTunnel(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"x-destination-ip", "192.0.2.7"}});
   respondToRequest("/first", *first);
-  EXPECT_EQ("192.0.2.7|198.51.100.9", waitForAccessLog(log_path_));
+  EXPECT_EQ("192.0.2.7|198.51.100.9", waitForTunnelAccessLog());
 
   // A second application request travels on the existing CONNECT stream; PNG sends no new headers.
   default_request_headers_.setPath("/second");
   auto second = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   respondToRequest("/second", *second);
-  EXPECT_EQ("192.0.2.7|198.51.100.9", waitForAccessLog(log_path_, 1));
+  EXPECT_EQ("192.0.2.7|198.51.100.9", waitForTunnelAccessLog(1));
   cleanupUpstreamAndDownstream();
 }
 
@@ -461,7 +469,7 @@ TEST_F(InternalTunnelResponseStateIntegrationTest, DisabledPublicationDoesNotUse
   acceptTunnel(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"x-destination-ip", "192.0.2.7"}});
   respondToRequest("/disabled", *response);
-  EXPECT_EQ("-|198.51.100.9", waitForAccessLog(log_path_));
+  EXPECT_EQ("-|198.51.100.9", waitForTunnelAccessLog());
   cleanupUpstreamAndDownstream();
 }
 
@@ -471,7 +479,7 @@ TEST_F(InternalTunnelResponseStateIntegrationTest, MissingTunnelHeaderDoesNotUse
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   acceptTunnel(Http::TestResponseHeaderMapImpl{{":status", "200"}});
   respondToRequest("/missing", *response);
-  EXPECT_EQ("-|198.51.100.9", waitForAccessLog(log_path_));
+  EXPECT_EQ("-|198.51.100.9", waitForTunnelAccessLog());
   cleanupUpstreamAndDownstream();
 }
 
@@ -490,9 +498,9 @@ TEST_F(InternalTunnelResponseStateIntegrationTest, PeriodicAndFinalLogsReadTheSa
     return data.find("GET /periodic HTTP/1.1") != std::string::npos;
   }));
   simTime().advanceTimeWait(std::chrono::seconds(1));
-  EXPECT_EQ("192.0.2.7|-", waitForAccessLog(log_path_));
+  EXPECT_EQ("192.0.2.7|-", waitForTunnelAccessLog());
   respondToRequest("/periodic", *response);
-  EXPECT_EQ("192.0.2.7|198.51.100.9", waitForAccessLog(log_path_, 1));
+  EXPECT_EQ("192.0.2.7|198.51.100.9", waitForTunnelAccessLog(1));
   cleanupUpstreamAndDownstream();
 }
 
@@ -502,7 +510,7 @@ TEST_F(InternalTunnelResponseStateIntegrationTest, FailedTunnelDoesNotPublishIts
   acceptTunnel(
       Http::TestResponseHeaderMapImpl{{":status", "503"}, {"x-destination-ip", "192.0.2.7"}});
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("-|-", waitForAccessLog(log_path_));
+  EXPECT_EQ("-|-", waitForTunnelAccessLog());
   cleanupUpstreamAndDownstream();
 }
 
