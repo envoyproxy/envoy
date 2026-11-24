@@ -15,17 +15,13 @@ output token cap, and message and tool counts as :ref:`envoy.data.ai.v3.RequestI
 Configuration
 -------------
 
-.. code-block:: yaml
-
-  http_filters:
-  - name: envoy.filters.http.ai_protocol_manager
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
-      request_handling: {}
-      filters:
-      - name: envoy.http.ai_filters.request_info
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
+.. literalinclude:: _include/request-info.yaml
+    :language: yaml
+    :lines: 31-40
+    :lineno-start: 31
+    :emphasize-lines: 6-8
+    :linenos:
+    :caption: :download:`request-info.yaml <_include/request-info.yaml>`
 
 Attributes are read according to the request's wire API: the one it declares,
 or the one the :ref:`schema validation
@@ -37,7 +33,7 @@ when it runs first:
   :widths: 1, 1, 1, 1, 1
 
   ``model``, ``model``, ``model``, ``model``, model segment of the request path
-  ``stream``, ``stream``, ``stream``, ``stream``, "``:generateContent`` (false) or ``:streamGenerateContent`` (true) operation in the request path"
+  ``stream``, ``stream``, ``stream``, ``stream``, "``:generateContent`` (``false``) or ``:streamGenerateContent`` (``true``) operation in the request path"
   ``max_output_tokens``, "``max_completion_tokens``, else ``max_tokens``", ``max_output_tokens``, ``max_tokens``, "``generationConfig.maxOutputTokens`` (camelCase or snake_case)"
   ``message_count``, ``messages``, "``input`` (a string counts as one message)", ``messages``, ``contents``
   ``tool_count``, ``tools``, ``tools``, ``tools``, ``tools``
@@ -52,12 +48,13 @@ decode filters see it from their first request-headers callback. An
 :ref:`ext_proc <config_http_filters_ext_proc>` filter listed after this one
 receives it through typed namespace forwarding:
 
-.. code-block:: yaml
-
-  metadata_options:
-    forwarding_namespaces:
-      typed:
-      - envoy.ai.request_info
+.. literalinclude:: _include/request-info.yaml
+    :language: yaml
+    :lines: 41-53
+    :lineno-start: 41
+    :emphasize-lines: 10-13
+    :linenos:
+    :caption: :download:`request-info.yaml <_include/request-info.yaml>`
 
 Only typed metadata is published. If the namespace already holds a record for
 the stream, the new one is skipped and counted by ``duplicate``.
@@ -80,13 +77,13 @@ or a load balancer weighing queued work. It is ``ceil(tokens_per_byte *
 request payload bytes)`` over the body Envoy buffered, so it reads no JSON and
 is published whatever the route declares:
 
-.. code-block:: yaml
-
-  - name: envoy.http.ai_filters.request_info
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
-      token_estimation:
-        tokens_per_byte: 0.5
+.. literalinclude:: _include/request-info.yaml
+    :language: yaml
+    :lines: 36-40
+    :lineno-start: 36
+    :emphasize-lines: 4-5
+    :linenos:
+    :caption: :download:`request-info.yaml <_include/request-info.yaml>`
 
 The ratio is a property of the payloads a deployment sees, and a size heuristic
 is not a tokenizer: an estimate does not replace the :ref:`token usage

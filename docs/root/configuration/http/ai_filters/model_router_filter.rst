@@ -9,7 +9,8 @@ object for the :ref:`route selector <config_http_ai_filters_route_selector>` AI
 filter to apply on each upstream attempt. It reads the requested model from the
 ``envoy.ai.model.request`` filter state object, which the :ref:`request info
 <config_http_ai_filters_request_info>` AI filter sets, so configure it after that
-filter.
+filter: without request info ahead of it, every request is rejected with a
+``404``.
 
 * This AI filter should be configured with the type URL
   ``type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.ModelRouter``.
@@ -28,47 +29,34 @@ optionally, the credential to send with it. A :ref:`route
 requested model to candidate models: the first serves the first attempt, and
 each retry the next. All models in a route must have the same provider.
 
-.. code-block:: yaml
+The filter does not retry by itself. Falling back to the next candidate takes a
+:ref:`retry policy <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>`
+on the route, whose ``retry_on`` conditions decide which failures move on to the
+next candidate. The filter caps the retries with ``x-envoy-max-retries``, one
+less than the number of candidates, and, until the router reads the resolved
+candidates itself, sets the request's authority to the first candidate's provider.
 
-  http_filters:
-  - name: envoy.filters.http.ai_protocol_manager
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
-      request_handling: {}
-      filters:
-      - name: envoy.http.ai_filters.request_info
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
-      - name: envoy.http.ai_filters.model_router
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.ModelRouter
-          providers:
-          - name: anthropic
-            llm_protocol: ANTHROPIC_MESSAGES
-            host_and_port: api.anthropic.com
-          models:
-          - name: haiku
-            provider: anthropic
-            model: claude-haiku-5-5
-            api_key:
-              environment_variable: ANTHROPIC_AUTHORIZATION
-          - name: sonnet
-            provider: anthropic
-            model: claude-sonnet-5-5
-            api_key:
-              environment_variable: ANTHROPIC_AUTHORIZATION
-          routes:
-          - requested_model: fast
-            targets:
-            - model: haiku
-            - model: sonnet
+The model router is one half of a configuration: it runs in the downstream
+filter chain, and the route selector, which applies each candidate, in the
+router's upstream filter chain. In this configuration, a request for the model
+``fast`` is sent to ``gpt-4o``, and on a retryable failure to ``gpt-4o-mini``:
 
-The credential is the whole header value, such as ``Bearer sk-...``.
+.. literalinclude:: _include/model-routing.yaml
+    :language: yaml
+    :lines: 20-69
+    :lineno-start: 20
+    :emphasize-lines: 6-10, 28-50
+    :linenos:
+    :caption: :download:`model-routing.yaml <_include/model-routing.yaml>`
 
-A request whose model is unknown, or that names none, is rejected with a 404.
-Until the router reads the resolved routes itself, the filter also sets the
-request's authority to the first candidate's provider and
-``x-envoy-max-retries`` to one less than the number of candidates.
+The route selector sends the credential as the whole ``authorization`` header
+value, such as ``Bearer sk-...``, or as ``x-goog-api-key`` for a
+``GEMINI_GENERATE_CONTENT`` provider. A provider that only takes its key in
+another header, such as Anthropic's ``x-api-key``, cannot be authenticated this
+way.
+
+A request that names no model, or one no route lists, is rejected with a
+``404``.
 
 Statistics
 ----------
@@ -80,5 +68,5 @@ The filter outputs statistics in the ``ai_protocol_manager.model_router.`` names
   :widths: 1, 1, 2
 
   success, Counter, The requested model matched a route and its candidates were stored in filter state.
-  model_name_missing, Counter, The request named no model and was rejected with a 404.
-  route_not_found, Counter, No route matched the requested model and the request was rejected with a 404.
+  model_name_missing, Counter, "The request named no model, or no ``envoy.ai.model.request`` object was set, and it was rejected with a ``404``."
+  route_not_found, Counter, No route matched the requested model and the request was rejected with a ``404``.

@@ -18,24 +18,13 @@ one per pair, and AI filters placed between the two legs only ever see the canon
 Configuration
 -------------
 
-.. code-block:: yaml
-
-  http_filters:
-  - name: envoy.filters.http.ai_protocol_manager
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
-      request_handling: {}
-      filters:
-      - name: envoy.http.ai_filters.transcoder
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.http.ai_filters.transcoder.v3.Transcoder
-          request_handling: TO_IR
-          response_handling: FROM_IR
-      - name: envoy.http.ai_filters.transcoder
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.http.ai_filters.transcoder.v3.Transcoder
-          request_handling: FROM_IR
-          response_handling: TO_IR
+.. literalinclude:: _include/transcoder.yaml
+    :language: yaml
+    :lines: 49-63
+    :lineno-start: 49
+    :emphasize-lines: 6-15
+    :linenos:
+    :caption: :download:`transcoder.yaml <_include/transcoder.yaml>`
 
 Two instances of the filter bracket the intermediate AI filters across both the request and
 response (unary and SSE streaming) pipelines: the client-boundary instance sets
@@ -74,7 +63,8 @@ Per-request transcoding instructions
 ------------------------------------
 
 The route decides the backend for every request it matches. A filter ahead of the transcoder --
-a model router, ext_proc, or :ref:`set_filter_state <config_http_filters_set_filter_state>` --
+the :ref:`route selector <config_http_ai_filters_route_selector>`, ext_proc, or
+:ref:`set_filter_state <config_http_filters_set_filter_state>` --
 can override that decision for one request by leaving instructions in filter state. Each key is
 independent, and a key that is not set leaves today's behavior in place.
 
@@ -151,39 +141,25 @@ binding's edits apply in order: to the body, and to the request headers. A reque
 the binding it arrived in gets those fields and headers back as the client sent them.
 
 A binding that does not parse, or one that needs a path variable the client's path did not hold,
-is a misconfiguration of the proxy, not of the client: the request fails with a 500, counted by
+is a misconfiguration of the proxy, not of the client: the request fails with a ``500``, counted by
 ``unresolved``. A request binding that does not match the path reads nothing and is
 logged at debug.
 
 The instructions are read once, when the transcoder's request leg runs, so the filter that
-writes them must run before that instance of the transcoder; a model router placed between the
-two instances in the example above writes them in time for the backend-boundary one. Writes
-during the response have no effect.
+writes them must run before that instance of the transcoder; the :ref:`route selector
+<config_http_ai_filters_route_selector>`, placed ahead of both instances, writes them in time.
+Writes during the response have no effect.
 
 The example pins a route to Claude on an illustrative gateway, statically, with
-``set_filter_state``; a model router would write the same keys per request.
+``set_filter_state``; the route selector writes the same keys for each upstream attempt.
 
-.. code-block:: yaml
-
-  routes:
-  - match: { prefix: /anthropic/ }
-    route: { cluster: claude_gateway }
-    typed_per_filter_config:
-      envoy.filters.http.set_filter_state:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
-        on_request_headers:
-        - object_key: envoy.ai.llm_protocol.response
-          format_string:
-            text_format_source:
-              inline_string: "ANTHROPIC_MESSAGES"
-        - object_key: envoy.ai.binding.response
-          format_string:
-            text_format_source:
-              inline_string: "/gateway/anthropic/{model}/{messages|messages-stream}"
-        - object_key: envoy.ai.model.resolved
-          format_string:
-            text_format_source:
-              inline_string: "claude-sonnet-4-5"
+.. literalinclude:: _include/transcoder.yaml
+    :language: yaml
+    :lines: 20-44
+    :lineno-start: 20
+    :emphasize-lines: 11-25
+    :linenos:
+    :caption: :download:`transcoder.yaml <_include/transcoder.yaml>`
 
 A binding in JSON also edits the body and the request headers, with the same
 :ref:`KeyValueMutation <envoy_v3_api_msg_config.core.v3.KeyValueMutation>` and

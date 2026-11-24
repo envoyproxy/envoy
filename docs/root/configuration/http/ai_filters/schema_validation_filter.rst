@@ -4,11 +4,12 @@ Schema validation
 =================
 
 The schema validation AI filter validates the payload against the payload
-schema of its wire API, for APIs with a defined schema (currently ``OPENAI_CHAT_COMPLETIONS``, ``ANTHROPIC_MESSAGES``
-and ``GEMINI_GENERATE_CONTENT``). Validation checks required fields, data
+schema of its wire API, for APIs with a defined schema (currently
+``OPENAI_CHAT_COMPLETIONS``, ``ANTHROPIC_MESSAGES`` and
+``GEMINI_GENERATE_CONTENT``). Validation checks required fields, data
 types, enum values, and offload rules -- metadata fields such as ``model`` and
 ``role`` must stay inline, while large message content may reside in the
-external buffer. A payload that fails is rejected with a 400, or forwarded
+external buffer. A payload that fails is rejected with a ``400``, or forwarded
 unchanged with :ref:`fail_open
 <envoy_v3_api_field_extensions.http.ai_filters.schema_validation.v3.SchemaValidation.fail_open>`.
 
@@ -22,20 +23,13 @@ read, and they only see a payload that passed.
 Configuration
 -------------
 
-.. code-block:: yaml
-
-  http_filters:
-  - name: envoy.filters.http.ai_protocol_manager
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
-      request_handling: {}
-      filters:
-      - name: envoy.http.ai_filters.schema_validation
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.http.ai_filters.schema_validation.v3.SchemaValidation
-      - name: envoy.http.ai_filters.request_info
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
+.. literalinclude:: _include/model-routing.yaml
+    :language: yaml
+    :lines: 36-46
+    :lineno-start: 36
+    :emphasize-lines: 6-8
+    :linenos:
+    :caption: :download:`model-routing.yaml <_include/model-routing.yaml>`
 
 The payload is validated against the API the request declares: the
 ``envoy.ai.llm_protocol.request`` filter state object, else the route's
@@ -65,6 +59,6 @@ The filter outputs statistics in the ``ai_protocol_manager.schema_validation.`` 
   :widths: 1, 1, 2
 
   valid, Counter, The payload passed its API's schema.
-  invalid, Counter, "The payload violated its API's schema: rejected with a 400, or forwarded with ``fail_open``."
+  invalid, Counter, "The payload violated its API's schema: rejected with a ``400``, or forwarded with ``fail_open``."
   skipped, Counter, "No API was resolved, or the resolved one has no payload schema; the payload was forwarded unvalidated."
   llm_protocol_detected, Counter, The API was detected from the request.
