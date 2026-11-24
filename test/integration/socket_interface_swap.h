@@ -27,7 +27,7 @@ public:
         ASSERT(matched_iohandle_ == nullptr || matched_iohandle_ == io_handle,
                "Matched multiple io_handles, expected at most one to match.");
         matched_iohandle_ = io_handle;
-        return (error_->getSystemErrorCode() == EAGAIN)
+        return (error_->getErrorCode() == Api::IoError::IoErrorCode::Again)
                    ? Envoy::Network::IoSocketError::getIoSocketEagainError()
                    : Envoy::Network::IoSocketError::create(error_->getSystemErrorCode());
       }

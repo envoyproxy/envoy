@@ -136,7 +136,9 @@ public:
     if (rds_upstream_info_.upstream_ != nullptr) {
       resetFakeUpstreamInfo(&rds_upstream_info_);
     }
-    resetFakeUpstreamInfo(&lds_upstream_info_);
+    if (lds_upstream_info_.upstream_ != nullptr) {
+      resetFakeUpstreamInfo(&lds_upstream_info_);
+    }
   }
 
   FakeUpstream& getLdsFakeUpstream() const { return *fake_upstreams_[1]; }

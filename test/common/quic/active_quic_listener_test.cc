@@ -69,12 +69,23 @@ class TestProcessObject : public ProcessObject {};
 
 // A test quic listener that exits after processing one round of packets.
 class TestActiveQuicListener : public ActiveQuicListener {
+public:
   using ActiveQuicListener::ActiveQuicListener;
+
+  void onDataWorker(Network::UdpRecvData&& data) override {
+    ++packets_received_;
+    ActiveQuicListener::onDataWorker(std::move(data));
+  }
 
   void onReadReady() override {
     ActiveQuicListener::onReadReady();
     dispatcher().post([this] { dispatcher().exit(); });
   }
+
+  size_t packetsReceived() const { return packets_received_; }
+
+private:
+  size_t packets_received_{0};
 };
 
 uint32_t testWorkerSelector(const Buffer::Instance&, uint32_t default_value) {
@@ -281,7 +292,8 @@ protected:
 
   void sendCHLO(quic::QuicConnectionId connection_id) { sendCHLO(connection_id, false); }
 
-  void sendCHLO(quic::QuicConnectionId connection_id, bool dual_stack) {
+  void sendCHLO(quic::QuicConnectionId connection_id, bool dual_stack,
+                size_t* packets_sent = nullptr) {
     Network::Address::InstanceConstSharedPtr client_address;
     if (dual_stack) {
       client_address = Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4);
@@ -302,6 +314,9 @@ protected:
     client_sockets_.back()->setSocketOption(level, optname, &value, sizeof(value));
     std::vector<Buffer::OwnedImpl> payloads =
         generateChloPacketsToSend(quic_version_, quic_config_, connection_id);
+    if (packets_sent != nullptr) {
+      *packets_sent = 0;
+    }
     for (Buffer::OwnedImpl& payload : payloads) {
       Buffer::RawSliceVector slice = payload.getRawSlices();
       ASSERT_EQ(1u, slice.size());
@@ -321,6 +336,20 @@ protected:
       auto send_rc = Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(),
                                                      slice.data(), 1, nullptr, *dest_address);
       ASSERT_EQ(slice[0].len_, send_rc.return_value_);
+      if (packets_sent != nullptr) {
+        ++(*packets_sent);
+      }
+    }
+  }
+
+  void sendCHLOAndWait(quic::QuicConnectionId connection_id, bool dual_stack = false) {
+    auto* listener = static_cast<TestActiveQuicListener*>(quic_listener_.get());
+    const size_t initial_packets = listener->packetsReceived();
+    size_t sent_packets = 0;
+    sendCHLO(connection_id, dual_stack, &sent_packets);
+    ASSERT_FALSE(HasFatalFailure());
+    while (listener->packetsReceived() < initial_packets + sent_packets) {
+      dispatcher_->run(Event::Dispatcher::RunType::Block);
     }
   }
 
@@ -451,8 +480,7 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
-  sendCHLO(connection_id);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  sendCHLOAndWait(connection_id);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
   EXPECT_EQ(50 * quic_dispatcher_->NumSessions(), quic_listener_->numPacketsExpectedPerEventLoop());
@@ -492,8 +520,7 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLODuringHotRestartShouldForwardPacket) {
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
   EXPECT_CALL(mock_packet_forwarding, handle(_, _, _))
       .Times(generateChloPacketsToSend(quic_version_, quic_config_, connection_id).size());
-  sendCHLO(connection_id);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  sendCHLOAndWait(connection_id);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_EQ(0u, quic_dispatcher_->NumSessions());
 }
@@ -507,8 +534,7 @@ TEST_P(ActiveQuicListenerTest, NormalizeTimeouts) {
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
-  sendCHLO(connection_id);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  sendCHLOAndWait(connection_id);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
   EXPECT_EQ(50 * quic_dispatcher_->NumSessions(), quic_listener_->numPacketsExpectedPerEventLoop());
@@ -538,8 +564,7 @@ TEST_P(ActiveQuicListenerTest, ConfigureReasonableInitialFlowControlWindow) {
   initialize();
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
-  sendCHLO(connection_id);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  sendCHLOAndWait(connection_id);
   const quic::QuicSession* session =
       quic::test::QuicDispatcherPeer::FindSession(quic_dispatcher_, connection_id);
   ASSERT(session != nullptr);
@@ -554,13 +579,19 @@ TEST_P(ActiveQuicListenerTest, ConfigureReasonableInitialFlowControlWindow) {
 
 TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   initialize();
+#ifdef WIN32
+  // Ensure the UDP receive buffer can hold all burst CHLO packets on Windows (default is 64 KB).
+  int rcvbuf_size = 512 * 1024;
+  ASSERT_EQ(
+      0, listen_socket_->setSocketOption(SOL_SOCKET, SO_RCVBUF, &rcvbuf_size, sizeof(rcvbuf_size))
+             .return_value_);
+#endif
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   const uint32_t count = (ActiveQuicListener::kNumSessionsToCreatePerLoop * 2) + 1;
   maybeConfigureMocks(count + 1);
   // Create 1 session to increase number of packet to read in the next read event.
-  sendCHLO(quic::test::TestConnectionId());
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  sendCHLOAndWait(quic::test::TestConnectionId());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
 
   // Generate one more CHLO than can be processed immediately.
@@ -597,20 +628,17 @@ TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
   initialize();
   maybeConfigureMocks(/* connection_count = */ 2);
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
-  sendCHLO(quic::test::TestConnectionId(1));
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  sendCHLOAndWait(quic::test::TestConnectionId(1));
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
 
   scoped_runtime_.mergeValues({{"quic.enabled", " false"}});
-  sendCHLO(quic::test::TestConnectionId(2));
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  sendCHLOAndWait(quic::test::TestConnectionId(2));
   // If listener was enabled, there should have been session created for active connection.
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
   EXPECT_FALSE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 
   scoped_runtime_.mergeValues({{"quic.enabled", " true"}});
-  sendCHLO(quic::test::TestConnectionId(2));
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  sendCHLOAndWait(quic::test::TestConnectionId(2));
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 2);
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 }
@@ -619,21 +647,18 @@ TEST_P(ActiveQuicListenerTest, QuicRejectsAllAndResumes) {
   initialize();
   maybeConfigureMocks(/* connection_count = */ 2);
   EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_reject_all"));
-  sendCHLO(quic::test::TestConnectionId(1));
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  sendCHLOAndWait(quic::test::TestConnectionId(1));
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
 
   // Reject all packet.
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_reject_all", true);
-  sendCHLO(quic::test::TestConnectionId(2));
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  sendCHLOAndWait(quic::test::TestConnectionId(2));
   // No new connection was created.
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 1);
 
   // Stop rejecting traffic.
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_reject_all", false);
-  sendCHLO(quic::test::TestConnectionId(2));
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  sendCHLOAndWait(quic::test::TestConnectionId(2));
   EXPECT_EQ(quic_dispatcher_->NumSessions(), 2);
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));
 }
@@ -665,11 +690,14 @@ TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
 }
 
 TEST_P(ActiveQuicListenerTest, EcnReporting) {
+#ifdef WIN32
+  GTEST_SKIP()
+      << "Setting outgoing IP_TOS / IPV6_TCLASS via setsockopt is not supported on Windows.";
+#endif
   initialize();
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
-  sendCHLO(connection_id);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  sendCHLOAndWait(connection_id);
   quic::QuicConnection* connection =
       quic::test::QuicDispatcherPeer::GetFirstSessionIfAny(quic_dispatcher_)->connection();
   EXPECT_EQ(connection->connection_id(), quic::test::TestConnectionId(1));
@@ -679,14 +707,17 @@ TEST_P(ActiveQuicListenerTest, EcnReporting) {
 }
 
 TEST_P(ActiveQuicListenerTest, EcnReportingDualStack) {
+#ifdef WIN32
+  GTEST_SKIP()
+      << "Setting outgoing IP_TOS / IPV6_TCLASS via setsockopt is not supported on Windows.";
+#endif
   if (local_address_->ip()->version() == Network::Address::IpVersion::v4) {
     return;
   }
   initialize();
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
-  sendCHLO(connection_id, /*dual_stack=*/true);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  sendCHLOAndWait(connection_id, /*dual_stack=*/true);
   quic::QuicConnection* connection =
       quic::test::QuicDispatcherPeer::GetFirstSessionIfAny(quic_dispatcher_)->connection();
   EXPECT_EQ(connection->connection_id(), quic::test::TestConnectionId(1));
@@ -735,8 +766,7 @@ TEST_P(ActiveQuicListenerEmptyFlagConfigTest, ReceiveFullQuicCHLO) {
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
-  sendCHLO(connection_id);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  sendCHLOAndWait(connection_id);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
   EXPECT_TRUE(ActiveQuicListenerPeer::enabled(*quic_listener_));

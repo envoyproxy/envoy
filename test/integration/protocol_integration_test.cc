@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/platform.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/event/dispatcher.h"
@@ -21,6 +22,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread_annotations.h"
+#include "source/common/common/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
@@ -52,6 +54,7 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_replace.h"
 #include "absl/time/time.h"
+#include "fmt/format.h"
 #include "gtest/gtest.h"
 
 #ifdef ENVOY_ENABLE_QUIC
@@ -5616,11 +5619,20 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
 
   ASSERT_TRUE(response->waitForEndStream());
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
+#ifdef WIN32
     EXPECT_THAT(
         waitForAccessLog(access_log_name_),
-        HasSubstr(
-            "upstream_reset_before_response_started{connection_termination|QUIC_"
-            "PACKET_WRITE_ERROR|FROM_SELF|Write_failed_with_error:_9_(Bad_file_descriptor)}"));
+        HasSubstr(fmt::format("upstream_reset_before_response_started{{connection_termination|QUIC_"
+                              "PACKET_WRITE_ERROR|FROM_SELF|Write_failed_with_error:_{}_(",
+                              SOCKET_ERROR_BADF)));
+#else
+    EXPECT_THAT(
+        waitForAccessLog(access_log_name_),
+        HasSubstr(fmt::format("upstream_reset_before_response_started{{connection_termination|QUIC_"
+                              "PACKET_WRITE_ERROR|FROM_SELF|Write_failed_with_error:_{}_({})}}",
+                              SOCKET_ERROR_BADF,
+                              StringUtil::replaceAllEmptySpace(errorDetails(SOCKET_ERROR_BADF)))));
+#endif
   } else {
     EXPECT_THAT(waitForAccessLog(access_log_name_),
                 HasSubstr("upstream_reset_before_response_started{connection_termination}"));

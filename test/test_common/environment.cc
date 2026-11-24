@@ -24,6 +24,10 @@
 #include "source/common/signal/signal_action.h"
 #endif
 
+#ifdef WIN32
+#include <csignal>
+#endif
+
 #ifdef ENVOY_DISABLE_EXCEPTIONS
 #include "source/server/options_impl_base.h"
 #else
@@ -209,6 +213,12 @@ std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
 void TestEnvironment::initializeTestMain(char* program_name) {
 #ifdef WIN32
   _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+
+  // On Windows, UCRT abort() with _CALL_REPORTFAULT cleared falls back to ExitProcess(3), which
+  // runs DllMain(DLL_PROCESS_DETACH) and CRT/TLS teardown after killing background threads and can
+  // deadlock multi-threaded death tests (e.g., server_test after InstanceImpl::initialize()).
+  // Terminate immediately with exit code 3 to match POSIX SIGABRT semantics.
+  std::signal(SIGABRT, [](int) { ::TerminateProcess(::GetCurrentProcess(), 3); });
 
   _set_invalid_parameter_handler([](const wchar_t* expression, const wchar_t* function,
                                     const wchar_t* file, unsigned int line,

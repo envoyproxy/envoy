@@ -624,6 +624,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogSessionIdleTimeout) {
 
 // Verifies that access log value for `UPSTREAM_DETECTED_CLOSE_TYPE` matches the
 // upstream close type.
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
 TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamDetectedCloseType) {
   std::string access_log_path = TestEnvironment::temporaryPath(
       fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
@@ -670,7 +671,6 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamDetectedCloseType) {
 }
 
 // Verifies that upstream RST is propagated to downstream as RST (default behavior).
-#if ENVOY_PLATFORM_ENABLE_SEND_RST
 TEST_P(TcpProxyIntegrationTest, UpstreamRstPropagation) {
   std::string access_log_path = TestEnvironment::temporaryPath(
       fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",

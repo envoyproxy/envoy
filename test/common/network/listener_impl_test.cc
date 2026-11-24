@@ -168,7 +168,6 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
       .WillRepeatedly([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         server_connections.emplace_back(dispatcher_->createServerConnection(
             std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info));
-        dispatcher_->exit();
       });
 
   auto initiate_connections = [&](const int count) {
@@ -181,11 +180,27 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
     }
   };
 
+  uint32_t accepted_in_batch = 0;
+  uint32_t expected_in_batch = 0;
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_))
+      .WillRepeatedly([&](const uint32_t count) {
+        accepted_in_batch += count;
+        if (accepted_in_batch >= expected_in_batch) {
+          dispatcher_->exit();
+        }
+      });
+
+  auto run_until_accepted = [&](const uint32_t expected_total) {
+    accepted_in_batch = 0;
+    expected_in_batch = expected_total;
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+    EXPECT_EQ(expected_total, accepted_in_batch);
+  };
+
   initiate_connections(5);
   EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit))
       .Times(3);
-  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(5));
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  run_until_accepted(5);
 
   // We expect any server-side connections that get created to populate 'server_connections'.
   EXPECT_EQ(2, server_connections.size());
@@ -195,16 +210,14 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   initiate_connections(5);
   EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit))
       .Times(4);
-  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(5));
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  run_until_accepted(5);
 
   EXPECT_EQ(3, server_connections.size());
 
   // Clear the limit and verify there's no longer a limit.
   scoped_runtime.mergeValues({{"overload.global_downstream_max_connections", ""}});
   initiate_connections(10);
-  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(10));
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  run_until_accepted(10);
 
   EXPECT_EQ(13, server_connections.size());
 
@@ -243,7 +256,9 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitListenerOptOut) {
       .WillRepeatedly([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         server_connections.emplace_back(dispatcher_->createServerConnection(
             std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info));
-        dispatcher_->exit();
+        if (server_connections.size() == 2) {
+          dispatcher_->exit();
+        }
       });
 
   auto initiate_connections = [&](const int count) {
@@ -259,7 +274,8 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitListenerOptOut) {
   initiate_connections(2);
   EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit))
       .Times(0);
-  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_))
+      .Times(testing::AtLeast(1));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   for (const auto& conn : client_connections) {
@@ -465,12 +481,23 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionZero) {
   listener.setRejectFraction(UnitFloat(0));
 
   // This connection will be accepted and not rejected.
+  int events_remaining = 2;
+  auto maybe_exit = [&] {
+    if (--events_remaining == 0) {
+      dispatcher_->exit();
+    }
+  };
   {
     testing::InSequence s1;
-    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected));
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected)).WillOnce(maybe_exit);
     EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::LocalClose));
   }
-  EXPECT_CALL(listener_callbacks, onAccept_(_)).WillOnce([&] { dispatcher_->exit(); });
+  Network::ConnectionSocketPtr server_socket;
+  EXPECT_CALL(listener_callbacks, onAccept_(_))
+      .WillOnce([&server_socket, &maybe_exit](Network::ConnectionSocketPtr& accepted_socket) {
+        server_socket = std::move(accepted_socket);
+        maybe_exit();
+      });
 
   ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Address::InstanceConstSharedPtr(),
@@ -524,16 +551,26 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
   }
 
   // The second connection rolls better on initiative and is accepted.
+  int events_remaining = 2;
+  auto maybe_exit = [&] {
+    if (--events_remaining == 0) {
+      dispatcher_->exit();
+    }
+  };
+  Network::ConnectionSocketPtr server_socket;
   {
     testing::InSequence s1;
     EXPECT_CALL(random_generator, random()).WillOnce(Return(std::numeric_limits<uint64_t>::max()));
-    // Exiting dispatcher on client side connect event can cause a race, listener accept callback
-    // may not have been triggered, exit dispatcher here to prevent this.
-    EXPECT_CALL(listener_callbacks, onAccept_(_)).WillOnce([&] { dispatcher_->exit(); });
+    // Wait for both listener accept and client-side Connected events before exiting.
+    EXPECT_CALL(listener_callbacks, onAccept_(_))
+        .WillOnce([&server_socket, &maybe_exit](Network::ConnectionSocketPtr& accepted_socket) {
+          server_socket = std::move(accepted_socket);
+          maybe_exit();
+        });
   }
   {
     testing::InSequence s2;
-    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected));
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected)).WillOnce(maybe_exit);
     EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::RemoteClose)).Times(0);
   }
 
@@ -749,20 +786,35 @@ TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {
   listener.configureLoadShedPoints(overload_manager);
   listener.disable();
 
+  // Wait for the accepted server connection and both client-side Connected events before exiting
+  // the dispatcher loop; otherwise client_connection2 may still be connecting when closed below.
+  int events_remaining = 3;
+  auto maybe_exit = [&] {
+    if (--events_remaining == 0) {
+      dispatcher_->exit();
+    }
+  };
+
   // When accepting we'll reject the first connection, get queried again and accept the
-  // second connection.
+  // second connection. Save the accepted socket so the server side doesn't send FIN before
+  // client_connection2 finishes connecting.
+  Network::ConnectionSocketPtr server_socket;
   {
     testing::InSequence s1;
     EXPECT_CALL(accept_connection_point, shouldShedLoad()).WillOnce(Return(true));
     EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::OverloadAction));
 
     EXPECT_CALL(accept_connection_point, shouldShedLoad()).WillOnce(Return(false));
-    EXPECT_CALL(listener_callbacks, onAccept_(_)).WillOnce([&] { dispatcher_->exit(); });
+    EXPECT_CALL(listener_callbacks, onAccept_(_))
+        .WillOnce([&server_socket, &maybe_exit](Network::ConnectionSocketPtr& accepted_socket) {
+          server_socket = std::move(accepted_socket);
+          maybe_exit();
+        });
   }
 
   {
     testing::InSequence s2;
-    EXPECT_CALL(connection_callbacks1, onEvent(ConnectionEvent::Connected));
+    EXPECT_CALL(connection_callbacks1, onEvent(ConnectionEvent::Connected)).WillOnce(maybe_exit);
     // The first connection is rejected by load shedding, so it will receive RemoteClose.
     // Use AnyNumber since the close event may or may not be processed before dispatcher exits.
     EXPECT_CALL(connection_callbacks1, onEvent(ConnectionEvent::RemoteClose))
@@ -771,7 +823,7 @@ TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {
 
   {
     testing::InSequence s3;
-    EXPECT_CALL(connection_callbacks2, onEvent(ConnectionEvent::Connected));
+    EXPECT_CALL(connection_callbacks2, onEvent(ConnectionEvent::Connected)).WillOnce(maybe_exit);
     EXPECT_CALL(connection_callbacks2, onEvent(ConnectionEvent::RemoteClose)).Times(0);
   }
 
@@ -833,17 +885,21 @@ TEST_P(TcpListenerImplTest, ShouldOnlyAcceptTheMaxNumberOfConnectionsConfiguredP
   client_connection2->addConnectionCallbacks(connection_callbacks2);
   client_connection2->connect();
 
-  EXPECT_CALL(connection_callbacks1, onEvent(ConnectionEvent::Connected));
-  EXPECT_CALL(connection_callbacks2, onEvent(ConnectionEvent::Connected));
+  int events_remaining = 4;
+  auto maybe_exit = [&] {
+    if (--events_remaining == 0) {
+      dispatcher_->exit();
+    }
+  };
+  EXPECT_CALL(connection_callbacks1, onEvent(ConnectionEvent::Connected)).WillOnce(maybe_exit);
+  EXPECT_CALL(connection_callbacks2, onEvent(ConnectionEvent::Connected)).WillOnce(maybe_exit);
   // Save the sever sockets so the connections do not close after being
   // accepted.
   std::vector<Network::ConnectionSocketPtr> server_sockets;
   EXPECT_CALL(listener_callbacks, onAccept_(_))
-      .WillRepeatedly([this, &server_sockets](Network::ConnectionSocketPtr& server_socket) -> void {
+      .WillRepeatedly([&server_sockets, &maybe_exit](Network::ConnectionSocketPtr& server_socket) {
         server_sockets.push_back(std::move(server_socket));
-        if (server_sockets.size() == 2) {
-          dispatcher_->exit();
-        }
+        maybe_exit();
       });
   //  Check the logs that they are accepted at different socket events
   EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(1)).Times(2);

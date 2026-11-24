@@ -84,7 +84,7 @@ TEST(IpAddressParsingTest, ParseIPv6Valid) {
   const sockaddr_in6 sa6 = sa6_or.value();
   EXPECT_EQ(AF_INET6, sa6.sin6_family);
   EXPECT_EQ(htons(443), sa6.sin6_port);
-  in6_addr loopback = IN6ADDR_LOOPBACK_INIT;
+  in6_addr loopback = in6addr_loopback;
   EXPECT_EQ(0, memcmp(&loopback, &sa6.sin6_addr, sizeof(in6_addr)));
 
   // Test other valid IPv6 addresses.
