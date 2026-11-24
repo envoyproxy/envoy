@@ -299,7 +299,7 @@ IoSocketHandleImpl::getOrCreateEnvoyAddressInstance(sockaddr_storage ss, socklen
 
 Address::InstanceConstSharedPtr
 IoSocketHandleImpl::maybeGetDstAddressFromHeader(const cmsghdr& cmsg, uint32_t self_port) {
-  if (cmsg.cmsg_type == IPV6_PKTINFO) {
+  if (cmsg.cmsg_level == IPPROTO_IPV6 && cmsg.cmsg_type == IPV6_PKTINFO) {
     auto info = reinterpret_cast<const in6_pktinfo*>(CMSG_DATA(&cmsg));
     sockaddr_storage ss;
     auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
@@ -310,7 +310,7 @@ IoSocketHandleImpl::maybeGetDstAddressFromHeader(const cmsghdr& cmsg, uint32_t s
     return getOrCreateEnvoyAddressInstance(ss, sizeof(sockaddr_in6));
   }
 
-  if (cmsg.cmsg_type == messageTypeContainsIP()) {
+  if (cmsg.cmsg_level == IPPROTO_IP && cmsg.cmsg_type == messageTypeContainsIP()) {
     sockaddr_storage ss;
     auto ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
     memset(ipv4_addr, 0, sizeof(sockaddr_in));
