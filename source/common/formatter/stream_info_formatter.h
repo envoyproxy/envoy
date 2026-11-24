@@ -61,7 +61,7 @@ protected:
 
 private:
   // Returns the value at path_, which must not be empty. The result points into the metadata, or
-  // into truncated when max_length_ applies and shortened the value. Returns nullptr when the
+  // into truncated, as a string, when max_length_ shortened the value. Returns nullptr when the
   // path is absent.
   const Protobuf::Value* leafValue(const envoy::config::core::v3::Metadata& metadata,
                                    Protobuf::Value& truncated) const;

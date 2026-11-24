@@ -159,6 +159,10 @@ MetadataFormatter::leafValue(const envoy::config::core::v3::Metadata& metadata,
                                     val.kind_case() != Protobuf::Value::kListValue);
 
     if (truncatable) {
+      if (val.kind_case() == Protobuf::Value::kStringValue &&
+          val.string_value().size() <= max_length_.value()) {
+        return &val;
+      }
       std::string str;
       if (val.kind_case() == Protobuf::Value::kStringValue) {
         str = val.string_value();

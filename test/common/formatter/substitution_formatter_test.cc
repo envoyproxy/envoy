@@ -4584,6 +4584,13 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
       DynamicMetadataFormatter bool_formatter("com.test", {"test_bool"}, std::optional<size_t>(2));
       EXPECT_THAT(formatValueForTest(bool_formatter, stream_info),
                   ProtoEq(ValueUtil::stringValue("tr")));
+
+      // A scalar that fits within max_length keeps its type.
+      DynamicMetadataFormatter wide_num_formatter("com.test", {"test_num"},
+                                                  std::optional<size_t>(10));
+      EXPECT_THAT(formatValueForTest(wide_num_formatter, stream_info),
+                  ProtoEq(ValueUtil::numberValue(1234)));
+      EXPECT_EQ("1234", formatForTest(wide_num_formatter, stream_info));
     }
 
     struct_obj.mutable_fields()->erase("test_num");
@@ -4615,9 +4622,9 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
   }
 }
 
-// formatValueTo() serializes the metadata it finds without first building a Protobuf::Value, so
-// its JSON is checked byte for byte, including escaping, truncation and the explicit null that
-// leaves the sink unconsumed.
+// formatValueTo() serializes the metadata in place instead of going through formatValue(), so its
+// JSON is pinned literally, including escaping, truncation and the explicit null that leaves the
+// sink unconsumed.
 TEST(SubstitutionFormatterTest, DynamicMetadataFormatValueTo) {
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
@@ -4660,7 +4667,7 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatValueTo) {
   EXPECT_EQ(std::make_pair(false, std::string()),
             format_value_to("com.notfound", {}, std::nullopt));
 
-  // An explicit null is reported as a missing value by the string paths too.
+  // format() reports an explicit null as a missing value, and formatValue() as a null Value.
   DynamicMetadataFormatter null_formatter("com.test", {"null_key"}, std::nullopt);
   EXPECT_EQ(std::nullopt, formatForTest(null_formatter, stream_info));
   EXPECT_THAT(formatValueForTest(null_formatter, stream_info), ProtoEq(ValueUtil::nullValue()));
