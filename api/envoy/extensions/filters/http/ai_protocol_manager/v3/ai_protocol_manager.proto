@@ -265,7 +265,7 @@ message RequestPerRoute {
   type.ai.v3.LLMProtocol llm_protocol = 1 [(validate.rules).enum = {defined_only: true}];
 
   // How clients on this route carry ``llm_protocol`` on HTTP: the
-  // :ref:`binding <config_http_filters_ai_protocol_manager_transcoder_instructions>`
+  // :ref:`binding <config_http_ai_filters_transcoder_instructions>`
   // the transcoder reads the client's path and body under. When unset, the
   // client's path is read under the API's own binding and the bindings Envoy
   // defines for it, so one route takes clients of the Anthropic API and of
@@ -284,7 +284,7 @@ message ResponsePerRoute {
   type.ai.v3.LLMProtocol llm_protocol = 1 [(validate.rules).enum = {defined_only: true}];
 
   // How the backend carries its API on HTTP: the
-  // :ref:`binding <config_http_filters_ai_protocol_manager_transcoder_instructions>`
+  // :ref:`binding <config_http_ai_filters_transcoder_instructions>`
   // the transcoder renders the request's path from and applies to its body.
   // When unset, a request whose backend speaks the client's API leaves in the
   // binding it arrived in, and any other request in the backend API's own.
