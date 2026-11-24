@@ -214,6 +214,12 @@ enum class Status {
 
   // Jwt algorithm is not allowed.
   JwtAlgorithmNotAllowed,
+
+  // "crit" in the header is not a list of extension parameters present in the header.
+  JwtHeaderBadCrit,
+
+  // "crit" in the header lists a parameter that is not allowed.
+  JwtCritHeaderNotAllowed,
 };
 
 /**
