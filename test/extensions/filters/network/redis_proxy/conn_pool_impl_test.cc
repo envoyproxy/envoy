@@ -386,6 +386,13 @@ TEST_F(RedisConnPoolImplTest, Basic) {
 };
 
 TEST_F(RedisConnPoolImplTest, ShardSize) {
+  envoy::config::cluster::v3::Cluster::CustomClusterType cluster_type;
+  cluster_type.set_name("envoy.clusters.redis");
+
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
+      .WillOnce(Return(
+          makeOptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>(cluster_type)));
+
   InSequence s;
 
   setup();
@@ -399,7 +406,6 @@ TEST_F(RedisConnPoolImplTest, ShardSize) {
       .WillRepeatedly([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         EXPECT_EQ(context->downstreamConnection(), nullptr);
-        std::cout << (context->computeHashKey().value()) << std::endl;
         if (context->computeHashKey() < shard_size) {
           return cm_.thread_local_cluster_.lb_.host_;
         }
@@ -475,6 +481,13 @@ TEST_F(RedisConnPoolImplTest, ShardNoHost) {
 };
 
 TEST_F(RedisConnPoolImplTest, ShardSizeDuplicateHosts) {
+  envoy::config::cluster::v3::Cluster::CustomClusterType cluster_type;
+  cluster_type.set_name("envoy.clusters.redis");
+
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
+      .WillOnce(Return(
+          makeOptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>(cluster_type)));
+
   InSequence s;
 
   setup();
@@ -498,6 +511,37 @@ TEST_F(RedisConnPoolImplTest, ShardSizeDuplicateHosts) {
   // shardSize() should only count max_hosts, ignoring duplicates
   EXPECT_EQ(conn_pool_->shardSize(), max_hosts);
   EXPECT_GT(call_count, max_hosts);
+
+  tls_.shutdownThread();
+};
+
+TEST_F(RedisConnPoolImplTest, ShardSizeGenericLoadBalancer) {
+  InSequence s;
+
+  setup();
+
+  std::vector<Upstream::HostSharedPtr> hosts;
+  for (uint16_t i = 0; i < 3; i++) {
+    hosts.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
+  }
+  cm_.thread_local_cluster_.cluster_.priority_set_.getMockHostSet(0)->healthy_hosts_ = hosts;
+  cm_.thread_local_cluster_.cluster_.priority_set_.getMockHostSet(0)->hosts_ = hosts;
+
+  // A generic load balancer is never consulted: the shard count is the number of
+  // configured healthy hosts.
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_)).Times(0);
+  EXPECT_EQ(conn_pool_->shardSize(), 3);
+
+  tls_.shutdownThread();
+};
+
+TEST_F(RedisConnPoolImplTest, ShardSizeGenericLoadBalancerNoHealthyHosts) {
+  InSequence s;
+
+  setup();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_)).Times(0);
+  EXPECT_EQ(conn_pool_->shardSize(), 0);
 
   tls_.shutdownThread();
 };
