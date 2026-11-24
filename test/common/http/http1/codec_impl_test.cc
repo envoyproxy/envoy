@@ -5188,6 +5188,15 @@ TEST_F(Http1ServerConnectionImplTest, ValueEndsWithNullCharacter) {
                                     "header value contains invalid chars");
 }
 
+TEST_F(Http1ServerConnectionImplTest, ObsFoldContinuationLineWithInvalidCharacter) {
+  for (const absl::string_view invalid : {absl::string_view("\x7f"), kNullCharacter}) {
+    SCOPED_TRACE(absl::StrCat("byte 0x", absl::Hex(invalid[0], absl::kZeroPad2)));
+    testRequestWithValueExpectFailure(absl::StrCat("foo\r\n b", invalid, "r"),
+                                      "http1.invalid_characters",
+                                      "header value contains invalid chars");
+  }
+}
+
 TEST_F(Http1ServerConnectionImplTest, ValueStartsWithCR) {
   const absl::string_view value = "\r value starts with carriage return";
 
