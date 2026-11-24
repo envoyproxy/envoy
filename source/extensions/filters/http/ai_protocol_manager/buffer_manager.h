@@ -45,7 +45,7 @@ using ReplayDoneCallback = absl::AnyInvocable<void(absl::Status)>;
 //     needs no flow-control surface of its own.
 //   - Replay: re-injected data is paced against the chain's back-pressure, which
 //     the bridge tracks. We pause issuing reads/injects while the chain is backed
-//     up and resume on the bridge's ReplayResumeHandler callback.
+//     up and resume on the bridge's WriteResumeCallback.
 //
 // TODO(penguingao): Decouple passive storage from active filter-chain replay/injection.
 // Currently BufferManager combines a passive payload store (in-memory queue + ExternalBuffer)
@@ -138,7 +138,7 @@ private:
     BufferManager& owner_;
   };
 
-  void onReplayResumed();
+  void onWriteResumed();
   void armWriteResumeCallback();
   // Issues a write of the queued backlog when one is warranted: no write is in
   // flight and the backlog has reached WriteFlushThreshold, the stream has ended,

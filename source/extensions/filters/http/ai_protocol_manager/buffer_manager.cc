@@ -19,7 +19,7 @@ BufferManager::BufferManager(Config config, ExternalBufferFactory& buffer_factor
 
 void BufferManager::armWriteResumeCallback() {
   bridge_.clearWriteResumeCallback();
-  bridge_.setWriteResumeCallback([this]() { onReplayResumed(); });
+  bridge_.setWriteResumeCallback([this]() { onWriteResumed(); });
 }
 
 Event::SchedulableCallback& BufferManager::replayCallback() {
@@ -291,7 +291,7 @@ void BufferManager::maybeReadNextChunk() {
   if (!replaying_ || read_in_flight_) {
     return;
   }
-  // Pause while the chain we feed is backed up; onReplayResumed() restarts us
+  // Pause while the chain we feed is backed up; onWriteResumed() restarts us
   // once it drains. This bounds how much replayed data piles up in the chain when
   // it is slow.
   if (bridge_.writePaused()) {
@@ -451,7 +451,7 @@ void BufferManager::onExternalBufferError() {
   bridge_.onUnrecoverableError();
 }
 
-void BufferManager::onReplayResumed() {
+void BufferManager::onWriteResumed() {
   if (replaying_) {
     armWriteResumeCallback();
   }

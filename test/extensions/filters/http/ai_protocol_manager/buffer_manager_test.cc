@@ -466,7 +466,7 @@ TEST_F(BufferManagerTest, TerminalReplayDoneDetachesManagerSynchronously) {
 
 // Managers share one bridge and take its replay handler slot only for the duration of a range, so
 // a second manager on the same bridge can replay after the first is done. Holding the slot would
-// trip setReplayHandler()'s ASSERT here.
+// trip setWriteResumeCallback()'s ASSERT here.
 TEST_F(BufferManagerTest, ManagersTakeTheBridgeReplaySlotInTurn) {
   Buffer::OwnedImpl body("first");
   manager_->onData(body);
@@ -1257,7 +1257,7 @@ TEST_F(BufferManagerTest, SynchronousDeallocationDuringInjectDataDoesNotUAF) {
 
 // When replay has yielded for the per-iteration inject budget, a watermark resume must not
 // overwrite the scheduled next-iteration callback with a current-iteration callback.
-TEST_F(BufferManagerTest, OnReplayResumedWhileBudgetYieldedDoesNotScheduleCurrentIteration) {
+TEST_F(BufferManagerTest, OnWriteResumedWhileBudgetYieldedDoesNotScheduleCurrentIteration) {
   manager_config_.max_in_memory_bytes = 1024 * 1024;
   resetManager(factory_);
 
