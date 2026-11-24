@@ -35,11 +35,9 @@ protected:
         bridge_(*dispatcher_), writer_(bridge_),
         executor_(std::make_shared<Coroutine::DispatcherExecutor>(*dispatcher_)) {}
 
-  void drain() {
-    for (int i = 0; i < 40; ++i) {
-      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    }
-  }
+  // Runs until no posted, current-iteration, or next-iteration callbacks remain queued (returning
+  // immediately once work completes or parks on a watermark).
+  void drain() { dispatcher_->run(Event::Dispatcher::RunType::Block); }
 
   Coroutine::Task<absl::Status> inject(Buffer::Instance& data) {
     co_return co_await writer_.inject(data);
@@ -162,7 +160,8 @@ TEST_F(ChainWriterTest, CancelUnwindsBudgetYieldedInject) {
   std::optional<Coroutine::DetachedHandle> handle;
   bridge_.on_inject_ = [&]() {
     if (bridge_.inject_calls_ == 8) {
-      // Cancel on the next loop step after the 9th chunk parks on budget_cb_.
+      // Current-iteration post runs after chunk 9 parks on budget_cb_ (next iteration) and before
+      // the next loop iteration executes.
       dispatcher_->post([&]() {
         if (handle.has_value()) {
           handle->cancel();
