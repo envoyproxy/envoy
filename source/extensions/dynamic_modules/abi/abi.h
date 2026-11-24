@@ -9612,8 +9612,8 @@ typedef enum envoy_dynamic_module_type_bootstrap_config_snapshot_result {
   envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success = 0,
   // called off the main thread, before
   // envoy_dynamic_module_on_bootstrap_extension_server_initialized, during shutdown, from a
-  // cluster or listener lifecycle hook, whatever triggered it, from another bootstrap hook Envoy
-  // runs inside an xDS update or a resource's destruction, or while another collection runs
+  // cluster, listener or secret lifecycle hook, whatever triggered it, from another bootstrap hook
+  // Envoy runs inside an xDS update or a resource's destruction, or while another collection runs
   envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed = 1,
   // the name regex is invalid or its RE2 program size exceeds re2.max_program_size.error_level
   envoy_dynamic_module_type_bootstrap_config_snapshot_result_InvalidRegex = 2,
@@ -10130,7 +10130,9 @@ void envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update(
  * references it is removed, or when an on-demand certificate selector drops it after a delta xDS
  * removal. A delta xDS removal alone does not fire it while a listener or cluster still holds a
  * provider for the name, and a name held only by a draining listener or filter chain fires when
- * the drain ends. It fires only for a name that delivered a secret, and the name can leave the
+ * the drain ends. Likewise a name held only by a removed cluster fires once the connections and
+ * requests still using that cluster are done, so a long-lived stream can delay it well past the
+ * cluster's removal. It fires only for a name that delivered a secret, and the name can leave the
  * active resource names before it fires.
  *
  * Config snapshot collection returns NotAllowed during this hook. Defer collection with the
@@ -10836,10 +10838,11 @@ bool envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
  * cluster name when no service name is set.
  * Cost grows with the selected resources, so combine frequent notifications into one collection.
  *
- * Collection is refused in cluster or listener lifecycle hooks, whatever triggered them, and in
- * other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction. Providers can
- * contain partial changes under the previous version. Defer collection with the bootstrap config
- * scheduler. Callout failures during cluster removal are already reported from a posted callback.
+ * Collection is refused in cluster, listener or secret lifecycle hooks, whatever triggered them,
+ * and in other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction.
+ * Providers can contain partial changes under the previous version. Defer collection with the
+ * bootstrap config scheduler. Callout failures during cluster removal are already reported from a
+ * posted callback.
  *
  * Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
  * configuration may retain sensitive data. No admin listener is needed, and admin allow_paths does

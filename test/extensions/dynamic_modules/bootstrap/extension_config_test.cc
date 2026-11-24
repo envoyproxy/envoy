@@ -8,6 +8,7 @@
 #include "test/mocks/server/listener_manager.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -359,7 +360,28 @@ TEST_F(ExtensionConfigTest, EnableSecretLifecycleRequiresHook) {
   ASSERT_TRUE(config_or.ok()) << config_or.status();
   testing::NiceMock<Server::MockListenerManager> listener_manager;
   config_or.value()->setListenerManager(listener_manager);
-  EXPECT_FALSE(config_or.value()->enableSecretLifecycle());
+  EXPECT_LOG_CONTAINS("error", "cannot enable secret lifecycle without a secret lifecycle hook",
+                      EXPECT_FALSE(config_or.value()->enableSecretLifecycle()));
+}
+
+void ignoreSecretRemoval(envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+                         envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+                         envoy_dynamic_module_type_envoy_buffer) {}
+
+TEST_F(ExtensionConfigTest, EnableSecretLifecycleWithOnlyRemovalHook) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+  auto config_or = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", DefaultMetricsNamespace, std::move(dynamic_module.value()), dispatcher_,
+      context_, context_.store_);
+  ASSERT_TRUE(config_or.ok()) << config_or.status();
+  auto config = config_or.value();
+  ASSERT_EQ(config->on_bootstrap_extension_secret_add_or_update_, nullptr);
+  config->on_bootstrap_extension_secret_removal_ = &ignoreSecretRemoval;
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  EXPECT_TRUE(config->enableSecretLifecycle());
 }
 
 std::vector<std::string>& recordedSecretEvents() {

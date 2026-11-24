@@ -151,8 +151,8 @@ impl Drop for EnvoyBootstrapExtensionConfigSnapshotImpl {
 /// A collection or encoding failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigSnapshotError {
-  /// Called off the main thread, before `on_server_initialized`, during shutdown, from a cluster
-  /// or listener lifecycle hook, whatever triggered it, from another bootstrap hook Envoy runs
+  /// Called off the main thread, before `on_server_initialized`, during shutdown, from a cluster,
+  /// listener or secret lifecycle hook, whatever triggered it, from another bootstrap hook Envoy runs
   /// inside an xDS update or a resource's destruction, or while another collection runs. A call
   /// off the main thread also reports an Envoy bug.
   NotAllowed,
@@ -502,9 +502,9 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// expression selects all names. Cost grows with the selected resources, so combine frequent
   /// notifications into one collection.
   ///
-  /// Collection is refused in cluster or listener lifecycle hooks, whatever triggered them, and in
-  /// other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction. Providers
-  /// can contain partial changes under the previous version. Defer collection with
+  /// Collection is refused in cluster, listener or secret lifecycle hooks, whatever triggered them,
+  /// and in other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction.
+  /// Providers can contain partial changes under the previous version. Defer collection with
   /// [`Self::new_scheduler`]. Callout failures during cluster removal are already reported from a
   /// posted callback.
   /// No admin listener is needed and admin `allow_paths` does not restrict access.
@@ -1030,7 +1030,9 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   /// or when an on-demand certificate selector drops it after a delta xDS removal. A delta xDS
   /// removal alone does not trigger it while a listener or cluster still holds a provider for the
   /// name, and a name held only by a draining listener or filter chain is reported when the drain
-  /// ends. The name can leave the active resource names before this is called.
+  /// ends. Likewise a name held only by a removed cluster is reported once the connections and
+  /// requests still using that cluster are done, so a long-lived stream can delay it well past the
+  /// cluster's removal. The name can leave the active resource names before this is called.
   ///
   /// [`EnvoyBootstrapExtensionConfig::get_config_snapshot`] returns
   /// [`ConfigSnapshotError::NotAllowed`] during this hook.
