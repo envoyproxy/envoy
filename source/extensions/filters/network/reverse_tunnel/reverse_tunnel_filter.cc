@@ -22,6 +22,8 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 #include "source/server/generic_factory_context.h"
 
+#include "absl/strings/numbers.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -347,11 +349,62 @@ void ReverseTunnelFilter::onFramingRejection(
 
 void ReverseTunnelFilter::onTerminalRejection() { disarmHandshakeTimer(); }
 
-Bootstrap::ReverseConnection::HandshakePolicyResult
-ReverseTunnelFilter::evaluatePolicy(const Http::RequestHeaderMap& headers,
-                                    absl::string_view node_id, absl::string_view cluster_id,
-                                    absl::string_view tenant_id) {
+Bootstrap::ReverseConnection::TunnelDecision
+ReverseTunnelFilter::onTunnelRequest(const Bootstrap::ReverseConnection::TunnelRequest& request) {
   Network::Connection& conn = read_callbacks_->connection();
+  const Bootstrap::ReverseConnection::TunnelDecision registration_failed{
+      false, Http::Code::ServiceUnavailable, "Reverse tunnel registration unavailable",
+      "reverse_tunnel_registration_failed"};
+
+  if (tunnel_requested_) {
+    IS_ENVOY_BUG("reverse_tunnel: second tunnel request on one connection");
+    stats_.registration_failed_.inc();
+    return registration_failed;
+  }
+  tunnel_requested_ = true;
+
+  const Bootstrap::ReverseConnection::TunnelDecision policy_decision = evaluatePolicy(request);
+  if (!policy_decision.accepted) {
+    return policy_decision;
+  }
+
+  // Parse the optional initiator metadata. All three are optional so older initiators that do not
+  // advertise them are handled gracefully (empty values).
+  int64_t initiation_time_ms = 0;
+  if (request.initiation_time_ms.has_value() &&
+      !absl::SimpleAtoi(*request.initiation_time_ms, &initiation_time_ms)) {
+    ENVOY_CONN_LOG(warn, "reverse_tunnel: failed to parse initiation-time header value '{}'", conn,
+                   *request.initiation_time_ms);
+    initiation_time_ms = 0;
+  }
+  pending_node_id_ = std::string(request.node_id);
+  pending_cluster_id_ = std::string(request.cluster_id);
+  pending_tenant_id_ = std::string(request.tenant_id);
+  pending_initiator_worker_id_ = std::string(request.initiator_worker_id);
+  pending_initiator_connection_id_ = std::string(request.initiator_connection_id);
+  pending_initiation_time_ms_ = initiation_time_ms;
+
+  // Phase one. Duplicate the socket and resolve the registration target before responding, so a
+  // tunnel that cannot be registered is answered with 503 rather than a 200 over a dropped socket.
+  if (!prepareAcceptedConnectionInternal()) {
+    stats_.registration_failed_.inc();
+    ENVOY_CONN_LOG(debug, "reverse_tunnel: cannot register tunnel, rejecting handshake", conn);
+    return registration_failed;
+  }
+
+  // Stop reading further bytes on the handshake connection so no later pipelined request is
+  // dispatched while the socket is handed off.
+  conn.readDisable(true);
+  return {true, Http::Code::OK, "", ""};
+}
+
+Bootstrap::ReverseConnection::TunnelDecision
+ReverseTunnelFilter::evaluatePolicy(const Bootstrap::ReverseConnection::TunnelRequest& request) {
+  Network::Connection& conn = read_callbacks_->connection();
+  const Http::RequestHeaderMap& headers = request.headers;
+  const absl::string_view node_id = request.node_id;
+  const absl::string_view cluster_id = request.cluster_id;
+  const absl::string_view tenant_id = request.tenant_id;
 
   // Reject a present-but-empty tenant id the same way as a missing header. An empty tenant
   // silently disables tenant scoping when the socket is registered, since
@@ -458,32 +511,10 @@ ReverseTunnelFilter::evaluatePolicy(const Http::RequestHeaderMap& headers,
             toStringView(validation_result), toStringView(validation_result)};
   }
 
-  pending_node_id_ = std::string(node_id);
-  pending_cluster_id_ = std::string(cluster_id);
-  pending_tenant_id_ = std::string(tenant_id);
-  policy_approved_ = true;
   return {true, Http::Code::OK, "", ""};
 }
 
-bool ReverseTunnelFilter::prepareAcceptedConnection(
-    const Bootstrap::ReverseConnection::AcceptedTunnelInfo& info) {
-  // Registration is allowed once, for the identifiers a passing policy approved.
-  const bool approved = policy_approved_;
-  policy_approved_ = false;
-  if (!approved) {
-    IS_ENVOY_BUG("reverse_tunnel: tunnel prepared without a passing policy decision");
-  }
-  if (!approved || !prepareAcceptedConnectionInternal(info)) {
-    stats_.registration_failed_.inc();
-    ENVOY_CONN_LOG(debug, "reverse_tunnel: cannot register tunnel, rejecting handshake",
-                   read_callbacks_->connection());
-    return false;
-  }
-  return true;
-}
-
-bool ReverseTunnelFilter::prepareAcceptedConnectionInternal(
-    const Bootstrap::ReverseConnection::AcceptedTunnelInfo& info) {
+bool ReverseTunnelFilter::prepareAcceptedConnectionInternal() {
   Network::Connection& connection = read_callbacks_->connection();
 
   // The worker-local socket manager owns the idle pool. Without it the tunnel cannot be registered.
@@ -511,11 +542,8 @@ bool ReverseTunnelFilter::prepareAcceptedConnectionInternal(
       socket->connectionInfoProvider().remoteAddress());
   wrapped_socket->ioHandle().resetFileEvents();
 
-  // Hold the duplicated socket and identifiers until the acceptance response is flushed.
+  // Hold the duplicated socket until the acceptance response is flushed.
   pending_socket_ = std::move(wrapped_socket);
-  pending_initiator_worker_id_ = info.initiator_worker_id;
-  pending_initiator_connection_id_ = info.initiator_connection_id;
-  pending_initiation_time_ms_ = info.initiation_time_ms;
   return true;
 }
 

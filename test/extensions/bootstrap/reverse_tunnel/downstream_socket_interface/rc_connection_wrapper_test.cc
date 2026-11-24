@@ -111,13 +111,11 @@ protected:
     return config;
   }
 
-  // The extension builds the handshake factory from the framing it copies into the socket config;
-  // mirror that here.
+  // The extension builds the handshake factory from its HTTP/1 framing; mirror that here.
   std::unique_ptr<ReverseConnectionIOHandle>
-  createTestIOHandle(ReverseConnectionSocketConfig config) {
+  createTestIOHandle(ReverseConnectionSocketConfig config, Http1InitiatorFraming framing = {}) {
     config.handshake_configurator =
-        std::make_shared<Http1HandshakeConfigurator>(Http1InitiatorFraming{
-            config.request_path, config.use_http_upgrade, config.additional_headers});
+        std::make_shared<Http1HandshakeConfigurator>(std::move(framing));
     return std::make_unique<ReverseConnectionIOHandle>(-1, // dummy fd
                                                        config, cluster_manager_, extension_.get(),
                                                        *stats_scope_);
@@ -366,8 +364,9 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithCustomRequestPath) {
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
   ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
-  custom_config.request_path = "/custom/handshake";
-  auto local_io_handle = createTestIOHandle(custom_config);
+  Http1InitiatorFraming framing;
+  framing.request_path = "/custom/handshake";
+  auto local_io_handle = createTestIOHandle(custom_config, std::move(framing));
 
   RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
                               "test-cluster");
@@ -412,8 +411,10 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithAdditionalHeaders) {
   auto handshake_headers = std::make_shared<std::vector<HandshakeHeader>>();
   handshake_headers->push_back(makeHandshakeHeader("x-custom-auth", "token123"));
   handshake_headers->push_back(makeHandshakeHeader("x-request-id", "abc-def"));
-  custom_config.handshake_headers = handshake_headers;
-  auto local_io_handle = createTestIOHandle(custom_config);
+  Http1InitiatorFraming framing;
+  framing.formatted_headers =
+      std::make_shared<Http1HandshakeHeaders>(Http1HandshakeHeaders{handshake_headers});
+  auto local_io_handle = createTestIOHandle(custom_config, std::move(framing));
 
   RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
                               "test-cluster");
@@ -460,8 +461,10 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersOverwrite) 
   handshake_headers->push_back(
       makeHandshakeHeader("host", "custom-host:9090",
                           envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD));
-  custom_config.handshake_headers = handshake_headers;
-  auto local_io_handle = createTestIOHandle(custom_config);
+  Http1InitiatorFraming framing;
+  framing.formatted_headers =
+      std::make_shared<Http1HandshakeHeaders>(Http1HandshakeHeaders{handshake_headers});
+  auto local_io_handle = createTestIOHandle(custom_config, std::move(framing));
 
   RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
                               "test-cluster");
@@ -512,8 +515,10 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersAddIfAbsent
   // "x-new-header" is absent, so ADD_IF_ABSENT should add it.
   handshake_headers->push_back(makeHandshakeHeader(
       "x-new-header", "new-value", envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT));
-  custom_config.handshake_headers = handshake_headers;
-  auto local_io_handle = createTestIOHandle(custom_config);
+  Http1InitiatorFraming framing;
+  framing.formatted_headers =
+      std::make_shared<Http1HandshakeHeaders>(Http1HandshakeHeaders{handshake_headers});
+  auto local_io_handle = createTestIOHandle(custom_config, std::move(framing));
 
   RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
                               "test-cluster");
@@ -566,8 +571,10 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersOverwriteIf
   handshake_headers->push_back(
       makeHandshakeHeader("x-nonexistent", "should-not-appear",
                           envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS));
-  custom_config.handshake_headers = handshake_headers;
-  auto local_io_handle = createTestIOHandle(custom_config);
+  Http1InitiatorFraming framing;
+  framing.formatted_headers =
+      std::make_shared<Http1HandshakeHeaders>(Http1HandshakeHeaders{handshake_headers});
+  auto local_io_handle = createTestIOHandle(custom_config, std::move(framing));
 
   RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
                               "test-cluster");
@@ -620,8 +627,10 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeFormatterHeaders) {
       makeHandshakeHeader("authorization", "Bearer %COMMAND_EXTENSION()%",
                           envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD,
                           std::move(command_parsers)));
-  custom_config.handshake_headers = handshake_headers;
-  auto local_io_handle = createTestIOHandle(custom_config);
+  Http1InitiatorFraming framing;
+  framing.formatted_headers =
+      std::make_shared<Http1HandshakeHeaders>(Http1HandshakeHeaders{handshake_headers});
+  auto local_io_handle = createTestIOHandle(custom_config, std::move(framing));
 
   RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
                               "test-cluster");
@@ -667,9 +676,10 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeLiteralHeaders) {
   envoy::config::core::v3::HeaderValueOption hdr;
   hdr.mutable_header()->set_key("x-literal");
   hdr.mutable_header()->set_value("100% literal");
-  custom_config.additional_headers.push_back(hdr);
-  // handshake_headers left null -> literal application path.
-  auto local_io_handle = createTestIOHandle(custom_config);
+  Http1InitiatorFraming framing;
+  framing.additional_headers.push_back(hdr);
+  // No formatted headers are published -> literal application path.
+  auto local_io_handle = createTestIOHandle(custom_config, std::move(framing));
 
   RCConnectionWrapper wrapper(*local_io_handle, std::move(mock_connection), mock_host,
                               "test-cluster");
@@ -680,12 +690,9 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeLiteralHeaders) {
   EXPECT_THAT(encoded_request, HasSubstr("x-literal: 100% literal"));
 }
 
-// Exercises the full ReverseTunnelInitiator::socket() -> io_handle -> wrapper path. socket()
-// snapshots the handshake formatters into the io_handle's config at creation time; when that
-// happens before onServerInitialized() builds them, the snapshot is null and gets reused for every
-// re-dial. This creates the socket while the extension is still uninitialized (and checks the
-// snapshot really is null), then initializes, dials, and checks the formatted value is sent -- not
-// the raw literal. Fails if the wrapper goes back to trusting the snapshot.
+// Exercises the full ReverseTunnelInitiator::socket() -> io_handle -> wrapper path. The socket and
+// its handshake factory exist before onServerInitialized() publishes the formatters, so the dial
+// must read them live and send the formatted value, not the raw literal.
 TEST_F(RCConnectionWrapperTest, HandshakeHeadersResolvedThroughSocketPathAfterInit) {
   Envoy::Formatter::TestCommandFactory factory;
   Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(factory);
@@ -709,8 +716,7 @@ TEST_F(RCConnectionWrapperTest, HandshakeHeadersResolvedThroughSocketPathAfterIn
   live_extension->setTestOnlyTLSRegistry(std::move(live_tls_slot));
 
   // Create the reverse-connection socket through the genuine initiator path while the extension is
-  // still uninitialized. This is the step that snapshots the (still null) formatters into the
-  // io_handle's config.
+  // still uninitialized.
   ReverseTunnelInitiator initiator(context_);
   initiator.extension_ = live_extension.get();
   ReverseConnectionAddress::ReverseConnectionConfig addr_config;
@@ -724,17 +730,9 @@ TEST_F(RCConnectionWrapperTest, HandshakeHeadersResolvedThroughSocketPathAfterIn
                                  Network::SocketCreationOptions{});
   auto* io_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
   ASSERT_NE(io_handle, nullptr);
-  // Root cause: the socket captured a null formatter snapshot because it was created before
-  // onServerInitialized(). A wrapper trusting this snapshot would emit the raw literal on every
-  // dial.
-  ASSERT_EQ(io_handle->handshakeHeaders(), nullptr);
-
   // The worker registers and the formatters are built only now, after the socket already exists.
   NiceMock<Server::MockInstance> server;
   live_extension->onServerInitialized(server);
-  ASSERT_NE(live_extension->handshakeHeaders(), nullptr);
-  // The io_handle's own snapshot is still null -- the fix must not depend on it.
-  ASSERT_EQ(io_handle->handshakeHeaders(), nullptr);
 
   // Drive a handshake on the real io_handle and confirm the live formatter value is sent.
   auto mock_connection = getDeletableConn(dispatcher_);
@@ -1466,8 +1464,9 @@ TEST_F(RCConnectionWrapperTest, OnEventWithNullConnection) {
 // in the handshake request. Verifies by capturing the bytes written by the encoder.
 TEST_F(RCConnectionWrapperTest, ConnectEmitsUpgradeHeaders) {
   ReverseConnectionSocketConfig upgrade_config = createDefaultTestConfig();
-  upgrade_config.use_http_upgrade = true;
-  auto upgrade_io_handle = createTestIOHandle(upgrade_config);
+  Http1InitiatorFraming upgrade_framing;
+  upgrade_framing.use_http_upgrade = true;
+  auto upgrade_io_handle = createTestIOHandle(upgrade_config, std::move(upgrade_framing));
 
   auto mock_connection = getDeletableConn(dispatcher_);
   std::string written;
@@ -2011,8 +2010,9 @@ TEST_F(RCConnectionWrapperTest, ResidualCoalescedWith200ReachesTunnel) {
 // Post-101 bytes in upgrade mode reach the accepted tunnel for replay.
 TEST_F(RCConnectionWrapperTest, ResidualAfter101ReachesTunnel) {
   ReverseConnectionSocketConfig upgrade_config = createDefaultTestConfig();
-  upgrade_config.use_http_upgrade = true;
-  io_handle_ = createTestIOHandle(upgrade_config);
+  Http1InitiatorFraming upgrade_framing;
+  upgrade_framing.use_http_upgrade = true;
+  io_handle_ = createTestIOHandle(upgrade_config, std::move(upgrade_framing));
 
   auto read_filter = dialOneTunnel();
   feed(read_filter, "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\n"
@@ -2065,29 +2065,56 @@ TEST_F(RCConnectionWrapperTest, ConnectWithoutConfiguratorFails) {
 
 namespace {
 
-// Handshake that reports a terminal outcome from start() and still returns ok.
-class TerminalInStartHandshake : public InitiatorHandshake {
+// Counts the calls a scripted handshake receives after start().
+struct HandshakeCallCounts {
+  int cancels{0};
+  int reads{0};
+};
+
+// How a scripted handshake's start() behaves.
+enum class StartBehavior {
+  // Reports a failure and returns an error, as the contract requires.
+  FailWithOutcome,
+  // Reports a failure but returns ok, which violates the contract.
+  OutcomeWithOkStatus,
+  // Returns an error without reporting an outcome, which violates the contract.
+  FailWithoutOutcome,
+};
+
+class MisbehavingStartHandshake : public InitiatorHandshake {
 public:
-  explicit TerminalInStartHandshake(InitiatorHandshakeCallbacks& callbacks)
-      : callbacks_(callbacks) {}
+  MisbehavingStartHandshake(InitiatorHandshakeCallbacks& callbacks, StartBehavior behavior,
+                            HandshakeCallCounts& counts)
+      : callbacks_(callbacks), behavior_(behavior), counts_(counts) {}
   absl::Status start(std::optional<int64_t>) override {
-    callbacks_.onHandshakeDone(HandshakeOutcome::failure("finished early"), std::nullopt);
-    return absl::OkStatus();
+    if (behavior_ != StartBehavior::FailWithoutOutcome) {
+      callbacks_.onHandshakeDone(HandshakeOutcome::failure("finished early"), std::nullopt);
+    }
+    return behavior_ == StartBehavior::OutcomeWithOkStatus ? absl::OkStatus()
+                                                           : absl::InternalError("start failed");
   }
-  void onData(Buffer::Instance&) override {}
-  void cancel() override {}
+  void onData(Buffer::Instance&) override { ++counts_.reads; }
+  void cancel() override { ++counts_.cancels; }
   Buffer::InstancePtr takeResidual() override { return nullptr; }
 
 private:
   InitiatorHandshakeCallbacks& callbacks_;
+  const StartBehavior behavior_;
+  HandshakeCallCounts& counts_;
 };
 
-class TerminalInStartConfigurator : public InitiatorHandshakeConfigurator {
+class MisbehavingStartConfigurator : public InitiatorHandshakeConfigurator {
 public:
+  MisbehavingStartConfigurator(StartBehavior behavior, HandshakeCallCounts& counts)
+      : behavior_(behavior), counts_(counts) {}
   std::unique_ptr<InitiatorHandshake>
   createHandshake(InitiatorHandshakeCallbacks& callbacks) const override {
-    return std::make_unique<TerminalInStartHandshake>(callbacks);
+    return std::make_unique<MisbehavingStartHandshake>(callbacks, behavior_, counts_);
   }
+
+private:
+  const StartBehavior behavior_;
+  HandshakeCallCounts& counts_;
 };
 
 } // namespace
@@ -2095,8 +2122,10 @@ public:
 // An attempt that ended inside start() with an ok status is a contract violation: connect()
 // reports it rather than arming a deadline on a finished attempt.
 TEST_F(RCConnectionWrapperTest, TerminalOutcomeInsideStartWithOkStatusFails) {
+  HandshakeCallCounts counts;
   ReverseConnectionSocketConfig config = createDefaultTestConfig();
-  config.handshake_configurator = std::make_shared<TerminalInStartConfigurator>();
+  config.handshake_configurator =
+      std::make_shared<MisbehavingStartConfigurator>(StartBehavior::OutcomeWithOkStatus, counts);
   auto handle = std::make_unique<ReverseConnectionIOHandle>(-1, config, cluster_manager_,
                                                             extension_.get(), *stats_scope_);
   auto mock_connection = getDeletableConn(dispatcher_);
@@ -2106,6 +2135,44 @@ TEST_F(RCConnectionWrapperTest, TerminalOutcomeInsideStartWithOkStatusFails) {
 
   EXPECT_ENVOY_BUG(EXPECT_FALSE(wrapper.connect("test-tenant", "test-cluster", "test-node").ok()),
                    "returned ok");
+}
+
+// A start() failure without a terminal outcome is a contract violation that connect() reports.
+TEST_F(RCConnectionWrapperTest, StartFailureWithoutOutcomeFails) {
+  HandshakeCallCounts counts;
+  ReverseConnectionSocketConfig config = createDefaultTestConfig();
+  config.handshake_configurator =
+      std::make_shared<MisbehavingStartConfigurator>(StartBehavior::FailWithoutOutcome, counts);
+  auto handle = std::make_unique<ReverseConnectionIOHandle>(-1, config, cluster_manager_,
+                                                            extension_.get(), *stats_scope_);
+  auto mock_connection = getDeletableConn(dispatcher_);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  RCConnectionWrapper wrapper(*handle, std::move(mock_connection), mock_host, "test-cluster");
+
+  EXPECT_ENVOY_BUG(EXPECT_FALSE(wrapper.connect("test-tenant", "test-cluster", "test-node").ok()),
+                   "start() failed without reporting a terminal outcome");
+}
+
+// A failure reported inside start() cancels the handshake, and later reads no longer reach it.
+TEST_F(RCConnectionWrapperTest, FailureInsideStartCancelsAndStopsReads) {
+  HandshakeCallCounts counts;
+  ReverseConnectionSocketConfig config = createDefaultTestConfig();
+  config.handshake_configurator =
+      std::make_shared<MisbehavingStartConfigurator>(StartBehavior::FailWithOutcome, counts);
+  auto handle = std::make_unique<ReverseConnectionIOHandle>(-1, config, cluster_manager_,
+                                                            extension_.get(), *stats_scope_);
+  auto mock_connection = getDeletableConn(dispatcher_);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  RCConnectionWrapper wrapper(*handle, std::move(mock_connection), mock_host, "test-cluster");
+
+  EXPECT_FALSE(wrapper.connect("test-tenant", "test-cluster", "test-node").ok());
+  EXPECT_EQ(counts.cancels, 1);
+
+  Buffer::OwnedImpl late("late bytes");
+  wrapper.onHandshakeData(late);
+  EXPECT_EQ(counts.reads, 0);
 }
 
 } // namespace ReverseConnection

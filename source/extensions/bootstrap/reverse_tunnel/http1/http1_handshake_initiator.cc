@@ -5,6 +5,7 @@
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
@@ -22,16 +23,35 @@ Http1HandshakeInitiator::Http1HandshakeInitiator(InitiatorHandshakeCallbacks& ca
     : callbacks_(callbacks), framing_(std::move(framing)) {}
 
 absl::Status Http1HandshakeInitiator::start(std::optional<int64_t> initiation_time_ms) {
-  Network::ClientConnection& connection = callbacks_.connection();
+  createCodec();
+  const Http::RequestHeaderMapPtr headers = buildRequestHeaders(initiation_time_ms);
 
-  // Create HTTP/1 codec to parse the response.
+  // Encode via HTTP/1 codec.
+  Http::RequestEncoder& request_encoder = http1_client_codec_->newStream(*this);
+  const Http::Status encode_status = request_encoder.encodeHeaders(*headers, true);
+  if (!encode_status.ok()) {
+    ENVOY_LOG(error, "RCConnectionWrapper: encodeHeaders failed: {}", encode_status.message());
+    terminal_reported_ = true;
+    callbacks_.onHandshakeDone(HandshakeOutcome::failure(HandshakeFailureReason::encodeError()),
+                               std::nullopt);
+    return absl::InternalError(absl::StrCat("handshake encode failed: ", encode_status.message()));
+  }
+
+  return absl::OkStatus();
+}
+
+void Http1HandshakeInitiator::createCodec() {
   Http::Http1Settings http1_settings =
       callbacks_.host()->cluster().httpProtocolOptions().http1Settings();
   http1_client_codec_ = std::make_unique<Http::Http1::ClientConnectionImpl>(
-      connection, callbacks_.host()->cluster().http1CodecStats(), *this, http1_settings,
-      callbacks_.host()->cluster().maxResponseHeadersKb(),
+      callbacks_.connection(), callbacks_.host()->cluster().http1CodecStats(), *this,
+      http1_settings, callbacks_.host()->cluster().maxResponseHeadersKb(),
       callbacks_.host()->cluster().maxResponseHeadersCount());
-  http1_parse_connection_ = http1_client_codec_.get();
+}
+
+Http::RequestHeaderMapPtr
+Http1HandshakeInitiator::buildRequestHeaders(std::optional<int64_t> initiation_time_ms) {
+  Network::ClientConnection& connection = callbacks_.connection();
 
   // Build HTTP handshake headers with identifiers.
   absl::string_view tenant_id = callbacks_.srcTenantId();
@@ -104,7 +124,9 @@ absl::Status Http1HandshakeInitiator::start(std::optional<int64_t> initiation_ti
     }
   };
 
-  const HandshakeHeadersConstSharedPtr handshake_headers = callbacks_.effectiveHandshakeHeaders();
+  // Read live: the extension publishes the formatted headers after this factory is built.
+  const HandshakeHeadersConstSharedPtr handshake_headers =
+      framing_->formatted_headers != nullptr ? framing_->formatted_headers->headers : nullptr;
   if (handshake_headers != nullptr) {
     StreamInfo::StreamInfoImpl stream_info(connection.dispatcher().timeSource(), nullptr,
                                            StreamInfo::FilterState::LifeSpan::Connection);
@@ -117,19 +139,7 @@ absl::Status Http1HandshakeInitiator::start(std::optional<int64_t> initiation_ti
     }
   }
   headers->setContentLength(0);
-
-  // Encode via HTTP/1 codec.
-  Http::RequestEncoder& request_encoder = http1_client_codec_->newStream(*this);
-  const Http::Status encode_status = request_encoder.encodeHeaders(*headers, true);
-  if (!encode_status.ok()) {
-    ENVOY_LOG(error, "RCConnectionWrapper: encodeHeaders failed: {}", encode_status.message());
-    terminal_reported_ = true;
-    callbacks_.onHandshakeDone(HandshakeOutcome::failure(HandshakeFailureReason::encodeError()),
-                               std::nullopt);
-    return absl::InternalError(absl::StrCat("handshake encode failed: ", encode_status.message()));
-  }
-
-  return absl::OkStatus();
+  return headers;
 }
 
 void Http1HandshakeInitiator::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool) {
@@ -188,10 +198,12 @@ Http1HandshakeInitiator::parseRetryAfter(const Http::ResponseHeaderMap& headers)
 void Http1HandshakeInitiator::onData(Buffer::Instance& buffer) { dispatchHttp1(buffer); }
 
 void Http1HandshakeInitiator::dispatchHttp1(Buffer::Instance& buffer) {
-  if (http1_parse_connection_ == nullptr || terminal_reported_) {
+  if (http1_client_codec_ == nullptr || terminal_reported_) {
     return;
   }
-  const Http::Status status = http1_parse_connection_->dispatch(buffer);
+  // The codec's dispatch() is reached through the Http::Connection interface it implements.
+  Http::Connection& codec = *http1_client_codec_;
+  const Http::Status status = codec.dispatch(buffer);
 
   // On success the handoff runs here so bytes the responder coalesced with the response are
   // captured from the buffer before the tunnel is queued. The codec reports those trailing bytes as
@@ -233,10 +245,7 @@ void Http1HandshakeInitiator::captureHandshakeResidual(Buffer::Instance& buffer)
   handshake_residual_->move(buffer);
 }
 
-void Http1HandshakeInitiator::cancel() {
-  http1_parse_connection_ = nullptr;
-  http1_client_codec_.reset();
-}
+void Http1HandshakeInitiator::cancel() { http1_client_codec_.reset(); }
 
 Buffer::InstancePtr Http1HandshakeInitiator::takeResidual() {
   return std::move(handshake_residual_);

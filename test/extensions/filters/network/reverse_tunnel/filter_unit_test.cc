@@ -657,6 +657,26 @@ TEST_F(ReverseTunnelFilterUnitTest, AcceptanceStopsReadingBeforeReply) {
   EXPECT_THAT(written, testing::HasSubstr("200 OK"));
 }
 
+// The filter disables reads itself when it accepts a tunnel request, before any reply.
+TEST_F(ReverseTunnelFilterUnitTest, TunnelRequestAcceptDisablesReads) {
+  Http::TestRequestHeaderMapImpl headers;
+  const Bootstrap::ReverseConnection::TunnelRequest request{"n",          "c", "t", headers,
+                                                            std::nullopt, "",  ""};
+  EXPECT_CALL(callbacks_.connection_, readDisable(true));
+  EXPECT_TRUE(filter_->onTunnelRequest(request).accepted);
+}
+
+// A connection carries one tunnel request; a second is a bug and is refused.
+TEST_F(ReverseTunnelFilterUnitTest, SecondTunnelRequestIsRefused) {
+  Http::TestRequestHeaderMapImpl headers;
+  const Bootstrap::ReverseConnection::TunnelRequest request{"n",          "c", "t", headers,
+                                                            std::nullopt, "",  ""};
+  ASSERT_TRUE(filter_->onTunnelRequest(request).accepted);
+
+  EXPECT_ENVOY_BUG(EXPECT_FALSE(filter_->onTunnelRequest(request).accepted),
+                   "second tunnel request on one connection");
+}
+
 // The acceptance flush callback accumulates per-write byte counts, so a response split across
 // several writes still completes the handshake once the cumulative bytes reach the full response.
 TEST_F(ReverseTunnelFilterUnitTest, AcceptanceCompletesAcrossSplitWrites) {

@@ -13,7 +13,6 @@
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
 #include "absl/strings/match.h"
-#include "absl/strings/numbers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -234,58 +233,32 @@ void Http1HandshakeResponder::RequestDecoderImpl::processIfComplete(bool end_str
   const absl::string_view cluster_id = cluster_vals[0]->value().getStringView();
   const absl::string_view tenant_id = tenant_vals[0]->value().getStringView();
 
-  // Identity, authentication, and authorization checks.
-  const HandshakePolicyResult policy_result =
-      callbacks.evaluatePolicy(*headers_, node_id, cluster_id, tenant_id);
-  if (!policy_result.accepted) {
-    sendLocalReply(policy_result.code, policy_result.body, nullptr, std::nullopt,
-                   policy_result.details);
-    callbacks.connection().close(Network::ConnectionCloseType::FlushWrite);
-    return;
-  }
-
-  // Parse the optional initiator metadata carried on the handshake. All three are optional so older
-  // initiators that do not advertise them are handled gracefully (empty values).
-  int64_t initiation_time_ms = 0;
+  // Initiator metadata is optional, so older initiators that do not advertise it still connect.
+  const auto first_value = [this](const Http::LowerCaseString& key) -> absl::string_view {
+    const auto vals = headers_->get(key);
+    return vals.empty() ? absl::string_view{} : vals[0]->value().getStringView();
+  };
   const auto initiation_time_vals =
       headers_->get(Bootstrap::ReverseConnection::reverseTunnelInitiationTimeHeader());
-  if (!initiation_time_vals.empty()) {
-    if (!absl::SimpleAtoi(initiation_time_vals[0]->value().getStringView(), &initiation_time_ms)) {
-      ENVOY_CONN_LOG(warn, "reverse_tunnel: failed to parse initiation-time header value '{}'",
-                     callbacks.connection(), initiation_time_vals[0]->value().getStringView());
-      initiation_time_ms = 0;
-    }
-  }
-  const auto initiator_worker_vals =
-      headers_->get(Bootstrap::ReverseConnection::reverseTunnelWorkerIdHeader());
-  const absl::string_view initiator_worker_id =
-      initiator_worker_vals.empty() ? absl::string_view{}
-                                    : initiator_worker_vals[0]->value().getStringView();
-  const auto initiator_connection_vals =
-      headers_->get(Bootstrap::ReverseConnection::reverseTunnelConnectionIdHeader());
-  const absl::string_view initiator_connection_id =
-      initiator_connection_vals.empty() ? absl::string_view{}
-                                        : initiator_connection_vals[0]->value().getStringView();
+  const TunnelRequest request{
+      node_id,
+      cluster_id,
+      tenant_id,
+      *headers_,
+      initiation_time_vals.empty()
+          ? std::nullopt
+          : std::make_optional(initiation_time_vals[0]->value().getStringView()),
+      first_value(Bootstrap::ReverseConnection::reverseTunnelWorkerIdHeader()),
+      first_value(Bootstrap::ReverseConnection::reverseTunnelConnectionIdHeader())};
 
-  // The metadata is copied out of the request headers; the filter holds it with the approved
-  // identifiers until phase two registers the socket.
-  AcceptedTunnelInfo info;
-  info.initiation_time_ms = initiation_time_ms;
-  info.initiator_worker_id = std::string(initiator_worker_id);
-  info.initiator_connection_id = std::string(initiator_connection_id);
-
-  // Phase one. Duplicate the socket and resolve the registration target before responding, so a
-  // tunnel that cannot be registered is answered with 503 rather than a 200 over a dropped socket.
-  if (!callbacks.prepareAcceptedConnection(info)) {
-    sendLocalReply(Http::Code::ServiceUnavailable, "Reverse tunnel registration unavailable",
-                   nullptr, std::nullopt, "reverse_tunnel_registration_failed");
+  // Policy checks and phase one of acceptance. On accept the filter has duplicated the socket and
+  // disabled reads; on reject the reply below is terminal and the connection is closed.
+  const TunnelDecision decision = callbacks.onTunnelRequest(request);
+  if (!decision.accepted) {
+    sendLocalReply(decision.code, decision.body, nullptr, std::nullopt, decision.details);
     callbacks.connection().close(Network::ConnectionCloseType::FlushWrite);
     return;
   }
-
-  // Stop reading further bytes on the handshake connection so no later pipelined request is
-  // dispatched while the socket is handed off.
-  callbacks.connection().readDisable(true);
 
   // Send the acceptance response. In upgrade mode this is `101 Switching Protocols`.
   auto resp_headers = Http::ResponseHeaderMapImpl::create();
@@ -302,7 +275,8 @@ void Http1HandshakeResponder::RequestDecoderImpl::processIfComplete(bool end_str
   encoder_.encodeHeaders(*resp_headers, true);
 
   // Phase two runs once the acceptance response has reached the wire, so the response is ordered
-  // ahead of any first byte a consumer writes into the tunnel.
+  // ahead of any first byte a consumer writes into the tunnel. The count must be the exact size of
+  // the encoded response, which is all this stream sends.
   const uint64_t response_wire_bytes = encoder_.getStream().bytesMeter()->wireBytesSent();
   callbacks.onAcceptanceResponseEncoded(response_wire_bytes);
 }

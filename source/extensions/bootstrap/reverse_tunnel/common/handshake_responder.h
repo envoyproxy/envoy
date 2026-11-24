@@ -1,16 +1,15 @@
 #pragma once
 
 #include <memory>
-#include <string>
+#include <optional>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/stats/scope.h"
-
-#include "source/common/http/codes.h"
 
 #include "absl/strings/string_view.h"
 
@@ -19,19 +18,26 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
-// Optional initiator metadata parsed from an accepted handshake. The identifiers are not carried
-// here: the filter registers the ones its last passing evaluatePolicy() approved.
-struct AcceptedTunnelInfo {
-  int64_t initiation_time_ms{0};
-  std::string initiator_worker_id;
-  std::string initiator_connection_id;
+// Handshake request parsed by a responder handshake. Every view is valid only during
+// ResponderHandshakeCallbacks::onTunnelRequest().
+struct TunnelRequest {
+  absl::string_view node_id;
+  absl::string_view cluster_id;
+  absl::string_view tenant_id;
+  // Attributes the JWT check and the %REQ(...)% identifier validation read. A non-HTTP handshake
+  // supplies the equivalent key/values.
+  const Http::RequestHeaderMap& headers;
+  // Raw initiation time in epoch millis, absent when not advertised. The filter parses it.
+  std::optional<absl::string_view> initiation_time_ms;
+  absl::string_view initiator_worker_id;
+  absl::string_view initiator_connection_id;
 };
 
-// Policy decision on the handshake's identity, authentication, and authorization checks.
-struct HandshakePolicyResult {
+// Decision on a tunnel request. Both views point at constants. The reply does not carry
+// ``details``.
+struct TunnelDecision {
   bool accepted{false};
   Http::Code code{Http::Code::Forbidden};
-  // Both views point at constants. The reply does not carry ``details``.
   absl::string_view body;
   absl::string_view details;
 };
@@ -56,14 +62,12 @@ public:
   // Overload manager backing the connection, consulted when codec resources are created.
   virtual Server::OverloadManager& overloadManager() = 0;
 
-  // Policy gate run once framing validation passes: empty tenant, tenant-isolation delimiters,
-  // required cluster name, JWT authentication, and identifier validation. The string views alias
-  // the request headers and are only valid for the duration of the call. Increments its own stats.
-  // A passing result records the identifiers for prepareAcceptedConnection().
-  virtual HandshakePolicyResult evaluatePolicy(const Http::RequestHeaderMap& headers,
-                                               absl::string_view node_id,
-                                               absl::string_view cluster_id,
-                                               absl::string_view tenant_id) = 0;
+  // Runs the policy checks on a framed request and, when they pass, prepares the tunnel: the
+  // socket is duplicated and reads are disabled. Called once per connection, and increments its
+  // own stats. On accept the handshake sends its acceptance reply and then calls
+  // onAcceptanceResponseEncoded(). On reject it sends ``code`` and ``body`` and closes the
+  // connection with FlushWrite.
+  virtual TunnelDecision onTunnelRequest(const TunnelRequest& request) = 0;
 
   // Stats sink for a framing rejection; the handshake sends the matching reply itself.
   virtual void onFramingRejection(HandshakeFramingRejection rejection) = 0;
@@ -72,14 +76,8 @@ public:
   // longer applies.
   virtual void onTerminalRejection() = 0;
 
-  // Phase one of acceptance: duplicate the socket and hold registration state for the identifiers
-  // the preceding evaluatePolicy() approved. Valid once, after a passing evaluatePolicy(). Returns
-  // false when the tunnel cannot be registered; the handshake answers 503 and the filter owns the
-  // stat.
-  virtual bool prepareAcceptedConnection(const AcceptedTunnelInfo& info) = 0;
-
-  // The acceptance response has been encoded; the filter orders phase two behind it reaching the
-  // wire.
+  // The acceptance reply has been encoded. ``response_wire_bytes`` is its exact size on the wire;
+  // the filter registers the tunnel once that many bytes are sent.
   virtual void onAcceptanceResponseEncoded(uint64_t response_wire_bytes) = 0;
 };
 

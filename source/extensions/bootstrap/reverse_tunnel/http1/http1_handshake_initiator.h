@@ -7,7 +7,10 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/header_map.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/http1/codec_impl.h"
@@ -23,14 +26,36 @@ namespace Bootstrap {
 namespace ReverseConnection {
 
 /**
+ * A single formatted handshake header: literal key, an append action, and a value formatter
+ * evaluated against an empty stream info at handshake time.
+ */
+struct HandshakeHeader {
+  Http::LowerCaseString key;
+  envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action;
+  Formatter::FormatterPtr value_formatter;
+};
+using HandshakeHeadersConstSharedPtr = std::shared_ptr<const std::vector<HandshakeHeader>>;
+
+/**
+ * Formatted handshake headers, published by the initiator extension once it builds them in
+ * onServerInitialized(). Null until then. Read on every start(), never cached.
+ */
+struct Http1HandshakeHeaders {
+  HandshakeHeadersConstSharedPtr headers;
+};
+using Http1HandshakeHeadersSharedPtr = std::shared_ptr<Http1HandshakeHeaders>;
+
+/**
  * Request framing of the HTTP/1.1 handshake, fixed when its factory is built.
  */
 struct Http1InitiatorFraming {
   std::string request_path{ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH};
   // Negotiate the handshake as an HTTP/1.1 Upgrade, expecting 101 instead of 200.
   bool use_http_upgrade{false};
-  // Sent verbatim when the callbacks resolve no formatted handshake headers.
+  // Sent verbatim while no formatted handshake headers are published.
   std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers;
+  // Formatted headers shared with the extension. Null means none are ever published.
+  std::shared_ptr<const Http1HandshakeHeaders> formatted_headers;
 };
 using Http1InitiatorFramingConstSharedPtr = std::shared_ptr<const Http1InitiatorFraming>;
 
@@ -74,6 +99,12 @@ public:
   parseRetryAfter(const Http::ResponseHeaderMap& headers);
 
 private:
+  // Creates the HTTP/1 client codec from the dialed cluster's settings.
+  void createCodec();
+
+  // Builds the handshake request: framing, identity, initiator metadata, and handshake headers.
+  Http::RequestHeaderMapPtr buildRequestHeaders(std::optional<int64_t> initiation_time_ms);
+
   // Dispatches received bytes to the HTTP/1 codec and completes a pending handoff once dispatch
   // returns, so residual bytes coalesced with the response are captured before the tunnel is
   // queued.
@@ -84,10 +115,8 @@ private:
 
   InitiatorHandshakeCallbacks& callbacks_;
   const Http1InitiatorFramingConstSharedPtr framing_;
-  // HTTP/1 codec used to send request and parse response.
+  // HTTP/1 codec used to send request and parse response. Null after cancel().
   std::unique_ptr<Http::Http1::ClientConnectionImpl> http1_client_codec_;
-  // Base interface pointer used to call dispatch via public API.
-  Http::Connection* http1_parse_connection_{nullptr};
   // Set when the handshake succeeds so the handoff runs after dispatch returns.
   bool pending_handoff_{false};
   // Guards the exactly-once contract of onHandshakeDone: after the terminal notification, late

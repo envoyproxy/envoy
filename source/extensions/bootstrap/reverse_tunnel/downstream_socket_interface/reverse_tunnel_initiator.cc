@@ -135,10 +135,6 @@ ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
     RemoteClusterConnectionConfig cluster_config(config.remote_cluster, config.connection_count);
     socket_config.remote_clusters.push_back(cluster_config);
     if (extension_ != nullptr) {
-      socket_config.request_path = extension_->handshakeRequestPath();
-      socket_config.additional_headers = extension_->handshakeAdditionalHeaders();
-      socket_config.use_http_upgrade = extension_->handshakeUsesHttpUpgrade();
-      socket_config.handshake_headers = extension_->handshakeHeaders();
       socket_config.handshake_configurator = extension_->handshakeConfigurator();
       socket_config.maintain_interval_ms = extension_->maintainIntervalMs();
       socket_config.handshake_timeout_ms = extension_->handshakeTimeoutMs();

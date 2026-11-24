@@ -4,12 +4,8 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <vector>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/config/core/v3/base.pb.h"
-#include "envoy/formatter/substitution_formatter.h"
-#include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 #include "envoy/upstream/upstream.h"
 
@@ -23,17 +19,6 @@ namespace Bootstrap {
 namespace ReverseConnection {
 
 /**
- * A single formatted handshake header: literal key, an append action, and a value formatter
- * evaluated against an empty stream info at handshake time.
- */
-struct HandshakeHeader {
-  Http::LowerCaseString key;
-  envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action;
-  Formatter::FormatterPtr value_formatter;
-};
-using HandshakeHeadersConstSharedPtr = std::shared_ptr<const std::vector<HandshakeHeader>>;
-
-/**
  * Class representing handshake failure with type and context.
  * Provides methods to generate detailed error messages and stat names.
  */
@@ -44,6 +29,7 @@ public:
     EncodeError,     // HTTP request encoding failed
     Timeout,         // Handshake response not received within the deadline
     ConnectionClose, // Connection closed or the codec failed before the response
+    Rejected,        // Protocol-specific rejection; the handshake names its stat suffix
   };
 
   /**
@@ -73,6 +59,18 @@ public:
   }
 
   /**
+   * Create a protocol-neutral rejection for handshakes other than the built-in HTTP/1.
+   * @param stat_suffix stat name suffix counted for this failure.
+   * @param detail optional context describing the rejection.
+   */
+  static HandshakeFailureReason rejected(absl::string_view stat_suffix,
+                                         absl::string_view detail = "") {
+    HandshakeFailureReason reason{Type::Rejected, detail};
+    reason.stat_suffix_ = std::string(stat_suffix);
+    return reason;
+  }
+
+  /**
    * Get a detailed human-readable error message.
    * @return detailed error message string
    */
@@ -87,6 +85,8 @@ public:
     case Type::ConnectionClose:
       return context_.empty() ? "HTTP handshake connection closed"
                               : absl::StrCat("HTTP handshake connection closed: ", context_);
+    case Type::Rejected:
+      return absl::StrCat("handshake rejected: ", context_.empty() ? stat_suffix_ : context_);
     }
     return "Unknown handshake failure";
   }
@@ -105,6 +105,8 @@ public:
       return "timeout";
     case Type::ConnectionClose:
       return "connection_close";
+    case Type::Rejected:
+      return stat_suffix_;
     }
     return "unknown";
   }
@@ -114,6 +116,8 @@ private:
 
   Type type_;
   std::string context_;
+  // Set only for Type::Rejected.
+  std::string stat_suffix_;
 };
 
 /**
@@ -147,7 +151,8 @@ struct HandshakeOutcome {
 /**
  * Sink through which a per-connection initiator handshake reaches the dial it belongs to.
  * Implemented by RCConnectionWrapper; all methods run on the worker that owns the connection,
- * between handshake creation and terminal outcome.
+ * between handshake creation and terminal outcome. Carries only identity, transport and outcome;
+ * protocol-specific settings live in the handshake's own factory.
  */
 class InitiatorHandshakeCallbacks {
 public:
@@ -167,14 +172,12 @@ public:
   virtual const std::string& srcClusterId() = 0;
   virtual const std::string& srcNodeId() = 0;
 
-  // Handshake headers to send on the request. Resolved live at start() time — the value can change
-  // between dials — so implementations must call this once per start() and never cache it.
-  virtual HandshakeHeadersConstSharedPtr effectiveHandshakeHeaders() = 0;
-
   // Reports the terminal outcome and ends the attempt: the deadline is disarmed and the outcome is
-  // counted. Called exactly once per handshake, after which the handshake makes no further
+  // counted. Called at most once per handshake, after which the handshake makes no further
   // callbacks. On success, bytes the responder coalesced with the response must already be
-  // readable via takeResidual().
+  // readable via takeResidual(). A success re-enters cancel() and takeResidual() before this
+  // returns, so report it only after the codec dispatch returns, never from inside a codec
+  // callback that still uses the codec.
   virtual void onHandshakeDone(HandshakeOutcome outcome,
                                std::optional<std::chrono::milliseconds> retry_after) = 0;
 };
@@ -183,6 +186,9 @@ public:
  * Per-connection initiator handshake. One instance per dial attempt; drives the protocol-specific
  * half of establishing a reverse tunnel. Implementations must only interact with the transport
  * through the connection exposed by the callbacks.
+ *
+ * Lifetime: the connection stays valid until the terminal outcome or cancel(). The owner may
+ * destroy the handshake synchronously after either, so no callback may be pending past them.
  */
 class InitiatorHandshake {
 public:
@@ -193,8 +199,8 @@ public:
    * connection.
    * @param initiation_time_ms epoch millis advertised as the tunnel's initiation time; absent
    *        means the current time.
-   * @return ok when the request was dispatched and the attempt is still in flight. A terminal
-   *         outcome reported from within start() must come with a non-ok status.
+   * @return ok when the request was dispatched and the attempt is still in flight. start() never
+   *         reports success; a failure reported from within it must come with a non-ok status.
    */
   virtual absl::Status start(std::optional<int64_t> initiation_time_ms) = 0;
 
@@ -207,8 +213,9 @@ public:
   virtual void onData(Buffer::Instance& buffer) = 0;
 
   /**
-   * Stops the handshake without a terminal outcome (wrapper teardown or transport close) and
-   * detaches from the connection. Any residual captured so far stays readable via takeResidual().
+   * Stops the handshake without a terminal outcome (wrapper teardown, deadline, or a success
+   * handoff) and detaches from the connection. A transport close reaches it only through the
+   * owner's deferred teardown. Any residual captured so far stays readable via takeResidual().
    * No callback runs after cancel().
    */
   virtual void cancel() = 0;

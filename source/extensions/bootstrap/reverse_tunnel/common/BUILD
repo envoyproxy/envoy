@@ -49,12 +49,8 @@ envoy_cc_library(
     hdrs = ["handshake_initiator.h"],
     deps = [
         "//envoy/buffer:buffer_interface",
-        "//envoy/formatter:substitution_formatter_interface",
-        "//envoy/http:header_map_interface",
         "//envoy/network:connection_interface",
         "//envoy/upstream:upstream_interface",
-        "//source/common/protobuf",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -63,11 +59,11 @@ envoy_cc_library(
     hdrs = ["handshake_responder.h"],
     deps = [
         "//envoy/buffer:buffer_interface",
+        "//envoy/http:codes_interface",
         "//envoy/http:header_map_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/stats:scope_interface",
-        "//source/common/http:codes_lib",
     ],
 )

@@ -13,18 +13,21 @@ envoy_cc_library(
     srcs = ["http1_handshake_initiator.cc"],
     hdrs = ["http1_handshake_initiator.h"],
     deps = [
+        "//envoy/formatter:substitution_formatter_interface",
         "//envoy/http:codec_interface",
+        "//envoy/http:header_map_interface",
         "//envoy/network:address_interface",
-        "//envoy/network:filter_interface",
+        "//envoy/network:connection_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:response_decoder_impl_base",
         "//source/common/http:utility_lib",
         "//source/common/http/http1:codec_lib",
-        "//source/common/network:filter_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/bootstrap/reverse_tunnel/common:handshake_initiator_lib",
         "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

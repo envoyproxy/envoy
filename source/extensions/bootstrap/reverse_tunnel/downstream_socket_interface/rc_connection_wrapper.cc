@@ -5,7 +5,6 @@
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 
-#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
@@ -100,6 +99,7 @@ absl::Status RCConnectionWrapper::connect(const std::string& src_tenant_id,
   const absl::Status start_status = handshake_->start(initiation_time_ms);
   if (handshake_terminal_) {
     // The attempt already ended inside start(), and a success has released the connection.
+    handshake_->cancel();
     if (start_status.ok()) {
       IS_ENVOY_BUG("reverse_tunnel: handshake reported a terminal outcome but start() returned ok");
       return absl::InternalError("handshake finished during start");
@@ -108,6 +108,7 @@ absl::Status RCConnectionWrapper::connect(const std::string& src_tenant_id,
   }
   if (!start_status.ok()) {
     IS_ENVOY_BUG("reverse_tunnel: start() failed without reporting a terminal outcome");
+    handshake_->cancel();
     onHandshakeDone(HandshakeOutcome::failure(start_status.message()), std::nullopt);
     return start_status;
   }
@@ -151,7 +152,8 @@ void RCConnectionWrapper::onHandshakeDone(HandshakeOutcome outcome,
       ext->incrementHandshakeStats(cluster_name_, true, "");
     }
   } else if (outcome.failure_reason.has_value()) {
-    ENVOY_LOG(trace, "handshake failed: {}", outcome.message);
+    ENVOY_LOG(debug, "RCConnectionWrapper: connection {} to cluster '{}' handshake failed: {}",
+              connection_ != nullptr ? connection_->id() : 0, cluster_name_, outcome.message);
     // Track handshake failure stats.
     auto* ext = getDownstreamExtension();
     if (ext) {
@@ -172,16 +174,6 @@ Upstream::HostDescriptionConstSharedPtr RCConnectionWrapper::host() { return hos
 
 const std::string& RCConnectionWrapper::clusterName() { return cluster_name_; }
 
-HandshakeHeadersConstSharedPtr RCConnectionWrapper::effectiveHandshakeHeaders() {
-  // Live formatters are preferred; the snapshot can predate extension init and is reused across
-  // re-dials.
-  ReverseTunnelInitiatorExtension* ext = getDownstreamExtension();
-  if (ext != nullptr && ext->handshakeHeaders() != nullptr) {
-    return ext->handshakeHeaders();
-  }
-  return parent_.handshakeHeaders();
-}
-
 Network::ClientConnectionPtr RCConnectionWrapper::releaseConnection() {
   if (!connection_) {
     return nullptr;
@@ -200,7 +192,8 @@ Network::ClientConnectionPtr RCConnectionWrapper::releaseConnection() {
 }
 
 void RCConnectionWrapper::onHandshakeData(Buffer::Instance& buffer) {
-  if (handshake_ != nullptr) {
+  // Reads stop at the terminal outcome.
+  if (handshake_ != nullptr && !handshake_terminal_) {
     handshake_->onData(buffer);
   }
 }

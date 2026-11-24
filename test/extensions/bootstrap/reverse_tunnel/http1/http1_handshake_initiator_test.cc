@@ -44,7 +44,6 @@ public:
   MOCK_METHOD(const std::string&, srcTenantId, (), (override));
   MOCK_METHOD(const std::string&, srcClusterId, (), (override));
   MOCK_METHOD(const std::string&, srcNodeId, (), (override));
-  MOCK_METHOD(HandshakeHeadersConstSharedPtr, effectiveHandshakeHeaders, (), (override));
   MOCK_METHOD(void, onHandshakeDone,
               (HandshakeOutcome outcome, std::optional<std::chrono::milliseconds> retry_after),
               (override));
@@ -95,9 +94,6 @@ protected:
     ON_CALL(callbacks_, srcTenantId()).WillByDefault(ReturnRef(tenant_id_));
     ON_CALL(callbacks_, srcClusterId()).WillByDefault(ReturnRef(cluster_id_));
     ON_CALL(callbacks_, srcNodeId()).WillByDefault(ReturnRef(node_id_));
-    ON_CALL(callbacks_, effectiveHandshakeHeaders()).WillByDefault([this]() {
-      return effective_handshake_headers_;
-    });
     ON_CALL(callbacks_, onHandshakeDone(_, _))
         .WillByDefault(
             [this](HandshakeOutcome outcome, std::optional<std::chrono::milliseconds> retry_after) {
@@ -110,8 +106,8 @@ protected:
   Http1HandshakeInitiator& handshake() {
     if (handshake_ == nullptr) {
       handshake_ = std::make_unique<Http1HandshakeInitiator>(
-          callbacks_, std::make_shared<const Http1InitiatorFraming>(
-                          Http1InitiatorFraming{path_, use_http_upgrade_, additional_headers_}));
+          callbacks_, std::make_shared<const Http1InitiatorFraming>(Http1InitiatorFraming{
+                          path_, use_http_upgrade_, additional_headers_, published_headers_}));
     }
     return *handshake_;
   }
@@ -148,7 +144,8 @@ protected:
   std::string node_id_{"test-node"};
   std::string path_{"/reverse-connections"};
   bool use_http_upgrade_{false};
-  HandshakeHeadersConstSharedPtr effective_handshake_headers_;
+  // Formatted headers the extension publishes; shared with the handshake's framing.
+  Http1HandshakeHeadersSharedPtr published_headers_{std::make_shared<Http1HandshakeHeaders>()};
   std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers_;
 
   std::vector<HandshakeOutcome> outcomes_;
@@ -175,23 +172,67 @@ TEST_F(Http1HandshakeInitiatorTest, RequestCarriesIdentityAndCorrelationHeaders)
   EXPECT_THAT(request, testing::Not(testing::HasSubstr("upgrade:")));
 }
 
-// A non-empty effectiveHandshakeHeaders() set replaces the additional_headers path, and is
-// resolved exactly once per start().
-TEST_F(Http1HandshakeInitiatorTest, EffectiveHandshakeHeadersWinAndResolveOnce) {
-  std::vector<HandshakeHeader> effective_headers;
-  effective_headers.push_back(makeHandshakeHeader("x-effective", "effective-value"));
-  effective_handshake_headers_ =
-      std::make_shared<const std::vector<HandshakeHeader>>(std::move(effective_headers));
-  auto headers = std::make_shared<const std::vector<envoy::config::core::v3::HeaderValueOption>>(
-      std::vector<envoy::config::core::v3::HeaderValueOption>{
-          makeAdditionalHeader("x-custom", "custom-value"),
-      });
-  additional_headers_ = *headers;
-  EXPECT_CALL(callbacks_, effectiveHandshakeHeaders());
+// Published formatted headers replace the literal additional_headers.
+TEST_F(Http1HandshakeInitiatorTest, PublishedHandshakeHeadersWin) {
+  auto formatted = std::make_shared<std::vector<HandshakeHeader>>();
+  formatted->push_back(makeHandshakeHeader("x-effective", "effective-value"));
+  published_headers_->headers = std::move(formatted);
+  additional_headers_ = {makeAdditionalHeader("x-custom", "custom-value")};
 
   const std::string& request = start();
   EXPECT_THAT(request, testing::HasSubstr("x-effective: effective-value\r\n"));
   EXPECT_THAT(request, testing::Not(testing::HasSubstr("x-custom: custom-value")));
+}
+
+// Headers published after the handshake and its factory exist are read at start().
+TEST_F(Http1HandshakeInitiatorTest, HeadersPublishedAfterFactoryAreSent) {
+  additional_headers_ = {makeAdditionalHeader("x-custom", "literal-value")};
+  handshake();
+  auto formatted = std::make_shared<std::vector<HandshakeHeader>>();
+  formatted->push_back(makeHandshakeHeader("x-custom", "formatted-value"));
+  published_headers_->headers = std::move(formatted);
+
+  const std::string& request = start();
+  EXPECT_THAT(request, testing::HasSubstr("x-custom: formatted-value\r\n"));
+  EXPECT_THAT(request, testing::Not(testing::HasSubstr("literal-value")));
+}
+
+// ADD_IF_ABSENT does not clobber a header the handshake itself set.
+TEST_F(Http1HandshakeInitiatorTest, AdditionalHeadersAddIfAbsentSkipsExisting) {
+  additional_headers_ = {makeAdditionalHeader(
+      kTenantHeader, "other-tenant", envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT)};
+
+  const std::string& request = start();
+  EXPECT_THAT(request, testing::Not(testing::HasSubstr("other-tenant")));
+  EXPECT_THAT(request, testing::HasSubstr(absl::StrCat(kTenantHeader, ": test-tenant\r\n")));
+}
+
+// A non-2xx status fails with the documented message and stat.
+TEST_F(Http1HandshakeInitiatorTest, Rejected401) {
+  start();
+  feed("HTTP/1.1 401 Unauthorized\r\ncontent-length: 0\r\n\r\n");
+
+  ASSERT_EQ(outcomes_.size(), 1);
+  EXPECT_FALSE(outcomes_[0].accepted);
+  ASSERT_TRUE(outcomes_[0].failure_reason.has_value());
+  EXPECT_EQ(outcomes_[0].failure_reason->getNameForStats(), "http.401");
+  EXPECT_EQ(outcomes_[0].message, "HTTP handshake failed with status 401");
+  EXPECT_EQ(retry_afters_[0], std::nullopt);
+}
+
+// A protocol-neutral rejection names its own stat suffix and message.
+TEST(HandshakeFailureReasonTest, RejectedIsProtocolNeutral) {
+  const HandshakeFailureReason with_detail =
+      HandshakeFailureReason::rejected("custom.denied", "policy denied");
+  EXPECT_EQ(with_detail.getNameForStats(), "custom.denied");
+  EXPECT_EQ(with_detail.getDetailedName(), "handshake rejected: policy denied");
+
+  const HandshakeFailureReason without_detail = HandshakeFailureReason::rejected("custom.denied");
+  EXPECT_EQ(without_detail.getDetailedName(), "handshake rejected: custom.denied");
+
+  const HandshakeOutcome outcome = HandshakeOutcome::failure(with_detail);
+  EXPECT_FALSE(outcome.accepted);
+  EXPECT_EQ(outcome.message, "handshake rejected: policy denied");
 }
 
 // A malformed response fails the handshake as a connection close carrying the codec detail.

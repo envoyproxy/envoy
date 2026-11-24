@@ -451,20 +451,6 @@ TEST_F(ReverseConnectionIOHandleTest, BasicSetup) {
   EXPECT_TRUE(SOCKET_VALID(io_handle_->fdDoNotUse()));
 }
 
-TEST_F(ReverseConnectionIOHandleTest, RequestPathDefaultsAndOverrides) {
-  auto default_config = createDefaultTestConfig();
-  io_handle_ = createTestIOHandle(default_config);
-  ASSERT_NE(io_handle_, nullptr);
-  EXPECT_EQ(io_handle_->requestPath(),
-            ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
-
-  ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
-  custom_config.request_path = "/custom/handshake";
-  auto custom_handle = createTestIOHandle(custom_config);
-  ASSERT_NE(custom_handle, nullptr);
-  EXPECT_EQ(custom_handle->requestPath(), "/custom/handshake");
-}
-
 // listen() is a no-op for the initiator
 TEST_F(ReverseConnectionIOHandleTest, ListenNoOp) {
   auto config = createDefaultTestConfig();

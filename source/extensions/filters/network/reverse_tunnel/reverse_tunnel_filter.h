@@ -202,14 +202,11 @@ public:
   Network::Connection& connection() override;
   Stats::Scope& statsScope() override;
   Server::OverloadManager& overloadManager() override;
-  Bootstrap::ReverseConnection::HandshakePolicyResult
-  evaluatePolicy(const Http::RequestHeaderMap& headers, absl::string_view node_id,
-                 absl::string_view cluster_id, absl::string_view tenant_id) override;
+  Bootstrap::ReverseConnection::TunnelDecision
+  onTunnelRequest(const Bootstrap::ReverseConnection::TunnelRequest& request) override;
   void
   onFramingRejection(Bootstrap::ReverseConnection::HandshakeFramingRejection rejection) override;
   void onTerminalRejection() override;
-  bool
-  prepareAcceptedConnection(const Bootstrap::ReverseConnection::AcceptedTunnelInfo& info) override;
   void onAcceptanceResponseEncoded(uint64_t response_wire_bytes) override;
 
 private:
@@ -240,12 +237,17 @@ private:
   // Disables the handshake deadline timer once the handshake reaches a terminal outcome.
   void disarmHandshakeTimer();
 
+  // Identity, authentication, and authorization checks on a framed request: empty tenant,
+  // tenant-isolation delimiters, required cluster name, JWT authentication, and identifier
+  // validation. Increments its own stats.
+  Bootstrap::ReverseConnection::TunnelDecision
+  evaluatePolicy(const Bootstrap::ReverseConnection::TunnelRequest& request);
+
   // Phase one of acceptance. Resolves the socket manager and duplicates the fd before the response
   // is sent. Returns false if the tunnel cannot be registered, so the caller answers 503 without
-  // leaving a duplicated fd behind. On success the duplicated socket and identifiers are held until
-  // the acceptance response is flushed.
-  bool
-  prepareAcceptedConnectionInternal(const Bootstrap::ReverseConnection::AcceptedTunnelInfo& info);
+  // leaving a duplicated fd behind. On success the duplicated socket is held until the acceptance
+  // response is flushed.
+  bool prepareAcceptedConnectionInternal();
 
   // Phase two of acceptance. Registers the prepared socket, then detaches and closes the handshake
   // connection so the duplicated fd is the tunnel's single reader.
@@ -263,13 +265,11 @@ private:
   // Handshake deadline timer, spanning the first byte to registration.
   Event::TimerPtr handshake_timer_;
 
-  // Set by a passing evaluatePolicy() and consumed by the one prepareAcceptedConnection() it
-  // allows.
-  bool policy_approved_{false};
+  // Set by the first onTunnelRequest(); a connection carries at most one tunnel request.
+  bool tunnel_requested_{false};
 
   // Socket duplicated in phase one and registered in phase two, held between the two phases along
-  // with the identifiers needed to register it. The identifiers are the ones evaluatePolicy()
-  // approved.
+  // with the identifiers the policy approved.
   Network::ConnectionSocketPtr pending_socket_;
   std::string pending_node_id_;
   std::string pending_cluster_id_;

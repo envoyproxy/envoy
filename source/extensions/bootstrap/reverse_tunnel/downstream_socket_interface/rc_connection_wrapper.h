@@ -131,7 +131,6 @@ public:
   const std::string& srcTenantId() override { return src_tenant_id_; }
   const std::string& srcClusterId() override { return src_cluster_id_; }
   const std::string& srcNodeId() override { return src_node_id_; }
-  HandshakeHeadersConstSharedPtr effectiveHandshakeHeaders() override;
   void onHandshakeDone(HandshakeOutcome outcome,
                        std::optional<std::chrono::milliseconds> retry_after) override;
 
