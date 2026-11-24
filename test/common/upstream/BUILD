@@ -851,6 +851,7 @@ envoy_cc_test(
         "//envoy/api:api_interface",
         "//envoy/http:client_codec_factory_interface",
         "//envoy/http:codec_interface",
+        "//envoy/router:router_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:hash_lib",
         "//source/common/config:metadata_lib",
