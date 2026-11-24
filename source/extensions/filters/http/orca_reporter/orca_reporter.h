@@ -70,7 +70,7 @@ public:
   std::optional<double> sample(MonotonicTime now) override;
 
 private:
-  std::optional<uint64_t> capacity() const;
+  std::optional<double> capacity() const;
 
   const std::vector<CgroupReader> cgroups_;
   const std::optional<uint64_t> capacity_bytes_;
@@ -108,8 +108,15 @@ public:
   // The header the report is written to.
   const Http::LowerCaseString& headerName() const { return header_name_; }
 
-  // The encoded report on the current thread. Empty if no metric is available.
-  const std::string& encodedReport() const { return (*tls_)->encoded_report; }
+  // The encoded report on the current thread. Empty if no metric is available, or if the report
+  // has not reached this thread yet: set() only posts it to the workers.
+  absl::string_view encodedReport() const {
+    if (!tls_->currentThreadRegistered()) {
+      return {};
+    }
+    const OptRef<ThreadLocalReport> local = tls_->get();
+    return local.has_value() ? local->encoded_report : absl::string_view();
+  }
 
   // Called on the workers for every request. The count is turned into rps_fractional on the next
   // refresh.
@@ -124,7 +131,7 @@ private:
 
   struct ThreadLocalReport : public ThreadLocal::ThreadLocalObject {
     explicit ThreadLocalReport(std::string report) : encoded_report(std::move(report)) {}
-    std::string encoded_report;
+    const std::string encoded_report;
   };
 
   LoadReporter(const ProtoConfig& proto_config, std::vector<Metric> metrics,
@@ -134,6 +141,8 @@ private:
   // Samples all metrics and returns the encoded report.
   std::string sampleAndEncode();
   void updateRequestRate(MonotonicTime now);
+  // Publishes the report to all threads, including the ones registered later.
+  void publish(std::string report);
   void onRefreshTimer();
 
   const ProtoConfig::Format format_;

@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/orca_reporter/orca_reporter.h"
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 #include "source/common/common/base64.h"
@@ -137,12 +138,20 @@ std::optional<double> CpuSampler::sample(MonotonicTime now) {
     usage.push_back(value.value());
   }
 
-  const std::optional<MonotonicTime> last_time = std::exchange(last_time_, now);
-  const std::vector<uint64_t> last_usage = std::exchange(last_usage_, usage);
-  if (!last_time.has_value()) {
+  if (!last_time_.has_value()) {
     // The first sample only sets the baseline.
+    last_time_ = now;
+    last_usage_ = std::move(usage);
     return std::nullopt;
   }
+  const auto elapsed_usec =
+      std::chrono::duration_cast<std::chrono::microseconds>(now - *last_time_).count();
+  // Without elapsed time, keep the baseline so that the usage is counted in the next interval.
+  if (elapsed_usec <= 0) {
+    return last_value_;
+  }
+  const std::vector<uint64_t> last_usage = std::exchange(last_usage_, usage);
+  last_time_ = now;
 
   uint64_t used_usec = 0;
   for (size_t i = 0; i < usage.size(); ++i) {
@@ -154,12 +163,6 @@ std::optional<double> CpuSampler::sample(MonotonicTime now) {
     used_usec += usage[i] - last_usage[i];
   }
 
-  const auto elapsed_usec =
-      std::chrono::duration_cast<std::chrono::microseconds>(now - last_time.value()).count();
-  if (elapsed_usec <= 0) {
-    return last_value_;
-  }
-
   const std::optional<double> cores = capacity();
   if (!cores.has_value()) {
     last_value_.reset();
@@ -169,11 +172,12 @@ std::optional<double> CpuSampler::sample(MonotonicTime now) {
   return last_value_;
 }
 
-std::optional<uint64_t> MemorySampler::capacity() const {
+std::optional<double> MemorySampler::capacity() const {
   if (capacity_bytes_.has_value()) {
-    return capacity_bytes_;
+    return static_cast<double>(*capacity_bytes_);
   }
-  uint64_t total = 0;
+  // Summed as double, so that very large limits can't overflow.
+  double total = 0;
   for (const CgroupReader& cgroup : cgroups_) {
     absl::StatusOr<std::optional<uint64_t>> limit = cgroup.memoryLimitBytes();
     if (!limit.ok()) {
@@ -200,11 +204,11 @@ std::optional<double> MemorySampler::sample(MonotonicTime) {
     used_bytes += value.value();
   }
 
-  const std::optional<uint64_t> bytes = capacity();
+  const std::optional<double> bytes = capacity();
   if (!bytes.has_value()) {
     return std::nullopt;
   }
-  return static_cast<double>(used_bytes) / static_cast<double>(*bytes);
+  return static_cast<double>(used_bytes) / *bytes;
 }
 
 absl::StatusOr<MetricTarget> parseMetricName(absl::string_view name) {
@@ -305,6 +309,9 @@ LoadReporter::create(const ProtoConfig& proto_config, Filesystem::Instance& fs,
       std::optional<double> capacity;
       if (metric.cgroup_cpu().has_capacity_cores()) {
         capacity = metric.cgroup_cpu().capacity_cores().value();
+        if (!std::isfinite(*capacity)) {
+          return absl::InvalidArgumentError("capacity_cores must be finite");
+        }
       }
       sampler = std::make_unique<CpuSampler>(std::move(readers).value(), capacity);
       break;
@@ -349,10 +356,7 @@ LoadReporter::LoadReporter(const ProtoConfig& proto_config, std::vector<Metric> 
       metrics_(std::move(metrics)), time_source_(time_source),
       tls_(ThreadLocal::TypedSlot<ThreadLocalReport>::makeUnique(tls)),
       refresh_timer_(main_dispatcher.createTimer([this]() { onRefreshTimer(); })) {
-  published_report_ = sampleAndEncode();
-  tls_->set([report = published_report_](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalReport>(report);
-  });
+  publish(sampleAndEncode());
   refresh_timer_->enableTimer(std::min(kFirstRefreshInterval, refresh_interval_));
 }
 
@@ -377,7 +381,8 @@ std::string LoadReporter::sampleAndEncode() {
   std::vector<std::string> text_entries;
   for (Metric& metric : metrics_) {
     const std::optional<double> value = metric.sampler->sample(now);
-    if (!value.has_value()) {
+    // Clients can't parse NaN or Inf, which a tiny capacity_cores can produce.
+    if (!value.has_value() || !std::isfinite(*value)) {
       continue;
     }
     setMetric(metric.target, *value, report);
@@ -415,15 +420,21 @@ std::string LoadReporter::sampleAndEncode() {
   }
 }
 
+void LoadReporter::publish(std::string report) {
+  published_report_ = report;
+  // set() rather than runOnAllThreads(), so that workers registered later also start with the
+  // latest report. The report is immutable and shared by all threads.
+  auto shared = std::make_shared<ThreadLocalReport>(std::move(report));
+  tls_->set([shared = std::move(shared)](Event::Dispatcher&) { return shared; });
+}
+
 void LoadReporter::onRefreshTimer() {
+  if (tls_->isShutdown()) {
+    return;
+  }
   std::string report = sampleAndEncode();
   if (report != published_report_) {
-    published_report_ = report;
-    tls_->runOnAllThreads([report = std::move(report)](OptRef<ThreadLocalReport> local) {
-      if (local.has_value()) {
-        local->encoded_report = report;
-      }
-    });
+    publish(std::move(report));
   }
   refresh_timer_->enableTimer(refresh_interval_);
 }
@@ -463,8 +474,9 @@ Http::FilterTrailersStatus OrcaReporterFilter::encodeTrailers(Http::ResponseTrai
 
 void OrcaReporterFilter::writeReport(Http::HeaderMap& headers) const {
   const LoadReporter& reporter = config_->reporter();
+  const absl::string_view report = reporter.encodedReport();
   // An existing report is kept when there is nothing to replace it with.
-  if (reporter.encodedReport().empty()) {
+  if (report.empty()) {
     return;
   }
   if (hasReport(headers)) {
@@ -473,7 +485,7 @@ void OrcaReporterFilter::writeReport(Http::HeaderMap& headers) const {
     }
     removeReport(headers);
   }
-  headers.addCopy(reporter.headerName(), reporter.encodedReport());
+  headers.addCopy(reporter.headerName(), report);
 }
 
 } // namespace OrcaReporter

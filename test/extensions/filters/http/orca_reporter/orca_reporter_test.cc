@@ -278,6 +278,10 @@ TEST_F(OrcaReporterTest, CpuNoElapsedTimeKeepsPreviousValue) {
   pod_.setCpuUsage(600000);
   refresh(std::chrono::milliseconds(0));
   EXPECT_EQ("TEXT cpu_utilization=0.5", reportHeader());
+  // The usage during the zero interval is counted in the next one.
+  pod_.setCpuUsage(1100000);
+  refresh();
+  EXPECT_EQ("TEXT cpu_utilization=0.6", reportHeader());
 }
 
 TEST_F(OrcaReporterTest, MemoryReadFailureOmitsMetric) {
@@ -753,6 +757,56 @@ TEST_F(OrcaReporterTest, LocalReplyNotCountedAsRequest) {
   encode({{":status", "503"}});
   refresh();
   EXPECT_EQ("TEXT mem_utilization=0.5,rps_fractional=1", reportHeader());
+}
+
+TEST_F(OrcaReporterTest, NonFiniteUtilizationOmitted) {
+  initialize(absl::Substitute(R"EOF(
+metrics:
+- name: cpu_utilization
+  cgroup_cpu:
+    cgroups:
+    - path: "$0"
+    capacity_cores: 1e-320
+)EOF",
+                              pod_.directory()));
+
+  pod_.setCpuUsage(500000);
+  refresh();
+  EXPECT_FALSE(encode().has(TextHeader));
+}
+
+TEST_F(OrcaReporterTest, InfiniteCpuCapacityRejected) {
+  absl::StatusOr<OrcaReporterConfigSharedPtr> config = create(absl::Substitute(R"EOF(
+metrics:
+- name: cpu_utilization
+  cgroup_cpu:
+    cgroups:
+    - path: "$0"
+    capacity_cores: "Infinity"
+)EOF",
+                                                                                pod_.directory()));
+  EXPECT_EQ("capacity_cores must be finite", config.status().message());
+}
+
+TEST_F(OrcaReporterTest, NoRefreshAfterThreadingShutdown) {
+  pod_.setMemory(500, 0);
+  pod_.setMemoryMax("1000");
+  initialize(cpuAndMemoryConfig(pod_.directory()));
+
+  tls_.shutdownGlobalThreading();
+  pod_.setMemory(800, 0);
+  EXPECT_CALL(*timer_, enableTimer(_, _)).Times(0);
+  refresh();
+  EXPECT_EQ("TEXT mem_utilization=0.5", reportHeader());
+}
+
+TEST_F(OrcaReporterTest, NoReportOnUnregisteredThread) {
+  pod_.setMemory(500, 0);
+  pod_.setMemoryMax("1000");
+  initialize(cpuAndMemoryConfig(pod_.directory()));
+
+  tls_.registered_ = false;
+  EXPECT_FALSE(encode().has(TextHeader));
 }
 
 } // namespace
