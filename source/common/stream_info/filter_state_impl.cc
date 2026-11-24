@@ -157,10 +157,9 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
   if (index.has_value()) {
     untyped_indexed_mask_ |= (uint32_t{1} << static_cast<size_t>(index.value()));
   }
-  std::unique_ptr<FilterStateImpl::FilterObject> filter_object(new FilterStateImpl::FilterObject());
-  filter_object->data_ = std::move(data);
-  filter_object->stream_sharing_ = stream_sharing;
-  data_storage_[data_name] = std::move(filter_object);
+  StoredObject& stored = data_storage_[data_name];
+  stored.data_ = std::move(data);
+  stored.stream_sharing_ = stream_sharing;
 }
 
 bool FilterStateImpl::hasDataWithName(absl::string_view data_name) const {
@@ -180,7 +179,7 @@ FilterStateImpl::getDataReadOnlyGeneric(absl::string_view data_name) const {
   if (!data_storage_.empty()) {
     const auto it = data_storage_.find(data_name);
     if (it != data_storage_.end()) {
-      return it->second->data_.get();
+      return it->second.data_.get();
     }
   }
   if (parent_) {
@@ -202,7 +201,7 @@ FilterStateImpl::getDataSharedMutableGeneric(absl::string_view data_name) {
   if (!data_storage_.empty()) {
     const auto it = data_storage_.find(data_name);
     if (it != data_storage_.end()) {
-      return it->second->data_;
+      return it->second.data_;
     }
   }
   if (parent_) {
@@ -225,12 +224,12 @@ FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() c
   auto objects = parent_ ? parent_->objectsSharedWithUpstreamConnection()
                          : std::make_unique<FilterState::Objects>();
   for (const auto& [name, object] : data_storage_) {
-    switch (object->stream_sharing_) {
+    switch (object.stream_sharing_) {
     case StreamSharingMayImpactPooling::SharedWithUpstreamConnection:
-      objects->push_back({object->data_, object->stream_sharing_, name});
+      objects->push_back({object.data_, object.stream_sharing_, name});
       break;
     case StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce:
-      objects->push_back({object->data_, StreamSharingMayImpactPooling::None, name});
+      objects->push_back({object.data_, StreamSharingMayImpactPooling::None, name});
       break;
     default:
       break;
@@ -298,10 +297,9 @@ void FilterStateImpl::setIndexedData(FilterStateIndex index, std::shared_ptr<Obj
     --indexed_count_;
   }
   untyped_indexed_mask_ |= bit;
-  auto filter_object = std::make_unique<FilterStateImpl::FilterObject>();
-  filter_object->data_ = std::move(data);
-  filter_object->stream_sharing_ = stream_sharing;
-  data_storage_[FilterState::indexToName(index)] = std::move(filter_object);
+  StoredObject& stored = data_storage_[FilterState::indexToName(index)];
+  stored.data_ = std::move(data);
+  stored.stream_sharing_ = stream_sharing;
 }
 
 void FilterStateImpl::setIndexedDataGeneric(FilterStateIndex index, std::shared_ptr<Object> data,
@@ -341,7 +339,7 @@ void FilterStateImpl::setIndexedDataGeneric(FilterStateIndex index, std::shared_
   if (indexed_data_storage_[idx] == nullptr) {
     ++indexed_count_;
   }
-  auto filter_object = std::make_unique<FilterStateImpl::IndexedFilterObject>();
+  auto filter_object = std::make_unique<StoredObject>();
   filter_object->data_ = std::move(data);
   filter_object->stream_sharing_ = stream_sharing;
   indexed_data_storage_[idx] = std::move(filter_object);
@@ -405,7 +403,7 @@ FilterStateImpl::getIndexedDataReadOnlyAnyType(FilterStateIndex index) const {
   if ((untyped_indexed_mask_ & (uint32_t{1} << idx)) != 0) {
     const auto it = data_storage_.find(FilterState::indexToName(index));
     ASSERT(it != data_storage_.end());
-    return it->second->data_.get();
+    return it->second.data_.get();
   }
   if (parent_) {
     return parent_->getIndexedDataReadOnlyAnyType(index);
@@ -425,7 +423,7 @@ FilterStateImpl::getIndexedDataSharedMutableAnyType(FilterStateIndex index) {
   if ((untyped_indexed_mask_ & (uint32_t{1} << idx)) != 0) {
     const auto it = data_storage_.find(FilterState::indexToName(index));
     ASSERT(it != data_storage_.end());
-    return it->second->data_;
+    return it->second.data_;
   }
   if (parent_) {
     return parent_->getIndexedDataSharedMutableAnyType(index);

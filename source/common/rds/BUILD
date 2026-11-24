@@ -36,6 +36,7 @@ envoy_cc_library(
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:callback_impl_lib",
+        "//source/common/common:hash_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:api_version_lib",
         "//source/common/config:resource_type_helper_lib",

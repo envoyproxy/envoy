@@ -41,7 +41,7 @@ absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnCh
   RETURN_IF_NOT_OK_REF(result_or_error.status());
   const PathSplitResult result = result_or_error.value();
 
-  const uint32_t watch_mask = IN_MODIFY | IN_MOVED_TO;
+  const uint32_t watch_mask = IN_MODIFY | IN_MOVED_TO | IN_CREATE;
   int watch_fd = inotify_add_watch(inotify_fd_, std::string(result.directory_).c_str(), watch_mask);
   if (watch_fd == -1) {
     return absl::InvalidArgumentError(
@@ -108,6 +108,9 @@ absl::Status WatcherImpl::onInotifyEvent() {
       }
       if (file_event->mask & IN_MOVED_TO) {
         events |= Events::MovedTo;
+      }
+      if (file_event->mask & IN_CREATE) {
+        events |= Events::Created;
       }
 
       for (FileWatch& watch : callback_map_[file_event->wd].watches_) {

@@ -32,6 +32,7 @@ pub mod listener;
 pub mod load_balancer;
 pub mod matcher;
 pub mod matcher_data_input;
+pub mod memory;
 pub mod network;
 pub mod resource_monitor;
 pub mod route_specifier;
@@ -262,6 +263,35 @@ pub fn get_runtime_number(key: &str, default_value: f64) -> f64 {
   unsafe {
     abi::envoy_dynamic_module_callback_get_runtime_number(str_to_module_buffer(key), default_value)
   }
+}
+
+/// Read a runtime value as a string: the text of the value in the topmost layer that sets the key.
+/// A number or a boolean has a text too, for example `"80"` or `"true"`, so this reads a value of
+/// any type. See [`get_runtime_bool`] for the description of the runtime and the threading
+/// behavior, which are identical here.
+///
+/// Unlike the functions above, this takes no default value: it returns `None` when the key does not
+/// exist or the runtime is not reachable from the calling thread. A value that is not valid UTF-8
+/// is converted lossily.
+///
+/// Note that, as with [`get_runtime_int`], `key` must not name one of Envoy's own
+/// `envoy.reloadable_features.*` or `envoy.restart_features.*` guards; read those with
+/// [`get_runtime_bool`] instead.
+pub fn get_runtime_string(key: &str) -> Option<String> {
+  let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+  let found = unsafe {
+    abi::envoy_dynamic_module_callback_get_runtime_string(str_to_module_buffer(key), &mut result)
+  };
+  if !found {
+    return None;
+  }
+  // The buffer is owned by Envoy and valid until the end of the current event hook, so copy it.
+  Some(
+    unsafe { ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length) }.into_owned(),
+  )
 }
 
 /// Register a function pointer under a name in the process-wide function registry.

@@ -23,8 +23,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.compressor"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/compression/gzip/compressor:config",
@@ -47,11 +50,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.compressor"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/extensions/compression/brotli/compressor:config",
@@ -81,8 +83,11 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.compressor"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":mock_config_cc_proto",
@@ -144,11 +149,10 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.compressor"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         ":compressor_integration_tests_lib",

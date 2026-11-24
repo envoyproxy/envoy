@@ -15,14 +15,8 @@ envoy_cc_test_binary(
     name = "schema_validator_tool",
     srcs = ["schema_validator.cc"],
     rbe_pool = {
-        "default": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "gcc": {
-            "build": "linux_x64_large",
-            "link": "linux_x64_small",
-        },
+        "default": {"link": "linux_x64_small"},
+        "gcc": {"link": "default"},
     },
     deps = [":schema_validator_lib"] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),

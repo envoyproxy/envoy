@@ -35,12 +35,7 @@ RouteConfigProviderManager::dumpRouteConfigs(const Matchers::StringMatcher& name
 
   for (const auto& element : dynamic_route_config_providers_) {
     const auto provider = element.second.first.lock();
-    // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
-    // in the RdsRouteConfigSubscription destructor, and the single threaded nature
-    // of this code, locking the weak_ptr will not fail.
-    ASSERT(provider);
-
-    if (provider->configInfo()) {
+    if (provider && provider->configInfo()) {
       if (!name_matcher.match(provider->configInfo().value().name_)) {
         continue;
       }

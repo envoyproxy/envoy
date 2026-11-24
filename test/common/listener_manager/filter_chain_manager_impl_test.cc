@@ -1,5 +1,6 @@
 #include <chrono>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
@@ -10,6 +11,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/base64.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/resource_name.h"
@@ -23,6 +25,7 @@
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/tls/ssl_socket.h"
 #include "source/server/configuration_impl.h"
 
@@ -58,8 +61,14 @@ namespace Server {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
   MockFilterChainFactoryBuilder() {
+    // Each build returns a new filter chain, so that a rebuilt filter chain is not the one it
+    // replaces.
     ON_CALL(*this, buildFilterChain(_, _, _))
-        .WillByDefault(Return(std::make_shared<Network::MockFilterChain>()));
+        .WillByDefault([](const envoy::config::listener::v3::FilterChain&,
+                          FilterChainFactoryContextCreator&,
+                          bool) -> absl::StatusOr<Network::DrainableFilterChainSharedPtr> {
+          return std::make_shared<Network::MockFilterChain>();
+        });
   }
 
   MOCK_METHOD(absl::StatusOr<Network::DrainableFilterChainSharedPtr>, buildFilterChain,
@@ -72,6 +81,24 @@ class MockFcdsListenerManagerCallbacks : public FcdsListenerManagerCallbacks {
 public:
   MOCK_METHOD(void, notifyFilterChainUpdateCallbacks, (absl::string_view filter_chain_name));
 };
+
+namespace {
+
+// The same struct with its two fields serialized in two orders.
+constexpr absl::string_view SerializedStruct = "CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g=";
+constexpr absl::string_view ReserializedStruct = "CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo=";
+
+// Returns the filter chain with one more filter, whose typed config is the Base64 encoded struct.
+envoy::config::listener::v3::FilterChain
+withStructFilter(envoy::config::listener::v3::FilterChain filter_chain,
+                 absl::string_view base64_struct) {
+  auto* typed_config = filter_chain.add_filters()->mutable_typed_config();
+  typed_config->set_type_url("type.googleapis.com/google.protobuf.Struct");
+  typed_config->set_value(Base64::decode(base64_struct));
+  return filter_chain;
+}
+
+} // namespace
 
 class FilterChainManagerImplTest : public testing::TestWithParam<bool> {
 public:
@@ -412,6 +439,153 @@ TEST_P(FilterChainManagerImplTest, UpdateFilterChainsBetweenVersions) {
   // filter chains to be drained.
   EXPECT_EQ(filter_chain_manager_->drainingFilterChains().size(), 1);
   EXPECT_EQ(filter_chain_manager_->drainingFilterChains()[0], filter_chain);
+}
+
+// A filter chain whose Any payload is serialized differently is still reused.
+TEST_P(FilterChainManagerImplTest, ReuseFilterChainWithReserializedAny) {
+  const auto filter_chain = withStructFilter(filter_chain_template_, SerializedStruct);
+  const auto reserialized_filter_chain =
+      withStructFilter(filter_chain_template_, ReserializedStruct);
+  ASSERT_NE(MessageUtil::serializeDeterministically(filter_chain),
+            MessageUtil::serializeDeterministically(reserialized_filter_chain));
+
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _));
+  addSingleFilterChainHelper(filter_chain);
+
+  FilterChainManagerImpl new_filter_chain_manager{addresses_, parent_context_, init_manager_,
+                                                  *filter_chain_manager_};
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _)).Times(0);
+  EXPECT_OK(new_filter_chain_manager.addFilterChains(
+      GetParam() ? &matcher_ : nullptr,
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&reserialized_filter_chain},
+      nullptr, filter_chain_factory_builder_, new_filter_chain_manager, nullptr,
+      empty_config_source_, dummy_fcds_callbacks_));
+  EXPECT_TRUE(filter_chain_manager_->drainingFilterChains().empty());
+}
+
+// A default filter chain whose Any payload is serialized differently is still reused.
+TEST_P(FilterChainManagerImplTest, ReuseDefaultFilterChainWithReserializedAny) {
+  const auto default_filter_chain =
+      withStructFilter(envoy::config::listener::v3::FilterChain(), SerializedStruct);
+  const auto reserialized_default_filter_chain =
+      withStructFilter(envoy::config::listener::v3::FilterChain(), ReserializedStruct);
+  ASSERT_NE(MessageUtil::serializeDeterministically(default_filter_chain),
+            MessageUtil::serializeDeterministically(reserialized_default_filter_chain));
+
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
+      .WillOnce(Return(build_out_filter_chain_))
+      .WillOnce(Return(build_out_fallback_filter_chain_));
+  addSingleFilterChainHelper(filter_chain_template_, &default_filter_chain);
+
+  FilterChainManagerImpl new_filter_chain_manager{addresses_, parent_context_, init_manager_,
+                                                  *filter_chain_manager_};
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _)).Times(0);
+  EXPECT_OK(new_filter_chain_manager.addFilterChains(
+      GetParam() ? &matcher_ : nullptr,
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_template_},
+      &reserialized_default_filter_chain, filter_chain_factory_builder_, new_filter_chain_manager,
+      nullptr, empty_config_source_, dummy_fcds_callbacks_));
+  EXPECT_EQ(new_filter_chain_manager.defaultFilterChain(), build_out_fallback_filter_chain_);
+}
+
+// A filter chain whose MessageUtil::hash() matches but whose message differs is rebuilt.
+TEST_P(FilterChainManagerImplTest, RebuildFilterChainWithEqualHashButDifferentMessage) {
+  // MessageUtil::hash() hashes only the type URL of an Any whose type is not linked in.
+  envoy::config::listener::v3::FilterChain filter_chain = filter_chain_template_;
+  auto* typed_config = filter_chain.add_filters()->mutable_typed_config();
+  typed_config->set_type_url("type.googleapis.com/envoy.test.NotLinked");
+  typed_config->set_value("a");
+  envoy::config::listener::v3::FilterChain changed_filter_chain = filter_chain;
+  changed_filter_chain.mutable_filters(0)->mutable_typed_config()->set_value("b");
+  ASSERT_EQ(MessageUtil::hash(filter_chain), MessageUtil::hash(changed_filter_chain));
+
+  auto origin_filter_chain = std::make_shared<Network::MockFilterChain>();
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
+      .WillOnce(Return(origin_filter_chain));
+  addSingleFilterChainHelper(filter_chain);
+
+  FilterChainManagerImpl new_filter_chain_manager{addresses_, parent_context_, init_manager_,
+                                                  *filter_chain_manager_};
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _));
+  EXPECT_OK(new_filter_chain_manager.addFilterChains(
+      GetParam() ? &matcher_ : nullptr,
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&changed_filter_chain}, nullptr,
+      filter_chain_factory_builder_, new_filter_chain_manager, nullptr, empty_config_source_,
+      dummy_fcds_callbacks_));
+  ASSERT_EQ(filter_chain_manager_->drainingFilterChains().size(), 1);
+  EXPECT_EQ(filter_chain_manager_->drainingFilterChains()[0], origin_filter_chain);
+}
+
+// A reused filter chain keeps its hash, so later updates reuse it by its bytes or by its hash.
+TEST_P(FilterChainManagerImplTest, ReuseFilterChainWithReserializedAnyAcrossUpdates) {
+  const auto filter_chain = withStructFilter(filter_chain_template_, SerializedStruct);
+  const auto reserialized_filter_chain =
+      withStructFilter(filter_chain_template_, ReserializedStruct);
+  ASSERT_NE(MessageUtil::serializeDeterministically(filter_chain),
+            MessageUtil::serializeDeterministically(reserialized_filter_chain));
+  const auto add_filter_chain = [this](FilterChainManagerImpl& manager,
+                                       const envoy::config::listener::v3::FilterChain& message) {
+    EXPECT_OK(manager.addFilterChains(
+        GetParam() ? &matcher_ : nullptr,
+        std::vector<const envoy::config::listener::v3::FilterChain*>{&message}, nullptr,
+        filter_chain_factory_builder_, manager, nullptr, empty_config_source_,
+        dummy_fcds_callbacks_));
+  };
+
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _));
+  addSingleFilterChainHelper(filter_chain);
+
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _)).Times(0);
+  FilterChainManagerImpl bytes_match_manager{addresses_, parent_context_, init_manager_,
+                                             *filter_chain_manager_};
+  add_filter_chain(bytes_match_manager, filter_chain);
+  FilterChainManagerImpl hash_match_manager{addresses_, parent_context_, init_manager_,
+                                            bytes_match_manager};
+  add_filter_chain(hash_match_manager, reserialized_filter_chain);
+  FilterChainManagerImpl second_hash_match_manager{addresses_, parent_context_, init_manager_,
+                                                   hash_match_manager};
+  add_filter_chain(second_hash_match_manager, filter_chain);
+  EXPECT_TRUE(filter_chain_manager_->drainingFilterChains().empty());
+  EXPECT_TRUE(bytes_match_manager.drainingFilterChains().empty());
+  EXPECT_TRUE(hash_match_manager.drainingFilterChains().empty());
+}
+
+// Filter chains that serialize to the same bytes are reused, even when their messages are not
+// equal to themselves.
+TEST_P(FilterChainManagerImplTest, ReuseFilterChainsWithUnchangedBytes) {
+  // A message holding a NaN is never equal to itself, so only the byte comparison can reuse these
+  // filter chains.
+  envoy::config::listener::v3::FilterChain filter_chain = filter_chain_template_;
+  Config::Metadata::mutableMetadataValue(*filter_chain.mutable_metadata(), "test", "nan")
+      .set_number_value(std::numeric_limits<double>::quiet_NaN());
+  envoy::config::listener::v3::FilterChain default_filter_chain;
+  *default_filter_chain.mutable_metadata() = filter_chain.metadata();
+  const envoy::config::listener::v3::FilterChain updated_filter_chain = filter_chain;
+  const envoy::config::listener::v3::FilterChain updated_default_filter_chain =
+      default_filter_chain;
+  ASSERT_EQ(MessageUtil::serializeDeterministically(filter_chain),
+            MessageUtil::serializeDeterministically(updated_filter_chain));
+  ASSERT_FALSE(Protobuf::util::MessageDifferencer::Equals(filter_chain, updated_filter_chain));
+  ASSERT_EQ(MessageUtil::serializeDeterministically(default_filter_chain),
+            MessageUtil::serializeDeterministically(updated_default_filter_chain));
+  ASSERT_FALSE(Protobuf::util::MessageDifferencer::Equals(default_filter_chain,
+                                                          updated_default_filter_chain));
+
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
+      .WillOnce(Return(build_out_filter_chain_))
+      .WillOnce(Return(build_out_fallback_filter_chain_));
+  addSingleFilterChainHelper(filter_chain, &default_filter_chain);
+
+  FilterChainManagerImpl new_filter_chain_manager{addresses_, parent_context_, init_manager_,
+                                                  *filter_chain_manager_};
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _)).Times(0);
+  EXPECT_OK(new_filter_chain_manager.addFilterChains(
+      GetParam() ? &matcher_ : nullptr,
+      std::vector<const envoy::config::listener::v3::FilterChain*>{&updated_filter_chain},
+      &updated_default_filter_chain, filter_chain_factory_builder_, new_filter_chain_manager,
+      nullptr, empty_config_source_, dummy_fcds_callbacks_));
+  EXPECT_TRUE(filter_chain_manager_->drainingFilterChains().empty());
+  EXPECT_EQ(new_filter_chain_manager.defaultFilterChain(), build_out_fallback_filter_chain_);
 }
 
 TEST_P(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependentDrainClose) {

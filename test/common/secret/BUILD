@@ -21,8 +21,11 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         ":private_key_provider_proto_cc_proto",
@@ -53,8 +56,11 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/secret:sds_api_lib",

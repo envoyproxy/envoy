@@ -16,8 +16,11 @@ envoy_extension_cc_test(
     srcs = ["upstream_request_test.cc"],
     extension_names = ["envoy.upstreams.http.tcp"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/buffer:buffer_lib",
@@ -36,6 +39,7 @@ envoy_extension_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

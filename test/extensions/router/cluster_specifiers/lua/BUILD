@@ -16,8 +16,11 @@ envoy_extension_cc_test(
     srcs = ["lua_cluster_specifier_test.cc"],
     extension_names = ["envoy.router.cluster_specifier_plugin.lua"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/router/cluster_specifiers/lua:lua_cluster_specifier_lib",
@@ -33,8 +36,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.router.cluster_specifier_plugin.lua"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/router/cluster_specifiers/lua:config",

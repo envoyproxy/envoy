@@ -20,6 +20,7 @@ envoy_cc_library(
         "//envoy/stats:stats_macros",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:containers_lib",
+        "//source/common/config:ecds_subscription_registry_lib",
         "//source/common/config:resource_type_helper_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:common_lib",

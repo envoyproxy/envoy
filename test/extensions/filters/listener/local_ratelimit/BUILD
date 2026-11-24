@@ -15,7 +15,10 @@ envoy_extension_cc_test(
     name = "local_ratelimit_test",
     srcs = ["local_ratelimit_test.cc"],
     extension_names = ["envoy.filters.listener.local_ratelimit"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/network:default_socket_interface_lib",
         "//source/common/network:listener_filter_buffer_lib",
@@ -34,11 +37,9 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.listener.local_ratelimit"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/runtime:runtime_features_lib",

@@ -71,7 +71,7 @@ private:
   bool hasDataWithNameInternally(absl::string_view data_name) const;
   void maybeCreateParent(FilterStateSharedPtr ancestor);
 
-  struct IndexedFilterObject {
+  struct StoredObject {
     std::shared_ptr<Object> data_;
     StreamSharingMayImpactPooling stream_sharing_{StreamSharingMayImpactPooling::None};
   };
@@ -80,11 +80,11 @@ private:
                 "untyped_indexed_mask_ requires at most 32 FilterStateIndex entries");
   FilterStateSharedPtr parent_{};
   const FilterState::LifeSpan life_span_;
-  absl::flat_hash_map<std::string, std::unique_ptr<FilterObject>> data_storage_;
+  absl::flat_hash_map<std::string, StoredObject> data_storage_;
   uint32_t indexed_count_{0};
   // Bitmask of FilterStateIndex entries currently held as non-canonical objects in data_storage_.
   uint32_t untyped_indexed_mask_{0};
-  std::array<std::unique_ptr<IndexedFilterObject>, FilterStateIndexCount> indexed_data_storage_{};
+  std::array<std::unique_ptr<StoredObject>, FilterStateIndexCount> indexed_data_storage_{};
 };
 
 } // namespace StreamInfo

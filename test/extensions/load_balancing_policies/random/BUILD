@@ -20,8 +20,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.random"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/load_balancing_policies/random:config",
@@ -39,11 +42,10 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.random"],
     rbe_pool = {
-        "tsan": {
-            "build": "linux_x64_small",
-            "link": "linux_x64_small",
-        },
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/protobuf",
@@ -67,7 +69,7 @@ envoy_extension_cc_fuzz_test(
     srcs = ["random_load_balancer_fuzz_test.cc"],
     corpus = "random_load_balancer_corpus",
     extension_names = ["envoy.load_balancing_policies.random"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"fuzz_coverage": {"link": "linux_x64_small"}},
     deps = [
         ":random_load_balancer_fuzz_proto_cc_proto",
         "//source/extensions/load_balancing_policies/random:config",
@@ -80,7 +82,6 @@ envoy_extension_cc_benchmark_binary(
     name = "random_lb_benchmark",
     srcs = ["random_lb_benchmark.cc"],
     extension_names = ["envoy.load_balancing_policies.random"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         "//source/extensions/load_balancing_policies/random:random_lb_lib",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",
@@ -99,7 +100,10 @@ envoy_extension_cc_test(
     name = "random_lb_test",
     srcs = ["random_lb_test.cc"],
     extension_names = ["envoy.load_balancing_policies.random"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/load_balancing_policies/random:config",
         "//test/extensions/load_balancing_policies/common:load_balancer_base_test_lib",
@@ -110,7 +114,7 @@ envoy_extension_cc_test(
     name = "random_lb_simulation_test",
     srcs = ["random_lb_simulation_test.cc"],
     extension_names = ["envoy.load_balancing_policies.random"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {"coverage": {"link": "linux_x64_small"}},
     deps = [
         "//source/common/common:random_generator_lib",
         "//source/common/upstream:load_balancer_context_base_lib",

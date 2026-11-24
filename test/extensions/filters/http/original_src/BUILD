@@ -26,8 +26,11 @@ envoy_extension_cc_test(
     srcs = ["original_src_config_factory_test.cc"],
     extension_names = ["envoy.filters.http.original_src"],
     rbe_pool = {
-        "build": "linux_x64_small",
-        "link": "linux_x64_small",
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
     },
     deps = [
         "//source/extensions/filters/http/original_src:config",
@@ -43,8 +46,8 @@ envoy_extension_cc_test(
     srcs = ["original_src_test.cc"],
     extension_names = ["envoy.filters.http.original_src"],
     rbe_pool = {
-        "asan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/network:socket_option_lib",

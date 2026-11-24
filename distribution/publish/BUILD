@@ -1,7 +1,8 @@
 load("@envoy_repo//:version.bzl", "VERSION")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//distribution:packages.bzl", "MAINTAINER", "PUBLISH_PACKAGING_TAGS", "envoy_pkg_distros")
+load("//distribution:packages.bzl", "MAINTAINER", "PUBLISH_PACKAGING_TAGS", "envoy_pkg_distros", "release_version_for")
 load("//distribution/binary:compiler.bzl", "bundled")
+load(":arch.bzl", "arch_file", "arch_files")
 
 licenses(["notice"])  # Apache 2
 
@@ -46,14 +47,98 @@ envoy_pkg_distros(
     version = VERSION,
 )
 
+# The tools, built as the release binaries (and as the container images' tools).
+bundled(
+    name = "tools",
+    mode = "opt",
+    stripopts = ["--strip-all"],
+    targets = {
+        "//tools/config_load_check:config_load_check_tool.stripped": "config_load_check_tool",
+        "//tools/router_check:router_check_tool.stripped": "router_check_tool",
+        "//tools/schema_validator:schema_validator_tool.stripped": "schema_validator_tool",
+    },
+)
+
 filegroup(
     name = "publish",
     srcs = [
         ":packages",
+        ":tools",
         "//distribution/binary:release",
         "//distribution/docker:images",
-        "//tools/config_load_check:config_load_check_tool.stripped",
-        "//tools/router_check:router_check_tool.stripped",
-        "//tools/schema_validator:schema_validator_tool.stripped",
     ],
 )
+
+# The `.deb`/`.changes` files of the packages (as bundled in `packages.tar.gz`).
+filegroup(
+    name = "debs_files",
+    srcs = [
+        ":%s.%s" % (package, kind)
+        for package in [
+            "envoy",
+            "envoy-%s" % release_version_for(VERSION),
+            "envoy-contrib",
+            "envoy-contrib-%s" % release_version_for(VERSION),
+        ]
+        for kind in [
+            "changes",
+            "deb",
+        ]
+    ],
+)
+
+# What `ci/do_ci.sh release.multiarch` builds for each arch: the container images (published), and
+# what it signs for both arches, in the same invocation (the `.deb`/`.changes` files, and the
+# stripped release binaries).
+filegroup(
+    name = "publish_multiarch",
+    srcs = [
+        ":debs_files",
+        "//distribution/binary:release_stripped",
+        "//distribution/docker:images",
+    ],
+)
+
+# Everything published for each arch, at `publish_<arch>/<basename>`, from any host: the binaries
+# of another arch are cross-compiled (eg arm64 from an x64 host).
+[
+    arch_files(
+        name = "%s_%s" % (name, arch),
+        srcs = [":%s" % name],
+        platform = "//bazel/platforms:linux_%s" % arch,
+    )
+    for name in [
+        "publish",
+        "publish_multiarch",
+    ]
+    for arch in [
+        "arm64",
+        "x64",
+    ]
+]
+
+# The signing inputs of each arch, for `ci/do_ci.sh release.multiarch`, which signs in the same
+# invocation (`--//distribution:<arch>-{debs,release}`).
+[
+    arch_file(
+        name = "publish_multiarch_%s_release" % arch,
+        src = ":publish_multiarch_%s" % arch,
+        basename = "release.stripped.tar.zst",
+    )
+    for arch in [
+        "arm64",
+        "x64",
+    ]
+]
+
+[
+    arch_files(
+        name = "publish_multiarch_%s_debs" % arch,
+        srcs = [":debs_files"],
+        platform = "//bazel/platforms:linux_%s" % arch,
+    )
+    for arch in [
+        "arm64",
+        "x64",
+    ]
+]

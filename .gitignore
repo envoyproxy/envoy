@@ -113,7 +113,6 @@ yarn-error.log*
 /devcontainer/devcontainer.env
 /docs/landing_source/.bundle
 /linux
-distribution/custom
 examples/single-page-app/xds/lds.yml
 examples/websocket/certs
 tools/dev/src
