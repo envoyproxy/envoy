@@ -181,6 +181,15 @@ public:
                              bool increment, bool tenant_isolation_enabled = false);
 
   /**
+   * Update this worker's count of the cluster's idle sockets, the ones a request on this worker can
+   * still take: <stat_prefix>.<worker>.idle.cluster.<cluster>. Only with detailed stats.
+   * @param cluster_id the cluster identifier of the socket.
+   * @param increment whether a socket joined (true) or left (false) the worker's idle pool.
+   */
+  void updateIdleSocketStats(const std::string& cluster_id, bool increment,
+                             bool tenant_isolation_enabled = false);
+
+  /**
    * Get per-worker connection stats for debugging.
    * @return map of node/cluster -> connection count for the current worker thread.
    */

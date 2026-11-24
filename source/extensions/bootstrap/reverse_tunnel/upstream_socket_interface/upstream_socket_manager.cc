@@ -225,6 +225,8 @@ void UpstreamSocketManager::addConnectionSocket(
   if (auto extension = getUpstreamExtension()) {
     extension->updateConnectionStats(scoped_node_id, scoped_cluster_id, true /* increment */,
                                      tenant_isolation_enabled_);
+    extension->updateIdleSocketStats(scoped_cluster_id, true /* increment */,
+                                     tenant_isolation_enabled_);
     extension->emitSyntheticLifecycleLog(kLifecycleEventTunnelSetup, fd_to_lifecycle_info_[fd],
                                          dispatcher_.timeSource(),
                                          AccessLog::AccessLogType::TcpUpstreamConnected);
@@ -302,6 +304,9 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
   const int fd = socket->ioHandle().fdDoNotUse();
   if (counted_idle_fds_.erase(fd) != 0) {
     decrementIdleCount(node_id);
+  }
+  if (auto* extension = getUpstreamExtension()) {
+    extension->updateIdleSocketStats(cluster_id, false /* increment */, tenant_isolation_enabled_);
   }
   const std::string& remoteConnectionKey =
       socket->connectionInfoProvider().remoteAddress()->asString();
@@ -544,6 +549,10 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
     fd_to_socket_it_map_.erase(socket_it);
     if (counted_idle_fds_.erase(fd) != 0) {
       decrementIdleCount(node_id);
+    }
+    if (extension != nullptr) {
+      extension->updateIdleSocketStats(cluster_id, false /* increment */,
+                                       tenant_isolation_enabled_);
     }
 
     fd_to_event_map_.erase(fd);

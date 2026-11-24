@@ -557,6 +557,51 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, MissThresholdOneMarksDeadOnFirstInval
   EXPECT_EQ(retrieved, nullptr);
 }
 
+TEST_F(ReverseTunnelAcceptorExtensionTest, IdleSocketGaugeFollowsTheIdlePool) {
+  thread_local_.setDispatcher(&dispatcher_);
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockTimer>>());
+  EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _))
+      .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockFileEvent>>());
+  setupThreadLocalSlot();
+  auto* socket_manager = extension_->getLocalRegistry()->socketManager();
+  const auto add_socket = [socket_manager](int fd) {
+    auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+    auto io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+    EXPECT_CALL(*io_handle, fdDoNotUse()).WillRepeatedly(testing::Return(fd));
+    EXPECT_CALL(*socket, ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
+    socket->io_handle_ = std::move(io_handle);
+    socket->connection_info_provider_->setLocalAddress(
+        Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 10000));
+    socket->connection_info_provider_->setRemoteAddress(
+        Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 10000 + fd));
+    socket_manager->addConnectionSocket("n1", "c1", std::move(socket), std::chrono::seconds(30),
+                                        false /* rebalanced */);
+  };
+  const auto idle = [this]() {
+    return TestUtility::findGauge(stats_store_,
+                                  "test_scope.reverse_connections.worker_0.idle.cluster.c1")
+        ->value();
+  };
+
+  add_socket(201);
+  add_socket(202);
+  add_socket(203);
+  EXPECT_EQ(idle(), 3);
+
+  // A request takes the oldest idle socket, 201.
+  ASSERT_NE(socket_manager->getConnectionSocket("n1"), nullptr);
+  EXPECT_EQ(idle(), 2);
+
+  // An idle socket dies.
+  socket_manager->markSocketDead(202);
+  EXPECT_EQ(idle(), 1);
+
+  // The taken socket closing leaves the idle count alone.
+  socket_manager->markSocketDead(201);
+  EXPECT_EQ(idle(), 1);
+}
+
 TEST_F(ReverseTunnelAcceptorExtensionTest, PingFailureThresholdConfiguration) {
   // Test default threshold value
   EXPECT_EQ(extension_->pingFailureThreshold(), 3); // Default threshold should be 3.
