@@ -125,3 +125,5 @@ test_program(name = "config_validator_test")
 test_program(name = "tls_certificate_selector_integration_test")
 
 test_program(name = "resource_monitor_test")
+
+test_program(name = "memory_tracking_integration_test")

@@ -423,6 +423,7 @@ envoy_cc_library(
     hdrs = ["request_filter_manager.h"],
     deps = [
         ":ai_filter_lib",
+        ":ai_filter_state_lib",
         ":ai_request_lib",
         ":buffer_manager_lib",
         ":filter_pipeline_lib",

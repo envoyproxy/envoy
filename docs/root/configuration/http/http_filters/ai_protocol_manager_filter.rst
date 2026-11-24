@@ -161,6 +161,14 @@ object when unset so upstream filter chains can read the client's API.
 Other routes pass through untouched unless :ref:`parse_unconfigured_routes
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>`
 is set, which parses them best-effort and forwards unparseable payloads unchanged.
+A payload that parses runs the AI filters with no API declared, so a single
+catch-all route -- a dynamic forward proxy's, say -- can leave the API to the
+:ref:`schema validation filter <config_http_ai_filters_schema_validation>`
+to detect. The response runs the AI filters only when one of them detected
+the request's API; other responses on the route are left untouched. Every
+JSON request on such a route is re-serialized unless :ref:`reserialize_body
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.reserialize_body>`
+is ``DISABLE``, which suits AI filters that only read the request.
 
 .. code-block:: yaml
 
@@ -176,14 +184,14 @@ is set, which parses them best-effort and forwards unparseable payloads unchange
 AI filters
 ----------
 
-After a declared AI endpoint's payload is parsed, and before it is replayed,
-the filter runs the configured :ref:`AI filters
+After a request's payload is parsed, and before it is replayed, the filter
+runs the configured :ref:`AI filters
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.filters>`
 in order over the parsed document; they require ``request_handling``. An AI
 filter (category ``envoy.http.ai_filters``)
 may read or modify the document, or reject the request with a local reply.
-Routes without a per-route request declaration, and requests without a body,
-run no AI filters.
+Requests the filter does not parse -- those passed through, those without a
+body, and best-effort payloads that fail to parse -- run no AI filters.
 
 Once the AI filters finish, the parsed document is re-serialized as the
 request body by default. With :ref:`reserialize_body
@@ -191,6 +199,10 @@ request body by default. With :ref:`reserialize_body
 set to ``DISABLE``, the received body is forwarded byte for byte instead, and
 edits AI filters make to the document are not sent; use it only with AI filters
 that read the request.
+
+A response runs the AI filters when its request was an AI call: a declared
+AI endpoint, or one whose API an AI filter detected. Any other response
+passes through untouched.
 
 The available AI filters are described under :ref:`AI filters
 <config_http_ai_filters>`.

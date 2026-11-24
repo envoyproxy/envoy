@@ -29,6 +29,7 @@
 #include "test/mocks/upstream/priority_set.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
@@ -416,6 +417,53 @@ TEST_F(DynamicModuleClusterTest, ConfigNewFail) {
 TEST_F(DynamicModuleClusterTest, ClusterNewFail) {
   auto result = createCluster(makeYamlConfig("cluster_new_fail"));
   ASSERT_THAT(result, HasStatusMessage(HasSubstr("Failed to create in-module cluster instance")));
+}
+
+absl::StatusOr<Envoy::Extensions::DynamicModules::DynamicModulePtr> loadGoClusterTestModule() {
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/go"), 1);
+  // Pin the Go runtime across configurations and tests.
+  return Envoy::Extensions::DynamicModules::newDynamicModule(
+      Envoy::Extensions::DynamicModules::testSharedObjectPath("cluster_integration_test", "go"),
+      /*do_not_close=*/true);
+}
+
+TEST_F(DynamicModuleClusterTest, GoConstructionFailures) {
+  auto module = loadGoClusterTestModule();
+  ASSERT_OK(module);
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  for (const std::string mode :
+       {"create_error", "create_nil", "create_panic", "new_nil", "new_panic"}) {
+    SCOPED_TRACE(mode);
+    auto result =
+        createCluster(makeYamlConfigWithClusterConfig("cluster_integration_test", "test", mode));
+    const std::string expected = mode.rfind("create_", 0) == 0
+                                     ? "Failed to create in-module cluster configuration"
+                                     : "Failed to create in-module cluster instance";
+    ASSERT_THAT(result, HasStatusMessage(HasSubstr(expected)));
+  }
+}
+
+TEST_F(DynamicModuleClusterTest, GoSchedulerAfterDestructionIsNoOp) {
+  auto module = loadGoClusterTestModule();
+  ASSERT_OK(module);
+  auto schedule =
+      module.value()->getFunctionPointer<void (*)()>("go_cluster_test_schedule_after_destroy");
+  ASSERT_OK(schedule);
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  {
+    auto result = createCluster(
+        makeYamlConfigWithClusterConfig("cluster_integration_test", "test", "init_sync"));
+    ASSERT_OK(result);
+    bool initialized = false;
+    result->first->initialize([&initialized]() {
+      initialized = true;
+      return absl::OkStatus();
+    });
+    EXPECT_TRUE(initialized);
+  }
+  (*schedule.value())();
 }
 
 // The cluster_config Any cannot be unpacked. This is parsed before the module is loaded, so it is
@@ -2455,6 +2503,34 @@ TEST_F(DynamicModuleClusterTest, ShutdownCallbackWithCompletion) {
   bool completion_called = false;
   captured_shutdown_cb([&completion_called]() { completion_called = true; });
   EXPECT_TRUE(completion_called);
+}
+
+TEST_F(DynamicModuleClusterTest, GoDrainAndRetainedShutdown) {
+  Server::DrainManager::DrainCloseCb drain;
+  EXPECT_CALL(server_context_.drain_manager_, addOnDrainCloseCb(Network::DrainDirection::All, _))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&drain), Return(nullptr)));
+  Server::ServerLifecycleNotifier::StageCallbackWithCompletion shutdown;
+  EXPECT_CALL(server_context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                               An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&shutdown), Return(nullptr)));
+  auto module = loadGoClusterTestModule();
+  ASSERT_OK(module);
+  auto finish = module.value()->getFunctionPointer<void (*)()>("go_cluster_test_finish_shutdown");
+  ASSERT_OK(finish);
+  auto result = createCluster(
+      makeYamlConfigWithClusterConfig("cluster_integration_test", "test", "retain_shutdown"));
+  ASSERT_OK(result);
+
+  ASSERT_TRUE(drain);
+  EXPECT_LOG_CONTAINS("info", "Go cluster drain started",
+                      EXPECT_OK(drain(std::chrono::milliseconds(0))));
+  ASSERT_TRUE(shutdown);
+  uint32_t completions = 0;
+  shutdown([&completions]() { ++completions; });
+  EXPECT_EQ(0, completions);
+  finish.value()();
+  EXPECT_EQ(1, completions);
 }
 
 // Test that shutdown completion is still called when the in-module cluster is null.

@@ -165,6 +165,12 @@ public:
     return cluster_manager;
   }
 
+  using ClusterData = ClusterManagerImpl::ClusterData;
+  using ClusterMap = ClusterManagerImpl::ClusterMap;
+
+  const ClusterMap& activeClusterData() const { return active_clusters_; }
+  const ClusterMap& warmingClusterData() const { return warming_clusters_; }
+
   std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
     std::map<std::string, std::reference_wrapper<Cluster>> clusters;
     for (auto& cluster : active_clusters_) {

@@ -615,7 +615,10 @@ envoy_cc_library(
     hdrs = ["header_cluster_specifier.h"],
     deps = [
         ":delegating_route_lib",
+        "//envoy/http:header_map_interface",
         "//envoy/router:cluster_specifier_plugin_interface",
+        "//envoy/router:router_interface",
+        "//envoy/stream_info:stream_info_interface",
     ],
 )
 

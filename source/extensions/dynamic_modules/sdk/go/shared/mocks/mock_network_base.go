@@ -1071,6 +1071,20 @@ func (mr *MockNetworkFilterConfigHandleMockRecorder) GetScheduler() *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetScheduler", reflect.TypeOf((*MockNetworkFilterConfigHandle)(nil).GetScheduler))
 }
 
+// GetServerConcurrency mocks base method.
+func (m *MockNetworkFilterConfigHandle) GetServerConcurrency() uint32 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetServerConcurrency")
+	ret0, _ := ret[0].(uint32)
+	return ret0
+}
+
+// GetServerConcurrency indicates an expected call of GetServerConcurrency.
+func (mr *MockNetworkFilterConfigHandleMockRecorder) GetServerConcurrency() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServerConcurrency", reflect.TypeOf((*MockNetworkFilterConfigHandle)(nil).GetServerConcurrency))
+}
+
 // IncrementCounterValue mocks base method.
 func (m *MockNetworkFilterConfigHandle) IncrementCounterValue(id shared.MetricID, value uint64) shared.MetricsResult {
 	m.ctrl.T.Helper()
