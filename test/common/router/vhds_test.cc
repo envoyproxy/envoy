@@ -13,6 +13,7 @@
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
 #include "source/common/router/route_provider_manager.h"
+#include "source/common/router/vhds.h"
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/server/admin/admin.h"
@@ -39,6 +40,15 @@ using ::testing::Not;
 class MockRouteConfigUpdateObserver : public Rds::RouteConfigUpdateObserver {
 public:
   MOCK_METHOD(void, onConfigWarmed, ());
+};
+
+class MockVhdsConfigUpdateReceiver : public VhdsConfigUpdateReceiver {
+public:
+  MOCK_METHOD(bool, onVhdsUpdate,
+              (const VirtualHostRefVector& added_vhosts, std::set<std::string>&& added_resource_ids,
+               const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+               const std::string& version_info),
+              (override));
 };
 
 class VhdsTest : public testing::Test {
@@ -765,6 +775,232 @@ vhds:
   EXPECT_EQ("vhost.rds.domain", virtual_hosts[0].domains(0));
   EXPECT_EQ("overlapping_vhost", virtual_hosts[1].name());
   EXPECT_EQ("vhost.vhds.domain", virtual_hosts[1].domains(0));
+}
+
+TEST_F(VhdsTest, SkipInitialWarmingMarksInitTargetReadyImmediately) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  skip_initial_warming: {}
+)EOF");
+
+  testing::NiceMock<MockVhdsConfigUpdateReceiver> receiver;
+  auto subscription_or = VhdsSubscription::createVhdsSubscription(
+      route_config, factory_context_, "vhds_test.", /*from_rds=*/false, receiver, init_manager_);
+  ASSERT_OK(subscription_or.status());
+  VhdsSubscriptionPtr vhds_subscription = std::move(subscription_or.value());
+
+  Envoy::Config::MockSubscription* mock_subscription =
+      factory_context_.cluster_manager_.subscription_factory_.subscription_;
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks =
+      factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  ASSERT_NE(nullptr, mock_subscription);
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  {
+    testing::InSequence s;
+    EXPECT_CALL(*mock_subscription, accept(absl::flat_hash_set<std::string>{"my_route/*"}));
+    EXPECT_CALL(*mock_subscription, start(absl::flat_hash_set<std::string>{}));
+    init_watcher_.expectReady();
+  }
+  init_manager_.initialize(init_watcher_);
+  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
+
+  // Later VHDS updates and failures must not re-fire the already-ready init watcher.
+  init_watcher_.expectReady().Times(0);
+
+  auto vhost = buildVirtualHost("vhost1", "vhost.first");
+  const auto added_resources = buildAddedResources({vhost});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  EXPECT_CALL(receiver, onVhdsUpdate(::testing::SizeIs(1), ::testing::_, ::testing::_, "1"))
+      .WillOnce(::testing::Return(true));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
+
+  vhds_callbacks->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
+                                       nullptr);
+}
+
+TEST_F(VhdsTest, SkipInitialWarmingPublishesStaticVirtualHostsBeforeVhdsUpdate) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+virtual_hosts:
+- name: vhost_static
+  domains: ["static.vhost"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: static_service }
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  skip_initial_warming: {}
+)EOF");
+
+  NiceMock<MockRouteConfigUpdateObserver> observer;
+  RouteConfigUpdatePtr config_update_info = makeReceiver();
+  config_update_info->setObserver(observer);
+
+  auto mock_subscription = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
+  Envoy::Config::MockSubscription* mock_subscription_ptr = mock_subscription.get();
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = nullptr;
+  EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
+      .WillOnce([&mock_subscription,
+                 &vhds_callbacks](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                                  Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
+                                  Envoy::Config::OpaqueResourceDecoderSharedPtr,
+                                  const Envoy::Config::SubscriptionOptions&) {
+        vhds_callbacks = &callbacks;
+        return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(mock_subscription));
+      });
+  EXPECT_CALL(*mock_subscription_ptr, accept(absl::flat_hash_set<std::string>{"my_route/*"}));
+  EXPECT_CALL(*mock_subscription_ptr, start(absl::flat_hash_set<std::string>{}));
+  EXPECT_CALL(observer, onConfigWarmed());
+
+  EXPECT_OK(config_update_info->onRdsUpdate(route_config, "1"));
+  ::testing::Mock::VerifyAndClearExpectations(&observer);
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // Static virtual hosts are published and routable immediately while VHDS has not responded yet.
+  EXPECT_FALSE(config_update_info->configWarming());
+  auto initial_config =
+      std::static_pointer_cast<const Config>(config_update_info->parsedConfiguration());
+  ASSERT_NE(nullptr, initial_config);
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http11, factory_context_.timeSource(),
+                                         nullptr, StreamInfo::FilterState::LifeSpan::FilterChain);
+  RouteConstSharedPtr static_route = initial_config->route(
+      Http::TestRequestHeaderMapImpl{
+          {":authority", "static.vhost"}, {":path", "/"}, {"x-forwarded-proto", "http"}},
+      stream_info, 0);
+  ASSERT_NE(nullptr, static_route);
+  ASSERT_NE(nullptr, static_route->routeEntry());
+  EXPECT_EQ("static_service", static_route->routeEntry()->clusterName());
+  EXPECT_EQ(nullptr, initial_config
+                         ->route(Http::TestRequestHeaderMapImpl{{":authority", "vhost.first"},
+                                                                {":path", "/"},
+                                                                {"x-forwarded-proto", "http"}},
+                                 stream_info, 0)
+                         .route);
+
+  // Subsequent VHDS update merges cleanly into the published route configuration.
+  auto vhost = buildVirtualHost("vhost1", "vhost.first");
+  const auto added_resources = buildAddedResources({vhost});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  EXPECT_CALL(observer, onConfigWarmed());
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "2"));
+  ::testing::Mock::VerifyAndClearExpectations(&observer);
+
+  auto merged_config =
+      std::static_pointer_cast<const Config>(config_update_info->parsedConfiguration());
+  ASSERT_NE(nullptr, merged_config);
+  EXPECT_EQ("static_service",
+            merged_config
+                ->route(Http::TestRequestHeaderMapImpl{{":authority", "static.vhost"},
+                                                       {":path", "/"},
+                                                       {"x-forwarded-proto", "http"}},
+                        stream_info, 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("my_service", merged_config
+                              ->route(Http::TestRequestHeaderMapImpl{{":authority", "vhost.first"},
+                                                                     {":path", "/"},
+                                                                     {"x-forwarded-proto", "http"}},
+                                      stream_info, 0)
+                              ->routeEntry()
+                              ->clusterName());
+
+  // onConfigUpdateFailed is also a safe no-op after skip_initial_warming already marked ready.
+  EXPECT_CALL(observer, onConfigWarmed()).Times(0);
+  vhds_callbacks->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
+                                       nullptr);
+}
+
+TEST_F(VhdsTest, VhdsSubscriptionSurvivesRdsUpdateTogglingSkipInitialWarming) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  config_update_info->updateOnDemand("vhost1");
+  const auto added_resources = buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, {}, "1"));
+  ASSERT_FALSE(config_update_info->configWarming());
+  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+  EXPECT_FALSE(routeConfiguration(*config_update_info).vhds().has_skip_initial_warming());
+
+  // Toggling skip_initial_warming on an already-initialized route configuration with unchanged
+  // config_source must keep the active VHDS subscription, answered resource IDs, and VHDS vhosts.
+  EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
+      .Times(0);
+
+  auto route_config_with_skip = route_config;
+  route_config_with_skip.mutable_vhds()->mutable_skip_initial_warming();
+  EXPECT_OK(config_update_info->onRdsUpdate(route_config_with_skip, "2"));
+  EXPECT_TRUE(routeConfiguration(*config_update_info).vhds().has_skip_initial_warming());
+  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+  ASSERT_EQ(1, routeConfiguration(*config_update_info).virtual_hosts_size());
+  EXPECT_EQ("vhost1", routeConfiguration(*config_update_info).virtual_hosts(0).name());
+
+  // Rolling skip_initial_warming back via another RDS update must also preserve the subscription.
+  EXPECT_OK(config_update_info->onRdsUpdate(route_config, "3"));
+  EXPECT_FALSE(routeConfiguration(*config_update_info).vhds().has_skip_initial_warming());
+  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+  ASSERT_EQ(1, routeConfiguration(*config_update_info).virtual_hosts_size());
+  EXPECT_EQ("vhost1", routeConfiguration(*config_update_info).virtual_hosts(0).name());
+}
+
+TEST_F(VhdsTest, SecondRdsUpdateWhileWarmingAppliesSkipInitialWarmingImmediately) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
+  NiceMock<MockRouteConfigUpdateObserver> observer;
+  RouteConfigUpdatePtr config_update_info = makeReceiver();
+  config_update_info->setObserver(observer);
+
+  // First RDS update without skip_initial_warming leaves the route configuration warming.
+  EXPECT_CALL(observer, onConfigWarmed()).Times(0);
+  EXPECT_OK(config_update_info->onRdsUpdate(route_config, "1"));
+  EXPECT_TRUE(config_update_info->configWarming());
+  ::testing::Mock::VerifyAndClearExpectations(&observer);
+
+  // A second RDS update arriving while still uninitialized creates a new VHDS subscription on the
+  // new update's init manager and marks initialization ready immediately when skip_initial_warming
+  // is set.
+  auto mock_subscription = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
+  Envoy::Config::MockSubscription* mock_subscription_ptr = mock_subscription.get();
+  EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
+      .WillOnce([&mock_subscription](const envoy::config::core::v3::ConfigSource&,
+                                     absl::string_view, Stats::Scope&,
+                                     Envoy::Config::SubscriptionCallbacks&,
+                                     Envoy::Config::OpaqueResourceDecoderSharedPtr,
+                                     const Envoy::Config::SubscriptionOptions&) {
+        return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(mock_subscription));
+      });
+  EXPECT_CALL(*mock_subscription_ptr, accept(absl::flat_hash_set<std::string>{"my_route/*"}));
+  EXPECT_CALL(*mock_subscription_ptr, start(absl::flat_hash_set<std::string>{}));
+  EXPECT_CALL(observer, onConfigWarmed());
+
+  auto route_config_with_skip = route_config;
+  route_config_with_skip.mutable_vhds()->mutable_skip_initial_warming();
+  EXPECT_OK(config_update_info->onRdsUpdate(route_config_with_skip, "2"));
+  EXPECT_FALSE(config_update_info->configWarming());
+  EXPECT_TRUE(routeConfiguration(*config_update_info).vhds().has_skip_initial_warming());
 }
 
 } // namespace

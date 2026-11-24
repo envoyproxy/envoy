@@ -1250,5 +1250,62 @@ TEST_P(OnDemandVhdsWithBodyIntegrationTest, VhdsOnDemandUpdateWithBody) {
   cleanupUpstreamAndDownstream();
 }
 
+class OnDemandVhdsSkipInitialWarmingIntegrationTest : public VhdsIntegrationTest {
+public:
+  const envoy::config::route::v3::RouteConfiguration rdsConfig() const override {
+    envoy::config::route::v3::RouteConfiguration config = VhdsIntegrationTest::rdsConfig();
+    config.mutable_vhds()->mutable_skip_initial_warming();
+    return config;
+  }
+
+  void initialize() override {
+    config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    )EOF");
+    initializeUpToInitialVhdsRequest();
+    waitForListenerToServe();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OnDemandVhdsSkipInitialWarmingIntegrationTest,
+                         VHDS_INTEGRATION_PARAMS, vhdsTestParamsToString);
+
+TEST_P(OnDemandVhdsSkipInitialWarmingIntegrationTest,
+       OnDemandDiscoveryWorksWhileInitialVhdsPending) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"x-lyft-user-id", "123"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  test_server_->waitForGauge("http.config_test.on_demand.route_discovery_pending", Eq(1));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost.first")}, {},
+                                           vhds_stream_.get()));
+
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "1", vhds_stream_.get(),
+      {"my_route/vhost.first"});
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  waitForNextUpstreamRequest(1);
+  EXPECT_TRUE(upstream_request_->complete());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(0, test_server_->gauge("http.config_test.on_demand.route_discovery_pending")->value());
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
 } // namespace
 } // namespace Envoy

@@ -86,6 +86,7 @@ VhdsSubscription::VhdsSubscription(const envoy::config::route::v3::RouteConfigur
                                    VhdsConfigUpdateReceiver& receiver, Init::Manager& init_manager,
                                    absl::Status& status)
     : receiver_(receiver), route_config_name_(route_config.name()),
+      skip_initial_warming_(route_config.vhds().has_skip_initial_warming()),
       scope_(createStatsScope(factory_context.scope(), stat_prefix, from_rds, route_config_name_)),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
       init_target_(fmt::format("VhdsConfigSubscription {}", route_config_name_),
@@ -97,6 +98,9 @@ VhdsSubscription::VhdsSubscription(const envoy::config::route::v3::RouteConfigur
                      // watch without being subscribed on the wire.
                      subscription_->accept({route_config_name_ + "/*"});
                      subscription_->start({});
+                     if (skip_initial_warming_) {
+                       init_target_.ready();
+                     }
                    }),
       resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
                             "name") {
