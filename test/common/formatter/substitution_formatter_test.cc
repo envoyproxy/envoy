@@ -4615,6 +4615,57 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
   }
 }
 
+// formatValueTo() serializes the metadata it finds without first building a Protobuf::Value, so
+// its JSON is checked byte for byte, including escaping, truncation and the explicit null that
+// leaves the sink unconsumed.
+TEST(SubstitutionFormatterTest, DynamicMetadataFormatValueTo) {
+  envoy::config::core::v3::Metadata metadata;
+  populateMetadataTestData(metadata);
+  auto& fields = *(*metadata.mutable_filter_metadata())["com.test"].mutable_fields();
+  fields["null_key"] = ValueUtil::nullValue();
+  fields["quoted_key"] = ValueUtil::stringValue(R"(a"b\c)");
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+  EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  const auto format_value_to = [&stream_info](absl::string_view filter_namespace,
+                                              const std::vector<absl::string_view>& path,
+                                              std::optional<size_t> max_length) {
+    DynamicMetadataFormatter formatter(filter_namespace, path, max_length);
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), {}, stream_info);
+    return std::make_pair(helper.consumed(), helper.output());
+  };
+
+  EXPECT_EQ(std::make_pair(true, std::string(R"("test_value")")),
+            format_value_to("com.test", {"test_key"}, std::nullopt));
+  EXPECT_EQ(std::make_pair(true, std::string(R"("test_")")),
+            format_value_to("com.test", {"test_key"}, 5));
+  EXPECT_EQ(std::make_pair(true, std::string(R"("a\"b\\c")")),
+            format_value_to("com.test", {"quoted_key"}, std::nullopt));
+  EXPECT_EQ(std::make_pair(true, std::string(R"({"inner_key":"inner_value"})")),
+            format_value_to("com.test", {"test_obj"}, 5));
+  EXPECT_EQ(std::make_pair(true, std::string(R"(["item0",4.2])")),
+            format_value_to("com.test", {"test_list"}, 5));
+  EXPECT_EQ(std::make_pair(true, std::string(R"({"null_key":null,"quoted_key":"a\"b\\c",)"
+                                             R"("test_key":"test_value",)"
+                                             R"("test_list":["item0",4.2],)"
+                                             R"("test_obj":{"inner_key":"inner_value"}})")),
+            format_value_to("com.test", {}, 5));
+
+  EXPECT_EQ(std::make_pair(false, std::string()),
+            format_value_to("com.test", {"null_key"}, std::nullopt));
+  EXPECT_EQ(std::make_pair(false, std::string()),
+            format_value_to("com.test", {"notfound"}, std::nullopt));
+  EXPECT_EQ(std::make_pair(false, std::string()),
+            format_value_to("com.notfound", {}, std::nullopt));
+
+  // An explicit null is reported as a missing value by the string paths too.
+  DynamicMetadataFormatter null_formatter("com.test", {"null_key"}, std::nullopt);
+  EXPECT_EQ(std::nullopt, formatForTest(null_formatter, stream_info));
+  EXPECT_THAT(formatValueForTest(null_formatter, stream_info), ProtoEq(ValueUtil::nullValue()));
+}
+
 // A metadata source that isn't available at all (no cluster info, no upstream host) is reported
 // as a missing value by both the string and the value paths.
 TEST(SubstitutionFormatterTest, MetadataFormatterWithoutMetadataSource) {

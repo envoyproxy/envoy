@@ -93,22 +93,31 @@ MetadataFormatter::MetadataFormatter(absl::string_view filter_namespace,
       only_truncate_string_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.metadata_formatter_only_truncate_string")) {}
 
-std::optional<std::string>
-MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metadata) const {
-  Protobuf::Value value = formatMetadataValue(metadata);
-  if (value.kind_case() == Protobuf::Value::kNullValue) {
-    return std::nullopt;
-  }
-
-  std::string str;
-  str.reserve(256);
-  if (value.kind_case() == Protobuf::Value::kStringValue) {
-    str = value.string_value();
+bool MetadataFormatter::formatMetadataTo(const envoy::config::core::v3::Metadata& metadata,
+                                         std::string& sink) const {
+  const size_t start = sink.size();
+  if (path_.empty()) {
+    const auto filter_it = metadata.filter_metadata().find(filter_namespace_);
+    if (filter_it == metadata.filter_metadata().end()) {
+      return false;
+    }
+    Json::Utility::appendStructToString(filter_it->second, sink);
   } else {
-    Json::Utility::appendValueToString(value, str);
+    Protobuf::Value truncated;
+    const Protobuf::Value* value = leafValue(metadata, truncated);
+    if (value == nullptr || value->kind_case() == Protobuf::Value::kNullValue) {
+      return false;
+    }
+    if (value->kind_case() == Protobuf::Value::kStringValue) {
+      sink.append(value->string_value());
+    } else {
+      Json::Utility::appendValueToString(*value, sink);
+    }
   }
-  SubstitutionFormatUtils::truncate(str, max_length_);
-  return str;
+  if (max_length_.has_value() && sink.size() - start > max_length_.value()) {
+    sink.resize(start + max_length_.value());
+  }
+  return true;
 }
 
 Protobuf::Value
@@ -123,9 +132,21 @@ MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& 
     return output;
   }
 
+  Protobuf::Value truncated;
+  const Protobuf::Value* value = leafValue(metadata, truncated);
+  if (value == nullptr) {
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
+  return *value;
+}
+
+const Protobuf::Value*
+MetadataFormatter::leafValue(const envoy::config::core::v3::Metadata& metadata,
+                             Protobuf::Value& truncated) const {
+  ASSERT(!path_.empty());
   const Protobuf::Value& val = Config::Metadata::metadataValue(&metadata, filter_namespace_, path_);
   if (val.kind_case() == Protobuf::Value::KindCase::KIND_NOT_SET) {
-    return SubstitutionFormatUtils::unspecifiedValue();
+    return nullptr;
   }
 
   if (max_length_.has_value()) {
@@ -145,20 +166,23 @@ MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& 
         Json::Utility::appendValueToString(val, str);
       }
       if (SubstitutionFormatUtils::truncate(str, max_length_)) {
-        Protobuf::Value output;
-        output.set_string_value(str);
-        return output;
+        truncated.set_string_value(std::move(str));
+        return &truncated;
       }
     }
   }
 
-  return val;
+  return &val;
 }
 
 std::optional<std::string>
 MetadataFormatter::format(const Context&, const StreamInfo::StreamInfo& stream_info) const {
-  auto metadata = get_func_(stream_info);
-  return (metadata != nullptr) ? formatMetadata(*metadata) : std::nullopt;
+  const auto* metadata = get_func_(stream_info);
+  std::string str;
+  if (metadata == nullptr || !formatMetadataTo(*metadata, str)) {
+    return std::nullopt;
+  }
+  return str;
 }
 
 Protobuf::Value MetadataFormatter::formatValue(const Context&,
@@ -170,28 +194,31 @@ Protobuf::Value MetadataFormatter::formatValue(const Context&,
   return formatMetadataValue(*metadata);
 }
 
-bool MetadataFormatter::formatTo(std::string& sink, const Context& context,
+bool MetadataFormatter::formatTo(std::string& sink, const Context&,
                                  const StreamInfo::StreamInfo& stream_info) const {
-  // TODO(wbpcode): To optimize the implementation in the future to avoid
-  // unnecessary string copy or memory allocation.
-  const auto value = format(context, stream_info);
-  if (!value.has_value()) {
-    return false;
-  }
-  sink.append(*value);
-  return true;
+  const auto* metadata = get_func_(stream_info);
+  return metadata != nullptr && formatMetadataTo(*metadata, sink);
 }
 
-void MetadataFormatter::formatValueTo(ValueSink& sink, const Context& context,
+void MetadataFormatter::formatValueTo(ValueSink& sink, const Context&,
                                       const StreamInfo::StreamInfo& stream_info) const {
-  // TODO(wbpcode): To optimize the implementation in the future to avoid
-  // unnecessary string copy or memory allocation.
-  const auto value = formatValue(context, stream_info);
-  if (value.kind_case() == Protobuf::Value::kNullValue ||
-      value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+  const auto* metadata = get_func_(stream_info);
+  if (metadata == nullptr) {
     return;
   }
-  sink.addValue(value);
+  if (path_.empty()) {
+    const auto filter_it = metadata->filter_metadata().find(filter_namespace_);
+    if (filter_it != metadata->filter_metadata().end()) {
+      sink.addValue(filter_it->second);
+    }
+    return;
+  }
+  Protobuf::Value truncated;
+  const Protobuf::Value* value = leafValue(*metadata, truncated);
+  if (value == nullptr || value->kind_case() == Protobuf::Value::kNullValue) {
+    return;
+  }
+  sink.addValue(*value);
 }
 
 // TODO(glicht): Consider adding support for route/listener/cluster metadata as suggested by
