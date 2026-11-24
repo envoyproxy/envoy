@@ -90,8 +90,12 @@ getters read it:
   read by ``envoy_dynamic_module_callback_get_runtime_number``.
 * ``envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update`` for a boolean, as read by
   ``envoy_dynamic_module_callback_get_runtime_bool``.
+* ``envoy_dynamic_module_on_bootstrap_extension_runtime_string_update`` for a non-empty string that
+  reads as neither a number nor a boolean, as read by
+  ``envoy_dynamic_module_callback_get_runtime_string``, which reads a value of any type as its text.
+  The text of a structured value that is not a fractional percent is unspecified.
 
-A value of any other type, such as a string, counts as unset. When a key becomes unset, Envoy calls
+A value of any other type, such as an empty string or null, counts as unset. When a key becomes unset, Envoy calls
 the hook of its previous type with the previous value and ``removed`` set. Envoy compares each
 newly loaded runtime snapshot with the previous values of the watched keys, so an RTDS update, a
 disk layer update or a request to the admin ``/runtime_modify`` endpoint reports only the watched
@@ -105,7 +109,7 @@ The extension can only watch keys during
 ``envoy_dynamic_module_on_bootstrap_extension_server_initialized``. RTDS may or may not have
 delivered its layers by then, so the extension should read the current value with the runtime
 getters when it starts watching a key, and then rely on the hooks for the later changes. No update
-is reported once the server began to shut down. In the Rust SDK, the three hooks call
+is reported once the server began to shut down. In the Rust SDK, the four hooks call
 ``on_runtime_update`` of ``BootstrapExtension`` with a ``RuntimeValue``, or with ``None`` when the
 key became unset.
 
