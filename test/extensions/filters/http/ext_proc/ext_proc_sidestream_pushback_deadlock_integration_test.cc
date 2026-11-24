@@ -228,28 +228,28 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ExtProcSidestreamPushbackDeadlock
 
 TEST_P(ExtProcSidestreamPushbackDeadlockTest, RequestBodyScanningWithSlowReaderFc3Off) {
   if (!IsEnvoyGrpc()) {
-    GTEST_SKIP() << "FC3 applies only to Envoy gRPC side streams.";
+    GTEST_SKIP() << "Ext_Proc flow control only applies to Envoy gRPC";
   }
   runRequestBodyScanningWithSlowReader(/*flow_control_3_enabled=*/false);
 }
 
 TEST_P(ExtProcSidestreamPushbackDeadlockTest, RequestBodyScanningWithSlowReaderFc3On) {
   if (!IsEnvoyGrpc()) {
-    GTEST_SKIP() << "FC3 applies only to Envoy gRPC side streams.";
+    GTEST_SKIP() << "Ext_Proc flow control only applies to Envoy gRPC";
   }
   runRequestBodyScanningWithSlowReader(/*flow_control_3_enabled=*/true);
 }
 
 TEST_P(ExtProcSidestreamPushbackDeadlockTest, FullDuplexWithPassThroughServerFc3Off) {
   if (!IsEnvoyGrpc()) {
-    GTEST_SKIP() << "FC3 applies only to Envoy gRPC side streams.";
+    GTEST_SKIP() << "Ext_Proc flow control only applies to Envoy gRPC";
   }
   runFullDuplexWithPassThroughServer(/*flow_control_3_enabled=*/false);
 }
 
 TEST_P(ExtProcSidestreamPushbackDeadlockTest, FullDuplexWithPassThroughServerFc3On) {
   if (!IsEnvoyGrpc()) {
-    GTEST_SKIP() << "FC3 applies only to Envoy gRPC side streams.";
+    GTEST_SKIP() << "Ext_Proc flow control only applies to Envoy gRPC";
   }
   runFullDuplexWithPassThroughServer(/*flow_control_3_enabled=*/true);
 }

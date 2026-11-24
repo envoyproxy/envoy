@@ -1219,7 +1219,7 @@ TEST_P(ExtProcIntegrationTest, ModeOverrideEmptyBodyBeforeHeadersResponse) {
 // Downstream push back sidestream and upstream with FULL_DUPLEX_STREAMED in both directions.
 TEST_P(ExtProcIntegrationTest, DownstreamPushbackSidestreamAndUpstreamFullDuplex) {
   if (!IsEnvoyGrpc()) {
-    return;
+    GTEST_SKIP() << "Ext_Proc flow control only applies to Envoy gRPC";
   }
   initializeDownstreamPushbackConfig(ProcessingMode::FULL_DUPLEX_STREAMED, /*send_headers=*/true,
                                      /*send_trailers=*/true);
@@ -1283,7 +1283,7 @@ TEST_P(ExtProcIntegrationTest, DownstreamPushbackSidestreamAndUpstreamFullDuplex
 // side-stream once request processing finishes.
 TEST_P(ExtProcIntegrationTest, DownstreamPushbackDeferredUntilRequestCompleteFullDuplex) {
   if (!IsEnvoyGrpc()) {
-    return;
+    GTEST_SKIP() << "Ext_Proc flow control only applies to Envoy gRPC";
   }
   initializeDownstreamPushbackConfig(ProcessingMode::FULL_DUPLEX_STREAMED, /*send_headers=*/true,
                                      /*send_trailers=*/true);

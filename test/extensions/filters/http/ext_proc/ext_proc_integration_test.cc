@@ -6329,7 +6329,7 @@ TEST_P(ExtProcIntegrationTest, StreamedBodyCompleteBeforeHeadersUnsetChunkSizePa
 // In STREAMED mode, downstream high watermark pushes back upstream without pausing the side-stream.
 TEST_P(ExtProcIntegrationTest, DownstreamPushbackUpstreamOnlyInStreamedMode) {
   if (!IsEnvoyGrpc()) {
-    return;
+    GTEST_SKIP() << "Ext_Proc flow control only applies to Envoy gRPC";
   }
   initializeDownstreamPushbackConfig(ProcessingMode::STREAMED);
 
@@ -6367,7 +6367,7 @@ TEST_P(ExtProcIntegrationTest, DownstreamPushbackUpstreamOnlyInStreamedMode) {
 
 TEST_P(ExtProcIntegrationTest, DownstreamPushbackUpstreamOnlyWhenNoBody) {
   if (!IsEnvoyGrpc()) {
-    return;
+    GTEST_SKIP() << "Ext_Proc flow control only applies to Envoy gRPC";
   }
   initializeDownstreamPushbackConfig(ProcessingMode::NONE);
 
@@ -6395,7 +6395,7 @@ TEST_P(ExtProcIntegrationTest, DownstreamPushbackUpstreamOnlyWhenNoBody) {
 
 TEST_P(ExtProcIntegrationTest, DownstreamPushbackUpstreamOnlyWithHeadersTrailers) {
   if (!IsEnvoyGrpc()) {
-    return;
+    GTEST_SKIP() << "Ext_Proc flow control only applies to Envoy gRPC";
   }
   initializeDownstreamPushbackConfig(ProcessingMode::NONE, /*send_headers=*/true,
                                      /*send_trailers=*/true);
@@ -6433,7 +6433,7 @@ TEST_P(ExtProcIntegrationTest, DownstreamPushbackUpstreamOnlyWithHeadersTrailers
 
 TEST_P(ExtProcIntegrationTest, DownstreamPushbackUpstreamWithBodyAndHeaders) {
   if (!IsEnvoyGrpc()) {
-    return;
+    GTEST_SKIP() << "Ext_Proc flow control only applies to Envoy gRPC";
   }
   initializeDownstreamPushbackConfig(ProcessingMode::STREAMED, /*send_headers=*/true,
                                      /*send_trailers=*/false);
