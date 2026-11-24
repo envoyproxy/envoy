@@ -60,21 +60,19 @@ fn bazel_clang_args() -> Vec<String> {
   // pulling in incompatible headers (e.g. amd64 stubs-32.h when targeting arm64).
   let target = env::var("TARGET").unwrap_or_default();
   for (env_var, triple, target_prefix) in [
-    ("ENVOY_SYSROOT_AMD64_ANCHOR", "x86_64-linux-gnu", "x86_64"),
-    ("ENVOY_SYSROOT_ARM64_ANCHOR", "aarch64-linux-gnu", "aarch64"),
+    ("ENVOY_SYSROOT_AMD64", "x86_64-linux-gnu", "x86_64"),
+    ("ENVOY_SYSROOT_ARM64", "aarch64-linux-gnu", "aarch64"),
   ] {
     if !target.is_empty() && !target.starts_with(target_prefix) {
       continue;
     }
-    if let Ok(sysroot_anchor) = env::var(env_var) {
-      if let Some(anchor) = resolve_bazel_location(&sysroot_anchor) {
-        // The anchor is `<sysroot>/usr/include/stdio.h`, so its parent is `usr/include`.
-        if let Some(include_dir) = anchor.parent() {
-          args.push("-isystem".to_string());
-          args.push(format!("{}", include_dir.display()));
-          args.push("-isystem".to_string());
-          args.push(format!("{}/{}", include_dir.display(), triple));
-        }
+    if let Ok(sysroot) = env::var(env_var) {
+      if let Some(root) = resolve_bazel_location(&sysroot) {
+        let include_dir = root.join("usr/include");
+        args.push("-isystem".to_string());
+        args.push(format!("{}", include_dir.display()));
+        args.push("-isystem".to_string());
+        args.push(format!("{}/{}", include_dir.display(), triple));
       }
     }
   }
