@@ -111,8 +111,7 @@ TEST_P(OrcaReporterIntegrationTest, AddsReportToGrpcHeadersAndTrailers) {
 
   EXPECT_THAT(reportHeader(response->headers()), testing::StartsWith("TEXT mem_utilization=0.4"));
   ASSERT_NE(nullptr, response->trailers());
-  EXPECT_THAT(reportHeader(*response->trailers()),
-              testing::StartsWith("TEXT mem_utilization=0.4"));
+  EXPECT_THAT(reportHeader(*response->trailers()), testing::StartsWith("TEXT mem_utilization=0.4"));
 }
 
 TEST_P(OrcaReporterIntegrationTest, KeepsUpstreamGrpcTrailerReport) {

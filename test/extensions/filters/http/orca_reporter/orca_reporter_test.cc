@@ -718,8 +718,8 @@ TEST_F(OrcaReporterTest, BinaryReportUpdatesClientSideWeight) {
   EXPECT_DOUBLE_EQ(10, report.rps_fractional());
   // 10 rps at 0.5 utilization.
   const absl::StatusOr<uint32_t> weight =
-      LoadBalancingPolicies::Common::OrcaLoadReportHandler::calculateWeightFromOrcaReport(
-          report, {}, 1.0);
+      LoadBalancingPolicies::Common::OrcaLoadReportHandler::calculateWeightFromOrcaReport(report,
+                                                                                          {}, 1.0);
   ASSERT_TRUE(weight.ok()) << weight.status();
   EXPECT_EQ(20, weight.value());
 }
