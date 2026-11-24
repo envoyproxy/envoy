@@ -1,4 +1,6 @@
 #include <array>
+#include <atomic>
+#include <memory>
 #include <optional>
 #include <thread>
 
@@ -9,9 +11,11 @@
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.h"
 #include "envoy/http/codec.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/cleanup.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
@@ -1502,14 +1506,42 @@ TEST_P(ReverseTunnelDrainIntegrationTest, HotRestartParentDrainPreservesIdleTunn
 
   // Exercise the parent drain entry point used by hot restart, including stop-before-drain
   // ordering. The successor need not be ready for these existing idle tunnels to stay usable.
-  test_server_->server().dispatcher().post([this]() { test_server_->server().drainListeners(); });
+  // Wait (bounded) for the worker to process onListenerDrain() as well, since listener_stopped is
+  // signaled by the preceding stopListener() post and advancing simulated time mid-onDrain() can
+  // push HCM's proactive drain timer past the 7s wait below.
+  const auto drain_notified = std::make_shared<std::atomic<bool>>(false);
+  ThreadLocal::TypedSlotPtr<> drain_barrier_slot;
+  Cleanup cleanup_server([this, &drain_barrier_slot]() {
+    if (test_server_ != nullptr) {
+      absl::Notification slot_cleared;
+      test_server_->server().dispatcher().post([&drain_barrier_slot, &slot_cleared]() {
+        drain_barrier_slot.reset();
+        slot_cleared.Notify();
+      });
+      slot_cleared.WaitForNotification();
+      test_server_.reset();
+    }
+  });
+  test_server_->server().dispatcher().post([this, &drain_barrier_slot, drain_notified]() {
+    test_server_->server().drainListeners();
+    drain_barrier_slot = ThreadLocal::TypedSlot<>::makeUnique(test_server_->server().threadLocal());
+    drain_barrier_slot->set(
+        [](Event::Dispatcher&) -> std::shared_ptr<ThreadLocal::ThreadLocalObject> {
+          return nullptr;
+        });
+    drain_barrier_slot->runOnAllThreads([](OptRef<ThreadLocal::ThreadLocalObject>) {},
+                                        [&drain_barrier_slot, drain_notified]() {
+                                          drain_barrier_slot.reset();
+                                          drain_notified->store(true);
+                                        });
+  });
   ASSERT_TRUE(IntegrationUtil::runDispatcherUntil(
       *dispatcher_,
-      [this]() {
+      [this, drain_notified]() {
         const auto stopped = test_server_->counter("listener_manager.listener_stopped");
-        return stopped != nullptr && stopped->value() == 1;
+        return stopped != nullptr && stopped->value() == 1 && drain_notified->load();
       },
-      "listener stop"));
+      "listener stop and drain notification"));
   // If draining closes every idle tunnel, the stopped worker can exit. Keep these checks bounded
   // instead of waiting for that worker to acknowledge a simulated-time update.
   timeSystem().advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
