@@ -67,6 +67,16 @@ TEST_F(DecodedResourceCacheTest, UnchangedBytesAreNotDecodedAgain) {
                    .seconds());
 }
 
+TEST_F(DecodedResourceCacheTest, NonDeterministicDecoderIsNeverReused) {
+  ON_CALL(decoder_, isDeterministic()).WillByDefault(Return(false));
+  decode(clusterAny("a", 1), "v1");
+  cache_.endUpdate();
+  decode(clusterAny("a", 1), "v2");
+  cache_.endUpdate();
+  EXPECT_EQ(2, decodes_);
+  EXPECT_EQ(0, cache_.hits());
+}
+
 TEST_F(DecodedResourceCacheTest, ChangedBytesAreDecoded) {
   decode(clusterAny("a", 1), "v1");
   cache_.endUpdate();

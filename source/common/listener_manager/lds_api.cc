@@ -44,6 +44,9 @@ public:
     return message;
   }
 
+  // The generated name differs on every decode, so a decode must not be reused.
+  bool isDeterministic() const override { return false; }
+
 private:
   Random::RandomGenerator& random_;
 };

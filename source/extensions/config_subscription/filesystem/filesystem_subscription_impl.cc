@@ -100,7 +100,8 @@ std::string FilesystemSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePt
   std::unique_ptr<DecodedResourcesWrapper> decoded_resources;
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.xds_skip_unchanged_resource_decode")) {
-    decoded_resources = std::make_unique<DecodedResourcesWrapper>(resource_decoder_->arenaOptions());
+    decoded_resources =
+        std::make_unique<DecodedResourcesWrapper>(resource_decoder_->arenaOptions());
     for (const auto& resource : message.resources()) {
       absl::StatusOr<DecodedResourcePtr> decoded = decode_cache_.decode(
           *resource_decoder_, resource, message.version_info(), *decoded_resources->arena_);
@@ -112,10 +113,10 @@ std::string FilesystemSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePt
     }
     decode_cache_.endUpdate();
   } else {
-    decoded_resources = THROW_OR_RETURN_VALUE(
-        DecodedResourcesWrapper::create(*resource_decoder_, message.resources(),
-                                        message.version_info()),
-        std::unique_ptr<DecodedResourcesWrapper>);
+    decoded_resources =
+        THROW_OR_RETURN_VALUE(DecodedResourcesWrapper::create(
+                                  *resource_decoder_, message.resources(), message.version_info()),
+                              std::unique_ptr<DecodedResourcesWrapper>);
   }
   THROW_IF_NOT_OK(callbacks_.onConfigUpdate(decoded_resources->refvec_, message.version_info()));
   config_hash_ = new_hash;

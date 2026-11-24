@@ -440,8 +440,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
             DecodedResourcePtr);
       } else {
         decoded_resource = THROW_OR_RETURN_VALUE(
-            DecodedResourceImpl::fromResource(resource_decoder, resource,
-                                              message->version_info(), batch_arena),
+            DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info(),
+                                              batch_arena),
             DecodedResourceImplPtr);
       }
 

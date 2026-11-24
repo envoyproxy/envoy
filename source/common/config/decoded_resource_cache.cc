@@ -18,6 +18,12 @@ std::string DecodedResourceCache::keyOf(const Protobuf::Any& resource) {
 absl::StatusOr<DecodedResourcePtr>
 DecodedResourceCache::decode(OpaqueResourceDecoder& resource_decoder, const Protobuf::Any& resource,
                              const std::string& version, Protobuf::Arena& arena) {
+  if (!resource_decoder.isDeterministic()) {
+    absl::StatusOr<DecodedResourceImplPtr> decoded =
+        DecodedResourceImpl::fromResource(resource_decoder, resource, version, arena);
+    RETURN_IF_NOT_OK_REF(decoded.status());
+    return DecodedResourcePtr(std::move(decoded.value()));
+  }
   std::string key = keyOf(resource);
   if (auto it = current_.find(key); it != current_.end()) {
     // The same bytes twice in one update: reuse, the subscriber reports duplicates.

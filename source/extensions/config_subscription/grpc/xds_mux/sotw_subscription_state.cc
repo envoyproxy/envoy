@@ -76,10 +76,10 @@ void SotwSubscriptionState::handleGoodResponse(
             decode_cache_.decode(*resource_decoder_, any, message.version_info(), batch_arena),
             DecodedResourcePtr);
       } else {
-        decoded_resource = THROW_OR_RETURN_VALUE(
-            DecodedResourceImpl::fromResource(*resource_decoder_, any, message.version_info(),
-                                              batch_arena),
-            DecodedResourceImplPtr);
+        decoded_resource =
+            THROW_OR_RETURN_VALUE(DecodedResourceImpl::fromResource(
+                                      *resource_decoder_, any, message.version_info(), batch_arena),
+                                  DecodedResourceImplPtr);
       }
       setResourceTtl(*decoded_resource);
       if (isHeartbeatResource(*decoded_resource, message.version_info())) {
