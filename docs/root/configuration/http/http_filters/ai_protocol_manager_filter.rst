@@ -182,8 +182,16 @@ the filter runs the configured :ref:`AI filters
 in order over the parsed document; they require ``request_handling``. An AI
 filter (category ``envoy.http.ai_filters``)
 may read or modify the document, or reject the request with a local reply.
-Routes without a per-route request declaration, and requests without a body,
-run no AI filters.
+Routes without a per-route request declaration run no AI filters.
+
+A declared endpoint's request that has no body, or whose body is not JSON, has
+no document to run the AI filters over. Each AI filter may answer such a request
+with a local reply of its own; when none does, the request without a body is
+forwarded and the one that is not JSON is rejected with a 400.
+
+A route configures an AI filter with :ref:`typed_per_filter_config
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.typed_per_filter_config>`,
+keyed by the filter's name in ``filters``.
 
 Once the AI filters finish, the parsed document is re-serialized as the
 request body by default. With :ref:`reserialize_body

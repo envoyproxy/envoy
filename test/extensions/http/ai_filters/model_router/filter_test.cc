@@ -107,10 +107,11 @@ routes:
     ModelRouterFilter filter(config != nullptr ? std::move(config) : defaultConfig(), context);
     AiRequest request{JsonWithExtBuf{}};
     const absl::Status status =
-        filter.decodeSync(request, [this](Http::Code code, std::string details) {
-          reply_code_ = code;
-          reply_details_ = std::move(details);
-        });
+        filter.decodeSync(request, HttpFilters::AiProtocolManager::LocalReplier(
+                                       [this](HttpFilters::AiProtocolManager::LocalReply reply) {
+                                         reply_code_ = reply.code;
+                                         reply_details_ = std::move(reply.body);
+                                       }));
     EXPECT_TRUE(status.ok()) << status;
   }
 

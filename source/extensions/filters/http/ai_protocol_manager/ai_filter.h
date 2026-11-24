@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -11,12 +13,14 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
+#include "envoy/router/router.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/coroutine/task.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_request.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_response.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
@@ -83,8 +87,41 @@ private:
   Impl impl_;
 };
 
-// Callable callback to send an immediate HTTP local reply and abort processing.
-using LocalReplier = absl::AnyInvocable<void(Http::Code code, std::string details) &&>;
+// A response the manager sends in place of the upstream's.
+struct LocalReply {
+  Http::Code code;
+  std::string body;
+  // Response code details; the manager's own when empty.
+  std::string details{};
+  std::function<void(Http::ResponseHeaderMap&)> modify_headers{};
+};
+
+// Sends a local reply and aborts processing. Callable on r-value only.
+class LocalReplier {
+public:
+  using Impl = absl::AnyInvocable<void(LocalReply) &&>;
+
+  explicit LocalReplier(Impl impl) : impl_(std::move(impl)) {}
+
+  void operator()(LocalReply reply) && { std::move(impl_)(std::move(reply)); }
+
+  // Replies with `body` as plain text.
+  void operator()(Http::Code code, std::string body) && {
+    std::move(impl_)(LocalReply{.code = code, .body = std::move(body)});
+  }
+
+private:
+  Impl impl_;
+};
+
+// The manager's own sink for a local reply.
+using LocalReplyFn = absl::AnyInvocable<void(LocalReply)>;
+
+// Why a declared endpoint's request has no document for decode().
+enum class UnparsedRequest {
+  NoBody,
+  InvalidJson,
+};
 
 // Abstract interface implemented by AI filter instances.
 //
@@ -116,6 +153,11 @@ public:
   virtual Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
                                                AiRequestPropagator propagate_request,
                                                LocalReplier reply_locally) = 0;
+
+  // Invoked in place of decode() for a request the manager has no document for. Returns the
+  // reply to answer it with. Nullopt leaves the request to the next filter and then to the
+  // manager, which forwards one without a body and answers 400 to one that is not JSON.
+  virtual std::optional<LocalReply> onUnparsedRequest(UnparsedRequest) { return std::nullopt; }
 
   // Invoked for Server-Sent Events (SSE) streaming responses. The coroutine runs for the entire
   // lifetime of the response stream, receiving and propagating discrete frames.
@@ -158,6 +200,13 @@ struct AiFilterContext {
   // envoy.ai.binding.request and envoy.ai.binding.response filter state objects replace them.
   LlmBindingConstSharedPtr request_binding{};
   LlmBindingConstSharedPtr response_binding{};
+  // The filter's name in AiProtocolManager.filters.
+  absl::string_view filter_name{};
+  // The route's configuration for the filter, from
+  // AiProtocolManagerPerRoute.typed_per_filter_config; null when the route has none.
+  Router::RouteSpecificFilterConfigConstSharedPtr route_config{};
+  // Drops the cached route, so the request is routed again by the headers the chain leaves.
+  std::function<void()> clear_route_cache{[] {}};
 };
 
 // Creates one AiFilter per stream, or nullptr to skip the stream; built once at config load.
@@ -174,6 +223,31 @@ public:
   createAiFilterFactory(const Protobuf::Message& config,
                         Server::Configuration::ServerFactoryContext& context,
                         Stats::Scope& scope) PURE;
+
+  // The filter's per-route configuration message; null when it takes none.
+  virtual ProtobufTypes::MessagePtr createEmptyRouteConfigProto() { return nullptr; }
+
+  // Builds the per-route configuration from a message of createEmptyRouteConfigProto().
+  virtual absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteConfig(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
+                    ProtobufMessage::ValidationVisitor&) {
+    return nullptr;
+  }
+
+  // The largest request string value the filter needs inline rather than offloaded. The manager
+  // raises its inline string threshold to it; nullopt when the filter reads no such value.
+  virtual std::optional<uint32_t> requestInlineStringBytes(const Protobuf::Message&) {
+    return std::nullopt;
+  }
+
+  std::set<std::string> configTypes() override {
+    std::set<std::string> config_types = TypedFactory::configTypes();
+    if (const ProtobufTypes::MessagePtr message = createEmptyRouteConfigProto();
+        message != nullptr) {
+      config_types.emplace(createReflectableMessage(*message)->GetDescriptor()->full_name());
+    }
+    return config_types;
+  }
 
   std::string category() const override { return "envoy.http.ai_filters"; }
 };

@@ -95,11 +95,11 @@ private:
         return AsyncState::propagateRequestTask(weak_state, i, std::move(req));
       });
 
-      LocalReplier replier = [weak_state](Http::Code code, std::string details) {
+      LocalReplier replier([weak_state](LocalReply reply) {
         if (auto state = weak_state.lock()) {
-          state->triggerLocalReply(code, std::move(details));
+          state->triggerLocalReply(std::move(reply));
         }
-      };
+      });
 
       auto task =
           filters_[i]->decode(std::move(receiver), std::move(propagator), std::move(replier));
@@ -249,14 +249,14 @@ private:
     ENVOY_LOG(debug, "ai_protocol_manager: filter chain error: {}", status.message());
 
     if (reply_fn != nullptr) {
-      reply_fn(Http::Code::BadGateway, std::string(status.message()));
+      reply_fn(LocalReply{.code = Http::Code::BadGateway, .body = std::string(status.message())});
     }
     if (on_complete != nullptr) {
       on_complete(std::move(status));
     }
   }
 
-  void triggerLocalReply(Http::Code code, std::string details) {
+  void triggerLocalReply(LocalReply reply) {
     if (terminated()) {
       return;
     }
@@ -265,10 +265,10 @@ private:
     OnCompleteFn on_complete = std::move(on_complete_);
     cancel();
     ENVOY_LOG(debug, "ai_protocol_manager: filter chain triggered local reply: {} {}",
-              static_cast<uint32_t>(code), details);
+              static_cast<uint32_t>(reply.code), reply.body);
 
     if (reply_fn != nullptr) {
-      reply_fn(code, std::move(details));
+      reply_fn(std::move(reply));
     }
     if (on_complete != nullptr) {
       on_complete(absl::CancelledError("local reply sent"));
