@@ -7636,7 +7636,7 @@ TEST_F(OAuth2Test, RedirectWithUsePushesAuthorizationRequestInsteadOfRedirecting
   // The browser is not redirected; the redirect happens after the PAR response.
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
 
   std::map<std::string, std::string> sent(sent_params.begin(), sent_params.end());
@@ -7695,7 +7695,7 @@ public:
     OAuth2Client::FormParams pushed;
     EXPECT_CALL(*oauth_client_, asyncPushAuthorizationRequest(_, _, _, _))
         .WillOnce(testing::SaveArg<0>(&pushed));
-    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+    EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter_->decodeHeaders(request_headers_, false));
     return pushed;
   }
@@ -7905,7 +7905,7 @@ TEST_F(OAuth2ParRedirectTest, InlineParSuccessSendsOneRedirect) {
         EXPECT_THAT(std::string(headers.getLocationValue()), HasSubstr("request_uri="));
       });
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
 }

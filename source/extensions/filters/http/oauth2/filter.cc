@@ -1238,7 +1238,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
                               "redirecting to OAuth server: {}", path_str);
       redirectToOAuthServer(headers);
-      return Http::FilterHeadersStatus::StopIteration;
+      // With PAR the redirect is sent later, so also hold the request body and trailers.
+      return config_->usePar() ? Http::FilterHeadersStatus::StopAllIterationAndWatermark
+                               : Http::FilterHeadersStatus::StopIteration;
     }
   }
 
@@ -1936,7 +1938,8 @@ Http::FilterHeadersStatus OAuth2Filter::onRefreshAccessTokenFailure() {
   } else {
     redirectToOAuthServer(*request_headers_);
   }
-  return Http::FilterHeadersStatus::StopIteration;
+  return config_->usePar() ? Http::FilterHeadersStatus::StopAllIterationAndWatermark
+                           : Http::FilterHeadersStatus::StopIteration;
 }
 
 void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
