@@ -30,22 +30,20 @@ void setTypedMetadata(const Config& config, envoy::config::core::v3::Metadata& d
 }
 
 // Serializes a filter state object into an Any for typed metadata. Returns false if the object
-// supports neither proto nor string serialization.
+// supports neither proto nor string serialization, or if packing it into the Any fails.
 bool serializeFilterStateObject(const StreamInfo::FilterState::Object& object, Protobuf::Any& out) {
   if (ProtobufTypes::MessagePtr proto = object.serializeAsProto(); proto != nullptr) {
     if (proto->GetTypeName() == Protobuf::Any::descriptor()->full_name()) {
       // The object already serializes to an Any; use it directly rather than double-wrapping.
       out = *Protobuf::DynamicCastMessage<Protobuf::Any>(proto.get());
-    } else {
-      out.PackFrom(*proto);
+      return true;
     }
-    return true;
+    return out.PackFrom(*proto);
   }
   if (std::optional<std::string> str = object.serializeAsString(); str.has_value()) {
     Protobuf::StringValue string_value;
     string_value.set_value(std::move(*str));
-    out.PackFrom(string_value);
-    return true;
+    return out.PackFrom(string_value);
   }
   return false;
 }

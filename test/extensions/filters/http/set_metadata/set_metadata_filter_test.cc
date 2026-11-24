@@ -49,7 +49,7 @@ public:
     envoy::extensions::filters::http::set_metadata::v3::Config message;
     message.set_metadata_namespace(value_);
     auto any = std::make_unique<Protobuf::Any>();
-    any->PackFrom(message);
+    EXPECT_TRUE(any->PackFrom(message));
     return any;
   }
 
