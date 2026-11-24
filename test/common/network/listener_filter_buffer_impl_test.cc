@@ -350,6 +350,23 @@ TEST_F(ListenerFilterBufferImplTest, DrainData) {
   EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 }
 
+TEST_F(ListenerFilterBufferImplTest, DrainMoreThanBufferedDataFails) {
+  initialize();
+
+  EXPECT_CALL(io_handle_, recv).WillOnce([&](void*, size_t length, int flags) {
+    EXPECT_EQ(MSG_PEEK, flags);
+    return Api::IoCallUint64Result(length / 2, Api::IoError::none());
+  });
+  on_data_cb_ = [&](ListenerFilterBuffer&) {};
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
+
+  // A drain beyond the buffered data must not read from the socket.
+  EXPECT_CALL(io_handle_, recv).Times(0);
+  EXPECT_FALSE(listener_buffer_->drain(buffer_size_ / 2 + 1));
+  EXPECT_FALSE(listener_buffer_->drain(buffer_size_ * 4));
+  EXPECT_EQ(buffer_size_ / 2, listener_buffer_->rawSlice().len_);
+}
+
 TEST_F(ListenerFilterBufferImplTest, ResetCapacity) {
   initialize();
 
