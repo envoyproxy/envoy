@@ -266,10 +266,7 @@ absl::Status WuffsJsonCursor::handleStructureToken(uint64_t token_detail, size_t
     level.expecting_key = to_dict;
     // key for onContainerOpen is the parent dict key that triggered this container.
     // Empty when the parent is an array or at root (depth 1).
-    const absl::string_view parent_key = (depth_ > 1 && levels_[depth_ - 1].is_dict)
-                                             ? absl::string_view(levels_[depth_ - 1].key)
-                                             : absl::string_view();
-    handler_.onContainerOpen(parent_key, to_dict, depth_, token_start);
+    handler_.onContainerOpen(keyAt(depth_ - 1), to_dict, depth_, token_start);
   } else {
     const int pop_depth = depth_;
     --depth_;
@@ -290,8 +287,7 @@ absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t 
       key_token_start_ = token_start;
     } else {
       // levels_[depth_].key is always current here — onKey fired before this value.
-      const absl::string_view value_key =
-          levels_[depth_].is_dict ? absl::string_view(levels_[depth_].key) : absl::string_view();
+      const absl::string_view value_key = keyAt(depth_);
       string_capturing_ = handler_.openStringCapture(value_key, depth_, token_start);
       string_chunk_active_ = string_capturing_;
     }
@@ -308,8 +304,7 @@ absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t 
   } else if (string_chunk_active_ &&
              (token_detail & WUFFS_BASE__TOKEN__VBD__STRING__CONVERT_1_DST_1_SRC_COPY) &&
              !raw.empty()) {
-    const absl::string_view value_key =
-        levels_[depth_].is_dict ? absl::string_view(levels_[depth_].key) : absl::string_view();
+    const absl::string_view value_key = keyAt(depth_);
     if (!handler_.onStringChunk(value_key, depth_, raw)) {
       string_chunk_active_ = false;
     }
@@ -330,8 +325,7 @@ absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t 
       }
       levels_[depth_].expecting_key = false;
     } else {
-      const absl::string_view value_key =
-          levels_[depth_].is_dict ? absl::string_view(levels_[depth_].key) : absl::string_view();
+      const absl::string_view value_key = keyAt(depth_);
       handler_.closeStringCapture(value_key, depth_, body_src_pos_);
       if (depth_ >= 1 && levels_[depth_].is_dict) {
         levels_[depth_].expecting_key = true;
@@ -366,8 +360,7 @@ absl::Status WuffsJsonCursor::handleUnicodeCodePointToken(uint64_t token_detail)
     // them as a single call on the next STRING/COPY token or chain end.
     uint8_t buf[4];
     encodeCodePoint(buf, code_point);
-    const absl::string_view value_key =
-        levels_[depth_].is_dict ? absl::string_view(levels_[depth_].key) : absl::string_view();
+    const absl::string_view value_key = keyAt(depth_);
     if (!handler_.onStringChunk(value_key, depth_,
                                 absl::string_view(reinterpret_cast<char*>(buf), utf8_len))) {
       string_chunk_active_ = false;
@@ -381,8 +374,7 @@ absl::Status WuffsJsonCursor::handleUnicodeCodePointToken(uint64_t token_detail)
 absl::Status WuffsJsonCursor::handleNumberOrLiteralToken(int64_t token_category,
                                                          absl::string_view raw,
                                                          size_t token_start) {
-  const absl::string_view value_key =
-      levels_[depth_].is_dict ? absl::string_view(levels_[depth_].key) : absl::string_view();
+  const absl::string_view value_key = keyAt(depth_);
   if (token_category == WUFFS_BASE__TOKEN__VBC__NUMBER) {
     if (raw.size() > kMaxNumberBytes) {
       return absl::InvalidArgumentError("wuffs json: number token too large");
@@ -430,6 +422,11 @@ bool WuffsJsonCursor::matchesChain(absl::Span<const PatternSegment> segments) co
     }
   }
   return true;
+}
+
+absl::string_view WuffsJsonCursor::keyAt(int depth) const {
+  const Level& level = levels_[depth];
+  return level.is_dict ? absl::string_view(level.key) : absl::string_view();
 }
 
 bool WuffsJsonCursor::matchesPatternPath(absl::Span<const PatternSegment> segments) const {

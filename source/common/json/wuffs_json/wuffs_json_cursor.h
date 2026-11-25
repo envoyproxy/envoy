@@ -173,7 +173,7 @@ public:
   struct Options {
     // Deepest nesting accepted, root container at 1, capped at Wuffs' 1024. Deeper nesting
     // fails with ResourceExhausted, which the cursor returns for nothing else.
-    uint32_t max_depth{kMaxTrackedDepth - 1};
+    uint32_t max_depth{kDefaultMaxDepth};
   };
 
   explicit WuffsJsonCursor(Handler& handler) : WuffsJsonCursor(handler, Options{}) {}
@@ -219,20 +219,19 @@ public:
   // Aligns with token_start / token_end values in callbacks.
   size_t nextSourcePosition() const { return body_src_pos_; }
 
-  // One past the default Options::max_depth: a cursor built without options
-  // accepts depths 1 through kMaxTrackedDepth-1 (currently 1–16).
-  // Value covers the deepest known provider schema paths:
-  //   tools[i].function.parameters.properties.<arg>.type      (depth 7)
-  //   messages[i].content[j].content[k].text                  (depth 7)
-  //   [i].candidates[j].content.parts[k].functionCall.args.*  (depth 9+,
-  //     Gemini streamed root arrays; `args` is an arbitrary object)
-  // plus headroom for nested tool arguments.
-  //
   // Per-depth state up to this bound is stored inline; deeper levels are
   // allocated only when a document reaches them.
   //
   // Public so callers can pass kMaxTrackedDepth - 1 to parseExtractFieldSpec.
   static constexpr int kMaxTrackedDepth = 17;
+
+  // Options::max_depth when unset. It covers the deepest known provider schema paths:
+  //   tools[i].function.parameters.properties.<arg>.type      (depth 7)
+  //   messages[i].content[j].content[k].text                  (depth 7)
+  //   [i].candidates[j].content.parts[k].functionCall.args.*  (depth 9+,
+  //     Gemini streamed root arrays; `args` is an arbitrary object)
+  // plus headroom for nested tool arguments.
+  static constexpr uint32_t kDefaultMaxDepth = kMaxTrackedDepth - 1;
 
 private:
   // feed() without the sticky-error check.
@@ -258,8 +257,6 @@ private:
   // legitimate number is at most ~25 chars (64-bit int ≤ 20 digits; float with
   // sign/decimal/exponent ≤ ~25). 64 bytes gives generous headroom.
   static constexpr size_t kMaxNumberBytes = 64;
-  const int max_depth_;
-  int depth_{0};
 
   struct Level {
     bool is_dict{false};
@@ -270,6 +267,8 @@ private:
     // Keys seen at this depth, for duplicate detection.
     absl::flat_hash_set<std::string> seen_keys;
   };
+  const int max_depth_;
+  int depth_{0};
   // levels_[d] is the state of depth d. It holds every depth reached so far, so
   // depth_ always indexes it.
   absl::InlinedVector<Level, kMaxTrackedDepth> levels_;
@@ -288,6 +287,8 @@ private:
 
   // Shared walk. Callers must first check segments.size() against their level.
   bool matchesChain(absl::Span<const PatternSegment> segments) const;
+  // Key of the item at `depth`, or empty when that level is an array or outside any container.
+  absl::string_view keyAt(int depth) const;
 
   absl::Status handleStructureToken(uint64_t token_detail, size_t token_start);
   absl::Status handleStringToken(absl::string_view raw, uint64_t token_detail, bool continued,

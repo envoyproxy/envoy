@@ -216,8 +216,8 @@ A response payload, a JSON body or the data of one SSE event, may nest up to
 :ref:`max_json_depth
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.ResponseParsingLimits.max_json_depth>`
 levels, 64 by default. A deeper one is not parsed: the AI filters get the SSE
-event unparsed, a JSON body fails the response, and token usage extraction
-counts it in ``response_parse_error``.
+event unparsed, a JSON body they would run on is replaced with a 502, and token
+usage extraction counts it in ``response_parse_error``.
 
 The available AI filters are described under :ref:`AI filters
 <config_http_ai_filters>`.

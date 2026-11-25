@@ -86,7 +86,7 @@ struct ParserConfig {
   size_t max_total_scalar_bytes{0};
 
   // When true, capture every scalar value (strings, numbers, booleans, nulls)
-  // at any depth. The cursor rejects nesting deeper than kMaxTrackedDepth - 1,
+  // at any depth. The cursor rejects nesting deeper than its Options::max_depth,
   // so that is the effective ceiling.
   //
   // Mutually exclusive with extract_fields; validate() rejects parser config that

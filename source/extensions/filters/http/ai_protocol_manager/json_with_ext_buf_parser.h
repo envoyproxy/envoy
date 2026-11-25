@@ -53,9 +53,7 @@ public:
   // provider response is a few thousand nodes).
   static constexpr std::uint32_t kDefaultMaxNodes = 1 << 18;
 
-  // The cursor's own default.
-  static constexpr std::uint32_t kDefaultMaxDepth =
-      Json::Wuffs::WuffsJsonCursor::kMaxTrackedDepth - 1;
+  static constexpr std::uint32_t kDefaultMaxDepth = Json::Wuffs::WuffsJsonCursor::kDefaultMaxDepth;
 
   struct Config {
     // A string whose decoded content exceeds this is recorded as a reference

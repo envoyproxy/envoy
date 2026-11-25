@@ -160,7 +160,7 @@ message ResponseParsingLimits {
   //
   // A payload nested deeper is not parsed. Token usage extraction counts it in
   // ``response_parse_error``. The AI filters get an SSE event unparsed, and a
-  // JSON response body fails the response.
+  // JSON response body they would run on is replaced with a 502.
   //
   // Defaults to 64.
   google.protobuf.UInt32Value max_json_depth = 1 [(validate.rules).uint32 = {lte: 128 gte: 1}];

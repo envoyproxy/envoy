@@ -83,7 +83,7 @@ class FlatteningJsonDecoder : public Json::Wuffs::WuffsJsonCursor::Handler {
 public:
   struct Config {
     // Decoding fails with ResourceExhausted once containers nest deeper than this.
-    uint32_t max_depth{Json::Wuffs::WuffsJsonCursor::kMaxTrackedDepth - 1};
+    uint32_t max_depth{Json::Wuffs::WuffsJsonCursor::kDefaultMaxDepth};
   };
 
   explicit FlatteningJsonDecoder(Config config);
