@@ -329,6 +329,8 @@ envoy_cc_library(
         "//envoy/router:scopes_interface",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/protobuf:utility_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:str_format",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -360,6 +362,8 @@ envoy_cc_library(
         "//source/common/init:watcher_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:prefix_utility_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -611,7 +615,10 @@ envoy_cc_library(
     hdrs = ["header_cluster_specifier.h"],
     deps = [
         ":delegating_route_lib",
+        "//envoy/http:header_map_interface",
         "//envoy/router:cluster_specifier_plugin_interface",
+        "//envoy/router:router_interface",
+        "//envoy/stream_info:stream_info_interface",
     ],
 )
 

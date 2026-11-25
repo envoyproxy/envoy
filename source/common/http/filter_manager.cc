@@ -806,11 +806,24 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       state_.filter_call_state_ &= ~FilterCallState::EndOfStream;
     }
     if (state_.decoder_filter_chain_aborted_) {
-      executeLocalReplyIfPrepared();
       ENVOY_STREAM_LOG(trace,
                        "decodeHeaders filter iteration aborted due to local reply: filter={}",
                        *this, (*entry)->filter_context_.config_name);
+      // Finish this filter's bookkeeping, including decodeComplete(), before running the prepared
+      // local reply. Running the local reply encodes the response and may complete or reset the
+      // stream synchronously, destroying the filters.
       status = FilterHeadersStatus::StopIteration;
+      (*entry)->processed_headers_ = true;
+      (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
+      if ((*entry)->end_stream_ && !state_.destroyed_) {
+        (*entry)->handle_->decodeComplete();
+      }
+      executeLocalReplyIfPrepared();
+      if (end_stream && !state_.destroyed_ &&
+          !filter_manager_callbacks_.responseHeaders().has_value()) {
+        disarmRequestTimeout();
+      }
+      return;
     }
 
     ASSERT(!(status == FilterHeadersStatus::ContinueAndDontEndStream && !(*entry)->end_stream_),
@@ -834,13 +847,12 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
                   (*entry)->filter_context_.config_name));
 
     // If this filter ended the stream, decodeComplete() should be called for it.
-    if ((*entry)->end_stream_) {
+    if ((*entry)->end_stream_ && !state_.destroyed_) {
       (*entry)->handle_->decodeComplete();
     }
 
     // Skip processing metadata after sending local reply
     if (stopDecoderFilterChain() && std::next(entry) != decoder_filters_.end()) {
-      maybeContinueDecoding(continue_data_entry);
       return;
     }
 
@@ -881,6 +893,9 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   }
 
   maybeContinueDecoding(continue_data_entry);
+  if (state_.destroyed_) {
+    return;
+  }
 
   if (end_stream) {
     disarmRequestTimeout();
@@ -968,7 +983,8 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     // is replayed to it with end_stream false, and that delivery must not retract the marker.
     (*entry)->observed_end_stream_ |= (*entry)->end_stream_;
     FilterDataStatus status = (*entry)->handle_->decodeData(data, (*entry)->end_stream_);
-    if ((*entry)->end_stream_) {
+    // Run decodeComplete() inside the call state so an abort it triggers stops the iteration.
+    if ((*entry)->end_stream_ && !state_.destroyed_) {
       (*entry)->handle_->decodeComplete();
     }
     state_.filter_call_state_ &= ~FilterCallState::DecodeData;
@@ -978,9 +994,13 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
     if (state_.decoder_filter_chain_aborted_) {
-      executeLocalReplyIfPrepared();
       ENVOY_STREAM_LOG(trace, "decodeData filter iteration aborted due to local reply: filter={}",
                        *this, (*entry)->filter_context_.config_name);
+      executeLocalReplyIfPrepared();
+      if (end_stream && !state_.destroyed_ &&
+          !filter_manager_callbacks_.responseHeaders().has_value()) {
+        disarmRequestTimeout();
+      }
       return;
     }
 
@@ -1008,6 +1028,10 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       // a previous filter has added trailers.
       break;
     }
+  }
+
+  if (state_.destroyed_) {
+    return;
   }
 
   if (forward_held_trailers_) {
@@ -1092,17 +1116,25 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     state_.filter_call_state_ |= FilterCallState::DecodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
     request_trailers_state_.processed_ = true;
-    (*entry)->handle_->decodeComplete();
     (*entry)->end_stream_ = true;
+    // Run decodeComplete() inside the call state so an abort it triggers stops the iteration.
+    if (!state_.destroyed_) {
+      (*entry)->handle_->decodeComplete();
+    }
     state_.filter_call_state_ &= ~FilterCallState::DecodeTrailers;
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
     if (state_.decoder_filter_chain_aborted_) {
-      executeLocalReplyIfPrepared();
+      status = FilterTrailersStatus::StopIteration;
       ENVOY_STREAM_LOG(trace,
                        "decodeTrailers filter iteration aborted due to local reply: filter={}",
                        *this, (*entry)->filter_context_.config_name);
-      status = FilterTrailersStatus::StopIteration;
+      (*entry)->commonHandleAfterTrailersCallback(status);
+      executeLocalReplyIfPrepared();
+      if (!state_.destroyed_ && !filter_manager_callbacks_.responseHeaders().has_value()) {
+        disarmRequestTimeout();
+      }
+      return;
     }
 
     processNewlyAddedMetadata();

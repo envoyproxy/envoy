@@ -25,6 +25,17 @@
 // can, which makes it impossible to enforce any security boundaries between Envoy and the modules
 // by nature. For example, we assume that modules will not try to pass invalid pointers to Envoy
 // intentionally.
+//
+// Likewise, Envoy does not check the header names and values that modules pass to it unless a
+// callback's documentation says it does. A name must be a non-empty HTTP token, optionally
+// prefixed with ':' for a pseudo-header, and a value must not hold a control character other than
+// horizontal tab. A CR, LF or NUL in a header map fails an assertion in debug builds. In release
+// builds, an upstream HTTP codec fails a request with one in a header with a 503, but on an HTTP/1
+// connection, response headers, trailers when HTTP/1 trailers are enabled, and the names a header
+// formatter returns are written as they are, and a CR or LF in them can end the header and start
+// another. The names a header formatter returns are not checked in debug builds either. A module
+// that builds a header from request data or other untrusted input should check it first; the SDKs
+// provide helpers for this.
 
 // =============================================================================
 // =========================== ABI Compatibility Policy ========================
@@ -145,7 +156,7 @@ const char* __attribute__((weak)) envoy_dynamic_modules_abi_version =
  * contains the ABI version the dynamic module was built against. Envoy logs it and does not
  * otherwise act on it. It is a diagnostic marker, not a compatibility gate, and a value that
  * differs from Envoy's own does not prevent the module from loading. See the ABI compatibility
- * policy at the top of this file.
+ * policy at the top of abi.h.
  *
  * OWNERSHIP: Module owns the pointer. Envoy copies the string immediately after on_program_init
  * returns, so it only needs to remain valid until then. Returning a static string satisfies this.
@@ -189,7 +200,8 @@ typedef struct envoy_dynamic_module_type_module_buffer {
 
 /**
  * envoy_dynamic_module_type_module_http_header represents a key-value pair of an HTTP header owned
- * by the module.
+ * by the module. Envoy does not check the key or the value; see the note on header names and values
+ * at the top of abi.h.
  */
 typedef struct envoy_dynamic_module_type_module_http_header {
   envoy_dynamic_module_type_buffer_module_ptr key_ptr;
@@ -702,8 +714,8 @@ typedef void* envoy_dynamic_module_type_load_shed_point_envoy_ptr;
 
 /**
  * envoy_dynamic_module_on_program_init is called by the main thread exactly when the module is
- * loaded. The function returns the ABI version of the dynamic module. If null is returned, the
- * module will be unloaded immediately.
+ * loaded. The function returns the ABI version of the dynamic module. If null is returned, the load
+ * fails, and the next load of the module calls this function again.
  *
  * For Envoy, the return value is recorded and logged for diagnostics only. Envoy does not
  * validate it against its own ABI version, so returning a version that differs from Envoy's does
@@ -717,7 +729,7 @@ typedef void* envoy_dynamic_module_type_load_shed_point_envoy_ptr;
  * report an error to Envoy.
  *
  * @return envoy_dynamic_module_type_abi_version_module_ptr is the ABI version the dynamic module
- * was built against. Null means the error and the module will be unloaded immediately.
+ * was built against. Null means the error and the load fails.
  */
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void);
 
@@ -866,6 +878,26 @@ uint64_t envoy_dynamic_module_callback_get_runtime_int(envoy_dynamic_module_type
  */
 double envoy_dynamic_module_callback_get_runtime_number(envoy_dynamic_module_type_module_buffer key,
                                                         double default_value);
+
+/**
+ * envoy_dynamic_module_callback_get_runtime_string is called by the module to read a runtime value
+ * as a string, which is the text of the value in the topmost layer that sets the key. A number or a
+ * boolean has a text too, for example "80" or "true", so this reads a value of any type. Unlike the
+ * callbacks above it takes no default value: the result tells whether the key has a value.
+ *
+ * @param key is the runtime key to look up.
+ * @param result is the pointer to the buffer variable where the text of the value will be stored.
+ * It is left untouched when this returns false.
+ * @return true if the key has a value, false if the key does not exist or the runtime is not
+ * reachable from the calling thread.
+ *
+ * Note that the buffer stored in result is owned by Envoy, and it is guaranteed to be valid until
+ * the end of the current event hook. A module that needs the text for longer must copy it.
+ * As for the callbacks above, key must not name one of Envoy's own `envoy.reloadable_features.*`
+ * or `envoy.restart_features.*` guards.
+ */
+bool envoy_dynamic_module_callback_get_runtime_string(
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
 
 // ----------------------------- Function Registry -----------------------------
 
@@ -2234,17 +2266,17 @@ bool envoy_dynamic_module_callback_http_get_headers(
     envoy_dynamic_module_type_envoy_http_header* result_headers);
 
 /**
- * envoy_dynamic_module_callback_http_add_header is called by the module to add
- * the value of the header with the given key. If the header does not exist, it will be
- * created. If the header already exists, all existing values will be removed and the new value will
- * be set. When the given value is null, the header will be removed if the key exists.
+ * envoy_dynamic_module_callback_http_add_header is called by the module to add a value to the
+ * header with the given key, keeping any existing values. If the header does not exist, it will be
+ * created. Use envoy_dynamic_module_callback_http_set_header to replace or remove a header.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param header_type is the type of the header map to add the header to (request/response
  * headers/trailers).
- * @param key is the key of the header.
- * @param value is the pointer to the buffer of the value. It can be null to remove the header.
+ * @param key is the key of the header. It must be a valid header name; Envoy does not check it.
+ * @param value is the pointer to the buffer of the value. A null or empty value is rejected.
+ * Otherwise it must be a valid header value; Envoy does not check it.
  * @return true if the operation is successful, false otherwise.
  *
  * Note that this only adds the header to the underlying Envoy object. Whether or not the header is
@@ -2261,14 +2293,15 @@ bool envoy_dynamic_module_callback_http_add_header(
  * envoy_dynamic_module_callback_http_set_header is called by the module to set
  * the value of the header with the given key. If the header does not exist, it will be
  * created. If the header already exists, all existing values will be removed and the new value will
- * be set. When the given value is null, the header will be removed if the key exists.
+ * be set. When the given value is null or empty, the header will be removed if the key exists.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param header_type is the type of the header map to set the header to (request/response
  * headers/trailers).
- * @param key is the key of the header.
- * @param value is the pointer to the buffer of the value. It can be null to remove the header.
+ * @param key is the key of the header. It must be a valid header name; Envoy does not check it.
+ * @param value is the pointer to the buffer of the value. A null or empty value removes the header.
+ * Otherwise it must be a valid header value; Envoy does not check it.
  * @return true if the operation is successful, false otherwise.
  *
  * Note that this only sets the header to the underlying Envoy object. Whether or not the header is
@@ -10936,7 +10969,10 @@ void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names
 //    envoy_dynamic_module_on_bootstrap_extension_runtime_number_update. An integer is not reported
 //    as a boolean, though envoy_dynamic_module_callback_get_runtime_bool also reads it as one.
 //  * A boolean is reported through envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update.
-//  * Any other value, such as a string, counts as unset.
+//  * A non-empty string that reads as neither a number nor a boolean is reported through
+//    envoy_dynamic_module_on_bootstrap_extension_runtime_string_update. The text of a structured
+//    value that is not a fractional percent is unspecified.
+//  * Any other value, such as an empty string or null, counts as unset.
 //
 // Envoy loads a new runtime snapshot whenever a layer of the `layered_runtime` bootstrap option
 // changes, for example on an RTDS update, a disk layer update or a request to the admin
@@ -10992,6 +11028,17 @@ void envoy_dynamic_module_on_bootstrap_extension_runtime_number_update(
     envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr,
     envoy_dynamic_module_type_envoy_buffer key, double value, bool removed);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_runtime_string_update is called when a watched
+ * runtime key gets a new string value, or becomes unset after having one. The value is owned by
+ * Envoy and valid only for the duration of the call.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_runtime_string_update(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_envoy_buffer value,
+    bool removed);
 
 /**
  * envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update is called by the module

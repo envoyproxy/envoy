@@ -39,9 +39,15 @@ namespace Envoy {
 namespace Formatter {
 class Formatter;
 }
+namespace Server {
+namespace Configuration {
+class ServerFactoryContext;
+} // namespace Configuration
+} // namespace Server
 namespace Upstream {
 class ClusterManager;
 class LoadBalancerContext;
+class ProtocolOptionsConfig;
 class ThreadLocalCluster;
 } // namespace Upstream
 
@@ -1435,6 +1441,21 @@ public:
       GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
       Upstream::ResourcePriority priority, std::optional<Http::Protocol> downstream_protocol,
       Upstream::LoadBalancerContext* ctx, const Protobuf::Message& config) const PURE;
+
+  /**
+   * Creates the options that the connection pools of a cluster with this upstream config share. A
+   * cluster calls it on the main thread when it is created, and is rejected when it returns an
+   * error. The cluster exposes the options through extensionProtocolOptions() under the name of
+   * this factory.
+   * @param typed_config the typed config of the upstream config of the cluster.
+   * @param context the server factory context.
+   * @return the options, or nullptr when the factory keeps none.
+   */
+  virtual absl::StatusOr<std::shared_ptr<const Upstream::ProtocolOptionsConfig>>
+  createClusterOptions(const Protobuf::Any& /* typed_config */,
+                       Server::Configuration::ServerFactoryContext& /* context */) const {
+    return nullptr;
+  }
 };
 
 using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;

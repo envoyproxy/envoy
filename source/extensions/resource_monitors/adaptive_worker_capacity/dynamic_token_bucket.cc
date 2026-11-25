@@ -74,8 +74,7 @@ void DynamicTokenBucket::onLoadAccepted() {
   consumed_tokens_since_last_pop_ += 1.0;
 }
 
-double DynamicTokenBucket::popBucketUtilization() {
-  const MonotonicTime now = time_source_.monotonicTime();
+double DynamicTokenBucket::popBucketUtilization(MonotonicTime now) {
   if (now <= last_utilization_pop_time_) {
     return 0.0;
   }
@@ -91,8 +90,7 @@ double DynamicTokenBucket::popBucketUtilization() {
   return std::clamp(utilization, 0.0, 1.0);
 }
 
-double DynamicTokenBucket::popTokenConsumptionRate() {
-  const MonotonicTime now = time_source_.monotonicTime();
+double DynamicTokenBucket::popTokenConsumptionRate(MonotonicTime now) {
   if (now <= last_consumption_rate_pop_time_) {
     return 0.0;
   }
@@ -104,11 +102,11 @@ double DynamicTokenBucket::popTokenConsumptionRate() {
   return rate;
 }
 
-void DynamicTokenBucket::setRefillRate(double new_refill_rate) {
+void DynamicTokenBucket::setRefillRate(double new_refill_rate, MonotonicTime now) {
   if (new_refill_rate <= 0.0 || !std::isfinite(new_refill_rate)) {
     return;
   }
-  refill(time_source_.monotonicTime());
+  refill(now);
   const std::optional<double> old_max_tokens = max_tokens_;
   refill_rate_ = std::clamp(new_refill_rate, kMinRefillRate, kMaxRefillRate);
   const double bucket_size_s = absl::ToDoubleSeconds(bucket_size_);
@@ -126,11 +124,11 @@ void DynamicTokenBucket::setRefillRate(double new_refill_rate) {
   }
 }
 
-void DynamicTokenBucket::scaleRefillRate(double factor) {
+void DynamicTokenBucket::scaleRefillRate(double factor, MonotonicTime now) {
   if (factor <= 0.0 || !std::isfinite(factor) || refill_rate_ <= 0.0) {
     return;
   }
-  setRefillRate(std::clamp(refill_rate_ * factor, kMinRefillRate, kMaxRefillRate));
+  setRefillRate(std::clamp(refill_rate_ * factor, kMinRefillRate, kMaxRefillRate), now);
 }
 
 } // namespace AdaptiveWorkerCapacity

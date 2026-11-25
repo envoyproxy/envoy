@@ -57,7 +57,8 @@ void DynamicModuleBootstrapExtension::onWorkerThreadInitialized() {
 bool DynamicModuleBootstrapExtension::enableRuntimeUpdate(absl::string_view key) {
   if (config_->on_bootstrap_extension_runtime_bool_update_ == nullptr &&
       config_->on_bootstrap_extension_runtime_int_update_ == nullptr &&
-      config_->on_bootstrap_extension_runtime_number_update_ == nullptr) {
+      config_->on_bootstrap_extension_runtime_number_update_ == nullptr &&
+      config_->on_bootstrap_extension_runtime_string_update_ == nullptr) {
     ENVOY_LOG(error, "cannot enable runtime update since the module implements none of the "
                      "envoy_dynamic_module_on_bootstrap_extension_runtime_*_update hooks");
     return false;
@@ -108,6 +109,10 @@ DynamicModuleBootstrapExtension::runtimeValue(const Runtime::Snapshot& snapshot,
     if (value.bool_value_.has_value()) {
       return RuntimeValue(absl::in_place_type<bool>, *value.bool_value_);
     }
+    // A fractional percent is a structured value, which the string hook does not report.
+    if (!value.fractional_percent_value_.has_value() && !value.raw_string_value_.empty()) {
+      return RuntimeValue(absl::in_place_type<std::string>, value.raw_string_value_);
+    }
     return std::nullopt;
   }
   return std::nullopt;
@@ -136,9 +141,15 @@ void DynamicModuleBootstrapExtension::reportRuntimeUpdate(absl::string_view key,
       config_->on_bootstrap_extension_runtime_int_update_(
           thisAsVoidPtr(), in_module_extension_, key_buffer, absl::get<uint64_t>(value), removed);
     }
-  } else if (config_->on_bootstrap_extension_runtime_number_update_ != nullptr) {
-    config_->on_bootstrap_extension_runtime_number_update_(
-        thisAsVoidPtr(), in_module_extension_, key_buffer, absl::get<double>(value), removed);
+  } else if (absl::holds_alternative<double>(value)) {
+    if (config_->on_bootstrap_extension_runtime_number_update_ != nullptr) {
+      config_->on_bootstrap_extension_runtime_number_update_(
+          thisAsVoidPtr(), in_module_extension_, key_buffer, absl::get<double>(value), removed);
+    }
+  } else if (config_->on_bootstrap_extension_runtime_string_update_ != nullptr) {
+    const std::string& text = absl::get<std::string>(value);
+    config_->on_bootstrap_extension_runtime_string_update_(
+        thisAsVoidPtr(), in_module_extension_, key_buffer, {text.data(), text.size()}, removed);
   }
 }
 

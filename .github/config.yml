@@ -58,61 +58,33 @@ checks:
     required: true
     on-run:
     - mobile-android
-  mobile-android-tests:
-    name: Mobile/Android tests
-    required: true
-    on-run:
     - mobile-android-tests
-  mobile-asan:
-    name: Mobile/ASAN
+  mobile-checks:
+    name: Mobile/Checks
     required: true
     on-run:
     - mobile-asan
-  mobile-cc:
-    name: Mobile/CC
-    required: true
-    on-run:
     - mobile-cc
-  mobile-coverage:
-    name: Mobile/Coverage
-    required: true
-    on-run:
     - mobile-coverage
+    - mobile-format
+    - mobile-python
+    - mobile-tsan
   mobile-docs:
     name: Mobile/Docs
     on-run:
     - mobile-docs
-  mobile-format:
-    name: Mobile/Format
-    required: true
-    on-run:
-    - mobile-format
   mobile-ios:
     name: Mobile/iOS
     required: true
     cache:
     on-run:
     - mobile-ios
-  mobile-ios-tests:
-    name: Mobile/iOS tests
-    required: true
-    on-run:
     - mobile-ios-tests
-  mobile-python:
-    name: Mobile/Python
-    required: true
-    on-run:
-    - mobile-python
   mobile-release-validation:
     name: Mobile/Release validation
     required: true
     on-run:
     - mobile-release-validation
-  mobile-tsan:
-    name: Mobile/TSAN
-    required: true
-    on-run:
-    - mobile-tsan
   prechecks:
     name: Envoy/Prechecks
     on-run:
@@ -622,7 +594,7 @@ run:
     - .bazelrc
     - .bazelversion
     - .github/config.yml
-    - .github/workflows/mobile-python.yml
+    - .github/workflows/mobile-checks.yml
     - bazel/external/quiche.BUILD
     - mobile/.bazelrc
     - mobile/**/*

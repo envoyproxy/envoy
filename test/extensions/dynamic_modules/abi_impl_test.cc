@@ -574,6 +574,44 @@ TEST(CommonAbiImplTest, GetRuntimeMissingKeyReturnsDefault) {
   EXPECT_DOUBLE_EQ(2.5, envoy_dynamic_module_callback_get_runtime_number(key, 2.5));
 }
 
+TEST(CommonAbiImplTest, GetRuntimeStringReturnsTheTextOfTheValue) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  const std::string text = "80:15100,8080:15101";
+  EXPECT_CALL(context.runtime_loader_.snapshot_, get(absl::string_view("some.mapping")))
+      .WillOnce(Return(Envoy::Runtime::Snapshot::ConstStringOptRef(text)));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  envoy_dynamic_module_type_module_buffer key = {"some.mapping", 12};
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  ASSERT_TRUE(envoy_dynamic_module_callback_get_runtime_string(key, &result));
+  EXPECT_EQ(text, absl::string_view(result.ptr, result.length));
+}
+
+TEST(CommonAbiImplTest, GetRuntimeStringOfMissingKeyLeavesTheResult) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.runtime_loader_.snapshot_, get(testing::_))
+      .WillByDefault(Return(Envoy::Runtime::Snapshot::ConstStringOptRef()));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  envoy_dynamic_module_type_module_buffer key = {"missing.key", 11};
+  envoy_dynamic_module_type_envoy_buffer result = {"untouched", 9};
+  EXPECT_FALSE(envoy_dynamic_module_callback_get_runtime_string(key, &result));
+  EXPECT_EQ("untouched", absl::string_view(result.ptr, result.length));
+}
+
+TEST(CommonAbiImplTest, GetRuntimeStringHonorsBufferLength) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  const std::string text = "text";
+  EXPECT_CALL(context.runtime_loader_.snapshot_, get(absl::string_view("some.key")))
+      .WillOnce(Return(Envoy::Runtime::Snapshot::ConstStringOptRef(text)));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  // The key buffer is longer than the key: only its length counts.
+  envoy_dynamic_module_type_module_buffer key = {"some.key.and more", 8};
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_runtime_string(key, &result));
+}
+
 // Verifies that the callbacks fall back to the caller supplied default, rather than failing
 // closed on a fixed value, when the server context has not been installed.
 TEST(CommonAbiImplTest, GetRuntimeBeforeServerContextReturnsDefault) {
@@ -582,6 +620,8 @@ TEST(CommonAbiImplTest, GetRuntimeBeforeServerContextReturnsDefault) {
   EXPECT_FALSE(envoy_dynamic_module_callback_get_runtime_bool(key, false));
   EXPECT_EQ(99u, envoy_dynamic_module_callback_get_runtime_int(key, 99));
   EXPECT_DOUBLE_EQ(9.5, envoy_dynamic_module_callback_get_runtime_number(key, 9.5));
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_FALSE(envoy_dynamic_module_callback_get_runtime_string(key, &result));
 }
 
 // Verifies that calling off the main thread is legal and simply yields the default. The server
@@ -592,6 +632,7 @@ TEST(CommonAbiImplTest, GetRuntimeOffMainThreadReturnsDefaultWithoutEnvoyBug) {
   EXPECT_CALL(context.runtime_loader_.snapshot_, getBoolean(testing::_, testing::_)).Times(0);
   EXPECT_CALL(context.runtime_loader_.snapshot_, getInteger(testing::_, testing::_)).Times(0);
   EXPECT_CALL(context.runtime_loader_.snapshot_, getDouble(testing::_, testing::_)).Times(0);
+  EXPECT_CALL(context.runtime_loader_.snapshot_, get(testing::_)).Times(0);
 
   ScopedThreadLocalServerContextSetter setter(context);
   std::thread t([] {
@@ -600,6 +641,8 @@ TEST(CommonAbiImplTest, GetRuntimeOffMainThreadReturnsDefaultWithoutEnvoyBug) {
     EXPECT_FALSE(envoy_dynamic_module_callback_get_runtime_bool(key, false));
     EXPECT_EQ(7u, envoy_dynamic_module_callback_get_runtime_int(key, 7));
     EXPECT_DOUBLE_EQ(3.5, envoy_dynamic_module_callback_get_runtime_number(key, 3.5));
+    envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+    EXPECT_FALSE(envoy_dynamic_module_callback_get_runtime_string(key, &result));
   });
   t.join();
 }

@@ -2671,8 +2671,8 @@ TEST_F(BootstrapAbiImplTest, RuntimeUpdateReportsWatchedKeys) {
 }
 
 // Test that a value is reported through the hook of its type, that a change of type is a change,
-// that a NaN that stays NaN is not reported, and that a value that is neither a boolean nor a
-// number counts as unset.
+// that a NaN that stays NaN is not reported, that a string that is neither a boolean nor a number
+// is reported as a string, and that an empty string counts as unset.
 TEST_F(BootstrapAbiImplTest, RuntimeUpdateReportsTypedValues) {
   setRuntimeLayers({{}});
   auto extension = initializeExtension(newOptionalHooksConfig("watch_runtime_keys:k"));
@@ -2687,8 +2687,11 @@ TEST_F(BootstrapAbiImplTest, RuntimeUpdateReportsTypedValues) {
            {"false", "k=b:false;"},
            {"nan", "k=n:nan;"},
            {"nan", ""},
-           {"text", "k!n:nan;"},
-           {"other text", ""},
+           {"text", "k=s:text;"},
+           {"text", ""},
+           {"other text", "k=s:other text;"},
+           {"", "k!s:other text;"},
+           {"80:15100,8080:15101", "k=s:80:15100,8080:15101;"},
            {"true", "k=b:true;"},
        }) {
     setRuntimeLayers({{{"k", value}}});
@@ -2704,9 +2707,10 @@ TEST_F(BootstrapAbiImplTest, RuntimeUpdateSkipsTypesWithoutAHook) {
   auto config = newOptionalHooksConfig("watch_runtime_keys:k");
   config->on_bootstrap_extension_runtime_bool_update_ = nullptr;
   config->on_bootstrap_extension_runtime_int_update_ = nullptr;
+  config->on_bootstrap_extension_runtime_string_update_ = nullptr;
   auto extension = initializeExtension(config);
   EXPECT_EQ("+k;", runtimeWatchResults());
-  for (absl::string_view value : {"true", "1", "1.5"}) {
+  for (absl::string_view value : {"true", "1", "text", "1.5", "more text"}) {
     setRuntimeLayers({{{"k", std::string(value)}}});
     loadRuntimeSnapshot();
   }

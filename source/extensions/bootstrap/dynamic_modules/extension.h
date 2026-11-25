@@ -105,11 +105,11 @@ private:
   Server::ServerLifecycleNotifier::HandlePtr post_init_handle_;
 
   // The value of a watched runtime key, typed the way the runtime update hooks report it: a
-  // boolean, a non-negative integer or any other number.
-  using RuntimeValue = absl::variant<bool, uint64_t, double>;
+  // boolean, a non-negative integer, any other number or a non-empty string.
+  using RuntimeValue = absl::variant<bool, uint64_t, double, std::string>;
 
   // Returns the value of the key from the topmost layer of the snapshot that sets it, or nothing
-  // when that value is neither a boolean nor a number.
+  // when that value is none of those types.
   static std::optional<RuntimeValue> runtimeValue(const Runtime::Snapshot& snapshot,
                                                   absl::string_view key);
 
