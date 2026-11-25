@@ -442,6 +442,137 @@ TEST_F(InternalClientConnectionImplTest,
 
   EXPECT_EQ(StreamInfo::DetectedCloseType::Normal, client_->detectedCloseType());
 }
+
+TEST_F(InternalClientConnectionImplTest, PeerCloseWithUnreadDataEmitsRemoteResetGuardEnabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+
+  client_ = std::make_unique<Network::ClientConnectionImpl>(
+      *dispatcher_,
+      std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_), local_addr_,
+                                                      remote_addr_),
+      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr, nullptr);
+  client_->addConnectionCallbacks(connection_callbacks);
+  client_->connect();
+  client_->noDelay(true);
+
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  Buffer::OwnedImpl payload("hello");
+  client_->write(payload, /*end_stream=*/false);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  ASSERT_EQ(5, io_handle_peer_->getReceiveBuffer()->length());
+
+  // Peer closes without reading the buffered data, which must propagate an RST to the client.
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  io_handle_peer_->close();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(StreamInfo::DetectedCloseType::RemoteReset, client_->detectedCloseType());
+}
+
+TEST_F(InternalClientConnectionImplTest, PeerCloseWithUnreadDataEmitsNormalCloseGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "false"}});
+
+  client_ = std::make_unique<Network::ClientConnectionImpl>(
+      *dispatcher_,
+      std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_), local_addr_,
+                                                      remote_addr_),
+      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr, nullptr);
+  client_->addConnectionCallbacks(connection_callbacks);
+  client_->connect();
+  client_->noDelay(true);
+
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  Buffer::OwnedImpl payload("hello");
+  client_->write(payload, /*end_stream=*/false);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  ASSERT_EQ(5, io_handle_peer_->getReceiveBuffer()->length());
+
+  // With the runtime guard disabled, peer close with unread data emits a normal EOF close.
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  io_handle_peer_->close();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(StreamInfo::DetectedCloseType::Normal, client_->detectedCloseType());
+}
+
+TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerCloseWithUnreadDataEmitsRemoteReset) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+
+  client_ = std::make_unique<Network::ClientConnectionImpl>(
+      *dispatcher_,
+      std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_), local_addr_,
+                                                      remote_addr_),
+      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr, nullptr);
+  client_->enableHalfClose(true);
+  client_->addConnectionCallbacks(connection_callbacks);
+  client_->connect();
+  client_->noDelay(true);
+
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  Buffer::OwnedImpl payload("hello");
+  client_->write(payload, /*end_stream=*/false);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  ASSERT_EQ(5, io_handle_peer_->getReceiveBuffer()->length());
+
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  io_handle_peer_->close();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(StreamInfo::DetectedCloseType::RemoteReset, client_->detectedCloseType());
+}
+
+TEST_F(InternalClientConnectionImplTest,
+       ClientCloseWithUnreadDataEmitsConnectionResetToPeerGuardEnabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+
+  client_ = std::make_unique<Network::ClientConnectionImpl>(
+      *dispatcher_,
+      std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_), local_addr_,
+                                                      remote_addr_),
+      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr, nullptr);
+  client_->addConnectionCallbacks(connection_callbacks);
+  client_->connect();
+  client_->noDelay(true);
+
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Disable reads so data written by the peer stays unread in the client's receive buffer.
+  client_->readDisable(true);
+  Buffer::OwnedImpl payload("hello");
+  ASSERT_TRUE(io_handle_peer_->write(payload).ok());
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  client_->close(Network::ConnectionCloseType::NoFlush);
+
+  Buffer::OwnedImpl read_buf;
+  auto read_res = io_handle_peer_->read(read_buf, 1024);
+  EXPECT_FALSE(read_res.ok());
+  ASSERT_NE(nullptr, read_res.err_);
+  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, read_res.err_->getErrorCode());
+}
 } // namespace
 } // namespace UserSpace
 } // namespace IoSocket
