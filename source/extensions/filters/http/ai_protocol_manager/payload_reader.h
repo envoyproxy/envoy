@@ -95,6 +95,8 @@ public:
   void failExternalHandoff();
 
 private:
+  class ReadExternalBuffer;
+
   PayloadReader() = default;
 
   uint64_t total_length_{0};

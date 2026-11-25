@@ -22,56 +22,50 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
-namespace {
-
-class ExternalReadAwaitable : public Coroutine::LeafAwaitable<absl::StatusOr<Buffer::InstancePtr>> {
+class PayloadReader::ReadExternalBuffer
+    : public Coroutine::LeafAwaitable<absl::StatusOr<Buffer::InstancePtr>> {
 public:
-  ExternalReadAwaitable(PayloadReaderSharedPtr reader, ExternalBuffer& buffer, bool& failed,
-                        uint64_t offset, uint64_t max_length,
-                        Coroutine::SemaphoreReservation permit)
-      : reader_(std::move(reader)), buffer_(buffer), failed_(failed), offset_(offset),
-        max_length_(max_length), permit_(std::move(permit)) {}
+  ReadExternalBuffer(PayloadReaderSharedPtr reader, uint64_t offset, uint64_t max_length,
+                     Coroutine::SemaphoreReservation permit)
+      : reader_(std::move(reader)), offset_(offset), max_length_(max_length),
+        permit_(std::move(permit)) {}
 
 protected:
   void onStart() override {
-    buffer_.read(offset_, max_length_,
-                 [self = self_, reader = reader_, &failed = failed_, permit = std::move(permit_)](
-                     ExternalBufferStatus status, Buffer::InstancePtr data) mutable {
-                   // `reader` keeps `*reader` (and therefore `failed`) alive across cancellation.
-                   // Release the single-flight permit before resuming so the next chunk or a
-                   // waiting coroutine can immediately acquire it; if this coroutine's context was
-                   // cancelled mid-read (`*self == nullptr`), the permit stayed held until this
-                   // underlying ExternalBuffer::read() callback completed.
-                   if (status != ExternalBufferStatus::Ok) {
-                     failed = true;
-                     permit.release();
-                     if (ExternalReadAwaitable* awaitable = std::exchange(*self, nullptr);
-                         awaitable != nullptr) {
-                       awaitable->complete(absl::DataLossError("external buffer read failed"));
-                     }
-                     return;
-                   }
-                   permit.release();
-                   if (ExternalReadAwaitable* awaitable = std::exchange(*self, nullptr);
-                       awaitable != nullptr) {
-                     awaitable->complete(std::move(data));
-                   }
-                 });
+    reader_->buffer_->read(
+        offset_, max_length_,
+        [self = self_, reader = reader_, permit = std::move(permit_)](
+            ExternalBufferStatus status, Buffer::InstancePtr data) mutable {
+          // `reader` keeps `*reader` (and therefore `failed_`) alive across cancellation.
+          // Release the single-flight permit before resuming so the next chunk or a waiting
+          // coroutine can immediately acquire it; if this coroutine's context was cancelled
+          // mid-read (`*self == nullptr`), the permit stayed held until this underlying
+          // ExternalBuffer::read() callback completed.
+          if (status != ExternalBufferStatus::Ok) {
+            reader->failed_ = true;
+            permit.release();
+            if (ReadExternalBuffer* awaitable = std::exchange(*self, nullptr);
+                awaitable != nullptr) {
+              awaitable->complete(absl::DataLossError("external buffer read failed"));
+            }
+            return;
+          }
+          permit.release();
+          if (ReadExternalBuffer* awaitable = std::exchange(*self, nullptr); awaitable != nullptr) {
+            awaitable->complete(std::move(data));
+          }
+        });
   }
 
   void onCancel() override { *self_ = nullptr; }
 
 private:
   PayloadReaderSharedPtr reader_;
-  ExternalBuffer& buffer_;
-  bool& failed_;
   uint64_t offset_;
   uint64_t max_length_;
   Coroutine::SemaphoreReservation permit_;
-  std::shared_ptr<ExternalReadAwaitable*> self_{std::make_shared<ExternalReadAwaitable*>(this)};
+  std::shared_ptr<ReadExternalBuffer*> self_{std::make_shared<ReadExternalBuffer*>(this)};
 };
-
-} // namespace
 
 std::optional<absl::Status> PayloadReader::ReadableAwaitable::tryImmediate() {
   if (reader_->failed_) {
@@ -148,8 +142,7 @@ Coroutine::Task<absl::StatusOr<Buffer::InstancePtr>> PayloadReader::readChunk(ui
     co_return absl::DataLossError("external buffer failed");
   }
 
-  co_return co_await ExternalReadAwaitable(self, *self->buffer_, self->failed_, offset, max_length,
-                                           std::move(*permit));
+  co_return co_await ReadExternalBuffer(self, offset, max_length, std::move(*permit));
 }
 
 void PayloadReader::completeExternalHandoff(std::shared_ptr<ExternalBuffer> buffer) {
