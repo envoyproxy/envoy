@@ -129,16 +129,16 @@ absl::Status ThreadAwareLoadBalancerBase::initialize() {
   // think the synchronous/asynchronous split is probably the best option.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update")) {
-    member_update_cb_ =
-        priority_set_.addMemberUpdateCb([this](const HostVector&, const HostVector&) {
+    // Refresh before the cluster manager posts the update to worker threads. Deferring this to the
+    // member update callback allows a worker to snapshot the previous factory state.
+    priority_update_cb_ = priority_set_.addPriorityUpdateCb(
+        [this](uint32_t, const HostVector&, const HostVector&) {
           processDirtyPriorities();
           refresh();
         });
 
-    // PriorityUpdateCb can fire before initialize() during batch host updates, while MemberUpdateCb
-    // (which flushes dirty priorities) is deferred until the batch completes. If initialize() is
-    // invoked mid-batch, process any queued priorities now so per_priority_panic_ is sized for all
-    // current priorities before refresh() indexes into it.
+    // PriorityUpdateCb can fire before initialize() during batch host updates. Process any queued
+    // priorities now so per_priority_panic_ is sized before refresh() indexes into it.
     processDirtyPriorities();
   } else {
     priority_update_cb_ = priority_set_.addPriorityUpdateCb(
