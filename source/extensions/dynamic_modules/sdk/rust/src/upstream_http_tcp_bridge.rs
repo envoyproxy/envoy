@@ -76,6 +76,10 @@ pub trait UpstreamHttpTcpBridge: Send {
 }
 
 /// Envoy-side bridge operations available to the module.
+///
+/// Envoy does not check the header and trailer names and values given to the response methods.
+/// Check any that come from upstream data or other untrusted input with
+/// [`crate::is_valid_header_name`] and [`crate::is_valid_header_value`] first.
 #[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyUpstreamHttpTcpBridge: Send {
