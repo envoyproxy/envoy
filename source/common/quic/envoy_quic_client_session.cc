@@ -350,6 +350,17 @@ void EnvoyQuicClientSession::OnNewEncryptionKeyAvailable(
   quic::QuicSpdyClientSession::OnNewEncryptionKeyAvailable(level, std::move(encrypter));
   if (level == quic::ENCRYPTION_ZERO_RTT) {
     ENVOY_CONN_LOG(trace, "able to send early data", *this);
+    // The resumed transport parameters are applied before early data can be sent. If they carry a
+    // zero outgoing stream limit, report it to the connection pool now, before the ConnectedZeroRtt
+    // event, so the connection is not advertised as ready for early data and a request is not
+    // dispatched onto a stream QUICHE cannot open (which would reset, per-try-timeout and retry).
+    // OnConfigNegotiated() reports this too, but only once the server config round-trips, which is
+    // too late: the early data has already gone out.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.quic_report_zero_stream_limit_before_handshake") &&
+        connection()->connected() && streamsAvailable() == 0) {
+      OnCanCreateNewOutgoingStream(false);
+    }
     raiseConnectionEvent(Network::ConnectionEvent::ConnectedZeroRtt);
   }
 }
