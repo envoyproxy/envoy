@@ -169,9 +169,8 @@ public:
     virtual void onContainerClose(int depth, size_t token_end) = 0;
   };
 
-  // `max_depth` is the deepest nesting accepted, the root container counting as 1;
-  // Wuffs itself stops at 1024, which caps it. Deeper nesting is rejected with
-  // ResourceExhaustedError, the only error the cursor itself raises with that code.
+  // `max_depth` is the deepest nesting accepted, root container at 1, capped at Wuffs' 1024.
+  // Deeper nesting fails with ResourceExhausted, which the cursor returns for nothing else.
   explicit WuffsJsonCursor(Handler& handler, uint32_t max_depth = kMaxTrackedDepth - 1);
 
   WuffsJsonCursor(const WuffsJsonCursor&) = delete;
@@ -262,7 +261,7 @@ private:
     // Key of the item at this depth; forwarded as the `key` argument to
     // callbacks, and the sole label source for matchesPatternPath.
     std::string key;
-    // duplicate-key detection.
+    // Keys seen at this depth, for duplicate detection.
     absl::flat_hash_set<std::string> seen_keys;
   };
   // levels_[d] is the state of depth d. It holds every depth reached so far, so

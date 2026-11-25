@@ -53,6 +53,10 @@ public:
   // provider response is a few thousand nodes).
   static constexpr std::uint32_t kDefaultMaxNodes = 1 << 18;
 
+  // The cursor's own default.
+  static constexpr std::uint32_t kDefaultMaxDepth =
+      Json::Wuffs::WuffsJsonCursor::kMaxTrackedDepth - 1;
+
   struct Config {
     // A string whose decoded content exceeds this is recorded as a reference
     // instead of being materialized.
@@ -61,7 +65,7 @@ public:
     // containers, and external references alike).
     std::uint32_t max_nodes{kDefaultMaxNodes};
     // Parsing fails with ResourceExhausted once containers nest deeper than this.
-    std::uint32_t max_depth{Json::Wuffs::WuffsJsonCursor::kMaxTrackedDepth - 1};
+    std::uint32_t max_depth{kDefaultMaxDepth};
   };
 
   explicit JsonWithExtBufParser(Config config);

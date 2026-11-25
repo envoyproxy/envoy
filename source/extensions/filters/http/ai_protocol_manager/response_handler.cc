@@ -283,7 +283,7 @@ void SseResponseHandler::processSseEvent(absl::string_view event) {
   }
   --parse_budget_;
 
-  JsonWithExtBufParser parser({});
+  JsonWithExtBufParser parser({.max_depth = max_json_depth_});
   if (const absl::Status status = parser.feed(data, /*end_stream=*/true); !status.ok()) {
     // Never log payload bytes: they can carry model output or user data.
     ENVOY_LOG(debug, "ai_protocol_manager: {}-byte SSE event data is not valid JSON, skipped",
@@ -299,9 +299,11 @@ void SseResponseHandler::processSseEvent(absl::string_view event) {
 
 JsonResponseHandler::JsonResponseHandler(LLMProtocol format, uint32_t max_inspected_body_size,
                                          AiProtocolManagerStats& stats,
-                                         const Buffer::BufferMemoryAccountSharedPtr& /*account*/)
+                                         const Buffer::BufferMemoryAccountSharedPtr& /*account*/,
+                                         uint32_t max_json_depth)
     : ResponseHandler(format, stats), max_inspected_body_size_(max_inspected_body_size),
-      parser_(std::make_unique<JsonWithExtBufParser>(JsonWithExtBufParser::Config{})) {}
+      parser_(std::make_unique<JsonWithExtBufParser>(
+          JsonWithExtBufParser::Config{.max_depth = max_json_depth})) {}
 
 void JsonResponseHandler::abandonOverLimit() {
   ENVOY_LOG(debug,

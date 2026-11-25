@@ -41,8 +41,8 @@ constexpr uint32_t DefaultMaxJsonBodySize = 4 * 1024 * 1024;
 // Far above ordinary streams (hundreds to low thousands of events) while
 // bounding the parse work a lifetime event flood can extract; see the proto.
 constexpr uint32_t DefaultMaxParsedSseEvents = 65536;
-// A tool or response schema nests two levels per object it describes, so one a handful of objects
-// deep is past the cursor's own default of 16.
+// Shared by requests and responses. A schema nests two levels per object it describes, so one a
+// few objects deep is already past the cursor's own default of 16.
 constexpr uint32_t DefaultMaxJsonDepth = 64;
 
 // HTTP Content-Type is case-insensitive and may carry parameters
@@ -207,8 +207,8 @@ FilterConfig::FilterConfig(
       inline_string_threshold_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto.request_handling().limits(), inline_string_threshold_bytes,
           JsonWithExtBufParser::kDefaultInlineStringThresholdBytes)),
-      max_json_depth_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto.request_handling().limits(),
-                                                      max_json_depth, DefaultMaxJsonDepth)),
+      max_request_json_depth_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto.request_handling().limits(),
+                                                              max_json_depth, DefaultMaxJsonDepth)),
       token_usage_enabled_(proto.response_handling().has_token_usage()),
       include_unconfigured_routes_(
           proto.response_handling().token_usage().include_unconfigured_routes()),
@@ -229,6 +229,8 @@ FilterConfig::FilterConfig(
       max_parsed_sse_events_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto.response_handling().token_usage().limits(),
                                           max_parsed_sse_events, DefaultMaxParsedSseEvents)),
+      max_response_json_depth_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          proto.response_handling().limits(), max_json_depth, DefaultMaxJsonDepth)),
       ai_filter_factories_(std::move(ai_filter_factories)),
       buffer_factory_(std::move(buffer_factory)) {
   ASSERT(buffer_factory_ != nullptr);
@@ -349,7 +351,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
 
   JsonWithExtBufParser::Config parser_config;
   parser_config.inline_string_threshold_bytes = inlineStringThresholdBytes();
-  parser_config.max_depth = config_->maxJsonDepth();
+  parser_config.max_depth = config_->maxRequestJsonDepth();
   request_parser_ = std::make_unique<JsonWithExtBufParser>(parser_config);
   // Built here, not at setDecoderFilterCallbacks(), so a pass-through stream pays
   // for none of it: constructing it subscribes to upstream watermarks and claims
@@ -665,14 +667,17 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
     encode_manager_ = std::make_shared<BufferManager>(
         BufferManager::Config{encoder_callbacks_->encoderBufferLimit()}, config_->bufferFactory(),
         *encode_bridge_);
+    ResponseFilterManager::Config response_config;
+    response_config.sse.parser.max_depth = config_->maxResponseJsonDepth();
+    response_config.unary.max_depth = config_->maxResponseJsonDepth();
     if (is_sse) {
       filter_manager_->startSseResponse(
           config_->bufferFactory(), *encode_bridge_, *encode_manager_,
-          [this](absl::Status status) { onEncodeComplete(std::move(status)); });
+          [this](absl::Status status) { onEncodeComplete(std::move(status)); }, response_config);
     } else if (is_json) {
       filter_manager_->startUnaryResponse(
           config_->bufferFactory(), *encode_bridge_, *encode_manager_,
-          [this](absl::Status status) { onEncodeComplete(std::move(status)); });
+          [this](absl::Status status) { onEncodeComplete(std::move(status)); }, response_config);
     }
   }
 
@@ -702,12 +707,13 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
     // downstream stream's account.
     const Buffer::BufferMemoryAccountSharedPtr account = decoder_callbacks_->account();
     if (is_sse) {
-      response_handler_ = std::make_unique<SseResponseHandler>(protocol, config_->maxSseEventSize(),
-                                                               config_->maxParsedSseEvents(),
-                                                               config_->stats(), account);
+      response_handler_ = std::make_unique<SseResponseHandler>(
+          protocol, config_->maxSseEventSize(), config_->maxParsedSseEvents(), config_->stats(),
+          account, config_->maxResponseJsonDepth());
     } else {
       auto handler = std::make_unique<JsonResponseHandler>(protocol, config_->maxJsonBodySize(),
-                                                           config_->stats(), account);
+                                                           config_->stats(), account,
+                                                           config_->maxResponseJsonDepth());
       // A body already known (from content-length) to exceed the cap abandons
       // extraction up front, through the same transition the incremental cap
       // takes -- identical bodies produce the identical outcome regardless of

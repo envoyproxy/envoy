@@ -60,7 +60,7 @@ public:
 
   absl::StatusOr<std::string> roundTrip(absl::string_view input, size_t chunk_size = 0) {
     bridge_.injected_.drain(bridge_.injected_.length());
-    FlatteningJsonDecoder decoder;
+    FlatteningJsonDecoder decoder({});
     std::vector<std::vector<FlattenJsonField>> batches;
     if (chunk_size == 0) {
       Buffer::OwnedImpl buf(input);
@@ -138,7 +138,7 @@ TEST_F(FlatteningJsonCodecTest, FlattenJsonFieldCopyMoveAndMutationPreservePath)
 }
 
 TEST_F(FlatteningJsonCodecTest, TransformsAndInjectsFlattenedFieldsBeforeSerializing) {
-  FlatteningJsonDecoder decoder;
+  FlatteningJsonDecoder decoder({});
   Buffer::OwnedImpl buf(R"({"id":"chatcmpl-1","model":"gpt-4","usage":{"total_tokens":12}})");
   auto decoded_or = decoder.onData(buf, /*end_stream=*/true);
   ASSERT_THAT(decoded_or.status(), IsOk());
@@ -224,7 +224,7 @@ TEST_F(FlatteningJsonCodecTest, RoundTripsEmptyContainersAndScalars) {
 }
 
 TEST_F(FlatteningJsonCodecTest, StreamsStringsAcrossOnDataChunksAndCoalescesOnSerialize) {
-  FlatteningJsonDecoder decoder;
+  FlatteningJsonDecoder decoder({});
   std::vector<FlattenJsonField> fields;
 
   // Split a string value across three onData calls (including one where only the closing quote
@@ -280,6 +280,22 @@ TEST_F(FlatteningJsonCodecTest, RejectsInvalidAndTruncatedJson) {
   // Unrepresentable float overflow.
   EXPECT_THAT(roundTrip(R"({"a": 1e400})").status(),
               HasStatusCode(absl::StatusCode::kInvalidArgument));
+}
+
+// The nesting bound is the config's, and exceeding it has its own status code.
+TEST_F(FlatteningJsonCodecTest, MaxDepthIsConfigured) {
+  const std::string body = R"({"a":{"b":{"c":1}}})";
+  {
+    FlatteningJsonDecoder decoder({.max_depth = 3});
+    Buffer::OwnedImpl buf(body);
+    EXPECT_THAT(decoder.onData(buf, /*end_stream=*/true).status(), IsOk());
+  }
+  {
+    FlatteningJsonDecoder decoder({.max_depth = 2});
+    Buffer::OwnedImpl buf(body);
+    EXPECT_THAT(decoder.onData(buf, /*end_stream=*/true).status(),
+                HasStatusCode(absl::StatusCode::kResourceExhausted));
+  }
 }
 
 TEST_F(FlatteningJsonCodecTest, SerializerHandlesEmptyStreamAndRejectsConflictingPaths) {

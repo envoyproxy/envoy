@@ -33,6 +33,16 @@ namespace HttpFilters {
 namespace AiProtocolManager {
 namespace {
 
+// A chat completion whose `args` holds `depth` nested objects, with usage beside them.
+std::string chatCompletionNestedTo(int depth) {
+  std::string args = "1";
+  for (int i = 0; i < depth; ++i) {
+    args = R"({"a":)" + args + "}";
+  }
+  return R"({"object":"chat.completion","args":)" + args +
+         R"(,"usage":{"prompt_tokens":3,"completion_tokens":4,"total_tokens":7}})";
+}
+
 // Wraps the in-memory store and records each write's size and end_stream flag.
 class RecordingExternalBufferFactory : public ExternalBufferFactory {
 public:
@@ -1139,6 +1149,45 @@ TEST_F(AiProtocolManagerFilterResponseTest, RouteScopingDefaultsToConfiguredRout
            true);
   ASSERT_TRUE(singleTypedWrite("envoy.ai.token_usage").has_value());
   EXPECT_EQ(counterValue("token_usage_found"), 1);
+}
+
+// The response bound defaults to 64 as well, so usage is read from a JSON body
+// and from an SSE event nested past the cursor's own 16.
+TEST_F(AiProtocolManagerFilterResponseTest, DefaultMaxJsonDepthAdmitsNestedResponse) {
+  setup("{default_llm_protocol: OPENAI_CHAT_COMPLETIONS}");
+  sendHeaders("application/json");
+  sendData(chatCompletionNestedTo(20), true);
+  EXPECT_EQ(counterValue("token_usage_found"), 1);
+
+  setup("{default_llm_protocol: OPENAI_CHAT_COMPLETIONS}");
+  sendHeaders("text/event-stream");
+  sendData("data: " + chatCompletionNestedTo(20) + "\n\n", true);
+  EXPECT_EQ(counterValue("token_usage_found"), 2);
+  EXPECT_EQ(counterValue("response_parse_error"), 0);
+}
+
+// A response nested past the configured bound is not parsed, as a JSON body
+// or as an SSE event.
+TEST_F(AiProtocolManagerFilterResponseTest, ResponseNestedPastMaxJsonDepthIsNotParsed) {
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+  TestUtility::loadFromYaml(R"EOF(
+response_handling:
+  token_usage:
+    include_unconfigured_routes: true
+  limits:
+    max_json_depth: 16
+)EOF",
+                            proto_config);
+  setupWithProto(proto_config);
+  sendHeaders("application/json");
+  sendData(chatCompletionNestedTo(20), true);
+  EXPECT_EQ(counterValue("response_parse_error"), 1);
+
+  setupWithProto(proto_config);
+  sendHeaders("text/event-stream");
+  sendData("data: " + chatCompletionNestedTo(20) + "\n\n", true);
+  EXPECT_EQ(counterValue("response_parse_error"), 2);
+  EXPECT_EQ(counterValue("token_usage_found"), 0);
 }
 
 // A request API named in `envoy.ai.llm_protocol.request` filter state declares
@@ -2733,6 +2782,63 @@ TEST_F(AiProtocolManagerFilterTest, UnaryJsonResponseFilterErrorSendsBadGatewayL
 
   EXPECT_EQ(encode_local_reply_calls_, 1);
   EXPECT_EQ(encode_local_reply_code_, Http::Code::BadGateway);
+}
+
+// The response bound reaches the AI filters' decoders: a JSON body nested past
+// the cursor's own 16 is parsed by default.
+TEST_F(AiProtocolManagerFilterTest, DefaultMaxJsonDepthAdmitsNestedUnaryJsonResponse) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<UnaryTaggingAiFilter>("tagged");
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "application/json"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+
+  const std::string nested = chatCompletionNestedTo(20);
+  Buffer::OwnedImpl json_chunk(nested);
+  EXPECT_EQ(filter_->encodeData(json_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+  nlohmann::json expected = nlohmann::json::parse(nested);
+  expected["tagged"] = true;
+  EXPECT_EQ(nlohmann::json::parse(encoded_injected_.toString()), expected);
+}
+
+// So is an SSE event: the filter tags only an event it got as JSON.
+TEST_F(AiProtocolManagerFilterTest, DefaultMaxJsonDepthAdmitsNestedSseEvent) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<SseTaggingAiFilter>("tagged");
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "text/event-stream"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+
+  const std::string nested = chatCompletionNestedTo(20);
+  Buffer::OwnedImpl sse_chunk("data: " + nested + "\n\n");
+  EXPECT_EQ(filter_->encodeData(sse_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+  nlohmann::json expected = nlohmann::json::parse(nested);
+  expected["tagged"] = true;
+  EXPECT_EQ(encoded_injected_.toString(), "data: " + expected.dump() + "\n\n");
 }
 
 TEST_F(AiProtocolManagerFilterTest, UnaryJsonResponseEngagesOnStructuredSuffixAndSkipsFramedRpc) {

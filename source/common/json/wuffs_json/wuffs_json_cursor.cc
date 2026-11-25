@@ -13,6 +13,9 @@ namespace Wuffs {
 
 namespace {
 
+// Wuffs stops at this depth itself, so a larger bound would never be reached.
+constexpr uint32_t kWuffsMaxDepth = WUFFS_JSON__DECODER_DEPTH_MAX_INCL;
+
 // Append the content of one Wuffs STRING token to `out`.
 // JSON STRING tokens carry either plain bytes (COPY) or the opening/closing
 // quote delimiter (DROP). Backslash escapes do NOT arrive as STRING tokens —
@@ -58,10 +61,9 @@ void appendCodePoint(std::string& out, uint32_t code_point) {
 } // namespace
 
 WuffsJsonCursor::WuffsJsonCursor(Handler& handler, uint32_t max_depth)
-    : handler_(handler), max_depth_(static_cast<int>(
-                             std::min<uint32_t>(max_depth, WUFFS_JSON__DECODER_DEPTH_MAX_INCL))),
+    : handler_(handler), max_depth_(static_cast<int>(std::min(max_depth, kWuffsMaxDepth))),
       levels_(1) {
-  // Reserved once so no level ever moves, and with it the key a callback was handed.
+  // Reserve up front so a level, and the key handed to a callback, never moves.
   levels_.reserve(max_depth_ + 1);
   decoder_ = wuffs_json__decoder::alloc();
   token_buf_ =
@@ -217,7 +219,7 @@ absl::Status WuffsJsonCursor::feedChunk(absl::string_view chunk, bool closed) {
     if (!wuffs_base__status__is_suspension(&status)) {
       const std::string message =
           absl::StrCat("wuffs json: ", wuffs_base__status__message(&status));
-      // Wuffs' own bound, reached only when max_depth_ sits at it.
+      // Wuffs' own depth bound, reachable only when max_depth_ equals it.
       if (status.repr == wuffs_json__error__unsupported_recursion_depth) {
         return absl::ResourceExhaustedError(message);
       }
@@ -260,9 +262,10 @@ absl::Status WuffsJsonCursor::handleStructureToken(uint64_t token_detail, size_t
     if (static_cast<size_t>(depth_) == levels_.size()) {
       levels_.emplace_back();
     }
-    levels_[depth_].seen_keys.clear();
-    levels_[depth_].is_dict = to_dict;
-    levels_[depth_].expecting_key = to_dict;
+    Level& level = levels_[depth_];
+    level.seen_keys.clear();
+    level.is_dict = to_dict;
+    level.expecting_key = to_dict;
     // key for onContainerOpen is the parent dict key that triggered this container.
     // Empty when the parent is an array or at root (depth 1).
     const absl::string_view parent_key = (depth_ > 1 && levels_[depth_ - 1].is_dict)

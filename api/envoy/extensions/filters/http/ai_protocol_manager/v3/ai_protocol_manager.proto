@@ -146,6 +146,24 @@ message ResponseHandling {
   // Extract canonical token usage from eligible AI responses. When unset,
   // token usage extraction is disabled.
   TokenUsageExtraction token_usage = 1;
+
+  // Response-path parsing limits. Defaults apply when unset.
+  ResponseParsingLimits limits = 2;
+}
+
+// Per-stream limits for response payload parsing.
+message ResponseParsingLimits {
+  // Maximum nesting depth of a response payload, counted the same way as the
+  // request's :ref:`max_json_depth
+  // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestParsingLimits.max_json_depth>`.
+  // It applies to a JSON response body and to the payload of each SSE event.
+  //
+  // A payload nested deeper is not parsed. Token usage extraction counts it in
+  // ``response_parse_error``. The AI filters get an SSE event unparsed, and a
+  // JSON response body fails the response.
+  //
+  // Defaults to 64.
+  google.protobuf.UInt32Value max_json_depth = 1 [(validate.rules).uint32 = {lte: 128 gte: 1}];
 }
 
 // Configuration for canonical response token-usage extraction.

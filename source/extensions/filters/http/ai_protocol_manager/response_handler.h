@@ -88,9 +88,10 @@ class SseResponseHandler : public ResponseHandler, public Logger::Loggable<Logge
 public:
   SseResponseHandler(LLMProtocol format, uint32_t max_event_size, uint32_t max_parsed_events,
                      AiProtocolManagerStats& stats,
-                     const Buffer::BufferMemoryAccountSharedPtr& account = nullptr)
+                     const Buffer::BufferMemoryAccountSharedPtr& account = nullptr,
+                     uint32_t max_json_depth = JsonWithExtBufParser::kDefaultMaxDepth)
       : ResponseHandler(format, stats), max_event_size_(max_event_size),
-        parse_budget_(max_parsed_events) {
+        max_json_depth_(max_json_depth), parse_budget_(max_parsed_events) {
     if (account != nullptr) {
       buffer_.bindAccount(account);
     }
@@ -123,6 +124,7 @@ private:
   bool pendingEventSkippable(absl::string_view tail);
 
   const uint32_t max_event_size_ = 0;
+  const uint32_t max_json_depth_ = 0;
   // Remaining parse budget (max_parsed_events); exhaustion makes the handler
   // inert with the accumulated usage flagged partial.
   uint32_t parse_budget_ = 0;
@@ -148,7 +150,8 @@ class JsonResponseHandler : public ResponseHandler, public Logger::Loggable<Logg
 public:
   JsonResponseHandler(LLMProtocol format, uint32_t max_inspected_body_size,
                       AiProtocolManagerStats& stats,
-                      const Buffer::BufferMemoryAccountSharedPtr& account = nullptr);
+                      const Buffer::BufferMemoryAccountSharedPtr& account = nullptr,
+                      uint32_t max_json_depth = JsonWithExtBufParser::kDefaultMaxDepth);
 
   void onData(const Buffer::Instance& data) override;
   void onEndStream() override;

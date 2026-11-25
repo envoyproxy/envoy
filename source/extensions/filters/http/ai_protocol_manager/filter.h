@@ -54,7 +54,7 @@ public:
   bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
   bool alwaysSerializeRequest() const { return always_serialize_request_; }
   uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }
-  uint32_t maxJsonDepth() const { return max_json_depth_; }
+  uint32_t maxRequestJsonDepth() const { return max_request_json_depth_; }
   bool tokenUsageEnabled() const { return token_usage_enabled_; }
   bool includeUnconfiguredRoutes() const { return include_unconfigured_routes_; }
   LLMProtocol defaultLLMProtocol() const { return default_llm_protocol_; }
@@ -63,6 +63,7 @@ public:
   uint32_t maxSseEventSize() const { return max_sse_event_size_; }
   uint32_t maxJsonBodySize() const { return max_json_body_size_; }
   uint32_t maxParsedSseEvents() const { return max_parsed_sse_events_; }
+  uint32_t maxResponseJsonDepth() const { return max_response_json_depth_; }
   AiProtocolManagerStats& stats() const { return stats_; }
   ExternalBufferFactory& bufferFactory() const { return *buffer_factory_; }
 
@@ -74,7 +75,7 @@ private:
   const bool parse_unconfigured_routes_ = false;
   const bool always_serialize_request_ = true;
   const uint32_t inline_string_threshold_bytes_ = 0;
-  const uint32_t max_json_depth_ = 0;
+  const uint32_t max_request_json_depth_ = 0;
   const bool token_usage_enabled_ = false;
   const bool include_unconfigured_routes_ = false;
   const LLMProtocol default_llm_protocol_ = LLMProtocol::Unspecified;
@@ -83,6 +84,7 @@ private:
   const uint32_t max_sse_event_size_ = 0;
   const uint32_t max_json_body_size_ = 0;
   const uint32_t max_parsed_sse_events_ = 0;
+  const uint32_t max_response_json_depth_ = 0;
   const AiFilterFactories ai_filter_factories_;
   const ExternalBufferFactorySharedPtr buffer_factory_;
 };

@@ -395,9 +395,10 @@ class UnaryAsyncState : public ResponseAsyncState<std::vector<FlattenJsonField>>
 public:
   UnaryAsyncState(std::vector<AiFilterSharedPtr> filters, FilterChainBridge& bridge,
                   BufferManager& out_buffer_manager,
-                  ResponseFilterManager::OnCompleteFn on_complete)
+                  ResponseFilterManager::OnCompleteFn on_complete,
+                  FlatteningJsonDecoder::Config decoder_config)
       : ResponseAsyncState(std::move(filters), bridge, out_buffer_manager, std::move(on_complete)),
-        serializer_(out_buffer_manager) {}
+        decoder_(decoder_config), serializer_(out_buffer_manager) {}
 
   ~UnaryAsyncState() override { cancel(); }
 
@@ -501,7 +502,7 @@ ResponseFilterManager::ResponseFilterManager(std::vector<AiFilterSharedPtr> filt
                                              OnCompleteFn on_complete, Config config) {
   if (config.mode == Mode::Unary) {
     async_state_ = std::make_shared<UnaryAsyncState>(std::move(filters), bridge, out_buffer_manager,
-                                                     std::move(on_complete));
+                                                     std::move(on_complete), config.unary);
   } else {
     async_state_ =
         std::make_shared<SseAsyncState>(std::move(filters), buffer_factory, bridge,

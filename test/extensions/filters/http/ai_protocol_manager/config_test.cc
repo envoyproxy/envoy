@@ -177,23 +177,26 @@ TEST(AiProtocolManagerConfigTest, RejectsOutOfRangeInlineStringThreshold) {
   }
 }
 
-// The nesting bound comes from the request-handling config too.
+// Each direction has its own nesting bound, with the same default.
 TEST(AiProtocolManagerConfigTest, MaxJsonDepthDefaultsAndOverrides) {
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
   {
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
-    proto_config.mutable_request_handling();
     const FilterConfig config(proto_config, *stats_store.rootScope(), AiFilterFactories{},
                               std::make_shared<InMemoryExternalBufferFactory>());
-    EXPECT_EQ(config.maxJsonDepth(), 64);
+    EXPECT_EQ(config.maxRequestJsonDepth(), 64);
+    EXPECT_EQ(config.maxResponseJsonDepth(), 64);
   }
   {
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
     proto_config.mutable_request_handling()->mutable_limits()->mutable_max_json_depth()->set_value(
         32);
+    proto_config.mutable_response_handling()->mutable_limits()->mutable_max_json_depth()->set_value(
+        48);
     const FilterConfig config(proto_config, *stats_store.rootScope(), AiFilterFactories{},
                               std::make_shared<InMemoryExternalBufferFactory>());
-    EXPECT_EQ(config.maxJsonDepth(), 32);
+    EXPECT_EQ(config.maxRequestJsonDepth(), 32);
+    EXPECT_EQ(config.maxResponseJsonDepth(), 48);
   }
 }
 
@@ -203,11 +206,23 @@ TEST(AiProtocolManagerConfigTest, RejectsOutOfRangeMaxJsonDepth) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   AiProtocolManagerFilterConfigFactory factory;
   for (const uint32_t value : {0u, 129u}) {
-    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
-    proto_config.mutable_request_handling()->mutable_limits()->mutable_max_json_depth()->set_value(
-        value);
-    EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
-                 EnvoyException);
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager request_config;
+    request_config.mutable_request_handling()
+        ->mutable_limits()
+        ->mutable_max_json_depth()
+        ->set_value(value);
+    EXPECT_THROW(
+        factory.createFilterFactoryFromProto(request_config, "stats", context).IgnoreError(),
+        EnvoyException);
+
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager response_config;
+    response_config.mutable_response_handling()
+        ->mutable_limits()
+        ->mutable_max_json_depth()
+        ->set_value(value);
+    EXPECT_THROW(
+        factory.createFilterFactoryFromProto(response_config, "stats", context).IgnoreError(),
+        EnvoyException);
   }
 }
 

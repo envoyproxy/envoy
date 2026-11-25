@@ -51,7 +51,7 @@ uint64_t FlattenJsonField::byteSize() const {
   return total;
 }
 
-FlatteningJsonDecoder::FlatteningJsonDecoder() : cursor_(*this) {}
+FlatteningJsonDecoder::FlatteningJsonDecoder(Config config) : cursor_(*this, config.max_depth) {}
 
 absl::Status FlatteningJsonDecoder::feedCursor(absl::string_view data, bool closed) {
   const absl::Status status = cursor_.feed(data, closed);

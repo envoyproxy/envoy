@@ -81,7 +81,12 @@ private:
 // with `is_partial() == false`.
 class FlatteningJsonDecoder : public Json::Wuffs::WuffsJsonCursor::Handler {
 public:
-  FlatteningJsonDecoder();
+  struct Config {
+    // Decoding fails with ResourceExhausted once containers nest deeper than this.
+    uint32_t max_depth{Json::Wuffs::WuffsJsonCursor::kMaxTrackedDepth - 1};
+  };
+
+  explicit FlatteningJsonDecoder(Config config);
 
   // Decodes `data` and returns every flattened `FlattenJsonField` produced during this call. When
   // `end_stream` is true, also validates that the JSON document is complete.
