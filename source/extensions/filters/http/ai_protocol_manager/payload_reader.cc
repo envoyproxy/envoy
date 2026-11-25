@@ -22,6 +22,33 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
+class PayloadReader::WaitReadable : public Coroutine::LeafAwaitable<absl::Status> {
+public:
+  explicit WaitReadable(PayloadReaderSharedPtr reader) : reader_(std::move(reader)) {}
+
+protected:
+  std::optional<absl::Status> tryImmediate() override {
+    if (reader_->failed_) {
+      return absl::DataLossError("external buffer write failed");
+    }
+    if (reader_->readable_) {
+      return absl::OkStatus();
+    }
+    return std::nullopt;
+  }
+
+  void onStart() override {
+    ASSERT(!reader_->failed_ && !reader_->readable_);
+    reader_->readable_waiters_.push_back(this);
+  }
+
+  void onCancel() override { std::erase(reader_->readable_waiters_, this); }
+
+private:
+  friend class PayloadReader;
+  PayloadReaderSharedPtr reader_;
+};
+
 // Bridges a single ExternalBuffer::read() call into a cancellable LeafAwaitable.
 //
 // ExternalBuffer::read() is single-flight and intentionally non-cancellable (e.g., backing stores
@@ -71,22 +98,9 @@ private:
   std::shared_ptr<bool> alive_{std::make_shared<bool>(true)};
 };
 
-std::optional<absl::Status> PayloadReader::ReadableAwaitable::tryImmediate() {
-  if (reader_->failed_) {
-    return absl::DataLossError("external buffer write failed");
-  }
-  if (reader_->readable_) {
-    return absl::OkStatus();
-  }
-  return std::nullopt;
+Coroutine::Task<absl::Status> PayloadReader::waitReadable() {
+  co_return co_await WaitReadable(shared_from_this());
 }
-
-void PayloadReader::ReadableAwaitable::onStart() {
-  ASSERT(!reader_->failed_ && !reader_->readable_);
-  reader_->readable_waiters_.push_back(this);
-}
-
-void PayloadReader::ReadableAwaitable::onCancel() { std::erase(reader_->readable_waiters_, this); }
 
 PayloadReaderSharedPtr PayloadReader::fromInMemory(Buffer::Instance& data) {
   PayloadReaderSharedPtr reader(new PayloadReader());
@@ -126,7 +140,7 @@ PayloadReaderSharedPtr PayloadReader::createFailed(uint64_t length) {
 Coroutine::Task<absl::StatusOr<Buffer::InstancePtr>> PayloadReader::readChunk(uint64_t offset,
                                                                               uint64_t max_length) {
   PayloadReaderSharedPtr self = shared_from_this();
-  CO_RETURN_IF_ERROR(co_await self->waitReadable());
+  CO_RETURN_IF_ERROR(co_await WaitReadable(self));
   if (offset > self->total_length_ || max_length > self->total_length_ - offset) {
     co_return absl::InvalidArgumentError("payload read range out of bounds");
   }
@@ -158,7 +172,7 @@ PayloadReader::completeExternalHandoff(std::shared_ptr<ExternalBuffer> buffer) {
   readable_ = true;
   std::shared_ptr<void> owner = std::move(pending_owner_);
   while (!readable_waiters_.empty()) {
-    ReadableAwaitable* waiter = readable_waiters_.front();
+    WaitReadable* waiter = readable_waiters_.front();
     readable_waiters_.erase(readable_waiters_.begin());
     waiter->complete(absl::OkStatus());
   }
@@ -172,7 +186,7 @@ std::shared_ptr<void> PayloadReader::failExternalHandoff() {
   failed_ = true;
   std::shared_ptr<void> owner = std::move(pending_owner_);
   while (!readable_waiters_.empty()) {
-    ReadableAwaitable* waiter = readable_waiters_.front();
+    WaitReadable* waiter = readable_waiters_.front();
     readable_waiters_.erase(readable_waiters_.begin());
     waiter->complete(absl::DataLossError("external buffer write failed"));
   }

@@ -68,10 +68,6 @@ protected:
 
   void drain() { dispatcher_->run(Event::Dispatcher::RunType::Block); }
 
-  static Coroutine::Task<absl::Status> waitReadableTask(PayloadReaderSharedPtr reader) {
-    co_return co_await reader->waitReadable();
-  }
-
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Coroutine::DispatcherExecutor> executor_;
@@ -201,7 +197,7 @@ TEST_F(PayloadReaderTest, PendingExternalHandoffFailureFailsWaitersAndSubsequent
 
   absl::Status wait_status = absl::OkStatus();
   auto wait_handle = Coroutine::launch(
-      waitReadableTask(reader), executor_,
+      reader->waitReadable(), executor_,
       [&wait_status](absl::Status s) { wait_status = std::move(s); }, Coroutine::StartMode::Inline);
 
   reader->failExternalHandoff();
@@ -225,12 +221,12 @@ TEST_F(PayloadReaderTest, PendingExternalHandoffFailureFailsWaitersAndSubsequent
   EXPECT_THAT(read2.status(), HasStatusCode(absl::StatusCode::kDataLoss));
 }
 
-TEST_F(PayloadReaderTest, ContextCancelUnwindsReadableAwaitableWithoutPoisoningReader) {
+TEST_F(PayloadReaderTest, ContextCancelUnwindsWaitReadableWithoutPoisoningReader) {
   PayloadReaderSharedPtr reader = PayloadReader::createPendingExternal(10);
 
   absl::Status wait_status = absl::OkStatus();
   auto wait_handle = Coroutine::launch(
-      waitReadableTask(reader), executor_,
+      reader->waitReadable(), executor_,
       [&wait_status](absl::Status s) { wait_status = std::move(s); }, Coroutine::StartMode::Inline);
 
   wait_handle.cancel();

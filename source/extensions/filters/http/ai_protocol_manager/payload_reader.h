@@ -2,13 +2,11 @@
 
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/coroutine/leaf_awaitable.h"
 #include "source/common/coroutine/semaphore.h"
 #include "source/common/coroutine/task.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
@@ -28,23 +26,6 @@ using PayloadReaderSharedPtr = std::shared_ptr<PayloadReader>;
 // serializing ExternalBuffer::read() calls across coroutines via a single-flight semaphore.
 class PayloadReader : public std::enable_shared_from_this<PayloadReader> {
 public:
-  // Awaitable that resolves once all bytes in [0, length()) are durable and readable (immediately
-  // without suspending if already readable), or fails with DataLossError if external storage
-  // failed.
-  class ReadableAwaitable : public Coroutine::LeafAwaitable<absl::Status> {
-  public:
-    explicit ReadableAwaitable(PayloadReaderSharedPtr reader) : reader_(std::move(reader)) {}
-
-  protected:
-    std::optional<absl::Status> tryImmediate() override;
-    void onStart() override;
-    void onCancel() override;
-
-  private:
-    friend class PayloadReader;
-    PayloadReaderSharedPtr reader_;
-  };
-
   // Adopts `data` (draining it) into an immediately readable in-memory PayloadReader.
   static PayloadReaderSharedPtr fromInMemory(Buffer::Instance& data);
 
@@ -81,8 +62,9 @@ public:
     return (allBytesReadable() && buffer_ == nullptr) ? &in_memory_ : nullptr;
   }
 
-  // Suspends only while an ExternalBuffer terminal write is still in flight.
-  ReadableAwaitable waitReadable() { return ReadableAwaitable(shared_from_this()); }
+  // Suspends only while an ExternalBuffer terminal write is still in flight; resolves immediately
+  // once all bytes in [0, length()) are durable, or fails with DataLossError if storage failed.
+  Coroutine::Task<absl::Status> waitReadable();
 
   // Reads `[offset, offset + max_length)` as a coroutine, awaiting `waitReadable()` first when an
   // ExternalBuffer flush is still in flight. Already-readable inline and zero-length reads complete
@@ -99,6 +81,7 @@ public:
   std::shared_ptr<void> failExternalHandoff();
 
 private:
+  class WaitReadable;
   class ReadExternalBuffer;
 
   PayloadReader() = default;
@@ -112,7 +95,7 @@ private:
   bool readable_{false};
   bool failed_{false};
 
-  std::vector<ReadableAwaitable*> readable_waiters_;
+  std::vector<WaitReadable*> readable_waiters_;
 };
 
 } // namespace AiProtocolManager
