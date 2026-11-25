@@ -498,10 +498,8 @@ void SplicePump::complete(Outcome outcome) {
 
 // splice and kTLS are Linux only. Elsewhere prepare fails, so the caller stays on the buffered path
 // and every other method is an unused no-op.
-SplicePump::SplicePump(os_fd_t down_fd, os_fd_t up_fd, Event::Dispatcher& dispatcher,
-                       CompletionCb on_complete, uint64_t max_bytes_per_wakeup)
-    : down_fd_(down_fd), up_fd_(up_fd), dispatcher_(dispatcher),
-      on_complete_(std::move(on_complete)), max_bytes_per_wakeup_(max_bytes_per_wakeup) {}
+SplicePump::SplicePump(os_fd_t, os_fd_t, Event::Dispatcher&, CompletionCb on_complete, uint64_t)
+    : on_complete_(std::move(on_complete)) {}
 
 SplicePump::~SplicePump() = default;
 bool SplicePump::prepare(bool) { return false; }
