@@ -1,5 +1,8 @@
 #include "source/extensions/transport_sockets/tls/cert_mappers/sni/config.h"
 
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/tls/utility.h"
+
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -16,7 +19,16 @@ public:
   std::string deriveFromClientHello(const SSL_CLIENT_HELLO& ssl_client_hello) override {
     absl::string_view sni = absl::NullSafeStringView(
         SSL_get_servername(ssl_client_hello.ssl, TLSEXT_NAMETYPE_host_name));
-    return sni.empty() ? default_value_ : std::string(sni);
+    if (sni.empty()) {
+      return default_value_;
+    }
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.tls_sni_mapper_validate_hostname")) {
+      // Return empty string on invalid wire SNI so the certificate selector fails closed instead
+      // of subscribing to untrusted xDS resource names.
+      return Tls::Utility::normalizeDnsHostname(sni).value_or(std::string());
+    }
+    return std::string(sni);
   }
 
 private:

@@ -37,6 +37,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3:pkg_cc_proto",

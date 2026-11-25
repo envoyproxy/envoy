@@ -56,6 +56,30 @@ bool dnsNameMatch(absl::string_view dns_name, absl::string_view pattern);
 bool labelWildcardMatch(absl::string_view dns_label, absl::string_view pattern);
 
 /**
+ * Validates whether the given string is a valid bare ASCII DNS hostname suitable for TLS SNI
+ * (RFC 1035 / RFC 1123 / RFC 6066 section 3).
+ *
+ * Accepts single-label hostnames (e.g., "localhost") and an optional single trailing dot
+ * (e.g., "example.com."). Enforces a maximum length of 253 bytes (excluding the optional trailing
+ * dot), label lengths of 1..63 bytes, ASCII alphanumeric and hyphen characters with alphanumeric
+ * label boundaries, and rejects IP literals (IPv6 via character checks and IPv4 / all-numeric
+ * hostnames via RFC 3696 section 2).
+ *
+ * @param hostname the hostname to validate
+ * @return true if hostname is a valid ASCII DNS hostname
+ */
+bool isValidDnsHostname(absl::string_view hostname);
+
+/**
+ * Validates and normalizes a bare ASCII DNS hostname suitable for TLS SNI.
+ * Strips an optional single trailing dot and converts ASCII letters to lowercase.
+ *
+ * @param hostname the hostname to validate and normalize
+ * @return lowercased hostname without trailing dot, or std::nullopt if invalid
+ */
+std::optional<std::string> normalizeDnsHostname(absl::string_view hostname);
+
+/**
  * Retrieves the serial number of a certificate.
  * @param cert the certificate
  * @return std::string the serial number field of the certificate. Returns "" if

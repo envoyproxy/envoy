@@ -70,6 +70,95 @@ TEST(UtilityTest, TestDnsNameMatching) {
   EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", ""));
 }
 
+TEST(UtilityTest, TestIsValidDnsHostname) {
+  // Valid single-label and multi-label hostnames, including punycode and optional trailing dot.
+  EXPECT_TRUE(Utility::isValidDnsHostname("a"));
+  EXPECT_TRUE(Utility::isValidDnsHostname("server"));
+  EXPECT_TRUE(Utility::isValidDnsHostname("localhost"));
+  EXPECT_TRUE(Utility::isValidDnsHostname("localhost2"));
+  EXPECT_TRUE(Utility::isValidDnsHostname("example.com"));
+  EXPECT_TRUE(Utility::isValidDnsHostname("example.com."));
+  EXPECT_TRUE(Utility::isValidDnsHostname("Example.COM"));
+  EXPECT_TRUE(Utility::isValidDnsHostname("Example.COM."));
+  EXPECT_TRUE(Utility::isValidDnsHostname("a-b.c-d.example.com"));
+  EXPECT_TRUE(Utility::isValidDnsHostname("123.example.com"));
+  EXPECT_TRUE(Utility::isValidDnsHostname("0.pool.ntp.org"));
+  EXPECT_TRUE(Utility::isValidDnsHostname("123-456"));
+  EXPECT_TRUE(Utility::isValidDnsHostname("xn--bcher-kva.example"));
+  EXPECT_TRUE(Utility::isValidDnsHostname("xn--e1afmkfd.xn--p1ai"));
+
+  // Maximum label length (63 bytes) and hostname length (253 bytes excluding trailing dot).
+  const std::string max_label(63, 'a');
+  EXPECT_TRUE(Utility::isValidDnsHostname(max_label));
+  EXPECT_FALSE(Utility::isValidDnsHostname(std::string(64, 'a')));
+  const std::string max_host =
+      absl::StrCat(max_label, ".", max_label, ".", max_label, ".", std::string(61, 'b'));
+  ASSERT_EQ(253, max_host.size());
+  EXPECT_TRUE(Utility::isValidDnsHostname(max_host));
+  EXPECT_TRUE(Utility::isValidDnsHostname(max_host + "."));
+  EXPECT_FALSE(Utility::isValidDnsHostname(max_host + "c"));
+  EXPECT_FALSE(Utility::isValidDnsHostname(max_host + "c."));
+
+  // Empty, dots, and malformed label boundaries.
+  EXPECT_FALSE(Utility::isValidDnsHostname(""));
+  EXPECT_FALSE(Utility::isValidDnsHostname("."));
+  EXPECT_FALSE(Utility::isValidDnsHostname(".."));
+  EXPECT_FALSE(Utility::isValidDnsHostname(".example.com"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("example..com"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("example.com.."));
+  EXPECT_FALSE(Utility::isValidDnsHostname("-example.com"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("example-.com"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("a.-.com"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("a.com-"));
+
+  // Disallowed characters (wildcards, xdstp schemes, ports, underscores, percent encoding, etc.).
+  EXPECT_FALSE(Utility::isValidDnsHostname("*"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("*.example.com"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("xdstp:x"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("xdstp://x"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("xdstp://a/b/c"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("XDSTP:x"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("example.com:443"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("foo_bar.example.com"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("envoy_proxy_server_cert"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("a%41.example.com"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("example.com/path"));
+
+  // IPv4, IPv6, and all-numeric hostnames / TLDs.
+  EXPECT_FALSE(Utility::isValidDnsHostname("127.0.0.1"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("10.0.0.1"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("192.168.1.1."));
+  EXPECT_FALSE(Utility::isValidDnsHostname("127.1"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("2130706433"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("foo.123"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("::1"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("[::1]"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("2001:db8::1"));
+
+  // Control characters, whitespace, embedded NUL, and non-ASCII / invalid UTF-8 bytes.
+  EXPECT_FALSE(Utility::isValidDnsHostname("foo\nbar.com"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("foo\rbar.com"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("foo\tbar.com"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("foo bar.com"));
+  EXPECT_FALSE(Utility::isValidDnsHostname(absl::string_view("foo\0bar.com", 11)));
+  EXPECT_FALSE(Utility::isValidDnsHostname("\xff\xfe.example"));
+  EXPECT_FALSE(Utility::isValidDnsHostname("caf\xc3\xa9.example"));
+}
+
+TEST(UtilityTest, TestNormalizeDnsHostname) {
+  EXPECT_EQ("server", Utility::normalizeDnsHostname("server"));
+  EXPECT_EQ("example.com", Utility::normalizeDnsHostname("Example.COM"));
+  EXPECT_EQ("example.com", Utility::normalizeDnsHostname("Example.COM."));
+  EXPECT_EQ("example.com", Utility::normalizeDnsHostname("example.com."));
+  EXPECT_EQ("localhost2", Utility::normalizeDnsHostname("LocalHost2"));
+  EXPECT_EQ(std::nullopt, Utility::normalizeDnsHostname(""));
+  EXPECT_EQ(std::nullopt, Utility::normalizeDnsHostname("."));
+  EXPECT_EQ(std::nullopt, Utility::normalizeDnsHostname("*"));
+  EXPECT_EQ(std::nullopt, Utility::normalizeDnsHostname("xdstp:x"));
+  EXPECT_EQ(std::nullopt, Utility::normalizeDnsHostname("127.0.0.1"));
+  EXPECT_EQ(std::nullopt, Utility::normalizeDnsHostname("\xff\xfe.example"));
+}
+
 TEST(UtilityTest, TestOtherNameUniversalWithEmbeddedNull) {
   // Universal strings are utf-32.
   uint32_t utf32_data[] = {

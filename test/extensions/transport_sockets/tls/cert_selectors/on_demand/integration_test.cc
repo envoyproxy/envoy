@@ -373,6 +373,91 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessSNI) {
   EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
 }
 
+TEST_P(OnDemandIntegrationTest, SniNormalizationAndFallback) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "SNI mapper only works on downstream";
+  }
+  ssl_options_.setSni("SERVER.");
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: server
+  )EOF");
+
+  // Mixed-case trailing-dot SNI normalizes to "server".
+  auto conn = createClientConnection();
+  waitCertsRequested(1);
+  createXdsConnection();
+  waitSendSdsResponse("server");
+  conn->waitForUpstreamConnection();
+  conn->sendAndReceiveTlsData("hello", "world");
+  conn.reset();
+
+  // Different casing ("Server", "sErVeR.") and absent SNI (default_value: "server") all resolve
+  // to the same cached subscription without triggering additional SDS requests.
+  for (const std::string& variant : {"Server", "sErVeR.", ""}) {
+    auto options = ssl_options_;
+    options.setSni(variant);
+    context_ = Ssl::createClientSslTransportSocketFactory(options, *context_manager_, *api_,
+                                                          &server_factory_context_.serverScope());
+    auto conn2 = createClientConnection();
+    conn2->waitForUpstreamConnection();
+    conn2->sendAndReceiveTlsData("hello", "world");
+    conn2.reset();
+  }
+  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
+TEST_P(OnDemandIntegrationTest, InvalidSniRejectedWithoutCrashingOrSubscribing) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "SNI mapper only works on downstream";
+  }
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: server
+  )EOF");
+
+  for (const std::string& bad_sni :
+       {"xdstp:x", "xdstp://x", "*", "127.0.0.1", "foo\nbar.com", "\xff\xfe.example"}) {
+    auto options = ssl_options_;
+    options.setSni(bad_sni);
+    context_ = Ssl::createClientSslTransportSocketFactory(options, *context_manager_, *api_,
+                                                          &server_factory_context_.serverScope());
+    auto conn = createClientConnection();
+    conn->waitForDisconnect();
+    // tcp_proxy opens an upstream connection eagerly on accept before TLS fails; drain it so
+    // the subsequent valid connection pops its own FakeRawConnection.
+    FakeRawConnectionPtr discarded_upstream;
+    ASSERT_TRUE(dataStream()->waitForRawConnection(discarded_upstream));
+    ASSERT_TRUE(discarded_upstream->close());
+    ASSERT_TRUE(discarded_upstream->waitForDisconnect());
+    conn.reset();
+  }
+  EXPECT_EQ(0, test_server_->counter(onDemandStat("cert_requested"))->value());
+  EXPECT_EQ(0, test_server_->gauge(onDemandStat("cert_active"))->value());
+
+  // Valid connections continue to succeed after hostile SNIs.
+  auto options = ssl_options_;
+  options.setSni("server");
+  context_ = Ssl::createClientSslTransportSocketFactory(options, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
+  auto good_conn = createClientConnection();
+  waitCertsRequested(1);
+  createXdsConnection();
+  waitSendSdsResponse("server");
+  good_conn->waitForUpstreamConnection();
+  good_conn->sendAndReceiveTlsData("hello", "world");
+  good_conn.reset();
+  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
 TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {
   setup(R"EOF(
   certificate_mapper:
