@@ -14,6 +14,7 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 
@@ -58,9 +59,19 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   }
 
   descriptors_.clear();
+  stream_done_request_headers_.reset();
+  has_stream_done_rate_limits_ = false;
   // Request-time population: the response has not been produced yet, so no response headers are
   // available to the formatter (%RESP()% resolves empty here, as before).
   populateRateLimitDescriptors(descriptors_, headers, /*response_headers=*/nullptr, false);
+  if (has_stream_done_rate_limits_ &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ratelimit_stream_done_use_decode_time_request_headers")) {
+    // Like route_ and cluster_, save the request headers so stream-done descriptors use the same
+    // context as the request-time ones. The router and other filters can change the live headers
+    // later in the filter chain.
+    stream_done_request_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
+  }
   ENVOY_LOG(debug, "rate limit descriptors size: {}", descriptors_.size());
   if (!descriptors_.empty()) {
     state_ = State::Calling;
@@ -101,6 +112,9 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
   for (const FilterConfigPerRoute& route_config :
        absl::MakeConstSpan(route_configs_).subspan(0, all_levels ? route_configs_.size() : 1)) {
     if (route_config.hasRateLimitConfigs()) {
+      if (!on_stream_done) {
+        has_stream_done_rate_limits_ |= route_config.hasStreamDoneRateLimits();
+      }
       route_config.populateDescriptors(headers, response_headers, callbacks_->streamInfo(),
                                        descriptors, on_stream_done);
       populated = true;
@@ -109,6 +123,9 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
 
   // The filter level embedded rate limits take precedence over the route rate limits.
   if ((!populated || all_levels) && config_->hasRateLimitConfigs()) {
+    if (!on_stream_done) {
+      has_stream_done_rate_limits_ |= config_->hasStreamDoneRateLimits();
+    }
     config_->populateDescriptors(headers, response_headers, callbacks_->streamInfo(), descriptors,
                                  on_stream_done);
     populated = true;
@@ -211,7 +228,9 @@ void Filter::onDestroy() {
     client_->cancel();
   } else if (client_ != nullptr && request_headers_ != nullptr) {
     std::vector<Envoy::RateLimit::Descriptor> descriptors;
-    populateRateLimitDescriptors(descriptors, *request_headers_, response_headers_, true);
+    const Http::RequestHeaderMap& stream_done_headers =
+        stream_done_request_headers_ != nullptr ? *stream_done_request_headers_ : *request_headers_;
+    populateRateLimitDescriptors(descriptors, stream_done_headers, response_headers_, true);
     if (!descriptors.empty()) {
       // If the limit() call fails directly then the callback and client will be destroyed
       // when calling the limit() function. To make sure we can call the detach() function
@@ -345,6 +364,9 @@ void Filter::populateRateLimitDescriptorsForPolicy(const Router::RateLimitPolicy
       continue;
     }
     const bool apply_on_stream_done = rate_limit.applyOnStreamDone();
+    if (!on_stream_done && apply_on_stream_done) {
+      has_stream_done_rate_limits_ = true;
+    }
     if (on_stream_done == apply_on_stream_done) {
       rate_limit.populateDescriptors(descriptors, config_->localInfo().clusterName(), headers,
                                      callbacks_->streamInfo());
@@ -372,6 +394,9 @@ void Filter::populateResponseHeaders(Http::HeaderMap& response_headers, bool fro
 void Filter::appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add) {
   if (request_headers_to_add && request_headers_) {
     Http::HeaderMapImpl::copyFrom(*request_headers_, *request_headers_to_add);
+    if (stream_done_request_headers_ != nullptr) {
+      Http::HeaderMapImpl::copyFrom(*stream_done_request_headers_, *request_headers_to_add);
+    }
     request_headers_to_add = nullptr;
   }
 }

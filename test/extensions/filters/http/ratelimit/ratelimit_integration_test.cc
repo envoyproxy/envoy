@@ -77,7 +77,7 @@ public:
     HttpIntegrationTest::initialize();
   }
 
-  void initiateClientConnection() {
+  void initiateClientConnection(bool include_tenant_header = false) {
     ratelimit_requests_.resize(num_requests_);
     upstream_requests_.resize(num_requests_);
     responses_.resize(num_requests_);
@@ -87,6 +87,9 @@ public:
       Http::TestRequestHeaderMapImpl headers{
           {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
           {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
+      if (include_tenant_header) {
+        headers.addCopy("x-tenant", "tenant-a");
+      }
       responses_[i] = codec_client_->makeRequestWithBody(headers, request_size_);
     }
   }
@@ -820,6 +823,65 @@ TEST_P(RatelimitIntegrationTest, ClusterLocalityEntry) {
   cleanup();
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
+}
+
+TEST_P(RatelimitIntegrationTest, StreamDoneRequestHeaderSnapshotWithRouteHeaderRemoval) {
+  base_filter_config_ = R"EOF(
+    domain: some_domain
+    timeout: 0.5s
+  )EOF";
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->add_request_headers_to_remove("x-tenant");
+
+        envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute per_route_config;
+        auto* request_rate_limit = per_route_config.add_rate_limits();
+        request_rate_limit->add_actions()->mutable_generic_key()->set_descriptor_value("request");
+
+        auto* stream_done_rate_limit = per_route_config.add_rate_limits();
+        auto* request_headers_action =
+            stream_done_rate_limit->add_actions()->mutable_request_headers();
+        request_headers_action->set_header_name("x-tenant");
+        request_headers_action->set_descriptor_key("tenant");
+        stream_done_rate_limit->set_apply_on_stream_done(true);
+
+        std::ignore =
+            (*route->mutable_typed_per_filter_config())["envoy.filters.http.ratelimit"].PackFrom(
+                per_route_config);
+      });
+
+  initialize();
+  initiateClientConnection(/*include_tenant_header=*/true);
+
+  envoy::service::ratelimit::v3::RateLimitRequest expected_request_msg;
+  expected_request_msg.set_domain("some_domain");
+  auto* entry = expected_request_msg.add_descriptors()->add_entries();
+  entry->set_key("generic_key");
+  entry->set_value("request");
+  waitForRatelimitRequest(expected_request_msg);
+  sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OK, {},
+                        Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{}, 0);
+
+  // Keep the request-path stream alive while the stream-done request is received.
+  FakeStreamPtr first_stream = std::move(ratelimit_requests_[0]);
+
+  expected_request_msg.mutable_descriptors()->Clear();
+  entry = expected_request_msg.add_descriptors()->add_entries();
+  entry->set_key("tenant");
+  entry->set_value("tenant-a");
+  ASSERT_NE(fake_ratelimit_connection_, nullptr);
+  ASSERT_TRUE(fake_ratelimit_connection_->waitForNewStream(*dispatcher_, ratelimit_requests_[0]));
+  envoy::service::ratelimit::v3::RateLimitRequest stream_done_request;
+  ASSERT_TRUE(ratelimit_requests_[0]->waitForGrpcMessage(*dispatcher_, stream_done_request));
+  ASSERT_TRUE(ratelimit_requests_[0]->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(expected_request_msg.DebugString(), stream_done_request.DebugString());
+  sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OK, {},
+                        Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{}, 0);
+
+  waitForSuccessfulUpstreamResponse(0);
+  cleanup();
 }
 
 // End-to-end: a stream-done descriptor whose hits_addend is a %RESP() substitution resolves the

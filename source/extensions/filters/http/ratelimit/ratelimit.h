@@ -131,6 +131,10 @@ public:
     ASSERT(rate_limit_config_ != nullptr);
     return !rate_limit_config_->empty();
   }
+  bool hasStreamDoneRateLimits() const {
+    ASSERT(rate_limit_config_ != nullptr);
+    return rate_limit_config_->hasStreamDone();
+  }
   void populateDescriptors(const Http::RequestHeaderMap& headers,
                            const Http::ResponseHeaderMap* response_headers,
                            const StreamInfo::StreamInfo& info,
@@ -222,6 +226,10 @@ public:
   bool hasRateLimitConfigs() const {
     ASSERT(rate_limit_config_ != nullptr);
     return !rate_limit_config_->empty();
+  }
+  bool hasStreamDoneRateLimits() const {
+    ASSERT(rate_limit_config_ != nullptr);
+    return rate_limit_config_->hasStreamDone();
   }
 
   void populateDescriptors(const Http::RequestHeaderMap& headers,
@@ -328,6 +336,11 @@ private:
   // both header maps are owned by the ActiveStream and outlive destroyFilters().
   Http::ResponseHeaderMap* response_headers_{};
   std::vector<Envoy::RateLimit::Descriptor> descriptors_;
+  // Copy of the request headers taken at request time for apply_on_stream_done rate limits. Only
+  // set when such a rate limit applies and the runtime guard is enabled.
+  Http::RequestHeaderMapPtr stream_done_request_headers_;
+  // Whether any rate limit that applied at request time has apply_on_stream_done set.
+  bool has_stream_done_rate_limits_{false};
 };
 
 /**

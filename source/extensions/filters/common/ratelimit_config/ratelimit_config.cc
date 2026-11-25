@@ -255,6 +255,7 @@ RateLimitConfig::RateLimitConfig(const Protobuf::RepeatedPtrField<ProtoRateLimit
                                  absl::Status& creation_status, bool no_limit) {
   rate_limit_policies_.reserve(configs.size());
   for (const ProtoRateLimit& config : configs) {
+    has_stream_done_ |= config.apply_on_stream_done();
     rate_limit_policies_.emplace_back(config, context, creation_status, no_limit);
     RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   }

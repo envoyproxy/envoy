@@ -20,6 +20,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -432,6 +433,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
   setUpTest(filter_config_);
   InSequence s;
 
+  request_headers_.addCopy("x-header-name", "header-value");
   filter_callbacks_.stream_info_.filter_state_->setData(
       "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(5));
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
@@ -483,11 +485,18 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
   EXPECT_CALL(vh_rate_limit_, applyOnStreamDone()).WillRepeatedly(Return(true));
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
-      .WillOnce(SetArgReferee<0>(descriptor_two_));
+      .WillOnce([&](std::vector<RateLimit::Descriptor>& descriptors, const std::string&,
+                    const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo&) {
+        const auto header_values = headers.get(Http::LowerCaseString("x-header-name"));
+        ASSERT_EQ(1, header_values.size());
+        EXPECT_EQ("header-value", header_values[0]->value().getStringView());
+        descriptors = descriptor_two_;
+      });
   EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(descriptor_two_), _, _, 100))
       .WillOnce(WithArgs<0>([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
         request_callbacks_ = &callbacks;
       }));
+  request_headers_.remove("x-header-name");
   EXPECT_CALL(*client_, detach());
   filter_->onDestroy();
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
@@ -2480,6 +2489,7 @@ TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsAndOnStreamDone) {
                                std::make_unique<Http::TestResponseHeaderMapImpl>(), nullptr, "",
                                nullptr);
 
+  request_headers_.remove("x-header-name");
   EXPECT_EQ(0U, filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromStatName(ratelimit_over_limit_)
@@ -2739,6 +2749,150 @@ TEST_F(HttpRateLimitFilterTest, InlinedRateLimitActionOnStreamDone) {
       filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
 }
 
+TEST_F(HttpRateLimitFilterTest, StreamDoneRequestHeaderSnapshot) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ratelimit_stream_done_use_decode_time_request_headers",
+        "true"}});
+  const std::string config = R"EOF(
+  domain: foo
+  rate_limits:
+  - actions:
+    - request_headers:
+        header_name: x-tenant
+        descriptor_key: tenant
+    apply_on_stream_done: true
+  - actions:
+    - request_headers:
+        header_name: :path
+        descriptor_key: path
+    apply_on_stream_done: true
+  - actions:
+    - generic_key:
+        descriptor_value: request
+  )EOF";
+  setUpTest(config);
+  request_headers_.addCopy("x-tenant", "tenant-a");
+  request_headers_.setPath("/original");
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"generic_key", "request"}}}}),
+                              _, _, 0))
+      .WillOnce(WithArgs<0>([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) {
+        request_callbacks_ = &callbacks;
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+
+  request_headers_.remove("x-tenant");
+  request_headers_.setPath("/rewritten");
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"tenant", "tenant-a"}}}, {{{"path", "/original"}}}}),
+                              _, _, 0))
+      .WillOnce(WithArgs<0>([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) {
+        request_callbacks_ = &callbacks;
+      }));
+  EXPECT_CALL(*client_, detach());
+  filter_->onDestroy();
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+}
+
+TEST_F(HttpRateLimitFilterTest, StreamDoneRequestHeaderSnapshotIncludesRateLimitServiceHeaders) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ratelimit_stream_done_use_decode_time_request_headers",
+        "true"}});
+  const std::string config = R"EOF(
+  domain: foo
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: request
+  - actions:
+    - request_headers:
+        header_name: x-added
+        descriptor_key: added
+    apply_on_stream_done: true
+  )EOF";
+  setUpTest(config);
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"generic_key", "request"}}}}),
+                              _, _, 0))
+      .WillOnce(WithArgs<0>([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) {
+        request_callbacks_ = &callbacks;
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               std::make_unique<Http::TestRequestHeaderMapImpl>(
+                                   Http::TestRequestHeaderMapImpl{{"x-added", "from-rls"}}),
+                               "", nullptr);
+
+  request_headers_.remove("x-added");
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(
+                                  std::vector<RateLimit::Descriptor>{{{{"added", "from-rls"}}}}),
+                              _, _, 0))
+      .WillOnce(WithArgs<0>([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) {
+        request_callbacks_ = &callbacks;
+      }));
+  EXPECT_CALL(*client_, detach());
+  filter_->onDestroy();
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+}
+
+TEST_F(HttpRateLimitFilterTest, StreamDoneRequestHeaderSnapshotRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ratelimit_stream_done_use_decode_time_request_headers",
+        "false"}});
+  const std::string config = R"EOF(
+  domain: foo
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: request
+  - actions:
+    - request_headers:
+        header_name: x-added
+        descriptor_key: added
+    apply_on_stream_done: true
+  )EOF";
+  setUpTest(config);
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"generic_key", "request"}}}}),
+                              _, _, 0))
+      .WillOnce(WithArgs<0>([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) {
+        request_callbacks_ = &callbacks;
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               std::make_unique<Http::TestRequestHeaderMapImpl>(
+                                   Http::TestRequestHeaderMapImpl{{"x-added", "from-rls"}}),
+                               "", nullptr);
+
+  request_headers_.remove("x-added");
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, _)).Times(0);
+  filter_->onDestroy();
+}
+
 // A stream-done descriptor whose hits_addend is a %RESP()% substitution resolves the value from the
 // response headers captured at encodeHeaders() time.
 TEST_F(HttpRateLimitFilterTest, InlinedRateLimitActionOnStreamDoneResponseHeaderHitsAddend) {
@@ -2913,6 +3067,73 @@ TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsAllLevels) {
                     testing::ContainerEq(std::vector<RateLimit::Descriptor>{
                         {{{"generic_key", "route-done-key"}}}, {{{"generic_key", "vh-done-key"}}}}),
                     _, _, 0))
+      .WillOnce([this](Filters::Common::RateLimit::RequestCallbacks& callbacks, const std::string&,
+                       const std::vector<Envoy::RateLimit::Descriptor>&, Tracing::Span&,
+                       OptRef<const StreamInfo::StreamInfo>,
+                       uint32_t) -> void { request_callbacks_ = &callbacks; });
+  EXPECT_CALL(*client_, detach());
+  filter_->onDestroy();
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+}
+
+TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsAllLevelsStreamDoneHeaderSnapshot) {
+  const std::string vh_config_yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "vh-key"
+  )EOF";
+  const std::string route_config_yaml = R"EOF(
+  rate_limits_override_option: ALL_LEVELS
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: "route-key"
+  - actions:
+    - request_headers:
+        header_name: x-tenant
+        descriptor_key: tenant
+    apply_on_stream_done: true
+  )EOF";
+  setUpTest(filter_config_, route_config_yaml);
+  request_headers_.addCopy("x-tenant", "tenant-a");
+
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute vh_settings;
+  TestUtility::loadFromYaml(vh_config_yaml, vh_settings);
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigPerRoute vh_config(factory_context_, vh_settings, creation_status);
+  EXPECT_OK(creation_status);
+  FilterConfigPerRoute empty_config(
+      factory_context_, envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute(),
+      creation_status);
+  EXPECT_OK(creation_status);
+
+  EXPECT_CALL(filter_callbacks_, perFilterConfigs())
+      .WillOnce(Return(
+          Router::RouteSpecificFilterConfigs{&empty_config, &vh_config, route_config_.get()}));
+
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _)).Times(0);
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"generic_key", "route-key"}}}, {{{"generic_key", "vh-key"}}}}),
+                              _, _, 0))
+      .WillOnce([this](Filters::Common::RateLimit::RequestCallbacks& callbacks, const std::string&,
+                       const std::vector<Envoy::RateLimit::Descriptor>&, Tracing::Span&,
+                       OptRef<const StreamInfo::StreamInfo>,
+                       uint32_t) -> void { request_callbacks_ = &callbacks; });
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+
+  request_headers_.remove("x-tenant");
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(
+                                  std::vector<RateLimit::Descriptor>{{{{"tenant", "tenant-a"}}}}),
+                              _, _, 0))
       .WillOnce([this](Filters::Common::RateLimit::RequestCallbacks& callbacks, const std::string&,
                        const std::vector<Envoy::RateLimit::Descriptor>&, Tracing::Span&,
                        OptRef<const StreamInfo::StreamInfo>,
