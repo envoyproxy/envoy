@@ -9,6 +9,10 @@
 #include "source/common/coroutine/dispatcher_executor.h"
 #include "source/common/coroutine/launch.h"
 #include "source/extensions/filters/http/ai_protocol_manager/chain_writer.h"
+#include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
+#include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
+#include "source/extensions/filters/http/ai_protocol_manager/payload_reader.h"
+#include "source/extensions/filters/http/ai_protocol_manager/payload_stream.h"
 
 #include "test/extensions/filters/http/ai_protocol_manager/fake_bridge.h"
 #include "test/mocks/event/mocks.h"
@@ -26,6 +30,7 @@ namespace HttpFilters {
 namespace AiProtocolManager {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusCode;
 using ::Envoy::StatusHelpers::IsOk;
 
 class ChainWriterTest : public testing::Test {
@@ -38,6 +43,19 @@ protected:
   // Runs until no posted, current-iteration, or next-iteration callbacks remain queued (returning
   // immediately once work completes or parks on a watermark).
   void drain() { dispatcher_->run(Event::Dispatcher::RunType::Block); }
+
+  PayloadReaderSharedPtr store(absl::string_view bytes) {
+    InMemoryExternalBufferFactory factory;
+    std::shared_ptr<ExternalBuffer> ext = factory.createBuffer(*dispatcher_);
+    ext->write(std::make_unique<Buffer::OwnedImpl>(bytes), /*end_stream=*/true,
+               [](ExternalBufferStatus) {});
+    drain();
+    return PayloadReader::fromExternalBuffer(std::move(ext), bytes.size());
+  }
+
+  Coroutine::Task<absl::Status> stream(PayloadReader& reader, uint64_t offset, uint64_t length) {
+    co_return co_await streamPayload(reader, offset, length, writer_);
+  }
 
   Coroutine::Task<absl::Status> inject(Buffer::Instance& data) {
     co_return co_await writer_.inject(data);
@@ -59,6 +77,64 @@ protected:
   std::shared_ptr<Coroutine::DispatcherExecutor> executor_;
   absl::Status result_ = absl::UnknownError("never completed");
 };
+
+TEST_F(ChainWriterTest, StreamsARangeOfTheReader) {
+  PayloadReaderSharedPtr reader = store("0123456789");
+  Coroutine::DetachedHandle handle = launch(stream(*reader, 2, 4));
+  drain();
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(injected(), "2345");
+}
+
+TEST_F(ChainWriterTest, EmptyRangeCompletesWithoutSuspending) {
+  Buffer::OwnedImpl empty;
+  PayloadReaderSharedPtr reader = PayloadReader::fromInMemory(empty);
+  Coroutine::DetachedHandle handle = launch(stream(*reader, 0, 0));
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(injected(), "");
+}
+
+TEST_F(ChainWriterTest, OutOfBoundsStreamReturnsInvalidArgument) {
+  PayloadReaderSharedPtr reader = store("hello");
+  Coroutine::DetachedHandle handle = launch(stream(*reader, 3, 5));
+  drain();
+
+  EXPECT_THAT(result_, HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(injected(), "");
+}
+
+TEST_F(ChainWriterTest, EmptyExternalChunkReturnsDataLoss) {
+  class EmptyChunkExternalBuffer : public ExternalBuffer {
+  public:
+    void write(Buffer::InstancePtr, bool, WriteCallback done) override {
+      done(ExternalBufferStatus::Ok);
+    }
+    void read(uint64_t, uint64_t, ReadCallback done) override {
+      done(ExternalBufferStatus::Ok, std::make_unique<Buffer::OwnedImpl>());
+    }
+    uint64_t length() const override { return 4; }
+  };
+
+  PayloadReaderSharedPtr reader =
+      PayloadReader::fromExternalBuffer(std::make_shared<EmptyChunkExternalBuffer>(), 4);
+  Coroutine::DetachedHandle handle = launch(stream(*reader, 0, 4));
+  drain();
+
+  EXPECT_THAT(result_, HasStatusCode(absl::StatusCode::kDataLoss));
+  EXPECT_EQ(injected(), "");
+}
+
+TEST_F(ChainWriterTest, CancelStopsAPendingRangeStream) {
+  PayloadReaderSharedPtr reader = store("0123456789");
+  Coroutine::DetachedHandle handle = launch(stream(*reader, 0, 10));
+  handle.cancel();
+  drain();
+
+  EXPECT_EQ(result_.code(), absl::StatusCode::kCancelled);
+  EXPECT_EQ(injected(), "");
+}
 
 TEST_F(ChainWriterTest, InjectsTheCallersBytesAndDrainsThem) {
   Buffer::OwnedImpl data;
