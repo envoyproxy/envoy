@@ -428,6 +428,17 @@ void envoy_dynamic_module_on_bootstrap_extension_runtime_number_update(
   appendRuntimeUpdateValue(extension_envoy_ptr, key, removed, typed_value);
 }
 
+void envoy_dynamic_module_on_bootstrap_extension_runtime_string_update(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_envoy_buffer value,
+    bool removed) {
+  (void)extension_module_ptr;
+  char typed_value[128];
+  snprintf(typed_value, sizeof(typed_value), "s:%.*s", (int)value.length, value.ptr);
+  appendRuntimeUpdateValue(extension_envoy_ptr, key, removed, typed_value);
+}
+
 size_t bootstrap_optional_hooks_test_worker_event_count(void) {
   return atomic_load(&g_worker_event_count);
 }

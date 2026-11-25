@@ -35,7 +35,6 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "gcp_authn_filter_test",
-    size = "small",
     srcs = ["gcp_authn_filter_test.cc"],
     extension_names = ["envoy.filters.http.gcp_authn"],
     rbe_pool = {

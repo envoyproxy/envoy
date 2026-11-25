@@ -34,6 +34,7 @@
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/tcp/async_tcp_client_impl.h"
@@ -550,6 +551,7 @@ protected:
 private:
   // To enable access to the protected constructor.
   friend ProdClusterManagerFactory;
+  friend class TestClusterManagerImpl;
 
   /**
    * Thread local cached cluster data. Each thread local cluster gets updates from the parent
@@ -845,12 +847,11 @@ private:
   };
 
   struct ClusterData : public ClusterManagerCluster {
-    ClusterData(const envoy::config::cluster::v3::Cluster& cluster_config,
-                const uint64_t cluster_config_hash, const uint64_t serialized_cluster_config_hash,
-                const std::string& version_info, bool added_via_api, bool required_for_ads,
-                ClusterSharedPtr&& cluster, TimeSource& time_source,
-                const bool avoid_cds_removal = false)
-        : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
+    ClusterData(Protobuf::Any&& cluster_config_any, const uint64_t cluster_config_hash,
+                const uint64_t serialized_cluster_config_hash, const std::string& version_info,
+                bool added_via_api, bool required_for_ads, ClusterSharedPtr&& cluster,
+                TimeSource& time_source, const bool avoid_cds_removal = false)
+        : cluster_config_any_(std::move(cluster_config_any)), config_hash_(cluster_config_hash),
           serialized_config_hash_(serialized_cluster_config_hash), version_info_(version_info),
           cluster_(std::move(cluster)), last_updated_(time_source.systemTime()),
           added_via_api_(added_via_api), avoid_cds_removal_(avoid_cds_removal),
@@ -874,7 +875,9 @@ private:
     }
     bool requiredForAds() const override { return required_for_ads_; }
 
-    const envoy::config::cluster::v3::Cluster cluster_config_;
+    const Protobuf::Any& clusterConfigAny() const { return cluster_config_any_; }
+
+    Protobuf::Any cluster_config_any_;
     const uint64_t config_hash_;
     // The hash of the deterministic serialization of the config this cluster was built from, or of
     // the last update that blockUpdate() blocked. A push of the same bytes matches it without

@@ -452,6 +452,7 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
   if (end_stream) {
     request_json_ = request_parser_->takeDocument();
     request_parser_.reset();
+    request_parsed_ = true;
     config_->stats().request_parsed_.inc();
   }
   return true;
@@ -607,7 +608,7 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
     }
   };
 
-  if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
+  if (request_parsed_ && !payload_rejected_) {
     std::vector<AiFilterSharedPtr> filters = createAiFilters();
     // The route and the chain are configured apart, so only a request shows that the chain
     // leaves a binding the route declares unapplied.
@@ -644,11 +645,6 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // TODO(penguingao): consider add request only / response only AI filter chain
-  // when there is a need. Currently, all AI filters handle both request and
-  // response.
-  const bool can_filter_response = filter_manager_ != nullptr && !payload_rejected_;
-
   // Route scoping: only declared AI endpoints are inspected unless the filter
   // opted into unconfigured routes, so enabling token usage on a mixed
   // listener does not silently parse unrelated JSON/SSE responses. Resolved
@@ -673,6 +669,14 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
       config_->tokenUsageEnabled() &&
       (route_config != nullptr || filter_state_request_api != LLMProtocol::Unspecified ||
        config_->includeUnconfiguredRoutes());
+  // TODO(penguingao): consider add request only / response only AI filter chain
+  // when there is a need. Currently, all AI filters handle both request and
+  // response.
+  // A response runs the AI filters when its request was an AI call: a declared endpoint, or one
+  // whose API a filter named.
+  const bool can_filter_response =
+      filter_manager_ != nullptr && !payload_rejected_ &&
+      (isAiEndpoint() || filter_state_request_api != LLMProtocol::Unspecified);
 
   if (!can_filter_response && !want_token_usage) {
     return Http::FilterHeadersStatus::Continue;
