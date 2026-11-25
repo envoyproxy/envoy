@@ -333,25 +333,6 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
               llmProtocolName(request_protocol_));
   }
 
-  // Resolve the client binding once for every AI filter, failing fast on unparseable filter state.
-  if (isAiEndpoint()) {
-    absl::StatusOr<LlmBindingConstSharedPtr> named_binding =
-        LlmBindingObject::fromFilterState(filter_state, FilterStateKeys::BindingRequest);
-    if (!named_binding.ok()) {
-      ENVOY_LOG(debug, "ai_protocol_manager: rejecting request: filter state `{}`: {}",
-                FilterStateKeys::BindingRequest, named_binding.status().message());
-      payload_rejected_ = true;
-      decoder_callbacks_->sendLocalReply(
-          Http::Code::InternalServerError,
-          absl::StrCat("ai_protocol_manager: filter state `", FilterStateKeys::BindingRequest,
-                       "`: ", named_binding.status().message()),
-          nullptr, std::nullopt, "ai_protocol_manager_invalid_request_binding");
-      return Http::FilterHeadersStatus::StopIteration;
-    }
-    request_binding_ =
-        *named_binding != nullptr ? *std::move(named_binding) : route_request_binding_;
-  }
-
   // Declared AI endpoints are parsed strictly; other routes are only parsed if
   // parse_unconfigured_routes is enabled and the request can be buffered without stalling.
   // TODO(penguingao): on best-effort parse failure, flush buffered headers/body immediately
@@ -360,6 +341,23 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     ENVOY_LOG(trace, "ai_protocol_manager: route has no payload to inspect, passing through");
     return Http::FilterHeadersStatus::Continue;
   }
+
+  // Resolve the client binding once for every AI filter, failing fast on unparseable filter state.
+  absl::StatusOr<LlmBindingConstSharedPtr> named_binding =
+      LlmBindingObject::fromFilterState(filter_state, FilterStateKeys::BindingRequest);
+  if (!named_binding.ok()) {
+    ENVOY_LOG(debug, "ai_protocol_manager: rejecting request: filter state `{}`: {}",
+              FilterStateKeys::BindingRequest, named_binding.status().message());
+    payload_rejected_ = true;
+    decoder_callbacks_->sendLocalReply(
+        Http::Code::InternalServerError,
+        absl::StrCat("ai_protocol_manager: filter state `", FilterStateKeys::BindingRequest,
+                     "`: ", named_binding.status().message()),
+        nullptr, std::nullopt, "ai_protocol_manager_invalid_request_binding");
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+  request_binding_ =
+      *named_binding != nullptr ? *std::move(named_binding) : route_request_binding_;
 
   JsonWithExtBufParser::Config parser_config;
   parser_config.inline_string_threshold_bytes = inlineStringThresholdBytes();

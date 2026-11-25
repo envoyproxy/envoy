@@ -194,7 +194,7 @@ TEST(SchemaTest, FieldsInThePathCountAsPresent) {
       Schema::object({
                          {"model", Schema::string().required()},
                          {"max_tokens", Schema::integer().required()},
-                         {"metadata", Schema::object({{"user_id", Schema::string().required()}})},
+                         {"metadata", Schema::object({{"model", Schema::string().required()}})},
                      })
           .customValidator([](const nlohmann::json& root) {
             return root.contains("rejected") ? absl::InvalidArgumentError("rejected")

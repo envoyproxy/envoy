@@ -17,9 +17,8 @@ namespace AiProtocolManager {
 // The bindings Envoy knows an API by: shared by the transcoder's engine and the filters ahead of
 // it, so every reader of a request path agrees on what it names.
 struct ApiBindings {
-  // The API's own layout, when it is more than the body: Gemini's path names the model and the
-  // streaming mode, Anthropic's header the API version. Null when the body carries everything, as
-  // for the OpenAI API.
+  // The API's own HTTP layout (path and any default headers or body edits); null for APIs with
+  // no built-in layout.
   LlmBindingConstSharedPtr api{};
   // Other layouts a client may arrive in, tried after `api`, such as Vertex AI's.
   std::vector<LlmBindingConstSharedPtr> client{};

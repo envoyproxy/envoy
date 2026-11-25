@@ -66,18 +66,26 @@ ApiBindings geminiBindings() {
   };
 }
 
+ApiBindings openAiChatBindings() {
+  return ApiBindings{
+      // OpenAI Chat Completions carries everything in the body on a fixed path.
+      .api = builtInBinding("/v1/chat/completions", {}),
+  };
+}
+
 } // namespace
 
 const ApiBindings& apiBindings(LLMProtocol protocol) {
   switch (protocol) {
+  case LLMProtocol::OpenAiChatCompletions: {
+    CONSTRUCT_ON_FIRST_USE(ApiBindings, openAiChatBindings());
+  }
   case LLMProtocol::AnthropicMessages: {
     CONSTRUCT_ON_FIRST_USE(ApiBindings, anthropicBindings());
   }
   case LLMProtocol::GeminiGenerateContent: {
     CONSTRUCT_ON_FIRST_USE(ApiBindings, geminiBindings());
   }
-  // OpenAI names the model in the body alone, so its paths bind nothing.
-  case LLMProtocol::OpenAiChatCompletions:
   case LLMProtocol::OpenAiResponses:
   case LLMProtocol::Unspecified:
     break;

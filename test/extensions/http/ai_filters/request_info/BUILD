@@ -19,6 +19,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ai_protocol_manager:api_bindings_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_readers_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:llm_binding_lib",
         "//source/extensions/filters/http/ai_protocol_manager:token_usage_lib",
         "//source/extensions/http/ai_filters/request_info:extractor_lib",
         "@abseil-cpp//absl/strings",

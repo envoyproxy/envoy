@@ -18,6 +18,11 @@ std::optional<LlmBindingRead> peek(LLMProtocol protocol, absl::string_view path,
 }
 
 TEST(ApiBindingsTest, EachApiHasItsOwnLayouts) {
+  const ApiBindings& openai_chat = apiBindings(LLMProtocol::OpenAiChatCompletions);
+  ASSERT_NE(openai_chat.api, nullptr);
+  ASSERT_TRUE(openai_chat.api->pattern().has_value());
+  EXPECT_EQ(openai_chat.api->pattern()->source(), "/v1/chat/completions");
+  EXPECT_TRUE(openai_chat.client.empty());
   const ApiBindings& anthropic = apiBindings(LLMProtocol::AnthropicMessages);
   ASSERT_NE(anthropic.api, nullptr);
   EXPECT_EQ(anthropic.client.size(), 1);
@@ -25,14 +30,23 @@ TEST(ApiBindingsTest, EachApiHasItsOwnLayouts) {
   ASSERT_NE(gemini.api, nullptr);
   EXPECT_TRUE(gemini.api->removesModel());
   EXPECT_EQ(gemini.client.size(), 2);
-  // The OpenAI API carries everything in the body; an API without a pack has nothing either.
-  for (const LLMProtocol protocol : {LLMProtocol::OpenAiChatCompletions,
-                                     LLMProtocol::OpenAiResponses, LLMProtocol::Unspecified}) {
+  // APIs without a built-in binding return empty bindings.
+  for (const LLMProtocol protocol : {LLMProtocol::OpenAiResponses, LLMProtocol::Unspecified}) {
     EXPECT_EQ(apiBindings(protocol).api, nullptr);
     EXPECT_TRUE(apiBindings(protocol).client.empty());
   }
   // One instance per API, so the engine and the filters share it.
   EXPECT_EQ(&apiBindings(LLMProtocol::GeminiGenerateContent), &gemini);
+
+  // OpenAI's own path names neither model nor streaming mode: the body's stand.
+  const std::optional<LlmBindingRead> chat_read =
+      peek(LLMProtocol::OpenAiChatCompletions, "/v1/chat/completions",
+           nlohmann::json::parse(R"({"model": "gpt-4o"})"));
+  ASSERT_TRUE(chat_read.has_value());
+  EXPECT_EQ(chat_read->binding, openai_chat.api);
+  EXPECT_TRUE(chat_read->model.empty());
+  EXPECT_FALSE(chat_read->model_from_path);
+  EXPECT_FALSE(chat_read->stream.has_value());
 }
 
 TEST(ApiBindingsTest, ClaudeOnVertexNamesTheModelInThePath) {

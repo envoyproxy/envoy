@@ -7,5 +7,5 @@ matches ``/{version}/models/{model}:...`` under any API version, and Gemini on V
 without a project and location. ``request_info`` used to read any path ending in
 ``/models/{model}:generateContent`` or ``:streamGenerateContent``; a path under another prefix,
 such as ``/gemini/v1beta/models/{model}:generateContent``, now needs a
-:ref:`request binding <config_http_filters_ai_protocol_manager_transcoder_instructions>`
+:ref:`request binding <config_http_ai_filters_transcoder_instructions>`
 on the route to be read.
