@@ -2698,8 +2698,11 @@ TEST_P(ExtProcIntegrationTest, ResponseMessageTimeoutDownstreamDisconnect) {
   handleUpstreamRequest();
   processResponseHeadersMessage(*grpc_upstreams_[0], false,
                                 [this](const HttpHeaders&, HeadersResponse&) {
-                                  // Downstream disconnect
-                                  destroyFilter([&] { codec_client_->close(); });
+                                  codec_client_->close();
+                                  // The reset proves teardown has started. Drain its worker so
+                                  // cleanup has finished before advancing the former deadline.
+                                  EXPECT_TRUE(processor_stream_->waitForReset());
+                                  test_server_->waitForWorkerThreads();
                                   // 400ms passes the former 200ms message deadline to exercise
                                   // cleanup after disconnect.
                                   simTime().advanceTimeWait(400ms);
@@ -5507,9 +5510,11 @@ TEST_P(ExtProcIntegrationTest, RequestTimeoutWhileWaitingForGracefulClose) {
   // Reset the client stream. It will put the stream in waiting for graceful close state.
   // TODO(yavlasov): add ability to detect that the stream
   // was reset and reset the side stream in this case.
-  // Wait for teardown itself, so the side stream's timers are armed before advancing time.
-  destroyFilter([&] { codec_client_->sendReset(*request_encoder_); });
+  codec_client_->sendReset(*request_encoder_);
+  // Wait for the side stream's half-close, then drain its worker so teardown and timer setup
+  // have finished before advancing time.
   ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+  test_server_->waitForWorkerThreads();
 
   // Without any activity side stream should hit per try timeout and try to send error response,
   // but since the stream is waiting for graceful close, it will get reset.

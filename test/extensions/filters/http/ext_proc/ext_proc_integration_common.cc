@@ -12,19 +12,13 @@
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/grpc/async_client.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/common/expr/evaluator.h"
-#include "source/extensions/filters/common/ext_proc/grpc_client_impl.h"
-#include "source/extensions/filters/http/ext_proc/config.h"
-#include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/test_common/struct_matchers.h"
 
-#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -43,277 +37,22 @@ using Envoy::Protobuf::Any;
 using Envoy::Protobuf::MapPair;
 using namespace std::chrono_literals;
 
-// Observes completed callbacks, rather than inferring them from statistics. In particular,
-// IntegrationTestServer::waitForCounter advances simulated time while polling, which can expire
-// the message being awaited before Google gRPC's completion thread has delivered it.
-class ProcessingEventObserver {
-public:
-  std::shared_ptr<absl::Notification> expect(const std::string& stream_id, ProcessingEvent event,
-                                             const ProcessingResponse* response) {
-    absl::MutexLock lock(&mutex_);
-    ASSERT(notification_ == nullptr);
-    stream_id_ = stream_id;
-    event_ = event;
-    expected_response_ = response ? std::make_optional(*response) : std::nullopt;
-    notification_ = std::make_shared<absl::Notification>();
-    return notification_;
-  }
-
-  void complete(const std::string& stream_id, ProcessingEvent event,
-                const ProcessingResponse* response = nullptr) {
-    absl::MutexLock lock(&mutex_);
-    if (notification_ && !notification_->HasBeenNotified() && stream_id == stream_id_ &&
-        event == event_ &&
-        (!expected_response_ ||
-         (response && TestUtility::protoEqual(*response, *expected_response_)))) {
-      notification_->Notify();
-    }
-  }
-
-  void clear() {
-    absl::MutexLock lock(&mutex_);
-    notification_.reset();
-  }
-
-private:
-  absl::Mutex mutex_;
-  std::string stream_id_ ABSL_GUARDED_BY(mutex_);
-  ProcessingEvent event_ ABSL_GUARDED_BY(mutex_) = ProcessingEvent::Message;
-  std::optional<ProcessingResponse> expected_response_ ABSL_GUARDED_BY(mutex_);
-  std::shared_ptr<absl::Notification> notification_ ABSL_GUARDED_BY(mutex_);
-};
-
-namespace {
-
-class ObservedGrpcCallbacks : public Grpc::RawAsyncStreamCallbacks {
-public:
-  ObservedGrpcCallbacks(Grpc::RawAsyncStreamCallbacks& callbacks,
-                        std::shared_ptr<ProcessingEventObserver> observer)
-      : callbacks_(callbacks), stream_id_(fmt::format("{:p}", static_cast<void*>(this))),
-        observer_(std::move(observer)) {}
-
-  void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override {
-    callbacks_.onCreateInitialMetadata(metadata);
-    metadata.setCopy(Http::LowerCaseString("x-ext-proc-test-stream-id"), stream_id_);
-  }
-  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
-    auto observer = observer_;
-    const auto stream_id = stream_id_;
-    callbacks_.onReceiveInitialMetadata(std::move(metadata));
-    observer->complete(stream_id, ProcessingEvent::InitialMetadata);
-  }
-  bool onReceiveMessageRaw(Buffer::InstancePtr&& message) override {
-    auto observer = observer_;
-    const auto stream_id = stream_id_;
-    ProcessingResponse response;
-    const bool parsed = response.ParseFromString(message->toString());
-    const bool accepted = callbacks_.onReceiveMessageRaw(std::move(message));
-    if (parsed && accepted) {
-      observer->complete(stream_id, ProcessingEvent::Message, &response);
-    }
-    return accepted;
-  }
-  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override {
-    callbacks_.onReceiveTrailingMetadata(std::move(metadata));
-  }
-  void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
-    // The forwarded callback can delete this stream and its callback adapter.
-    auto observer = observer_;
-    const auto stream_id = stream_id_;
-    callbacks_.onRemoteClose(status, message);
-    observer->complete(stream_id, ProcessingEvent::RemoteClose);
-  }
-
-private:
-  Grpc::RawAsyncStreamCallbacks& callbacks_;
-  const std::string stream_id_;
-  const std::shared_ptr<ProcessingEventObserver> observer_;
-};
-
-class ObservedGrpcClient : public Grpc::RawAsyncClient {
-public:
-  ObservedGrpcClient(Grpc::RawAsyncClientSharedPtr client,
-                     std::shared_ptr<ProcessingEventObserver> observer)
-      : client_(std::move(client)), observer_(std::move(observer)) {}
-
-  Grpc::AsyncRequest* sendRaw(absl::string_view service, absl::string_view method,
-                              Buffer::InstancePtr&& request,
-                              Grpc::RawAsyncRequestCallbacks& callbacks, Tracing::Span& span,
-                              const Http::AsyncClient::RequestOptions& options) override {
-    return client_->sendRaw(service, method, std::move(request), callbacks, span, options);
-  }
-  Grpc::RawAsyncStream* startRaw(absl::string_view service, absl::string_view method,
-                                 Grpc::RawAsyncStreamCallbacks& callbacks,
-                                 const Http::AsyncClient::StreamOptions& options) override {
-    callbacks_.push_back(std::make_unique<ObservedGrpcCallbacks>(callbacks, observer_));
-    return client_->startRaw(service, method, *callbacks_.back(), options);
-  }
-  absl::string_view destination() override { return client_->destination(); }
-
-private:
-  const Grpc::RawAsyncClientSharedPtr client_;
-  const std::shared_ptr<ProcessingEventObserver> observer_;
-  std::vector<std::unique_ptr<ObservedGrpcCallbacks>> callbacks_;
-};
-
-using ProcessorClientImpl =
-    CommonExtProc::ProcessorClientImpl<ProcessingRequest, ProcessingResponse>;
-
-class ObservedProcessorClient : public ProcessorClientImpl {
-public:
-  ObservedProcessorClient(Grpc::AsyncClientManager& manager, Stats::Scope& scope,
-                          std::shared_ptr<ProcessingEventObserver> observer)
-      : ProcessorClientImpl(manager, scope, "envoy.service.ext_proc.v3.ExternalProcessor.Process"),
-        manager_(manager), scope_(scope), observer_(std::move(observer)) {}
-
-  ExternalProcessorStreamPtr
-  start(ExternalProcessorCallbacks& callbacks, const Grpc::GrpcServiceConfigWithHashKey& config,
-        Http::AsyncClient::StreamOptions& options,
-        Http::StreamFilterSidestreamWatermarkCallbacks& watermark_callbacks) override {
-    auto client = manager_.getOrCreateRawAsyncClientWithHashKey(config, scope_, true);
-    if (!client.ok()) {
-      return ProcessorClientImpl::start(callbacks, config, options, watermark_callbacks);
-    }
-    auto observed = std::make_shared<ObservedGrpcClient>(*client, observer_);
-    return CommonExtProc::ProcessorStreamImpl<ProcessingRequest, ProcessingResponse>::create(
-        Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>(observed), callbacks, options,
-        watermark_callbacks, "envoy.service.ext_proc.v3.ExternalProcessor.Process");
-  }
-
-private:
-  Grpc::AsyncClientManager& manager_;
-  Stats::Scope& scope_;
-  const std::shared_ptr<ProcessingEventObserver> observer_;
-};
-
-class ObservedFilter : public Filter {
-public:
-  ObservedFilter(const FilterConfigSharedPtr& config, ClientBasePtr&& client,
-                 std::shared_ptr<ProcessingEventObserver> observer)
-      : Filter(config, std::move(client)), observer_(std::move(observer)) {}
-
-  void onDestroy() override {
-    auto observer = observer_;
-    Filter::onDestroy();
-    observer->complete("", ProcessingEvent::FilterDestroyed);
-  }
-
-private:
-  const std::shared_ptr<ProcessingEventObserver> observer_;
-};
-
-// Keep the production filter, processor stream, and both real gRPC clients. Only their callback
-// delivery is observed, so waits for those callbacks do not need to advance simulated time.
-class ObservedFilterFactory : public ExternalProcessingFilterConfig {
-public:
-  explicit ObservedFilterFactory(std::shared_ptr<ProcessingEventObserver> observer)
-      : observer_(std::move(observer)) {}
-
-private:
-  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
-      Server::Configuration::ServerFactoryContext& context,
-      Server::Configuration::ExtraFactoryContext& extra_context) override {
-    absl::Status status;
-    auto config = std::make_shared<FilterConfig>(
-        proto_config,
-        std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, message_timeout, 200)),
-        PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, 0),
-        extra_context.scopeOr(context), extra_context.stats_prefix, extra_context.is_upstream,
-        Envoy::Extensions::Filters::Common::Expr::getBuilder(context), context, status);
-    RETURN_IF_NOT_OK_REF(status);
-    return [config, &context, observer = observer_](Http::FilterChainFactoryCallbacks& callbacks) {
-      callbacks.addStreamFilter(std::make_shared<ObservedFilter>(
-          config,
-          std::make_unique<ObservedProcessorClient>(
-              context.clusterManager().grpcAsyncClientManager(), context.scope(), observer),
-          observer));
-    };
-  }
-
-  const std::shared_ptr<ProcessingEventObserver> observer_;
-};
-
-} // namespace
-
-// Replace both names together: the deprecated name otherwise keeps the original factory's
-// config types registered. Restore it before InjectFactory rebuilds the type map on destruction.
-class ObservedFilterFactoryRegistration {
-  template <class Base> class Registration {
-  public:
-    explicit Registration(ObservedFilterFactory& factory)
-        : original_alias_(Registry::FactoryRegistry<Base>::getFactory("envoy.ext_proc")) {
-      Registry::FactoryRegistry<Base>::factories()["envoy.ext_proc"] = &factory;
-      registration_ = std::make_unique<Registry::InjectFactory<Base>>(factory);
-    }
-    ~Registration() {
-      Registry::FactoryRegistry<Base>::factories()["envoy.ext_proc"] = original_alias_;
-      registration_.reset();
-    }
-
-  private:
-    Base* original_alias_;
-    std::unique_ptr<Registry::InjectFactory<Base>> registration_;
-  };
-
-public:
-  explicit ObservedFilterFactoryRegistration(std::shared_ptr<ProcessingEventObserver> observer)
-      : factory_(std::move(observer)), downstream_(factory_), upstream_(factory_) {}
-
-private:
-  ObservedFilterFactory factory_;
-  Registration<Server::Configuration::NamedHttpFilterConfigFactory> downstream_;
-  Registration<Server::Configuration::UpstreamHttpFilterConfigFactory> upstream_;
-};
-
 ExtProcIntegrationTest::ExtProcIntegrationTest()
-    : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()),
-      processing_events_(std::make_shared<ProcessingEventObserver>()),
-      observed_filter_factory_(
-          std::make_unique<ObservedFilterFactoryRegistration>(processing_events_)) {}
+    : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()), ext_proc_test_server_(simTime()) {}
 
 ExtProcIntegrationTest::~ExtProcIntegrationTest() = default;
 
-void ExtProcIntegrationTest::waitForProcessingEvent(FakeStream& stream, ProcessingEvent event,
-                                                    const std::function<void()>& action,
-                                                    const ProcessingResponse* response) {
-  // Correlate the callback with this exact stream, including per-route service overrides.
-  const auto ids = stream.headers().get(Http::LowerCaseString("x-ext-proc-test-stream-id"));
-  ASSERT_EQ(ids.size(), 1);
-  const std::string id =
-      event == ProcessingEvent::FilterDestroyed ? "" : std::string(ids[0]->value().getStringView());
-  auto done = processing_events_->expect(id, event, response);
-  const auto before = simTime().monotonicTime();
-  action();
-  const bool completed =
-      done->WaitForNotificationWithTimeout(absl::FromChrono(TestUtility::DefaultTimeout));
-  processing_events_->clear();
-  ASSERT_TRUE(completed) << "Timed out waiting for ext_proc callback completion";
-  EXPECT_EQ(before, simTime().monotonicTime());
-}
-
 void ExtProcIntegrationTest::sendGrpcResponse(FakeStream& stream,
                                               const ProcessingResponse& response) {
-  waitForProcessingEvent(
-      stream, ProcessingEvent::Message, [&] { stream.sendGrpcMessage(response); }, &response);
+  ASSERT_TRUE(ext_proc_test_server_.sendResponse(stream, response));
 }
 
 void ExtProcIntegrationTest::startGrpcStream(FakeStream& stream, bool send_headers) {
-  if (send_headers) {
-    waitForProcessingEvent(stream, ProcessingEvent::InitialMetadata,
-                           [&] { stream.startGrpcStream(); });
-  } else {
-    stream.startGrpcStream(false);
-  }
+  ASSERT_TRUE(ext_proc_test_server_.startStream(stream, send_headers));
 }
 
 void ExtProcIntegrationTest::finishGrpcStream(FakeStream& stream, Grpc::Status::GrpcStatus status) {
-  waitForProcessingEvent(stream, ProcessingEvent::RemoteClose,
-                         [&] { stream.finishGrpcStream(status); });
-}
-
-void ExtProcIntegrationTest::destroyFilter(const std::function<void()>& action) {
-  waitForProcessingEvent(*processor_stream_, ProcessingEvent::FilterDestroyed, action);
+  ASSERT_TRUE(ext_proc_test_server_.finishStream(stream, status));
 }
 
 void ExtProcIntegrationTest::createUpstreams() {

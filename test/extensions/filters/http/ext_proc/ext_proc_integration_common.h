@@ -15,6 +15,7 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/ext_proc_test_filters.pb.h"
+#include "test/extensions/filters/http/ext_proc/ext_proc_test_server.h"
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/filters/common.h"
@@ -45,10 +46,6 @@ using envoy::service::ext_proc::v3::ProtocolConfiguration;
 using envoy::service::ext_proc::v3::TrailersResponse;
 using Extensions::HttpFilters::ExternalProcessing::TestOnProcessingResponseFactory;
 using test::integration::filters::LoggingTestFilterConfig;
-
-class ProcessingEventObserver;
-class ObservedFilterFactoryRegistration;
-enum class ProcessingEvent { InitialMetadata, Message, RemoteClose, FilterDestroyed };
 
 struct ConfigOptions {
   enum class FilterSetup {
@@ -116,14 +113,9 @@ protected:
   ExtProcIntegrationTest();
   ~ExtProcIntegrationTest() override;
 
-  // Wait for the real processing callback without advancing simulated deadlines during I/O.
-  void waitForProcessingEvent(FakeStream& stream, ProcessingEvent event,
-                              const std::function<void()>& action,
-                              const ProcessingResponse* response = nullptr);
   void sendGrpcResponse(FakeStream& stream, const ProcessingResponse& response);
   void startGrpcStream(FakeStream& stream, bool send_headers = true);
   void finishGrpcStream(FakeStream& stream, Grpc::Status::GrpcStatus status);
-  void destroyFilter(const std::function<void()>& action);
 
   void createUpstreams() override;
 
@@ -252,8 +244,7 @@ protected:
   void initializeLogConfig(std::string& access_log_path);
   void prependExtProcCompositeFilter(const Protobuf::Message& match_input);
 
-  std::shared_ptr<ProcessingEventObserver> processing_events_;
-  std::unique_ptr<ObservedFilterFactoryRegistration> observed_filter_factory_;
+  ExtProcTestServer ext_proc_test_server_;
 
   std::unique_ptr<UniqueSimpleFilterConfig<
       DynamicMetadataToHeadersFilter,

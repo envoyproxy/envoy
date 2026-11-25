@@ -485,6 +485,31 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test_library(
+    name = "ext_proc_test_server_lib",
+    srcs = ["ext_proc_test_server.cc"],
+    hdrs = ["ext_proc_test_server.h"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    tags = ["skip_on_windows"],
+    deps = [
+        "//envoy/common:time_interface",
+        "//envoy/grpc:async_client_interface",
+        "//envoy/grpc:status",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/common/expr:evaluator_lib",
+        "//source/extensions/filters/common/ext_proc:grpc_client_lib",
+        "//source/extensions/filters/http/ext_proc",
+        "//source/extensions/filters/http/ext_proc:config",
+        "//test/integration:fake_upstream_lib",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/synchronization",
+        "@abseil-cpp//absl/time",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test_library(
     name = "ext_proc_integration_common_lib",
     srcs = ["ext_proc_integration_common.cc"],
     hdrs = ["ext_proc_integration_common.h"],
@@ -493,15 +518,11 @@ envoy_extension_cc_test_library(
     tags = ["skip_on_windows"],
     deps = [
         ":ext_proc_test_filters_proto_cc_proto",
+        ":ext_proc_test_server_lib",
         ":logging_test_filter_lib",
         ":utils_lib",
-        "//envoy/grpc:async_client_interface",
         "//source/common/protobuf",
-        "//source/extensions/filters/common/expr:evaluator_lib",
-        "//source/extensions/filters/common/ext_proc:grpc_client_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//source/extensions/filters/http/ext_proc",
-        "//source/extensions/filters/http/ext_proc:config",
         "//source/extensions/filters/http/set_metadata:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
@@ -511,7 +532,6 @@ envoy_extension_cc_test_library(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
