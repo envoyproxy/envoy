@@ -120,15 +120,11 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
                               StreamSharingMayImpactPooling stream_sharing) {
   const auto index = FilterState::nameToIndex(data_name);
   if (index.has_value()) {
-    if (auto canonical = canonicalizeForIndex(index.value(), data); canonical != nullptr) {
-      setIndexedDataGeneric(index.value(), std::move(canonical), life_span, stream_sharing);
-      return;
-    }
+    setIndexedData(index.value(), std::move(data), life_span, stream_sharing);
+    return;
   }
-  const bool has_local_indexed =
-      index.has_value() && indexed_data_storage_[static_cast<size_t>(index.value())] != nullptr;
   if (life_span > life_span_) {
-    if (has_local_indexed || hasDataWithNameInternally(data_name)) {
+    if (hasDataWithNameInternally(data_name)) {
       IS_ENVOY_BUG(fmt::format("FilterStateAccessViolation: FilterState::setData<T> "
                                "called twice with "
                                "conflicting life_span on the same data_name: {}.",
@@ -150,13 +146,6 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
     return;
   }
 
-  if (has_local_indexed) {
-    indexed_data_storage_[static_cast<size_t>(index.value())].reset();
-    --indexed_count_;
-  }
-  if (index.has_value()) {
-    untyped_indexed_mask_ |= (uint32_t{1} << static_cast<size_t>(index.value()));
-  }
   StoredObject& stored = data_storage_[data_name];
   stored.data_ = std::move(data);
   stored.stream_sharing_ = stream_sharing;
@@ -268,38 +257,10 @@ void FilterStateImpl::setIndexedData(FilterStateIndex index, std::shared_ptr<Obj
     return;
   }
   if (auto canonical = canonicalizeForIndex(index, data); canonical != nullptr) {
-    setIndexedDataGeneric(index, std::move(canonical), life_span, stream_sharing);
+    storeIndexedData(index, std::move(canonical), /*is_canonical=*/true, life_span, stream_sharing);
     return;
   }
-  const uint32_t bit = uint32_t{1} << idx;
-  if (life_span > life_span_) {
-    if (indexed_data_storage_[idx] != nullptr || (untyped_indexed_mask_ & bit) != 0) {
-      IS_ENVOY_BUG(fmt::format("FilterStateAccessViolation: FilterState::setIndexedData<T> "
-                               "called twice with "
-                               "conflicting life_span on index: {}.",
-                               idx));
-      return;
-    }
-    maybeCreateParent(nullptr);
-    parent_->setIndexedData(index, std::move(data), life_span, stream_sharing);
-    return;
-  }
-  if (parent_ && parent_->hasIndexedData(index)) {
-    IS_ENVOY_BUG(
-        fmt::format("FilterStateAccessViolation: FilterState::setIndexedData<T> called twice with "
-                    "conflicting life_span on index: {}.",
-                    idx));
-    return;
-  }
-
-  if (indexed_data_storage_[idx] != nullptr) {
-    indexed_data_storage_[idx].reset();
-    --indexed_count_;
-  }
-  untyped_indexed_mask_ |= bit;
-  StoredObject& stored = data_storage_[FilterState::indexToName(index)];
-  stored.data_ = std::move(data);
-  stored.stream_sharing_ = stream_sharing;
+  storeIndexedData(index, std::move(data), /*is_canonical=*/false, life_span, stream_sharing);
 }
 
 void FilterStateImpl::setIndexedDataGeneric(FilterStateIndex index, std::shared_ptr<Object> data,
@@ -311,9 +272,15 @@ void FilterStateImpl::setIndexedDataGeneric(FilterStateIndex index, std::shared_
     return;
   }
   ASSERT(FilterState::isValidObjectForIndex(index, data.get()));
-  const uint32_t bit = uint32_t{1} << idx;
+  storeIndexedData(index, std::move(data), /*is_canonical=*/true, life_span, stream_sharing);
+}
+
+void FilterStateImpl::storeIndexedData(FilterStateIndex index, std::shared_ptr<Object> data,
+                                       bool is_canonical, FilterState::LifeSpan life_span,
+                                       StreamSharingMayImpactPooling stream_sharing) {
+  const size_t idx = static_cast<size_t>(index);
   if (life_span > life_span_) {
-    if (indexed_data_storage_[idx] != nullptr || (untyped_indexed_mask_ & bit) != 0) {
+    if (indexed_data_storage_[idx] != nullptr) {
       IS_ENVOY_BUG(fmt::format("FilterStateAccessViolation: FilterState::setIndexedData<T> "
                                "called twice with "
                                "conflicting life_span on index: {}.",
@@ -321,7 +288,11 @@ void FilterStateImpl::setIndexedDataGeneric(FilterStateIndex index, std::shared_
       return;
     }
     maybeCreateParent(nullptr);
-    parent_->setIndexedDataGeneric(index, std::move(data), life_span, stream_sharing);
+    if (is_canonical) {
+      parent_->setIndexedDataGeneric(index, std::move(data), life_span, stream_sharing);
+    } else {
+      parent_->setIndexedData(index, std::move(data), life_span, stream_sharing);
+    }
     return;
   }
   if (parent_ && parent_->hasIndexedData(index)) {
@@ -332,17 +303,14 @@ void FilterStateImpl::setIndexedDataGeneric(FilterStateIndex index, std::shared_
     return;
   }
 
-  if ((untyped_indexed_mask_ & bit) != 0) {
-    data_storage_.erase(FilterState::indexToName(index));
-    untyped_indexed_mask_ &= ~bit;
-  }
   if (indexed_data_storage_[idx] == nullptr) {
     ++indexed_count_;
+    indexed_data_storage_[idx] = std::make_unique<StoredObject>();
   }
-  auto filter_object = std::make_unique<StoredObject>();
-  filter_object->data_ = std::move(data);
-  filter_object->stream_sharing_ = stream_sharing;
-  indexed_data_storage_[idx] = std::move(filter_object);
+  StoredObject& filter_object = *indexed_data_storage_[idx];
+  filter_object.data_ = std::move(data);
+  filter_object.stream_sharing_ = stream_sharing;
+  filter_object.is_canonical_ = is_canonical;
 }
 
 const FilterState::Object*
@@ -351,18 +319,27 @@ FilterStateImpl::getIndexedDataReadOnlyGeneric(FilterStateIndex index) const {
   if (idx >= FilterStateIndexCount) {
     return nullptr;
   }
-  const auto& obj = indexed_data_storage_[idx];
-  if (obj == nullptr) {
-    if (parent_) {
-      return parent_->getIndexedDataReadOnlyGeneric(index);
-    }
-    return nullptr;
+  if (const auto& obj = indexed_data_storage_[idx]; obj != nullptr) {
+    return obj->is_canonical_ ? obj->data_.get() : nullptr;
   }
-  return obj->data_.get();
+  if (parent_) {
+    return parent_->getIndexedDataReadOnlyGeneric(index);
+  }
+  return nullptr;
 }
 
 FilterState::Object* FilterStateImpl::getIndexedDataMutableGeneric(FilterStateIndex index) {
-  return getIndexedDataSharedMutableGeneric(index).get();
+  const size_t idx = static_cast<size_t>(index);
+  if (idx >= FilterStateIndexCount) {
+    return nullptr;
+  }
+  if (const auto& obj = indexed_data_storage_[idx]; obj != nullptr) {
+    return obj->is_canonical_ ? obj->data_.get() : nullptr;
+  }
+  if (parent_) {
+    return parent_->getIndexedDataMutableGeneric(index);
+  }
+  return nullptr;
 }
 
 std::shared_ptr<FilterState::Object>
@@ -371,14 +348,13 @@ FilterStateImpl::getIndexedDataSharedMutableGeneric(FilterStateIndex index) {
   if (idx >= FilterStateIndexCount) {
     return nullptr;
   }
-  const auto& obj = indexed_data_storage_[idx];
-  if (obj == nullptr) {
-    if (parent_) {
-      return parent_->getIndexedDataSharedMutableGeneric(index);
-    }
-    return nullptr;
+  if (const auto& obj = indexed_data_storage_[idx]; obj != nullptr) {
+    return obj->is_canonical_ ? obj->data_ : nullptr;
   }
-  return obj->data_;
+  if (parent_) {
+    return parent_->getIndexedDataSharedMutableGeneric(index);
+  }
+  return nullptr;
 }
 
 bool FilterStateImpl::hasIndexedData(FilterStateIndex index) const {
@@ -386,9 +362,7 @@ bool FilterStateImpl::hasIndexedData(FilterStateIndex index) const {
   if (idx >= FilterStateIndexCount) {
     return false;
   }
-  return indexed_data_storage_[idx] != nullptr ||
-         (untyped_indexed_mask_ & (uint32_t{1} << idx)) != 0 ||
-         (parent_ && parent_->hasIndexedData(index));
+  return indexed_data_storage_[idx] != nullptr || (parent_ && parent_->hasIndexedData(index));
 }
 
 const FilterState::Object*
@@ -399,11 +373,6 @@ FilterStateImpl::getIndexedDataReadOnlyAnyType(FilterStateIndex index) const {
   }
   if (const auto& obj = indexed_data_storage_[idx]; obj != nullptr) {
     return obj->data_.get();
-  }
-  if ((untyped_indexed_mask_ & (uint32_t{1} << idx)) != 0) {
-    const auto it = data_storage_.find(FilterState::indexToName(index));
-    ASSERT(it != data_storage_.end());
-    return it->second.data_.get();
   }
   if (parent_) {
     return parent_->getIndexedDataReadOnlyAnyType(index);
@@ -419,11 +388,6 @@ FilterStateImpl::getIndexedDataSharedMutableAnyType(FilterStateIndex index) {
   }
   if (const auto& obj = indexed_data_storage_[idx]; obj != nullptr) {
     return obj->data_;
-  }
-  if ((untyped_indexed_mask_ & (uint32_t{1} << idx)) != 0) {
-    const auto it = data_storage_.find(FilterState::indexToName(index));
-    ASSERT(it != data_storage_.end());
-    return it->second.data_;
   }
   if (parent_) {
     return parent_->getIndexedDataSharedMutableAnyType(index);

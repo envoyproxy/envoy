@@ -318,6 +318,14 @@ public:
    */
   static bool isValidObjectForIndex(FilterStateIndex index, const Object* data);
 
+  /**
+   * Stores a canonical IndexedFilterStateType<Index> object under Index.
+   * Non-canonical types are rejected at compile time so indexed lookups can safely downcast via
+   * static_cast. Passing nullptr is a no-op.
+   *
+   * Note that it is an error to call setIndexedData() twice on the same index with different
+   * life_span.
+   */
   template <FilterStateIndex Index>
   void setIndexedData(
       std::shared_ptr<IndexedFilterStateType<Index>> data,
@@ -394,23 +402,31 @@ public:
    */
   virtual bool hasIndexedData(FilterStateIndex index) const PURE;
 
+  /**
+   * Single-walk lookups returning any Object (canonical or non-canonical) stored under index,
+   * used by getData*Generic(), legacy runtime-indexed getters, and generic callers that accept
+   * arbitrary FilterState::Object types under a well-known key.
+   */
+  virtual const Object* getIndexedDataReadOnlyAnyType(FilterStateIndex index) const {
+    return getIndexedDataReadOnlyGeneric(index);
+  }
+  virtual std::shared_ptr<Object> getIndexedDataSharedMutableAnyType(FilterStateIndex index) {
+    return getIndexedDataSharedMutableGeneric(index);
+  }
+
 protected:
   friend class FilterStateImpl;
 
   /**
    * Stores an object already validated to satisfy isValidObjectForIndex(index, data.get()).
+   * Defaults to setIndexedData() so external subclasses and mocks do not need to override it.
    */
   virtual void setIndexedDataGeneric(
       FilterStateIndex index, std::shared_ptr<Object> data,
       LifeSpan life_span = LifeSpan::FilterChain,
-      StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
-
-  /**
-   * Single-walk lookups returning any Object (canonical or non-canonical) stored under index,
-   * used by getData*Generic() and the legacy runtime-indexed getters.
-   */
-  virtual const Object* getIndexedDataReadOnlyAnyType(FilterStateIndex index) const PURE;
-  virtual std::shared_ptr<Object> getIndexedDataSharedMutableAnyType(FilterStateIndex index) PURE;
+      StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) {
+    setIndexedData(index, std::move(data), life_span, stream_sharing);
+  }
 };
 
 } // namespace StreamInfo

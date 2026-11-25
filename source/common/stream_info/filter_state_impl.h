@@ -54,6 +54,8 @@ public:
   Object* getIndexedDataMutableGeneric(FilterStateIndex index) override;
   std::shared_ptr<Object> getIndexedDataSharedMutableGeneric(FilterStateIndex index) override;
   bool hasIndexedData(FilterStateIndex index) const override;
+  const Object* getIndexedDataReadOnlyAnyType(FilterStateIndex index) const override;
+  std::shared_ptr<Object> getIndexedDataSharedMutableAnyType(FilterStateIndex index) override;
 
   FilterState::LifeSpan lifeSpan() const override { return life_span_; }
   FilterStateSharedPtr parent() const override { return parent_; }
@@ -63,27 +65,25 @@ protected:
       FilterStateIndex index, std::shared_ptr<Object> data,
       FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain,
       StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) override;
-  const Object* getIndexedDataReadOnlyAnyType(FilterStateIndex index) const override;
-  std::shared_ptr<Object> getIndexedDataSharedMutableAnyType(FilterStateIndex index) override;
 
 private:
   // This only checks the local data_storage_ for data_name existence.
   bool hasDataWithNameInternally(absl::string_view data_name) const;
   void maybeCreateParent(FilterStateSharedPtr ancestor);
+  void storeIndexedData(FilterStateIndex index, std::shared_ptr<Object> data, bool is_canonical,
+                        FilterState::LifeSpan life_span,
+                        StreamSharingMayImpactPooling stream_sharing);
 
   struct StoredObject {
     std::shared_ptr<Object> data_;
     StreamSharingMayImpactPooling stream_sharing_{StreamSharingMayImpactPooling::None};
+    bool is_canonical_{false};
   };
 
-  static_assert(FilterStateIndexCount <= 32,
-                "untyped_indexed_mask_ requires at most 32 FilterStateIndex entries");
   FilterStateSharedPtr parent_{};
   const FilterState::LifeSpan life_span_;
   absl::flat_hash_map<std::string, StoredObject> data_storage_;
   uint32_t indexed_count_{0};
-  // Bitmask of FilterStateIndex entries currently held as non-canonical objects in data_storage_.
-  uint32_t untyped_indexed_mask_{0};
   std::array<std::unique_ptr<StoredObject>, FilterStateIndexCount> indexed_data_storage_{};
 };
 

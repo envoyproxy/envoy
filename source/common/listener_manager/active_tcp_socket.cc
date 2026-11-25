@@ -258,7 +258,7 @@ void ActiveTcpSocket::newConnection() {
     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
     listener_.decNumConnections();
     std::optional<std::string> network_namespace;
-    if (const auto* obj = stream_info_->filterState()->getIndexedDataReadOnlyGeneric(
+    if (const auto* obj = stream_info_->filterState()->getIndexedDataReadOnlyAnyType(
             StreamInfo::FilterStateIndex::NetworkNamespace);
         obj) {
       network_namespace = obj->serializeAsString();
