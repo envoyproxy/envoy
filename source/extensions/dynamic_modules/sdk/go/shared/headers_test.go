@@ -47,8 +47,15 @@ func TestHeaderChecksEveryByte(t *testing.T) {
 			t.Errorf("IsValidHeaderName(%q) = %v, want %v", b, got, token)
 		}
 		allowed := b == '\t' || b >= ' ' && b != 0x7f
-		if got := IsValidHeaderValue(string([]byte{'v', b, 'v'})); got != allowed {
-			t.Errorf("IsValidHeaderValue(%q) = %v, want %v", b, got, allowed)
+		for _, size := range []int{3, 5, 12, 40, 67} {
+			for _, position := range []int{0, size / 2, size - 1} {
+				value := []byte(strings.Repeat("v", size))
+				value[position] = b
+				if got := IsValidHeaderValue(string(value)); got != allowed {
+					t.Errorf("IsValidHeaderValue(%q at %d of %d) = %v, want %v", b, position, size, got,
+						allowed)
+				}
+			}
 		}
 	}
 }

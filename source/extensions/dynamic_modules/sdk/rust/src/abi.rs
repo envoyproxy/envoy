@@ -7,7 +7,7 @@ pub const envoy_dynamic_modules_abi_version: &[u8; 7] = b"v0.2.0\0";
  contains the ABI version the dynamic module was built against. Envoy logs it and does not
  otherwise act on it. It is a diagnostic marker, not a compatibility gate, and a value that
  differs from Envoy's own does not prevent the module from loading. See the ABI compatibility
- policy at the top of this file.
+ policy at the top of abi.h.
 
  OWNERSHIP: Module owns the pointer. Envoy copies the string immediately after on_program_init
  returns, so it only needs to remain valid until then. Returning a static string satisfies this.*/
@@ -71,7 +71,7 @@ const _: () = {
 };
 /** envoy_dynamic_module_type_module_http_header represents a key-value pair of an HTTP header owned
  by the module. Envoy does not check the key or the value; see the note on header names and values
- at the top of this file.*/
+ at the top of abi.h.*/
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct envoy_dynamic_module_type_module_http_header {
@@ -2443,14 +2443,14 @@ unsafe extern "C" {
     /** envoy_dynamic_module_callback_http_set_header is called by the module to set
  the value of the header with the given key. If the header does not exist, it will be
  created. If the header already exists, all existing values will be removed and the new value will
- be set. When the given value is null, the header will be removed if the key exists.
+ be set. When the given value is null or empty, the header will be removed if the key exists.
 
  @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  corresponding HTTP filter.
  @param header_type is the type of the header map to set the header to (request/response
  headers/trailers).
  @param key is the key of the header. It must be a valid header name; Envoy does not check it.
- @param value is the pointer to the buffer of the value. It can be null to remove the header.
+ @param value is the pointer to the buffer of the value. A null or empty value removes the header.
  Otherwise it must be a valid header value; Envoy does not check it.
  @return true if the operation is successful, false otherwise.
 

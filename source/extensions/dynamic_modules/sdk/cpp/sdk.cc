@@ -90,7 +90,8 @@ bool isValidHeaderName(std::string_view name) {
 
 bool isValidHeaderValue(std::string_view value) {
   // c ^ 0x16 maps tab to 0x1f and every other control character below it. Bitwise operators and
-  // no early exit keep the loop free of branches, so compilers can vectorize it.
+  // no early exit keep the loop free of branches, so clang, GCC 16 and MSVC x64 vectorize it.
+  // GCC 13 to 15 keep it scalar.
   bool valid = true;
   for (const unsigned char c : value) {
     valid &= ((c ^ 0x16) >= 0x1f) & (c != 0x7f);

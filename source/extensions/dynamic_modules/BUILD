@@ -134,15 +134,6 @@ go_library(
     visibility = ["//visibility:public"],
 )
 
-go_test(
-    name = "go_sdk_shared_test",
-    srcs = [
-        "sdk/go/shared/headers_test.go",
-        "sdk/go/shared/types_test.go",
-    ],
-    embed = [":go_sdk_shared"],
-)
-
 go_library(
     name = "go_sdk",
     srcs = ["sdk/go/sdk.go"],
@@ -182,7 +173,11 @@ go_library(
 )
 
 exports_files(
-    ["sdk/go/internal/scheduler/scheduler_test.go"],
+    [
+        "sdk/go/internal/scheduler/scheduler_test.go",
+        "sdk/go/shared/headers_test.go",
+        "sdk/go/shared/types_test.go",
+    ],
     visibility = ["//test/extensions/dynamic_modules:__pkg__"],
 )
 

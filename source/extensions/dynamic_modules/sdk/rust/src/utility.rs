@@ -143,8 +143,10 @@ pub fn read_whole_response_body<EHF: EnvoyHttpFilter>(envoy_filter: &mut EHF) ->
 /// Returns whether `name` is a header name that Envoy accepts: a non-empty HTTP token, optionally
 /// prefixed with `:` for a pseudo-header. Upper case letters are allowed.
 ///
-/// Envoy does not check the header names that a module passes, so a module that builds a name
-/// from request data or other untrusted input should check it with this first.
+/// Envoy does not check the header names that a module passes unless a callback's documentation
+/// says it does, so a module that builds a name from request data or other untrusted input should
+/// check it with this first. This checks syntax only: a pseudo-header such as `:authority`, or
+/// `host` or `content-length`, passes, so such a name may still need an allowlist.
 pub fn is_valid_header_name(name: impl AsRef<[u8]>) -> bool {
   let name = name.as_ref();
   let token = name.strip_prefix(b":").unwrap_or(name);
@@ -152,11 +154,13 @@ pub fn is_valid_header_name(name: impl AsRef<[u8]>) -> bool {
 }
 
 /// Returns whether `value` is a header value that Envoy accepts: one without a control character
-/// other than horizontal tab. Bytes above 0x7f are allowed.
+/// other than horizontal tab. Bytes above 0x7f are allowed. An empty value passes, though the
+/// HTTP filter's `set_*` methods remove the header for one and its `add_*` methods reject it.
 ///
-/// Envoy does not check the header values that a module passes. A CR or LF in a value can end the
-/// header and start another on an HTTP/1 connection, so a module that copies request data or
-/// other untrusted input into a header should check it with this first.
+/// Envoy does not check the header values that a module passes unless a callback's documentation
+/// says it does. A CR or LF in a value can end the header and start another on an HTTP/1
+/// connection, so a module that copies request data or other untrusted input into a header should
+/// check it with this first.
 pub fn is_valid_header_value(value: impl AsRef<[u8]>) -> bool {
   // c ^ 0x16 maps tab to 0x1f and every other control character below it. A fold rather than
   // all() has no early exit, so the compiler can vectorize it.
@@ -475,6 +479,19 @@ mod tests {
     ] {
       assert!(!is_valid_header_value(value), "{value:?}");
     }
+  }
+
+  #[test]
+  fn test_header_checks_take_sdk_buffers() {
+    let name = EnvoyBuffer::new(b"x-custom");
+    let value = EnvoyBuffer::new(b"a\rb");
+    assert!(is_valid_header_name(name));
+    assert!(is_valid_header_name(&name));
+    assert!(!is_valid_header_value(value));
+    assert!(!is_valid_header_value(&value));
+    static mut VALUE: [u8; 5] = *b"value";
+    let value = unsafe { EnvoyMutBuffer::new(&raw mut VALUE) };
+    assert!(is_valid_header_value(&value));
   }
 
   #[test]

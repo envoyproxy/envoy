@@ -55,6 +55,10 @@ private:
 /**
  * HeaderView should have the same layout as envoy_dynamic_module_type_module_http_header
  * and envoy_dynamic_module_type_envoy_http_header.
+ *
+ * Envoy does not check the keys and values of the HeaderViews given to it, such as the headers of
+ * local replies, callouts and streams. Check any that come from request data or other untrusted
+ * input with Utility::isValidHeaderName() and Utility::isValidHeaderValue() first.
  */
 class HeaderView {
 public:
@@ -1549,8 +1553,10 @@ std::string readWholeResponseBody(HttpFilterHandle& handle);
  * Returns whether a name is a header name that Envoy accepts: a non-empty HTTP token, optionally
  * prefixed with ':' for a pseudo-header. Upper case letters are allowed.
  *
- * Envoy does not check the header names that a module passes, so a module that builds a name from
- * request data or other untrusted input should check it with this first.
+ * Envoy does not check the header names that a module passes unless a callback's documentation
+ * says it does, so a module that builds a name from request data or other untrusted input should
+ * check it with this first. This checks syntax only: a pseudo-header such as ":authority", or
+ * "host" or "content-length", passes, so such a name may still need an allowlist.
  * @param name The header name.
  * @return Whether Envoy accepts the name.
  */
@@ -1558,11 +1564,13 @@ bool isValidHeaderName(std::string_view name);
 
 /**
  * Returns whether a value is a header value that Envoy accepts: one without a control character
- * other than horizontal tab. Bytes above 0x7f are allowed.
+ * other than horizontal tab. Bytes above 0x7f are allowed. An empty value passes, though the HTTP
+ * filter's HeaderMap::set() removes the header for one and its HeaderMap::add() rejects it.
  *
- * Envoy does not check the header values that a module passes. A CR or LF in a value can end the
- * header and start another on an HTTP/1 connection, so a module that copies request data or other
- * untrusted input into a header should check it with this first.
+ * Envoy does not check the header values that a module passes unless a callback's documentation
+ * says it does. A CR or LF in a value can end the header and start another on an HTTP/1
+ * connection, so a module that copies request data or other untrusted input into a header should
+ * check it with this first.
  * @param value The header value.
  * @return Whether Envoy accepts the value.
  */
