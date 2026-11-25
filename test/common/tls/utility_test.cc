@@ -71,7 +71,7 @@ TEST(UtilityTest, TestDnsNameMatching) {
 }
 
 TEST(UtilityTest, TestIsValidDnsHostname) {
-  // Valid single-label and multi-label hostnames, including punycode and optional trailing dot.
+  // Valid single-label and multi-label hostnames, including A-labels and optional trailing dot.
   EXPECT_TRUE(Utility::isValidDnsHostname("a"));
   EXPECT_TRUE(Utility::isValidDnsHostname("server"));
   EXPECT_TRUE(Utility::isValidDnsHostname("localhost"));
