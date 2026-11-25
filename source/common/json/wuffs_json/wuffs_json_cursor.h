@@ -172,7 +172,7 @@ public:
   // `max_depth` is the deepest nesting accepted, the root container counting as 1;
   // Wuffs itself stops at 1024, which caps it. Deeper nesting is rejected with
   // ResourceExhaustedError, the only error the cursor itself raises with that code.
-  explicit WuffsJsonCursor(Handler& handler, int max_depth = kMaxTrackedDepth - 1);
+  explicit WuffsJsonCursor(Handler& handler, uint32_t max_depth = kMaxTrackedDepth - 1);
 
   WuffsJsonCursor(const WuffsJsonCursor&) = delete;
   WuffsJsonCursor& operator=(const WuffsJsonCursor&) = delete;

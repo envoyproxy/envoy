@@ -1,3 +1,4 @@
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -662,6 +663,24 @@ TEST(WuffsJsonCursorTest, ConfiguredMaxDepth) {
     const absl::Status status = cursor.feed(nested, /*closed=*/true);
     EXPECT_EQ(status.code(), absl::StatusCode::kResourceExhausted);
     EXPECT_EQ(status.message(), "wuffs json: nesting depth exceeds " + std::to_string(depth - 1));
+  }
+}
+
+// A bound past Wuffs' own is capped at it, and nesting past that is the same
+// depth error.
+TEST(WuffsJsonCursorTest, MaxDepthCappedAtWuffsBound) {
+  constexpr int wuffs_bound = WUFFS_JSON__DECODER_DEPTH_MAX_INCL;
+  const auto nested = [](int depth) { return std::string(depth, '[') + std::string(depth, ']'); };
+  {
+    CapturingHandler h;
+    WuffsJsonCursor cursor(h, std::numeric_limits<uint32_t>::max());
+    EXPECT_OK(cursor.feed(nested(wuffs_bound), /*closed=*/true));
+  }
+  {
+    CapturingHandler h;
+    WuffsJsonCursor cursor(h, std::numeric_limits<uint32_t>::max());
+    EXPECT_EQ(cursor.feed(nested(wuffs_bound + 1), /*closed=*/true).code(),
+              absl::StatusCode::kResourceExhausted);
   }
 }
 

@@ -57,9 +57,9 @@ void appendCodePoint(std::string& out, uint32_t code_point) {
 
 } // namespace
 
-WuffsJsonCursor::WuffsJsonCursor(Handler& handler, int max_depth)
-    : handler_(handler),
-      max_depth_(std::min(max_depth, static_cast<int>(WUFFS_JSON__DECODER_DEPTH_MAX_INCL))),
+WuffsJsonCursor::WuffsJsonCursor(Handler& handler, uint32_t max_depth)
+    : handler_(handler), max_depth_(static_cast<int>(
+                             std::min<uint32_t>(max_depth, WUFFS_JSON__DECODER_DEPTH_MAX_INCL))),
       levels_(1) {
   // Reserved once so no level ever moves, and with it the key a callback was handed.
   levels_.reserve(max_depth_ + 1);
@@ -215,8 +215,13 @@ absl::Status WuffsJsonCursor::feedChunk(absl::string_view chunk, bool closed) {
       break;
     }
     if (!wuffs_base__status__is_suspension(&status)) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("wuffs json: ", wuffs_base__status__message(&status)));
+      const std::string message =
+          absl::StrCat("wuffs json: ", wuffs_base__status__message(&status));
+      // Wuffs' own bound, reached only when max_depth_ sits at it.
+      if (status.repr == wuffs_json__error__unsupported_recursion_depth) {
+        return absl::ResourceExhaustedError(message);
+      }
+      return absl::InvalidArgumentError(message);
     }
     if (status.repr == wuffs_base__suspension__short_read) {
       // When Wuffs suspends mid-token it resets its read cursor to before the

@@ -13,7 +13,7 @@ namespace HttpFilters {
 namespace AiProtocolManager {
 
 JsonWithExtBufParser::JsonWithExtBufParser(Config config)
-    : config_(config), cursor_(*this, static_cast<int>(config.max_depth)) {}
+    : config_(config), cursor_(*this, config.max_depth) {}
 
 absl::Status JsonWithExtBufParser::feed(absl::string_view chunk, bool end_stream) {
   // Order matters: a parser that already failed reports that failure again, so a
