@@ -254,6 +254,38 @@ TEST_P(DynamicModuleClusterIntegrationTest, AsyncHostSelection) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// An async client stream, here a dynamic module HTTP filter's stream callout, selects its host
+// through a cluster whose module completes from a thread it started. The downstream request gets
+// its reply from the filter, so the cluster's load balancer never serves a downstream connection,
+// and the result must still reach the router on the worker that owns the load balancer. The callout
+// carries no body, since an async client stream resets on request data while its host selection is
+// pending.
+TEST_P(DynamicModuleClusterIntegrationTest, AsyncHostSelectionForAsyncClientStream) {
+  constexpr absl::string_view stream_filter_config = R"EOF(
+name: envoy.extensions.filters.http.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+  dynamic_module_config:
+    name: http_integration_test
+  filter_name: http_stream_basic
+  filter_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: cluster_0
+)EOF";
+  config_helper_.prependFilter(std::string(stream_filter_config));
+  initializeWithDecCluster("async_host_selection");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData("response_from_upstream", true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("stream_callout_success", response->body());
+}
+
 // Exercise asynchronous selection and TLS together using one client context and distinct
 // runtime hosts. Both servers accept the same tickets so server-side key isolation cannot
 // conceal a client that incorrectly offers one hostname's session to another hostname.

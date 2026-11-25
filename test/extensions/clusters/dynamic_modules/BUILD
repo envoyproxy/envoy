@@ -101,8 +101,12 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:cluster_dynamic_metadata_test",
         "//test/extensions/dynamic_modules/test_data/rust:cluster_filter_state_test",
         "//test/extensions/dynamic_modules/test_data/rust:cluster_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:http_integration_test",
     ],
-    extension_names = ["envoy.clusters.dynamic_modules"],
+    extension_names = [
+        "envoy.clusters.dynamic_modules",
+        "envoy.filters.http.dynamic_modules",
+    ],
     rbe_pool = {
         "gcc": {"build": "linux_x64_small"},
         "openssl": {"link": "linux_x64_small"},
