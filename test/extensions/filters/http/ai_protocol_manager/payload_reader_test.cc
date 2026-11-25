@@ -83,19 +83,12 @@ TEST_F(PayloadReaderTest, FromInMemoryReadsSliceWithoutSuspending) {
   EXPECT_EQ(reader->inMemoryBytes()->toString(), "0123456789");
 
   absl::StatusOr<Buffer::InstancePtr> chunk_or = absl::UnknownError("pending");
-  auto task = [](PayloadReaderSharedPtr r) -> Coroutine::Task<absl::StatusOr<Buffer::InstancePtr>> {
-    absl::Status ready = co_await r->waitReadable();
-    if (!ready.ok()) {
-      co_return ready;
-    }
-    co_return co_await r->readChunk(2, 4);
-  };
   auto handle = Coroutine::launch(
-      task(reader), executor_,
+      reader->readChunk(2, 4), executor_,
       [&chunk_or](absl::StatusOr<Buffer::InstancePtr> res) { chunk_or = std::move(res); },
       Coroutine::StartMode::Inline);
 
-  // In-memory waitReadable + readChunk resolves synchronously without dispatcher pumping.
+  // In-memory readChunk resolves synchronously without dispatcher pumping.
   ASSERT_OK(chunk_or);
   ASSERT_NE(*chunk_or, nullptr);
   EXPECT_EQ((*chunk_or)->toString(), "2345");
@@ -137,20 +130,19 @@ TEST_F(PayloadReaderTest, PendingExternalHandoffWaitsUntilCompletedAndReadsSlice
   EXPECT_EQ(reader->inMemoryBytes(), nullptr);
 
   absl::StatusOr<Buffer::InstancePtr> chunk_or = absl::UnknownError("pending");
-  auto task = [](PayloadReaderSharedPtr r) -> Coroutine::Task<absl::StatusOr<Buffer::InstancePtr>> {
-    absl::Status ready = co_await r->waitReadable();
-    if (!ready.ok()) {
-      co_return ready;
-    }
-    co_return co_await r->readChunk(3, 5);
-  };
   auto handle = Coroutine::launch(
-      task(reader), executor_,
+      reader->readChunk(3, 5), executor_,
       [&chunk_or](absl::StatusOr<Buffer::InstancePtr> res) { chunk_or = std::move(res); },
+      Coroutine::StartMode::Inline);
+  absl::StatusOr<Buffer::InstancePtr> empty_or = absl::UnknownError("pending");
+  auto empty_handle = Coroutine::launch(
+      reader->readChunk(0, 0), executor_,
+      [&empty_or](absl::StatusOr<Buffer::InstancePtr> res) { empty_or = std::move(res); },
       Coroutine::StartMode::Inline);
   drain();
   EXPECT_FALSE(chunk_or.ok());
   EXPECT_EQ(chunk_or.status().code(), absl::StatusCode::kUnknown);
+  EXPECT_EQ(empty_or.status().code(), absl::StatusCode::kUnknown);
 
   InMemoryExternalBufferFactory factory;
   std::shared_ptr<ExternalBuffer> ext = factory.createBuffer(*dispatcher_);
@@ -164,45 +156,23 @@ TEST_F(PayloadReaderTest, PendingExternalHandoffWaitsUntilCompletedAndReadsSlice
   ASSERT_OK(chunk_or);
   ASSERT_NE(*chunk_or, nullptr);
   EXPECT_EQ((*chunk_or)->toString(), "34567");
-}
-
-TEST_F(PayloadReaderTest, ReadChunkDirectlyAwaitsPendingExternalHandoff) {
-  PayloadReaderSharedPtr reader = PayloadReader::createPendingExternal(10);
-  EXPECT_FALSE(reader->allBytesReadable());
-
-  absl::StatusOr<Buffer::InstancePtr> chunk_or = absl::UnknownError("pending");
-  auto handle = Coroutine::launch(
-      reader->readChunk(2, 5), executor_,
-      [&chunk_or](absl::StatusOr<Buffer::InstancePtr> res) { chunk_or = std::move(res); },
-      Coroutine::StartMode::Inline);
-  drain();
-  EXPECT_EQ(chunk_or.status().code(), absl::StatusCode::kUnknown);
-
-  InMemoryExternalBufferFactory factory;
-  std::shared_ptr<ExternalBuffer> ext = factory.createBuffer(*dispatcher_);
-  ext->write(std::make_unique<Buffer::OwnedImpl>("0123456789"), /*end_stream=*/true,
-             [](ExternalBufferStatus) {});
-  drain();
-
-  reader->completeExternalHandoff(std::move(ext));
-  drain();
-
-  ASSERT_OK(chunk_or);
-  ASSERT_NE(*chunk_or, nullptr);
-  EXPECT_EQ((*chunk_or)->toString(), "23456");
+  ASSERT_OK(empty_or);
+  ASSERT_NE(*empty_or, nullptr);
+  EXPECT_EQ((*empty_or)->length(), 0);
 }
 
 TEST_F(PayloadReaderTest, PendingExternalHandoffFailureFailsWaitersAndSubsequentReads) {
   PayloadReaderSharedPtr reader = PayloadReader::createPendingExternal(10);
 
-  absl::Status wait_status = absl::OkStatus();
+  absl::StatusOr<Buffer::InstancePtr> wait_res = absl::UnknownError("pending");
   auto wait_handle = Coroutine::launch(
-      reader->waitReadable(), executor_,
-      [&wait_status](absl::Status s) { wait_status = std::move(s); }, Coroutine::StartMode::Inline);
+      reader->readChunk(0, 5), executor_,
+      [&wait_res](absl::StatusOr<Buffer::InstancePtr> res) { wait_res = std::move(res); },
+      Coroutine::StartMode::Inline);
 
   reader->failExternalHandoff();
   drain();
-  EXPECT_THAT(wait_status, HasStatusCode(absl::StatusCode::kDataLoss));
+  EXPECT_THAT(wait_res.status(), HasStatusCode(absl::StatusCode::kDataLoss));
   EXPECT_TRUE(reader->hasFailed());
 
   absl::StatusOr<Buffer::InstancePtr> read1 = absl::UnknownError("pending");
@@ -224,13 +194,14 @@ TEST_F(PayloadReaderTest, PendingExternalHandoffFailureFailsWaitersAndSubsequent
 TEST_F(PayloadReaderTest, ContextCancelUnwindsWaitReadableWithoutPoisoningReader) {
   PayloadReaderSharedPtr reader = PayloadReader::createPendingExternal(10);
 
-  absl::Status wait_status = absl::OkStatus();
+  absl::StatusOr<Buffer::InstancePtr> wait_res = absl::UnknownError("pending");
   auto wait_handle = Coroutine::launch(
-      reader->waitReadable(), executor_,
-      [&wait_status](absl::Status s) { wait_status = std::move(s); }, Coroutine::StartMode::Inline);
+      reader->readChunk(0, 5), executor_,
+      [&wait_res](absl::StatusOr<Buffer::InstancePtr> res) { wait_res = std::move(res); },
+      Coroutine::StartMode::Inline);
 
   wait_handle.cancel();
-  EXPECT_THAT(wait_status, HasStatusCode(absl::StatusCode::kCancelled));
+  EXPECT_THAT(wait_res.status(), HasStatusCode(absl::StatusCode::kCancelled));
   EXPECT_FALSE(reader->hasFailed());
 
   InMemoryExternalBufferFactory factory;

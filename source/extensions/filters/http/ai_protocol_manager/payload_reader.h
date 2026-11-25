@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <vector>
 
 #include "envoy/buffer/buffer.h"
 
@@ -62,15 +61,11 @@ public:
     return (allBytesReadable() && buffer_ == nullptr) ? &in_memory_ : nullptr;
   }
 
-  // Suspends only while an ExternalBuffer terminal write is still in flight; resolves immediately
-  // once all bytes in [0, length()) are durable, or fails with DataLossError if storage failed.
-  Coroutine::Task<absl::Status> waitReadable();
-
-  // Reads `[offset, offset + max_length)` as a coroutine, awaiting `waitReadable()` first when an
-  // ExternalBuffer flush is still in flight. Already-readable inline and zero-length reads complete
-  // synchronously without suspending; ExternalBuffer reads serialize single-flight access via a
-  // 1-permit semaphore so cancelling one attempt mid-read via CoroutineContext cannot overlap a
-  // second ExternalBuffer::read() until the underlying callback returns.
+  // Reads `[offset, offset + max_length)` as a coroutine, suspending while an ExternalBuffer flush
+  // is still in flight. Already-readable inline and zero-length reads complete synchronously
+  // without suspending; ExternalBuffer reads serialize single-flight access via a 1-permit
+  // semaphore so cancelling one attempt mid-read via CoroutineContext cannot overlap a second
+  // ExternalBuffer::read() until the underlying callback returns.
   Coroutine::Task<absl::StatusOr<Buffer::InstancePtr>> readChunk(uint64_t offset,
                                                                  uint64_t max_length);
 
@@ -81,7 +76,6 @@ public:
   std::shared_ptr<void> failExternalHandoff();
 
 private:
-  class WaitReadable;
   class ReadExternalBuffer;
 
   PayloadReader() = default;
@@ -90,12 +84,11 @@ private:
   Buffer::OwnedImpl in_memory_;
   std::shared_ptr<ExternalBuffer> buffer_;
   Coroutine::SemaphorePtr read_sem_;
+  Coroutine::SemaphoreReservation pending_permit_;
   std::shared_ptr<void> pending_owner_;
 
   bool readable_{false};
   bool failed_{false};
-
-  std::vector<WaitReadable*> readable_waiters_;
 };
 
 } // namespace AiProtocolManager

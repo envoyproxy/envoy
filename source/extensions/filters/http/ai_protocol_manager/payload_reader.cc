@@ -4,7 +4,6 @@
 #include <memory>
 #include <optional>
 #include <utility>
-#include <vector>
 
 #include "envoy/buffer/buffer.h"
 
@@ -22,33 +21,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
-class PayloadReader::WaitReadable : public Coroutine::LeafAwaitable<absl::Status> {
-public:
-  explicit WaitReadable(PayloadReaderSharedPtr reader) : reader_(std::move(reader)) {}
-
-protected:
-  std::optional<absl::Status> tryImmediate() override {
-    if (reader_->failed_) {
-      return absl::DataLossError("external buffer write failed");
-    }
-    if (reader_->readable_) {
-      return absl::OkStatus();
-    }
-    return std::nullopt;
-  }
-
-  void onStart() override {
-    ASSERT(!reader_->failed_ && !reader_->readable_);
-    reader_->readable_waiters_.push_back(this);
-  }
-
-  void onCancel() override { std::erase(reader_->readable_waiters_, this); }
-
-private:
-  friend class PayloadReader;
-  PayloadReaderSharedPtr reader_;
-};
-
 // Bridges a single ExternalBuffer::read() call into a cancellable LeafAwaitable.
 //
 // ExternalBuffer::read() is single-flight and intentionally non-cancellable (e.g., backing stores
@@ -98,10 +70,6 @@ private:
   std::shared_ptr<bool> alive_{std::make_shared<bool>(true)};
 };
 
-Coroutine::Task<absl::Status> PayloadReader::waitReadable() {
-  co_return co_await WaitReadable(shared_from_this());
-}
-
 PayloadReaderSharedPtr PayloadReader::fromInMemory(Buffer::Instance& data) {
   PayloadReaderSharedPtr reader(new PayloadReader());
   reader->total_length_ = data.length();
@@ -126,6 +94,11 @@ PayloadReaderSharedPtr PayloadReader::createPendingExternal(uint64_t length,
   PayloadReaderSharedPtr reader(new PayloadReader());
   reader->total_length_ = length;
   reader->read_sem_ = std::make_shared<Coroutine::Semaphore>(1);
+  // Hold the single-flight permit while the external flush is in flight so readers park FIFO on
+  // `read_sem_` until completeExternalHandoff() or failExternalHandoff() releases it.
+  std::optional<Coroutine::SemaphoreReservation> permit = reader->read_sem_->tryAcquire(1);
+  ASSERT(permit.has_value());
+  reader->pending_permit_ = std::move(*permit);
   reader->pending_owner_ = std::move(pending_owner);
   return reader;
 }
@@ -140,11 +113,13 @@ PayloadReaderSharedPtr PayloadReader::createFailed(uint64_t length) {
 Coroutine::Task<absl::StatusOr<Buffer::InstancePtr>> PayloadReader::readChunk(uint64_t offset,
                                                                               uint64_t max_length) {
   PayloadReaderSharedPtr self = shared_from_this();
-  CO_RETURN_IF_ERROR(co_await WaitReadable(self));
+  if (self->failed_) {
+    co_return absl::DataLossError("external buffer failed");
+  }
   if (offset > self->total_length_ || max_length > self->total_length_ - offset) {
     co_return absl::InvalidArgumentError("payload read range out of bounds");
   }
-  if (self->buffer_ == nullptr || max_length == 0) {
+  if (self->readable_ && (self->buffer_ == nullptr || max_length == 0)) {
     auto data = std::make_unique<Buffer::OwnedImpl>();
     if (max_length > 0) {
       auto bytes = std::make_unique<uint8_t[]>(max_length);
@@ -157,6 +132,9 @@ Coroutine::Task<absl::StatusOr<Buffer::InstancePtr>> PayloadReader::readChunk(ui
   ASSIGN_OR_CO_RETURN(Coroutine::SemaphoreReservation permit, co_await self->read_sem_->acquire(1));
   if (self->failed_) {
     co_return absl::DataLossError("external buffer failed");
+  }
+  if (max_length == 0) {
+    co_return std::make_unique<Buffer::OwnedImpl>();
   }
 
   co_return co_await ReadExternalBuffer(self, offset, max_length, std::move(permit));
@@ -171,11 +149,7 @@ PayloadReader::completeExternalHandoff(std::shared_ptr<ExternalBuffer> buffer) {
   buffer_ = std::move(buffer);
   readable_ = true;
   std::shared_ptr<void> owner = std::move(pending_owner_);
-  while (!readable_waiters_.empty()) {
-    WaitReadable* waiter = readable_waiters_.front();
-    readable_waiters_.erase(readable_waiters_.begin());
-    waiter->complete(absl::OkStatus());
-  }
+  pending_permit_.release();
   return owner;
 }
 
@@ -185,11 +159,7 @@ std::shared_ptr<void> PayloadReader::failExternalHandoff() {
   }
   failed_ = true;
   std::shared_ptr<void> owner = std::move(pending_owner_);
-  while (!readable_waiters_.empty()) {
-    WaitReadable* waiter = readable_waiters_.front();
-    readable_waiters_.erase(readable_waiters_.begin());
-    waiter->complete(absl::DataLossError("external buffer write failed"));
-  }
+  pending_permit_.release();
   return owner;
 }
 
