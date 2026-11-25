@@ -520,8 +520,10 @@ void FaultFilter::abortWithStatus(Http::Code http_status_code,
       [this](Http::ResponseHeaderMap& headers) {
         const Formatter::Context formatter_context(decoder_callbacks_->requestHeaders().ptr(),
                                                    &headers);
-        fault_settings_->requestAbort()->responseHeadersParser().evaluateHeaders(
-            headers, formatter_context, decoder_callbacks_->streamInfo());
+        if (fault_settings_->requestAbort() != nullptr) {
+          fault_settings_->requestAbort()->responseHeadersParser().evaluateHeaders(
+              headers, formatter_context, decoder_callbacks_->streamInfo());
+        }
       },
       grpc_status, RcDetails::get().FaultAbort);
 }
