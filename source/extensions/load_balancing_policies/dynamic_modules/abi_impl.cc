@@ -1,3 +1,6 @@
+#include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
+#include "source/common/http/message_impl.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/load_balancing_policies/dynamic_modules/load_balancer.h"
@@ -915,6 +918,82 @@ envoy_dynamic_module_callback_lb_config_record_histogram_value(
                                    label_values_length);
   histogram->recordValue(config->metrics().scope(), tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+// =============================================================================
+// HTTP Callout and Timer Callbacks
+// =============================================================================
+
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_lb_config_http_callout(
+    envoy_dynamic_module_type_lb_config_envoy_ptr lb_config_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(
+        "envoy_dynamic_module_callback_lb_config_http_callout must be called on the main thread");
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
+  }
+  auto* config = static_cast<DynamicModuleLbConfig*>(lb_config_envoy_ptr);
+  absl::string_view cluster_name_view(cluster_name.ptr, cluster_name.length);
+
+  if (headers_size > 0 && headers == nullptr) {
+    return envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders;
+  }
+
+  Envoy::Http::RequestHeaderMapPtr header_map = Envoy::Http::RequestHeaderMapImpl::create();
+  for (size_t i = 0; i < headers_size; ++i) {
+    const auto& header = headers[i];
+    const absl::string_view key(static_cast<const char*>(header.key_ptr), header.key_length);
+    const absl::string_view value(static_cast<const char*>(header.value_ptr), header.value_length);
+    header_map->addCopy(Envoy::Http::LowerCaseString(key), value);
+  }
+  auto message = std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(header_map));
+  if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
+      message->headers().Host() == nullptr) {
+    return envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders;
+  }
+  if (body.length > 0 && body.ptr) {
+    message->body().add(absl::string_view(static_cast<const char*>(body.ptr), body.length));
+    message->headers().setContentLength(body.length);
+  }
+  return config->sendHttpCallout(callout_id_out, cluster_name_view, std::move(message),
+                                 timeout_milliseconds);
+}
+
+void envoy_dynamic_module_callback_lb_config_enable_timer(
+    envoy_dynamic_module_type_lb_config_envoy_ptr lb_config_envoy_ptr,
+    uint64_t interval_milliseconds) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(
+        "envoy_dynamic_module_callback_lb_config_enable_timer must be called on the main thread");
+    return;
+  }
+  auto* config = static_cast<DynamicModuleLbConfig*>(lb_config_envoy_ptr);
+  config->enableTimer(interval_milliseconds);
+}
+
+void envoy_dynamic_module_callback_lb_config_disable_timer(
+    envoy_dynamic_module_type_lb_config_envoy_ptr lb_config_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(
+        "envoy_dynamic_module_callback_lb_config_disable_timer must be called on the main thread");
+    return;
+  }
+  auto* config = static_cast<DynamicModuleLbConfig*>(lb_config_envoy_ptr);
+  config->disableTimer();
+}
+
+bool envoy_dynamic_module_callback_lb_config_schedule_on_server_initialized(
+    envoy_dynamic_module_type_lb_config_envoy_ptr lb_config_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_config_schedule_on_server_initialized must be "
+                 "called on the main thread");
+    return false;
+  }
+  auto* config = static_cast<DynamicModuleLbConfig*>(lb_config_envoy_ptr);
+  return config->scheduleOnServerInitialized();
 }
 
 } // extern "C"

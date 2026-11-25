@@ -274,6 +274,14 @@ test_program(name = "lb_config_new_fail")
 
 test_program(name = "lb_callbacks_test")
 
+test_program(name = "lb_server_initialized_test")
+
+test_program(name = "lb_server_initialized_no_schedule")
+
+test_program(name = "lb_callout_timer")
+
+test_program(name = "lb_integration_test")
+
 test_program(name = "lb_new_fail")
 
 test_program(name = "lb_no_choose_host")

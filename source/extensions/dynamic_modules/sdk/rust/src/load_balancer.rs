@@ -1,5 +1,6 @@
 use crate::{
   abi,
+  bytes_to_module_buffer,
   drop_wrapped_c_void_ptr,
   ffi_export,
   str_to_module_buffer,
@@ -731,9 +732,12 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
 /// Trait for defining and recording custom metrics for load balancer modules.
 ///
 /// An implementation of this trait is passed to the user's config creation function for defining
-/// metrics. It can also be stored by the user and used at runtime (e.g., during host selection)
-/// to record metric values. The raw pointer is safe to store and use from any thread because the
-/// underlying C++ `DynamicModuleLbConfig` is thread-safe for metric operations.
+/// metrics. It can also be stored by the user and used at runtime, such as during host
+/// selection, to record metric values from any thread, since the underlying C++
+/// `DynamicModuleLbConfig` is thread-safe for metric operations. The callout, timer and
+/// `schedule_on_server_initialized` methods must run on the main thread. Elsewhere a debug build
+/// aborts and other builds refuse the call. Load balancer configs do not provide a
+/// worker-to-main thread scheduler yet.
 #[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyLbConfig: Send + Sync {
@@ -858,11 +862,43 @@ pub trait EnvoyLbConfig: Send + Sync {
     label_values: &[&'a str],
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Main-thread HTTP callout. Requires `:method`, `:path`, and `host`.
+  /// The callout id is valid only on `Success`; otherwise it is `0`.
+  /// Delivers the response even when `on_http_callout_done` keeps its empty default.
+  /// A callout to a cluster that uses this load balancer can run its `choose_host` before
+  /// returning, so don't send one to that cluster from that load balancer's own hooks.
+  fn send_http_callout<'a>(
+    &self,
+    cluster_name: &'a str,
+    headers: &[(&'a str, &'a [u8])],
+    body: Option<&'a [u8]>,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64);
+
+  /// Arms a main-thread timer that calls [`LoadBalancerConfig::on_timer`] and re-arms until
+  /// [`EnvoyLbConfig::disable_timer`]. Must be called on the main thread.
+  /// Fires even when `on_timer` keeps its default empty implementation.
+  fn enable_timer(&self, interval_milliseconds: u64);
+
+  /// Stops the timer. Main thread. No-op after the config is destroyed.
+  fn disable_timer(&self);
+
+  /// Opts in to [`LoadBalancerConfig::on_server_initialized`]. Call from config creation.
+  /// Returns `true` if scheduled, or `false` if called after config creation or off the main
+  /// thread.
+  fn schedule_on_server_initialized(&self) -> bool;
 }
 
 /// Implementation of [`EnvoyLbConfig`] that calls into the Envoy ABI.
 pub struct EnvoyLbConfigImpl {
   raw: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+}
+
+impl EnvoyLbConfigImpl {
+  pub(crate) fn new(raw: abi::envoy_dynamic_module_type_lb_config_envoy_ptr) -> Self {
+    Self { raw }
+  }
 }
 
 // The raw pointer references C++ DynamicModuleLbConfig which is safe for metric operations
@@ -1169,6 +1205,61 @@ impl EnvoyLbConfig for EnvoyLbConfigImpl {
       )
     })
   }
+
+  fn send_http_callout<'a>(
+    &self,
+    cluster_name: &'a str,
+    headers: &[(&'a str, &'a [u8])],
+    body: Option<&'a [u8]>,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
+    let module_headers: Vec<abi::envoy_dynamic_module_type_module_http_header> = headers
+      .iter()
+      .map(|(k, v)| abi::envoy_dynamic_module_type_module_http_header {
+        key_ptr: k.as_ptr() as *const _,
+        key_length: k.len(),
+        value_ptr: v.as_ptr() as *const _,
+        value_length: v.len(),
+      })
+      .collect();
+
+    let mut callout_id: u64 = 0;
+
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_lb_config_http_callout(
+        self.raw,
+        &mut callout_id as *mut u64,
+        str_to_module_buffer(cluster_name),
+        module_headers.as_ptr() as *mut _,
+        module_headers.len(),
+        body.map_or(
+          abi::envoy_dynamic_module_type_module_buffer {
+            ptr: std::ptr::null(),
+            length: 0,
+          },
+          bytes_to_module_buffer,
+        ),
+        timeout_milliseconds,
+      )
+    };
+    (result, callout_id)
+  }
+
+  fn enable_timer(&self, interval_milliseconds: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_config_enable_timer(self.raw, interval_milliseconds);
+    }
+  }
+
+  fn disable_timer(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_config_disable_timer(self.raw);
+    }
+  }
+
+  fn schedule_on_server_initialized(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_lb_config_schedule_on_server_initialized(self.raw) }
+  }
 }
 
 /// Trait for the load balancer configuration.
@@ -1181,6 +1272,25 @@ pub trait LoadBalancerConfig: Sync {
   /// This is called once per worker thread when the thread is initialized.
   /// The `envoy_lb` provides access to cluster information (context methods are not available).
   fn new_load_balancer(&self, envoy_lb: &dyn EnvoyLoadBalancer) -> Box<dyn LoadBalancer>;
+
+  /// Main-thread HTTP callout result. Default is a no-op.
+  fn on_http_callout_done(
+    &self,
+    _envoy_config: &dyn EnvoyLbConfig,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+    _response_body: Option<&[EnvoyBuffer]>,
+  ) {
+  }
+
+  /// Main-thread timer fire. Default is a no-op.
+  fn on_timer(&self, _envoy_config: &dyn EnvoyLbConfig) {}
+
+  /// Called once on the main thread after cluster-manager TLS is up, and only if
+  /// [`EnvoyLbConfig::schedule_on_server_initialized`] ran during config creation.
+  /// Default is a no-op and does not schedule the hook.
+  fn on_server_initialized(&self, _envoy_config: &dyn EnvoyLbConfig) {}
 }
 
 /// Represents the result of a host selection decision, containing the priority level
@@ -1256,9 +1366,8 @@ ffi_export! {
     let new_config_fn = NEW_LOAD_BALANCER_CONFIG_FUNCTION
       .get()
       .expect("NEW_LOAD_BALANCER_CONFIG_FUNCTION must be set");
-    let envoy_lb_config: Arc<dyn EnvoyLbConfig> = Arc::new(EnvoyLbConfigImpl {
-      raw: lb_config_envoy_ptr,
-    });
+    let envoy_lb_config: Arc<dyn EnvoyLbConfig> =
+      Arc::new(EnvoyLbConfigImpl::new(lb_config_envoy_ptr));
     match new_config_fn(name_str.as_ref(), config_slice, envoy_lb_config) {
       Some(config) => wrap_into_c_void_ptr!(config),
       None => std::ptr::null(),
@@ -1360,5 +1469,89 @@ ffi_export! {
     lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
   ) {
     drop_wrapped_c_void_ptr!(lb_module_ptr, LoadBalancer);
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_lb_config_http_callout_done(
+    lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+    lb_config_module_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
+    callout_id: u64,
+    result: abi::envoy_dynamic_module_type_http_callout_result,
+    headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+    headers_size: usize,
+    body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
+    body_chunks_size: usize,
+  ) {
+    let lb_config = {
+      let raw = lb_config_module_ptr as *const *const dyn LoadBalancerConfig;
+      &**raw
+    };
+    let envoy_config = EnvoyLbConfigImpl::new(lb_config_envoy_ptr);
+
+    let response_headers = if headers_size > 0 {
+      Some(crate::ffi_helpers::slice_from_raw_or_empty(
+        headers as *const (EnvoyBuffer, EnvoyBuffer),
+        headers_size,
+      ))
+    } else {
+      None
+    };
+    let response_body = if body_chunks_size > 0 {
+      Some(crate::ffi_helpers::slice_from_raw_or_empty(
+        body_chunks as *const EnvoyBuffer,
+        body_chunks_size,
+      ))
+    } else {
+      None
+    };
+
+    lb_config.on_http_callout_done(
+      &envoy_config,
+      callout_id,
+      result,
+      response_headers,
+      response_body,
+    );
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_lb_config_timer(
+    lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+    lb_config_module_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
+  ) {
+    let lb_config = {
+      let raw = lb_config_module_ptr as *const *const dyn LoadBalancerConfig;
+      &**raw
+    };
+    let envoy_config = EnvoyLbConfigImpl::new(lb_config_envoy_ptr);
+    lb_config.on_timer(&envoy_config);
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_lb_config_server_initialized(
+    lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+    lb_config_module_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
+  ) {
+    let lb_config = {
+      let raw = lb_config_module_ptr as *const *const dyn LoadBalancerConfig;
+      &**raw
+    };
+    let envoy_config = EnvoyLbConfigImpl::new(lb_config_envoy_ptr);
+    lb_config.on_server_initialized(&envoy_config);
   }
 }

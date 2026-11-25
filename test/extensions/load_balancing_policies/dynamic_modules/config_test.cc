@@ -4,10 +4,12 @@
 #include "envoy/extensions/load_balancing_policies/dynamic_modules/v3/dynamic_modules.pb.h"
 
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/load_balancing_policies/dynamic_modules/config.h"
 #include "source/extensions/load_balancing_policies/dynamic_modules/load_balancer.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/init/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
@@ -30,15 +32,45 @@ namespace {
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
+using ::testing::_;
 using ::testing::NiceMock;
 using ::testing::Not;
+using ::testing::NotNull;
 using ::testing::Return;
 using ::testing::ReturnRef;
+
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+using ::Envoy::Extensions::DynamicModules::newDynamicModule;
+using ::Envoy::Extensions::DynamicModules::testSharedObjectPath;
 
 class DynamicModulesLoadBalancerConfigTest : public testing::Test {
 protected:
   DynamicModulesLoadBalancerConfigTest() {
     Envoy::Extensions::DynamicModules::DynamicModulesTestEnvironment::setModulesSearchPath();
+  }
+
+  template <typename FunctionType>
+  FunctionType moduleFunction(const std::string& module_name, const std::string& symbol) {
+    // RTLD_NODELETE so the returned function pointer stays mapped after this handle is closed.
+    auto module = newDynamicModule(testSharedObjectPath(module_name, "c"), true);
+    return module.value()->getFunctionPointer<FunctionType>(symbol).value();
+  }
+
+  void resetModuleCounter(const std::string& module_name, const std::string& reset_symbol) {
+    moduleFunction<void (*)()>(module_name, reset_symbol)();
+  }
+
+  int moduleCounter(const std::string& module_name, const std::string& called_symbol) {
+    return moduleFunction<int (*)()>(module_name, called_symbol)();
+  }
+
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr> loadLbConfig(const std::string& module_name) {
+    envoy::extensions::load_balancing_policies::dynamic_modules::v3::
+        DynamicModulesLoadBalancerConfig config;
+    config.mutable_dynamic_module_config()->set_name(module_name);
+    config.set_lb_policy_name("test_lb");
+    Factory factory;
+    return factory.loadConfig(factory_context_, config);
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
@@ -53,9 +85,6 @@ protected:
 // Config Tests
 // =============================================================================
 
-// Pull the shared dynamic-modules test helper into scope.
-using ::Envoy::Extensions::DynamicModules::failureCounter;
-
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccess) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
@@ -69,6 +98,63 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccess) {
   // The happy path emits no load-failure counters.
   EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test_lb"));
   EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "config_init_error", "test_lb"));
+}
+
+TEST_F(DynamicModulesLoadBalancerConfigTest, ServerInitializedWithoutScheduleDoesNothing) {
+  resetModuleCounter("lb_server_initialized_no_schedule",
+                     "lb_server_initialized_no_schedule_reset");
+  ON_CALL(factory_context_.init_manager_, state())
+      .WillByDefault(Return(Init::Manager::State::Uninitialized));
+  EXPECT_CALL(factory_context_.init_manager_, add(_)).Times(0);
+
+  auto lb_config_or_error = loadLbConfig("lb_server_initialized_no_schedule");
+  EXPECT_THAT(lb_config_or_error, IsOkAndHolds(NotNull()));
+  EXPECT_EQ(0, moduleCounter("lb_server_initialized_no_schedule",
+                             "lb_server_initialized_no_schedule_called"));
+}
+
+TEST_F(DynamicModulesLoadBalancerConfigTest, ServerInitializedRunsHookBeforeReady) {
+  resetModuleCounter("lb_server_initialized_test", "lb_server_initialized_test_reset");
+  ON_CALL(factory_context_.init_manager_, state())
+      .WillByDefault(Return(Init::Manager::State::Uninitialized));
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(factory_context_.init_manager_, add(_)).WillOnce([&](const Init::Target& target) {
+    EXPECT_EQ(target.name(), "target dynamic_modules_lb_config");
+    init_target_handle = target.createHandle("test");
+  });
+
+  auto lb_config_or_error = loadLbConfig("lb_server_initialized_test");
+  EXPECT_THAT(lb_config_or_error, IsOkAndHolds(NotNull()));
+  EXPECT_EQ(0, moduleCounter("lb_server_initialized_test", "lb_server_initialized_test_called"));
+
+  Init::ExpectableWatcherImpl watcher;
+  watcher.expectReady().WillOnce([&]() {
+    EXPECT_EQ(1, moduleCounter("lb_server_initialized_test", "lb_server_initialized_test_called"));
+  });
+  ASSERT_TRUE(init_target_handle->initialize(watcher));
+  EXPECT_EQ(1, moduleCounter("lb_server_initialized_test", "lb_server_initialized_test_called"));
+}
+
+TEST_F(DynamicModulesLoadBalancerConfigTest, ServerInitializedRunsHookInlineWhenInitializing) {
+  resetModuleCounter("lb_server_initialized_test", "lb_server_initialized_test_reset");
+  ON_CALL(factory_context_.init_manager_, state())
+      .WillByDefault(Return(Init::Manager::State::Initializing));
+  EXPECT_CALL(factory_context_.init_manager_, add(_)).Times(0);
+
+  auto lb_config_or_error = loadLbConfig("lb_server_initialized_test");
+  EXPECT_THAT(lb_config_or_error, IsOkAndHolds(NotNull()));
+  EXPECT_EQ(1, moduleCounter("lb_server_initialized_test", "lb_server_initialized_test_called"));
+}
+
+TEST_F(DynamicModulesLoadBalancerConfigTest, ServerInitializedRunsHookInlineWhenInitialized) {
+  resetModuleCounter("lb_server_initialized_test", "lb_server_initialized_test_reset");
+  ON_CALL(factory_context_.init_manager_, state())
+      .WillByDefault(Return(Init::Manager::State::Initialized));
+  EXPECT_CALL(factory_context_.init_manager_, add(_)).Times(0);
+
+  auto lb_config_or_error = loadLbConfig("lb_server_initialized_test");
+  EXPECT_THAT(lb_config_or_error, IsOkAndHolds(NotNull()));
+  EXPECT_EQ(1, moduleCounter("lb_server_initialized_test", "lb_server_initialized_test_called"));
 }
 
 // Load the module via the ``module.local.filename`` data source instead of by name.
