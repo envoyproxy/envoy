@@ -3823,10 +3823,8 @@ envoy_cc_test(
             "link": "linux_x64_small",
         },
     },
-    tags = [
-        "fails_on_clang_cl",
-        "fails_on_windows",
-    ],
+    # Uses POSIX sockets and poll(); hot restart is disabled on Windows.
+    tags = ["skip_on_windows"],
     deps = envoy_select_enable_http3([
         ":quic_http_integration_test_lib",
         "//envoy/network:parent_drained_callback_registrar_interface",

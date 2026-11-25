@@ -21,7 +21,7 @@ namespace {
 
 class TrackedWatermarkBufferTest : public testing::Test {
 public:
-  TrackedWatermarkBufferFactory factory_{absl::bit_width(4096u)};
+  TrackedWatermarkBufferFactory factory_{static_cast<uint32_t>(absl::bit_width(4096u))};
   Http::MockStreamResetHandler mock_reset_handler_;
 };
 
