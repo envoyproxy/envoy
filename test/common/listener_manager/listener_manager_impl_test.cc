@@ -2,6 +2,7 @@
 
 #include <cerrno>
 #include <chrono>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
@@ -20,7 +21,9 @@
 #ifdef __linux__
 #include "source/common/api/os_sys_calls_impl_linux.h"
 #endif
+#include "source/common/common/base64.h"
 #include "source/common/common/cpu_affinity.h"
+#include "source/common/common/hash.h"
 #include "source/common/config/metadata.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/address_impl.h"
@@ -30,6 +33,7 @@
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/tls/ssl_socket.h"
 #include "source/extensions/common/matcher/ip_range_matcher.h"
@@ -1477,7 +1481,7 @@ TEST_P(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
     auto new_listener = listener;
     f(new_listener);
     EXPECT_EQ(ListenerImpl::create(new_listener, "version", *manager_, "foo", true, false,
-                                   /*hash=*/static_cast<uint64_t>(0))
+                                   /*hash=*/static_cast<uint64_t>(0), /*serialized_hash=*/0)
                   .status()
                   .message(),
               "error adding listener named 'foo': has "
@@ -2478,6 +2482,44 @@ filter_chains:
   EXPECT_CALL(*listener_baz_update1, onDestroy());
 }
 
+// An update that only serializes an Any payload differently should be a NOP.
+TEST_P(ListenerManagerImplTest, UpdateWithReserializedAnyIsNoop) {
+  InSequence s;
+
+  envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+name: "foo"
+address:
+  socket_address:
+    address: "127.0.0.1"
+    port_value: 1234
+filter_chains: {}
+  )EOF");
+  // The same struct with its two fields serialized in two orders.
+  Protobuf::Any& any = (*listener.mutable_metadata()->mutable_typed_filter_metadata())["foo"];
+  any.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+
+  const auto serialized_config_hash = [this]() {
+    return dynamic_cast<ListenerImpl&>(manager_->listeners().front().get()).serializedConfigHash();
+  };
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_TRUE(addOrUpdateListener(listener));
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(listener)),
+            serialized_config_hash());
+
+  any.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  EXPECT_FALSE(addOrUpdateListener(listener));
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+  // The listener keeps the new bytes, so that the next push of them skips MessageUtil::hash().
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(listener)),
+            serialized_config_hash());
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
 TEST_P(ListenerManagerImplTest, UpdateActiveToWarmAndBack) {
   InSequence s;
 
@@ -2528,6 +2570,11 @@ filter_chains:
   EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
   checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
 
+  // Pushing the warming config again keeps it warming.
+  EXPECT_FALSE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
   // Update foo back to original active, should cause the warming listener to be removed.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
@@ -2537,6 +2584,129 @@ filter_chains:
   EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
 
   EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+// A re-encoded push of the warming config keeps it warming, and a re-encoded push of the active
+// config reverts to the active listener.
+TEST_P(ListenerManagerImplTest, UpdateActiveToWarmAndBackWithReserializedAny) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+
+  envoy::config::listener::v3::Listener listener_foo = parseListenerFromV3Yaml(R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF");
+  // The same struct with its two fields serialized in two orders.
+  const std::string struct_bytes = Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g=");
+  const std::string reordered_struct_bytes = Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo=");
+  Protobuf::Any& any = (*listener_foo.mutable_metadata()->mutable_typed_filter_metadata())["foo"];
+  any.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any.set_value(struct_bytes);
+
+  ListenerHandle* listener_foo_handle = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo_handle->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(listener_foo));
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  listener_foo_handle->target_.ready();
+  worker_->callAddCompletion();
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // Update foo into warming.
+  envoy::config::listener::v3::Listener listener_foo_update1 = listener_foo;
+  listener_foo_update1.mutable_per_connection_buffer_limit_bytes()->set_value(999);
+  ListenerHandle* listener_foo_update1_handle = expectListenerCreate(true, true);
+  EXPECT_CALL(*listener_factory_.socket_, duplicate());
+  EXPECT_CALL(listener_foo_update1_handle->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(listener_foo_update1));
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  // A re-encoded push of the warming config keeps it warming and keeps the new bytes.
+  (*listener_foo_update1.mutable_metadata()->mutable_typed_filter_metadata())["foo"].set_value(
+      reordered_struct_bytes);
+  EXPECT_FALSE(addOrUpdateListener(listener_foo_update1));
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(listener_foo_update1)),
+            dynamic_cast<ListenerImpl&>(manager_->listeners(ListenerManager::WARMING).front().get())
+                .serializedConfigHash());
+
+  // A re-encoded push of the active config removes the warming listener.
+  any.set_value(reordered_struct_bytes);
+  EXPECT_CALL(*listener_foo_update1_handle, onDestroy());
+  EXPECT_TRUE(addOrUpdateListener(listener_foo));
+  checkStats(__LINE__, 1, 2, 0, 0, 1, 0, 0);
+  EXPECT_EQ(0UL, manager_->listeners(ListenerManager::WARMING).size());
+
+  EXPECT_CALL(*listener_foo_handle, onDestroy());
+}
+
+// A listener matches the stored serialized hash before MessageUtil::hash(), and a push of the
+// warming listener's bytes skips the revert check. The test sets the stored hashes by hand, which
+// no push does, so that a revert check that ran, or a MessageUtil::hash() that decided a check,
+// would change the result.
+TEST_P(ListenerManagerImplTest, SerializedConfigHashIsCheckedBeforeMessageHash) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+
+  const envoy::config::listener::v3::Listener listener_foo = parseListenerFromV3Yaml(R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF");
+  ListenerHandle* listener_foo_handle = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo_handle->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(listener_foo));
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  listener_foo_handle->target_.ready();
+  worker_->callAddCompletion();
+
+  envoy::config::listener::v3::Listener listener_foo_update1 = listener_foo;
+  listener_foo_update1.mutable_per_connection_buffer_limit_bytes()->set_value(999);
+  ListenerHandle* listener_foo_update1_handle = expectListenerCreate(true, true);
+  EXPECT_CALL(*listener_factory_.socket_, duplicate());
+  EXPECT_CALL(listener_foo_update1_handle->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(listener_foo_update1));
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  auto& active =
+      dynamic_cast<ListenerImpl&>(manager_->listeners(ListenerManager::ACTIVE).front().get());
+  auto& warming =
+      dynamic_cast<ListenerImpl&>(manager_->listeners(ListenerManager::WARMING).front().get());
+
+  // A push of the warming bytes stays blocked even with the active listener set to match them.
+  active.setSerializedConfigHash(warming.serializedConfigHash());
+  EXPECT_FALSE(addOrUpdateListener(listener_foo_update1));
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  // A push whose bytes match the hash set on the warming listener is blocked without
+  // MessageUtil::hash(), which would find this config changed.
+  envoy::config::listener::v3::Listener listener_foo_update2 = listener_foo;
+  listener_foo_update2.mutable_per_connection_buffer_limit_bytes()->set_value(1000);
+  warming.setSerializedConfigHash(
+      HashUtil::xxHash64(MessageUtil::serializeDeterministically(listener_foo_update2)));
+  EXPECT_FALSE(addOrUpdateListener(listener_foo_update2));
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  // Pushing the active config still removes the warming listener.
+  EXPECT_CALL(*listener_foo_update1_handle, onDestroy());
+  EXPECT_TRUE(addOrUpdateListener(listener_foo));
+  checkStats(__LINE__, 1, 2, 0, 0, 1, 0, 0);
+
+  EXPECT_CALL(*listener_foo_handle, onDestroy());
 }
 
 TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleAddresses) {
@@ -7794,13 +7964,13 @@ filter_chains: {}
       TestUtility::parseYaml<envoy::config::listener::v3::Listener>(yaml_config3);
 
   auto listener1 = ListenerImpl::create(config1, "", *manager_, config1.name(), false, false,
-                                        MessageUtil::hash(config1));
+                                        MessageUtil::hash(config1), /*serialized_hash=*/0);
   ASSERT_OK(listener1);
   auto listener2 = ListenerImpl::create(config2, "", *manager_, config2.name(), false, false,
-                                        MessageUtil::hash(config2));
+                                        MessageUtil::hash(config2), /*serialized_hash=*/0);
   ASSERT_OK(listener2);
   auto listener3 = ListenerImpl::create(config3, "", *manager_, config3.name(), false, false,
-                                        MessageUtil::hash(config3));
+                                        MessageUtil::hash(config3), /*serialized_hash=*/0);
   ASSERT_OK(listener3);
 
   EXPECT_FALSE(listener1.value()->hasCompatibleAddress(*(listener2.value())));
@@ -8473,6 +8643,11 @@ filter_chains:
   EXPECT_CALL(listener_foo_update1->target_, initialize());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
+  // The in place update keeps the bytes of its own config.
+  EXPECT_EQ(HashUtil::xxHash64(MessageUtil::serializeDeterministically(
+                parseListenerFromV3Yaml(listener_foo_update1_yaml))),
+            dynamic_cast<ListenerImpl&>(manager_->listeners(ListenerManager::WARMING).front().get())
+                .serializedConfigHash());
 
   EXPECT_EQ(1UL, manager_->listeners().size());
 
@@ -9431,12 +9606,25 @@ filter_chains:
     return socket;
   }
 
-  ListenerHandle* addActiveListener(const envoy::config::listener::v3::Listener& listener_proto) {
+  // Adds an active listener that builds 1 + further_filter_chain_builds filter chains. gMock tries
+  // the newest expectation first, so the listener handle takes the last build.
+  ListenerHandle* addActiveListener(const envoy::config::listener::v3::Listener& listener_proto,
+                                    uint32_t further_filter_chain_builds = 0) {
     ListenerHandle* listener_handle = expectListenerCreate(false, true);
+    for (uint32_t i = 0; i < further_filter_chain_builds; i++) {
+      expectFilterChainBuild();
+    }
     EXPECT_CALL(*worker_, addListener(Eq(std::nullopt), _, _, _, _));
     EXPECT_TRUE(addOrUpdateListener(listener_proto));
     worker_->callAddCompletion();
     return listener_handle;
+  }
+
+  // The listener handle expects one filter chain build, so each further build loads its filters.
+  void expectFilterChainBuild() {
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+        .WillOnce(testing::DoDefault())
+        .RetiresOnSaturation();
   }
 
   // Applies the update in place and returns the drain timer of the replaced listener.
@@ -9469,7 +9657,7 @@ filter_chains:
   std::unique_ptr<ListenerImpl>
   listenerWithBoundAddresses(const envoy::config::listener::v3::Listener& listener_proto,
                              const std::vector<std::string>& bound_addresses) {
-    auto listener = *ListenerImpl::create(listener_proto, "", *manager_, "foo", true, false, 0);
+    auto listener = *ListenerImpl::create(listener_proto, "", *manager_, "foo", true, false, 0, 0);
     for (const std::string& bound_address : bound_addresses) {
       auto socket_factory = std::make_unique<NiceMock<Network::MockListenSocketFactory>>();
       ON_CALL(*socket_factory, localAddress())
@@ -9531,6 +9719,78 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, AddAddressWithoutReusePort) 
   EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
   drain_timer->invokeCallback();
   worker_->callDrainFilterChainsComplete();
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+// An in place update drains the default filter chain only when it rebuilds or removes it.
+TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, DrainDefaultFilterChainOnlyWhenNotReused) {
+  startWorkers();
+  auto listener_proto = listenerProto({"127.0.0.1"});
+  listener_proto.mutable_default_filter_chain()->set_name("default");
+  // A message comparison never finds a default filter chain holding a NaN equal to itself, so a
+  // drain that compared messages would drain the default filter chain this update reuses.
+  Config::Metadata::mutableMetadataValue(
+      *listener_proto.mutable_default_filter_chain()->mutable_metadata(), "test", "nan")
+      .set_number_value(std::numeric_limits<double>::quiet_NaN());
+  auto socket = expectListenSocket("127.0.0.1:1234");
+  ListenerHandle* listener_foo = addActiveListener(listener_proto, 1);
+
+  listener_proto.mutable_filter_chains(0)->set_name("bar");
+  expectFilterChainBuild();
+  EXPECT_CALL(
+      *worker_,
+      onFilterChainDrain(_, ElementsAre(Pointee(Property(&Network::FilterChain::name, "foo"))), _));
+  updateInPlace(listener_proto);
+
+  listener_proto.mutable_default_filter_chain()->set_name("new_default");
+  expectFilterChainBuild();
+  EXPECT_CALL(*worker_,
+              onFilterChainDrain(
+                  _, ElementsAre(Pointee(Property(&Network::FilterChain::name, "default"))), _));
+  updateInPlace(listener_proto);
+
+  listener_proto.clear_default_filter_chain();
+  EXPECT_CALL(
+      *worker_,
+      onFilterChainDrain(
+          _, ElementsAre(Pointee(Property(&Network::FilterChain::name, "new_default"))), _));
+  updateInPlace(listener_proto);
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+// An in place update keeps a default filter chain whose Any payload arrives serialized in another
+// order.
+TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, KeepDefaultFilterChainWithReserializedAny) {
+  startWorkers();
+  auto listener_proto = listenerProto({"127.0.0.1"});
+  listener_proto.mutable_default_filter_chain()->set_name("default");
+  auto& typed_metadata = (*listener_proto.mutable_default_filter_chain()
+                               ->mutable_metadata()
+                               ->mutable_typed_filter_metadata())["test"];
+  typed_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  // The same struct with its two fields serialized in two orders.
+  typed_metadata.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+  auto socket = expectListenSocket("127.0.0.1:1234");
+  ListenerHandle* listener_foo = addActiveListener(listener_proto, 1);
+
+  auto reserialized_listener_proto = listener_proto;
+  reserialized_listener_proto.mutable_filter_chains(0)->set_name("bar");
+  (*reserialized_listener_proto.mutable_default_filter_chain()
+        ->mutable_metadata()
+        ->mutable_typed_filter_metadata())["test"]
+      .set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  ASSERT_NE(
+      MessageUtil::serializeDeterministically(listener_proto.default_filter_chain()),
+      MessageUtil::serializeDeterministically(reserialized_listener_proto.default_filter_chain()));
+  ASSERT_TRUE(Protobuf::util::MessageDifferencer::Equals(
+      listener_proto.default_filter_chain(), reserialized_listener_proto.default_filter_chain()));
+  expectFilterChainBuild();
+  EXPECT_CALL(
+      *worker_,
+      onFilterChainDrain(_, ElementsAre(Pointee(Property(&Network::FilterChain::name, "foo"))), _));
+  updateInPlace(reserialized_listener_proto);
 
   EXPECT_CALL(*listener_foo, onDestroy());
 }
@@ -11184,8 +11444,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, InvalidExtendConnectionBalanceCon
   extend_balance_config->mutable_typed_config()->set_type_url(
       "type.googleapis.com/google.protobuf.test");
 
-  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
-                                             /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl =
+      *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                            /*hash=*/static_cast<uint64_t>(0), /*serialized_hash=*/0);
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
@@ -11201,8 +11462,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, EmptyConnectionBalanceConfig) {
   auto listener = createIPv4Listener("TCPListener");
   listener.mutable_connection_balance_config();
 
-  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
-                                             /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl =
+      *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                            /*hash=*/static_cast<uint64_t>(0), /*serialized_hash=*/0);
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
@@ -11260,8 +11522,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, CpuLocalityBalanceUsesNopBalancer
   listener.mutable_connection_balance_config()->mutable_cpu_locality_balance();
   EXPECT_CALL(os_sys_calls_, supportsReusePortBpfCpuSteering()).WillRepeatedly(Return(true));
 
-  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
-                                             /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl =
+      *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                            /*hash=*/static_cast<uint64_t>(0), /*serialized_hash=*/0);
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
@@ -11288,8 +11551,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
   listener.mutable_connection_balance_config()->mutable_cpu_locality_balance();
   EXPECT_CALL(os_sys_calls_, supportsReusePortBpfCpuSteering()).WillRepeatedly(Return(false));
 
-  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
-                                             /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl =
+      *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                            /*hash=*/static_cast<uint64_t>(0), /*serialized_hash=*/0);
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
@@ -11312,8 +11576,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
   listener.mutable_connection_balance_config()->mutable_cpu_locality_balance();
   EXPECT_CALL(os_sys_calls_, supportsReusePortBpfCpuSteering()).WillRepeatedly(Return(true));
 
-  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
-                                             /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl =
+      *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                            /*hash=*/static_cast<uint64_t>(0), /*serialized_hash=*/0);
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
@@ -11335,8 +11600,9 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
   listener.mutable_connection_balance_config()->mutable_cpu_locality_balance();
   EXPECT_CALL(os_sys_calls_, supportsReusePortBpfCpuSteering()).WillRepeatedly(Return(true));
 
-  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
-                                             /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl =
+      *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                            /*hash=*/static_cast<uint64_t>(0), /*serialized_hash=*/0);
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));

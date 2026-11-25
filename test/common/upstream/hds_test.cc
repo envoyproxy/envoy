@@ -281,6 +281,27 @@ TEST_F(HdsTest, HealthCheckRequest) {
   createHdsDelegate();
 }
 
+// Test that a reconnect sends the node as it is then, not as it was at construction.
+TEST_F(HdsTest, ReconnectSendsCurrentNode) {
+  envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse request;
+  request.mutable_health_check_request()->mutable_node()->set_id("hds-node-v2");
+  request.mutable_health_check_request()->mutable_capability()->add_health_check_protocols(
+      envoy::service::health::v3::Capability::HTTP);
+  request.mutable_health_check_request()->mutable_capability()->add_health_check_protocols(
+      envoy::service::health::v3::Capability::TCP);
+
+  EXPECT_CALL(server_context_.local_info_, node()).WillRepeatedly(ReturnRef(node_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
+      .WillOnce(Return(nullptr))
+      .WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(request), false));
+
+  createHdsDelegate(); // The first stream fails to start.
+  node_.set_id("hds-node-v2");
+  retry_timer_cb_();
+}
+
 // Test if processMessage processes endpoints from a HealthCheckSpecifier
 // message correctly
 TEST_F(HdsTest, TestProcessMessageEndpoints) {

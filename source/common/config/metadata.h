@@ -22,9 +22,22 @@
 namespace Envoy {
 namespace Config {
 
-using ConstMetadataSharedPoolSharedPtr =
-    std::shared_ptr<SharedPool::ObjectSharedPool<const envoy::config::core::v3::Metadata,
-                                                 MessageUtil, MessageUtil>>;
+// Hashes and compares metadata by its deterministic serialization, without reflection. Some equal
+// metadata compares unequal, such as metadata whose google.protobuf.Any payloads were serialized
+// differently.
+struct SerializedMetadataHash {
+  size_t operator()(const envoy::config::core::v3::Metadata& metadata) const;
+};
+
+struct SerializedMetadataEqual {
+  bool operator()(const envoy::config::core::v3::Metadata& lhs,
+                  const envoy::config::core::v3::Metadata& rhs) const;
+};
+
+using ConstMetadataSharedPool =
+    SharedPool::ObjectSharedPool<const envoy::config::core::v3::Metadata, SerializedMetadataHash,
+                                 SerializedMetadataEqual>;
+using ConstMetadataSharedPoolSharedPtr = std::shared_ptr<ConstMetadataSharedPool>;
 
 /**
  * PathSegment represents one segment in a metadata access path.

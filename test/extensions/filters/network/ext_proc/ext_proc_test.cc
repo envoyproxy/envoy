@@ -8,6 +8,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/struct_matchers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1856,6 +1857,104 @@ TEST_F(NetworkExtProcFilterTest, MetadataForwardingSentOnlyOnceWhenFirstRequestH
     EXPECT_FALSE(req.has_metadata());
   });
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data2, false));
+}
+
+TEST_F(NetworkExtProcFilterTest, SpuriousResponseWhenDirectionSkipped) {
+  // Configure process_read as SKIP and allow receiving dynamic metadata to verify side effects
+  // are skipped when a response is rejected as spurious.
+  auto config = createConfig(false);
+  config.mutable_processing_mode()->set_process_read(ProcessingMode::SKIP);
+  config.mutable_metadata_options()->mutable_receiving_namespaces()->add_untyped("allowed-ns");
+
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  ProcessingResponse read_response;
+  read_response.mutable_read_data()->set_data("unexpected_read");
+  read_response.set_connection_status(ProcessingResponse::CLOSE);
+  (*(*read_response.mutable_dynamic_metadata()->mutable_fields())["allowed-ns"]
+        .mutable_struct_value()
+        ->mutable_fields())["k"]
+      .set_string_value("v");
+
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(connection_, close(_, _)).Times(0);
+  EXPECT_CALL(stream_info_, setDynamicMetadata(_, _)).Times(0);
+
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(read_response));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.spurious_msgs_received"));
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_received"));
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.read_data_injected"));
+
+  // Symmetric case: configure process_write as SKIP.
+  config = createConfig(false);
+  config.mutable_processing_mode()->set_process_write(ProcessingMode::SKIP);
+
+  filter_config = std::make_shared<Config>(config, scope_);
+  client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  ProcessingResponse write_response;
+  write_response.mutable_write_data()->set_data("unexpected_write");
+
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, _)).Times(0);
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(write_response));
+  EXPECT_EQ(2, getCounterValue("network_ext_proc.test_ext_proc.spurious_msgs_received"));
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_received"));
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.write_data_injected"));
+}
+
+TEST_F(NetworkExtProcFilterTest, SpuriousResponseWithBothReadAndWriteData) {
+  ProcessingResponse response;
+  response.mutable_read_data()->set_data("read");
+  response.mutable_write_data()->set_data("write");
+
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, _)).Times(0);
+
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.spurious_msgs_received"));
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_received"));
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.read_data_injected"));
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.write_data_injected"));
+}
+
+TEST_F(NetworkExtProcFilterTest, SpuriousResponseLegacyBehaviorWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.network_ext_proc_enforce_processing_mode", "false"}});
+
+  auto config = createConfig(false);
+  config.mutable_processing_mode()->set_process_write(ProcessingMode::SKIP);
+
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  ProcessingResponse write_response;
+  write_response.mutable_write_data()->set_data("legacy_write");
+
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false));
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(write_response));
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.spurious_msgs_received"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_received"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.write_data_injected"));
+
+  // Verify disable_count_write_ did not underflow when no write request was in flight.
+  EXPECT_CALL(write_callbacks_, disableClose(true));
+  filter_->updateCloseCallbackStatus(true, false);
+  EXPECT_CALL(write_callbacks_, disableClose(false));
+  filter_->updateCloseCallbackStatus(false, false);
 }
 
 } // namespace

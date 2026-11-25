@@ -80,6 +80,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_CTX_set_options \
   --uncomment-func-decl SSL_CTX_set_min_proto_version \
   --uncomment-func-decl SSL_CTX_set_max_proto_version \
+  --uncomment-func-decl SSL_CTX_set_max_send_fragment \
   --uncomment-func-decl SSL_CTX_set_client_CA_list \
   --uncomment-func-decl SSL_CTX_set_cert_cb \
   --uncomment-func-decl SSL_CTX_set_cert_verify_callback \
