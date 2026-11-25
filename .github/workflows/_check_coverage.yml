@@ -60,7 +60,7 @@ jobs:
         - target: coverage
           name: Coverage
           steps-post: |
-            - uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+            - uses: envoyproxy/toolshed/actions/jq@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
               with:
                 output-path: generated/coverage/html/gcs-metadata.json
                 input-format: yaml
@@ -81,7 +81,7 @@ jobs:
         - target: fuzz_coverage
           name: Fuzz coverage
           steps-post: |
-            - uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+            - uses: envoyproxy/toolshed/actions/jq@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
               with:
                 output-path: generated/fuzz_coverage/html/gcs-metadata.json
                 input-format: yaml
