@@ -44,8 +44,9 @@ suffix against each provider's REST path (``/chat/completions``,
 
 A provider's other endpoints take payloads shaped like its chat API. A path
 under one of the REST paths above, such as ``/v1/messages/count_tokens`` or
-``/v1/messages/batches``, therefore detects nothing, whatever it carries, and
-neither does a Gemini payload sent to another method, such as
+``/v1/messages/batches``, therefore detects nothing, whatever it carries. The
+same goes for Vertex AI's ``.../models/count-tokens:rawPredict``, which counts
+Claude's tokens, and for a Gemini payload sent to another method, such as
 ``:countTokens``. The Responses API is detected by its path only, because
 ``{"model": ..., "input": ...}`` is an embeddings, moderations or speech
 request just as well.
