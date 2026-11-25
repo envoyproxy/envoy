@@ -276,6 +276,34 @@ TEST(WuffsJsonCursorTest, DuplicateKeyInNestedObjectRejected) {
   EXPECT_THAT(parse(R"({"x":{"a":1,"a":2}})", h), Not(IsOk()));
 }
 
+TEST(WuffsJsonCursorTest, DuplicateKeyPassedOnWhenAllowed) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h, {.allow_duplicate_keys = true});
+  EXPECT_FALSE(cursor.sawDuplicateKeys());
+
+  EXPECT_OK(cursor.feed(R"({"model":"gpt-4","model":"gpt-4o"})", /*closed=*/true));
+
+  EXPECT_TRUE(cursor.sawDuplicateKeys());
+  ASSERT_EQ(h.fields.size(), 2u);
+  EXPECT_EQ(h.fields[0].str_val, "gpt-4");
+  EXPECT_EQ(h.fields[1].str_val, "gpt-4o");
+}
+
+TEST(WuffsJsonCursorTest, DuplicateKeyInNestedObjectSeenWhenAllowed) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h, {.allow_duplicate_keys = true});
+  EXPECT_OK(cursor.feed(R"({"x":{"a":1,"a":2}})", /*closed=*/true));
+  EXPECT_TRUE(cursor.sawDuplicateKeys());
+}
+
+// The same key in two objects is not a repeat.
+TEST(WuffsJsonCursorTest, SameKeyInSiblingObjectsIsNotADuplicate) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h, {.allow_duplicate_keys = true});
+  EXPECT_OK(cursor.feed(R"({"x":{"a":1},"y":{"a":2},"z":[{"a":3},{"a":4}]})", /*closed=*/true));
+  EXPECT_FALSE(cursor.sawDuplicateKeys());
+}
+
 // Sticky errors: after any failure, further feed() calls return the same
 // status and never re-enter the decoder. Errors raised inside the token loop
 // are the risky case, since undrained tokens still refer to the old chunk.

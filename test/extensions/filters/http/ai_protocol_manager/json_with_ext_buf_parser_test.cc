@@ -241,6 +241,115 @@ TEST_F(JsonWithExtBufParserTest, DuplicateKeyIsRejected) {
               HasStatusCode(absl::StatusCode::kInvalidArgument));
 }
 
+TEST_F(JsonWithExtBufParserTest, DuplicateKeyKeepsTheLastValueWhenAllowed) {
+  config_.allow_duplicate_keys = true;
+  JsonWithExtBufParser parser(config_);
+
+  ASSERT_OK(parser.feed(R"({"model":"a","model":"b","n":{"k":1,"k":{"x":1},"k":2}})",
+                        /*end_stream=*/true));
+
+  EXPECT_TRUE(parser.hasDuplicateKeys());
+  EXPECT_EQ(parser.takeDocument().json(), nlohmann::json::parse(R"({"model":"b","n":{"k":2}})"));
+}
+
+TEST_F(JsonWithExtBufParserTest, NoDuplicateKeyReportedWithoutARepeat) {
+  config_.allow_duplicate_keys = true;
+  JsonWithExtBufParser parser(config_);
+  ASSERT_OK(parser.feed(R"({"a":{"k":1},"b":{"k":2}})", /*end_stream=*/true));
+  EXPECT_FALSE(parser.hasDuplicateKeys());
+}
+
+// What the parser read before it gave up, for a caller that can still use it.
+class JsonWithExtBufParserPartialTest : public JsonWithExtBufParserTest {
+public:
+  // Feeds `body` in one shot, expecting failure, and returns what was read of it.
+  PartialJson partialOf(absl::string_view body) {
+    JsonWithExtBufParser parser(config_);
+    EXPECT_THAT(parser.feed(body, /*end_stream=*/true),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+    return parser.takePartial();
+  }
+};
+
+TEST_F(JsonWithExtBufParserPartialTest, BodyThatEndsInsideNestedContainers) {
+  const PartialJson partial = partialOf(R"({"id":7,"params":{"name":"a","args":[1,{"x":)");
+
+  EXPECT_TRUE(partial.ended_early);
+  EXPECT_EQ(partial.json, nlohmann::json::parse(R"({"id":7,"params":{"name":"a","args":[1,{}]}})"));
+  // Root, "params", "args", and the array's last element.
+  EXPECT_THAT(partial.open_keys, testing::ElementsAre("", "params", "args", ""));
+}
+
+TEST_F(JsonWithExtBufParserPartialTest, BodyThatEndsInsideAToken) {
+  const PartialJson in_string = partialOf(R"({"id":7,"name":"abc)");
+  EXPECT_TRUE(in_string.ended_early);
+  EXPECT_EQ(in_string.json, nlohmann::json::parse(R"({"id":7})"));
+  EXPECT_THAT(in_string.open_keys, testing::ElementsAre(""));
+
+  const PartialJson after_number = partialOf(R"({"id":7)");
+  EXPECT_TRUE(after_number.ended_early);
+  EXPECT_EQ(after_number.json, nlohmann::json::parse(R"({"id":7})"));
+}
+
+TEST_F(JsonWithExtBufParserPartialTest, BodyWithNoValue) {
+  for (const absl::string_view body : {"", "  \n"}) {
+    const PartialJson partial = partialOf(body);
+    EXPECT_TRUE(partial.ended_early) << body;
+    EXPECT_TRUE(partial.json.is_discarded()) << body;
+    EXPECT_TRUE(partial.open_keys.empty()) << body;
+  }
+}
+
+TEST_F(JsonWithExtBufParserPartialTest, BodyThatIsNotJson) {
+  const PartialJson mid_body = partialOf(R"({"id":7 "name":"a"})");
+  EXPECT_FALSE(mid_body.ended_early);
+  EXPECT_EQ(mid_body.json, nlohmann::json::parse(R"({"id":7})"));
+  EXPECT_THAT(mid_body.open_keys, testing::ElementsAre(""));
+
+  // The byte that is not JSON is the body's last.
+  EXPECT_FALSE(partialOf(R"({"id":7x)").ended_early);
+
+  const PartialJson from_the_start = partialOf("hello");
+  EXPECT_FALSE(from_the_start.ended_early);
+  EXPECT_TRUE(from_the_start.json.is_discarded());
+}
+
+TEST_F(JsonWithExtBufParserPartialTest, BytesAfterTheDocument) {
+  const PartialJson partial = partialOf(R"({"a":{"b":1}}x)");
+
+  EXPECT_FALSE(partial.ended_early);
+  EXPECT_EQ(partial.json, nlohmann::json::parse(R"({"a":{"b":1}})"));
+  EXPECT_TRUE(partial.open_keys.empty());
+}
+
+TEST_F(JsonWithExtBufParserPartialTest, BodyThatEndsEarlyAcrossChunks) {
+  JsonWithExtBufParser parser(config_);
+  ASSERT_OK(parser.feed(R"({"a":[{"b":1},)", /*end_stream=*/false));
+  ASSERT_OK(parser.feed(R"({"c":)", /*end_stream=*/false));
+  EXPECT_THAT(parser.feed("", /*end_stream=*/true),
+              HasStatusCode(absl::StatusCode::kInvalidArgument));
+
+  const PartialJson partial = parser.takePartial();
+  EXPECT_TRUE(partial.ended_early);
+  EXPECT_EQ(partial.json, nlohmann::json::parse(R"({"a":[{"b":1},{}]})"));
+  EXPECT_THAT(partial.open_keys, testing::ElementsAre("", "a", ""));
+}
+
+// A failure before the last chunk is never a body that ended too soon.
+TEST_F(JsonWithExtBufParserPartialTest, FailureBeforeTheLastChunk) {
+  JsonWithExtBufParser parser(config_);
+  ASSERT_OK(parser.feed(R"({"a":1 )", /*end_stream=*/false));
+  EXPECT_THAT(parser.feed(R"(x)", /*end_stream=*/false),
+              HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_FALSE(parser.takePartial().ended_early);
+}
+
+// A string over the inline threshold stays a reference in what was read.
+TEST_F(JsonWithExtBufParserPartialTest, KeepsExternalReferences) {
+  const PartialJson partial = partialOf(R"({"big":"0123456789abcdef","id":)");
+  EXPECT_TRUE(JsonWithExtBuf::isExternalRef(partial.json["big"]));
+}
+
 TEST_F(JsonWithExtBufParserTest, FeedAfterCompletionIsRejected) {
   JsonWithExtBufParser parser(config_);
   ASSERT_OK(parser.feed(R"({"a":1})", /*end_stream=*/true));
