@@ -53,9 +53,21 @@ bool hasOpenAiOnlyRole(const nlohmann::json& messages) {
          });
 }
 
+// `/v1/messages/count_tokens` and the like take a body shaped like the API they sit under.
+bool isApiSubResource(absl::string_view path) {
+  static constexpr absl::string_view ApiPaths[]{"/chat/completions/", "/responses/",
+                                                "/v1/messages/"};
+  return absl::c_any_of(
+      ApiPaths, [path](absl::string_view api_path) { return absl::StrContains(path, api_path); });
+}
+
+bool endsInMethod(absl::string_view path) {
+  return absl::StrContains(path.substr(path.rfind('/') + 1), ':');
+}
+
 } // namespace
 
-LLMProtocol detectFromHeaders(const Http::RequestHeaderMap& headers) {
+LLMProtocol detectLlmProtocol(const Http::RequestHeaderMap& headers, const nlohmann::json& json) {
   struct PathSuffix {
     absl::string_view suffix;
     LLMProtocol protocol;
@@ -74,22 +86,21 @@ LLMProtocol detectFromHeaders(const Http::RequestHeaderMap& headers) {
       return protocol;
     }
   }
-  return headers.get(anthropicVersionHeader()).empty() ? LLMProtocol::Unspecified
-                                                       : LLMProtocol::AnthropicMessages;
-}
-
-LLMProtocol detectFromPayload(const nlohmann::json& json) {
-  if (!json.is_object()) {
+  if (!json.is_object() || isApiSubResource(path)) {
     return LLMProtocol::Unspecified;
   }
   if (hasAnyKey(json, GeminiOnlyKeys)) {
-    return LLMProtocol::GeminiGenerateContent;
+    // `:countTokens` and Gemini's other methods take `contents` too.
+    return endsInMethod(path) ? LLMProtocol::Unspecified : LLMProtocol::GeminiGenerateContent;
   }
+  // `input` alone is `/v1/embeddings` or `/v1/moderations` as much as the Responses API.
   const auto messages = json.find(Keys::Messages);
   if (messages == json.end()) {
-    return json.contains(Keys::Input) ? LLMProtocol::OpenAiResponses : LLMProtocol::Unspecified;
+    return LLMProtocol::Unspecified;
   }
-  const bool anthropic = hasAnyKey(json, AnthropicOnlyKeys) || anyToolHas(json, "input_schema");
+  // Anthropic clients send the header to every endpoint, so it counts only beside `messages`.
+  const bool anthropic = hasAnyKey(json, AnthropicOnlyKeys) || anyToolHas(json, "input_schema") ||
+                         !headers.get(anthropicVersionHeader()).empty();
   const bool openai = hasAnyKey(json, OpenAiOnlyKeys) || anyToolHas(json, "function") ||
                       hasOpenAiOnlyRole(*messages);
   if (anthropic == openai) {

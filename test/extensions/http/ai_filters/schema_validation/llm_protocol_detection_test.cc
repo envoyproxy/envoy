@@ -15,19 +15,29 @@ namespace {
 
 using HttpFilters::AiProtocolManager::LLMProtocol;
 
-LLMProtocol fromPath(const std::string& path) {
-  return detectFromHeaders(Http::TestRequestHeaderMapImpl{{":path", path}});
+constexpr absl::string_view EitherChatApiPayload =
+    R"({"model":"m","max_tokens":8,"messages":[{"role":"user","content":"hi"}]})";
+
+LLMProtocol detect(absl::string_view path, absl::string_view payload,
+                   bool anthropic_version = false) {
+  Http::TestRequestHeaderMapImpl headers{{":path", std::string(path)}};
+  if (anthropic_version) {
+    headers.addCopy("anthropic-version", "2023-06-01");
+  }
+  return detectLlmProtocol(headers, nlohmann::json::parse(payload));
 }
 
-LLMProtocol fromPayload(const std::string& json) {
-  return detectFromPayload(nlohmann::json::parse(json));
-}
+LLMProtocol fromPath(const std::string& path) { return detect(path, "{}"); }
 
-TEST(DetectFromHeadersTest, MatchesProviderPathSuffix) {
+LLMProtocol fromPayload(const std::string& json) { return detect("/generate", json); }
+
+TEST(DetectLlmProtocolTest, MatchesProviderPathSuffix) {
   EXPECT_EQ(fromPath("/v1/chat/completions"), LLMProtocol::OpenAiChatCompletions);
   EXPECT_EQ(fromPath("/openai/v1/chat/completions?trace=1"), LLMProtocol::OpenAiChatCompletions);
   EXPECT_EQ(fromPath("/v1/responses"), LLMProtocol::OpenAiResponses);
   EXPECT_EQ(fromPath("/proxy/v1/messages"), LLMProtocol::AnthropicMessages);
+  EXPECT_EQ(fromPath("/v1/messages"), LLMProtocol::AnthropicMessages);
+  EXPECT_EQ(fromPath("/v1/messages?beta=true"), LLMProtocol::AnthropicMessages);
   EXPECT_EQ(fromPath("/v1beta/models/gemini-2.5-pro:generateContent"),
             LLMProtocol::GeminiGenerateContent);
   EXPECT_EQ(fromPath("/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse"),
@@ -36,20 +46,68 @@ TEST(DetectFromHeadersTest, MatchesProviderPathSuffix) {
   EXPECT_EQ(fromPath("/"), LLMProtocol::Unspecified);
 }
 
-TEST(DetectFromHeadersTest, PathWinsOverTheAnthropicVersionHeader) {
-  EXPECT_EQ(detectFromHeaders(Http::TestRequestHeaderMapImpl{{":path", "/generate"},
-                                                             {"anthropic-version", "2023-06-01"}}),
+// `/v1/messages/count_tokens` takes a Messages body without the `max_tokens` that API requires.
+TEST(DetectLlmProtocolTest, PathUnderAnApiPathDetectsNothing) {
+  for (const absl::string_view path : {
+           "/v1/messages/count_tokens",
+           "/anthropic/v1/messages/count_tokens?beta=true",
+           "/v1/messages/batches",
+           "/anthropic/v1/messages/batches",
+           "/v1/responses/input_tokens",
+           "/v1/chat/completions/chatcmpl-1",
+       }) {
+    for (const absl::string_view payload : {
+             R"({"model":"m","system":"be terse","messages":[{"role":"user","content":"hi"}]})",
+             R"({"requests":[]})",
+             R"({"model":"m","input":"hi"})",
+             R"({"messages":[{"role":"system","content":"be terse"}]})",
+             R"({"contents":[{"parts":[{"text":"hi"}]}]})",
+         }) {
+      for (const bool anthropic_version : {false, true}) {
+        EXPECT_EQ(detect(path, payload, anthropic_version), LLMProtocol::Unspecified)
+            << path << " " << payload << " anthropic-version: " << anthropic_version;
+      }
+    }
+  }
+}
+
+// `:rawPredict` is how Vertex AI serves Claude, so another method discounts Gemini's keys only.
+TEST(DetectLlmProtocolTest, GeminiPayloadOnAnotherMethodDetectsNothing) {
+  constexpr absl::string_view payload = R"({"contents":[{"parts":[{"text":"hi"}]}]})";
+  EXPECT_EQ(detect("/generate", payload), LLMProtocol::GeminiGenerateContent);
+  EXPECT_EQ(detect("/v1beta/models/gemini-2.5-pro:countTokens", payload), LLMProtocol::Unspecified);
+  EXPECT_EQ(detect("/v1/publishers/anthropic/models/claude:rawPredict",
+                   R"({"max_tokens":8,"system":"be terse","messages":[]})"),
             LLMProtocol::AnthropicMessages);
-  EXPECT_EQ(detectFromHeaders(Http::TestRequestHeaderMapImpl{{":path", "/v1/chat/completions"},
-                                                             {"anthropic-version", "2023-06-01"}}),
+}
+
+// Anthropic clients send the header to every endpoint, so it names the provider, not the API.
+TEST(DetectLlmProtocolTest, AnthropicVersionHeaderOnlyBreaksATie) {
+  EXPECT_EQ(detect("/generate", EitherChatApiPayload), LLMProtocol::Unspecified);
+  EXPECT_EQ(detect("/generate", EitherChatApiPayload, true), LLMProtocol::AnthropicMessages);
+  EXPECT_EQ(detect("/generate", R"({"prompt":"hi"})", true), LLMProtocol::Unspecified);
+  EXPECT_EQ(detect("/v1/complete", R"({"model":"m","prompt":"hi","max_tokens_to_sample":8})", true),
+            LLMProtocol::Unspecified);
+  EXPECT_EQ(detect("/generate", R"({"messages":[],"response_format":{}})", true),
+            LLMProtocol::Unspecified);
+  EXPECT_EQ(detect("/v1/chat/completions", EitherChatApiPayload, true),
             LLMProtocol::OpenAiChatCompletions);
 }
 
-TEST(DetectFromPayloadTest, ExclusiveMarkers) {
+// `/v1/embeddings`, `/v1/moderations` and `/v1/audio/speech` take a `model` and an `input` too.
+TEST(DetectLlmProtocolTest, ResponsesIsDetectedByPathOnly) {
+  constexpr absl::string_view payload = R"({"model":"m","input":"hi"})";
+  EXPECT_EQ(detect("/v1/responses", payload), LLMProtocol::OpenAiResponses);
+  for (const absl::string_view path :
+       {"/v1/embeddings", "/v1/moderations", "/v1/audio/speech", "/generate"}) {
+    EXPECT_EQ(detect(path, payload), LLMProtocol::Unspecified) << path;
+  }
+}
+
+TEST(DetectLlmProtocolTest, ExclusivePayloadMarkers) {
   EXPECT_EQ(fromPayload(R"({"contents":[{"parts":[{"text":"hi"}]}]})"),
             LLMProtocol::GeminiGenerateContent);
   EXPECT_EQ(fromPayload(R"({"system_instruction":{}})"), LLMProtocol::GeminiGenerateContent);
-  EXPECT_EQ(fromPayload(R"({"model":"m","input":"hi"})"), LLMProtocol::OpenAiResponses);
   for (const std::string body : {
            R"({"messages":[],"system":"be terse"})",
            R"({"messages":[],"top_k":5})",
@@ -66,7 +124,7 @@ TEST(DetectFromPayloadTest, ExclusiveMarkers) {
   }
 }
 
-TEST(DetectFromPayloadTest, AmbiguousOrForeignDetectsNothing) {
+TEST(DetectLlmProtocolTest, AmbiguousOrForeignPayloadDetectsNothing) {
   for (const std::string body : {
            R"({"model":"m","max_tokens":8,"messages":[{"role":"user","content":"hi"}]})",
            R"({"messages":[],"top_k":5,"response_format":{}})",

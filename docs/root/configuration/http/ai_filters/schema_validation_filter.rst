@@ -40,12 +40,21 @@ A request that declares none falls back to :ref:`default_llm_protocol
 and by default the API is detected from the request: its path, matched as a
 suffix against each provider's REST path (``/chat/completions``,
 ``/responses``, ``/v1/messages``, ``:generateContent``,
-``:streamGenerateContent``); then the ``anthropic-version`` header; then the
-payload's shape.
+``:streamGenerateContent``); then the payload's shape.
+
+A provider's other endpoints take payloads shaped like its chat API. A path
+under one of the REST paths above, such as ``/v1/messages/count_tokens`` or
+``/v1/messages/batches``, therefore detects nothing, whatever it carries, and
+neither does a Gemini payload sent to another method, such as
+``:countTokens``. The Responses API is detected by its path only, because
+``{"model": ..., "input": ...}`` is an embeddings, moderations or speech
+request just as well.
 
 Chat Completions and Anthropic Messages share the ``messages[]`` request
-shape, so only keys exclusive to one of them tell the two apart. A payload
-carrying markers of both, or of neither -- including
+shape, so only keys exclusive to one of them tell the two apart. An
+``anthropic-version`` header counts as one for Anthropic beside ``messages[]``,
+and detects nothing by itself: Anthropic clients send it to every endpoint. A
+payload carrying markers of both, or of neither -- including
 ``{"model": ..., "messages": [{"role": "user", "content": ...}]}``, which is
 valid under either -- names no API, and is forwarded unvalidated.
 

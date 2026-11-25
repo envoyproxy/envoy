@@ -29,8 +29,8 @@ message SchemaValidation {
   // ``envoy.ai.llm_protocol.request`` filter state object or the route's :ref:`llm_protocol
   // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.llm_protocol>`.
   // ``LLM_PROTOCOL_UNSPECIFIED``, the default, detects it from the request path, then the
-  // ``anthropic-version`` header, then the payload's shape. A request none of them identifies is
-  // forwarded unvalidated.
+  // payload's shape together with the ``anthropic-version`` header. A request they do not identify
+  // is forwarded unvalidated.
   type.ai.v3.LLMProtocol default_llm_protocol = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Forward a payload that violates its schema instead of rejecting it. It is still counted.

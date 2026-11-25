@@ -68,8 +68,8 @@ public:
 
   void run(JsonWithExtBuf doc, LLMProtocol declared_protocol,
            absl::string_view path = "/v1/chat/completions") {
-    request_headers_ =
-        Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", std::string(path)}};
+    request_headers_.setMethod("POST");
+    request_headers_.setPath(path);
     envoy::extensions::http::ai_filters::schema_validation::v3::SchemaValidation proto;
     proto.set_default_llm_protocol(default_llm_protocol_);
     proto.set_fail_open(fail_open_);
@@ -210,6 +210,27 @@ TEST_F(SchemaValidationFilterTest, DetectsTheApiFromThePayload) {
 
 TEST_F(SchemaValidationFilterTest, UndetectedApiIsForwardedUnvalidated) {
   run(ChatPayload, LLMProtocol::Unspecified, "/generate");
+  expectForwarded();
+  EXPECT_EQ(seen_protocol_, LLMProtocol::Unspecified);
+  EXPECT_EQ(counterValue("llm_protocol_detected"), 0);
+  EXPECT_EQ(counterValue("skipped"), 1);
+}
+
+// Anthropic clients send the header to every endpoint, and this one takes a Messages-shaped body
+// without the `max_tokens` that schema requires.
+TEST_F(SchemaValidationFilterTest, CountTokensIsNotDetectedAsMessages) {
+  request_headers_.addCopy("anthropic-version", "2023-06-01");
+  run(R"({"model":"claude","system":"be terse","messages":[{"role":"user","content":"hi"}]})",
+      LLMProtocol::Unspecified, "/v1/messages/count_tokens");
+  expectForwarded();
+  EXPECT_EQ(seen_protocol_, LLMProtocol::Unspecified);
+  EXPECT_EQ(counterValue("llm_protocol_detected"), 0);
+  EXPECT_EQ(counterValue("skipped"), 1);
+}
+
+TEST_F(SchemaValidationFilterTest, EmbeddingsIsNotDetectedAsResponses) {
+  run(R"({"model":"text-embedding-3-small","input":"hi"})", LLMProtocol::Unspecified,
+      "/v1/embeddings");
   expectForwarded();
   EXPECT_EQ(seen_protocol_, LLMProtocol::Unspecified);
   EXPECT_EQ(counterValue("llm_protocol_detected"), 0);

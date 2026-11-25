@@ -11,14 +11,12 @@ namespace Extensions {
 namespace AiFilters {
 namespace SchemaValidation {
 
-// The API a request's path names, matched as a suffix so a gateway prefix does not hide it, then
-// the `anthropic-version` header.
-HttpFilters::AiProtocolManager::LLMProtocol
-detectFromHeaders(const Http::RequestHeaderMap& headers);
-
-// The API a payload's shape names. Chat Completions and Anthropic Messages share `messages[]`, so
-// markers of both, or of neither, detect nothing.
-HttpFilters::AiProtocolManager::LLMProtocol detectFromPayload(const nlohmann::json& json);
+// The API a request's path names, matched as a suffix so a gateway prefix does not hide it, else
+// the one its payload's shape names. Chat Completions and Anthropic Messages share `messages[]`,
+// so markers of both, or of neither, detect nothing. Nor does a path that names another endpoint
+// of a provider, such as `/v1/messages/count_tokens`, whatever its payload.
+HttpFilters::AiProtocolManager::LLMProtocol detectLlmProtocol(const Http::RequestHeaderMap& headers,
+                                                              const nlohmann::json& json);
 
 } // namespace SchemaValidation
 } // namespace AiFilters
