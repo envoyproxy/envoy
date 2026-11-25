@@ -50,7 +50,6 @@
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
 #include "source/server/generic_factory_context.h"
 
-#include "absl/container/flat_hash_set.h"
 #include "absl/hash/hash.h"
 #include "absl/status/status.h"
 
@@ -388,16 +387,13 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
   // Only sinks that don't depend on the cluster manager or TLS are allowed: gRPC/OTLP sinks would
   // log their own exports through this async client, and TLS-backed sinks are torn down before
   // in-flight async client streams are cancelled on shutdown.
-  static const absl::flat_hash_set<absl::string_view> allowed_logger_types = {
-      "envoy.extensions.access_loggers.file.v3.FileAccessLog",
-      "envoy.extensions.access_loggers.stream.v3.StdoutAccessLog",
-      "envoy.extensions.access_loggers.stream.v3.StderrAccessLog",
-  };
   Server::GenericFactoryContextImpl generic_context(context_, context_.messageValidationVisitor());
   for (const auto& log : bootstrap.cluster_manager().async_client_upstream_log()) {
     const absl::string_view type =
         TypeUtil::typeUrlToDescriptorFullName(log.typed_config().type_url());
-    if (!allowed_logger_types.contains(type)) {
+    if (type != "envoy.extensions.access_loggers.file.v3.FileAccessLog" &&
+        type != "envoy.extensions.access_loggers.stream.v3.StdoutAccessLog" &&
+        type != "envoy.extensions.access_loggers.stream.v3.StderrAccessLog") {
       return absl::InvalidArgumentError(
           fmt::format("async_client_upstream_log: unsupported access logger type '{}'; only file "
                       "and stdout/stderr access loggers are supported",
