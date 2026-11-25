@@ -177,7 +177,7 @@ private:
 
 // Installs ObservedProcessorClient at the point where the production factory normally constructs
 // ProcessorClientImpl. This lets the fake server wait until Envoy has applied a response before the
-// test advances simulated time. The ext_proc protocol has no acknowledgement for responses such as
+// test advances simulated time. The ext_proc protocol has no acknowledgment for responses such as
 // timeout overrides, so sending bytes from FakeStream alone cannot provide that synchronization.
 //
 // FilterConfig, Filter, ProcessorStreamImpl, and the configured Envoy or Google gRPC client remain
