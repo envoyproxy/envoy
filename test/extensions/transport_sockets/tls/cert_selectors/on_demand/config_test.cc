@@ -142,7 +142,7 @@ TEST(SNIMapperTest, ValidationAndNormalization) {
   // Absent SNI returns configured default_value unchanged.
   EXPECT_EQ("envoy_proxy_server_cert", mapper->deriveFromClientHello(client_hello));
 
-  // Valid SNIs are normalized (lowercased, optional single trailing dot stripped).
+  // Valid SNIs are normalized (converted to lowercase, optional single trailing dot stripped).
   auto derive_for = [&](const char* sni) -> std::string {
     EXPECT_EQ(1, SSL_set_tlsext_host_name(ssl.get(), sni));
     return mapper->deriveFromClientHello(client_hello);
