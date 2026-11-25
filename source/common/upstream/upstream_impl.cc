@@ -29,6 +29,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/registry/registry.h"
+#include "envoy/router/router.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -181,6 +182,23 @@ parseExtensionProtocolOptions(
     RETURN_IF_NOT_OK_REF(object_or_error.status());
     if (object_or_error.value() != nullptr) {
       options[name] = std::move(object_or_error.value());
+    }
+  }
+
+  // The workers create the connection pools of the cluster, so the factory of the upstream config
+  // creates what they share here, on the main thread.
+  if (config.has_upstream_config()) {
+    const auto* factory =
+        Config::Utility::getFactory<Router::GenericConnPoolFactory>(config.upstream_config());
+    if (factory != nullptr) {
+      auto object_or_error = factory->createClusterOptions(config.upstream_config().typed_config(),
+                                                           factory_context.serverFactoryContext());
+      RETURN_IF_NOT_OK_REF(object_or_error.status());
+      if (object_or_error.value() != nullptr &&
+          !options.try_emplace(factory->name(), std::move(object_or_error.value())).second) {
+        return absl::InvalidArgumentError(
+            fmt::format("protocol options for '{}' are already configured", factory->name()));
+      }
     }
   }
 

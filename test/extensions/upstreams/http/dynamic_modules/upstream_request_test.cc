@@ -616,22 +616,39 @@ public:
     return config;
   }
 
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr> createClusterOptions(
+      const envoy::extensions::upstreams::http::dynamic_modules::v3::Config& config) {
+    Protobuf::Any typed_config;
+    std::ignore = typed_config.PackFrom(config);
+    return factory_.createClusterOptions(typed_config, server_context_);
+  }
+
+  // Creates a connection pool of a cluster that has the given options.
+  Router::GenericConnPoolPtr
+  createGenericConnPool(Upstream::ProtocolOptionsConfigConstSharedPtr options) {
+    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, extensionProtocolOptions(_))
+        .WillByDefault(Return(std::move(options)));
+    return factory_.createGenericConnPool(
+        host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
+        Upstream::ResourcePriority::Default, std::nullopt, nullptr, createProtoConfig());
+  }
+
   DynamicModuleGenericConnPoolFactory factory_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Envoy::Tcp::ConnectionPool::MockInstance mock_pool_;
   std::shared_ptr<NiceMock<Upstream::MockHost>> host_;
 };
 
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateSuccess) {
-  auto config = createProtoConfig();
-  auto pool = factory_.createGenericConnPool(
-      host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
-  EXPECT_NE(pool, nullptr);
+  auto options = createClusterOptions(createProtoConfig());
+  ASSERT_OK(options);
+  ASSERT_NE(options.value(), nullptr);
+  EXPECT_NE(createGenericConnPool(options.value()), nullptr);
 }
 
-// Load the module via the ``module.local.filename`` data source instead of by name. The upstream
-// HTTP conn-pool factory has no factory context, so only this synchronous path is supported.
+// Load the module via the ``module.local.filename`` data source instead of by name. The cluster
+// options load the module without a factory context, so only the synchronous sources are supported.
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateSuccessWithLocalFile) {
   envoy::extensions::upstreams::http::dynamic_modules::v3::Config config;
   config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
@@ -639,53 +656,50 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateSuccessWithLocalFile) {
                                   "libupstream_bridge_no_op.so"));
   config.set_bridge_name("test_bridge");
 
-  auto pool = factory_.createGenericConnPool(
-      host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
-  EXPECT_NE(pool, nullptr);
+  auto options = createClusterOptions(config);
+  ASSERT_OK(options);
+  EXPECT_NE(createGenericConnPool(options.value()), nullptr);
 }
 
-TEST_F(DynamicModuleGenericConnPoolFactoryTest, CacheHit) {
-  auto config = createProtoConfig();
-  auto pool1 = factory_.createGenericConnPool(
-      host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
-  EXPECT_NE(pool1, nullptr);
+// The connection pools of a cluster share the bridge configuration that the cluster created, so
+// creating them loads nothing.
+TEST_F(DynamicModuleGenericConnPoolFactoryTest, ConnPoolsShareTheClusterOptions) {
+  auto options = createClusterOptions(createProtoConfig());
+  ASSERT_OK(options);
+  TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", "/should/not/find/this/path", 1);
+  EXPECT_NE(createGenericConnPool(options.value()), nullptr);
+  EXPECT_NE(createGenericConnPool(options.value()), nullptr);
+}
 
-  auto pool2 = factory_.createGenericConnPool(
-      host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
-  EXPECT_NE(pool2, nullptr);
+TEST_F(DynamicModuleGenericConnPoolFactoryTest, ClusterWithoutOptions) {
+  EXPECT_ENVOY_BUG(EXPECT_EQ(createGenericConnPool(nullptr), nullptr),
+                   "the cluster has no dynamic module bridge configuration");
 }
 
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, ModuleLoadFailure) {
   auto config = createProtoConfig();
   config.mutable_dynamic_module_config()->set_name("nonexistent_module");
 
-  auto pool = factory_.createGenericConnPool(
-      host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
-  EXPECT_EQ(pool, nullptr);
+  EXPECT_THAT(createClusterOptions(config),
+              HasStatusMessage(testing::HasSubstr("nonexistent_module")));
 }
 
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, BridgeConfigCreateFailure) {
   auto config = createProtoConfig();
   config.mutable_dynamic_module_config()->set_name("upstream_bridge_config_new_fail");
 
-  auto pool = factory_.createGenericConnPool(
-      host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
-  EXPECT_EQ(pool, nullptr);
+  EXPECT_THAT(createClusterOptions(config),
+              HasStatusMessage(
+                  testing::HasSubstr("failed to initialize dynamic module bridge configuration")));
 }
 
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, NoBridgeConfig) {
   auto config = createProtoConfig();
   config.clear_bridge_config();
 
-  auto pool = factory_.createGenericConnPool(
-      host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
-  EXPECT_NE(pool, nullptr);
+  auto options = createClusterOptions(config);
+  ASSERT_OK(options);
+  EXPECT_NE(options.value(), nullptr);
 }
 
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, BridgeConfigParseFailure) {
@@ -696,10 +710,17 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, BridgeConfigParseFailure) {
   any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
   any->set_value(std::string("\x0F\xFF\xFF", 3));
 
-  auto pool = factory_.createGenericConnPool(
-      host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
-  EXPECT_EQ(pool, nullptr);
+  EXPECT_THAT(createClusterOptions(config),
+              HasStatusMessage(testing::HasSubstr("failed to parse bridge_config")));
+}
+
+TEST_F(DynamicModuleGenericConnPoolFactoryTest, InvalidTypedConfig) {
+  Protobuf::Any typed_config;
+  typed_config.set_type_url(
+      "type.googleapis.com/envoy.extensions.upstreams.http.dynamic_modules.v3.Config");
+  typed_config.set_value(std::string("\xFF", 1));
+
+  EXPECT_FALSE(factory_.createClusterOptions(typed_config, server_context_).ok());
 }
 
 // Smoke test that a ``google.protobuf.Struct`` ``bridge_config`` is accepted by the factory.
@@ -718,10 +739,9 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, BridgeConfigWithStruct) {
   (*struct_value.mutable_fields())["key"].set_string_value("value");
   std::ignore = config.mutable_bridge_config()->PackFrom(struct_value);
 
-  auto pool = factory_.createGenericConnPool(
-      host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
-  EXPECT_NE(pool, nullptr);
+  auto options = createClusterOptions(config);
+  ASSERT_OK(options);
+  EXPECT_NE(options.value(), nullptr);
 }
 
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, NameAndCategory) {
@@ -735,16 +755,18 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateEmptyConfigProto) {
 }
 
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, InvalidTcpPool) {
+  auto options = createClusterOptions(createProtoConfig());
+  ASSERT_OK(options);
+
   NiceMock<Upstream::MockClusterManager> cm2;
   cm2.initializeThreadLocalClusters({"fake_cluster"});
   EXPECT_CALL(cm2.thread_local_cluster_, tcpConnPool(_, _, _)).WillOnce(Return(std::nullopt));
-
-  auto config = createProtoConfig();
-  config.set_bridge_name("invalid_pool_test");
+  ON_CALL(*cm2.thread_local_cluster_.cluster_.info_, extensionProtocolOptions(_))
+      .WillByDefault(Return(options.value()));
 
   auto pool = factory_.createGenericConnPool(
       host_, cm2.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      Upstream::ResourcePriority::Default, std::nullopt, nullptr, config);
+      Upstream::ResourcePriority::Default, std::nullopt, nullptr, createProtoConfig());
   EXPECT_EQ(pool, nullptr);
 }
 

@@ -1,10 +1,12 @@
 #include "source/extensions/upstreams/http/dynamic_modules/config.h"
 
+#include "source/common/common/macros.h"
+#include "source/common/common/thread.h"
+#include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/upstreams/http/dynamic_modules/upstream_request.h"
 
-#include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -15,29 +17,37 @@ namespace DynamicModules {
 
 namespace {
 
-// Thread-local cache of BridgeConfig instances keyed by proto config hash.
-// This ensures that on_bridge_config_new is called once per unique configuration per
-// worker thread, matching the lifecycle semantics of other dynamic module extension points.
-thread_local absl::flat_hash_map<uint64_t, BridgeConfigSharedPtr> bridge_config_cache;
+// The cluster stores its options under the name of the factory, which every request looks up.
+const std::string& factoryName() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.upstreams.http.dynamic_modules");
+}
 
-absl::StatusOr<BridgeConfigSharedPtr> getOrCreateBridgeConfig(
-    const envoy::extensions::upstreams::http::dynamic_modules::v3::Config& proto_config) {
-  const uint64_t cache_key = MessageUtil::hash(proto_config);
-  auto it = bridge_config_cache.find(cache_key);
-  if (it != bridge_config_cache.end()) {
-    return it->second;
-  }
+// The bridge configuration that a cluster creates on the main thread, which its workers share.
+class BridgeClusterOptions : public Upstream::ProtocolOptionsConfig {
+public:
+  explicit BridgeClusterOptions(BridgeConfigSharedPtr bridge_config)
+      : bridge_config_(std::move(bridge_config)) {}
 
-  const auto& module_config = proto_config.dynamic_module_config();
-  // The upstream HTTP conn-pool factory has no factory context to thread through here, so it is not
-  // passed: only the synchronous local-file and by-name module sources are supported, while remote
-  // sources are rejected by newDynamicModuleByConfig.
+  const BridgeConfigSharedPtr bridge_config_;
+};
+
+} // namespace
+
+std::string DynamicModuleGenericConnPoolFactory::name() const { return factoryName(); }
+
+absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>
+DynamicModuleGenericConnPoolFactory::createClusterOptions(
+    const Protobuf::Any& typed_config, Server::Configuration::ServerFactoryContext& context) const {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  envoy::extensions::upstreams::http::dynamic_modules::v3::Config proto_config;
+  RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+      typed_config, context.messageValidationVisitor(), proto_config));
+
+  // Without a factory context, newDynamicModuleByConfig rejects remote module sources, which a
+  // cluster could not wait for.
   auto load_result = Envoy::Extensions::DynamicModules::newDynamicModuleByConfig(
-      module_config, proto_config.bridge_name());
-  if (!load_result.ok()) {
-    return load_result.status();
-  }
-  auto dynamic_module = std::move(load_result->loaded);
+      proto_config.dynamic_module_config(), proto_config.bridge_name());
+  RETURN_IF_NOT_OK_REF(load_result.status());
 
   std::string bridge_config_bytes;
   if (proto_config.has_bridge_config()) {
@@ -50,33 +60,26 @@ absl::StatusOr<BridgeConfigSharedPtr> getOrCreateBridgeConfig(
   }
 
   auto bridge_config = BridgeConfig::create(proto_config.bridge_name(), bridge_config_bytes,
-                                            std::move(dynamic_module));
-  if (!bridge_config.ok()) {
-    return bridge_config.status();
-  }
-
-  bridge_config_cache[cache_key] = bridge_config.value();
-  return bridge_config.value();
+                                            std::move(load_result->loaded));
+  RETURN_IF_NOT_OK_REF(bridge_config.status());
+  return std::make_shared<const BridgeClusterOptions>(std::move(bridge_config.value()));
 }
-
-} // namespace
 
 Router::GenericConnPoolPtr DynamicModuleGenericConnPoolFactory::createGenericConnPool(
     Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
     Router::GenericConnPoolFactory::UpstreamProtocol, Upstream::ResourcePriority priority,
     std::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext* ctx,
-    const Protobuf::Message& config) const {
-  const auto& typed_config =
-      dynamic_cast<const envoy::extensions::upstreams::http::dynamic_modules::v3::Config&>(config);
-
-  auto bridge_config = getOrCreateBridgeConfig(typed_config);
-  if (!bridge_config.ok()) {
-    ENVOY_LOG_MISC(error, "failed to create bridge config: {}", bridge_config.status().message());
+    const Protobuf::Message&) const {
+  const auto options =
+      thread_local_cluster.info()->extensionProtocolOptionsTyped<BridgeClusterOptions>(
+          factoryName());
+  if (options == nullptr) {
+    ENVOY_BUG(false, "the cluster has no dynamic module bridge configuration");
     return nullptr;
   }
 
   auto ret = std::make_unique<TcpConnPool>(host, thread_local_cluster, priority, ctx,
-                                           bridge_config.value());
+                                           options->bridge_config_);
   return (ret->valid() ? std::move(ret) : nullptr);
 }
 

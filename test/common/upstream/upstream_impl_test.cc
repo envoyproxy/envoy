@@ -15,6 +15,7 @@
 #include "envoy/http/client_codec_factory.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/address.h"
+#include "envoy/router/router.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/health_check_host_monitor.h"
@@ -5783,6 +5784,118 @@ TEST_P(ParametrizedClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownF
   EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
                             "Didn't find a registered network or http filter or "
                             "protocol options implementation for name: 'no_such_filter'");
+}
+
+class TestClusterOptions : public ProtocolOptionsConfig {};
+
+// Creates the cluster options of an upstream config whose value is "create", leaves them to the
+// default for "default", and rejects the cluster for "reject".
+class TestClusterOptionsConnPoolFactory : public Router::GenericConnPoolFactory {
+public:
+  std::string name() const override { return "envoy.test.upstreams.cluster_options"; }
+  std::string category() const override { return "envoy.upstreams"; }
+  Router::GenericConnPoolPtr createGenericConnPool(HostConstSharedPtr, ThreadLocalCluster&,
+                                                   Router::GenericConnPoolFactory::UpstreamProtocol,
+                                                   ResourcePriority, std::optional<Http::Protocol>,
+                                                   LoadBalancerContext*,
+                                                   const Protobuf::Message&) const override {
+    return nullptr;
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::StringValue>();
+  }
+  absl::StatusOr<ProtocolOptionsConfigConstSharedPtr>
+  createClusterOptions(const Protobuf::Any& typed_config,
+                       Server::Configuration::ServerFactoryContext& context) const override {
+    Protobuf::StringValue response;
+    RETURN_IF_NOT_OK(MessageUtil::unpackTo(typed_config, response));
+    if (response.value() == "reject") {
+      return absl::InvalidArgumentError("cluster options rejected");
+    }
+    if (response.value() == "default") {
+      return Router::GenericConnPoolFactory::createClusterOptions(typed_config, context);
+    }
+    return std::make_shared<TestClusterOptions>();
+  }
+};
+
+// A protocol options factory with the name of TestClusterOptionsConnPoolFactory.
+class TestClusterOptionsProtocolOptionsFactory
+    : public Server::Configuration::ProtocolOptionsFactory {
+public:
+  std::string name() const override { return "envoy.test.upstreams.cluster_options"; }
+  std::string category() const override { return "envoy.upstream_options"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+  absl::StatusOr<ProtocolOptionsConfigConstSharedPtr>
+  createProtocolOptionsConfig(const Protobuf::Message&,
+                              Server::Configuration::ProtocolOptionsFactoryContext&) override {
+    return std::make_shared<TestClusterOptions>();
+  }
+};
+
+std::string clusterWithUpstreamConfig(absl::string_view response) {
+  return fmt::format(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    upstream_config:
+      name: envoy.test.upstreams.cluster_options
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: {}
+  )EOF",
+                     response);
+}
+
+TEST_P(ParametrizedClusterInfoImplTest, UpstreamConfigCreatesClusterOptions) {
+  TestClusterOptionsConnPoolFactory factory;
+  Registry::InjectFactory<Router::GenericConnPoolFactory> registered_factory(factory);
+  auto cluster = makeCluster(clusterWithUpstreamConfig("create"));
+  EXPECT_NE(nullptr, cluster->info()->extensionProtocolOptionsTyped<TestClusterOptions>(
+                         "envoy.test.upstreams.cluster_options"));
+}
+
+TEST_P(ParametrizedClusterInfoImplTest, UpstreamConfigWithoutClusterOptions) {
+  TestClusterOptionsConnPoolFactory factory;
+  Registry::InjectFactory<Router::GenericConnPoolFactory> registered_factory(factory);
+  auto cluster = makeCluster(clusterWithUpstreamConfig("default"));
+  EXPECT_EQ(nullptr, cluster->info()->extensionProtocolOptionsTyped<TestClusterOptions>(
+                         "envoy.test.upstreams.cluster_options"));
+}
+
+TEST_P(ParametrizedClusterInfoImplTest, UpstreamConfigOfAnUnknownFactoryHasNoClusterOptions) {
+  auto cluster = makeCluster(clusterWithUpstreamConfig("create"));
+  EXPECT_EQ(nullptr, cluster->info()->extensionProtocolOptionsTyped<TestClusterOptions>(
+                         "envoy.test.upstreams.cluster_options"));
+}
+
+TEST_P(ParametrizedClusterInfoImplTest, UpstreamConfigRejectsTheCluster) {
+  TestClusterOptionsConnPoolFactory factory;
+  Registry::InjectFactory<Router::GenericConnPoolFactory> registered_factory(factory);
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(clusterWithUpstreamConfig("reject")), EnvoyException,
+                            "cluster options rejected");
+}
+
+TEST_P(ParametrizedClusterInfoImplTest, UpstreamConfigClusterOptionsAlreadyConfigured) {
+  TestClusterOptionsConnPoolFactory factory;
+  Registry::InjectFactory<Router::GenericConnPoolFactory> registered_factory(factory);
+  TestClusterOptionsProtocolOptionsFactory options_factory;
+  Registry::InjectFactory<Server::Configuration::ProtocolOptionsFactory> registered_options_factory(
+      options_factory);
+  const std::string yaml = clusterWithUpstreamConfig("create") + R"EOF(
+    typed_extension_protocol_options:
+      envoy.test.upstreams.cluster_options:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(
+      makeCluster(yaml), EnvoyException,
+      "protocol options for 'envoy.test.upstreams.cluster_options' are already configured");
 }
 
 TEST_P(ParametrizedClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {

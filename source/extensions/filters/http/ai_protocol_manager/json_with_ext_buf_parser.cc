@@ -12,7 +12,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-JsonWithExtBufParser::JsonWithExtBufParser(Config config) : config_(config), cursor_(*this) {}
+JsonWithExtBufParser::JsonWithExtBufParser(Config config)
+    : config_(config), cursor_(*this, Json::Wuffs::WuffsJsonCursor::Options{
+                                          .allow_duplicate_keys = config.allow_duplicate_keys}) {}
 
 absl::Status JsonWithExtBufParser::feed(absl::string_view chunk, bool end_stream) {
   // Order matters: a parser that already failed reports that failure again, so a
@@ -24,6 +26,7 @@ absl::Status JsonWithExtBufParser::feed(absl::string_view chunk, bool end_stream
     return absl::FailedPreconditionError("ai json: feed() called after the document completed");
   }
 
+  bytes_fed_ += chunk.size();
   absl::Status status = cursor_.feed(chunk, end_stream);
   // A callback that cannot return a status may have failed first; that error is
   // the more specific one.
@@ -34,6 +37,9 @@ absl::Status JsonWithExtBufParser::feed(absl::string_view chunk, bool end_stream
   if (!status.ok()) {
     finished_ = true;
     status_ = status;
+    // A body cut off inside a token fails on its last chunk with every byte consumed. Bytes
+    // left over mean the cursor stopped at something that is not JSON.
+    ended_early_ = end_stream && cursor_.nextSourcePosition() == bytes_fed_;
     return status;
   }
   if (!end_stream) {
@@ -45,10 +51,22 @@ absl::Status JsonWithExtBufParser::feed(absl::string_view chunk, bool end_stream
   // of its own, so an unfinished document is caught here.
   if (!root_set_ || !stack_.empty()) {
     status_ = absl::InvalidArgumentError("ai json: incomplete JSON document");
+    ended_early_ = true;
     return status_;
   }
   document_.setJson(std::move(root_));
   return absl::OkStatus();
+}
+
+PartialJson JsonWithExtBufParser::takePartial() {
+  PartialJson partial;
+  partial.ended_early = ended_early_;
+  partial.open_keys = std::move(stack_keys_);
+  if (root_set_) {
+    partial.json = std::move(root_);
+  }
+  stack_.clear();
+  return partial;
 }
 
 void JsonWithExtBufParser::setError(absl::Status status) {
@@ -68,21 +86,24 @@ absl::StatusOr<nlohmann::json*> JsonWithExtBufParser::attach(nlohmann::json&& va
     }
     root_ = std::move(value);
     root_set_ = true;
+    attached_key_.clear();
     return &root_;
   }
 
   nlohmann::json& parent = *stack_.back();
   if (parent.is_object()) {
-    // Duplicate keys are rejected by the cursor, so this never overwrites.
+    // A repeated key only gets here when the configuration allows it; the last value wins.
     // nlohmann's object is a std::map, so key order is not preserved -- a future
     // re-serializer has to account for that.
     nlohmann::json& slot = parent[pending_key_];
+    attached_key_ = std::move(pending_key_);
     pending_key_.clear();
     slot = std::move(value);
     return &slot;
   }
   if (parent.is_array()) {
     parent.push_back(std::move(value));
+    attached_key_.clear();
     return &parent.back();
   }
   return absl::InternalError("ai json: value attached to a non-container");
@@ -99,6 +120,8 @@ absl::Status JsonWithExtBufParser::pushContainer(bool is_dict) {
     return slot.status();
   }
   stack_.push_back(*slot);
+  stack_keys_.push_back(std::move(attached_key_));
+  attached_key_.clear();
   return absl::OkStatus();
 }
 
@@ -208,6 +231,7 @@ void JsonWithExtBufParser::onContainerClose(int, size_t) {
     return;
   }
   stack_.pop_back();
+  stack_keys_.pop_back();
 }
 
 } // namespace AiProtocolManager

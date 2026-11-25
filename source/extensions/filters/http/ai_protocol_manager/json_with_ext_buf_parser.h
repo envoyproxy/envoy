@@ -60,6 +60,9 @@ public:
     // Parsing fails once the document exceeds this many DOM nodes (scalars,
     // containers, and external references alike).
     std::uint32_t max_nodes{kDefaultMaxNodes};
+    // Accept an object that repeats a key instead of failing. The document keeps the last
+    // value, and hasDuplicateKeys() reports the repeat.
+    bool allow_duplicate_keys{false};
   };
 
   explicit JsonWithExtBufParser(Config config);
@@ -72,6 +75,12 @@ public:
   // Moves the parsed document out. Only meaningful once feed() has returned OK
   // for the final chunk; before that the document is empty.
   JsonWithExtBuf takeDocument() { return std::move(document_); }
+
+  // Moves out what had been read when feed() failed. Call it only after a failed feed().
+  PartialJson takePartial();
+
+  // True if an object repeated a key. Needs Config::allow_duplicate_keys.
+  bool hasDuplicateKeys() const { return cursor_.sawDuplicateKeys(); }
 
   // True once any string has been recorded as a reference rather than materialized, i.e. once the
   // document depends on the offloaded bytes outliving it.
@@ -129,10 +138,17 @@ private:
   // when it closes, with no sibling appended in between. The array node itself
   // never moves.
   std::vector<nlohmann::json*> stack_;
+  // The key of each container in stack_; see PartialJson::open_keys.
+  std::vector<std::string> stack_keys_;
+  std::uint64_t bytes_fed_{0};
+  // Set on failure: the body ended too soon, as opposed to not being JSON.
+  bool ended_early_{false};
 
   // Key awaiting its value; always consumed by the next value, so one slot
   // suffices across nesting levels.
   std::string pending_key_;
+  // Key of the value attached last; empty for the root and for an array element.
+  std::string attached_key_;
 
   // In-flight string value state.
   std::string pending_string_;

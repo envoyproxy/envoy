@@ -90,7 +90,6 @@ envoy_extension_cc_dyn_module_test(
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
         "//test/test_common:environment_lib",
-        "//test/test_common:logging_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/dynamic_modules/v3:pkg_cc_proto",
     ],
