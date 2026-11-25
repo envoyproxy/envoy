@@ -142,6 +142,13 @@ ContextImpl::ContextImpl(
     rc = SSL_CTX_set_max_proto_version(ctx.ssl_ctx_.get(), config.maxProtocolVersion());
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
 
+    // Caps the plaintext of every record sent, handshake messages included.
+    if (const std::optional<uint32_t> max_send_fragment = config.maxSendFragment();
+        max_send_fragment.has_value()) {
+      rc = SSL_CTX_set_max_send_fragment(ctx.ssl_ctx_.get(), max_send_fragment.value());
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    }
+
     if (!capabilities_.provides_ciphers_and_curves || !capabilities_.provides_sigalgs) {
       creation_status = Utility::validateCipherCurveAndSigalgsOnSslCtx(
           capabilities_.provides_ciphers_and_curves ? "" : config.cipherSuites(),

@@ -15,7 +15,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Route Selector AI filter]
 // RouteSelector AI filter :ref:`configuration overview
-// <config_http_filters_ai_protocol_manager_ai_filters>`.
+// <config_http_ai_filters_route_selector>`.
 // [#extension: envoy.http.ai_filters.route_selector]
 
 message RouteSelector {

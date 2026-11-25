@@ -10,6 +10,24 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "config_snapshot_lib",
+    srcs = ["config_snapshot.cc"],
+    hdrs = ["config_snapshot.h"],
+    deps = [
+        "//envoy/common:exception_lib",
+        "//envoy/server:config_tracker_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/upstream:endpoint_config_dump_lib",
+        "@abseil-cpp//absl/algorithm:container",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "cluster_writer_lib",
     srcs = ["cluster_writer.cc"],
     hdrs = ["cluster_writer.h"],
@@ -25,6 +43,24 @@ envoy_cc_library(
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_chain_config_writer_lib",
+    srcs = ["filter_chain_config_writer.cc"],
+    hdrs = ["filter_chain_config_writer.h"],
+    deps = [
+        ":resource_writer_lib",
+        "//envoy/init:manager_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/server:listener_manager_interface",
+        "//source/common/common:fmt_lib",
+        "//source/common/init:target_lib",
+        "//source/extensions/dynamic_modules/abi",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -56,6 +92,7 @@ envoy_cc_library(
     deps = [
         ":writer_shared_state_lib",
         "//envoy/common:exception_lib",
+        "//envoy/common:optref_lib",
         "//envoy/common:pure_lib",
         "//envoy/common:time_interface",
         "//envoy/event:schedulable_cb_interface",
@@ -94,15 +131,55 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "extension_config_subscription_lib",
+    srcs = ["extension_config_subscription.cc"],
+    hdrs = ["extension_config_subscription.h"],
+    deps = [
+        "//envoy/config:subscription_interface",
+        "//envoy/config:xds_manager_interface",
+        "//envoy/server:admin_interface",
+        "//envoy/server:config_tracker_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/singleton:instance_interface",
+        "//envoy/singleton:manager_interface",
+        "//source/common/common:cleanup_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:matchers_lib",
+        "//source/common/config:ecds_subscription_registry_lib",
+        "//source/common/config:resource_name_lib",
+        "//source/common/config:resource_type_helper_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/config:xds_resource_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/stats:utility_lib",
+        "//source/extensions/dynamic_modules/abi",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@xds//udpa/type/v1:pkg_cc_proto",
+        "@xds//xds/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "extension_config_lib",
     srcs = ["extension_config.cc"],
     hdrs = ["extension_config.h"],
     deps = [
         ":cluster_writer_lib",
+        ":config_snapshot_lib",
+        ":extension_config_subscription_lib",
+        ":filter_chain_config_writer_lib",
         ":listener_writer_lib",
         "//envoy/common:optref_lib",
+        "//envoy/config:xds_config_tracker_interface",
+        "//envoy/config:xds_manager_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:async_client_interface",
+        "//envoy/server:admin_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/server:listener_manager_interface",
         "//envoy/server:options_interface",
@@ -110,10 +187,14 @@ envoy_cc_library(
         "//envoy/thread_local:thread_local_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:matchers_lib",
+        "//source/common/common:regex_lib",
         "//source/common/common:thread_lib",
         "//source/common/http:message_lib",
         "//source/common/init:target_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/dynamic_modules:metric_registry",
@@ -127,12 +208,15 @@ envoy_cc_library(
     deps = [
         ":extension_config_lib",
         "//envoy/common:callback",
+        "//envoy/runtime:runtime_interface",
         "//envoy/server:bootstrap_extension_config_interface",
         "//envoy/server:lifecycle_notifier_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/types:variant",
     ],
 )
 
@@ -140,6 +224,7 @@ envoy_cc_library(
     name = "abi_impl",
     srcs = ["abi_impl.cc"],
     deps = [
+        ":config_snapshot_lib",
         ":extension_config_lib",
         ":extension_lib",
         "//envoy/server:admin_interface",
@@ -147,6 +232,7 @@ envoy_cc_library(
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "@abseil-cpp//absl/container:inlined_vector",
         "@abseil-cpp//absl/strings",
     ],
 )

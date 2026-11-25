@@ -213,6 +213,36 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1));
 }
 
+TEST_F(ProtobufUtilityTest, MessageUtilSerializeDeterministically) {
+  Protobuf::Struct ascending;
+  Protobuf::Struct descending;
+  for (int i = 0; i < 16; i++) {
+    (*ascending.mutable_fields())[absl::StrCat("key", i)].set_number_value(i);
+    (*descending.mutable_fields())[absl::StrCat("key", 15 - i)].set_number_value(15 - i);
+  }
+  const std::string bytes = MessageUtil::serializeDeterministically(ascending);
+  EXPECT_EQ(bytes, MessageUtil::serializeDeterministically(descending));
+  Protobuf::Struct parsed;
+  ASSERT_TRUE(parsed.ParseFromString(bytes));
+  EXPECT_TRUE(TestUtility::protoEqual(parsed, ascending));
+
+  (*descending.mutable_fields())["key0"].set_number_value(16);
+  EXPECT_NE(bytes, MessageUtil::serializeDeterministically(descending));
+  EXPECT_EQ("", MessageUtil::serializeDeterministically(Protobuf::Struct()));
+}
+
+TEST_F(ProtobufUtilityTest, MessageUtilSerializeDeterministicallyKeepsAnyPayloadBytes) {
+  // An Any payload keeps its bytes, so the same struct serialized in two orders differs.
+  Protobuf::Any a1;
+  a1.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  a1.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+  Protobuf::Any a2 = a1;
+  a2.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  EXPECT_NE(MessageUtil::serializeDeterministically(a1),
+            MessageUtil::serializeDeterministically(a2));
+  EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2));
+}
+
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   Protobuf::RepeatedPtrField<Protobuf::UInt32Value> repeated;
   EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));
@@ -1141,8 +1171,7 @@ TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlAny) {
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
-// Deeply-nested opaque protos (`Any` and `TypedStruct`), which are reified using the
-// `DynamicMessageFactory`, should be redacted correctly.
+// deeply nested Any and TypedStruct fields can also arrive in dynamic messages
 TEST_F(ProtobufUtilityTest, RedactDeeplyNestedOpaqueProtos) {
   envoy::test::Sensitive actual, expected;
   TestUtility::loadFromYaml(R"EOF(
@@ -1189,6 +1218,14 @@ insensitive_typed_struct:
         sensitive_string: '[redacted]'
 )EOF",
                             expected);
+  Protobuf::DynamicMessageFactory message_factory;
+  auto reflectable_message = createReflectableMessage(actual);
+  std::unique_ptr<Protobuf::Message> dynamic_message(
+      message_factory.GetPrototype(reflectable_message->GetDescriptor())->New());
+  ASSERT_TRUE(dynamic_message->ParseFromString(actual.SerializeAsString()));
+  MessageUtil::redact(*dynamic_message);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, *dynamic_message));
+
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
@@ -1545,6 +1582,20 @@ TEST_F(ProtobufUtilityTest, KnownAnyToBytes) {
   {
     Protobuf::Any source_any;
     source_any.set_type_url("type.googleapis.com/xds.type.v3.TypedStruct");
+    source_any.set_value("\x0a");
+    EXPECT_THAT(MessageUtil::knownAnyToBytes(source_any), Not(IsOk()));
+  }
+  {
+    udpa::type::v1::TypedStruct source;
+    source.set_type_url("type.googleapis.com/example.FilterConfig");
+    (*source.mutable_value()->mutable_fields())["key"].set_string_value("value");
+    Protobuf::Any source_any;
+    std::ignore = source_any.PackFrom(source);
+    EXPECT_THAT(MessageUtil::knownAnyToBytes(source_any), IsOkAndHolds(R"({"key":"value"})"));
+  }
+  {
+    Protobuf::Any source_any;
+    source_any.set_type_url("type.googleapis.com/udpa.type.v1.TypedStruct");
     source_any.set_value("\x0a");
     EXPECT_THAT(MessageUtil::knownAnyToBytes(source_any), Not(IsOk()));
   }

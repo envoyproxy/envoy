@@ -8,10 +8,7 @@ build-image:
   sha-ci: 8fdf16ea0d40cb0e4726b13f97df8b73e80e331b206b62b224ceb2498149a1d5
   sha-devtools: 5914ff8694b377cbd137317acb4a0f91c9496e08a17e867743f942e15f4deb83
   sha-docker: 75bc814bc49ea2c4fe8807bd487fdb513b4b1ce9b6cce19bb1781ae9d28f80cf
-  sha-mobile: b4351554fbf60ecf5b69ae17434a1503802473118388361543a3c695040f8859
   sha-worker: 58abaea3f29aae5340f32dc99fc66c97a6c2fec0902345d03cf6d47684606a1d
-  # TODO: remove this dupe (currently used by ci request handler)
-  mobile-sha: b4351554fbf60ecf5b69ae17434a1503802473118388361543a3c695040f8859
   tag: v0.2.5
 
 config:
@@ -61,61 +58,33 @@ checks:
     required: true
     on-run:
     - mobile-android
-  mobile-android-tests:
-    name: Mobile/Android tests
-    required: true
-    on-run:
     - mobile-android-tests
-  mobile-asan:
-    name: Mobile/ASAN
+  mobile-checks:
+    name: Mobile/Checks
     required: true
     on-run:
     - mobile-asan
-  mobile-cc:
-    name: Mobile/CC
-    required: true
-    on-run:
     - mobile-cc
-  mobile-coverage:
-    name: Mobile/Coverage
-    required: true
-    on-run:
     - mobile-coverage
+    - mobile-format
+    - mobile-python
+    - mobile-tsan
   mobile-docs:
     name: Mobile/Docs
     on-run:
     - mobile-docs
-  mobile-format:
-    name: Mobile/Format
-    required: true
-    on-run:
-    - mobile-format
   mobile-ios:
     name: Mobile/iOS
     required: true
     cache:
     on-run:
     - mobile-ios
-  mobile-ios-tests:
-    name: Mobile/iOS tests
-    required: true
-    on-run:
     - mobile-ios-tests
-  mobile-python:
-    name: Mobile/Python
-    required: true
-    on-run:
-    - mobile-python
   mobile-release-validation:
     name: Mobile/Release validation
     required: true
     on-run:
     - mobile-release-validation
-  mobile-tsan:
-    name: Mobile/TSAN
-    required: true
-    on-run:
-    - mobile-tsan
   prechecks:
     name: Envoy/Prechecks
     on-run:
@@ -166,12 +135,16 @@ checks:
           ```
     # yamllint enable rule:line-length
   publish:
-    name: >-
-      Envoy/Publish and verify
+    name: Envoy/Publish
     on-run:
     - release
     - verify
     - docs
+    required: true
+  verify:
+    name: Envoy/Verify
+    on-run:
+    - verify
     required: true
 
 run:
@@ -621,7 +594,7 @@ run:
     - .bazelrc
     - .bazelversion
     - .github/config.yml
-    - .github/workflows/mobile-python.yml
+    - .github/workflows/mobile-checks.yml
     - bazel/external/quiche.BUILD
     - mobile/.bazelrc
     - mobile/**/*
@@ -677,10 +650,15 @@ run:
     paths:
     - "**/*"
   release:
+    # Includes the publishing workflows (and so every path of `verify`, which needs the release's
+    # signed packages): a change to them runs the jobs they define.
     paths:
     - .bazelrc
     - .bazelversion
     - .github/config.yml
+    - .github/workflows/_publish_*.yml
+    - .github/workflows/envoy-publish.yml
+    - .github/workflows/envoy-verify.yml
     - api/**/*
     - bazel/**/*
     - ci/**/*

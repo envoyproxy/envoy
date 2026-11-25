@@ -906,7 +906,7 @@ udp_listener_config:
 TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerAddressUpdateIsNotInPlace) {
   const envoy::config::listener::v3::Listener listener_proto =
       parseListenerFromV3Yaml(getBasicConfig());
-  auto listener = *ListenerImpl::create(listener_proto, "", *manager_, "foo", true, false, 0);
+  auto listener = *ListenerImpl::create(listener_proto, "", *manager_, "foo", true, false, 0, 0);
   auto socket_factory = std::make_unique<testing::NiceMock<Network::MockListenSocketFactory>>();
   ON_CALL(*socket_factory, localAddress())
       .WillByDefault(

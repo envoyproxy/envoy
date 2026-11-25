@@ -13,6 +13,8 @@
 
 #include "absl/container/btree_map.h"
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
 using Envoy::Http::LowerCaseString;
@@ -112,13 +114,41 @@ public:
     if (path_entry == nullptr) {
       return;
     }
-    Http::Utility::QueryParamsMulti query_params =
-        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(
-            path_entry->value().getStringView());
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.jwt_authn_remove_query_param_in_place")) {
+      Http::Utility::QueryParamsMulti query_params =
+          Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(
+              path_entry->value().getStringView());
+      query_params.remove(param_);
+      headers.setPath(query_params.replaceQueryString(path_entry->value()));
+      return;
+    }
 
-    query_params.remove(param_);
+    const absl::string_view path = path_entry->value().getStringView();
+    const size_t query_start = path.find('?');
+    if (query_start == absl::string_view::npos) {
+      return;
+    }
 
-    const auto updated_path = query_params.replaceQueryString(path_entry->value());
+    // Drop only the token parameter and keep the rest of the query string as sent: same order,
+    // same encoding, and no "=" added to valueless parameters.
+    std::string updated_path(path.substr(0, query_start + 1));
+    bool first = true;
+    for (absl::string_view param : absl::StrSplit(path.substr(query_start + 1), '&')) {
+      const absl::string_view name = param.substr(0, param.find('='));
+      if (Http::Utility::PercentEncoding::decode(name) == param_) {
+        continue;
+      }
+      if (!first) {
+        updated_path.push_back('&');
+      }
+      absl::StrAppend(&updated_path, param);
+      first = false;
+    }
+    if (updated_path.size() == query_start + 1) {
+      // Nothing is left of the query, so drop the "?".
+      updated_path.pop_back();
+    }
     headers.setPath(updated_path);
   }
 

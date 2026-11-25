@@ -1,13 +1,13 @@
 load("@rules_go//go:def.bzl", "go_binary")
 
-# This declares a cc_library target that is used to build a shared library.
-# name + ".c" is the source file that is compiled to create the shared library.
-def test_program(name):
+# Builds a Go shared library for Envoy's dynamic module tests.
+def test_program(name, extra_srcs = [], gotags = []):
     go_binary(
         name = name,
-        srcs = ["{}/{}.go".format(name, name)],
+        srcs = ["{}/{}.go".format(name, name)] + extra_srcs,
         out = "lib{}.so".format(name),
         cgo = True,
+        gotags = gotags,
         linkmode = "c-shared",
         visibility = ["//visibility:public"],
         deps = [

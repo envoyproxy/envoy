@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = [
         "background_fetch_manager.cc",
         "dynamic_module_stats.cc",
+        "program_init_state.cc",
     ] + select({
         "//bazel:windows_x86_64": ["win32/dynamic_modules.cc"],
         "//conditions:default": ["posix/dynamic_modules.cc"],
@@ -22,6 +23,7 @@ envoy_cc_library(
         "background_fetch_manager.h",
         "dynamic_module_stats.h",
         "dynamic_modules.h",
+        "program_init_state.h",
     ],
     external_deps = ["ssl"],
     deps = [
@@ -34,6 +36,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "//source/common/config:remote_data_fetcher_lib",
         "//source/common/runtime:runtime_features_lib",
@@ -41,9 +44,11 @@ envoy_cc_library(
         "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/dynamic_modules/abi",
         "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/synchronization",
         "@abseil-cpp//absl/types:span",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/dynamic_modules/v3:pkg_cc_proto",
@@ -107,11 +112,16 @@ envoy_cc_library(
 go_library(
     name = "go_sdk_shared",
     srcs = [
+        "sdk/go/shared/bootstrap.go",
+        "sdk/go/shared/bootstrap_api.go",
+        "sdk/go/shared/cluster.go",
+        "sdk/go/shared/cluster_api.go",
         "sdk/go/shared/common.go",
         "sdk/go/shared/early_header_mutation.go",
         "sdk/go/shared/early_header_mutation_api.go",
         "sdk/go/shared/header_formatter.go",
         "sdk/go/shared/header_formatter_api.go",
+        "sdk/go/shared/headers.go",
         "sdk/go/shared/http.go",
         "sdk/go/shared/http_api.go",
         "sdk/go/shared/listener_api.go",
@@ -127,12 +137,6 @@ go_library(
     cgo = True,
     importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared",
     visibility = ["//visibility:public"],
-)
-
-go_test(
-    name = "go_sdk_shared_test",
-    srcs = ["sdk/go/shared/types_test.go"],
-    embed = [":go_sdk_shared"],
 )
 
 go_library(
@@ -167,10 +171,29 @@ go_test(
 )
 
 go_library(
+    name = "go_sdk_internal_scheduler",
+    srcs = ["sdk/go/internal/scheduler/scheduler.go"],
+    importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/internal/scheduler",
+    visibility = ["//test/extensions/dynamic_modules:__pkg__"],
+)
+
+exports_files(
+    [
+        "sdk/go/internal/scheduler/scheduler_test.go",
+        "sdk/go/shared/headers_test.go",
+        "sdk/go/shared/types_test.go",
+    ],
+    visibility = ["//test/extensions/dynamic_modules:__pkg__"],
+)
+
+go_library(
     name = "go_sdk_abi",
     srcs = [
+        "sdk/go/abi/bootstrap.go",
+        "sdk/go/abi/cluster.go",
         "sdk/go/abi/common.go",
         "sdk/go/abi/early_header_mutation.go",
+        "sdk/go/abi/handle.go",
         "sdk/go/abi/header_formatter.go",
         "sdk/go/abi/internal.go",
         "sdk/go/abi/listener.go",
@@ -192,6 +215,7 @@ go_library(
         "//source/extensions/dynamic_modules:go_sdk",
         "//source/extensions/dynamic_modules:go_sdk_internal_buffer",
         "//source/extensions/dynamic_modules:go_sdk_internal_recovery",
+        "//source/extensions/dynamic_modules:go_sdk_internal_scheduler",
         "//source/extensions/dynamic_modules:go_sdk_shared",
     ],
 )

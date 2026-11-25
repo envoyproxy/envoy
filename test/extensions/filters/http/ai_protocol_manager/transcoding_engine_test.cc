@@ -212,8 +212,11 @@ TEST(TranscodingEngineTest, TranscodingEngineMaps_OpenAiSchema_PassthroughIr) {
   EXPECT_EQ(payload, original_snapshot);
 
   // Step 2: From IR (IR -> OpenAI)
-  ASSERT_THAT(requestFromIr(engine, LLMProtocol::OpenAiChatCompletions, payload), IsOk());
+  std::optional<std::string> rewritten_path;
+  ASSERT_THAT(requestFromIr(engine, LLMProtocol::OpenAiChatCompletions, payload, &rewritten_path),
+              IsOk());
   EXPECT_EQ(payload, original_snapshot);
+  EXPECT_THAT(rewritten_path, testing::Optional(std::string("/v1/chat/completions")));
 
   // Validate against OpenAI Chat Completions RequestSchema
   const PayloadSchema* openai_schema =

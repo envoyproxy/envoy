@@ -1,0 +1,11 @@
+script: BODY
+request {
+  headers {
+    headers { key: "x-fuzz-mode" value: "chunks" }
+    headers { key: "x-fuzz-value" value: "x" }
+  }
+  http_body { data: "a" data: "b" data: "c" }
+  trailers {
+    headers { key: "x-t" value: "1" }
+  }
+}
