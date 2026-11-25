@@ -36,6 +36,11 @@ on:
         required: true
 
 
+env:
+  _TS_0: &ts-gcp-setup envoyproxy/toolshed/actions/gcp/setup@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+  _TS_1: &ts-gcs-artefact-sync envoyproxy/toolshed/actions/gcs/artefact/sync@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+  _TS_2: &ts-jq envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+
 jobs:
   upload:
     runs-on: ubuntu-24.04
@@ -52,7 +57,7 @@ jobs:
       with:
         name: ${{ matrix.artifact }}
         path: ${{ matrix.artifact }}
-    - uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-jq
       id: metadata
       with:
         input: ${{ matrix.artifact }}/gcs-metadata.json
@@ -153,7 +158,7 @@ jobs:
         fi
     - name: Set up GCP credentials for dry run
       if: inputs.dry-run && inputs.trusted && env.HAS_GCP_KEY == 'true'
-      uses: envoyproxy/toolshed/actions/gcp/setup@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-gcp-setup
       with:
         key: ${{ secrets.gcp-key }}
     - name: Dry-run versioned artifact sync
@@ -188,12 +193,12 @@ jobs:
         else
             echo "::notice::Dry run: would write ${ARTIFACT} to gs://${BUCKET}/${SHA}/${ARTIFACT} (redirect: ${REDIRECT})"
         fi
-    - uses: envoyproxy/toolshed/actions/gcp/setup@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-gcp-setup
       if: ${{ !inputs.dry-run }}
       with:
         key: ${{ secrets.gcp-key }}
     - if: ${{ !inputs.dry-run && inputs.layout == 'sha' }}
-      uses: envoyproxy/toolshed/actions/gcs/artefact/sync@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-gcs-artefact-sync
       with:
         bucket: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
         path: ${{ matrix.artifact }}

@@ -17,6 +17,9 @@ on:
         type: boolean
 
 
+env:
+  _TS_0: &ts-gcp-setup envoyproxy/toolshed/actions/gcp/setup@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+
 jobs:
   cve-data:
     name: Fetch CVE data
@@ -35,7 +38,7 @@ jobs:
         else
             echo "weekly_run=false" >> $GITHUB_OUTPUT
         fi
-    - uses: envoyproxy/toolshed/actions/gcp/setup@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-gcp-setup
       name: Setup GCP
       with:
         key: ${{ secrets.gcs-cve-key }}

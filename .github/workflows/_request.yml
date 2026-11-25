@@ -30,6 +30,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  _TS_0: &ts-checkout envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+  _TS_1: &ts-env-summary envoyproxy/toolshed/actions/github/env/summary@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+  _TS_2: &ts-envoy-ci-request envoyproxy/toolshed/actions/envoy/ci/request@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+  _TS_3: &ts-jq envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
   CI_DEBUG: ${{ (vars.CI_DEBUG || vars.RUNNER_DEBUG) && true || false }}
 
 
@@ -45,14 +49,14 @@ jobs:
       env: ${{ steps.data.outputs.value }}
       config: ${{ steps.config.outputs.config }}
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-jq
       id: started
       name: Create timestamp
       with:
         options: -r
         filter: |
           now
-    - uses: envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-checkout
       id: checkout
       name: Checkout Envoy repository (requested)
       with:
@@ -70,7 +74,7 @@ jobs:
     # *ALL* variables collected should be treated as untrusted and should be sanitized before
     # use
     - name: Generate environment variables from commit
-      uses: envoyproxy/toolshed/actions/envoy/ci/request@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-envoy-ci-request
       id: env
       with:
         branch-name: ${{ steps.checkout.outputs.branch-name }}
@@ -83,7 +87,7 @@ jobs:
 
     - name: Request summary
       id: summary
-      uses: envoyproxy/toolshed/actions/github/env/summary@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-env-summary
       with:
         actor: ${{ toJSON(fromJSON(steps.env.outputs.data).request.actor) }}
         base-sha: ${{ fromJSON(steps.env.outputs.data).request.base-sha }}
@@ -99,7 +103,7 @@ jobs:
         target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
 
     - name: Environment data
-      uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: *ts-jq
       id: data
       with:
         input: |

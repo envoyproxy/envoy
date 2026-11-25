@@ -67,6 +67,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  _TS_0: &ts-appauth envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+  _TS_1: &ts-artifact-dl envoyproxy/toolshed/actions/github/artifact/download@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+  _TS_2: &ts-checks envoyproxy/toolshed/actions/github/checks@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+  _TS_3: &ts-env-load envoyproxy/toolshed/actions/github/env/load@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+  _TS_4: &ts-jq envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
   CI_DEBUG: ${{ vars.CI_DEBUG && true || false }}
 
 
@@ -89,7 +94,7 @@ jobs:
     # nothing records what triggered it. The triggering run saves the id of its request run
     # (`save-request`). Anything in that run could have written it: the request is only trusted
     # once it has been checked below.
-    - uses: envoyproxy/toolshed/actions/github/artifact/download@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-artifact-dl
       name: Download request id
       if: ${{ inputs.runs-after == true }}
       with:
@@ -113,7 +118,7 @@ jobs:
     # Handle any failure in triggering job
     # Remove any `checks` we dont care about
     # Prepare a check request
-    - uses: envoyproxy/toolshed/actions/github/env/load@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-env-load
       name: Load env
       id: data
       with:
@@ -139,7 +144,7 @@ jobs:
         if-no-files-found: error
 
     #  Update the check
-    - uses: envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-appauth
       name: Appauth
       id: appauth
       with:
@@ -169,7 +174,7 @@ jobs:
         RUN_ID: ${{ inputs.run-id }}
         SHA: ${{ fromJSON(steps.data.outputs.data).data.request.sha }}
 
-    - uses: envoyproxy/toolshed/actions/github/checks@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-checks
       name: Update check
       if: ${{ fromJSON(steps.data.outputs.data).data.check.action == 'RUN' }}
       with:
@@ -177,7 +182,7 @@ jobs:
         checks: ${{ toJSON(fromJSON(steps.data.outputs.data).checks) }}
         token: ${{ steps.appauth.outputs.token }}
 
-    - uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-jq
       name: Print request summary
       with:
         input: |
@@ -196,7 +201,7 @@ jobs:
           | $summary.summary as $summary
           | "${{ inputs.template-request-summary }}"
 
-    - uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: *ts-jq
       id: request-output
       name: Load request
       with:
