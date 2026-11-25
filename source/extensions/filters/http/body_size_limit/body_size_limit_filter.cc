@@ -3,7 +3,10 @@
 #include "envoy/extensions/filters/http/body_size_limit/v3/body_size_limit.pb.h"
 #include "envoy/http/codes.h"
 
+#include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,7 +51,7 @@ Http::FilterHeadersStatus BodySizeLimitFilter::decodeHeaders(Http::RequestHeader
 }
 
 Http::FilterDataStatus BodySizeLimitFilter::decodeData(Buffer::Instance& data, bool) {
-  if (config_->maxRequestBytes() == 0) {
+  if (tunnel_established_ || config_->maxRequestBytes() == 0) {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -62,6 +65,35 @@ Http::FilterDataStatus BodySizeLimitFilter::decodeData(Buffer::Instance& data, b
   return Http::FilterDataStatus::Continue;
 }
 
+Http::FilterHeadersStatus BodySizeLimitFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
+                                                             bool) {
+  if (tunnel_established_ || config_->maxRequestBytes() == 0) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  // Read the request headers the router forwarded rather than the ones this filter saw, so a
+  // later filter that strips the upgrade headers also keeps the body limited.
+  const auto request_headers = decoder_callbacks_->requestHeaders();
+  // A malformed HTTP/1 request gets its error reply through this filter before any request headers
+  // exist.
+  if (!request_headers.has_value()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  // Stop counting only once the upstream accepts: a CONNECT answered with a 200, or an upgrade
+  // answered with a 101 that carries upgrade headers. The connection manager also treats a failed
+  // handshake that keeps the upgrade headers as a tunnel, but nothing was tunneled, since the
+  // router doesn't send the body upstream until the upstream accepts. So the body stays limited.
+  // The codecs turn an HTTP/2 or HTTP/3 upstream's 200 into a 101.
+  const bool connect_accepted =
+      Http::HeaderUtility::isConnectResponse(request_headers.ptr(), headers);
+  const bool upgrade_accepted =
+      Http::Utility::isUpgrade(*request_headers) &&
+      Http::Utility::getResponseStatus(headers) == enumToInt(Http::Code::SwitchingProtocols) &&
+      Http::Utility::isUpgrade(headers);
+  tunnel_established_ = connect_accepted || upgrade_accepted;
+  return Http::FilterHeadersStatus::Continue;
+}
+
 void BodySizeLimitFilter::sizeExceeded(uint64_t length, const char* log_message,
                                        const char* reply_text) {
   // A rejection is client-controlled, so it is logged per stream at debug rather than at error:
@@ -70,6 +102,11 @@ void BodySizeLimitFilter::sizeExceeded(uint64_t length, const char* log_message,
   ENVOY_STREAM_LOG(debug, "{} ({} > {})", *decoder_callbacks_, log_message, length,
                    config_->maxRequestBytes());
 
+  Protobuf::Struct metadata;
+  (*metadata.mutable_fields())["details"].set_string_value(
+      "length=" + std::to_string(length) + ", limit=" + std::to_string(config_->maxRequestBytes()));
+  decoder_callbacks_->streamInfo().setDynamicMetadata(
+      std::string(decoder_callbacks_->filterConfigName()), metadata);
   decoder_callbacks_->sendLocalReply(Http::Code::PayloadTooLarge, reply_text, nullptr, std::nullopt,
                                      StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
 }

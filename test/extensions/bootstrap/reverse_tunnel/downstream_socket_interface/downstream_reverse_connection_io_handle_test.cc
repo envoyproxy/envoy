@@ -192,6 +192,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, Setup) {
   {
     auto handle = createHandle(io_handle_.get(), "test_key_1");
     EXPECT_NE(handle, nullptr);
+    EXPECT_FALSE(handle->listenerStopped());
     // Test fdDoNotUse() before any other operations.
     EXPECT_EQ(handle->fdDoNotUse(), 42);
   } // Destructor called here
@@ -200,6 +201,7 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, Setup) {
   {
     auto handle = createHandle(nullptr, "test_key_2");
     EXPECT_NE(handle, nullptr);
+    EXPECT_FALSE(handle->listenerStopped());
     // Test fdDoNotUse() before any other operations.
     EXPECT_EQ(handle->fdDoNotUse(), 42);
   } // Destructor called here
@@ -209,9 +211,11 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, Setup) {
 // so surviving drain/close notifications are no-ops instead of using a dangling parent pointer.
 TEST_F(DownstreamReverseConnectionIOHandleTest, ParentTeardownDetachesChild) {
   auto child = createHandle(io_handle_.get(), "detach_key");
+  EXPECT_FALSE(child->listenerStopped());
 
   // Destroying the parent runs cleanup(), which detaches its registered children.
   io_handle_.reset();
+  EXPECT_TRUE(child->listenerStopped());
 
   // Drain and close must not crash after detach (parent back-pointer is null).
   child->markTunnelDrainingAndDialReplacement();

@@ -4,6 +4,8 @@
 #include "envoy/network/connection.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/common/rbac/utility.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "contrib/postgres_proxy/filters/network/source/postgres_decoder.h"
@@ -36,11 +38,21 @@ Network::FilterStatus PostgresFilter::onData(Buffer::Instance& data, bool) {
 
   // Frontend Buffer
   frontend_buffer_.add(data);
-  Network::FilterStatus result = doDecode(frontend_buffer_, true);
-  if (result == Network::FilterStatus::StopIteration) {
-    data.drain(data.length());
+  const Decoder::Result result = doDecode(frontend_buffer_, true);
+  if (result == Decoder::Result::NeedMoreStartupData) {
+    pending_startup_.move(data);
+    return Network::FilterStatus::StopIteration;
   }
-  return result;
+  if (result == Decoder::Result::Stopped) {
+    pending_startup_.drain(pending_startup_.length());
+    data.drain(data.length());
+    return Network::FilterStatus::StopIteration;
+  }
+  if (pending_startup_.length() != 0) {
+    pending_startup_.move(data);
+    data.move(pending_startup_);
+  }
+  return Network::FilterStatus::Continue;
 }
 
 Network::FilterStatus PostgresFilter::onNewConnection() { return Network::FilterStatus::Continue; }
@@ -58,12 +70,17 @@ Network::FilterStatus PostgresFilter::onWrite(Buffer::Instance& data, bool) {
 
   // Backend Buffer
   backend_buffer_.add(data);
-  Network::FilterStatus result = doDecode(backend_buffer_, false);
-  if (result == Network::FilterStatus::StopIteration) {
+  const Decoder::Result result = doDecode(backend_buffer_, false);
+  if (result == Decoder::Result::Stopped) {
     ASSERT(backend_buffer_.length() == 0);
     data.drain(data.length());
+    return Network::FilterStatus::StopIteration;
   }
-  return result;
+  if (result == Decoder::Result::NeedMoreStartupData) {
+    data.drain(data.length());
+    return Network::FilterStatus::StopIteration;
+  }
+  return Network::FilterStatus::Continue;
 }
 
 DecoderPtr PostgresFilter::createDecoder(DecoderCallbacks* callbacks) {
@@ -204,10 +221,25 @@ void PostgresFilter::processQuery(const std::string& sql) {
   }
 }
 
+void PostgresFilter::recordProtocolRejection(absl::string_view details) {
+  config_->stats_.protocol_rejected_.inc();
+  read_callbacks_->connection().streamInfo().setConnectionTerminationDetails(details);
+}
+
+void PostgresFilter::rejectEncryptionNegotiation(absl::string_view reason) {
+  recordProtocolRejection("postgres_proxy_invalid_encryption_negotiation");
+  ENVOY_CONN_LOG(debug, "postgres_proxy: closing connection during encryption negotiation: {}",
+                 read_callbacks_->connection(), reason);
+  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
+void PostgresFilter::declineGSSEncryption() {
+  Buffer::OwnedImpl response("N");
+  write_callbacks_->injectWriteDataToFilterChain(response, false);
+}
+
 bool PostgresFilter::onSSLRequest() {
-  if (config_->downstream_ssl_ ==
-          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE &&
-      !config_->terminate_ssl_) {
+  if (shouldPassthroughSSL()) {
     // Signal to the decoder to continue.
     return true;
   }
@@ -289,14 +321,71 @@ bool PostgresFilter::encryptUpstream(bool upstream_agreed, Buffer::Instance& dat
   return encrypted;
 }
 
-void PostgresFilter::verifyDownstreamSSL() {
+bool PostgresFilter::authorizeStartup(StartupPacketType packet_type) {
+  // Keep the decoder's packet type separate from client-supplied startup parameters.
+  Protobuf::Struct packet_metadata;
+  auto& type = (*packet_metadata.mutable_fields())["packet_type"];
+  switch (packet_type) {
+  case StartupPacketType::StartupMessage:
+    type.set_string_value("startup_message");
+    break;
+  case StartupPacketType::CancelRequest:
+    type.set_string_value("cancel_request");
+    break;
+  case StartupPacketType::SSLRequest:
+    type.set_string_value("ssl_request");
+    break;
+  case StartupPacketType::GSSENCRequest:
+    type.set_string_value("gss_enc_request");
+    break;
+  }
+  // set basic attributes to metadata
+  const Protobuf::Struct metadata = MessageUtil::keyValueStruct(decoder_->getAttributes());
+  auto& info = read_callbacks_->connection().streamInfo();
+  info.setDynamicMetadata("envoy.filters.network.postgres_proxy.rbac", packet_metadata);
+  info.setDynamicMetadata(NetworkFilterNames::get().PostgresProxy, metadata);
+  std::string log_policy_id;
+  const bool allowed =
+      config_->engine_->handleAction(read_callbacks_->connection(), info, &log_policy_id);
+
+  if (!allowed) {
+    rejectStartup(log_policy_id);
+    return false;
+  }
+  config_->stats_.authorization_allowed_.inc();
+  return true;
+}
+
+void PostgresFilter::rejectStartup(absl::string_view log_policy_id) {
+  config_->stats_.authorization_denied_.inc();
+
+  // send error response to downstream client
+  auto response = encoder_->buildErrorResponse(
+      "FATAL", "connection denied by Envoy proxy: rbac denied", "28000");
+  write_callbacks_->injectWriteDataToFilterChain(response, false);
+  // close downstream client connection
+  read_callbacks_->connection().streamInfo().setConnectionTerminationDetails(
+      Filters::Common::RBAC::responseDetail(log_policy_id.empty() ? "none" : log_policy_id));
+  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+}
+
+void PostgresFilter::rejectInvalidStartup() {
+  recordProtocolRejection("postgres_proxy_invalid_startup");
+  auto response = encoder_->buildErrorResponse("FATAL", "invalid startup packet", "08P01");
+  write_callbacks_->injectWriteDataToFilterChain(response, false);
+  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+}
+
+bool PostgresFilter::verifyDownstreamSSL() {
   if (config_->downstream_ssl_ ==
           envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE &&
       (!switched_to_tls_)) {
     ENVOY_LOG(debug, "postgres_proxy: closing connection because downstream ssl is required but "
                      "downstream client did not start SSL handshake.");
     closeConn();
+    return false;
   }
+  return true;
 }
 
 void PostgresFilter::closeConn() {
@@ -310,20 +399,16 @@ void PostgresFilter::closeConn() {
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
-Network::FilterStatus PostgresFilter::doDecode(Buffer::Instance& data, bool frontend) {
+Decoder::Result PostgresFilter::doDecode(Buffer::Instance& data, bool frontend) {
   // Keep processing data until buffer is empty or decoder says
   // that it cannot process data in the buffer.
   while (0 < data.length()) {
-    switch (decoder_->onData(data, frontend)) {
-    case Decoder::Result::NeedMoreData:
-      return Network::FilterStatus::Continue;
-    case Decoder::Result::ReadyForNext:
-      continue;
-    case Decoder::Result::Stopped:
-      return Network::FilterStatus::StopIteration;
+    const Decoder::Result result = decoder_->onData(data, frontend);
+    if (result != Decoder::Result::ReadyForNext) {
+      return result;
     }
   }
-  return Network::FilterStatus::Continue;
+  return Decoder::Result::ReadyForNext;
 }
 
 } // namespace PostgresProxy

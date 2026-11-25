@@ -42,7 +42,7 @@ public:
   void onUpstreamConnectionEstablished() override;
 
   // Http::StreamFilterBase
-  void onDestroy() override { callbacks_->removeDownstreamWatermarkCallbacks(*this); }
+  void onDestroy() override;
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -103,6 +103,8 @@ public:
   std::optional<bool> latched_end_stream_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   bool calling_encode_ = false;
+  // True once the codec delivered end of stream or reset; the stream must not be touched after.
+  bool codec_stream_complete_ = false;
 
 private:
   struct ScopedEncodingTracker {

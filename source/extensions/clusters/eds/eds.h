@@ -41,6 +41,16 @@ public:
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return initialize_phase_; }
 
+  /**
+   * @return true only if updateDynamicHostList() would keep the given host and take nothing from
+   * a newly built one, so the host can be registered instead. A false result costs a build.
+   */
+  static bool
+  endpointMatchesHost(const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
+                      const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
+                      const Network::Address::Instance& address, const Host& host,
+                      Config::ConstMetadataSharedPoolSharedPtr metadata_pool);
+
 protected:
   EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                  ClusterFactoryContext& cluster_context, absl::Status& creation_status);
@@ -98,7 +108,7 @@ private:
         const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
         const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
         PriorityStateManager& priority_state_manager,
-        absl::flat_hash_set<std::string>& all_new_hosts);
+        absl::flat_hash_set<std::string>& all_new_hosts, const HostLookupMap* existing_hosts);
 
     EdsClusterImpl& parent_;
     const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment_;

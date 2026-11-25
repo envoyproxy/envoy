@@ -818,7 +818,7 @@ TEST_F(DescriptorFilterTest, RouteDescriptorBothMatch) {
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
 
-TEST_F(DescriptorFilterTest, RouteDescriptorWithStageConfig) {
+TEST_F(DescriptorFilterTest, DEPRECATED_FEATURE_TEST(RouteDescriptorWithStageConfig)) {
   setUpTest(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "1"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
@@ -993,7 +993,8 @@ TEST_F(DescriptorFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) {
 
 // Tests that the virtual host rate limit is used when VhRateLimitsOptions::INCLUDE is set and route
 // rate limit is empty
-TEST_F(DescriptorFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) {
+TEST_F(DescriptorFilterTest,
+       DEPRECATED_FEATURE_TEST(IncludeVHRateLimitOptionWithOnlyVHRateLimitSet)) {
   setUpTest(fmt::format(descriptor_vh_config_yaml, "1", "\"OFF\"", "1", "0", "INCLUDE"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
@@ -1013,7 +1014,8 @@ TEST_F(DescriptorFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) {
 
 // Tests that the virtual host rate limit is used when VhRateLimitsOptions::INCLUDE and route rate
 // limit is set
-TEST_F(DescriptorFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitSet) {
+TEST_F(DescriptorFilterTest,
+       DEPRECATED_FEATURE_TEST(IncludeVHRateLimitOptionWithRouteAndVHRateLimitSet)) {
   setUpTest(fmt::format(descriptor_vh_config_yaml, "1", "\"OFF\"", "1", "0", "INCLUDE"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
@@ -1036,7 +1038,8 @@ TEST_F(DescriptorFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitSet)
 
 // Tests that the route rate limit is used when VhRateLimitsOptions::IGNORE and route rate limit is
 // set
-TEST_F(DescriptorFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
+TEST_F(DescriptorFilterTest,
+       DEPRECATED_FEATURE_TEST(IgnoreVHRateLimitOptionWithRouteRateLimitSet)) {
   setUpTest(fmt::format(descriptor_vh_config_yaml, "1", "\"OFF\"", "1", "0", "IGNORE"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
@@ -1058,7 +1061,8 @@ TEST_F(DescriptorFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
 
 // Tests that no rate limit is used when VhRateLimitsOptions::IGNORE is set and route rate limit
 // empty
-TEST_F(DescriptorFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
+TEST_F(DescriptorFilterTest,
+       DEPRECATED_FEATURE_TEST(IgnoreVHRateLimitOptionWithOutRouteRateLimit)) {
   setUpTest(fmt::format(descriptor_vh_config_yaml, "1", "\"OFF\"", "1", "0", "IGNORE"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
@@ -1076,7 +1080,7 @@ TEST_F(DescriptorFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
 }
 
 // Tests that the virtual host rate limit is used when includeVirtualHostRateLimits is used
-TEST_F(DescriptorFilterTest, IncludeVirtualHostRateLimitsSetTrue) {
+TEST_F(DescriptorFilterTest, DEPRECATED_FEATURE_TEST(IncludeVirtualHostRateLimitsSetTrue)) {
   setUpTest(fmt::format(descriptor_vh_config_yaml, "1", "\"OFF\"", "1", "0", "IGNORE"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
@@ -1581,7 +1585,7 @@ TEST_P(StreamDoneFilterTest, MissingStreamRequestHeadersDoesNotAccount) {
   expectRemaining(5);
 }
 
-TEST_F(DescriptorFilterTest, RouteAndVirtualHostIgnoreApplyOnStreamDone) {
+TEST_F(DescriptorFilterTest, DEPRECATED_FEATURE_TEST(RouteAndVirtualHostIgnoreApplyOnStreamDone)) {
   setUpTest(fmt::format(descriptor_vh_config_yaml, "5", "\"OFF\"", "5", "0", "INCLUDE"));
   ON_CALL(route_rate_limit_, applyOnStreamDone()).WillByDefault(Return(true));
   ON_CALL(vh_rate_limit_, applyOnStreamDone()).WillByDefault(Return(true));

@@ -274,6 +274,9 @@ envoy_cc_test(
     },
     deps = [
         ":cluster_manager_impl_test_common",
+        "//source/common/common:base64_lib",
+        "//source/common/common:hash_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/load_balancing_policies/ring_hash:config",
@@ -848,6 +851,7 @@ envoy_cc_test(
         "//envoy/api:api_interface",
         "//envoy/http:client_codec_factory_interface",
         "//envoy/http:codec_interface",
+        "//envoy/router:router_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:hash_lib",
         "//source/common/config:metadata_lib",

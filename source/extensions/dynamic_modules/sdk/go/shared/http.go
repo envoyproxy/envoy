@@ -28,6 +28,9 @@ type BodyBuffer interface {
 
 // HeaderMap is an interface that provides access to the request and response headers.
 // This should be implemented by the SDK or runtime.
+//
+// Envoy does not check the names and values given to Set and Add. Check any that come from
+// request data or other untrusted input with IsValidHeaderName and IsValidHeaderValue first.
 type HeaderMap interface {
 	// Get retrieves the header values for a given key. If the key does not exist,
 	// nil will be returned.
@@ -179,6 +182,10 @@ type ChildSpan interface {
 
 // HttpFilterHandle is the interface that provides access to the plugin's context and configuration.
 // This should be implemented by the SDK or runtime.
+//
+// Envoy does not check the header names and values given to local replies, callouts and streams.
+// Check any that come from request data or other untrusted input with IsValidHeaderName and
+// IsValidHeaderValue first.
 type HttpFilterHandle interface {
 	// GetMetadataString retrieves the dynamic metadata string value of the stream.
 	// Returns metadata value if found, otherwise an empty UnsafeEnvoyBuffer.
@@ -624,6 +631,10 @@ type HttpFilterHandle interface {
 // HttpFilterConfigHandle is the per-filter-config handle exposed to HttpFilterConfig
 // implementations. It supports config-scoped logging, metric definition, generic secret
 // subscription, and async I/O via HttpCallout / StartHttpStream from the main thread.
+//
+// Envoy does not check the header names and values given to callouts and streams. Check any that
+// come from request data or other untrusted input with IsValidHeaderName and IsValidHeaderValue
+// first.
 type HttpFilterConfigHandle interface {
 	CommonHandle
 

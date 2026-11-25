@@ -71,6 +71,20 @@ void UpstreamCodecFilter::onAboveWriteBufferHighWatermark() {
   upstream->readDisable(true);
 }
 
+void UpstreamCodecFilter::onDestroy() {
+  callbacks_->removeDownstreamWatermarkCallbacks(*this);
+  // An upstream filter ended the response before the codec saw end of stream. Reset the codec
+  // stream so it drops its callbacks into the soon-to-be-freed GenericUpstream.
+  if (!codec_stream_complete_ && callbacks_->upstreamCallbacks().has_value()) {
+    if (auto upstream = callbacks_->upstreamCallbacks()->upstream(); upstream.has_value()) {
+      ENVOY_STREAM_LOG(debug, "resetting unfinished upstream codec stream on filter destroy",
+                       *callbacks_);
+      codec_stream_complete_ = true;
+      upstream->resetStream();
+    }
+  }
+}
+
 void UpstreamCodecFilter::onUpstreamConnectionEstablished() {
   if (latched_end_stream_.has_value()) {
     const bool end_stream = *latched_end_stream_;
@@ -231,6 +245,7 @@ void UpstreamCodecFilter::CodecBridge::decode1xxHeaders(Http::ResponseHeaderMapP
 // This is the response headers arriving from the codec. Send them through the filter manager.
 void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&& headers,
                                                      bool end_stream) {
+  filter_.codec_stream_complete_ |= end_stream;
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
   // byte.
   filter_.upstreamTiming().onFirstUpstreamRxByteReceived(
@@ -320,6 +335,7 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
 
 // This is response data arriving from the codec. Send it through the filter manager.
 void UpstreamCodecFilter::CodecBridge::decodeData(Buffer::Instance& data, bool end_stream) {
+  filter_.codec_stream_complete_ |= end_stream;
   // Record the time when the first byte of response body is received.
   if (!first_body_rx_recorded_) {
     first_body_rx_recorded_ = true;
@@ -333,6 +349,7 @@ void UpstreamCodecFilter::CodecBridge::decodeData(Buffer::Instance& data, bool e
 
 // This is response trailers arriving from the codec. Send them through the filter manager.
 void UpstreamCodecFilter::CodecBridge::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
+  filter_.codec_stream_complete_ = true;
   maybeEndDecode(true);
   filter_.callbacks_->encodeTrailers(std::move(trailers));
 }
@@ -355,6 +372,7 @@ void UpstreamCodecFilter::CodecBridge::maybeEndDecode(bool end_stream) {
 
 void UpstreamCodecFilter::CodecBridge::onResetStream(Http::StreamResetReason reason,
                                                      absl::string_view transport_failure_reason) {
+  filter_.codec_stream_complete_ = true;
   if (filter_.calling_encode_) {
     filter_.deferred_reset_ = {reason, std::string(transport_failure_reason)};
     return;

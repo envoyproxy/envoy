@@ -21,7 +21,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Model Router AI filter]
 // ModelRouter AI filter :ref:`configuration overview
-// <config_http_filters_ai_protocol_manager_ai_filters>`.
+// <config_http_ai_filters_model_router>`.
 // [#extension: envoy.http.ai_filters.model_router]
 
 // Represents an upstream LLM service provider or API endpoint host.

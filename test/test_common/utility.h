@@ -946,7 +946,7 @@ public:
   }
 
   void set(absl::string_view key, absl::string_view val) override {
-    context_map_.insert({std::string(key), std::string(val)});
+    context_map_.insert_or_assign(std::string(key), std::string(val));
   }
   void remove(absl::string_view key) override { context_map_.erase(std::string(key)); }
 

@@ -166,6 +166,21 @@ double envoy_dynamic_module_callback_get_runtime_number(envoy_dynamic_module_typ
   return snapshot->getDouble(absl::string_view(key.ptr, key.length), default_value);
 }
 
+bool envoy_dynamic_module_callback_get_runtime_string(
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result) {
+  const auto snapshot = currentRuntimeSnapshot();
+  if (!snapshot.has_value()) {
+    return false;
+  }
+  const auto value = snapshot->get(absl::string_view(key.ptr, key.length));
+  if (!value.has_value()) {
+    return false;
+  }
+  result->ptr = value->data();
+  result->length = value->size();
+  return true;
+}
+
 // ---------------------- Function registry callbacks --------------------------------
 
 bool envoy_dynamic_module_callback_register_function(envoy_dynamic_module_type_module_buffer key,
@@ -522,8 +537,30 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_file_watcher_a
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle, false,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds, false,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(envoy_dynamic_module_type_bootstrap_config_snapshot_result,
+          envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new,
+          envoy_dynamic_module_type_bootstrap_config_snapshot_result_Unavailable,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+          const envoy_dynamic_module_type_module_buffer*, size_t,
+          envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize, false,
+          envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr,
+          envoy_dynamic_module_type_bootstrap_extension_config_snapshot_json_fn, void*)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete,
+               envoy_dynamic_module_type_bootstrap_extension_config_snapshot_module_ptr)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle, false,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications, false,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr, bool)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update, false,
           envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
@@ -561,6 +598,22 @@ WEAK_STUB(envoy_dynamic_module_type_bootstrap_listener_writer_update_result,
 WEAK_STUB(envoy_dynamic_module_type_bootstrap_listener_writer_removal_result,
           envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove,
           envoy_dynamic_module_type_bootstrap_listener_writer_removal_result_NotAllowed,
+          envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer,
+          false, envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr)
+
+WEAK_STUB(
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result,
+    envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update,
+    envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result_NotAllowed,
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, uint64_t*)
+
+WEAK_STUB(envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result,
+          envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove,
+          envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result_NotAllowed,
           envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 

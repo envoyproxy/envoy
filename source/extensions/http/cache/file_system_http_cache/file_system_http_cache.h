@@ -216,8 +216,7 @@ private:
   // with uncacheable responses, another set could be added to keep track of uncacheable
   // responses, to skip the filesystem hit. (Using ReaderLock should make such a table
   // inherently low contention.)
-  absl::flat_hash_set<Key, MessageUtil, MessageUtil>
-      entries_being_written_ ABSL_GUARDED_BY(cache_mu_);
+  absl::flat_hash_set<SerializedKey> entries_being_written_ ABSL_GUARDED_BY(cache_mu_);
 
   std::shared_ptr<Common::AsyncFiles::AsyncFileManager> async_file_manager_;
 

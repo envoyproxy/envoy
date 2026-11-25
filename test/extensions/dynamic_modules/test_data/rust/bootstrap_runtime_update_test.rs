@@ -33,6 +33,7 @@ impl BootstrapExtension for MyBootstrapExtension {
     for key in [
       "dynamic_modules_test.number",
       "dynamic_modules_test.ratio",
+      "dynamic_modules_test.mapping",
       "envoy.reloadable_features.test_feature_true",
     ] {
       let enabled = envoy_extension.enable_runtime_update(key);
@@ -55,6 +56,7 @@ impl BootstrapExtension for MyBootstrapExtension {
       RuntimeValue::Bool(value) => get_runtime_bool(key, !value) == value,
       RuntimeValue::Int(value) => get_runtime_int(key, value + 1) == value,
       RuntimeValue::Number(value) => get_runtime_number(key, value + 1.0) == value,
+      RuntimeValue::String(ref value) => get_runtime_string(key).as_deref() == Some(value.as_str()),
     };
     envoy_log_info!(
       "Runtime update: {}={:?}, getter agrees: {}",

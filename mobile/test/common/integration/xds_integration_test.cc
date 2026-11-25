@@ -31,10 +31,9 @@ void XdsIntegrationTest::initialize() {
   // For server TLS.
   Extensions::TransportSockets::Tls::forceRegisterServerContextFactoryImpl();
 
-  if (sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw ||
-      sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedDelta) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-  }
+  const bool use_unified_mux = sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw ||
+                               sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedDelta;
+  builder_.addRuntimeGuard("unified_mux", use_unified_mux);
 
   // xDS upstream is created separately in the test infra, and there's only one non-xDS cluster.
   setUpstreamCount(1);

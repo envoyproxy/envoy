@@ -28,7 +28,7 @@ jobs:
          && github.actor != 'dependabot[bot]'
       }}
     steps:
-    - uses: envoyproxy/toolshed/actions/github/command@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: envoyproxy/toolshed/actions/github/command@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       name: Parse command from comment
       id: command
       with:
@@ -38,14 +38,14 @@ jobs:
 
     # /retest
     # The command parser may retain a carriage return in the command for CRLF comments.
-    - uses: envoyproxy/toolshed/actions/appauth@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: envoyproxy/toolshed/actions/appauth@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       if: ${{ startsWith(steps.command.outputs.command, 'retest') }}
       id: appauth-retest
       name: Appauth (retest)
       with:
         key: ${{ secrets.ENVOY_CI_APP_KEY }}
         app_id: ${{ secrets.ENVOY_CI_APP_ID }}
-    - uses: envoyproxy/toolshed/actions/retest@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: envoyproxy/toolshed/actions/retest@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       if: ${{ startsWith(steps.command.outputs.command, 'retest') }}
       name: Retest
       with:

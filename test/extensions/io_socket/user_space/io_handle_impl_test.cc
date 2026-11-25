@@ -1253,6 +1253,32 @@ TEST_F(IoHandleImplTest, PassthroughState) {
   ASSERT_EQ(object->value_, dest_object->value_);
 }
 
+TEST_F(IoHandleImplTest, MergeStateInto) {
+  auto source_metadata = std::make_unique<envoy::config::core::v3::Metadata>();
+  Protobuf::Struct& map = (*source_metadata->mutable_filter_metadata())["envoy.test"];
+  Protobuf::Value val;
+  val.set_string_value("val");
+  (*map.mutable_fields())["key"] = val;
+  StreamInfo::FilterState::Objects source_filter_state;
+  auto object = std::make_shared<TestObject>(1000);
+  source_filter_state.push_back(
+      {object, StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection,
+       "object_key"});
+  ASSERT_NE(nullptr, io_handle_->passthroughState());
+  io_handle_->passthroughState()->initialize(std::move(source_metadata), source_filter_state);
+
+  StreamInfo::FilterStateImpl dest_filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  envoy::config::core::v3::Metadata dest_metadata;
+  static_cast<Network::IoHandle&>(*io_handle_peer_)
+      .mergeStateInto(dest_metadata, dest_filter_state);
+  EXPECT_THAT(
+      dest_metadata.filter_metadata(),
+      Contains(Pair("envoy.test", HasStructFields(Contains(IsStructString("key", "val"))))));
+  auto dest_object = dest_filter_state.getDataReadOnly<TestObject>("object_key");
+  ASSERT_NE(nullptr, dest_object);
+  EXPECT_EQ(object->value_, dest_object->value_);
+}
+
 // A full peer close() drains pending data and returns clean EOF on read/readv/recv while latching
 // wasPeerFullyClosed() so half-close connections distinguish close() from shutdown(WR) without
 // corrupting end_stream into an I/O error.
