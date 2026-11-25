@@ -22,6 +22,19 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
+// Bridges a single ExternalBuffer::read() call into a cancellable LeafAwaitable.
+//
+// ExternalBuffer::read() is single-flight and intentionally non-cancellable (e.g., backing stores
+// like file or remote I/O are not easily cancelled, and keeping cancellation out of the
+// ExternalBuffer interface simplifies implementations). Because an in-flight read continues past
+// coroutine cancellation, onStart() moves the single-flight semaphore `permit` and a
+// `PayloadReaderSharedPtr` into the read callback and guards resumption with a weak `alive_` token:
+//   - `permit` stays held until the underlying read callback fires so a subsequent reader (e.g. on
+//     upstream retry) cannot overlap an orphaned read, and is released before `complete()` so an
+//     uncontended caller can re-acquire immediately without suspending.
+//   - `reader` keeps the ExternalBuffer and `failed_` alive until the callback completes.
+//   - `alive_` expires on onCancel() or destruction so an orphaned callback is a no-op after
+//     releasing `permit`.
 class PayloadReader::ReadExternalBuffer
     : public Coroutine::LeafAwaitable<absl::StatusOr<Buffer::InstancePtr>> {
 public:
@@ -35,10 +48,6 @@ protected:
     auto on_read = [this, alive = std::weak_ptr<bool>(alive_), reader = reader_,
                     permit = std::move(permit_)](ExternalBufferStatus status,
                                                  Buffer::InstancePtr data) mutable {
-      // `reader` keeps `*reader` (and therefore `failed_`) alive across cancellation.
-      // Release the single-flight permit before resuming so the next chunk can take the immediate
-      // fast path; if this coroutine's context was cancelled mid-read (`alive.expired()`), the
-      // permit stayed held until this underlying ExternalBuffer::read() callback completed.
       absl::StatusOr<Buffer::InstancePtr> result;
       if (status != ExternalBufferStatus::Ok) {
         reader->failed_ = true;
