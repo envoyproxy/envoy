@@ -177,6 +177,40 @@ TEST(AiProtocolManagerConfigTest, RejectsOutOfRangeInlineStringThreshold) {
   }
 }
 
+// The nesting bound comes from the request-handling config too.
+TEST(AiProtocolManagerConfigTest, MaxJsonDepthDefaultsAndOverrides) {
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    proto_config.mutable_request_handling();
+    const FilterConfig config(proto_config, *stats_store.rootScope(), AiFilterFactories{},
+                              std::make_shared<InMemoryExternalBufferFactory>());
+    EXPECT_EQ(config.maxJsonDepth(), 64);
+  }
+  {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    proto_config.mutable_request_handling()->mutable_limits()->mutable_max_json_depth()->set_value(
+        32);
+    const FilterConfig config(proto_config, *stats_store.rootScope(), AiFilterFactories{},
+                              std::make_shared<InMemoryExternalBufferFactory>());
+    EXPECT_EQ(config.maxJsonDepth(), 32);
+  }
+}
+
+// Zero would reject every payload, and the ceiling keeps the code that walks
+// the parsed document recursively within a bounded stack.
+TEST(AiProtocolManagerConfigTest, RejectsOutOfRangeMaxJsonDepth) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  AiProtocolManagerFilterConfigFactory factory;
+  for (const uint32_t value : {0u, 129u}) {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    proto_config.mutable_request_handling()->mutable_limits()->mutable_max_json_depth()->set_value(
+        value);
+    EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
+                 EnvoyException);
+  }
+}
+
 // Creating the filter from an upstream factory context yields the same stream
 // filter as the downstream path (see #46385: the upstream role installs the
 // full filter, request offload included, with the caveats documented for that

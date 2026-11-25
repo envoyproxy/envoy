@@ -60,6 +60,8 @@ public:
     // Parsing fails once the document exceeds this many DOM nodes (scalars,
     // containers, and external references alike).
     std::uint32_t max_nodes{kDefaultMaxNodes};
+    // Parsing fails with ResourceExhausted once containers nest deeper than this.
+    std::uint32_t max_depth{Json::Wuffs::WuffsJsonCursor::kMaxTrackedDepth - 1};
   };
 
   explicit JsonWithExtBufParser(Config config);

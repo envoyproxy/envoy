@@ -5,6 +5,7 @@
 #include <string>
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
@@ -168,7 +169,10 @@ public:
     virtual void onContainerClose(int depth, size_t token_end) = 0;
   };
 
-  explicit WuffsJsonCursor(Handler& handler);
+  // `max_depth` is the deepest nesting accepted, the root container counting as 1;
+  // Wuffs itself stops at 1024, which caps it. Deeper nesting is rejected with
+  // ResourceExhaustedError, the only error the cursor itself raises with that code.
+  explicit WuffsJsonCursor(Handler& handler, int max_depth = kMaxTrackedDepth - 1);
 
   WuffsJsonCursor(const WuffsJsonCursor&) = delete;
   WuffsJsonCursor& operator=(const WuffsJsonCursor&) = delete;
@@ -210,8 +214,8 @@ public:
   // Aligns with token_start / token_end values in callbacks.
   size_t nextSourcePosition() const { return body_src_pos_; }
 
-  // Exclusive upper bound for per-depth state tracking: depths 1 through
-  // kMaxTrackedDepth-1 (currently 1–16) have full key/dup/path tracking.
+  // One past the default nesting bound: a cursor built without `max_depth`
+  // accepts depths 1 through kMaxTrackedDepth-1 (currently 1–16).
   // Value covers the deepest known provider schema paths:
   //   tools[i].function.parameters.properties.<arg>.type      (depth 7)
   //   messages[i].content[j].content[k].text                  (depth 7)
@@ -219,17 +223,10 @@ public:
   //     Gemini streamed root arrays; `args` is an arbitrary object)
   // plus headroom for nested tool arguments.
   //
-  // Nesting beyond kMaxTrackedDepth-1 is rejected with InvalidArgumentError.
-  // Key/dup/path tracking accuracy is bounded by kMaxTrackedDepth-1 because
-  // the per-depth arrays below are stack-allocated at compile time.
+  // Per-depth state up to this bound is stored inline; a cursor with a larger
+  // `max_depth` allocates it once, at construction.
   //
   // Public so callers can pass kMaxTrackedDepth - 1 to parseExtractFieldSpec.
-  //
-  // TODO(tyxia): replace the fixed arrays with std::vector<T> to support
-  // dynamic depth so that max_depth_ can exceed kMaxTrackedDepth-1 without
-  // losing tracking accuracy. This removes the hard compile-time cap at the
-  // cost of per-push heap allocation; evaluate against the request-path perf
-  // budget before doing so.
   static constexpr int kMaxTrackedDepth = 17;
 
 private:
@@ -256,15 +253,21 @@ private:
   // legitimate number is at most ~25 chars (64-bit int ≤ 20 digits; float with
   // sign/decimal/exponent ≤ ~25). 64 bytes gives generous headroom.
   static constexpr size_t kMaxNumberBytes = 64;
+  const int max_depth_;
   int depth_{0};
-  bool is_dict_[kMaxTrackedDepth]{};
-  bool expecting_key_[kMaxTrackedDepth]{};
 
-  // key_stack_[d] — key of the item at depth d; forwarded as the `key` argument
-  // to callbacks, and the sole label source for matchesPatternPath.
-  std::string key_stack_[kMaxTrackedDepth]{};
-  // duplicate-key detection.
-  absl::flat_hash_set<std::string> seen_keys_[kMaxTrackedDepth]{};
+  struct Level {
+    bool is_dict{false};
+    bool expecting_key{false};
+    // Key of the item at this depth; forwarded as the `key` argument to
+    // callbacks, and the sole label source for matchesPatternPath.
+    std::string key;
+    // duplicate-key detection.
+    absl::flat_hash_set<std::string> seen_keys;
+  };
+  // levels_[d] is the state of depth d. It holds every depth reached so far, so
+  // depth_ always indexes it, and never grows past its reserved max_depth_ + 1.
+  absl::InlinedVector<Level, kMaxTrackedDepth> levels_;
 
   bool in_string_chain_{false};
   // bytes rewound by Wuffs on short_read; prepended to next chunk.

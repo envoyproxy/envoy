@@ -54,6 +54,7 @@ public:
   bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
   bool alwaysSerializeRequest() const { return always_serialize_request_; }
   uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }
+  uint32_t maxJsonDepth() const { return max_json_depth_; }
   bool tokenUsageEnabled() const { return token_usage_enabled_; }
   bool includeUnconfiguredRoutes() const { return include_unconfigured_routes_; }
   LLMProtocol defaultLLMProtocol() const { return default_llm_protocol_; }
@@ -73,6 +74,7 @@ private:
   const bool parse_unconfigured_routes_ = false;
   const bool always_serialize_request_ = true;
   const uint32_t inline_string_threshold_bytes_ = 0;
+  const uint32_t max_json_depth_ = 0;
   const bool token_usage_enabled_ = false;
   const bool include_unconfigured_routes_ = false;
   const LLMProtocol default_llm_protocol_ = LLMProtocol::Unspecified;
@@ -214,7 +216,7 @@ private:
   bool feedParser(const Buffer::Instance& data, bool end_stream);
 
   // Terminates the stream with a 400 for a payload that failed to parse.
-  void rejectInvalidPayload(const absl::Status& status);
+  void rejectInvalidPayload(const absl::Status& status, absl::string_view details);
 
   // Whether the request payload was handed to the filter -- by the route's
   // declaration or by filter state naming the client's API -- which is also

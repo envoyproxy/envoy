@@ -166,9 +166,9 @@ public:
   LogLevelSetter log_level_setter_{spdlog::level::trace};
 
   // A test wanting a different filter-level config calls this again first. A
-  // zero threshold leaves the field unset, so the default applies.
+  // zero limit leaves its field unset, so the default applies.
   void createFilter(bool parse_unconfigured_routes = false,
-                    uint32_t inline_string_threshold_bytes = 0) {
+                    uint32_t inline_string_threshold_bytes = 0, uint32_t max_json_depth = 0) {
     if (filter_ != nullptr) {
       filter_->onDestroy();
     }
@@ -179,6 +179,10 @@ public:
           ->mutable_limits()
           ->mutable_inline_string_threshold_bytes()
           ->set_value(inline_string_threshold_bytes);
+    }
+    if (max_json_depth != 0) {
+      proto.mutable_request_handling()->mutable_limits()->mutable_max_json_depth()->set_value(
+          max_json_depth);
     }
     filter_ = std::make_unique<AiProtocolManagerFilter>(std::make_shared<const FilterConfig>(
         proto, *stats_store_.rootScope(), AiFilterFactories{}, factory_));
@@ -1905,7 +1909,53 @@ TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJson) {
   EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
   EXPECT_EQ(inject_calls_, 0);
   EXPECT_EQ(counterValue("request_parse_error"), 1);
+  EXPECT_EQ(counterValue("request_json_depth_exceeded"), 0);
   EXPECT_EQ(counterValue("request_parsed"), 0);
+}
+
+// A payload nested past max_json_depth is well-formed, so its rejection is told
+// apart from malformed JSON.
+TEST_F(AiProtocolManagerFilterTest, RejectsPayloadNestedPastMaxJsonDepth) {
+  createFilter(/*parse_unconfigured_routes=*/false, /*inline_string_threshold_bytes=*/0,
+               /*max_json_depth=*/3);
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"a":{"b":{"c":{"d":1}}}})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 1);
+  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
+  EXPECT_EQ(local_reply_details_, "ai_protocol_manager_json_depth_exceeded");
+  EXPECT_EQ(inject_calls_, 0);
+  EXPECT_EQ(counterValue("request_json_depth_exceeded"), 1);
+  EXPECT_EQ(counterValue("request_parse_error"), 1);
+  EXPECT_EQ(counterValue("request_parsed"), 0);
+}
+
+// The default bound admits a tool schema several objects deep, which nests two
+// levels per object under tools[].function.parameters.
+TEST_F(AiProtocolManagerFilterTest, DefaultMaxJsonDepthAdmitsNestedToolSchema) {
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  std::string schema = R"({"type":"string"})";
+  for (int i = 0; i < 8; ++i) {
+    schema = R"({"type":"object","properties":{"p":)" + schema + "}}";
+  }
+  const std::string payload =
+      R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}],)"
+      R"("tools":[{"type":"function","function":{"name":"f","parameters":)" +
+      schema + "}}]}";
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString()), nlohmann::json::parse(payload));
+  EXPECT_EQ(counterValue("request_parsed"), 1);
+  EXPECT_EQ(counterValue("request_json_depth_exceeded"), 0);
 }
 
 // Where Envoy and the backend could otherwise read the same body differently.
@@ -2174,6 +2224,26 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsMalformedPayload) {
   EXPECT_EQ(counterValue("request_passthrough"), 1);
   EXPECT_EQ(counterValue("request_parse_error"), 0);
   EXPECT_EQ(counterValue("request_parsed"), 0);
+}
+
+// A payload nested past max_json_depth is forwarded like any other the parser
+// gives up on, and the counter is what shows the AI filters never saw it.
+TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsPayloadNestedPastMaxJsonDepth) {
+  createFilter(/*parse_unconfigured_routes=*/true, /*inline_string_threshold_bytes=*/0,
+               /*max_json_depth=*/3);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  const std::string payload = R"({"a":{"b":{"c":{"d":1}}}})";
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(injected_.toString(), payload);
+  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(counterValue("request_json_depth_exceeded"), 1);
+  EXPECT_EQ(counterValue("request_passthrough"), 1);
+  EXPECT_EQ(counterValue("request_parse_error"), 0);
 }
 
 // A payload abandoned mid-upload is still offloaded and replayed in full.

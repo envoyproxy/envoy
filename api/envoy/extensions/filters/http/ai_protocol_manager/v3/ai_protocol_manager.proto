@@ -125,6 +125,19 @@ message RequestParsingLimits {
   // requires ``model`` inline, so it rejects an offloaded one with a 400.
   google.protobuf.UInt32Value inline_string_threshold_bytes = 1
       [(validate.rules).uint32 = {lte: 1048576 gte: 64}];
+
+  // Maximum nesting depth of a request payload: how many JSON objects and
+  // arrays may be open at once, the root counting as one. A payload nested
+  // deeper is rejected with a 400 on a declared AI endpoint. On a route parsed
+  // under ``parse_unconfigured_routes`` it is forwarded unchanged, and the AI
+  // filters do not run on it. Both are counted by
+  // ``request_json_depth_exceeded``.
+  //
+  // Defaults to 64. A tool's parameter schema, or a response schema, nests two
+  // levels for each object it describes, on top of the levels of the request
+  // around it, so a schema several objects deep needs far more than its own
+  // depth.
+  google.protobuf.UInt32Value max_json_depth = 2 [(validate.rules).uint32 = {lte: 128 gte: 1}];
 }
 
 // Response-side processing configuration. Individual response features are

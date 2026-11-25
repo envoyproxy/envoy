@@ -615,6 +615,56 @@ TEST(WuffsJsonCursorTest, ExceedMaxDepthRejected) {
       Not(IsOk()));
 }
 
+// Reports the key of the number it sees, and whether the number sits on `pattern`.
+class MatchOnNumberHandler : public CapturingHandler {
+public:
+  const WuffsJsonCursor* cursor{nullptr};
+  std::vector<WuffsJsonCursor::PatternSegment> pattern;
+  std::string number_key;
+  bool matched{false};
+
+  absl::Status onNumber(absl::string_view key, absl::string_view, int, size_t, size_t) override {
+    number_key = std::string(key);
+    matched = cursor->matchesPatternPath(pattern);
+    return absl::OkStatus();
+  }
+};
+
+// The bound is the caller's to set, and the levels past the inline ones track
+// keys like any other.
+TEST(WuffsJsonCursorTest, ConfiguredMaxDepth) {
+  constexpr int depth = 2 * WuffsJsonCursor::kMaxTrackedDepth;
+  std::string open;
+  for (int i = 0; i < depth; ++i) {
+    open += R"({"a":)";
+  }
+  const std::string nested = open + "1" + std::string(depth, '}');
+  {
+    MatchOnNumberHandler h;
+    h.pattern.assign(depth, WuffsJsonCursor::PatternSegment{"a"});
+    WuffsJsonCursor cursor(h, depth);
+    h.cursor = &cursor;
+    EXPECT_OK(cursor.feed(nested, /*closed=*/true));
+    EXPECT_EQ(h.number_key, "a");
+    EXPECT_TRUE(h.matched);
+  }
+  {
+    CapturingHandler h;
+    WuffsJsonCursor cursor(h, depth);
+    const absl::Status status =
+        cursor.feed(open + R"(1,"a":2)" + std::string(depth, '}'), /*closed=*/true);
+    EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_EQ(status.message(), "wuffs json: duplicate key \"a\"");
+  }
+  {
+    CapturingHandler h;
+    WuffsJsonCursor cursor(h, depth - 1);
+    const absl::Status status = cursor.feed(nested, /*closed=*/true);
+    EXPECT_EQ(status.code(), absl::StatusCode::kResourceExhausted);
+    EXPECT_EQ(status.message(), "wuffs json: nesting depth exceeds " + std::to_string(depth - 1));
+  }
+}
+
 // Path-tracking tests
 
 // Helper: feed a complete JSON string with no path tracking (PathCapturingHandler

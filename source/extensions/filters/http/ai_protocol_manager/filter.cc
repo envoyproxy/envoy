@@ -41,6 +41,9 @@ constexpr uint32_t DefaultMaxJsonBodySize = 4 * 1024 * 1024;
 // Far above ordinary streams (hundreds to low thousands of events) while
 // bounding the parse work a lifetime event flood can extract; see the proto.
 constexpr uint32_t DefaultMaxParsedSseEvents = 65536;
+// A tool or response schema nests two levels per object it describes, so one a handful of objects
+// deep is past the cursor's own default of 16.
+constexpr uint32_t DefaultMaxJsonDepth = 64;
 
 // HTTP Content-Type is case-insensitive and may carry parameters
 // (`application/json; charset=utf-8`).
@@ -204,6 +207,8 @@ FilterConfig::FilterConfig(
       inline_string_threshold_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto.request_handling().limits(), inline_string_threshold_bytes,
           JsonWithExtBufParser::kDefaultInlineStringThresholdBytes)),
+      max_json_depth_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto.request_handling().limits(),
+                                                      max_json_depth, DefaultMaxJsonDepth)),
       token_usage_enabled_(proto.response_handling().has_token_usage()),
       include_unconfigured_routes_(
           proto.response_handling().token_usage().include_unconfigured_routes()),
@@ -344,6 +349,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
 
   JsonWithExtBufParser::Config parser_config;
   parser_config.inline_string_threshold_bytes = inlineStringThresholdBytes();
+  parser_config.max_depth = config_->maxJsonDepth();
   request_parser_ = std::make_unique<JsonWithExtBufParser>(parser_config);
   // Built here, not at setDecoderFilterCallbacks(), so a pass-through stream pays
   // for none of it: constructing it subscribes to upstream watermarks and claims
@@ -402,9 +408,15 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
   }
 
   if (!status.ok()) {
+    // The parser reports only the nesting limit as ResourceExhausted.
+    const bool too_deep = absl::IsResourceExhausted(status);
+    if (too_deep) {
+      config_->stats().request_json_depth_exceeded_.inc();
+    }
     if (isAiEndpoint()) {
       config_->stats().request_parse_error_.inc();
-      rejectInvalidPayload(status);
+      rejectInvalidPayload(status, too_deep ? "ai_protocol_manager_json_depth_exceeded"
+                                            : "ai_protocol_manager_invalid_json");
       return false;
     }
     // Best effort: the payload is forwarded as it stands, just without a
@@ -424,12 +436,13 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
   return true;
 }
 
-void AiProtocolManagerFilter::rejectInvalidPayload(const absl::Status& status) {
+void AiProtocolManagerFilter::rejectInvalidPayload(const absl::Status& status,
+                                                   absl::string_view details) {
   ENVOY_LOG(debug, "ai_protocol_manager: rejecting request: {}", status.message());
   payload_rejected_ = true;
   request_parser_.reset();
   decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, status.message(), nullptr,
-                                     std::nullopt, "ai_protocol_manager_invalid_json");
+                                     std::nullopt, details);
 }
 
 Http::FilterDataStatus AiProtocolManagerFilter::decodeData(Buffer::Instance& data,
