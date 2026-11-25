@@ -107,10 +107,12 @@ PayloadReaderSharedPtr PayloadReader::fromExternalBuffer(std::shared_ptr<Externa
   return reader;
 }
 
-PayloadReaderSharedPtr PayloadReader::createPendingExternal(uint64_t length) {
+PayloadReaderSharedPtr PayloadReader::createPendingExternal(uint64_t length,
+                                                            std::shared_ptr<void> pending_owner) {
   PayloadReaderSharedPtr reader(new PayloadReader());
   reader->total_length_ = length;
   reader->read_sem_ = std::make_shared<Coroutine::Semaphore>(1);
+  reader->pending_owner_ = std::move(pending_owner);
   return reader;
 }
 
@@ -146,30 +148,35 @@ Coroutine::Task<absl::StatusOr<Buffer::InstancePtr>> PayloadReader::readChunk(ui
   co_return co_await ReadExternalBuffer(self, offset, max_length, std::move(permit));
 }
 
-void PayloadReader::completeExternalHandoff(std::shared_ptr<ExternalBuffer> buffer) {
+std::shared_ptr<void>
+PayloadReader::completeExternalHandoff(std::shared_ptr<ExternalBuffer> buffer) {
   if (failed_ || readable_) {
-    return;
+    return nullptr;
   }
   ASSERT(buffer != nullptr);
   buffer_ = std::move(buffer);
   readable_ = true;
+  std::shared_ptr<void> owner = std::move(pending_owner_);
   while (!readable_waiters_.empty()) {
     ReadableAwaitable* waiter = readable_waiters_.front();
     readable_waiters_.erase(readable_waiters_.begin());
     waiter->complete(absl::OkStatus());
   }
+  return owner;
 }
 
-void PayloadReader::failExternalHandoff() {
+std::shared_ptr<void> PayloadReader::failExternalHandoff() {
   if (failed_ || readable_) {
-    return;
+    return nullptr;
   }
   failed_ = true;
+  std::shared_ptr<void> owner = std::move(pending_owner_);
   while (!readable_waiters_.empty()) {
     ReadableAwaitable* waiter = readable_waiters_.front();
     readable_waiters_.erase(readable_waiters_.begin());
     waiter->complete(absl::DataLossError("external buffer write failed"));
   }
+  return owner;
 }
 
 } // namespace AiProtocolManager
