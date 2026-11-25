@@ -456,6 +456,7 @@ envoy_cc_library(
         "//envoy/network:dns_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/registry",
+        "//envoy/router:router_interface",
         "//envoy/ssl:context_interface",
         "//envoy/upstream:health_checker_interface",
         "//source/common/common:dns_utils_lib",
