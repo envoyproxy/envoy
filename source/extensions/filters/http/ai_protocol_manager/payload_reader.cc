@@ -28,13 +28,11 @@ namespace AiProtocolManager {
 // like file or remote I/O are not easily cancelled, and keeping cancellation out of the
 // ExternalBuffer interface simplifies implementations). Because an in-flight read continues past
 // coroutine cancellation, onStart() moves the single-flight semaphore `permit` and a
-// `PayloadReaderSharedPtr` into the read callback and guards resumption with a weak `alive_` token:
+// `PayloadReaderSharedPtr` into the read callback:
 //   - `permit` stays held until the underlying read callback fires so a subsequent reader (e.g. on
 //     upstream retry) cannot overlap an orphaned read, and is released before `complete()` so an
 //     uncontended caller can re-acquire immediately without suspending.
 //   - `reader` keeps the ExternalBuffer and `failed_` alive until the callback completes.
-//   - `alive_` expires on onCancel() or destruction so an orphaned callback is a no-op after
-//     releasing `permit`.
 class PayloadReader::ReadExternalBuffer
     : public Coroutine::LeafAwaitable<absl::StatusOr<Buffer::InstancePtr>> {
 public:
