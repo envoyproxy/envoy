@@ -48,3 +48,24 @@ is the owning HTTP connection manager's.
 
   rq_content_length_too_large, Counter, Total requests rejected because their ``Content-Length`` exceeded the limit
   rq_body_too_large, Counter, Total requests rejected once the body bytes received exceeded the limit
+
+Dynamic Metadata
+----------------
+
+.. _config_http_filters_body_size_limit_dynamic_metadata:
+
+When a request is rejected because its body size exceeds the configured limit, the filter sets
+dynamic metadata before sending the ``413`` local reply.
+
+The metadata namespace is the name of the filter as configured in the filter chain (the ``name``
+field of the HTTP filter). The namespace contains the following field:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  details, string, "Human-readable details of the form ``length=<bytes>, limit=<bytes>``, describing the observed request length and the configured limit"
+
+For example, with the filter configured as ``body_size_limit``, the value can be
+logged using the ``%DYNAMIC_METADATA(body_size_limit:details)%`` access log
+format specifier.
