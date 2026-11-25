@@ -21,12 +21,17 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-// Path-agnostic view of the Envoy filter chain, and the owner of this path's flow control.
+// Path-agnostic view of the Envoy HTTP filter chain, hiding the minor API differences between the
+// decode (request) and encode (response) paths and owning a path's flow control.
 //
-// Each path supplies a concrete adapter that maps the virtual methods onto the corresponding
-// decoder/encoder callbacks. The bridge is shared by every ingest client and ChainWriter on the
-// path and outlives all of them: ingested data is from the same source (either downstream or
-// upstream), so ingest back-pressure is aggregated across registered clients.
+// Each path supplies a concrete adapter (DecoderFilterChainBridge for decode,
+// EncoderFilterChainBridge for encode) that maps the virtual methods onto the corresponding
+// StreamDecoderFilterCallbacks / StreamEncoderFilterCallbacks -- including data injection, source
+// watermark signaling, local-reply error reporting, and watermark subscription (upstream
+// watermarks on decode; downstream watermarks subscribed via decoder callbacks on encode). The
+// bridge is shared by every ingest client and ChainWriter on the path and outlives all of them:
+// ingested data is from the same source (downstream on decode, upstream on encode), so ingest
+// back-pressure is aggregated across registered clients.
 class FilterChainBridge : public Logger::Loggable<Logger::Id::filter> {
 public:
   using WriteResumeCallback = absl::AnyInvocable<void()>;
@@ -55,7 +60,8 @@ public:
   // Dispatcher the external buffer and writer should use for completion/watermark callbacks.
   virtual Event::Dispatcher& dispatcher() PURE;
 
-  // Injects a non-terminal data frame into the filter chain; end-of-stream is the caller's concern.
+  // Injects a non-terminal data frame into the HTTP filter chain; end-of-stream is the caller's
+  // concern.
   virtual void injectData(Buffer::Instance& data) PURE;
 
   // Fails the stream after an unrecoverable external-buffer error.
