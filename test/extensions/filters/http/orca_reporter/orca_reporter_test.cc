@@ -784,7 +784,7 @@ metrics:
     - path: "$0"
     capacity_cores: "Infinity"
 )EOF",
-                                                                                pod_.directory()));
+                                                                               pod_.directory()));
   EXPECT_EQ("capacity_cores must be finite", config.status().message());
 }
 
