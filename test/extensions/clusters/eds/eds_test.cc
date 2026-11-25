@@ -9,6 +9,7 @@
 
 #include "source/common/common/base64.h"
 #include "source/common/config/utility.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/eds/eds.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -415,7 +416,14 @@ TEST_P(EdsHostReuseTest, UnchangedEndpointKeepsHost) {
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   const HostSharedPtr host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
 
+  // Building a host resolves its transport socket, so the default match count shows whether
+  // the unchanged push built a new host.
+  const uint64_t matches =
+      stats_.findCounterByString("cluster.name.default.total_match_count").value().get().value();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(
+      matches + (GetParam() ? 0 : 1),
+      stats_.findCounterByString("cluster.name.default.total_match_count").value().get().value());
   EXPECT_EQ(1UL,
             stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
   ASSERT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -445,76 +453,143 @@ TEST_P(EdsHostReuseTest, UnchangedEndpointKeepsHost) {
 
 // Every endpoint field a host is built from must either be compared or force a new host.
 TEST_F(EdsTest, EndpointMatchesHostComparesEveryField) {
+  using LbEndpoint = envoy::config::endpoint::v3::LbEndpoint;
+  using Locality = envoy::config::endpoint::v3::LocalityLbEndpoints;
+
+  // Each host is built from its own endpoint: first the ones a host can be reused for, then the
+  // ones that always get a new host.
+  struct HostCase {
+    std::function<void(LbEndpoint&)> setup;
+    bool reusable;
+  };
+  const std::vector<HostCase> host_cases = {
+      {[](LbEndpoint&) {}, true},
+      {[](LbEndpoint& e) {
+         (*e.mutable_metadata()->mutable_filter_metadata())["x"] =
+             MessageUtil::keyValueStruct("k", "v");
+       },
+       true},
+      {[](LbEndpoint& e) {
+         e.mutable_endpoint()->set_observability_name("obs0");
+         e.set_health_status(envoy::config::core::v3::DEGRADED);
+         e.mutable_load_balancing_weight()->set_value(40);
+       },
+       true},
+      {[](LbEndpoint& e) {
+         e.mutable_endpoint()->mutable_health_check_config()->set_port_value(81);
+       },
+       false},
+      {[](LbEndpoint& e) {
+         e.mutable_endpoint()->mutable_health_check_config()->set_hostname("hc");
+       },
+       false},
+      {[](LbEndpoint& e) {
+         e.mutable_endpoint()->mutable_health_check_config()->set_disable_active_health_check(true);
+       },
+       false},
+      {[](LbEndpoint& e) {
+         auto* address = e.mutable_endpoint()
+                             ->add_additional_addresses()
+                             ->mutable_address()
+                             ->mutable_socket_address();
+         address->set_address("10.0.0.1");
+         address->set_port_value(80);
+       },
+       false},
+  };
+
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   auto* endpoints = cluster_load_assignment.add_endpoints();
   endpoints->mutable_locality()->set_zone("z1");
-  auto* endpoint = endpoints->add_lb_endpoints();
-  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
-  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
-  endpoint->mutable_endpoint()->set_hostname("foo");
-  endpoint->mutable_load_balancing_weight()->set_value(30);
+  for (size_t i = 0; i < host_cases.size(); ++i) {
+    auto* endpoint = endpoints->add_lb_endpoints();
+    auto* address = endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+    address->set_address(absl::StrCat("1.2.3.", i + 1));
+    address->set_port_value(80);
+    endpoint->mutable_endpoint()->set_hostname("foo");
+    endpoint->mutable_load_balancing_weight()->set_value(30);
+    host_cases[i].setup(*endpoint);
+  }
+  // A second locality with a non-default priority.
+  auto* other_endpoints = cluster_load_assignment.add_endpoints();
+  other_endpoints->set_priority(1);
+  other_endpoints->mutable_locality()->set_region("r1");
+  other_endpoints->mutable_locality()->set_zone("z2");
+  other_endpoints->mutable_locality()->set_sub_zone("s1");
+  auto* other_endpoint = other_endpoints->add_lb_endpoints();
+  other_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
+      "1.2.4.1");
+  other_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
+      80);
 
   initialize();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  const HostSharedPtr host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
-  const envoy::config::endpoint::v3::LocalityLbEndpoints locality = *endpoints;
-  const envoy::config::endpoint::v3::LbEndpoint lb_endpoint = *endpoint;
-  EXPECT_TRUE(EdsClusterImpl::endpointMatchesHost(lb_endpoint, locality, *host->address(), *host));
+  const auto host_map = cluster_->prioritySet().crossPriorityHostMap();
+  const auto metadata_pool = cluster_->constMetadataSharedPool();
 
-  using LbEndpoint = envoy::config::endpoint::v3::LbEndpoint;
-  using Locality = envoy::config::endpoint::v3::LocalityLbEndpoints;
-  const std::vector<std::pair<std::function<void(LbEndpoint&)>, std::function<void(Locality&)>>>
-      changes = {
-          {[](LbEndpoint& e) { e.mutable_endpoint()->set_hostname("bar"); }, nullptr},
-          {[](LbEndpoint& e) { e.mutable_endpoint()->set_observability_name("obs"); }, nullptr},
-          {[](LbEndpoint& e) { e.mutable_load_balancing_weight()->set_value(31); }, nullptr},
-          {[](LbEndpoint& e) { e.set_health_status(envoy::config::core::v3::UNHEALTHY); }, nullptr},
-          {[](LbEndpoint& e) {
-             (*e.mutable_metadata()->mutable_filter_metadata())["x"] =
-                 MessageUtil::keyValueStruct("k", "v");
-           },
-           nullptr},
-          {[](LbEndpoint& e) {
-             e.mutable_endpoint()->mutable_health_check_config()->set_port_value(81);
-           },
-           nullptr},
-          {[](LbEndpoint& e) {
-             e.mutable_endpoint()->mutable_health_check_config()->set_hostname("hc");
-           },
-           nullptr},
-          {[](LbEndpoint& e) {
-             e.mutable_endpoint()->mutable_health_check_config()->set_disable_active_health_check(
-                 true);
-           },
-           nullptr},
-          {[](LbEndpoint& e) {
-             auto* address = e.mutable_endpoint()
-                                 ->add_additional_addresses()
-                                 ->mutable_address()
-                                 ->mutable_socket_address();
-             address->set_address("1.2.3.5");
-             address->set_port_value(80);
-           },
-           nullptr},
-          {nullptr, [](Locality& l) { l.set_priority(1); }},
-          {nullptr, [](Locality& l) { l.mutable_locality()->set_zone("z2"); }},
-          {nullptr, [](Locality& l) { l.mutable_locality()->set_region("r"); }},
-          {nullptr, [](Locality& l) { l.mutable_locality()->set_sub_zone("s"); }},
-      };
-  for (const auto& [change_endpoint, change_locality] : changes) {
-    LbEndpoint changed_endpoint = lb_endpoint;
-    Locality changed_locality = locality;
-    if (change_endpoint) {
-      change_endpoint(changed_endpoint);
+  const std::vector<std::function<void(LbEndpoint&)>> endpoint_changes = {
+      [](LbEndpoint& e) { e.mutable_endpoint()->set_hostname("bar"); },
+      [](LbEndpoint& e) { e.mutable_endpoint()->set_observability_name("changed"); },
+      [](LbEndpoint& e) { e.mutable_load_balancing_weight()->set_value(77); },
+      [](LbEndpoint& e) { e.set_health_status(envoy::config::core::v3::UNHEALTHY); },
+      [](LbEndpoint& e) {
+        (*e.mutable_metadata()->mutable_filter_metadata())["x"] =
+            MessageUtil::keyValueStruct("k", "changed");
+      },
+  };
+  const std::vector<std::function<void(Locality&)>> locality_changes = {
+      [](Locality& l) { l.set_priority(7); },
+      [](Locality& l) { l.mutable_locality()->set_region("changed"); },
+      [](Locality& l) { l.mutable_locality()->set_zone("changed"); },
+      [](Locality& l) { l.mutable_locality()->set_sub_zone("changed"); },
+  };
+  const auto check_case = [&](const LbEndpoint& lb_endpoint, const Locality& locality,
+                              bool reusable) {
+    const std::string address = lb_endpoint.endpoint().address().socket_address().address();
+    const HostSharedPtr host = host_map->findHost(absl::StrCat(address, ":80"));
+    ASSERT_NE(nullptr, host);
+    EXPECT_EQ(reusable, EdsClusterImpl::endpointMatchesHost(lb_endpoint, locality, *host->address(),
+                                                            *host, metadata_pool))
+        << lb_endpoint.DebugString();
+    if (!reusable) {
+      return;
     }
-    if (change_locality) {
-      change_locality(changed_locality);
+    for (const auto& change : endpoint_changes) {
+      LbEndpoint changed = lb_endpoint;
+      change(changed);
+      EXPECT_FALSE(EdsClusterImpl::endpointMatchesHost(changed, locality, *host->address(), *host,
+                                                       metadata_pool))
+          << changed.DebugString();
     }
-    EXPECT_FALSE(EdsClusterImpl::endpointMatchesHost(changed_endpoint, changed_locality,
-                                                     *host->address(), *host))
-        << changed_endpoint.DebugString() << changed_locality.DebugString();
+    for (const auto& change : locality_changes) {
+      Locality changed = locality;
+      change(changed);
+      EXPECT_FALSE(EdsClusterImpl::endpointMatchesHost(lb_endpoint, changed, *host->address(),
+                                                       *host, metadata_pool))
+          << changed.DebugString();
+    }
+    // Removing metadata, or adding it to an endpoint that has none, must not match either.
+    LbEndpoint toggled_metadata = lb_endpoint;
+    if (lb_endpoint.has_metadata()) {
+      toggled_metadata.clear_metadata();
+    } else {
+      (*toggled_metadata.mutable_metadata()->mutable_filter_metadata())["x"] =
+          MessageUtil::keyValueStruct("k", "v");
+    }
+    EXPECT_FALSE(EdsClusterImpl::endpointMatchesHost(toggled_metadata, locality, *host->address(),
+                                                     *host, metadata_pool));
+    // Same address string, different network namespace.
+    const Network::Address::Ipv4Instance other_namespace(address, 80, nullptr,
+                                                         std::string("/var/run/netns/other"));
+    EXPECT_FALSE(EdsClusterImpl::endpointMatchesHost(lb_endpoint, locality, other_namespace, *host,
+                                                     metadata_pool));
+  };
+
+  for (size_t i = 0; i < host_cases.size(); ++i) {
+    check_case(endpoints->lb_endpoints(i), *endpoints, host_cases[i].reusable);
   }
+  check_case(other_endpoints->lb_endpoints(0), *other_endpoints, true);
 }
 
 // Verify that host weight changes cause a full rebuild.

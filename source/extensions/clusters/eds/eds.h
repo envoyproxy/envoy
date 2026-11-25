@@ -48,7 +48,8 @@ public:
   static bool
   endpointMatchesHost(const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
                       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
-                      const Network::Address::Instance& address, const Host& host);
+                      const Network::Address::Instance& address, const Host& host,
+                      Config::ConstMetadataSharedPoolSharedPtr metadata_pool);
 
 protected:
   EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,

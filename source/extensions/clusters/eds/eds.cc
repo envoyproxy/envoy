@@ -199,7 +199,7 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
     HostSharedPtr existing_host = existing_hosts->findHost(address_as_string);
     if (existing_host != nullptr &&
         EdsClusterImpl::endpointMatchesHost(lb_endpoint, locality_lb_endpoint, *address,
-                                            *existing_host)) {
+                                            *existing_host, parent_.constMetadataSharedPool())) {
       priority_state_manager.registerHostForPriority(existing_host, locality_lb_endpoint);
       all_new_hosts.emplace(address_as_string);
       return;
@@ -214,13 +214,16 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
 bool EdsClusterImpl::endpointMatchesHost(
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
-    const Network::Address::Instance& address, const Host& host) {
+    const Network::Address::Instance& address, const Host& host,
+    Config::ConstMetadataSharedPoolSharedPtr metadata_pool) {
   const auto& endpoint = lb_endpoint.endpoint();
+  // The host map is keyed by the address string, which omits the network namespace.
   // Endpoints with a health check config or additional addresses always get a new host, so the
   // health check address, health check hostname and address list are those of a default host.
-  if (endpoint.has_health_check_config() || !endpoint.additional_addresses().empty() ||
-      host.addressListOrNull() != nullptr || host.healthCheckAddress() != host.address() ||
-      !host.hostnameForHealthChecks().empty() || host.disableActiveHealthCheck()) {
+  if (*host.address() != address || endpoint.has_health_check_config() ||
+      !endpoint.additional_addresses().empty() || host.addressListOrNull() != nullptr ||
+      host.healthCheckAddress() != host.address() || !host.hostnameForHealthChecks().empty() ||
+      host.disableActiveHealthCheck()) {
     return false;
   }
   // Locality metadata is not compared: updateDynamicHostList() keeps the existing host when only
@@ -233,8 +236,10 @@ bool EdsClusterImpl::endpointMatchesHost(
          host.priority() == locality_lb_endpoint.priority() &&
          host.edsHealthStatus() == lb_endpoint.health_status() &&
          LocalityEqualTo()(host.locality(), locality_lb_endpoint.locality()) &&
-         host.metadataHash() ==
-             (lb_endpoint.has_metadata() ? MessageUtil::hash(lb_endpoint.metadata()) : 0);
+         // Hosts built from the pool share one metadata object per distinct content.
+         host.metadata() == (lb_endpoint.has_metadata()
+                                 ? metadata_pool->getObject(lb_endpoint.metadata())
+                                 : nullptr);
 }
 
 absl::Status

@@ -27,6 +27,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/config:utility_lib",
+        "//source/common/network:address_lib",
         "//source/extensions/clusters/eds:eds_lib",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
