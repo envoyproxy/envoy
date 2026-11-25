@@ -227,7 +227,6 @@ envoy_cc_library(
         "//envoy/router:rds_interface",
         "//envoy/router:route_config_update_info_interface",
         "//envoy/server:factory_context_interface",
-        "//envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf:utility_lib",

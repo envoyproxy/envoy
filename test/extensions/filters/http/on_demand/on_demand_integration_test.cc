@@ -1311,74 +1311,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OnDemandVhdsSkipInitialWarmingInt
                          VHDS_INTEGRATION_PARAMS, vhdsTestParamsToString);
 
 TEST_P(OnDemandVhdsSkipInitialWarmingIntegrationTest,
-       LatchedRequestResolvedByInitialWildcardWithFallbackAndTrailers) {
-  initialize();
-
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
-                                                 {":path", "/"},
-                                                 {":scheme", "http"},
-                                                 {":authority", "app.example.com"},
-                                                 {"x-lyft-user-id", "123"}};
-  auto encoder_decoder = codec_client_->startRequest(request_headers);
-  Http::RequestEncoder& encoder = encoder_decoder.first;
-  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
-
-  test_server_->waitForGauge("http.config_test.on_demand.route_discovery_pending", Eq(1));
-  waitForMainThreadDispatcher();
-  EXPECT_EQ(1, test_server_->counter(vhdsUpdateAttemptStatName())->value());
-
-  // Send trailers directly after headers (without body data) while route discovery is paused so
-  // FilterManager invokes OnDemandRouteUpdate::decodeTrailers() directly before VHDS responds.
-  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer", "trailer-value"}};
-  codec_client_->sendTrailers(encoder, request_trailers);
-  test_server_->waitForWorkerThreads();
-
-  // Initial wildcard response delivers both a specific vhost and a catch-all '*' vhost.
-  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
-      Config::TestTypeUrl::get().VirtualHost,
-      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
-           virtualHostYaml("my_route/app_vhost", "app.example.com")),
-       TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
-           virtualHostYaml("my_route/fallback_vhost", "\"*\""))},
-      {}, "1", vhds_stream_.get());
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
-                                           vhds_stream_.get()));
-
-  waitForNextUpstreamRequest(1);
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ("", upstream_request_->body().toString());
-  ASSERT_NE(nullptr, upstream_request_->trailers());
-  EXPECT_EQ("trailer-value", upstream_request_->trailers()
-                                 ->get(Http::LowerCaseString("x-trailer"))[0]
-                                 ->value()
-                                 .getStringView());
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ(0, test_server_->gauge("http.config_test.on_demand.route_discovery_pending")->value());
-  EXPECT_EQ(1, test_server_->counter("http.config_test.on_demand.route_discovery_found")->value());
-  EXPECT_EQ(1,
-            test_server_->counter("http.config_test.on_demand.route_discovery_requested")->value());
-  // 1 from initial subscription start() + 1 from processing the initial wildcard response; no
-  // per-domain requestOnDemandUpdate() occurred.
-  EXPECT_EQ(2, test_server_->counter(vhdsUpdateAttemptStatName())->value());
-
-  cleanupUpstreamAndDownstream();
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-
-  // Subsequent requests for arbitrary unmatched domains match the catch-all '*' vhost immediately
-  // without issuing any on-demand discovery or VHDS requests.
-  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "arbitrary.unmatched.example.com");
-  EXPECT_EQ(1,
-            test_server_->counter("http.config_test.on_demand.route_discovery_requested")->value());
-  EXPECT_EQ(2, test_server_->counter(vhdsUpdateAttemptStatName())->value());
-  cleanupUpstreamAndDownstream();
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-}
-
-TEST_P(OnDemandVhdsSkipInitialWarmingIntegrationTest,
        LatchedRequestFallsThroughToOnDemandAfterUnmatchedInitialWildcard) {
   initialize();
 
@@ -1455,7 +1387,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OnDemandVhdsSkipInitialWarmingOdC
                          VHDS_INTEGRATION_PARAMS, vhdsTestParamsToString);
 
 TEST_P(OnDemandVhdsSkipInitialWarmingOdCdsIntegrationTest,
-       LatchedRequestResolvedByInitialWildcardChainsIntoOdCds) {
+       LatchedRequestResolvedByInitialWildcardWithFallbackAndOdCds) {
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -1470,7 +1402,8 @@ TEST_P(OnDemandVhdsSkipInitialWarmingOdCdsIntegrationTest,
   waitForMainThreadDispatcher();
   EXPECT_EQ(1, test_server_->counter(vhdsUpdateAttemptStatName())->value());
 
-  // Initial wildcard response delivers a vhost targeting an undiscovered cluster.
+  // Initial wildcard response delivers both a vhost targeting an undiscovered cluster and a
+  // catch-all '*' fallback vhost without triggering per-domain VHDS requests.
   const auto vhost = TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
 name: my_route/odcds_vhost
 domains: ["odcds.example.com"]
@@ -1479,12 +1412,17 @@ routes:
   route: { cluster: "dynamic_cluster" }
 )EOF");
   sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
-      Config::TestTypeUrl::get().VirtualHost, {vhost}, {}, "1", vhds_stream_.get());
+      Config::TestTypeUrl::get().VirtualHost,
+      {vhost, TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+                  virtualHostYaml("my_route/fallback_vhost", "\"*\""))},
+      {}, "1", vhds_stream_.get());
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
                                            vhds_stream_.get()));
 
   test_server_->waitForCounter("http.config_test.on_demand.route_discovery_found", Eq(1));
   test_server_->waitForGauge("http.config_test.on_demand.cluster_discovery_pending", Eq(1));
+  EXPECT_EQ(1,
+            test_server_->counter("http.config_test.on_demand.route_discovery_requested")->value());
   EXPECT_EQ(2, test_server_->counter(vhdsUpdateAttemptStatName())->value());
 
   AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
@@ -1506,6 +1444,15 @@ routes:
   EXPECT_EQ(
       1, test_server_->counter("http.config_test.on_demand.cluster_discovery_available")->value());
 
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Subsequent requests for arbitrary unmatched domains match the catch-all '*' vhost immediately
+  // without issuing any on-demand discovery or VHDS requests.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "arbitrary.unmatched.example.com");
+  EXPECT_EQ(1,
+            test_server_->counter("http.config_test.on_demand.route_discovery_requested")->value());
+  EXPECT_EQ(2, test_server_->counter(vhdsUpdateAttemptStatName())->value());
   cleanupUpstreamAndDownstream();
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
