@@ -52,12 +52,6 @@ public:
   // True if external storage failed during durability handoff or on a subsequent read.
   bool hasFailed() const { return failed_; }
 
-  // Returns the inline buffer when the payload is readable and stored in memory; nullptr when
-  // backed by ExternalBuffer, pending flush, or failed.
-  const Buffer::Instance* inMemoryBytes() const {
-    return (allBytesReadable() && buffer_ == nullptr) ? &in_memory_ : nullptr;
-  }
-
   // Reads `[offset, offset + max_length)` as a coroutine, suspending while an ExternalBuffer flush
   // is still in flight. Already-readable inline and zero-length reads complete synchronously
   // without suspending; ExternalBuffer reads serialize single-flight access via a 1-permit

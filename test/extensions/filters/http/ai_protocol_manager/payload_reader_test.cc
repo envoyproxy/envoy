@@ -79,8 +79,6 @@ TEST_F(PayloadReaderTest, FromInMemoryReadsSliceWithoutSuspending) {
 
   EXPECT_EQ(reader->length(), 10);
   EXPECT_TRUE(reader->allBytesReadable());
-  ASSERT_NE(reader->inMemoryBytes(), nullptr);
-  EXPECT_EQ(reader->inMemoryBytes()->toString(), "0123456789");
 
   absl::StatusOr<Buffer::InstancePtr> chunk_or = absl::UnknownError("pending");
   auto handle = Coroutine::launch(
@@ -109,7 +107,6 @@ TEST_F(PayloadReaderTest, CreateFailedRejectsReadsImmediately) {
   EXPECT_EQ(reader->length(), 16);
   EXPECT_TRUE(reader->hasFailed());
   EXPECT_FALSE(reader->allBytesReadable());
-  EXPECT_EQ(reader->inMemoryBytes(), nullptr);
 
   // Subsequent handoff calls on an already-failed reader are no-ops.
   reader->failExternalHandoff();
@@ -127,7 +124,6 @@ TEST_F(PayloadReaderTest, CreateFailedRejectsReadsImmediately) {
 TEST_F(PayloadReaderTest, PendingExternalHandoffWaitsUntilCompletedAndReadsSlice) {
   PayloadReaderSharedPtr reader = PayloadReader::createPendingExternal(10);
   EXPECT_FALSE(reader->allBytesReadable());
-  EXPECT_EQ(reader->inMemoryBytes(), nullptr);
 
   absl::StatusOr<Buffer::InstancePtr> chunk_or = absl::UnknownError("pending");
   auto handle = Coroutine::launch(
