@@ -55,7 +55,6 @@ protected:
       }
       permit.release();
       if (!alive.expired()) {
-        alive.reset();
         complete(std::move(result));
       }
     };
