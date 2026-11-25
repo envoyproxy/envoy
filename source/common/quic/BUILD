@@ -547,6 +547,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:connection_socket_lib",
+        "//source/common/network:default_socket_interface_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/quic:quic_io_handle_wrapper_lib",
