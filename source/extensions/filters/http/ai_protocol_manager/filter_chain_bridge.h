@@ -24,14 +24,13 @@ namespace AiProtocolManager {
 // Path-agnostic view of the Envoy HTTP filter chain, hiding the minor API differences between the
 // decode (request) and encode (response) paths and owning a path's flow control.
 //
-// Each path supplies a concrete adapter (DecoderFilterChainBridge for decode,
-// EncoderFilterChainBridge for encode) that maps the virtual methods onto the corresponding
+// Each path supplies a concrete adapter that maps the virtual methods onto the corresponding
 // StreamDecoderFilterCallbacks / StreamEncoderFilterCallbacks -- including data injection, source
 // watermark signaling, local-reply error reporting, and watermark subscription (upstream
 // watermarks on decode; downstream watermarks subscribed via decoder callbacks on encode). The
 // bridge is shared by every ingest client and ChainWriter on the path and outlives all of them:
-// ingested data is from the same source (downstream on decode, upstream on encode), so ingest
-// back-pressure is aggregated across registered clients.
+// ingested data on a path comes from a single source, so ingest back-pressure is aggregated across
+// registered clients.
 class FilterChainBridge : public Logger::Loggable<Logger::Id::filter> {
 public:
   using WriteResumeCallback = absl::AnyInvocable<void()>;
