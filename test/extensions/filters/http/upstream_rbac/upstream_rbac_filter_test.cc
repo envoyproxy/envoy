@@ -118,6 +118,24 @@ public:
     return host;
   }
 
+  // Builds a host with the given primary address whose address list additionally contains
+  // `additional_addresses`, mirroring a host created from a multi-address DNS answer.
+  Upstream::HostDescriptionConstSharedPtr
+  makeHostWithAdditionalAddresses(const std::string& address,
+                                  const std::vector<std::string>& additional_addresses) {
+    auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    const auto primary = Network::Utility::parseInternetAddressAndPortNoThrow(address, false);
+    ON_CALL(*host, address()).WillByDefault(Return(primary));
+    auto address_list = std::make_shared<std::vector<Network::Address::InstanceConstSharedPtr>>();
+    address_list->push_back(primary);
+    for (const auto& additional_address : additional_addresses) {
+      address_list->push_back(
+          Network::Utility::parseInternetAddressAndPortNoThrow(additional_address, false));
+    }
+    ON_CALL(*host, addressListOrNull()).WillByDefault(Return(address_list));
+    return host;
+  }
+
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Network::MockConnection> connection_;
   NiceMock<StreamInfo::MockStreamInfo> req_info_;
@@ -162,6 +180,27 @@ TEST_F(UpstreamRbacFilterTest, AllowMatchingUpstreamIp) {
   filter_->onHostSelected(makeHost("1.2.3.4:80"));
 
   EXPECT_EQ(1U, config_->stats().allowed_.value());
+}
+
+// A DENY policy matching an additional address of the selected host denies the request even
+// though the primary address does not match: the connection may fall back to the additional
+// address (e.g. Happy Eyeballs) once the primary proves unreachable.
+TEST_F(UpstreamRbacFilterTest, DenyMatchingAdditionalUpstreamIp) {
+  setup(envoy::config::rbac::v3::RBAC::DENY, "1.2.3.4");
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", _, _, _));
+  filter_->onHostSelected(makeHostWithAdditionalAddresses("5.6.7.8:80", {"1.2.3.4:80"}));
+
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+// A DENY policy matching neither the primary nor any additional address of the selected host
+// allows the request.
+TEST_F(UpstreamRbacFilterTest, AllowNonMatchingAdditionalUpstreamIp) {
+  setup(envoy::config::rbac::v3::RBAC::DENY, "1.2.3.4");
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  filter_->onHostSelected(makeHostWithAdditionalAddresses("5.6.7.8:80", {"9.9.9.9:80"}));
+
+  EXPECT_TRUE(req_info_.filterState()->hasDataWithName(StreamInfo::UpstreamAddress::key()));
 }
 
 // Header matching is available at onHostSelected time: the request is denied only when both the
