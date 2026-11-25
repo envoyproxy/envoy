@@ -63,8 +63,6 @@ void appendCodePoint(std::string& out, uint32_t code_point) {
 WuffsJsonCursor::WuffsJsonCursor(Handler& handler, uint32_t max_depth)
     : handler_(handler), max_depth_(static_cast<int>(std::min(max_depth, kWuffsMaxDepth))),
       levels_(1) {
-  // Reserve up front so a level, and the key handed to a callback, never moves.
-  levels_.reserve(max_depth_ + 1);
   decoder_ = wuffs_json__decoder::alloc();
   token_buf_ =
       wuffs_base__slice_token__writer(wuffs_base__make_slice_token(token_data_, kTokenBufLen));

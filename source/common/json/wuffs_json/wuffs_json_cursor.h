@@ -61,7 +61,8 @@ class WuffsJsonCursor {
 public:
   // Handler — callback interface implemented by the JSON document consumer.
   //
-  // All callbacks are invoked synchronously from within feed().
+  // All callbacks are invoked synchronously from within feed(). A `key` is valid
+  // only for the duration of the call, like a `chunk`.
   //
   //   openStringCapture(key, depth, token_start)
   //     Called at the start of every non-key string value chain.
@@ -222,8 +223,8 @@ public:
   //     Gemini streamed root arrays; `args` is an arbitrary object)
   // plus headroom for nested tool arguments.
   //
-  // Per-depth state up to this bound is stored inline; a cursor with a larger
-  // `max_depth` allocates it once, at construction.
+  // Per-depth state up to this bound is stored inline; deeper levels are
+  // allocated only when a document reaches them.
   //
   // Public so callers can pass kMaxTrackedDepth - 1 to parseExtractFieldSpec.
   static constexpr int kMaxTrackedDepth = 17;
@@ -265,7 +266,7 @@ private:
     absl::flat_hash_set<std::string> seen_keys;
   };
   // levels_[d] is the state of depth d. It holds every depth reached so far, so
-  // depth_ always indexes it, and never grows past its reserved max_depth_ + 1.
+  // depth_ always indexes it.
   absl::InlinedVector<Level, kMaxTrackedDepth> levels_;
 
   bool in_string_chain_{false};
