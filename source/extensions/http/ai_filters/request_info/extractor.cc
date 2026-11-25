@@ -92,6 +92,8 @@ void readAnthropicMessages(const nlohmann::json& json, RequestAttributes& attrs)
 void readArrived(const LlmBindingRead& arrived, RequestAttributes& attrs) {
   if (arrived.model_from_path) {
     if (arrived.model.size() > MaxStringValueSize) {
+      // readCommon may have set the body's model already; the path decides, so drop it.
+      attrs.model.clear();
       attrs.malformed = true;
     } else {
       attrs.model = arrived.model;

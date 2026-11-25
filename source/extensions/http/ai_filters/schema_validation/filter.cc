@@ -4,7 +4,6 @@
 #include <string>
 #include <utility>
 
-#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/api_bindings.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_conversion.h"
@@ -25,7 +24,6 @@ using HttpFilters::AiProtocolManager::llmProtocolName;
 using HttpFilters::AiProtocolManager::LocalReplier;
 using HttpFilters::AiProtocolManager::PayloadSchema;
 using HttpFilters::AiProtocolManager::peekClientPath;
-using HttpFilters::AiProtocolManager::requestBinding;
 
 SchemaValidationFilterConfig::SchemaValidationFilterConfig(
     const envoy::extensions::http::ai_filters::schema_validation::v3::SchemaValidation& proto,
@@ -56,8 +54,7 @@ absl::Status SchemaValidationFilter::decodeSync(AiRequest& request, LocalReplier
   // payload ends.
   constexpr absl::string_view ModelInPath[] = {"model"};
   const std::optional<LlmBindingRead> arrived =
-      peekClientPath(request.protocol(),
-                     requestBinding(*context_.stream_info.filterState(), context_.request_binding),
+      peekClientPath(request.protocol(), context_.request_binding,
                      context_.request_headers.getPathValue(), request.json());
   const absl::Status status =
       schema->validateRequest(request.json(), arrived.has_value() && arrived->model_from_path

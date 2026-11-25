@@ -75,7 +75,8 @@ public:
     std::vector<AiFilterSharedPtr> filters;
     filters.push_back(std::make_unique<RequestInfoFilter>(
         config != nullptr ? std::move(config) : makeConfig(),
-        AiFilterContext{stream_info_, request_headers_, protocol, payload.size()}));
+        AiFilterContext{stream_info_, request_headers_, protocol, payload.size(),
+                        LLMProtocol::Unspecified, request_binding_}));
     FilterManager manager(std::move(filters));
 
     absl::Status status;
@@ -128,7 +129,19 @@ public:
   StreamInfo::StreamInfoImpl stream_info_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   Http::TestRequestHeaderMapImpl request_headers_;
+  HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr request_binding_;
 };
+
+// The filter reads the client's path under the route's request binding, so a chain of it alone
+// does not leave the binding unused.
+TEST_F(RequestInfoFilterTest, AppliesTheRequestBinding) {
+  const RequestInfoFilter filter(
+      makeConfig(),
+      AiFilterContext{stream_info_, request_headers_, LLMProtocol::OpenAiChatCompletions,
+                      /*request_payload_bytes=*/0, LLMProtocol::Unspecified, request_binding_});
+  EXPECT_TRUE(filter.bindingUse().request);
+  EXPECT_FALSE(filter.bindingUse().response);
+}
 
 TEST_F(RequestInfoFilterTest, PublishesTypedRecordAndForwardsPayloadUnchanged) {
   const std::string payload =
@@ -278,6 +291,18 @@ TEST_F(RequestInfoFilterTest, FirstWriterOwnsTheNamespace) {
   EXPECT_EQ(published()->model(), "first");
   EXPECT_EQ(counterValue("published"), 0);
   EXPECT_EQ(counterValue("duplicate"), 1);
+}
+
+TEST_F(RequestInfoFilterTest, ReadsModelAndStreamFromContextRequestBinding) {
+  request_binding_ =
+      *HttpFilters::AiProtocolManager::LlmBinding::parse("/gw/{model}/{chat|chat-stream}");
+  run(R"({"messages":[{"role":"user","content":"hi"}]})", LLMProtocol::OpenAiChatCompletions,
+      "/gw/gpt-4o/chat-stream");
+  const auto record = published();
+  ASSERT_TRUE(record.has_value());
+  EXPECT_EQ(record->model(), "gpt-4o");
+  EXPECT_TRUE(record->stream().value());
+  EXPECT_EQ(storedModel(), "gpt-4o");
 }
 
 } // namespace

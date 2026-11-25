@@ -24,7 +24,7 @@ TEST(ApiBindingsTest, EachApiHasItsOwnLayouts) {
   const ApiBindings& gemini = apiBindings(LLMProtocol::GeminiGenerateContent);
   ASSERT_NE(gemini.api, nullptr);
   EXPECT_TRUE(gemini.api->removesModel());
-  EXPECT_EQ(gemini.client.size(), 1);
+  EXPECT_EQ(gemini.client.size(), 2);
   // The OpenAI API carries everything in the body; an API without a pack has nothing either.
   for (const LLMProtocol protocol : {LLMProtocol::OpenAiChatCompletions,
                                      LLMProtocol::OpenAiResponses, LLMProtocol::Unspecified}) {
@@ -71,7 +71,10 @@ TEST(ApiBindingsTest, GeminiNamesTheModelAndTheModeInThePathUnderAnyVersion) {
         "/v1/models/gemini-2.5-pro:streamGenerateContent",
         "/v1alpha/models/gemini-2.5-pro:streamGenerateContent",
         "/v1/projects/p/locations/us-central1/publishers/google/models/"
-        "gemini-2.5-pro:streamGenerateContent?alt=sse"}) {
+        "gemini-2.5-pro:streamGenerateContent?alt=sse",
+        // Vertex AI express mode: no project or location.
+        "/v1/publishers/google/models/gemini-2.5-pro:streamGenerateContent",
+        "/v1beta1/publishers/google/models/gemini-2.5-pro:streamGenerateContent?alt=sse"}) {
     SCOPED_TRACE(path);
     const std::optional<LlmBindingRead> read = peek(LLMProtocol::GeminiGenerateContent, path);
     ASSERT_TRUE(read.has_value());
@@ -86,9 +89,25 @@ TEST(ApiBindingsTest, GeminiNamesTheModelAndTheModeInThePathUnderAnyVersion) {
   for (const absl::string_view path :
        {"/v1beta/models/gemini-2.5-pro:countTokens", "/v1beta/gemini-2.5-pro:generateContent",
         "/v1beta/models/gemini-2.5-pro", "/v1beta/models/:generateContent", "/",
-        "/v1/chat/completions"}) {
+        "/v1/chat/completions", "/v1/publishers/google/models/gemini-2.5-pro:countTokens",
+        "/v1/publishers/anthropic/models/gemini-2.5-pro:generateContent"}) {
     EXPECT_FALSE(peek(LLMProtocol::GeminiGenerateContent, path).has_value()) << path;
   }
+}
+
+// A path under a gateway prefix is not one of the API's layouts; the route's binding names it.
+TEST(ApiBindingsTest, GeminiUnderAPrefixNeedsABinding) {
+  constexpr absl::string_view path = "/gemini/v1beta/models/gemini-2.5-pro:generateContent";
+  EXPECT_FALSE(peek(LLMProtocol::GeminiGenerateContent, path).has_value());
+  const absl::StatusOr<LlmBindingConstSharedPtr> prefixed = LlmBinding::parse(
+      "/gemini/{version}/models/{model}:{generateContent|streamGenerateContent?alt=sse}");
+  ASSERT_TRUE(prefixed.ok());
+  const std::optional<LlmBindingRead> read =
+      peek(LLMProtocol::GeminiGenerateContent, path, nlohmann::json::object(), *prefixed);
+  ASSERT_TRUE(read.has_value());
+  EXPECT_EQ(read->model, "gemini-2.5-pro");
+  EXPECT_TRUE(read->model_from_path);
+  EXPECT_EQ(read->stream, false);
 }
 
 TEST(ApiBindingsTest, AGivenBindingReplacesTheApis) {

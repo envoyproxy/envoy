@@ -200,34 +200,34 @@ TEST(SchemaTest, FieldsInThePathCountAsPresent) {
             return root.contains("rejected") ? absl::InvalidArgumentError("rejected")
                                              : absl::OkStatus();
           });
-  constexpr absl::string_view model_in_path[] = {"model"};
+  constexpr absl::string_view supplied[] = {"model"};
 
   const nlohmann::json without_model = {{"max_tokens", 8}};
   EXPECT_THAT(schema.validate(without_model), StatusCodeIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(schema.validateRoot(without_model, model_in_path), IsOk());
-  EXPECT_THAT(schema.validateRoot(without_model, {}),
+  EXPECT_THAT(schema.validate(without_model, "", supplied), IsOk());
+  EXPECT_THAT(schema.validate(without_model, "", {}),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
 
   // Only the named field is excused.
-  const absl::Status missing_tokens = schema.validateRoot({{"stream", true}}, model_in_path);
+  const absl::Status missing_tokens = schema.validate({{"stream", true}}, "", supplied);
   EXPECT_THAT(missing_tokens, StatusCodeIs(absl::StatusCode::kInvalidArgument));
   EXPECT_EQ(missing_tokens.message(), "missing required field: max_tokens");
   // A body that names it too is still checked.
-  EXPECT_THAT(schema.validateRoot({{"model", 1}, {"max_tokens", 8}}, model_in_path),
+  EXPECT_THAT(schema.validate({{"model", 1}, {"max_tokens", 8}}, "", supplied),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
   // The root alone: a nested object with the same name is not excused.
-  EXPECT_THAT(schema.validateRoot({{"max_tokens", 8}, {"metadata", nlohmann::json::object()}},
-                                  model_in_path),
-              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(
+      schema.validate({{"max_tokens", 8}, {"metadata", nlohmann::json::object()}}, "", supplied),
+      StatusCodeIs(absl::StatusCode::kInvalidArgument));
   // The custom validator still runs.
   const absl::Status rejected =
-      schema.validateRoot({{"max_tokens", 8}, {"rejected", true}}, model_in_path);
+      schema.validate({{"max_tokens", 8}, {"rejected", true}}, "", supplied);
   EXPECT_THAT(rejected, StatusCodeIs(absl::StatusCode::kInvalidArgument));
   EXPECT_THAT(rejected.message(), testing::HasSubstr("rejected"));
 
   // Through the request schema.
   const PayloadSchema payload{RequestSchema{schema}};
-  EXPECT_THAT(payload.validateRequest(without_model, model_in_path), IsOk());
+  EXPECT_THAT(payload.validateRequest(without_model, supplied), IsOk());
   EXPECT_THAT(payload.validateRequest(without_model),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
 }

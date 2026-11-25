@@ -153,10 +153,12 @@ struct AiFilterContext {
   uint64_t request_payload_bytes{0};
   // Route-declared response/backend wire API; Unspecified when the route named none.
   LLMProtocol response_protocol = LLMProtocol::Unspecified;
-  // How the route's clients and its backend carry their APIs on HTTP; null when the route names
-  // none, and the request's when filter state names an API other than the route's. The
-  // envoy.ai.binding.request and envoy.ai.binding.response filter state objects replace them.
+  // Resolved client binding: `envoy.ai.binding.request` filter state, else the route's request
+  // binding (lapsing when filter state overrides the route's request API); null when neither
+  // names one.
   LlmBindingConstSharedPtr request_binding{};
+  // Route-declared backend binding; null when the route names none. The
+  // `envoy.ai.binding.response` filter state object replaces it.
   LlmBindingConstSharedPtr response_binding{};
 };
 

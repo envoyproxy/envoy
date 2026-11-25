@@ -450,6 +450,22 @@ TEST(LlmBindingReadTest, PeekReadsWithoutEditing) {
                                           R"( "max_tokens": 8})"));
 }
 
+// A binding that both captures `{model}` from the path and writes `model` to the body keeps the
+// path's model in `body` instead of stripping it back out as a written field.
+TEST(LlmBindingReadTest, PathModelStaysWhenBindingAlsoWritesModel) {
+  const LlmBindingConstSharedPtr binding = parseOk(
+      R"({"uri_pattern": "/gw/{model}",)"
+      R"( "body_mutations": [{"append": {"record": {"key": "model", "value": "default"},)"
+      R"( "action": "ADD_IF_ABSENT"}}]})");
+  nlohmann::json body = nlohmann::json::object();
+  const std::optional<LlmBindingRead> arrived = read(binding, "/gw/gpt-4o", body);
+  ASSERT_TRUE(arrived.has_value());
+  EXPECT_EQ(arrived->model, "gpt-4o");
+  EXPECT_TRUE(arrived->model_from_path);
+  EXPECT_TRUE(arrived->written_fields.empty());
+  EXPECT_EQ(body, nlohmann::json::parse(R"({"model": "gpt-4o"})"));
+}
+
 // `{model}` is the body's; every other variable is the client's path's, even when the body has a
 // field of that name.
 TEST(LlmBindingWriteTest, RendersTheModelFromTheBodyAndTheRestFromThePath) {

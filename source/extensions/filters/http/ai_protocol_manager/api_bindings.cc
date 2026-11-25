@@ -56,9 +56,13 @@ ApiBindings geminiBindings() {
           "/{version}/models/{model}:{generateContent|streamGenerateContent?alt=sse}",
           geminiMutations()),
       .client = {builtInBinding(
-          "/{version}/projects/{project}/locations/{location}/publishers/google/models/"
-          "{model}:{generateContent|streamGenerateContent?alt=sse}",
-          geminiMutations())},
+                     "/{version}/projects/{project}/locations/{location}/publishers/google/models/"
+                     "{model}:{generateContent|streamGenerateContent?alt=sse}",
+                     geminiMutations()),
+                 // Vertex AI express mode: the same methods with no project or location.
+                 builtInBinding("/{version}/publishers/google/models/"
+                                "{model}:{generateContent|streamGenerateContent?alt=sse}",
+                                geminiMutations())},
   };
 }
 
@@ -72,10 +76,13 @@ const ApiBindings& apiBindings(LLMProtocol protocol) {
   case LLMProtocol::GeminiGenerateContent: {
     CONSTRUCT_ON_FIRST_USE(ApiBindings, geminiBindings());
   }
-  default: {
-    CONSTRUCT_ON_FIRST_USE(ApiBindings);
+  // OpenAI names the model in the body alone, so its paths bind nothing.
+  case LLMProtocol::OpenAiChatCompletions:
+  case LLMProtocol::OpenAiResponses:
+  case LLMProtocol::Unspecified:
+    break;
   }
-  }
+  CONSTRUCT_ON_FIRST_USE(ApiBindings);
 }
 
 std::optional<LlmBindingRead> peekClientPath(LLMProtocol protocol,

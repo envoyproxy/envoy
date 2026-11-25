@@ -144,6 +144,18 @@ public:
   std::optional<LLMProtocol> seen_protocol_;
 };
 
+// The filter reads the client's path under the route's request binding, so a chain of it alone
+// does not leave the binding unused.
+TEST_F(SchemaValidationFilterTest, AppliesTheRequestBinding) {
+  envoy::extensions::http::ai_filters::schema_validation::v3::SchemaValidation proto;
+  const SchemaValidationFilter filter(
+      std::make_shared<const SchemaValidationFilterConfig>(proto, *stats_store_.rootScope()),
+      AiFilterContext{stream_info_, request_headers_, LLMProtocol::OpenAiChatCompletions,
+                      /*request_payload_bytes=*/0, LLMProtocol::Unspecified, request_binding_});
+  EXPECT_TRUE(filter.bindingUse().request);
+  EXPECT_FALSE(filter.bindingUse().response);
+}
+
 TEST_F(SchemaValidationFilterTest, ForwardsPayloadMatchingTheDeclaredSchema) {
   run(ChatPayload, LLMProtocol::OpenAiChatCompletions);
   expectForwarded();

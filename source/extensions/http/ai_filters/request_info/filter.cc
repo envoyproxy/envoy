@@ -94,10 +94,8 @@ void RequestInfoFilter::publish(const AiRequest& request) {
   // The path names the model, and sometimes the streaming mode, under the binding the request
   // arrived in: Gemini's own, or Vertex AI's for Gemini and Claude.
   const std::optional<LlmBindingRead> arrived = HttpFilters::AiProtocolManager::peekClientPath(
-      request.protocol(),
-      HttpFilters::AiProtocolManager::requestBinding(*stream_info.filterState(),
-                                                     context_.request_binding),
-      context_.request_headers.getPathValue(), request.json());
+      request.protocol(), context_.request_binding, context_.request_headers.getPathValue(),
+      request.json());
   const RequestAttributes attrs = extractRequestAttributes(
       request.protocol(), request.json(), arrived.has_value() ? &*arrived : nullptr);
   envoy::data::ai::v3::RequestInfo record = toProto(attrs);

@@ -333,6 +333,25 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
               llmProtocolName(request_protocol_));
   }
 
+  // Resolve the client binding once for every AI filter, failing fast on unparseable filter state.
+  if (isAiEndpoint()) {
+    absl::StatusOr<LlmBindingConstSharedPtr> named_binding =
+        LlmBindingObject::fromFilterState(filter_state, FilterStateKeys::BindingRequest);
+    if (!named_binding.ok()) {
+      ENVOY_LOG(debug, "ai_protocol_manager: rejecting request: filter state `{}`: {}",
+                FilterStateKeys::BindingRequest, named_binding.status().message());
+      payload_rejected_ = true;
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::InternalServerError,
+          absl::StrCat("ai_protocol_manager: filter state `", FilterStateKeys::BindingRequest,
+                       "`: ", named_binding.status().message()),
+          nullptr, std::nullopt, "ai_protocol_manager_invalid_request_binding");
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+    request_binding_ =
+        *named_binding != nullptr ? *std::move(named_binding) : route_request_binding_;
+  }
+
   // Declared AI endpoints are parsed strictly; other routes are only parsed if
   // parse_unconfigured_routes is enabled and the request can be buffered without stalling.
   // TODO(penguingao): on best-effort parse failure, flush buffered headers/body immediately
@@ -434,13 +453,13 @@ void AiProtocolManagerFilter::rejectInvalidPayload(const absl::Status& status) {
 
 Http::FilterDataStatus AiProtocolManagerFilter::decodeData(Buffer::Instance& data,
                                                            bool end_stream) {
-  if (decode_manager_ == nullptr) {
-    // decodeHeaders() decided this stream is none of our business.
-    return Http::FilterDataStatus::Continue;
-  }
   if (payload_rejected_) {
     // Already terminated by the local reply; drop whatever is still in flight.
     return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+  if (decode_manager_ == nullptr) {
+    // decodeHeaders() decided this stream is none of our business.
+    return Http::FilterDataStatus::Continue;
   }
 
   if (request_parser_ != nullptr) {
@@ -465,11 +484,11 @@ Http::FilterDataStatus AiProtocolManagerFilter::decodeData(Buffer::Instance& dat
 }
 
 Http::FilterTrailersStatus AiProtocolManagerFilter::decodeTrailers(Http::RequestTrailerMap&) {
-  if (decode_manager_ == nullptr) {
-    return Http::FilterTrailersStatus::Continue;
-  }
   if (payload_rejected_) {
     return Http::FilterTrailersStatus::StopIteration;
+  }
+  if (decode_manager_ == nullptr) {
+    return Http::FilterTrailersStatus::Continue;
   }
   // A trailer-only request (no body) has nothing to replay; let the trailers flow.
   if (decode_manager_->empty()) {
@@ -522,7 +541,7 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
                                   .request_protocol = request_protocol_,
                                   .request_payload_bytes = decode_manager_->length(),
                                   .response_protocol = route_response_protocol_,
-                                  .request_binding = route_request_binding_,
+                                  .request_binding = request_binding_,
                                   .response_binding = route_response_binding_};
     std::vector<AiFilterSharedPtr> filters;
     filters.reserve(config_->aiFilterFactories().size());

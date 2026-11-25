@@ -123,10 +123,9 @@ public:
   HttpFilters::AiProtocolManager::BindingUse bindingUse() const override;
 
 private:
-  // The transcoding instructions the request legs follow, from filter state or else the route;
-  // each is unset when neither names it.
+  // The backend-side transcoding instructions from filter state or else the route; each is unset
+  // when neither names it.
   struct Instructions {
-    HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr request_binding;
     HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr response_binding;
     std::string resolved_model;
   };
@@ -144,10 +143,9 @@ private:
   // backend-side leg and for field access.
   void recordRead(HttpFilters::AiProtocolManager::LlmBindingRead&& read);
   // The model the client's path names, for a request that leaves this instance without the IR's:
-  // what a request leg recorded, or else the path read again under `request_binding`. Called
+  // what a request leg recorded, or else the path read again under `request_binding_`. Called
   // before the path is rewritten.
-  std::string modelFromPath(
-      const HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr& request_binding) const;
+  std::string modelFromPath() const;
 
   // The engine leg that transcodes this stream's response as `kind`, or `std::nullopt` when the
   // response passes through: response transcoding is off, or the dialect it needs is unknown.
@@ -172,8 +170,9 @@ private:
   // The stream's filter state, where the instructions are left. Held by pointer: the stream info
   // itself is only valid for as long as `AiFilterContext` says.
   const StreamInfo::FilterStateSharedPtr filter_state_;
-  // The route's bindings, which the filter state objects replace for one request.
-  const HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr route_request_binding_;
+  // The resolved client binding from `AiFilterContext`, and the route's backend binding (which
+  // `envoy.ai.binding.response` filter state replaces for one request).
+  const HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr request_binding_;
   const HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr route_response_binding_;
   // When the stream started, in seconds since the Unix epoch: the `created` time of an IR
   // response whose dialect does not carry one.

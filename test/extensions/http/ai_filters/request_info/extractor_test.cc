@@ -176,11 +176,54 @@ TEST(RequestInfoExtractorTest, GeminiOversizedPathModelFlagsAndKeepsStream) {
   EXPECT_TRUE(attrs.malformed);
 }
 
+// The path decides the model, so the body's must not leak when the path's is too long.
+TEST(RequestInfoExtractorTest, GeminiOversizedPathModelDropsBodyModel) {
+  const RequestAttributes attrs =
+      extract(LLMProtocol::GeminiGenerateContent, R"({"model":"from-body"})",
+              "/v1beta/models/" + std::string(MaxStringValueSize + 1, 'm') + ":generateContent");
+  EXPECT_TRUE(attrs.model.empty());
+  EXPECT_EQ(attrs.stream, false);
+  EXPECT_TRUE(attrs.malformed);
+}
+
 TEST(RequestInfoExtractorTest, GeminiReadsTheTargetUnderAnyApiVersion) {
   const RequestAttributes attrs = extract(LLMProtocol::GeminiGenerateContent, "{}",
                                           "/v1/models/gemini-2.5-pro:generateContent");
   EXPECT_EQ(attrs.model, "gemini-2.5-pro");
   EXPECT_EQ(attrs.stream, false);
+}
+
+// Vertex AI express mode nests the methods under a publisher with no project or location.
+TEST(RequestInfoExtractorTest, GeminiReadsTheVertexExpressTarget) {
+  const RequestAttributes attrs =
+      extract(LLMProtocol::GeminiGenerateContent, "{}",
+              "/v1/publishers/google/models/gemini-2.5-flash:streamGenerateContent");
+  EXPECT_EQ(attrs.model, "gemini-2.5-flash");
+  EXPECT_EQ(attrs.stream, true);
+  EXPECT_FALSE(attrs.malformed);
+}
+
+// A gateway prefix is not one of the API's layouts, so the route's binding must name it.
+TEST(RequestInfoExtractorTest, GeminiUnderAPrefixReadsOnlyWithABinding) {
+  constexpr absl::string_view path = "/gemini/v1beta/models/gemini-2.5-pro:generateContent";
+  const nlohmann::json json = nlohmann::json::object();
+  const RequestAttributes unbound = extractJson(LLMProtocol::GeminiGenerateContent, json, path);
+  EXPECT_TRUE(unbound.model.empty());
+  EXPECT_FALSE(unbound.stream.has_value());
+  EXPECT_FALSE(unbound.malformed);
+
+  const absl::StatusOr<HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr> binding =
+      HttpFilters::AiProtocolManager::LlmBinding::parse(
+          "/gemini/{version}/models/{model}:{generateContent|streamGenerateContent?alt=sse}");
+  ASSERT_TRUE(binding.ok());
+  const std::optional<LlmBindingRead> arrived =
+      peekClientPath(LLMProtocol::GeminiGenerateContent, *binding, path, json);
+  ASSERT_TRUE(arrived.has_value());
+  const RequestAttributes bound =
+      extractRequestAttributes(LLMProtocol::GeminiGenerateContent, json, &*arrived);
+  EXPECT_EQ(bound.model, "gemini-2.5-pro");
+  EXPECT_EQ(bound.stream, false);
+  EXPECT_FALSE(bound.malformed);
 }
 
 // Claude on Vertex AI names the model in the path and leaves `stream` to the body unless the

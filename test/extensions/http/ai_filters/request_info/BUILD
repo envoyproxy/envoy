@@ -40,6 +40,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_manager_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:llm_binding_lib",
         "//source/extensions/http/ai_filters/request_info:filter_lib",
         "//test/extensions/filters/http/ai_protocol_manager:fake_bridge_lib",
         "//test/mocks/stats:stats_mocks",
