@@ -18,28 +18,25 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-class PayloadReader;
-using PayloadReaderSharedPtr = std::shared_ptr<PayloadReader>;
-
 // Reference-counted read handle over a payload stored inline in memory or in an ExternalBuffer,
 // serializing ExternalBuffer::read() calls across coroutines via a single-flight semaphore.
 class PayloadReader : public std::enable_shared_from_this<PayloadReader> {
 public:
   // Adopts `data` (draining it) into an immediately readable in-memory PayloadReader.
-  static PayloadReaderSharedPtr fromInMemory(Buffer::Instance& data);
+  static std::shared_ptr<PayloadReader> fromInMemory(Buffer::Instance& data);
 
   // Wraps an already-flushed `buffer` of `length` bytes in an immediately readable PayloadReader.
-  static PayloadReaderSharedPtr fromExternalBuffer(std::shared_ptr<ExternalBuffer> buffer,
-                                                   uint64_t length);
+  static std::shared_ptr<PayloadReader> fromExternalBuffer(std::shared_ptr<ExternalBuffer> buffer,
+                                                           uint64_t length);
 
   // Creates a PayloadReader of `length` bytes whose ExternalBuffer flush is still in flight.
   // `pending_owner`, if provided, keeps the ingest producer alive until completeExternalHandoff(),
   // failExternalHandoff(), or ~PayloadReader().
-  static PayloadReaderSharedPtr
+  static std::shared_ptr<PayloadReader>
   createPendingExternal(uint64_t length, std::shared_ptr<void> pending_owner = nullptr);
 
   // Creates a PayloadReader representing an already-failed external buffer write.
-  static PayloadReaderSharedPtr createFailed(uint64_t length = 0);
+  static std::shared_ptr<PayloadReader> createFailed(uint64_t length = 0);
 
   PayloadReader(const PayloadReader&) = delete;
   PayloadReader& operator=(const PayloadReader&) = delete;
@@ -90,6 +87,8 @@ private:
   bool readable_{false};
   bool failed_{false};
 };
+
+using PayloadReaderSharedPtr = std::shared_ptr<PayloadReader>;
 
 } // namespace AiProtocolManager
 } // namespace HttpFilters
