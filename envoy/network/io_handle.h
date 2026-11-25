@@ -413,8 +413,11 @@ public:
   virtual std::optional<std::string> interfaceName() PURE;
 
   /**
-   * Merge connection-scoped state from this IoHandle into an accepted stream before listener
-   * filters run. May be called again on listener handoff for listeners that support it.
+   * Merge connection-scoped state from this IoHandle into the accepted socket's stream info,
+   * before listener filters and filter chain matching run. Datagram listeners never call it. It
+   * runs on the thread that holds the socket after any balancing by that listener. An original
+   * destination hand-off can call it again with a fresh stream info, possibly on another worker,
+   * so a handle accepted where a hand-off can happen must keep its state rather than consume it.
    * @param metadata dynamic metadata to merge into.
    * @param filter_state filter state to populate.
    */

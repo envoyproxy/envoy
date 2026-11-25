@@ -764,6 +764,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
 
 // Verify that the server connection with recovered address is rebalanced at redirected listener.
 TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
+  StateCarryingIoHandle state_io_handle;
   // Prepare Listener1.
   NiceMock<Network::MockListenerConfig> listener_config1;
   NiceMock<Network::MockConnectionBalancer> balancer1;
@@ -814,6 +815,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   auto* test_filter = new NiceMock<Network::MockListenerFilter>();
   EXPECT_CALL(*test_filter, destroy_());
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(state_io_handle));
   bool redirected = false;
 
   // 1. Listener1 re-balance. Set the balance target to the the active listener itself.
@@ -841,6 +843,9 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
       });
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        EXPECT_EQ(state_io_handle.merge_calls_, 1);
+        EXPECT_EQ(state_io_handle.merged_metadata_, &cb.dynamicMetadata());
+        EXPECT_EQ(state_io_handle.merged_filter_state_, &cb.filterState());
         cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
         return Network::FilterStatus::Continue;
       });
@@ -872,6 +877,9 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   auto* connection = new NiceMock<Network::MockServerConnection>();
   EXPECT_CALL(dispatcher_, createServerConnection_(_))
       .WillOnce([&](StreamInfo::StreamInfo& info) -> Network::ServerConnection* {
+        EXPECT_EQ(state_io_handle.merge_calls_, 2);
+        EXPECT_EQ(state_io_handle.merged_metadata_, &info.dynamicMetadata());
+        EXPECT_EQ(state_io_handle.merged_filter_state_, info.filterState().get());
         EXPECT_TRUE(
             info.filterState()->hasIndexedData(StreamInfo::FilterStateIndex::NetworkNamespace));
         const auto* obj = info.filterState()->getIndexedDataReadOnlyGeneric(
