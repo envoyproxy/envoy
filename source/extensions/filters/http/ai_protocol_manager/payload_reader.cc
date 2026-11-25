@@ -74,7 +74,6 @@ PayloadReaderSharedPtr PayloadReader::fromInMemory(Buffer::Instance& data) {
   PayloadReaderSharedPtr reader(new PayloadReader());
   reader->total_length_ = data.length();
   reader->in_memory_.move(data);
-  reader->readable_ = true;
   return reader;
 }
 
@@ -85,7 +84,6 @@ PayloadReaderSharedPtr PayloadReader::fromExternalBuffer(std::shared_ptr<Externa
   reader->total_length_ = length;
   reader->buffer_ = std::move(buffer);
   reader->read_sem_ = std::make_shared<Coroutine::Semaphore>(1);
-  reader->readable_ = true;
   return reader;
 }
 
@@ -119,7 +117,7 @@ Coroutine::Task<absl::StatusOr<Buffer::InstancePtr>> PayloadReader::readChunk(ui
   if (offset > self->total_length_ || max_length > self->total_length_ - offset) {
     co_return absl::InvalidArgumentError("payload read range out of bounds");
   }
-  if (self->readable_ && (self->buffer_ == nullptr || max_length == 0)) {
+  if (!self->pending_permit_.hasPermits() && (self->buffer_ == nullptr || max_length == 0)) {
     auto data = std::make_unique<Buffer::OwnedImpl>();
     if (max_length > 0) {
       auto bytes = std::make_unique<uint8_t[]>(max_length);
@@ -142,19 +140,18 @@ Coroutine::Task<absl::StatusOr<Buffer::InstancePtr>> PayloadReader::readChunk(ui
 
 std::shared_ptr<void>
 PayloadReader::completeExternalHandoff(std::shared_ptr<ExternalBuffer> buffer) {
-  if (failed_ || readable_) {
+  if (!pending_permit_.hasPermits()) {
     return nullptr;
   }
   ASSERT(buffer != nullptr);
   buffer_ = std::move(buffer);
-  readable_ = true;
   std::shared_ptr<void> owner = std::move(pending_owner_);
   pending_permit_.release();
   return owner;
 }
 
 std::shared_ptr<void> PayloadReader::failExternalHandoff() {
-  if (failed_ || readable_) {
+  if (!pending_permit_.hasPermits()) {
     return nullptr;
   }
   failed_ = true;

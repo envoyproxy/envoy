@@ -47,7 +47,7 @@ public:
 
   // True when every byte in [0, length()) can be read immediately without waiting for an in-flight
   // external durability flush.
-  bool allBytesReadable() const { return readable_ && !failed_; }
+  bool allBytesReadable() const { return !failed_ && !pending_permit_.hasPermits(); }
 
   // True if external storage failed during durability handoff or on a subsequent read.
   bool hasFailed() const { return failed_; }
@@ -78,7 +78,6 @@ private:
   Coroutine::SemaphoreReservation pending_permit_;
   std::shared_ptr<void> pending_owner_;
 
-  bool readable_{false};
   bool failed_{false};
 };
 
