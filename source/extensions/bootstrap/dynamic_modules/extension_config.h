@@ -96,6 +96,8 @@ using OnBootstrapExtensionRuntimeIntUpdateType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_int_update);
 using OnBootstrapExtensionRuntimeNumberUpdateType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_number_update);
+using OnBootstrapExtensionRuntimeStringUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_runtime_string_update);
 
 class DynamicModuleBootstrapExtension;
 
@@ -392,6 +394,8 @@ public:
   OnBootstrapExtensionRuntimeBoolUpdateType on_bootstrap_extension_runtime_bool_update_ = nullptr;
   OnBootstrapExtensionRuntimeIntUpdateType on_bootstrap_extension_runtime_int_update_ = nullptr;
   OnBootstrapExtensionRuntimeNumberUpdateType on_bootstrap_extension_runtime_number_update_ =
+      nullptr;
+  OnBootstrapExtensionRuntimeStringUpdateType on_bootstrap_extension_runtime_string_update_ =
       nullptr;
 
   // The name of the extension.

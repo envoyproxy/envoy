@@ -105,6 +105,51 @@ pub extern "C" fn envoy_dynamic_module_callback_get_runtime_number(
     .unwrap_or(default_value)
 }
 
+static MOCK_RUNTIME_STRINGS: std::sync::Mutex<Option<std::collections::HashMap<String, String>>> =
+  std::sync::Mutex::new(None);
+// Keeps the text last handed out alive, as Envoy's buffer is until the end of the hook. A later
+// call replaces it, so nothing is leaked.
+static MOCK_RUNTIME_STRING_RESULT: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_get_runtime_string(
+  key: abi::envoy_dynamic_module_type_module_buffer,
+  result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  let guard = MOCK_RUNTIME_STRINGS.lock().unwrap();
+  let Some(value) = guard
+    .as_ref()
+    .and_then(|values| values.get(&module_buffer_to_string(key)))
+  else {
+    return false;
+  };
+  let mut stored = MOCK_RUNTIME_STRING_RESULT.lock().unwrap();
+  *stored = value.clone();
+  unsafe {
+    (*result).ptr = stored.as_ptr() as *const _;
+    (*result).length = stored.len();
+  }
+  true
+}
+
+#[test]
+fn test_runtime_string_callback() {
+  *MOCK_RUNTIME_STRINGS.lock().unwrap() = Some(std::collections::HashMap::from([
+    (
+      "some.mapping".to_string(),
+      "80:15100,8080:15101".to_string(),
+    ),
+    ("some.empty".to_string(), String::new()),
+  ]));
+  assert_eq!(
+    get_runtime_string("some.mapping").as_deref(),
+    Some("80:15100,8080:15101")
+  );
+  // A key that exists with an empty text is not a missing key.
+  assert_eq!(get_runtime_string("some.empty").as_deref(), Some(""));
+  assert_eq!(get_runtime_string("missing.key"), None);
+}
+
 #[test]
 fn test_runtime_callbacks() {
   *MOCK_RUNTIME_BOOLS.lock().unwrap() = Some(std::collections::HashMap::from([
@@ -8980,12 +9025,31 @@ fn test_bootstrap_extension_runtime_update() {
     1.5,
     true,
   );
+  envoy_dynamic_module_on_bootstrap_extension_runtime_string_update(
+    std::ptr::null_mut(),
+    extension_ptr,
+    buffer("some.mapping"),
+    buffer("80:15100,8080:15101"),
+    false,
+  );
+  envoy_dynamic_module_on_bootstrap_extension_runtime_string_update(
+    std::ptr::null_mut(),
+    extension_ptr,
+    buffer("some.text"),
+    buffer("previous text"),
+    true,
+  );
   assert_eq!(
     *UPDATES.lock().unwrap(),
     vec![
       ("some.flag".to_string(), Some(RuntimeValue::Bool(true))),
       ("some.int".to_string(), Some(RuntimeValue::Int(42))),
       ("some.number".to_string(), None),
+      (
+        "some.mapping".to_string(),
+        Some(RuntimeValue::String("80:15100,8080:15101".to_string()))
+      ),
+      ("some.text".to_string(), None),
     ]
   );
 

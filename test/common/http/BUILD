@@ -270,7 +270,10 @@ envoy_cc_benchmark_binary(
         "openssl": {"build": "default"},
     },
     deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:watermark_buffer_lib",
         "//source/common/http:filter_manager_lib",
+        "//source/common/http:header_map_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_reply:local_reply_mocks",
@@ -278,6 +281,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:test_runtime_lib",
         "@benchmark",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
 
@@ -852,8 +856,26 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "http_server_properties_cache_manager_speed_test",
+    srcs = ["http_server_properties_cache_manager_speed_test.cc"],
+    deps = [
+        "//source/common/http:http_server_properties_cache",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "http_server_properties_cache_manager_speed_test_benchmark_test",
+    benchmark_binary = "http_server_properties_cache_manager_speed_test",
 )
 
 envoy_proto_library(

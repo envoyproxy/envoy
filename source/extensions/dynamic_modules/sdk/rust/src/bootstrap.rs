@@ -818,7 +818,7 @@ pub trait EnvoyBootstrapExtension {
 }
 
 /// The value of a watched runtime key, as given to [`BootstrapExtension::on_runtime_update`].
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum RuntimeValue {
   /// A boolean, as read by [`crate::get_runtime_bool`].
   Bool(bool),
@@ -827,6 +827,10 @@ pub enum RuntimeValue {
   Int(u64),
   /// Any other number, as read by [`crate::get_runtime_number`].
   Number(f64),
+  /// A non-empty string that reads as neither a number nor a boolean, as read by
+  /// [`crate::get_runtime_string`]. The text of a structured value that is not a fractional
+  /// percent is unspecified.
+  String(String),
 }
 
 /// BootstrapExtensionConfig is the module-side bootstrap extension configuration.
@@ -1264,10 +1268,10 @@ pub trait BootstrapExtension: Send + Sync {
   /// * `envoy_extension` can be used to interact with the underlying Envoy extension object.
   /// * `key` is the watched runtime key whose value changed.
   /// * `value` is the new value of the key, typed the way the runtime getters read it, or `None`
-  ///   when the key became unset. A value that is neither a boolean nor a number counts as unset.
-  ///   See [`RuntimeValue`]. When a runtime guard becomes unset, the guard returns to its value
-  ///   before any layer set it, normally its compiled default, while [`crate::get_runtime_bool`]
-  ///   returns the default given by the caller.
+  ///   when the key became unset. A value that is none of a boolean, a number or a non-empty string
+  ///   counts as unset. See [`RuntimeValue`]. When a runtime guard becomes unset, the guard returns
+  ///   to its value before any layer set it, normally its compiled default, while
+  ///   [`crate::get_runtime_bool`] returns the default given by the caller.
   fn on_runtime_update(
     &mut self,
     _envoy_extension: &mut dyn EnvoyBootstrapExtension,
@@ -2895,6 +2899,23 @@ ffi_export! {
     removed: bool,
   ) {
     on_runtime_update_impl(envoy_ptr, extension_ptr, key, RuntimeValue::Number(value), removed);
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy when a watched runtime key gets a new string value, or becomes
+  /// unset after having one.
+  fn envoy_dynamic_module_on_bootstrap_extension_runtime_string_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+    key: abi::envoy_dynamic_module_type_envoy_buffer,
+    value: abi::envoy_dynamic_module_type_envoy_buffer,
+    removed: bool,
+  ) {
+    let text =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(value.ptr as *const u8, value.length) };
+    let value = RuntimeValue::String(text.into_owned());
+    on_runtime_update_impl(envoy_ptr, extension_ptr, key, value, removed);
   }
 }
 

@@ -17,30 +17,34 @@ class SchemaValidationIntegrationTest : public testing::TestWithParam<Network::A
 public:
   SchemaValidationIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
-  // The route declares an AI endpoint without naming its API.
-  void initializeFilters(bool with_filter_state, bool fail_open = false) {
-    config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
-      envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute
-          per_route;
-      per_route.mutable_request();
-      auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
-      std::ignore =
-          (*route->mutable_typed_per_filter_config())["envoy.filters.http.ai_protocol_manager"]
-              .PackFrom(per_route);
-    });
+  // The route declares an AI endpoint without naming its API, or with declare_route false, nothing.
+  void initializeFilters(bool with_filter_state, bool fail_open = false,
+                         bool declare_route = true) {
+    if (declare_route) {
+      config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+        envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute
+            per_route;
+        per_route.mutable_request();
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        std::ignore =
+            (*route->mutable_typed_per_filter_config())["envoy.filters.http.ai_protocol_manager"]
+                .PackFrom(per_route);
+      });
+    }
 
     config_helper_.prependFilter(fmt::format(R"EOF(
 name: envoy.filters.http.ai_protocol_manager
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
-  request_handling: {{}}
+  request_handling:
+    parse_unconfigured_routes: {}
   filters:
   - name: envoy.http.ai_filters.schema_validation
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.ai_filters.schema_validation.v3.SchemaValidation
       fail_open: {}
 )EOF",
-                                             fail_open));
+                                             !declare_route, fail_open));
 
     if (with_filter_state) {
       config_helper_.prependFilter(R"EOF(
@@ -110,6 +114,20 @@ TEST_P(SchemaValidationIntegrationTest, FailOpenForwardsAViolation) {
   const std::string payload = R"({"model":"claude","messages":[]})";
   expectForwarded(sendRequest("/v1/messages", payload), payload);
   test_server_->waitForCounter("ai_protocol_manager.schema_validation.invalid", testing::Eq(1));
+}
+
+// A dynamic forward proxy's catch-all route declares nothing; schema validation detects the API.
+TEST_P(SchemaValidationIntegrationTest, UnconfiguredRouteDetectsTheApi) {
+  initializeFilters(/*with_filter_state=*/false, /*fail_open=*/false, /*declare_route=*/false);
+  expectForwarded(sendRequest("/v1/messages", AnthropicPayload), AnthropicPayload);
+  test_server_->waitForCounter("ai_protocol_manager.schema_validation.valid", testing::Eq(1));
+  test_server_->waitForCounter("ai_protocol_manager.schema_validation.llm_protocol_detected",
+                               testing::Eq(1));
+}
+
+TEST_P(SchemaValidationIntegrationTest, UnconfiguredRouteRejectsADetectedApiViolation) {
+  initializeFilters(/*with_filter_state=*/false, /*fail_open=*/false, /*declare_route=*/false);
+  expectRejected(sendRequest("/v1/messages", R"({"model":"claude","messages":[]})"));
 }
 
 // set_filter_state builds the core's filter state object from its enum-value name. The payload is

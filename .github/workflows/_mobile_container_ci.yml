@@ -167,6 +167,7 @@ jobs:
       notice-match: ${{ inputs.notice-match }}
       output-path: ${{ inputs.output-path }}
       request: ${{ inputs.request }}
+      skip: ${{ inputs.skip }}
       source: ${{ inputs.source }}
       steps-pre: ${{ inputs.steps-pre }}
       steps-post: ${{ inputs.steps-post }}

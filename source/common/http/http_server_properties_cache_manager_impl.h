@@ -42,10 +42,12 @@ private:
   // Contains a cache and the options associated with it.
   struct CacheWithOptions {
     CacheWithOptions(const envoy::config::core::v3::AlternateProtocolsCacheOptions& options,
-                     HttpServerPropertiesCacheSharedPtr cache)
-        : options_(options), cache_(cache) {}
+                     std::string&& serialized_options, HttpServerPropertiesCacheSharedPtr cache)
+        : options_(options), serialized_options_(std::move(serialized_options)), cache_(cache) {}
 
     const envoy::config::core::v3::AlternateProtocolsCacheOptions options_;
+    // Equivalent options can serialize differently, so options_ decides when the bytes differ.
+    const std::string serialized_options_;
     HttpServerPropertiesCacheSharedPtr cache_;
   };
 

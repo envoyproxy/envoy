@@ -66,10 +66,23 @@ public:
   const std::string& connectionKey() const { return connection_key_; }
 
   /**
+   * Remember that the parent listener stopped accepting during teardown. A drain on a running
+   * listener only stops tunnel initiation and does not set this flag.
+   */
+  void onListenerStopped() { listener_stopped_ = true; }
+  bool listenerStopped() const { return listener_stopped_; }
+
+  // Whether the parent can still dial a replacement, including during an in-place update.
+  bool canInitiateConnections() const;
+
+  /**
    * Called by the parent ReverseConnectionIOHandle when it is destroyed, so a surviving tunnel
    * clears its back-pointer instead of retaining a dangling parent pointer.
    */
-  void detachParent() { parent_ = nullptr; }
+  void detachParent() {
+    onListenerStopped();
+    parent_ = nullptr;
+  }
 
   /**
    * Notify the parent that this tunnel has begun draining so it can drop the key from tracking
@@ -89,6 +102,7 @@ private:
   Network::ConnectionSocketPtr owned_socket_;
   // Pointer to parent ReverseConnectionIOHandle for connection lifecycle management.
   ReverseConnectionIOHandle* parent_;
+  bool listener_stopped_{false};
   // Connection key for tracking this specific connection.
   std::string connection_key_;
   // The initiator's per-connection identifier, reported to the parent on close.

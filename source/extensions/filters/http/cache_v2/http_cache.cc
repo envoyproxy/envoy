@@ -11,6 +11,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/deterministic_hash.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/cache_v2/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache_v2/cache_headers_utils.h"
 
@@ -24,6 +25,8 @@ namespace HttpFilters {
 namespace CacheV2 {
 
 size_t stableHashKey(const Key& key) { return DeterministicProtoHash::hash(key); }
+
+SerializedKey serializeKey(const Key& key) { return MessageUtil::serializeDeterministically(key); }
 
 LookupRequest::LookupRequest(Key&& key, Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher), key_(key) {}

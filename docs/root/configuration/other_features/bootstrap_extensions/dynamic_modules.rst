@@ -34,6 +34,38 @@ Example Configuration
         "@type": type.googleapis.com/google.protobuf.StringValue
         value: "my_config"
 
+Go SDK
+------
+
+The Go SDK supports bootstrap configuration factories, lifecycle hooks, initialization targets,
+and main-thread scheduling. Register a ``shared.BootstrapExtensionConfigFactory`` with
+``sdk.RegisterBootstrapExtensionConfigFactories`` during Go package initialization. Its
+``Create`` method receives a ``shared.BootstrapExtensionConfigHandle`` and returns a
+``shared.BootstrapExtensionConfig``. The configuration's ``Create`` method constructs each
+extension instance. Embed ``shared.EmptyBootstrapExtensionConfig`` and
+``shared.EmptyBootstrapExtension`` to inherit the optional hooks for each.
+
+Call ``SignalInitComplete`` exactly once to release the bootstrap initialization target. For
+asynchronous initialization, obtain ``GetScheduler`` on the main thread, perform background work,
+then use ``Schedule`` to call ``SignalInitComplete`` back on the main thread. Scheduled tasks may
+schedule more tasks. The SDK discards pending tasks at configuration destruction and ignores
+later scheduling attempts. ``SignalInitComplete`` can run lifecycle hooks and wait for workers
+to start before it returns. Release any locks those hooks need before calling it.
+
+``OnShutdown`` receives a completion function. Call it after cleanup finishes; it can be retained
+for asynchronous cleanup and called from another goroutine. The SDK ignores repeated calls and
+completes shutdown if the hook panics. Otherwise Envoy waits for completion before exiting.
+Put essential cleanup in ``OnDestroy`` because Envoy skips ``OnShutdown`` during shutdown before
+workers start and in ``init_only`` and ``validate`` modes. Configuration and instance ``OnDestroy``
+callbacks have separate lifetimes. As with other Go dynamic modules, configure
+``do_not_close: true`` so the Go runtime remains loaded.
+
+Modules that need bootstrap APIs such as HTTP callouts or timers can supply their own
+bootstrap ABI hooks. Build with ``go build -buildmode=c-shared -tags envoy_dynamic_modules_go_custom_bootstrap``
+to omit the SDK's bootstrap exports. The module then supplies all required bootstrap hooks.
+Use ``envoy_dynamic_modules_go_custom_cluster`` for a hand-written cluster ABI. The tags are
+independent and can be combined. Other SDK extension kinds remain available.
+
 Lifecycle Hooks
 ---------------
 
@@ -90,8 +122,12 @@ getters read it:
   read by ``envoy_dynamic_module_callback_get_runtime_number``.
 * ``envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update`` for a boolean, as read by
   ``envoy_dynamic_module_callback_get_runtime_bool``.
+* ``envoy_dynamic_module_on_bootstrap_extension_runtime_string_update`` for a non-empty string that
+  reads as neither a number nor a boolean, as read by
+  ``envoy_dynamic_module_callback_get_runtime_string``, which reads a value of any type as its text.
+  The text of a structured value that is not a fractional percent is unspecified.
 
-A value of any other type, such as a string, counts as unset. When a key becomes unset, Envoy calls
+A value of any other type, such as an empty string or null, counts as unset. When a key becomes unset, Envoy calls
 the hook of its previous type with the previous value and ``removed`` set. Envoy compares each
 newly loaded runtime snapshot with the previous values of the watched keys, so an RTDS update, a
 disk layer update or a request to the admin ``/runtime_modify`` endpoint reports only the watched
@@ -105,7 +141,7 @@ The extension can only watch keys during
 ``envoy_dynamic_module_on_bootstrap_extension_server_initialized``. RTDS may or may not have
 delivered its layers by then, so the extension should read the current value with the runtime
 getters when it starts watching a key, and then rely on the hooks for the later changes. No update
-is reported once the server began to shut down. In the Rust SDK, the three hooks call
+is reported once the server began to shut down. In the Rust SDK, the four hooks call
 ``on_runtime_update`` of ``BootstrapExtension`` with a ``RuntimeValue``, or with ``None`` when the
 key became unset.
 

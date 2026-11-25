@@ -946,6 +946,11 @@ newDynamicModuleBootstrapExtensionConfig(
           "envoy_dynamic_module_on_bootstrap_extension_runtime_number_update");
   config->on_bootstrap_extension_runtime_number_update_ =
       on_runtime_number_update.ok() ? on_runtime_number_update.value() : nullptr;
+  auto on_runtime_string_update =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionRuntimeStringUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_runtime_string_update");
+  config->on_bootstrap_extension_runtime_string_update_ =
+      on_runtime_string_update.ok() ? on_runtime_string_update.value() : nullptr;
 
   // Always register an init target so that Envoy blocks traffic until the module signals readiness.
   // This must happen before calling the module constructor so the module can call

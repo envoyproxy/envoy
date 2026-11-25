@@ -153,6 +153,7 @@ envoy_cc_library(
         "//envoy/registry",
         "//envoy/singleton:manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
         "//source/common/common:thread_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
