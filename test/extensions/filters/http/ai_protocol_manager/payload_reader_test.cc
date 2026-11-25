@@ -130,15 +130,19 @@ TEST_F(PayloadReaderTest, PendingExternalHandoffWaitsUntilCompletedAndReadsSlice
       reader->readChunk(3, 5), executor_,
       [&chunk_or](absl::StatusOr<Buffer::InstancePtr> res) { chunk_or = std::move(res); },
       Coroutine::StartMode::Inline);
+  // Zero-length reads resolve synchronously without waiting for external handoff.
   absl::StatusOr<Buffer::InstancePtr> empty_or = absl::UnknownError("pending");
   auto empty_handle = Coroutine::launch(
       reader->readChunk(0, 0), executor_,
       [&empty_or](absl::StatusOr<Buffer::InstancePtr> res) { empty_or = std::move(res); },
       Coroutine::StartMode::Inline);
+  ASSERT_OK(empty_or);
+  ASSERT_NE(*empty_or, nullptr);
+  EXPECT_EQ((*empty_or)->length(), 0);
+
   drain();
   EXPECT_FALSE(chunk_or.ok());
   EXPECT_EQ(chunk_or.status().code(), absl::StatusCode::kUnknown);
-  EXPECT_EQ(empty_or.status().code(), absl::StatusCode::kUnknown);
 
   InMemoryExternalBufferFactory factory;
   std::shared_ptr<ExternalBuffer> ext = factory.createBuffer(*dispatcher_);
@@ -152,9 +156,6 @@ TEST_F(PayloadReaderTest, PendingExternalHandoffWaitsUntilCompletedAndReadsSlice
   ASSERT_OK(chunk_or);
   ASSERT_NE(*chunk_or, nullptr);
   EXPECT_EQ((*chunk_or)->toString(), "34567");
-  ASSERT_OK(empty_or);
-  ASSERT_NE(*empty_or, nullptr);
-  EXPECT_EQ((*empty_or)->length(), 0);
 
   // Subsequent failExternalHandoff() after completion is a no-op.
   reader->failExternalHandoff();

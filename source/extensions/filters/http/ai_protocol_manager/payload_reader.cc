@@ -115,22 +115,20 @@ Coroutine::Task<absl::StatusOr<Buffer::InstancePtr>> PayloadReader::readChunk(ui
   if (offset > self->total_length_ || max_length > self->total_length_ - offset) {
     co_return absl::InvalidArgumentError("payload read range out of bounds");
   }
-  if (!self->pending_permit_.hasPermits() && (self->buffer_ == nullptr || max_length == 0)) {
+  if (max_length == 0) {
+    co_return std::make_unique<Buffer::OwnedImpl>();
+  }
+  if (!self->pending_permit_.hasPermits() && self->buffer_ == nullptr) {
     auto data = std::make_unique<Buffer::OwnedImpl>();
-    if (max_length > 0) {
-      auto bytes = std::make_unique<uint8_t[]>(max_length);
-      self->in_memory_.copyOut(offset, max_length, bytes.get());
-      data->add(bytes.get(), max_length);
-    }
+    auto bytes = std::make_unique<uint8_t[]>(max_length);
+    self->in_memory_.copyOut(offset, max_length, bytes.get());
+    data->add(bytes.get(), max_length);
     co_return data;
   }
 
   ASSIGN_OR_CO_RETURN(Coroutine::SemaphoreReservation permit, co_await self->read_sem_->acquire(1));
   if (self->failed_) {
     co_return absl::DataLossError("external buffer failed");
-  }
-  if (max_length == 0) {
-    co_return std::make_unique<Buffer::OwnedImpl>();
   }
 
   co_return co_await ReadExternalBuffer(self, offset, max_length, std::move(permit));

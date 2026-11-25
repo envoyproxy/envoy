@@ -49,11 +49,11 @@ public:
   // True if external storage failed during durability handoff or on a subsequent read.
   bool hasFailed() const { return failed_; }
 
-  // Reads `[offset, offset + max_length)` as a coroutine, suspending while an ExternalBuffer flush
-  // is still in flight. Already-readable inline and zero-length reads complete synchronously
-  // without suspending; ExternalBuffer reads serialize single-flight access via a 1-permit
-  // semaphore so cancelling one attempt mid-read via CoroutineContext cannot overlap a second
-  // ExternalBuffer::read() until the underlying callback returns.
+  // Reads `[offset, offset + max_length)` as a coroutine. Zero-length and inline reads complete
+  // synchronously without suspending; ExternalBuffer reads serialize single-flight access (and
+  // suspend while a pending flush is in flight) via a 1-permit semaphore so cancelling one attempt
+  // mid-read via CoroutineContext cannot overlap a second ExternalBuffer::read() until the
+  // underlying callback returns.
   Coroutine::Task<absl::StatusOr<Buffer::InstancePtr>> readChunk(uint64_t offset,
                                                                  uint64_t max_length);
 
