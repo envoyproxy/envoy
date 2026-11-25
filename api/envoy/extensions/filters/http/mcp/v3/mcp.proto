@@ -218,7 +218,8 @@ message ParserConfig {
 
     // Attributes to extract for this method. If set, they replace the built-in rules for the
     // method. If empty, the built-in rules for the method (if any) are used.
-    // ``jsonrpc``, ``method``, ``id`` and ``params._meta`` are always extracted.
+    // ``jsonrpc``, ``method``, ``id`` and ``params._meta`` are always extracted when present in
+    // the parsed part of the request.
     repeated AttributeExtractionRule extraction_rules = 3;
   }
 
