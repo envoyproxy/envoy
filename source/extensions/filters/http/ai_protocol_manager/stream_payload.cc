@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <tuple>
 
 #include "envoy/buffer/buffer.h"
 
@@ -23,10 +22,6 @@ Coroutine::Task<absl::Status> streamPayload(PayloadReader& source, uint64_t offs
   PayloadReaderSharedPtr reader = source.shared_from_this();
   if (offset > reader->length() || length > reader->length() - offset) {
     co_return absl::InvalidArgumentError("payload stream range out of bounds");
-  }
-  if (length == 0) {
-    ASSIGN_OR_CO_RETURN(std::ignore, co_await reader->readChunk(offset, 0));
-    co_return absl::OkStatus();
   }
 
   uint64_t current = offset;
