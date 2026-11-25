@@ -356,8 +356,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
         nullptr, std::nullopt, "ai_protocol_manager_invalid_request_binding");
     return Http::FilterHeadersStatus::StopIteration;
   }
-  request_binding_ =
-      *named_binding != nullptr ? *std::move(named_binding) : route_request_binding_;
+  request_binding_ = *named_binding != nullptr ? *std::move(named_binding) : route_request_binding_;
 
   JsonWithExtBufParser::Config parser_config;
   parser_config.inline_string_threshold_bytes = inlineStringThresholdBytes();
