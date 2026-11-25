@@ -2759,24 +2759,36 @@ TEST_F(AiProtocolManagerFilterTest,
 // Answers a request the manager has no document for, and records what it was asked.
 class UnparsedAnsweringAiFilter : public PassThroughAiFilter {
 public:
-  UnparsedAnsweringAiFilter(std::vector<UnparsedRequest>& seen, std::optional<LocalReply> reply)
-      : seen_(seen), reply_(std::move(reply)) {}
+  UnparsedAnsweringAiFilter(std::vector<UnparsedRequest>& seen, std::optional<LocalReply> reply,
+                            bool forward)
+      : seen_(seen), reply_(std::move(reply)), forward_(forward) {}
 
   std::optional<LocalReply> onUnparsedRequest(UnparsedRequest reason) override {
     seen_.push_back(reason);
     return reply_;
   }
+  bool forwardsUnparsedRequest() const override { return forward_; }
 
 private:
   std::vector<UnparsedRequest>& seen_;
   const std::optional<LocalReply> reply_;
+  const bool forward_;
 };
+
+AiFilterFactoryCb unparsedAnsweringFilter(std::vector<UnparsedRequest>& seen,
+                                          std::optional<LocalReply> reply, bool forward = false) {
+  return [&seen, reply, forward](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<UnparsedAnsweringAiFilter>(seen, reply, forward);
+  };
+}
 
 AiFilterFactories unparsedAnswering(std::vector<UnparsedRequest>& seen,
                                     std::optional<LocalReply> reply) {
-  return {[&seen, reply](const AiFilterContext&) -> AiFilterSharedPtr {
-    return std::make_shared<UnparsedAnsweringAiFilter>(seen, reply);
-  }};
+  return {unparsedAnsweringFilter(seen, std::move(reply))};
+}
+
+AiFilterFactories unparsedForwarding(std::vector<UnparsedRequest>& seen) {
+  return {unparsedAnsweringFilter(seen, std::nullopt, /*forward=*/true)};
 }
 
 // A filter can answer a request that ends on its headers, with its own body, headers and details.
@@ -2858,6 +2870,92 @@ TEST_F(AiProtocolManagerFilterTest, PayloadThatIsNotJsonGetsA400WhenNoAiFilterAn
   EXPECT_THAT(seen, testing::ElementsAre(UnparsedRequest::InvalidJson));
   EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
   EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
+}
+
+// A filter can have a payload that is not JSON forwarded as it arrived, past the chain.
+TEST_F(AiProtocolManagerFilterTest, AiFilterForwardsAPayloadThatIsNotJson) {
+  std::vector<UnparsedRequest> seen;
+  createFilterWithAiFilters(unparsedForwarding(seen));
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body("{not json");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_THAT(seen, testing::ElementsAre(UnparsedRequest::InvalidJson));
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(injected_.toString(), "{not json");
+  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(counterValue("request_parse_error"), 1);
+  EXPECT_EQ(counterValue("request_passthrough"), 0);
+
+  // The chain did not run for the request, so its response is not the chain's either.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"content-type", "application/json"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, false), Http::FilterHeadersStatus::Continue);
+  Buffer::OwnedImpl response_body("{not json either");
+  EXPECT_EQ(filter_->encodeData(response_body, true), Http::FilterDataStatus::Continue);
+  EXPECT_EQ(response_body.toString(), "{not json either");
+}
+
+// The filters are asked once, at the frame that fails; the frames after it are forwarded too.
+TEST_F(AiProtocolManagerFilterTest, AiFilterForwardsAPayloadThatFailsBeforeItsLastFrame) {
+  std::vector<UnparsedRequest> seen;
+  createFilterWithAiFilters(unparsedForwarding(seen));
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl first("{not json");
+  EXPECT_EQ(filter_->decodeData(first, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Buffer::OwnedImpl last(", and more of it");
+  EXPECT_EQ(filter_->decodeData(last, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_THAT(seen, testing::ElementsAre(UnparsedRequest::InvalidJson));
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(injected_.toString(), "{not json, and more of it");
+  EXPECT_TRUE(injected_end_stream_);
+}
+
+// Trailers that end a document still open are forwarded behind the body.
+TEST_F(AiProtocolManagerFilterTest, AiFilterForwardsAPayloadCutShortByTrailers) {
+  std::vector<UnparsedRequest> seen;
+  createFilterWithAiFilters(unparsedForwarding(seen));
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4")");
+  EXPECT_EQ(filter_->decodeData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Http::TestRequestTrailerMapImpl trailers{{"x-trailer", "1"}};
+  EXPECT_EQ(filter_->decodeTrailers(trailers), Http::FilterTrailersStatus::StopIteration);
+  drain();
+
+  EXPECT_THAT(seen, testing::ElementsAre(UnparsedRequest::InvalidJson));
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(injected_.toString(), R"({"model":"gpt-4")");
+  EXPECT_FALSE(injected_end_stream_);
+  EXPECT_EQ(continue_calls_, 1);
+}
+
+// One filter's reply is sent even if another has the payload forwarded.
+TEST_F(AiProtocolManagerFilterTest, AiFilterReplyWinsOverAForwardedPayload) {
+  std::vector<UnparsedRequest> seen;
+  createFilterWithAiFilters(
+      {unparsedAnsweringFilter(seen, std::nullopt, /*forward=*/true),
+       unparsedAnsweringFilter(seen, LocalReply{Http::Code::UnprocessableEntity, "not json"})});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body("{not json");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_THAT(seen,
+              testing::ElementsAre(UnparsedRequest::InvalidJson, UnparsedRequest::InvalidJson));
+  EXPECT_EQ(local_reply_calls_, 1);
+  EXPECT_EQ(local_reply_code_, Http::Code::UnprocessableEntity);
+  EXPECT_EQ(inject_calls_, 0);
 }
 
 // A body announced but never sent is a request without one.

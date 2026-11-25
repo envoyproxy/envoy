@@ -52,6 +52,7 @@ bool renderJson(absl::string_view name, const nlohmann::json& value, McpFieldExt
     extractor.RenderNull(name);
     break;
   case nlohmann::json::value_t::binary:
+    return !extractor.renderOmittedString(name);
   case nlohmann::json::value_t::discarded:
     return false;
   }
@@ -694,6 +695,29 @@ McpFieldExtractor* McpFieldExtractor::RenderNull(absl::string_view name) {
 
 McpFieldExtractor* McpFieldExtractor::RenderBytes(absl::string_view name, absl::string_view value) {
   return RenderString(name, value);
+}
+
+bool McpFieldExtractor::renderOmittedString(absl::string_view name) {
+  if (can_stop_parsing_ || array_depth_ > 0) {
+    return false;
+  }
+
+  // The member still tells a request from a response.
+  if (depth_ == 1) {
+    if (name == RESULT_FIELD) {
+      has_result_ = true;
+      if (has_jsonrpc_) {
+        is_valid_mcp_ = true;
+      }
+    } else if (name == METHOD_FIELD) {
+      has_method_ = true;
+      if (has_jsonrpc_) {
+        is_valid_mcp_ = true;
+      }
+    }
+  }
+
+  return context_stack_.top().struct_ptr != nullptr && isPathInteresting(buildFullPath(name));
 }
 
 void McpFieldExtractor::storeField(const std::string& path, absl::string_view name,

@@ -2347,12 +2347,55 @@ TEST_F(McpJsonParserTest, ParseDocumentReportsValuesLeftOut) {
   nlohmann::json document =
       nlohmann::json::parse(R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{}})");
   document["params"]["name"] = nlohmann::json::binary({0x01});
-  document["params"]["arguments"] = nlohmann::json(nlohmann::json::value_t::discarded);
 
   EXPECT_FALSE(parser_->parseDocument(document));
   EXPECT_TRUE(parser_->isValidMcpRequest());
   EXPECT_EQ(parser_->getMethod(), "tools/call");
   EXPECT_EQ(parser_->getNestedValue("params.name"), nullptr);
+
+  document["params"]["name"] = "tool";
+  document["params"]["_meta"]["traceparent"] = nlohmann::json::binary({0x01});
+  EXPECT_FALSE(parser_->parseDocument(document));
+
+  document["params"].erase("_meta");
+  document["params"]["arguments"] = nlohmann::json(nlohmann::json::value_t::discarded);
+  EXPECT_FALSE(parser_->parseDocument(document));
+}
+
+// A value the extraction does not read is not missed.
+TEST_F(McpJsonParserTest, ParseDocumentIgnoresValuesLeftOutThatItDoesNotRead) {
+  nlohmann::json document = nlohmann::json::parse(
+      R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"tool"}})");
+  document["params"]["arguments"]["blob"] = nlohmann::json::binary({0x01});
+  document["params"]["list"] = nlohmann::json::array({nlohmann::json::binary({0x01})});
+  document["extra"] = nlohmann::json::binary({0x01});
+
+  EXPECT_TRUE(parser_->parseDocument(document));
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->hasAllRequiredFields());
+  EXPECT_EQ(parser_->getNestedValue("params.name")->string_value(), "tool");
+}
+
+// A member whose value was left out still tells a response from a request.
+TEST_F(McpJsonParserTest, ParseDocumentClassifiesByMembersLeftOut) {
+  nlohmann::json response = nlohmann::json::parse(R"({"jsonrpc":"2.0","id":1})");
+  response["result"] = nlohmann::json::binary({0x01});
+  EXPECT_TRUE(parser_->parseDocument(response));
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->isResponse());
+
+  nlohmann::json request = nlohmann::json::parse(R"({"jsonrpc":"2.0","id":1,"result":{}})");
+  request["method"] = nlohmann::json::binary({0x01});
+  EXPECT_FALSE(parser_->parseDocument(request));
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_FALSE(parser_->isResponse());
+
+  nlohmann::json no_version = nlohmann::json::parse(R"({"id":1})");
+  no_version["result"] = nlohmann::json::binary({0x01});
+  no_version["method"] = nlohmann::json::binary({0x01});
+  no_version["jsonrpc"] = nlohmann::json::binary({0x01});
+  EXPECT_FALSE(parser_->parseDocument(no_version));
+  EXPECT_FALSE(parser_->isValidMcpRequest());
 }
 
 TEST_F(McpJsonParserTest, ParseDocumentReplacesAnEarlierParse) {

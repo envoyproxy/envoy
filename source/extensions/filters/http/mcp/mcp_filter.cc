@@ -574,25 +574,42 @@ McpInspector::Result McpInspector::onRequestBody(const nlohmann::json& body, uin
   parser_ = std::make_unique<JsonPathParser>(parserConfig());
   const bool complete = parser_->parseDocument(body);
   const uint32_t max_size = maxRequestBodySize();
-  if (!complete || (max_size > 0 && body_size > max_size)) {
+  // The streaming parse reads up to the limit, or to the routing attributes where it may stop
+  // there: a body past the limit is parsed in part unless it stopped early.
+  const bool truncated_by_limit = max_size > 0 && body_size > max_size &&
+                                  !(canEarlyTerminate() && parser_->hasAllRequiredFields());
+  if (!complete || truncated_by_limit) {
     is_exceeding_limit_ = true;
-    if (shouldRejectRequest()) {
-      config_->stats().body_too_large_.inc();
-      sendErrorReply("request body exceeds the configured body size",
-                     Filters::Common::Mcp::Status::BodyTooLarge);
-      return Result::Replied;
-    }
-    passthrough_reason_ = Filters::Common::Mcp::Status::BodyTooLarge;
+    return onIncompleteBody(Filters::Common::Mcp::Status::BodyTooLarge);
   }
   return completeParsing();
 }
 
 McpInspector::Result McpInspector::onInvalidRequestBody() {
-  config_->stats().invalid_json_.inc();
-  if (!shouldRejectRequest()) {
-    return Result::Continue;
+  if (!parser_) {
+    parser_ = std::make_unique<JsonPathParser>(parserConfig());
   }
-  sendErrorReply("not a valid JSON", Filters::Common::Mcp::Status::NotJsonRpc);
+
+  config_->stats().invalid_json_.inc();
+  if (shouldRejectRequest()) {
+    sendErrorReply("not a valid JSON", Filters::Common::Mcp::Status::NotJsonRpc);
+    return Result::Replied;
+  }
+  passthrough_reason_ = Filters::Common::Mcp::Status::NotJsonRpc;
+  return completeParsing();
+}
+
+McpInspector::Result McpInspector::onIncompleteBody(Filters::Common::Mcp::Status reason) {
+  if (!shouldRejectRequest()) {
+    ENVOY_LOG(debug, "{} in PASS_THROUGH mode; proceeding with partial parse",
+              statusToString(reason));
+    passthrough_reason_ = reason;
+    return completeParsing();
+  }
+  if (reason == Filters::Common::Mcp::Status::BodyTooLarge) {
+    config_->stats().body_too_large_.inc();
+  }
+  sendErrorReply("reached end_stream or configured body size, don't get enough data.", reason);
   return Result::Replied;
 }
 
@@ -630,11 +647,7 @@ McpInspector::Result McpInspector::onRequestBody(const Buffer::Instance& data, b
       bytes_parsed_in_this_call += len;
 
       if (!status.ok()) {
-        if (onInvalidRequestBody() == Result::Replied) {
-          return Result::Replied;
-        }
-        passthrough_reason_ = Filters::Common::Mcp::Status::NotJsonRpc;
-        return completeParsing();
+        return onInvalidRequestBody();
       }
 
       if (parser_->isParsingComplete()) {
@@ -671,23 +684,8 @@ McpInspector::Result McpInspector::onRequestBody(const Buffer::Instance& data, b
     }
     auto final_status = parser_->finishParse();
     if (!final_status.ok()) {
-      if (!shouldRejectRequest()) {
-        if (truncated_by_limit) {
-          ENVOY_LOG(debug, "size limit hit in PASS_THROUGH mode; proceeding with partial parse");
-          passthrough_reason_ = Filters::Common::Mcp::Status::BodyTooLarge;
-        } else {
-          ENVOY_LOG(debug, "parse error in PASS_THROUGH mode; proceeding");
-          passthrough_reason_ = Filters::Common::Mcp::Status::ParseError;
-        }
-        return completeParsing();
-      }
-      Filters::Common::Mcp::Status status = Filters::Common::Mcp::Status::ParseError;
-      if (truncated_by_limit) {
-        config_->stats().body_too_large_.inc();
-        status = Filters::Common::Mcp::Status::BodyTooLarge;
-      }
-      sendErrorReply("reached end_stream or configured body size, don't get enough data.", status);
-      return Result::Replied;
+      return onIncompleteBody(truncated_by_limit ? Filters::Common::Mcp::Status::BodyTooLarge
+                                                 : Filters::Common::Mcp::Status::ParseError);
     }
     return completeParsing();
   }

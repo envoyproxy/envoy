@@ -224,12 +224,11 @@ public:
   Result onRequestBody(const Buffer::Instance& data, bool end_stream);
 
   // Takes a body of `body_size` bytes that the host parsed whole, once onRequestHeaders() asked
-  // for it. A body over maxRequestBodySize(), or one the host left values out of, is handled as
-  // one the inspector could only parse in part.
+  // for it. A body the streaming parse would stop short in, or one the host left out a value the
+  // inspector reads, is handled as one parsed in part.
   Result onRequestBody(const nlohmann::json& body, uint64_t body_size);
 
-  // Takes a body the host could not parse, once onRequestHeaders() asked for it. Continue leaves
-  // the request to the host.
+  // Takes a body that is not JSON, once onRequestHeaders() asked for it.
   Result onInvalidRequestBody();
 
   uint32_t maxRequestBodySize() const;
@@ -253,6 +252,8 @@ private:
   bool canEarlyTerminate();
   // Whether onRequestHeaders() asked for the body.
   bool awaitsBody() const;
+  // Rejects a body parsed in part, or goes on with what was read, by the traffic mode.
+  Result onIncompleteBody(Filters::Common::Mcp::Status reason);
 
   void recordErrorState(absl::string_view error_msg, Filters::Common::Mcp::Status status);
   void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);

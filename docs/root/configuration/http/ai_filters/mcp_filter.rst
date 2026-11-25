@@ -59,17 +59,26 @@ is hosted:
   manager's :ref:`typed_per_filter_config
   <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.typed_per_filter_config>`
   under the filter's name.
-* The manager parses the body. A body that is not JSON, or that repeats a key,
-  is rejected with a 400 in every traffic mode, so ``reject_duplicate_keys`` and
-  ``early_terminate_when_routable`` have no effect.
+* The manager parses the body, and has no document for one that is not JSON,
+  that ends early, or that repeats a key. The filter rejects such a body in
+  ``REJECT_NO_MCP``. Otherwise it records ``passthrough_reason`` and the request
+  is forwarded as it arrived, as the HTTP filter forwards it, without the
+  attributes the HTTP filter reads before the body fails. A body that repeats a
+  key is handled this way whatever ``reject_duplicate_keys`` says.
 * :ref:`max_request_body_size
   <envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.max_request_body_size>`
-  limits the request the filter accepts, not what is buffered. The filter raises
-  the manager's :ref:`inline_string_threshold_bytes
+  limits the request the filter accepts, not what is buffered. A longer request
+  is handled as the HTTP filter handles one it parsed in part: rejected in
+  ``REJECT_NO_MCP``, and marked ``is_exceeding_limit`` otherwise. Its attributes
+  are those of the whole body, past the limit too. With
+  :ref:`early_terminate_when_routable
+  <envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.early_terminate_when_routable>`,
+  a longer request that has all of its routing attributes is not over the limit.
+* The filter raises the manager's :ref:`inline_string_threshold_bytes
   <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestParsingLimits.inline_string_threshold_bytes>`
-  to it, at most 1MiB, on every route of the manager, so it can read any
-  attribute of a request within the limit. A request with a longer string value
-  is handled as one over the limit.
+  to ``max_request_body_size``, at most 1MiB, on every route of the manager. A
+  request with an attribute in a longer string is handled as one over the limit;
+  longer strings the filter does not read, such as tool arguments, are not.
 * The filter only reads the request, so :ref:`reserialize_body
   <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.reserialize_body>`
   can be ``DISABLE`` unless another AI filter edits it.

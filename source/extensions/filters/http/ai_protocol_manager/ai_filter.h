@@ -159,6 +159,10 @@ public:
   // manager, which forwards one without a body and answers 400 to one that is not JSON.
   virtual std::optional<LocalReply> onUnparsedRequest(UnparsedRequest) { return std::nullopt; }
 
+  // Whether a request that is not JSON, and that no filter answers, is forwarded as it arrived
+  // in place of the manager's 400. The chain does not run for it.
+  virtual bool forwardsUnparsedRequest() const { return false; }
+
   // Invoked for Server-Sent Events (SSE) streaming responses. The coroutine runs for the entire
   // lifetime of the response stream, receiving and propagating discrete frames.
   //

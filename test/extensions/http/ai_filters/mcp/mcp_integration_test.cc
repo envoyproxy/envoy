@@ -213,6 +213,24 @@ TEST_P(McpAiFilterIntegrationTest, RejectModeRejectsABodyOverTheSizeLimit) {
   test_server_->waitForCounter("ai_protocol_manager.mcp.body_too_large", testing::Eq(1));
 }
 
+// The route's limit takes a body whose arguments the manager offloads, since the filter reads no
+// argument.
+TEST_P(McpAiFilterIntegrationTest, TakesArgumentsTheManagerOffloads) {
+  captureMetadata();
+  initializeFilter("traffic_mode: REJECT_NO_MCP", "max_request_body_size: 1048576");
+
+  const std::string body =
+      fmt::format(R"({{"jsonrpc":"2.0","id":1,"method":"tools/call",)"
+                  R"("params":{{"name":"test_tool","arguments":{{"blob":"{}"}}}}}})",
+                  std::string(64 * 1024, 'a'));
+  auto response = roundTrip(postHeaders(), body);
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(body, upstream_request_->body().toString());
+  EXPECT_THAT(metadata_json_, testing::HasSubstr(R"("params":{"name":"test_tool"})"));
+  EXPECT_THAT(metadata_json_, testing::Not(testing::HasSubstr("is_exceeding_limit")));
+}
+
 TEST_P(McpAiFilterIntegrationTest, RejectModeRejectsARequestWithoutABodyThatIsNotMcp) {
   initializeFilter("traffic_mode: REJECT_NO_MCP");
 
@@ -266,26 +284,42 @@ TEST_P(McpAiFilterIntegrationTest, RejectModeRejectsABodyThatIsNotJson) {
   test_server_->waitForCounter("ai_protocol_manager.mcp.invalid_json", testing::Eq(1));
 }
 
-// A declared AI endpoint's body is the manager's to hold to JSON, whatever the MCP traffic mode.
-TEST_P(McpAiFilterIntegrationTest, PassThroughLeavesABodyThatIsNotJsonToTheManager) {
+// A body the filter does not reject goes upstream as it arrived, as it does past the MCP HTTP
+// filter.
+TEST_P(McpAiFilterIntegrationTest, PassThroughForwardsABodyThatIsNotJson) {
+  captureMetadata();
   initializeFilter();
 
-  auto response = rejected(postHeaders(), "invalid_json_content");
+  auto response = roundTrip(postHeaders(), "invalid_json_content");
 
-  EXPECT_EQ("400", response->headers().getStatusValue());
-  EXPECT_THAT(response->body(), testing::Not(testing::HasSubstr("not a valid JSON")));
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("invalid_json_content", upstream_request_->body().toString());
+  EXPECT_THAT(metadata_json_, testing::HasSubstr(R"("passthrough_reason":"mcp_not_jsonrpc")"));
+  test_server_->waitForCounter("ai_protocol_manager.mcp.invalid_json", testing::Eq(1));
   test_server_->waitForCounter("ai_protocol_manager.request_parse_error", testing::Eq(1));
 }
 
-// The manager's parser takes no body that repeats a key, so the MCP filter never sees one.
-TEST_P(McpAiFilterIntegrationTest, ABodyThatRepeatsAKeyIsNotJsonToTheManager) {
+// The manager's parser takes no body that repeats a key, so the MCP filter has no document for
+// one.
+TEST_P(McpAiFilterIntegrationTest, PassThroughForwardsABodyThatRepeatsAKey) {
   initializeFilter();
+  const std::string body = R"({"jsonrpc": "2.0", "method": "tools/list", "id": 1, "id": 2})";
+
+  auto response = roundTrip(postHeaders(), body);
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(body, upstream_request_->body().toString());
+  test_server_->waitForCounter("ai_protocol_manager.request_parse_error", testing::Eq(1));
+}
+
+TEST_P(McpAiFilterIntegrationTest, RejectModeRejectsABodyThatRepeatsAKey) {
+  initializeFilter("traffic_mode: REJECT_NO_MCP");
 
   auto response =
       rejected(postHeaders(), R"({"jsonrpc": "2.0", "method": "tools/list", "id": 1, "id": 2})");
 
   EXPECT_EQ("400", response->headers().getStatusValue());
-  test_server_->waitForCounter("ai_protocol_manager.request_parse_error", testing::Eq(1));
+  EXPECT_EQ("not a valid JSON", response->body());
 }
 
 TEST_P(McpAiFilterIntegrationTest, AnswersAHeaderMismatchWithAJsonRpcError) {

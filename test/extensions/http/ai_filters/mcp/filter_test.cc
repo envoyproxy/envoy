@@ -299,8 +299,8 @@ TEST_F(McpAiFilterTest, BodySizeLimitOfZeroTakesAnyBody) {
   EXPECT_FALSE(local_reply_.has_value());
 }
 
-// A value the manager offloaded is not in the document, so the attributes may be incomplete.
-TEST_F(McpAiFilterTest, HandlesAnOffloadedValueAsABodyParsedInPart) {
+// An attribute the manager offloaded is not in the document, so the attributes are incomplete.
+TEST_F(McpAiFilterTest, HandlesAnOffloadedAttributeAsABodyParsedInPart) {
   nlohmann::json body = nlohmann::json::parse(ToolsCall);
   body["params"]["name"] = JsonWithExtBuf::makeExternalRef({.offset = 60, .length = 4096});
 
@@ -317,6 +317,43 @@ TEST_F(McpAiFilterTest, HandlesAnOffloadedValueAsABodyParsedInPart) {
   decodeDocument(body);
   ASSERT_TRUE(local_reply_.has_value());
   EXPECT_EQ(local_reply_->details, "mcp_body_too_large");
+}
+
+// The filter reads no argument, so one the manager offloaded is not missed.
+TEST_F(McpAiFilterTest, TakesARequestWhoseArgumentsAreOffloaded) {
+  nlohmann::json body = nlohmann::json::parse(ToolsCall);
+  body["params"]["arguments"]["blob"] =
+      JsonWithExtBuf::makeExternalRef({.offset = 80, .length = 4096});
+
+  makeFilter("traffic_mode: REJECT_NO_MCP");
+  decodeDocument(body);
+  EXPECT_FALSE(local_reply_.has_value());
+  EXPECT_TRUE(TestUtility::jsonStringEqual(
+      metadataJson(),
+      R"({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"get_weather"},)"
+      R"("status":"mcp_ok","is_mcp_request":true})"))
+      << metadataJson();
+}
+
+// Where the HTTP filter may stop reading at the routing attributes, a longer body is not one
+// parsed in part.
+TEST_F(McpAiFilterTest, TakesABodyOverTheSizeLimitThatMayStopEarly) {
+  makeFilter("max_request_body_size: 64\nearly_terminate_when_routable: true",
+             /*request_payload_bytes=*/65);
+  decode(ToolsCall);
+
+  EXPECT_FALSE(local_reply_.has_value());
+  EXPECT_TRUE(TestUtility::jsonStringEqual(
+      metadataJson(),
+      R"({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"get_weather"},)"
+      R"("status":"mcp_ok","is_mcp_request":true})"))
+      << metadataJson();
+
+  // Without its routing attributes the body is still over the limit.
+  makeFilter("max_request_body_size: 64\nearly_terminate_when_routable: true",
+             /*request_payload_bytes=*/65);
+  decode(R"({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{}})");
+  EXPECT_THAT(metadataJson(), HasSubstr("is_exceeding_limit"));
 }
 
 TEST_F(McpAiFilterTest, RejectModeAnswersARequestWithoutABodyThatIsNotMcp) {
@@ -379,12 +416,17 @@ TEST_F(McpAiFilterTest, RejectModeAnswersABodyThatIsNotJson) {
   EXPECT_EQ(counter("invalid_json"), 1);
 }
 
-// The request is the manager's to answer: it does not forward a body it could not parse.
-TEST_F(McpAiFilterTest, PassThroughLeavesABodyThatIsNotJsonToTheManager) {
-  makeFilter();
+// The filter records why it let the request go, and has the manager forward it.
+TEST_F(McpAiFilterTest, PassThroughForwardsABodyThatIsNotJson) {
+  makeFilter("clear_route_cache: true");
   EXPECT_FALSE(filter_->onUnparsedRequest(UnparsedRequest::InvalidJson).has_value());
+  EXPECT_TRUE(filter_->forwardsUnparsedRequest());
   EXPECT_EQ(counter("invalid_json"), 1);
-  EXPECT_EQ(metadata(), nullptr);
+  EXPECT_TRUE(TestUtility::jsonStringEqual(
+      metadataJson(),
+      R"({"status":"mcp_ok","is_mcp_request":false,"passthrough_reason":"mcp_not_jsonrpc"})"))
+      << metadataJson();
+  EXPECT_EQ(route_cache_clears_, 1);
 }
 
 // The header checks come first, as they do for a request the manager parsed.

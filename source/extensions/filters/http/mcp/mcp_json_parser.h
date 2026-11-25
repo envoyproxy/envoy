@@ -138,6 +138,10 @@ public:
   McpFieldExtractor* RenderNull(absl::string_view name) override;
   McpFieldExtractor* RenderBytes(absl::string_view name, absl::string_view value) override;
 
+  // Notes a string member whose value another parser left out of the document. Returns true if
+  // the value is one the extractor reads.
+  bool renderOmittedString(absl::string_view name);
+
   // Check if parsing is complete (root object has closed)
   bool shouldStopParsing() const { return can_stop_parsing_; }
 
@@ -263,8 +267,9 @@ public:
   // Finish parsing
   absl::Status finishParse();
 
-  // Extracts from a document another parser already read. Returns false if that parser left a
-  // value out of the document, marked by a node that is not JSON: the value reads as absent.
+  // Extracts from a document another parser already read. Returns false if that parser left out
+  // of the document a value the extraction reads, marked by a node that is not JSON: the value
+  // reads as absent.
   bool parseDocument(const nlohmann::json& document);
 
   // Check if this is a valid MCP request

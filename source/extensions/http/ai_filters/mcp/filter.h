@@ -34,6 +34,8 @@ public:
   // HttpFilters::AiProtocolManager::AiFilter
   std::optional<HttpFilters::AiProtocolManager::LocalReply>
   onUnparsedRequest(HttpFilters::AiProtocolManager::UnparsedRequest reason) override;
+  // A body the inspector does not reject goes upstream, as it does past the MCP HTTP filter.
+  bool forwardsUnparsedRequest() const override { return true; }
 
   // HttpFilters::Mcp::McpInspectorCallbacks
   StreamInfo::StreamInfo& streamInfo() override { return context_.stream_info; }

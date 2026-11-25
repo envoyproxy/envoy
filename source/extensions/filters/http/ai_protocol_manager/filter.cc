@@ -334,8 +334,9 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
   // request. (Pausing here would also deadlock, since no body would ever arrive
   // to drive the replay that releases them.)
   if (end_stream) {
-    return answerUnparsedRequest(UnparsedRequest::NoBody) ? Http::FilterHeadersStatus::StopIteration
-                                                          : Http::FilterHeadersStatus::Continue;
+    return answerUnparsedRequest(UnparsedRequest::NoBody) == UnparsedAnswer::Replied
+               ? Http::FilterHeadersStatus::StopIteration
+               : Http::FilterHeadersStatus::Continue;
   }
 
   // Check if an earlier filter set the request API in filter state. It overrides a
@@ -438,12 +439,14 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
   if (!status.ok()) {
     if (isAiEndpoint()) {
       config_->stats().request_parse_error_.inc();
-      rejectInvalidPayload(status);
-      return false;
+      if (rejectInvalidPayload(status)) {
+        return false;
+      }
+    } else {
+      // Best effort: the payload is forwarded as it stands, just without a
+      // document for later filters to work from.
+      config_->stats().request_passthrough_.inc();
     }
-    // Best effort: the payload is forwarded as it stands, just without a
-    // document for later filters to work from.
-    config_->stats().request_passthrough_.inc();
     ENVOY_LOG(debug, "ai_protocol_manager: forwarding unparsed payload: {}", status.message());
     request_parser_.reset();
     return true;
@@ -458,15 +461,21 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
   return true;
 }
 
-void AiProtocolManagerFilter::rejectInvalidPayload(const absl::Status& status) {
-  ENVOY_LOG(debug, "ai_protocol_manager: rejecting request: {}", status.message());
+bool AiProtocolManagerFilter::rejectInvalidPayload(const absl::Status& status) {
   request_parser_.reset();
-  if (answerUnparsedRequest(UnparsedRequest::InvalidJson)) {
-    return;
+  switch (answerUnparsedRequest(UnparsedRequest::InvalidJson)) {
+  case UnparsedAnswer::Replied:
+    return true;
+  case UnparsedAnswer::Forward:
+    return false;
+  case UnparsedAnswer::None:
+    break;
   }
+  ENVOY_LOG(debug, "ai_protocol_manager: rejecting request: {}", status.message());
   payload_rejected_ = true;
   decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, status.message(), nullptr,
                                      std::nullopt, "ai_protocol_manager_invalid_json");
+  return true;
 }
 
 std::vector<AiFilterSharedPtr> AiProtocolManagerFilter::createAiFilters() {
@@ -503,20 +512,23 @@ std::vector<AiFilterSharedPtr> AiProtocolManagerFilter::createAiFilters() {
   return filters;
 }
 
-bool AiProtocolManagerFilter::answerUnparsedRequest(UnparsedRequest reason) {
+AiProtocolManagerFilter::UnparsedAnswer
+AiProtocolManagerFilter::answerUnparsedRequest(UnparsedRequest reason) {
   if (!isAiEndpoint()) {
-    return false;
+    return UnparsedAnswer::None;
   }
+  bool forward = false;
   for (const AiFilterSharedPtr& filter : createAiFilters()) {
     if (std::optional<LocalReply> reply = filter->onUnparsedRequest(reason); reply.has_value()) {
       ENVOY_LOG(debug, "ai_protocol_manager: AI filter answers the unparsed request: {} {}",
                 static_cast<uint32_t>(reply->code), reply->body);
       payload_rejected_ = true;
       sendFilterLocalReply(*decoder_callbacks_, std::move(*reply));
-      return true;
+      return UnparsedAnswer::Replied;
     }
+    forward = forward || filter->forwardsUnparsedRequest();
   }
-  return false;
+  return forward ? UnparsedAnswer::Forward : UnparsedAnswer::None;
 }
 
 Http::FilterDataStatus AiProtocolManagerFilter::decodeData(Buffer::Instance& data,
@@ -538,7 +550,7 @@ Http::FilterDataStatus AiProtocolManagerFilter::decodeData(Buffer::Instance& dat
     // manager has been given nothing, since every frame reaches both.
     if (end_stream && data.length() == 0 && decode_manager_->empty()) {
       request_parser_.reset();
-      if (answerUnparsedRequest(UnparsedRequest::NoBody)) {
+      if (answerUnparsedRequest(UnparsedRequest::NoBody) == UnparsedAnswer::Replied) {
         return Http::FilterDataStatus::StopIterationNoBuffer;
       }
     } else if (!feedParser(data, end_stream)) {
@@ -564,7 +576,7 @@ Http::FilterTrailersStatus AiProtocolManagerFilter::decodeTrailers(Http::Request
   // A trailer-only request (no body) has nothing to replay; let the trailers flow unless an AI
   // filter answers the request.
   if (decode_manager_->empty()) {
-    return answerUnparsedRequest(UnparsedRequest::NoBody)
+    return answerUnparsedRequest(UnparsedRequest::NoBody) == UnparsedAnswer::Replied
                ? Http::FilterTrailersStatus::StopIteration
                : Http::FilterTrailersStatus::Continue;
   }

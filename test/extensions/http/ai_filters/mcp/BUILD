@@ -31,6 +31,29 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "parity_test",
+    srcs = ["parity_test.cc"],
+    extension_names = ["envoy.http.ai_filters.mcp"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/common/mcp:filter_state_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:ai_request_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_parser_lib",
+        "//source/extensions/filters/http/mcp:mcp_filter_lib",
+        "//source/extensions/http/ai_filters/mcp:config",
+        "//source/extensions/http/ai_filters/mcp:filter_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.ai_filters.mcp"],

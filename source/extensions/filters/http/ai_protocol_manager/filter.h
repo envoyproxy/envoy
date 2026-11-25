@@ -239,15 +239,24 @@ private:
   bool feedParser(const Buffer::Instance& data, bool end_stream);
 
   // Terminates the stream for a payload that failed to parse: with an AI filter's answer, else a
-  // 400.
-  void rejectInvalidPayload(const absl::Status& status);
+  // 400. Returns false if an AI filter has the payload forwarded instead.
+  bool rejectInvalidPayload(const absl::Status& status);
 
   // Creates the stream's AI filters.
   std::vector<AiFilterSharedPtr> createAiFilters();
 
-  // Offers a declared endpoint's request that has no document to the AI filters. Returns whether
-  // one answered it.
-  bool answerUnparsedRequest(UnparsedRequest reason);
+  // How the AI filters leave a request that has no document.
+  enum class UnparsedAnswer {
+    // To the manager.
+    None,
+    // Forwarded as it arrived.
+    Forward,
+    // Answered with a local reply.
+    Replied,
+  };
+
+  // Offers a declared endpoint's request that has no document to the AI filters.
+  UnparsedAnswer answerUnparsedRequest(UnparsedRequest reason);
 
   // Whether the request payload was handed to the filter -- by the route's
   // declaration or by filter state naming the client's API -- which is also
