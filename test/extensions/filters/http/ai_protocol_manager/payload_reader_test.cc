@@ -155,6 +155,11 @@ TEST_F(PayloadReaderTest, PendingExternalHandoffWaitsUntilCompletedAndReadsSlice
   ASSERT_OK(empty_or);
   ASSERT_NE(*empty_or, nullptr);
   EXPECT_EQ((*empty_or)->length(), 0);
+
+  // Subsequent failExternalHandoff() after completion is a no-op.
+  reader->failExternalHandoff();
+  EXPECT_FALSE(reader->hasFailed());
+  EXPECT_TRUE(reader->allBytesReadable());
 }
 
 TEST_F(PayloadReaderTest, PendingExternalHandoffFailureFailsWaitersAndSubsequentReads) {
@@ -325,49 +330,6 @@ TEST_F(PayloadReaderTest, ExternalReadFailureMarksReaderFailedAndFailsSubsequent
   drain();
   EXPECT_THAT(res2.status(), HasStatusCode(absl::StatusCode::kDataLoss));
   EXPECT_EQ(state->total_reads, 1);
-}
-
-TEST_F(PayloadReaderTest, PendingOwnerReturnedOnCompleteFailAndDroppedOnDestroy) {
-  // Normal handoff returns the owner so the producer outlives completeExternalHandoff() and drops
-  // cleanly once the returned handle goes out of scope.
-  {
-    auto owner = std::make_shared<int>(1);
-    std::weak_ptr<int> weak_owner = owner;
-    PayloadReaderSharedPtr reader = PayloadReader::createPendingExternal(4, std::move(owner));
-    EXPECT_FALSE(weak_owner.expired());
-
-    InMemoryExternalBufferFactory factory;
-    std::shared_ptr<ExternalBuffer> ext = factory.createBuffer(*dispatcher_);
-    std::shared_ptr<void> returned = reader->completeExternalHandoff(std::move(ext));
-    EXPECT_NE(returned, nullptr);
-    EXPECT_FALSE(weak_owner.expired());
-    // Subsequent handoff calls return nullptr.
-    EXPECT_EQ(reader->failExternalHandoff(), nullptr);
-    returned.reset();
-    EXPECT_TRUE(weak_owner.expired());
-  }
-
-  // Failed handoff returns the owner in the same way.
-  {
-    auto owner = std::make_shared<int>(2);
-    std::weak_ptr<int> weak_owner = owner;
-    PayloadReaderSharedPtr reader = PayloadReader::createPendingExternal(4, std::move(owner));
-    std::shared_ptr<void> returned = reader->failExternalHandoff();
-    EXPECT_NE(returned, nullptr);
-    EXPECT_FALSE(weak_owner.expired());
-    returned.reset();
-    EXPECT_TRUE(weak_owner.expired());
-  }
-
-  // Destroying a pending reader before handoff releases the owner immediately.
-  {
-    auto owner = std::make_shared<int>(3);
-    std::weak_ptr<int> weak_owner = owner;
-    PayloadReaderSharedPtr reader = PayloadReader::createPendingExternal(4, std::move(owner));
-    EXPECT_FALSE(weak_owner.expired());
-    reader.reset();
-    EXPECT_TRUE(weak_owner.expired());
-  }
 }
 
 } // namespace

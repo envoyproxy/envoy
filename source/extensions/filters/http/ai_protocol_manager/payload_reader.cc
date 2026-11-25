@@ -87,8 +87,7 @@ PayloadReaderSharedPtr PayloadReader::fromExternalBuffer(std::shared_ptr<Externa
   return reader;
 }
 
-PayloadReaderSharedPtr PayloadReader::createPendingExternal(uint64_t length,
-                                                            std::shared_ptr<void> pending_owner) {
+PayloadReaderSharedPtr PayloadReader::createPendingExternal(uint64_t length) {
   PayloadReaderSharedPtr reader(new PayloadReader());
   reader->total_length_ = length;
   reader->read_sem_ = std::make_shared<Coroutine::Semaphore>(1);
@@ -97,7 +96,6 @@ PayloadReaderSharedPtr PayloadReader::createPendingExternal(uint64_t length,
   std::optional<Coroutine::SemaphoreReservation> permit = reader->read_sem_->tryAcquire(1);
   ASSERT(permit.has_value());
   reader->pending_permit_ = std::move(*permit);
-  reader->pending_owner_ = std::move(pending_owner);
   return reader;
 }
 
@@ -138,26 +136,21 @@ Coroutine::Task<absl::StatusOr<Buffer::InstancePtr>> PayloadReader::readChunk(ui
   co_return co_await ReadExternalBuffer(self, offset, max_length, std::move(permit));
 }
 
-std::shared_ptr<void>
-PayloadReader::completeExternalHandoff(std::shared_ptr<ExternalBuffer> buffer) {
+void PayloadReader::completeExternalHandoff(std::shared_ptr<ExternalBuffer> buffer) {
   if (!pending_permit_.hasPermits()) {
-    return nullptr;
+    return;
   }
   ASSERT(buffer != nullptr);
   buffer_ = std::move(buffer);
-  std::shared_ptr<void> owner = std::move(pending_owner_);
   pending_permit_.release();
-  return owner;
 }
 
-std::shared_ptr<void> PayloadReader::failExternalHandoff() {
+void PayloadReader::failExternalHandoff() {
   if (!pending_permit_.hasPermits()) {
-    return nullptr;
+    return;
   }
   failed_ = true;
-  std::shared_ptr<void> owner = std::move(pending_owner_);
   pending_permit_.release();
-  return owner;
 }
 
 } // namespace AiProtocolManager

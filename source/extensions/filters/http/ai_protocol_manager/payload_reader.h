@@ -30,10 +30,7 @@ public:
                                                            uint64_t length);
 
   // Creates a PayloadReader of `length` bytes whose ExternalBuffer flush is still in flight.
-  // `pending_owner`, if provided, keeps the ingest producer alive until completeExternalHandoff(),
-  // failExternalHandoff(), or ~PayloadReader().
-  static std::shared_ptr<PayloadReader>
-  createPendingExternal(uint64_t length, std::shared_ptr<void> pending_owner = nullptr);
+  static std::shared_ptr<PayloadReader> createPendingExternal(uint64_t length);
 
   // Creates a PayloadReader representing an already-failed external buffer write.
   static std::shared_ptr<PayloadReader> createFailed(uint64_t length = 0);
@@ -60,11 +57,9 @@ public:
   Coroutine::Task<absl::StatusOr<Buffer::InstancePtr>> readChunk(uint64_t offset,
                                                                  uint64_t max_length);
 
-  // Handoff hooks invoked once a pending ExternalBuffer flush finishes. Returns any `pending_owner`
-  // passed to createPendingExternal() so the caller can release it on its own stack after returning
-  // rather than self-destructing mid-callback.
-  std::shared_ptr<void> completeExternalHandoff(std::shared_ptr<ExternalBuffer> buffer);
-  std::shared_ptr<void> failExternalHandoff();
+  // Handoff hooks invoked once a pending ExternalBuffer flush finishes.
+  void completeExternalHandoff(std::shared_ptr<ExternalBuffer> buffer);
+  void failExternalHandoff();
 
 private:
   class ReadExternalBuffer;
@@ -76,7 +71,6 @@ private:
   std::shared_ptr<ExternalBuffer> buffer_;
   Coroutine::SemaphorePtr read_sem_;
   Coroutine::SemaphoreReservation pending_permit_;
-  std::shared_ptr<void> pending_owner_;
 
   bool failed_{false};
 };
