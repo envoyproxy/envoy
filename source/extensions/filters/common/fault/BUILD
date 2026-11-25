@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["fault_config.cc"],
     hdrs = ["fault_config.h"],
     deps = [
+        "//envoy/common:exception_lib",
         "//envoy/http:header_map_interface",
         "//source/common/http:codes_lib",
         "//source/common/http:headers_lib",

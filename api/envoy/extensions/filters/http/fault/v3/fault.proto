@@ -93,6 +93,9 @@ message FaultAbort {
   // aborted. For requests with a ``Content-Type`` header equal to ``application/grpc`` or starting
   // with ``application/grpc+``, the ``Content-Type`` header is always set to ``application/grpc``
   // after these headers are evaluated.
+  // A ``grpc-status`` response header cannot be configured together with :ref:`grpc_status
+  // <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.grpc_status>`.
+  // Configurations that specify both are rejected.
   repeated config.core.v3.HeaderValueOption response_headers_to_add = 8
       [(validate.rules).repeated = {max_items: 10}];
 }
