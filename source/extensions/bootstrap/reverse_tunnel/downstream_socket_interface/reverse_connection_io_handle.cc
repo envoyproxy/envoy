@@ -707,7 +707,9 @@ void ReverseConnectionIOHandle::trackConnectionFailure(
   const uint64_t max_backoff_ms = extension_->maxReconnectBackoffMs();
 
   uint64_t backoff_delay_ms;
-  if (retry_after.has_value()) {
+  // A hint below one second would redial on every maintenance tick, so it falls back to the
+  // computed backoff.
+  if (retry_after.has_value() && *retry_after >= std::chrono::seconds(1)) {
     // Honor the server's explicit cool-off hint
     backoff_delay_ms =
         std::min<uint64_t>(static_cast<uint64_t>(retry_after->count()), max_backoff_ms);

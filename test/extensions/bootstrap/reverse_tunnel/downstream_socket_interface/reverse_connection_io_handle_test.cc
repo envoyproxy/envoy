@@ -1039,6 +1039,32 @@ TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureHonorsRetryAfter) {
   EXPECT_EQ(getBackoffDelayMs("192.168.1.2"), 33999);
 }
 
+// A hint below one second is ignored, so the computed backoff applies; one second or more is
+// honored.
+TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureIgnoresSubSecondRetryAfter) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  // First failure with no usable hint: 1000 (base) + 3999 % 150 = 1099ms.
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+  trackConnectionFailureWithRetryAfter("192.168.1.1", "test-cluster",
+                                       std::chrono::milliseconds(500));
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 1099);
+
+  addHostConnectionInfo("192.168.1.2", "test-cluster", 1);
+  trackConnectionFailureWithRetryAfter("192.168.1.2", "test-cluster", std::chrono::milliseconds(0));
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.2"), 1099);
+
+  // A 2s hint is honored: 2000 + 3999 % 300 = 2099ms.
+  addHostConnectionInfo("192.168.1.3", "test-cluster", 1);
+  trackConnectionFailureWithRetryAfter("192.168.1.3", "test-cluster",
+                                       std::chrono::milliseconds(2000));
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.3"), 2099);
+}
+
 // Test that max_reconnect_backoff caps the exponential schedule. With a 5s cap, the schedule
 // saturates at 5000ms (then jittered) instead of continuing to 8s/16s/etc.
 TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureRespectsConfiguredMaxBackoff) {

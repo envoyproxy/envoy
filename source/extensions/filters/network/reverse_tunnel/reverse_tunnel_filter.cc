@@ -169,8 +169,8 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
       jwt_validator_(std::move(jwt_validator)),
       handshake_configurator_(
           std::make_shared<Bootstrap::ReverseConnection::Http1HandshakeResponderConfigurator>(
-              http1_codec_stats_, Bootstrap::ReverseConnection::HandshakeRequestSpec{
-                                      request_method_string_, request_path_, use_http_upgrade_})) {}
+              Bootstrap::ReverseConnection::HandshakeRequestSpec{
+                  request_method_string_, request_path_, use_http_upgrade_})) {}
 
 ReverseTunnelFilterConfig::~ReverseTunnelFilterConfig() = default;
 
@@ -359,6 +359,8 @@ ReverseTunnelFilter::onTunnelRequest(const Bootstrap::ReverseConnection::TunnelR
   if (tunnel_requested_) {
     IS_ENVOY_BUG("reverse_tunnel: second tunnel request on one connection");
     stats_.registration_failed_.inc();
+    // Release a socket an earlier acceptance prepared, so its flush refuses to register it.
+    pending_socket_.reset();
     return registration_failed;
   }
   tunnel_requested_ = true;

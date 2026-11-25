@@ -21,6 +21,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -1687,6 +1688,66 @@ TEST_F(RCConnectionWrapperTest, LocalCloseFailsHandshake) {
   }
 }
 
+// A close disarms the handshake deadline, and a close after a terminal outcome does not notify
+// the parent again.
+TEST_F(RCConnectionWrapperTest, CloseDisarmsDeadlineAndIsIgnoredAfterOutcome) {
+  const auto make_connection = [this]() {
+    auto mock_connection = getDeletableConn(dispatcher_);
+    EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+    EXPECT_CALL(*mock_connection, addReadFilter(_));
+    EXPECT_CALL(*mock_connection, connect());
+    EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(7));
+    EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+    EXPECT_CALL(*mock_connection, write(_, _)).WillRepeatedly([](Buffer::Instance& buffer, bool) {
+      buffer.drain(buffer.length());
+    });
+    auto mock_remote = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 80);
+    auto mock_local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 10001);
+    EXPECT_CALL(*mock_connection, connectionInfoProvider())
+        .WillRepeatedly([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
+          static auto provider =
+              std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local, mock_remote);
+          return *provider;
+        });
+    return mock_connection;
+  };
+  const auto add_wrapper = [this](Network::ClientConnectionPtr connection) {
+    addHostConnectionInfo("10.0.0.1:80", "test-cluster", 1);
+    auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    auto wrapper = std::make_unique<RCConnectionWrapper>(*io_handle_, std::move(connection),
+                                                         mock_host, "test-cluster");
+    (void)wrapper->connect("tenant", "cluster", "node");
+    RCConnectionWrapper* wrapper_ptr = wrapper.get();
+    pushConnectionWrapper(std::move(wrapper));
+    addWrapperToHostMap(wrapper_ptr, "10.0.0.1:80");
+    return wrapper_ptr;
+  };
+
+  // A close before any outcome disarms the deadline before notifying the parent.
+  {
+    auto* handshake_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+    RCConnectionWrapper* wrapper_ptr = add_wrapper(make_connection());
+    EXPECT_CALL(*handshake_timer, disableTimer());
+    wrapper_ptr->onEvent(Network::ConnectionEvent::RemoteClose);
+    EXPECT_TRUE(getConnectionWrappers().empty());
+  }
+
+  // A close after a failure outcome is dropped: the parent already removed the wrapper.
+  {
+    new NiceMock<Event::MockTimer>(&dispatcher_);
+    RCConnectionWrapper* wrapper_ptr = add_wrapper(make_connection());
+    wrapper_ptr->onHandshakeDone(HandshakeOutcome::failure(HandshakeFailureReason::timeout()),
+                                 std::nullopt);
+    EXPECT_TRUE(getConnectionWrappers().empty());
+    EXPECT_LOG_NOT_CONTAINS("error", "Wrapper not found",
+                            wrapper_ptr->onEvent(Network::ConnectionEvent::RemoteClose));
+  }
+
+  while (!dispatcher_.to_delete_.empty()) {
+    dispatcher_.to_delete_.pop_front();
+  }
+}
+
 // Test that destructor invokes shutdown when not already called.
 TEST_F(RCConnectionWrapperTest, DestructorInvokesShutdown) {
   auto mock_connection = setupMockConnection();
@@ -2152,6 +2213,10 @@ TEST_F(RCConnectionWrapperTest, StartFailureWithoutOutcomeFails) {
 
   EXPECT_ENVOY_BUG(EXPECT_FALSE(wrapper.connect("test-tenant", "test-cluster", "test-node").ok()),
                    "start() failed without reporting a terminal outcome");
+#if defined(NDEBUG) || defined(ENVOY_CONFIG_COVERAGE)
+  // Where ENVOY_BUG only logs, connect() ran on and cancelled the handshake once.
+  EXPECT_EQ(counts.cancels, 1);
+#endif
 }
 
 // A failure reported inside start() cancels the handshake, and later reads no longer reach it.

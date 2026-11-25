@@ -220,21 +220,6 @@ TEST_F(Http1HandshakeInitiatorTest, Rejected401) {
   EXPECT_EQ(retry_afters_[0], std::nullopt);
 }
 
-// A protocol-neutral rejection names its own stat suffix and message.
-TEST(HandshakeFailureReasonTest, RejectedIsProtocolNeutral) {
-  const HandshakeFailureReason with_detail =
-      HandshakeFailureReason::rejected("custom.denied", "policy denied");
-  EXPECT_EQ(with_detail.getNameForStats(), "custom.denied");
-  EXPECT_EQ(with_detail.getDetailedName(), "handshake rejected: policy denied");
-
-  const HandshakeFailureReason without_detail = HandshakeFailureReason::rejected("custom.denied");
-  EXPECT_EQ(without_detail.getDetailedName(), "handshake rejected: custom.denied");
-
-  const HandshakeOutcome outcome = HandshakeOutcome::failure(with_detail);
-  EXPECT_FALSE(outcome.accepted);
-  EXPECT_EQ(outcome.message, "handshake rejected: policy denied");
-}
-
 // A malformed response fails the handshake as a connection close carrying the codec detail.
 TEST_F(Http1HandshakeInitiatorTest, MalformedResponseFails) {
   start();

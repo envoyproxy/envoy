@@ -98,14 +98,14 @@ private:
  */
 class Http1HandshakeResponderConfigurator : public ResponderHandshakeConfigurator {
 public:
-  Http1HandshakeResponderConfigurator(Http::Http1::CodecStats::AtomicPtr& codec_stats,
-                                      HandshakeRequestSpec spec)
-      : codec_stats_(codec_stats), spec_(std::move(spec)) {}
+  explicit Http1HandshakeResponderConfigurator(HandshakeRequestSpec spec)
+      : spec_(std::move(spec)) {}
 
   ResponderHandshakePtr createHandshake(ResponderHandshakeCallbacks& callbacks) const override;
 
 private:
-  Http::Http1::CodecStats::AtomicPtr& codec_stats_;
+  // Shared by every per-connection codec this factory creates, so it outlives each of them.
+  mutable Http::Http1::CodecStats::AtomicPtr codec_stats_;
   const HandshakeRequestSpec spec_;
 };
 

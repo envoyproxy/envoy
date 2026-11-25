@@ -21,11 +21,13 @@ namespace ReverseConnection {
 // Handshake request parsed by a responder handshake. Every view is valid only during
 // ResponderHandshakeCallbacks::onTunnelRequest().
 struct TunnelRequest {
+  // An empty tenant id is rejected. An empty node or cluster id passes the filter's checks and the
+  // tunnel is dropped at registration, after the acceptance reply.
   absl::string_view node_id;
   absl::string_view cluster_id;
   absl::string_view tenant_id;
-  // Attributes the JWT check and the %REQ(...)% identifier validation read. A non-HTTP handshake
-  // supplies the equivalent key/values.
+  // Attributes the required cluster name check, the JWT check and the %REQ(...)% identifier
+  // validation read. A non-HTTP handshake supplies the equivalent key/values.
   const Http::RequestHeaderMap& headers;
   // Raw initiation time in epoch millis, absent when not advertised. The filter parses it.
   std::optional<absl::string_view> initiation_time_ms;
@@ -102,6 +104,7 @@ class ResponderHandshakeConfigurator {
 public:
   virtual ~ResponderHandshakeConfigurator() = default;
 
+  // Never returns null.
   virtual ResponderHandshakePtr createHandshake(ResponderHandshakeCallbacks& callbacks) const = 0;
 };
 

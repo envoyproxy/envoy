@@ -43,7 +43,6 @@ envoy_cc_library(
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
-        "//source/common/http/http1:codec_stats_lib",
         "//source/common/network:connection_socket_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",

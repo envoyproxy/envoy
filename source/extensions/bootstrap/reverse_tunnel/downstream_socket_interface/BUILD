@@ -82,7 +82,6 @@ envoy_cc_library(
         "//envoy/api:io_error_interface",
         "//envoy/common:random_generator_interface",
         "//envoy/grpc:async_client_interface",
-        "//envoy/http:header_map_interface",
         "//envoy/network:address_interface",
         "//envoy/network:io_handle_interface",
         "//envoy/network:socket_interface",
@@ -92,7 +91,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/event:real_time_system_lib",
-        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/network:address_lib",
         "//source/common/network:connection_socket_lib",
@@ -105,7 +103,6 @@ envoy_cc_library(
         "//source/extensions/bootstrap/reverse_tunnel/common:handshake_initiator_lib",
         "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/common:rping_interceptor_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

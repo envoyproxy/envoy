@@ -225,6 +225,24 @@ public:
     return req;
   }
 
+  // Sends a request without identifiers through a filter built from `config` and returns the
+  // reply. A request whose method and path match the config reaches the identifier checks (400);
+  // one that does not is a 404.
+  std::string replyFor(const ReverseTunnelFilterConfigSharedPtr& config, const std::string& method,
+                       const std::string& path) {
+    auto written = std::make_shared<std::string>();
+    EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+        .WillRepeatedly([written](Buffer::Instance& data, bool) {
+          written->append(data.toString());
+          data.drain(data.length());
+        });
+    ReverseTunnelFilter filter(config, *stats_store_.rootScope(), overload_manager_);
+    filter.initializeReadFilterCallbacks(callbacks_);
+    Buffer::OwnedImpl request(makeHttpRequest(method, path));
+    filter.onData(request, false);
+    return *written;
+  }
+
   // Helper to build reverse tunnel headers block.
   std::string makeRtHeaders(const std::string& node, const std::string& cluster,
                             const std::string& tenant) {
@@ -638,6 +656,23 @@ TEST_F(ReverseTunnelFilterUnitTest, RejectionDisarmsHandshakeDeadline) {
   testing::Mock::VerifyAndClearExpectations(timer);
 }
 
+// A malformed request ends the handshake too, so the deadline is disarmed before the close.
+TEST_F(ReverseTunnelFilterUnitTest, CodecErrorDisarmsHandshakeDeadline) {
+  auto* timer = new NiceMock<Event::MockTimer>(&callbacks_.connection_.dispatcher_);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  {
+    testing::InSequence order;
+    // The codec's 400 reply disarms it, and the dispatch error disarms it again.
+    EXPECT_CALL(*timer, disableTimer()).Times(testing::AtLeast(1));
+    EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  }
+  Buffer::OwnedImpl request("NOT AN HTTP REQUEST\r\n\r\n");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+  testing::Mock::VerifyAndClearExpectations(timer);
+  EXPECT_EQ(0, handshakeCounter(stats_store_, "reverse_tunnel.handshake.timeout"));
+}
+
 // Reads stop before the acceptance reply, so no pipelined request is dispatched during handoff.
 TEST_F(ReverseTunnelFilterUnitTest, AcceptanceStopsReadingBeforeReply) {
   std::string written;
@@ -675,6 +710,19 @@ TEST_F(ReverseTunnelFilterUnitTest, SecondTunnelRequestIsRefused) {
 
   EXPECT_ENVOY_BUG(EXPECT_FALSE(filter_->onTunnelRequest(request).accepted),
                    "second tunnel request on one connection");
+#if defined(NDEBUG) || defined(ENVOY_CONFIG_COVERAGE)
+  // Where ENVOY_BUG only logs, the refusal released the socket the first request prepared, so the
+  // first acceptance's flush registers nothing.
+  Network::Connection::BytesSentCb bytes_sent_cb;
+  EXPECT_CALL(callbacks_.connection_, addBytesSentCallback(testing::_))
+      .WillOnce(
+          [&bytes_sent_cb](Network::Connection::BytesSentCb cb) { bytes_sent_cb = std::move(cb); });
+  filter_->onAcceptanceResponseEncoded(1);
+  ASSERT_NE(bytes_sent_cb, nullptr);
+  EXPECT_FALSE(bytes_sent_cb(1));
+  EXPECT_EQ(0, handshakeCounter(stats_store_, "reverse_tunnel.handshake.accepted"));
+  EXPECT_EQ(2, handshakeCounter(stats_store_, "reverse_tunnel.handshake.registration_failed"));
+#endif
 }
 
 // The acceptance flush callback accumulates per-write byte counts, so a response split across
@@ -777,8 +825,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationCustomPingInterval) {
   ASSERT_OK(config_or_error);
   auto config = config_or_error.value();
   EXPECT_EQ(std::chrono::milliseconds(10000), config->pingInterval());
-  EXPECT_EQ("/custom/path", config->requestPath());
-  EXPECT_EQ("PUT", config->requestMethod());
+  EXPECT_THAT(replyFor(config, "PUT", "/custom/path"), testing::HasSubstr("400 Bad Request"));
+  EXPECT_THAT(replyFor(config, "GET", "/custom/path"), testing::HasSubstr("404 Not Found"));
+  EXPECT_THAT(replyFor(config, "PUT", "/reverse_connections/request"),
+              testing::HasSubstr("404 Not Found"));
 }
 
 // Ensure defaults remain stable.
@@ -787,7 +837,8 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaultsRemainStable) {
   auto config_or_error = ReverseTunnelFilterConfig::create(proto_config, factory_context_);
   ASSERT_OK(config_or_error);
   auto config = config_or_error.value();
-  EXPECT_EQ("/reverse_connections/request", config->requestPath());
+  EXPECT_THAT(replyFor(config, "GET", "/reverse_connections/request"),
+              testing::HasSubstr("400 Bad Request"));
 }
 
 // Test configuration with default values.
@@ -800,8 +851,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaults) {
   auto config = config_or_error.value();
   EXPECT_EQ(std::chrono::milliseconds(2000), config->pingInterval());
   EXPECT_EQ(std::chrono::milliseconds(10000), config->handshakeTimeout());
-  EXPECT_EQ("/reverse_connections/request", config->requestPath());
-  EXPECT_EQ("GET", config->requestMethod());
+  EXPECT_THAT(replyFor(config, "GET", "/reverse_connections/request"),
+              testing::HasSubstr("400 Bad Request"));
+  EXPECT_THAT(replyFor(config, "PUT", "/reverse_connections/request"),
+              testing::HasSubstr("404 Not Found"));
   EXPECT_FALSE(config->skipRebalancing());
 }
 
@@ -1357,8 +1410,8 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationAllBranches) {
     auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
     ASSERT_OK(config_or_error);
     auto config = config_or_error.value();
-    EXPECT_EQ("/reverse_connections/request", config->requestPath());
-    EXPECT_EQ("GET", config->requestMethod());
+    EXPECT_THAT(replyFor(config, "GET", "/reverse_connections/request"),
+                testing::HasSubstr("400 Bad Request"));
   }
 }
 
@@ -1508,8 +1561,19 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationHandshakeTimeoutDefault) {
   ASSERT_OK(config_or_error);
   auto config = config_or_error.value();
   EXPECT_EQ(std::chrono::milliseconds(10000), config->handshakeTimeout());
-  EXPECT_EQ("/test", config->requestPath());
-  EXPECT_EQ("PUT", config->requestMethod());
+  EXPECT_THAT(replyFor(config, "PUT", "/test"), testing::HasSubstr("400 Bad Request"));
+  EXPECT_THAT(replyFor(config, "GET", "/test"), testing::HasSubstr("404 Not Found"));
+}
+
+// With upgrade negotiation on, a request that matches method and path but carries no
+// `Upgrade: reverse-tunnel` is answered 426.
+TEST_F(ReverseTunnelFilterUnitTest, ConfigurationUpgradeRequiresUpgradeHeader) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.set_use_http_upgrade(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_OK(config_or_error);
+  EXPECT_THAT(replyFor(config_or_error.value(), "GET", "/reverse_connections/request"),
+              testing::HasSubstr("426 Upgrade Required"));
 }
 
 // Test decodeData with multiple chunks.

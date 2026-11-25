@@ -29,7 +29,6 @@ public:
     EncodeError,     // HTTP request encoding failed
     Timeout,         // Handshake response not received within the deadline
     ConnectionClose, // Connection closed or the codec failed before the response
-    Rejected,        // Protocol-specific rejection; the handshake names its stat suffix
   };
 
   /**
@@ -59,18 +58,6 @@ public:
   }
 
   /**
-   * Create a protocol-neutral rejection for handshakes other than the built-in HTTP/1.
-   * @param stat_suffix stat name suffix counted for this failure.
-   * @param detail optional context describing the rejection.
-   */
-  static HandshakeFailureReason rejected(absl::string_view stat_suffix,
-                                         absl::string_view detail = "") {
-    HandshakeFailureReason reason{Type::Rejected, detail};
-    reason.stat_suffix_ = std::string(stat_suffix);
-    return reason;
-  }
-
-  /**
    * Get a detailed human-readable error message.
    * @return detailed error message string
    */
@@ -85,8 +72,6 @@ public:
     case Type::ConnectionClose:
       return context_.empty() ? "HTTP handshake connection closed"
                               : absl::StrCat("HTTP handshake connection closed: ", context_);
-    case Type::Rejected:
-      return absl::StrCat("handshake rejected: ", context_.empty() ? stat_suffix_ : context_);
     }
     return "Unknown handshake failure";
   }
@@ -105,8 +90,6 @@ public:
       return "timeout";
     case Type::ConnectionClose:
       return "connection_close";
-    case Type::Rejected:
-      return stat_suffix_;
     }
     return "unknown";
   }
@@ -116,8 +99,6 @@ private:
 
   Type type_;
   std::string context_;
-  // Set only for Type::Rejected.
-  std::string stat_suffix_;
 };
 
 /**
@@ -177,7 +158,10 @@ public:
   // callbacks. On success, bytes the responder coalesced with the response must already be
   // readable via takeResidual(). A success re-enters cancel() and takeResidual() before this
   // returns, so report it only after the codec dispatch returns, never from inside a codec
-  // callback that still uses the codec.
+  // callback that still uses the codec. A failure may be reported from inside a protocol callback
+  // (HTTP/1 reports it from decodeHeaders()), so the owner defers destroying the handshake until
+  // that callback returns. A retry_after below one second is ignored and the computed backoff
+  // applies.
   virtual void onHandshakeDone(HandshakeOutcome outcome,
                                std::optional<std::chrono::milliseconds> retry_after) = 0;
 };
@@ -188,7 +172,8 @@ public:
  * through the connection exposed by the callbacks.
  *
  * Lifetime: the connection stays valid until the terminal outcome or cancel(). The owner may
- * destroy the handshake synchronously after either, so no callback may be pending past them.
+ * destroy the handshake after either, deferring it past any protocol callback still on the stack,
+ * so no callback may be pending past them.
  */
 class InitiatorHandshake {
 public:
@@ -215,8 +200,9 @@ public:
   /**
    * Stops the handshake without a terminal outcome (wrapper teardown, deadline, or a success
    * handoff) and detaches from the connection. A transport close reaches it only through the
-   * owner's deferred teardown. Any residual captured so far stays readable via takeResidual().
-   * No callback runs after cancel().
+   * owner's deferred teardown. It may run more than once and after the terminal outcome, for
+   * example after a failure and twice after a deadline. Any residual captured so far stays
+   * readable via takeResidual(). No callback runs after cancel().
    */
   virtual void cancel() = 0;
 
@@ -229,7 +215,8 @@ public:
 
 /**
  * Creates per-connection initiator handshakes. One factory serves all dial attempts of an
- * initiator; it is immutable after construction.
+ * initiator. Its configuration is fixed at construction, except state the extension publishes
+ * once on the main thread before workers dial, such as the HTTP/1 formatted headers.
  */
 class InitiatorHandshakeConfigurator {
 public:

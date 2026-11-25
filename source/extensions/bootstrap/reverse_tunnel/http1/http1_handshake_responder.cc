@@ -58,7 +58,8 @@ Network::FilterStatus Http1HandshakeResponder::onData(Buffer::Instance& data) {
   if (!status.ok()) {
     ENVOY_CONN_LOG(debug, "reverse_tunnel: codec dispatch error: {}", callbacks_.connection(),
                    status.message());
-    // Close connection on codec error.
+    // A malformed request is terminal, so the handshake deadline no longer applies.
+    callbacks_.onTerminalRejection();
     callbacks_.connection().close(Network::ConnectionCloseType::FlushWrite);
   }
   return Network::FilterStatus::StopIteration;

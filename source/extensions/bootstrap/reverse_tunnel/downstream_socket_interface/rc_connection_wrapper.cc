@@ -41,6 +41,10 @@ void RCConnectionWrapper::onEvent(Network::ConnectionEvent event) {
       event != Network::ConnectionEvent::LocalClose) {
     return;
   }
+  // The parent already handled this attempt's terminal outcome and dropped the wrapper.
+  if (handshake_terminal_) {
+    return;
+  }
   if (!connection_) {
     ENVOY_LOG(debug, "RCConnectionWrapper: connection is null, skipping event handling");
     return;
@@ -56,6 +60,7 @@ void RCConnectionWrapper::onEvent(Network::ConnectionEvent event) {
 
   // Do not call shutdown() here, as that may trigger cleanup during event processing. Notify the
   // parent instead, which treats the premature close as a terminal handshake failure.
+  disarmHandshakeTimer();
   parent_.onConnectionDone(HandshakeOutcome::failure("Connection closed"), this, true);
 }
 
