@@ -53,13 +53,12 @@ bool hasOpenAiOnlyRole(const nlohmann::json& messages) {
          });
 }
 
-// `/v1/messages/count_tokens` and the like take a body shaped like the API they sit under, as does
-// `count-tokens` in place of a Claude model on Vertex AI.
-bool namesAnotherEndpoint(absl::string_view path) {
-  static constexpr absl::string_view Paths[]{"/chat/completions/", "/responses/", "/v1/messages/",
-                                             "/models/count-tokens:"};
-  return absl::c_any_of(Paths,
-                        [path](absl::string_view other) { return absl::StrContains(path, other); });
+// `/v1/messages/count_tokens` and the like take a body shaped like the API they sit under.
+bool isApiSubResource(absl::string_view path) {
+  static constexpr absl::string_view ApiPaths[]{"/chat/completions/", "/responses/",
+                                                "/v1/messages/"};
+  return absl::c_any_of(
+      ApiPaths, [path](absl::string_view api_path) { return absl::StrContains(path, api_path); });
 }
 
 bool endsInMethod(absl::string_view path) {
@@ -87,7 +86,7 @@ LLMProtocol detectLlmProtocol(const Http::RequestHeaderMap& headers, const nlohm
       return protocol;
     }
   }
-  if (!json.is_object() || namesAnotherEndpoint(path)) {
+  if (!json.is_object() || isApiSubResource(path)) {
     return LLMProtocol::Unspecified;
   }
   if (hasAnyKey(json, GeminiOnlyKeys)) {
@@ -107,7 +106,11 @@ LLMProtocol detectLlmProtocol(const Http::RequestHeaderMap& headers, const nlohm
   if (anthropic == openai) {
     return LLMProtocol::Unspecified;
   }
-  return anthropic ? LLMProtocol::AnthropicMessages : LLMProtocol::OpenAiChatCompletions;
+  if (openai) {
+    return LLMProtocol::OpenAiChatCompletions;
+  }
+  // Messages requires `max_tokens`, which the token-counting endpoints shaped like it do not take.
+  return json.contains(Keys::MaxTokens) ? LLMProtocol::AnthropicMessages : LLMProtocol::Unspecified;
 }
 
 } // namespace SchemaValidation

@@ -81,19 +81,20 @@ TEST(DetectLlmProtocolTest, GeminiPayloadOnAnotherMethodDetectsNothing) {
             LLMProtocol::AnthropicMessages);
 }
 
-// Vertex AI counts Claude's tokens at `count-tokens` in place of a model, with a Messages body.
-TEST(DetectLlmProtocolTest, VertexCountTokensDetectsNothing) {
+// Messages requires `max_tokens`. Token counting takes the same body without it, and for Claude
+// on Vertex AI the path names no API.
+TEST(DetectLlmProtocolTest, MessagesPayloadWithoutMaxTokensDetectsNothing) {
   constexpr absl::string_view payload =
-      R"({"anthropic_version":"vertex-2023-10-16","model":"claude-sonnet-4-5",)"
-      R"("system":"be terse","messages":[{"role":"user","content":"hi"}]})";
-  EXPECT_EQ(detect("/v1/projects/p/locations/us-east5/publishers/anthropic/models/"
-                   "count-tokens:rawPredict",
-                   payload),
-            LLMProtocol::Unspecified);
-  EXPECT_EQ(detect("/v1/projects/p/locations/us-east5/publishers/anthropic/models/"
-                   "claude-sonnet-4-5:rawPredict",
-                   payload),
-            LLMProtocol::AnthropicMessages);
+      R"({"model":"m","system":"be terse","messages":[{"role":"user","content":"hi"}]})";
+  for (const absl::string_view path : {
+           "/v1/projects/p/locations/us-east5/publishers/anthropic/models/count-tokens:rawPredict",
+           "/generate",
+       }) {
+    for (const bool anthropic_version : {false, true}) {
+      EXPECT_EQ(detect(path, payload, anthropic_version), LLMProtocol::Unspecified)
+          << path << " anthropic-version: " << anthropic_version;
+    }
+  }
 }
 
 // Anthropic clients send the header to every endpoint, so it names the provider, not the API.
@@ -124,9 +125,9 @@ TEST(DetectLlmProtocolTest, ExclusivePayloadMarkers) {
             LLMProtocol::GeminiGenerateContent);
   EXPECT_EQ(fromPayload(R"({"system_instruction":{}})"), LLMProtocol::GeminiGenerateContent);
   for (const std::string body : {
-           R"({"messages":[],"system":"be terse"})",
-           R"({"messages":[],"top_k":5})",
-           R"({"messages":[],"tools":[{"name":"t","input_schema":{}}]})",
+           R"({"max_tokens":8,"messages":[],"system":"be terse"})",
+           R"({"max_tokens":8,"messages":[],"top_k":5})",
+           R"({"max_tokens":8,"messages":[],"tools":[{"name":"t","input_schema":{}}]})",
        }) {
     EXPECT_EQ(fromPayload(body), LLMProtocol::AnthropicMessages) << body;
   }
