@@ -26,6 +26,13 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op",
     ],
     extension_names = ["envoy.matching.matchers.dynamic_modules"],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -70,6 +77,12 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:matcher_check_headers",
     ],
     extension_names = ["envoy.matching.matchers.dynamic_modules"],
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/extensions/matching/http/dynamic_modules:data_input_lib",
         "//source/extensions/matching/input_matchers/dynamic_modules:config",

@@ -71,7 +71,8 @@ absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFact
                                      config_with_hash_key, server_context.scope(), true);
       RELEASE_ASSERT(client_or_error.ok(), "failed to create ext_authz gRPC client");
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          client_or_error.value(), timeout, filter_config->emitClientSpan());
+          client_or_error.value(), timeout, filter_config->emitClientSpan(),
+          filter_config->readRawHeaderValue());
       callbacks.addStreamFilter(
           std::make_shared<Filter>(filter_config, std::move(client), server_context));
     };

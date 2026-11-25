@@ -12,14 +12,18 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/struct_matchers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ElementsAre;
 using testing::NiceMock;
+using testing::Pair;
 using testing::Return;
 using testing::ReturnRef;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -32,6 +36,7 @@ namespace {
 class FakeUpstreamStreamFilterCallbacks : public Http::UpstreamStreamFilterCallbacks {
 public:
   StreamInfo::StreamInfo& upstreamStreamInfo() override { return stream_info_; }
+  StreamInfo::StreamInfo& downstreamStreamInfo() override { return downstream_stream_info_; }
   OptRef<Router::GenericUpstream> upstream() override { return {}; }
   void dumpState(std::ostream&, int) const override {}
   bool pausedForConnect() const override { return false; }
@@ -51,6 +56,7 @@ public:
   void setUpstreamToDownstream(Router::UpstreamToDownstream&) override {}
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<StreamInfo::MockStreamInfo> downstream_stream_info_;
   Http::ConnectionPool::Instance::StreamOptions options_{false, false};
   Http::UpstreamCallbacks* registered_callbacks_{};
 };
@@ -201,17 +207,25 @@ TEST_F(UpstreamRbacFilterTest, ReevaluatesSelectedHostIgnoringStaleFilterState) 
 // the downstream rbac filter's namespace).
 TEST_F(UpstreamRbacFilterTest, EmitsDynamicMetadataUnderUpstreamRbacKey) {
   setup(envoy::config::rbac::v3::RBAC::DENY, "1.2.3.4");
-  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.filters.http.upstream_rbac", _));
   EXPECT_CALL(callbacks_, sendLocalReply(_, _, _, _, _));
+  // The fields go straight into the stream's metadata, with no Struct to merge.
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.filters.http.upstream_rbac", _)).Times(0);
   filter_->onHostSelected(makeHost("1.2.3.4:80"));
+
+  const auto& filter_metadata = req_info_.dynamicMetadata().filter_metadata();
+  EXPECT_THAT(filter_metadata,
+              ElementsAre(Pair("envoy.filters.http.upstream_rbac",
+                               HasStructFields(UnorderedElementsAre(
+                                   IsStructString("enforced_engine_result", "denied"),
+                                   IsStructString("enforced_effective_policy_id", "foo"))))));
 }
 
 // With no RBAC engine configured (empty config), the filter is a no-op: no denial, no metadata.
 TEST_F(UpstreamRbacFilterTest, NoEngineConfiguredAllows) {
   applyConfig(envoy::extensions::filters::http::rbac::v3::RBAC{});
   EXPECT_CALL(callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
-  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   filter_->onHostSelected(makeHost("1.2.3.4:80"));
+  EXPECT_TRUE(req_info_.dynamicMetadata().filter_metadata().empty());
 }
 
 // Per-route configuration works for the upstream filter exactly as for the downstream RBAC filter:
@@ -258,8 +272,8 @@ TEST_F(UpstreamRbacFilterTest, NoDownstreamConnectionIsSkipped) {
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(OptRef<const Network::Connection>{}));
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
-  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   filter_->onHostSelected(makeHost("1.2.3.4:80"));
+  EXPECT_TRUE(req_info_.dynamicMetadata().filter_metadata().empty());
 
   // The address is written (that happens before the connection guard), but no policy is evaluated.
   EXPECT_TRUE(req_info_.filterState()->hasDataWithName(StreamInfo::UpstreamAddress::key()));

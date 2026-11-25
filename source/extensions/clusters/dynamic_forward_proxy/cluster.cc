@@ -72,6 +72,8 @@ Cluster::Cluster(
       main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       orig_cluster_config_(cluster),
       allow_coalesced_connections_(config.allow_coalesced_connections()),
+      skip_draining_on_resolution_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, skip_draining_on_resolution, true)),
       time_source_(context.serverFactoryContext().timeSource()),
       cm_(context.serverFactoryContext().clusterManager()),
       max_sub_clusters_(
@@ -284,8 +286,7 @@ absl::Status Cluster::addOrUpdateHost(
     const auto host_map_it = host_map_.find(host);
     if (host_map_it != host_map_.end()) {
       ASSERT(host_info == host_map_it->second.shared_host_info_);
-      if (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.dfp_cluster_replace_host_on_address_change")) {
+      if (skip_draining_on_resolution_) {
         // If we only have an address change, we can do that swap inline without any other updates.
         // The appropriate R/W locking is in place to allow this. The details of this locking are:
         //  - Hosts are not thread local, they are global.

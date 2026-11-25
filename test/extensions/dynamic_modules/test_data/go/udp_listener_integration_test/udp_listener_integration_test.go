@@ -10,6 +10,7 @@ func init() {
 	sdk.RegisterUdpListenerFilterConfigFactories(map[string]shared.UdpListenerFilterConfigFactory{
 		"echo_datagram":    &echoDatagramConfigFactory{},
 		"rewrite_datagram": &rewriteDatagramConfigFactory{},
+		"load_shed_point":  &loadShedPointConfigFactory{},
 	})
 }
 
@@ -103,5 +104,37 @@ func (f *rewriteDatagramFilter) OnData() shared.UdpListenerFilterStatus {
 		panic("unexpected datagram size after rewrite")
 	}
 
+	return shared.UdpListenerFilterStatusContinue
+}
+
+// loadShedPointConfigFactory creates filters that drop a datagram when the load shed point named in
+// the filter config sheds it.
+type loadShedPointConfigFactory struct {
+	shared.EmptyUdpListenerFilterConfigFactory
+}
+
+func (f *loadShedPointConfigFactory) Create(handle shared.UdpListenerFilterConfigHandle,
+	config []byte) (shared.UdpListenerFilterFactory, error) {
+	return &loadShedPointFactory{loadShedPoint: handle.GetLoadShedPoint(string(config))}, nil
+}
+
+type loadShedPointFactory struct {
+	shared.EmptyUdpListenerFilterFactory
+	loadShedPoint shared.LoadShedPoint
+}
+
+func (f *loadShedPointFactory) Create(shared.UdpListenerFilterHandle) shared.UdpListenerFilter {
+	return &loadShedPointFilter{loadShedPoint: f.loadShedPoint}
+}
+
+type loadShedPointFilter struct {
+	loadShedPoint shared.LoadShedPoint
+	shared.EmptyUdpListenerFilter
+}
+
+func (f *loadShedPointFilter) OnData() shared.UdpListenerFilterStatus {
+	if f.loadShedPoint != nil && f.loadShedPoint.ShouldShedLoad() {
+		return shared.UdpListenerFilterStatusStop
+	}
 	return shared.UdpListenerFilterStatusContinue
 }

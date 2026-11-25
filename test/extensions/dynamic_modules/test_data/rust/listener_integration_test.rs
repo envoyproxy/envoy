@@ -27,6 +27,10 @@ fn new_listener_filter_config_fn<EC: EnvoyListenerFilterConfig, ELF: EnvoyListen
     "filter_chain_selector" => Some(Box::new(FilterChainSelectorFilterConfig {
       selection: config.to_vec(),
     })),
+    "load_shed_point" => Some(Box::new(LoadShedPointFilterConfig {
+      load_shed_point: envoy_filter_config
+        .get_load_shed_point(std::str::from_utf8(config).unwrap()),
+    })),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -416,5 +420,43 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for FilterChainSelectorFilter
   ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
     assert!(envoy_filter.set_filter_state_typed(SELECTOR_KEY, &self.selection));
     abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  }
+}
+
+// =============================================================================
+// Load Shed Point Test Filter
+// =============================================================================
+
+// Creates filters that close an accepted socket when the load shed point named in the filter
+// config sheds it.
+struct LoadShedPointFilterConfig {
+  load_shed_point: Option<Box<dyn EnvoyLoadShedPoint>>,
+}
+
+impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for LoadShedPointFilterConfig {
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+    Box::new(LoadShedPointFilter {
+      shed_load: self
+        .load_shed_point
+        .as_ref()
+        .is_some_and(|load_shed_point| load_shed_point.should_shed_load()),
+    })
+  }
+}
+
+struct LoadShedPointFilter {
+  shed_load: bool,
+}
+
+impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for LoadShedPointFilter {
+  fn on_accept(
+    &mut self,
+    envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    if !self.shed_load {
+      return abi::envoy_dynamic_module_type_on_listener_filter_status::Continue;
+    }
+    envoy_filter.close_socket(Some("load_shed"));
+    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration
   }
 }

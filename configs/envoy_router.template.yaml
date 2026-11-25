@@ -19,9 +19,6 @@ virtual_hosts:
     route:
       {{ helper.make_route('service1')|indent(4) }}
   require_tls: ALL
-  rate_limits:
-    actions:
-      remote_address: {}
 - name: www_redirect
   domains:
   - wwww.yourcompany.net
@@ -31,9 +28,6 @@ virtual_hosts:
     redirect:
       host_redirect: www.yourcompany.net
   require_tls: ALL
-  rate_limits:
-  - actions:
-      remote_address: {}
 - name: api
   domains:
   - api.yourcompany.net
@@ -47,6 +41,3 @@ virtual_hosts:
     route:
       {{ helper.make_route('service1')|indent(4) }}
   require_tls: EXTERNAL_ONLY
-  rate_limits:
-  - actions:
-      remote_address: {}

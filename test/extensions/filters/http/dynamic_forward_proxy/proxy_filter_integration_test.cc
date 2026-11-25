@@ -225,6 +225,7 @@ typed_config:
 name: envoy.clusters.dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+  skip_draining_on_resolution: {}
   dns_cache_config:
     dns_min_refresh_rate: 1s
     name: foo
@@ -236,9 +237,9 @@ typed_config:
     dns_cache_circuit_breaker:
       max_pending_requests: {}{}{}
 )EOF",
-        Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, host_ttl_, dns_query_timeout,
-        disable_dns_refresh_on_failure, max_pending_requests, key_value_config_,
-        typed_dns_resolver_config);
+        skip_draining_on_resolution_, Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts,
+        host_ttl_, dns_query_timeout, disable_dns_refresh_on_failure, max_pending_requests,
+        key_value_config_, typed_dns_resolver_config);
 
     TestUtility::loadFromYaml(use_sub_cluster ? cluster_type_config_use_sub_cluster
                                               : cluster_type_config_use_dns_cache,
@@ -260,7 +261,7 @@ typed_config:
   void createUpstreams() override {
     if (upstream_tls_ && !upstream_cert_name_.empty()) {
       addFakeUpstream(Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_,
-                                                        factory_context_),
+                                                        factory_context_, upstreamStatsScope()),
                       upstreamProtocol(), /*autonomous_upstream=*/false);
     } else {
       HttpIntegrationTest::createUpstreams();
@@ -418,6 +419,7 @@ typed_config:
   bool use_cache_file_{};
   uint32_t host_ttl_{1};
   uint32_t dns_cache_ttl_{1000000};
+  bool skip_draining_on_resolution_{true};
   std::string filename_;
   std::string key_value_config_;
   std::string dns_hostname_{"localhost"};
@@ -1163,15 +1165,11 @@ const BaseIntegrationTest::InstanceConstSharedPtrFn alternateLoopbackFunction() 
   return [](int) { return Network::Utility::parseInternetAddressNoThrow("127.0.0.2", 0); };
 }
 
-// Make sure that with the legacy in-place address update behavior
-// (envoy.reloadable_features.dfp_cluster_replace_host_on_address_change disabled), even with a
-// resolution success we won't drain the connection.
+// Make sure that even with a resolution success we won't drain the connection.
 TEST_P(ProxyFilterIntegrationTest, StreamPersistAcrossShortTtlResSuccess) {
   if (version_ != Network::Address::IpVersion::v4) {
     return;
   }
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.dfp_cluster_replace_host_on_address_change", "false");
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
@@ -1700,6 +1698,7 @@ TEST_P(ProxyFilterIntegrationTest, HostReplacementAcrossShortTtlResSuccess) {
   if (version_ != Network::Address::IpVersion::v4) {
     return;
   }
+  skip_draining_on_resolution_ = false;
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 

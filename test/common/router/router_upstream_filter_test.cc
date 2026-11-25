@@ -406,6 +406,40 @@ TEST_F(RouterUpstreamFilterStatsTest, StatsPrefixScopeWithLegacyEmptyPrefix) {
   EXPECT_EQ("", factory_.stats_prefix_or_);
 }
 
+TEST_F(RouterUpstreamFilterTest, DownstreamStreamInfoAccessor) {
+  auto filter = std::make_shared<LifecycleTrackingFilter>();
+
+  HttpFilter codec_filter;
+  codec_filter.set_name("envoy.filters.http.upstream_codec");
+  envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec upstream_codec_config;
+  std::ignore = codec_filter.mutable_typed_config()->PackFrom(upstream_codec_config);
+
+  init({codec_filter});
+
+  ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_, info())
+      .WillByDefault(Return(cluster_info_));
+
+  EXPECT_CALL(*cluster_info_, createFilterChain(_))
+      .WillOnce([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.addStreamDecoderFilter(filter);
+        return false;
+      });
+
+  run();
+
+  ASSERT_NE(nullptr, filter->callbacks_);
+  ASSERT_TRUE(filter->callbacks_->upstreamCallbacks().has_value());
+  EXPECT_EQ(&callbacks_.streamInfo(),
+            &filter->callbacks_->upstreamCallbacks()->downstreamStreamInfo());
+  EXPECT_NE(&callbacks_.streamInfo(),
+            &filter->callbacks_->upstreamCallbacks()->upstreamStreamInfo());
+
+  NiceMock<Http::MockUpstreamStreamFilterCallbacks> mock_upstream_callbacks;
+  EXPECT_EQ(&mock_upstream_callbacks.downstream_stream_info_,
+            &mock_upstream_callbacks.downstreamStreamInfo());
+  EXPECT_EQ(&mock_upstream_callbacks.upstream_stream_info_,
+            &mock_upstream_callbacks.upstreamStreamInfo());
+}
 } // namespace
 } // namespace Router
 } // namespace Envoy

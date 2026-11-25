@@ -25,6 +25,7 @@ public:
   struct Events {
     static constexpr uint32_t MovedTo = 0x1;
     static constexpr uint32_t Modified = 0x2;
+    static constexpr uint32_t Created = 0x4;
   };
 
   virtual ~Watcher() = default;

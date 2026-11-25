@@ -21,6 +21,7 @@ envoy_cc_extension(
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/network:address_lib",
+        "//source/common/stats:symbol_table_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:upstream_includes",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",

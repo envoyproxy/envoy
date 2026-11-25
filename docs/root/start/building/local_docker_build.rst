@@ -34,14 +34,15 @@ also build as follows:
 
   $ pwd
   src/envoy
-  $ ./ci/run_envoy_docker.sh './ci/do_ci.sh release.server_only'
+  $ ./ci/run_envoy_docker.sh './ci/do_ci.sh release.server'
 
 For more information on building and different build targets, please refer to :repo:`ci/README.md`.
 
 .. warning::
-   These instructions for building Envoy use
-   `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags>`_ image.
-   You will need 4-5GB of disk space to accommodate this image.
+   These instructions for building Envoy use the
+   `envoyproxy/envoy-build <https://hub.docker.com/r/envoyproxy/envoy-build/tags>`_ image.
+   The image itself is small, but Bazel fetches the toolchains and dependencies into the
+   build directory, which needs several GB of disk space.
 
    This script runs as effective root on your host system.
 
@@ -49,16 +50,23 @@ For more information on building and different build targets, please refer to :r
 
 In this step we'll build the Envoy deployment images.
 
-.. note::
-   The ``docker`` CI target expects a release tarball to have been built previously using one of the steps above.
-
-In order to build Docker inside the Envoy build image we need to set the env var ``ENVOY_DOCKER_IN_DOCKER``
-
 .. code-block:: console
 
   $ pwd
   src/envoy/
-  $ ENVOY_DOCKER_IN_DOCKER=1 ./ci/run_envoy_docker.sh './ci/do_ci.sh docker'
+  $ ./ci/run_envoy_docker.sh './ci/do_ci.sh release.containers'
+
+The images are built with Bazel, with the release binaries, each as an OCI tarball in
+``envoy/<arch>/build_images`` of the build directory, eg
+``/tmp/envoy-docker-build/envoy/x64/build_images/envoy.amd64.tar``.
+
+A tarball can be loaded into Docker with a tool that reads OCI archives, eg with ``skopeo``:
+
+.. code-block:: console
+
+  $ skopeo copy \
+      oci-archive:/tmp/envoy-docker-build/envoy/x64/build_images/envoy.amd64.tar \
+      docker-daemon:envoyproxy/envoy:local
 
 Now you can use the Envoy image to build the any of the sandboxes by changing
 the ``FROM`` line in a related Dockerfile.

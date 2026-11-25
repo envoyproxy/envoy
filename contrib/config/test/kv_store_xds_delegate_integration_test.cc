@@ -238,15 +238,9 @@ protected:
   }
 
   void shutdownAndRestartTestServer() {
-    // Shutdown the Envoy server.
-    absl::Notification shutdown_done;
-    Server::Instance& server = test_server_->server();
-    server.dispatcher().post([&server, &shutdown_done]() {
-      server.shutdown();
-      shutdown_done.Notify();
-    });
-    ASSERT_TRUE(shutdown_done.WaitForNotificationWithTimeout(absl::Seconds(5)));
-    // Reset the test server.
+    // Shut down the Envoy server and wait for it to go away. The test server's destructor posts
+    // the shutdown and waits for the server thread to finish; shutting the server down here
+    // first would race that destructor against the server thread destroying the server.
     test_server_.reset();
     // Reset the server init function, as we don't want xDS responses sent on restart (we want to
     // use the values in the KV store instead).
@@ -259,6 +253,7 @@ protected:
     closeConnection(sds_connection_);
     closeConnection(rtds_connection_);
     // Bring down the xDS FakeUpstreams.
+    const uint32_t sds_upstream_port = getSdsUpstream()->localAddress()->ip()->port();
     getSdsUpstream().reset();
     getRtdsUpstream().reset();
 
@@ -266,9 +261,14 @@ protected:
     // after the Envoy server gets re-created and the KV store loaded.
     fake_upstreams_.pop_back(); // Removes the RTDS upstream.
     fake_upstreams_.pop_back(); // Removes the SDS upstream.
-    // Adds the new SDS upstream.
+    // Adds the new SDS upstream, on the same port as the old one. The Google gRPC client dials
+    // an address rather than a cluster, and that address is the authority the secret is stored
+    // under in the KV store, so the restarted Envoy must keep using it. Holding the port here
+    // also stops anything else from listening on it: that would accept the SDS stream instead
+    // of refusing it, and the secret would never be loaded from the KV store.
     fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(
-        0, version_, configWithType(Http::CodecType::HTTP2), /*defer_initialization=*/true));
+        sds_upstream_port, version_, configWithType(Http::CodecType::HTTP2),
+        /*defer_initialization=*/true));
     // Adds the new RTDS upstream.
     fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(
         0, version_, configWithType(Http::CodecType::HTTP2), /*defer_initialization=*/true));

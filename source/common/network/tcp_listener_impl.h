@@ -28,6 +28,11 @@ public:
   }
   void disable() override;
   void enable() override;
+  void onDrain() override {
+    if (bind_to_port_) {
+      socket_->ioHandle().onListenerDrain();
+    }
+  }
   void setRejectFraction(UnitFloat reject_fraction) override;
   void configureLoadShedPoints(Server::LoadShedPointProvider& load_shed_point_provider) override;
   bool shouldBypassOverloadManager() const override;

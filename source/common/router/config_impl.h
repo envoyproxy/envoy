@@ -350,7 +350,6 @@ private:
 };
 using CorsPolicyImpl = CorsPolicyImplBase<envoy::config::route::v3::CorsPolicy>;
 
-using RetryPolicyConstOptRef = const OptRef<const envoy::config::route::v3::RetryPolicy>;
 using HedgePolicyConstOptRef = const OptRef<const envoy::config::route::v3::HedgePolicy>;
 
 class ConfigImpl;
@@ -575,8 +574,16 @@ public:
   }
   const Http::HeaderEvaluator& headerEvaluator() const override;
   absl::string_view hostRewriteLiteral() const override { return host_rewrite_literal_; }
+  const ShadowPolicyStatsSharedPtr& stats() const override { return stats_; }
 
 private:
+  struct ShadowPolicyStatsHolder {
+    explicit ShadowPolicyStatsHolder(Stats::ScopeSharedPtr scope);
+
+    const Stats::ScopeSharedPtr scope_;
+    const ShadowPolicyStats stats_;
+  };
+
   explicit ShadowPolicyImpl(const RequestMirrorPolicy& config,
                             Server::Configuration::CommonFactoryContext& factory_context,
                             absl::Status& creation_status);
@@ -589,6 +596,7 @@ private:
   const bool disable_shadow_host_suffix_append_;
   const std::string host_rewrite_literal_;
   HeaderMutationsPtr request_headers_mutations_;
+  ShadowPolicyStatsSharedPtr stats_;
 };
 
 /**
@@ -1370,6 +1378,7 @@ public:
                          const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
 
   const VirtualHostImpl* findVirtualHost(const Http::RequestHeaderMap& headers) const;
+  const VirtualHostImpl* findVirtualHost(absl::string_view host) const;
 
 private:
   RouteMatcher(const envoy::config::route::v3::RouteConfiguration& config,
@@ -1384,6 +1393,11 @@ private:
   const VirtualHostImpl* findWildcardVirtualHost(absl::string_view host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;
+  bool hasOnlyDefaultVirtualHost() const {
+    return virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
+           wildcard_virtual_host_prefixes_.empty();
+  }
+  const VirtualHostImpl* findVirtualHostInternal(absl::string_view host) const;
   bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
 
   // Keeps the shared part of the route config alive and gives access to the route configuration
@@ -1502,8 +1516,8 @@ public:
          ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
          bool validate_clusters_default);
 
-  bool virtualHostExists(const Http::RequestHeaderMap& headers) const {
-    return route_matcher_->findVirtualHost(headers) != nullptr;
+  bool virtualHostExists(absl::string_view domain) const {
+    return route_matcher_->findVirtualHost(domain) != nullptr;
   }
 
   // Router::Config

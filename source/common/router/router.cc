@@ -872,7 +872,8 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
   absl::InlinedVector<std::reference_wrapper<const ShadowPolicy>, 2> active_shadow_policies;
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
-  // runtime keys. Also the method CONNECT doesn't support shadowing.
+  // runtime keys. Also the method CONNECT doesn't support shadowing. Requests answered locally
+  // before host selection never get here, so they are not counted in rq_sampled.
   const absl::string_view method = headers.getMethodValue();
   if (method != Http::Headers::get().MethodValues.Connect) {
     // Use cluster-level shadow policies if they are available (most specific wins).
@@ -885,6 +886,9 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
       const auto& policy_ref = *shadow_policy;
       if (FilterUtility::shouldShadow(policy_ref, config_->runtime_, callbacks_->streamId())) {
         active_shadow_policies.push_back(std::cref(policy_ref));
+        if (policy_ref.stats() != nullptr) {
+          policy_ref.stats()->rq_sampled_.inc();
+        }
       }
     }
   }
@@ -940,6 +944,9 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
     const std::optional<absl::string_view> shadow_cluster_name =
         getShadowCluster(shadow_policy, *downstream_headers_);
     if (!shadow_cluster_name.has_value()) {
+      if (shadow_policy.stats() != nullptr) {
+        shadow_policy.stats()->rq_no_cluster_.inc();
+      }
       continue;
     }
     const bool last_policy = (i == num_shadow_policies - 1);
@@ -988,10 +995,11 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
       // without waiting.
       Http::RequestMessagePtr request(new Http::RequestMessageImpl(std::move(shadow_headers)));
       config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
-                                     options);
+                                     options, shadow_policy.stats());
     } else {
       Http::AsyncClient::OngoingRequest* shadow_stream = config_->shadowWriter().streamingShadow(
-          std::string(shadow_cluster_name.value()), std::move(shadow_headers), options);
+          std::string(shadow_cluster_name.value()), std::move(shadow_headers), options,
+          shadow_policy.stats());
       if (shadow_stream != nullptr) {
         ASSERT(std::find(shadow_streams_.begin(), shadow_streams_.end(), shadow_stream) ==
                shadow_streams_.end());
@@ -1206,6 +1214,12 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     }
   }
 
+  // Retries and redirects may have been given up on overflow above, or since the last frame, e.g.
+  // once the response started.
+  if (!buffering) {
+    dropKeptBody(decoding_buffer, data);
+  }
+
   for (auto* shadow_stream : shadow_streams_) {
     if (end_stream) {
       shadow_stream->removeDestructorCallback();
@@ -1229,7 +1243,9 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     // so that all buffered data is available by the time we do request complete processing and
     // potentially shadow. Additionally, we can't do a copy here because there's a check down
     // this stack for whether `data` is the same buffer as already buffered data.
+    const uint64_t length_before_keeping = getLength(callbacks_->decodingBuffer());
     callbacks_->addDecodedData(data, true);
+    kept_body_length_ += getLength(callbacks_->decodingBuffer()) - length_before_keeping;
   } else {
     if (!upstream_requests_.empty()) {
       upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
@@ -1250,6 +1266,21 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   }
 
   return Http::FilterDataStatus::StopIterationNoBuffer;
+}
+
+void Filter::dropKeptBody(const Buffer::Instance* decoding_buffer, const Buffer::Instance& data) {
+  // Nothing reads the kept body once retries and redirects are given up, so drop it to release its
+  // buffer accounting. Otherwise, with per-filter buffers, it keeps the stream buffer total above
+  // the low watermark and downstream reads may never resume. The guard is read separately from the
+  // filter manager, so only drop the body while the decoding buffer holds exactly what the router
+  // kept: with the shared buffer it may also hold the data of other filters. Skip it if the current
+  // frame is the decoding buffer itself, since the frame still has to be forwarded upstream.
+  if (!drop_kept_body_ || kept_body_length_ == 0 || decoding_buffer == nullptr ||
+      decoding_buffer == &data || decoding_buffer->length() != kept_body_length_) {
+    return;
+  }
+  kept_body_length_ = 0;
+  callbacks_->modifyDecodingBuffer([](Buffer::Instance& buffer) { buffer.drain(buffer.length()); });
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trailers) {

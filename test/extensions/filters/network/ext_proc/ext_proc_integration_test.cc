@@ -686,8 +686,8 @@ TEST_P(NetworkExtProcFilterIntegrationTest, GrpcStreamFailure) {
   // This should trigger onGrpcError instead of onGrpcClose
   closeGrpcStream();
   test_server_->waitForCounter("network_ext_proc.ext_proc_prefix.streams_grpc_error", Ge(1));
-  ASSERT_FALSE(tcp_client->write("", true));
-  tcp_client->waitForDisconnect();
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
 
   // Verify failure counters
   verifyCounters({{"streams_started", 1},
@@ -1121,8 +1121,8 @@ TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusCloseHandling) {
   verifyCounters({{"connections_closed", 1}});
 
   // Connection should be closed
-  ASSERT_FALSE(tcp_client->write("", true));
-  tcp_client->waitForDisconnect();
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
 }
 
 // Test connection status CLOSE_RST handling in responses
@@ -1153,8 +1153,99 @@ TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusRSTHandling) {
   verifyCounters({{"connections_closed", 1}, {"connections_reset", 1}});
 
   // Connection should be closed
-  ASSERT_FALSE(tcp_client->write("", true));
   tcp_client->waitForDisconnect();
+}
+
+TEST_P(NetworkExtProcFilterIntegrationTest, ProcessingModesWriteSkipIgnoresWriteResponse) {
+  initializeWithSkipProcessingModes(/*skip_read=*/false);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(tcp_client->write("client_data", false));
+  ProcessingRequest request;
+  waitForFirstGrpcMessage(request);
+  ASSERT_TRUE(request.has_read_data());
+
+  sendWriteGrpcMessage("unexpected_write", false, /*first_message=*/true);
+  sendReadGrpcMessage("client_data_inspected", false);
+
+  ASSERT_TRUE(fake_upstream_connection->waitForData(21));
+
+  ASSERT_TRUE(fake_upstream_connection->write("server_response", false));
+  tcp_client->waitForData("server_response");
+  EXPECT_EQ("server_response", tcp_client->data());
+
+  verifyCounters(
+      {{"spurious_msgs_received", 1}, {"stream_msgs_received", 1}, {"read_data_injected", 1}});
+  EXPECT_EQ(0,
+            test_server_->counter("network_ext_proc.ext_proc_prefix.write_data_injected")->value());
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
+}
+
+TEST_P(NetworkExtProcFilterIntegrationTest, ProcessingModesReadSkipIgnoresReadResponse) {
+  initializeWithSkipProcessingModes(/*skip_read=*/true);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(fake_upstream_connection->write("server_response", false));
+  ProcessingRequest request;
+  waitForFirstGrpcMessage(request);
+  ASSERT_TRUE(request.has_write_data());
+
+  sendReadGrpcMessage("unexpected_read", false, /*first_message=*/true);
+  sendWriteGrpcMessage("server_data_inspected", false);
+
+  tcp_client->waitForData("server_data_inspected");
+  EXPECT_EQ("server_data_inspected", tcp_client->data());
+
+  ASSERT_TRUE(tcp_client->write("client_data", false));
+  std::string upstream_data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(11, &upstream_data));
+  EXPECT_EQ("client_data", upstream_data);
+
+  verifyCounters(
+      {{"spurious_msgs_received", 1}, {"stream_msgs_received", 1}, {"write_data_injected", 1}});
+  EXPECT_EQ(0,
+            test_server_->counter("network_ext_proc.ext_proc_prefix.read_data_injected")->value());
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
+}
+
+TEST_P(NetworkExtProcFilterIntegrationTest, ProcessingModesWriteSkipLegacyRuntimeGuardDisabled) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.network_ext_proc_enforce_processing_mode", "false");
+  initializeWithSkipProcessingModes(/*skip_read=*/false);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(tcp_client->write("client_data", false));
+  ProcessingRequest request;
+  waitForFirstGrpcMessage(request);
+  ASSERT_TRUE(request.has_read_data());
+
+  sendWriteGrpcMessage("legacy_write", false, /*first_message=*/true);
+  sendReadGrpcMessage("client_data_inspected", false);
+
+  ASSERT_TRUE(fake_upstream_connection->waitForData(21));
+  tcp_client->waitForData("legacy_write");
+  EXPECT_EQ("legacy_write", tcp_client->data());
+
+  verifyCounters(
+      {{"stream_msgs_received", 2}, {"read_data_injected", 1}, {"write_data_injected", 1}});
+  EXPECT_EQ(
+      0, test_server_->counter("network_ext_proc.ext_proc_prefix.spurious_msgs_received")->value());
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
 }
 
 } // namespace ExtProc

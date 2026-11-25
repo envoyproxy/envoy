@@ -19,6 +19,7 @@
 #include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/ssl_handshaker.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.h"
@@ -215,6 +216,10 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
 
   // Get a connection from the queue.
   ENVOY_LOG(debug, "reverse_tunnel: accept() called");
+  if (!canInitiateConnections()) {
+    stopInitiatingConnections();
+    return nullptr;
+  }
   if (established_connections_.empty()) {
     return nullptr;
   }
@@ -311,40 +316,87 @@ Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
 void ReverseConnectionIOHandle::resetFileEvents() {
   listener_want_read_ = false;
 
-  // Stop redials on the timer's worker before the listener closes.
-  if (worker_dispatcher_ == nullptr || worker_dispatcher_->isThreadSafe()) {
+  // The dispatcher is gone during cleanup(). Otherwise stop all pending tunnel work on its worker.
+  if (worker_dispatcher_ == nullptr) {
     rev_conn_retry_timer_.reset();
-  }
-
-  // Handshake connections have their own file events. Tear them down on this worker so
-  // main-thread close()/destructor does not destroy in-flight codecs. Skip when
-  // worker_dispatcher_ is null (cleanup() after workers are gone).
-  if (worker_dispatcher_ != nullptr && worker_dispatcher_->isThreadSafe()) {
-    conn_wrapper_to_host_map_.clear();
-    std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers = std::move(connection_wrappers_);
-    connection_wrappers_.clear();
-    for (auto& wrapper : wrappers) {
-      if (wrapper == nullptr) {
-        continue;
-      }
-      wrapper->shutdown();
-      worker_dispatcher_->deferredDelete(std::move(wrapper));
+  } else if (worker_dispatcher_->isThreadSafe()) {
+    // Listener handoff stops accepting before notifying existing connections to drain. Preserve
+    // that distinction from an admin drain, which stops dials while leaving the listener running.
+    for (auto* child : child_io_handles_) {
+      child->onListenerStopped();
     }
-
-    // Close any established tunnels still queued for accept() on the worker that owns these
-    // ClientConnections. Leaving them for the main-thread destructor would close worker-owned
-    // connections off thread.
-    while (!established_connections_.empty()) {
-      auto established = std::move(established_connections_.front());
-      established_connections_.pop();
-      if (established.connection != nullptr &&
-          established.connection->state() == Network::Connection::State::Open) {
-        established.connection->close(Network::ConnectionCloseType::NoFlush);
-      }
-    }
+    stopInitiatingConnections();
   }
 
   IoSocketHandleImpl::resetFileEvents();
+}
+
+void ReverseConnectionIOHandle::onListenerDrain() {
+  listener_draining_ = true;
+  if (!canInitiateConnections()) {
+    stopInitiatingConnections();
+  }
+}
+
+bool ReverseConnectionIOHandle::canInitiateConnections() const {
+  if (connections_stopped_) {
+    return false;
+  }
+  return !listener_draining_ ||
+         !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reverse_tunnel_listener_drain");
+}
+
+void ReverseConnectionIOHandle::stopInitiatingConnections() {
+  ASSERT(worker_dispatcher_ != nullptr && worker_dispatcher_->isThreadSafe());
+  if (connections_stopped_) {
+    return;
+  }
+  ENVOY_LOG(info,
+            "reverse_tunnel: stopping tunnel initiation for source node '{}' and cluster '{}'",
+            config_.src_node_id, config_.src_cluster_id);
+  // Disable replacement dials before shutting down sockets, whose callbacks can request one.
+  connections_stopped_ = true;
+  rev_conn_retry_timer_.reset();
+
+  conn_wrapper_to_host_map_.clear();
+  std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers = std::move(connection_wrappers_);
+  connection_wrappers_.clear();
+  for (auto& wrapper : wrappers) {
+    if (wrapper != nullptr) {
+      wrapper->shutdown();
+      worker_dispatcher_->deferredDelete(std::move(wrapper));
+    }
+  }
+
+  for (auto& [host, host_info] : host_to_conn_info_map_) {
+    for (auto state = host_info.connection_states.begin();
+         state != host_info.connection_states.end();) {
+      if (state->second == ReverseConnectionState::Connecting) {
+        updateStateGauge(host, host_info.cluster_name, state->second, false);
+        host_info.connection_states.erase(state++);
+      } else {
+        ++state;
+      }
+    }
+    host_info.connecting_count = 0;
+  }
+
+  // These handshakes completed but the synthetic listener has not accepted their sockets yet.
+  // They have no active downstream streams and must not become usable after drain starts.
+  while (!established_connections_.empty()) {
+    auto established = std::move(established_connections_.front());
+    established_connections_.pop();
+    auto& connection = established.connection;
+    if (connection == nullptr) {
+      continue;
+    }
+    onDownstreamConnectionClosed(connection->connectionInfoProvider().localAddress()->asString(),
+                                 connection->id());
+    if (connection->state() == Network::Connection::State::Open) {
+      connection->close(Network::ConnectionCloseType::NoFlush);
+    }
+    worker_dispatcher_->deferredDelete(std::move(connection));
+  }
 }
 
 void ReverseConnectionIOHandle::onEvent(Network::ConnectionEvent event) {
@@ -401,7 +453,8 @@ ReverseTunnelInitiatorExtension* ReverseConnectionIOHandle::getDownstreamExtensi
 }
 
 void ReverseConnectionIOHandle::maybeUpdateHostsMappingsAndConnections(
-    const std::string& cluster_id, const std::vector<std::string>& hosts) {
+    const std::string& cluster_id, const std::vector<std::string>& hosts,
+    const RemoteClusterConnectionConfig& cluster_config) {
   absl::flat_hash_set<std::string> new_hosts(hosts.begin(), hosts.end());
   absl::flat_hash_set<std::string> removed_hosts;
   const auto& cluster_to_resolved_hosts_itr = cluster_to_resolved_hosts_map_.find(cluster_id);
@@ -424,16 +477,9 @@ void ReverseConnectionIOHandle::maybeUpdateHostsMappingsAndConnections(
           debug,
           "Creating HostConnectionInfo on-demand during host update for host {} in cluster {}",
           host, cluster_id);
-      host_to_conn_info_map_[host] = HostConnectionInfo{
-          host,
-          cluster_id,
-          {},                              // connection_keys - empty set initially
-          1,                               // default target_connection_count
-          0,                               // failure_count
-          getTimeSource().monotonicTime(), // last_failure_time
-          getTimeSource().monotonicTime(), // backoff_until (no backoff initially)
-          {}                               // connection_states - empty map initially
-      };
+      host_to_conn_info_map_.emplace(
+          host, HostConnectionInfo(host, cluster_id, cluster_config.reverse_connection_count,
+                                   getThreadLocalDispatcher()));
     } else {
       // Update cluster name if host moved to different cluster.
       host_it->second.cluster_name = cluster_id;
@@ -520,7 +566,7 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
   host_map_ptr->forEach([&](absl::string_view address, const Upstream::HostSharedPtr&) {
     resolved_hosts.emplace_back(address);
   });
-  maybeUpdateHostsMappingsAndConnections(cluster_name, std::move(resolved_hosts));
+  maybeUpdateHostsMappingsAndConnections(cluster_name, std::move(resolved_hosts), cluster_config);
   // Track successful connections for this cluster.
   uint32_t total_successful_connections = 0;
   uint32_t total_required_connections =
@@ -537,32 +583,23 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
     if (host_it == host_to_conn_info_map_.end()) {
       ENVOY_LOG(debug, "Creating HostConnectionInfo for host {} in cluster {}", host_address,
                 cluster_name);
-      host_to_conn_info_map_[host_address] = HostConnectionInfo{
-          host_address,
-          cluster_name,
-          {},                                      // connection_keys - empty set initially
-          cluster_config.reverse_connection_count, // target_connection_count from config
-          0,                                       // failure_count
-          // last_failure_time
-          worker_dispatcher_->timeSource().monotonicTime(),
-          // backoff_until
-          worker_dispatcher_->timeSource().monotonicTime(),
-          {} // connection_states
-      };
+      host_it =
+          host_to_conn_info_map_
+              .emplace(host_address, HostConnectionInfo(host_address, cluster_name,
+                                                        cluster_config.reverse_connection_count,
+                                                        getThreadLocalDispatcher()))
+              .first;
     }
 
-    host_to_conn_info_map_[host_address].target_connection_count =
-        cluster_config.reverse_connection_count;
-
     // Check if we should attempt connection to this host (backoff logic).
-    if (!shouldAttemptConnectionToHost(host_address, cluster_name)) {
+    if (!shouldAttemptConnectionToHost(host_address, cluster_name, cluster_config)) {
       ENVOY_LOG(debug, "reverse_tunnel: Skipping connection attempt to host {} due to backoff",
                 host_address);
       return;
     }
     // Get current number of successful connections to this host.
-    uint32_t current_connections = host_to_conn_info_map_[host_address].connection_keys.size();
-    uint32_t pending_connections = host_to_conn_info_map_[host_address].connecting_count;
+    uint32_t current_connections = host_it->second.connection_keys.size();
+    uint32_t pending_connections = host_it->second.connecting_count;
 
     ENVOY_LOG(debug,
               "reverse_tunnel: Number of reverse connections to host {} of cluster {} from source "
@@ -618,8 +655,9 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
   }
 }
 
-bool ReverseConnectionIOHandle::shouldAttemptConnectionToHost(const std::string& host_address,
-                                                              const std::string& cluster_name) {
+bool ReverseConnectionIOHandle::shouldAttemptConnectionToHost(
+    const std::string& host_address, const std::string& cluster_name,
+    const RemoteClusterConnectionConfig& cluster_config) {
   if (!config_.enable_circuit_breaker) {
     return true;
   }
@@ -628,17 +666,11 @@ bool ReverseConnectionIOHandle::shouldAttemptConnectionToHost(const std::string&
     // Create host entry on-demand to avoid race conditions during initialization.
     ENVOY_LOG(debug, "Creating HostConnectionInfo on-demand for host {} in cluster {}",
               host_address, cluster_name);
-    host_to_conn_info_map_[host_address] = HostConnectionInfo{
-        host_address,
-        cluster_name,
-        {},                              // connection_keys - empty set initially
-        1,                               // default target_connection_count
-        0,                               // failure_count
-        getTimeSource().monotonicTime(), // last_failure_time
-        getTimeSource().monotonicTime(), // backoff_until (no backoff initially)
-        {}                               // connection_states - empty map initially
-    };
-    host_it = host_to_conn_info_map_.find(host_address);
+    host_it = host_to_conn_info_map_
+                  .emplace(host_address, HostConnectionInfo(host_address, cluster_name,
+                                                            cluster_config.reverse_connection_count,
+                                                            getThreadLocalDispatcher()))
+                  .first;
   }
   auto& host_info = host_it->second;
   auto now = getTimeSource().monotonicTime();
@@ -853,10 +885,6 @@ void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& 
 
 void ReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement(
     const std::string& connection_key, uint64_t connection_id) {
-  ENVOY_LOG(info,
-            "reverse_tunnel: tunnel {} draining; dropping from tracking and dialing replacement",
-            connection_key);
-
   // Drop the key so the maintenance loop sees a deficit and dials a replacement. The underlying
   // TCP socket is left alone: in-flight HTTP/2 streams keep running on it and it closes naturally
   // on the next FIN; onDownstreamConnectionClosed() then no-ops.
@@ -870,7 +898,10 @@ void ReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement(
 
   emitAccessLog("connection_draining", host_address, cluster_name, connection_key, connection_id,
                 "");
-  // A stopped listener has no retry timer.
+  // A runtime opt-in after listener drain began must also prevent replacement dials.
+  if (!canInitiateConnections()) {
+    stopInitiatingConnections();
+  }
   if (rev_conn_retry_timer_ == nullptr) {
     ENVOY_LOG(debug,
               "reverse_tunnel: skipping replacement dial for {}; retry timer is gone "
@@ -879,6 +910,7 @@ void ReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement(
     return;
   }
 
+  ENVOY_LOG(info, "reverse_tunnel: tunnel {} draining; scheduling replacement", connection_key);
   // Dial the replacement on the next dispatcher pass instead of waiting for the periodic tick.
   rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(0));
 }
@@ -927,6 +959,10 @@ void ReverseConnectionIOHandle::updateStateGauge(const std::string& host_address
 }
 
 void ReverseConnectionIOHandle::maintainReverseConnections() {
+  if (!canInitiateConnections()) {
+    stopInitiatingConnections();
+    return;
+  }
   // During a hot restart, don't dial until we've asked the parent to stop accepting new
   // connections; otherwise the child's connection can be accepted by the still-listening parent
   // through a shared loopback listener and be reset when the parent exits. Re-check shortly. With
@@ -1037,6 +1073,23 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
   ENVOY_LOG(debug, "reverse_tunnel: Cluster '{}' found with type {} and {} hosts", cluster_name,
             static_cast<int>(cluster_info->type()), host_count);
 
+  // Stamp the episode on the first dial: initiation time and setup-time span, reused across
+  // handshake retries until the host reaches target connection count.
+  auto host_info_it = host_to_conn_info_map_.find(host_address);
+  RELEASE_ASSERT(host_info_it != host_to_conn_info_map_.end(),
+                 "HostConnectionInfo must exist before initiating a reverse connection");
+  auto& host_info = host_info_it->second;
+  if (!host_info.episode_initiation_time_ms.has_value()) {
+    host_info.episode_initiation_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                               getTimeSource().systemTime().time_since_epoch())
+                                               .count();
+    if (extension_) {
+      host_info.setup_time_span = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+          extension_->tunnel_setup_time_, getTimeSource());
+    }
+  }
+  const std::optional<int64_t> episode_initiation_time_ms = host_info.episode_initiation_time_ms;
+
   // Create load balancer context and validate it.
   ReverseConnectionLoadBalancerContext lb_context(host_address);
   ENVOY_LOG(debug, "reverse_tunnel: Created load balancer context for host key: {}", host_address);
@@ -1066,17 +1119,6 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
   auto wrapper = std::make_unique<RCConnectionWrapper>(*this, std::move(conn_data.connection_),
                                                        conn_data.host_description_, cluster_name);
   RCConnectionWrapper* wrapper_ptr = wrapper.get();
-
-  // Stamp the episode initiation time on the first dial of an establishment episode, and reuse it
-  // for subsequent handshake retries. It is cleared on handshake success (see onConnectionDone()),
-  // so a redial after a live connection drops begins a fresh episode with a new timestamp.
-  auto& host_info = host_to_conn_info_map_[host_address];
-  if (!host_info.episode_initiation_time_ms.has_value()) {
-    host_info.episode_initiation_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                               getTimeSource().systemTime().time_since_epoch())
-                                               .count();
-  }
-  const std::optional<int64_t> episode_initiation_time_ms = host_info.episode_initiation_time_ms;
 
   // Publish wrapper ownership before dialing. A handshake that fails synchronously calls
   // onConnectionDone() from within connect(), which looks the wrapper up here, so it must already
@@ -1241,6 +1283,10 @@ void ReverseConnectionIOHandle::onConnectionDone(
       // future redial after a connection drops then begins a fresh episode with a new timestamp.
       if (host_it->second.connection_keys.size() >= host_it->second.target_connection_count) {
         host_it->second.episode_initiation_time_ms.reset();
+        if (host_it->second.setup_time_span != nullptr) {
+          host_it->second.setup_time_span->complete();
+          host_it->second.setup_time_span.reset();
+        }
       }
     }
 
@@ -1271,6 +1317,16 @@ void ReverseConnectionIOHandle::removeAndDeferredDeleteWrapper(RCConnectionWrapp
     connection_wrappers_.erase(wrapper_vector_it);
     getThreadLocalDispatcher().deferredDelete(std::move(wrapper_to_delete));
   }
+}
+
+ReverseConnectionIOHandle::HostConnectionInfo::HostConnectionInfo(absl::string_view host_address,
+                                                                  absl::string_view cluster_name,
+                                                                  uint32_t target_connection_count,
+                                                                  Event::Dispatcher& dispatcher)
+    : host_address(host_address), cluster_name(cluster_name),
+      target_connection_count(target_connection_count) {
+  last_failure_time = dispatcher.timeSource().monotonicTime();
+  backoff_until = dispatcher.timeSource().monotonicTime();
 }
 
 } // namespace ReverseConnection
