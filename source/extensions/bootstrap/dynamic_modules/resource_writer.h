@@ -6,12 +6,14 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/event/schedulable_cb.h"
@@ -49,7 +51,8 @@ inline constexpr std::chrono::milliseconds WriterApplyPassBudget{5};
 // A queued write or removal of a resource.
 struct WriterOperation {
   std::string name;
-  // The sequence number of the latest submission for the resource.
+  // The sequence numbers of the first and of the latest submission for the resource.
+  uint64_t first_sequence;
   uint64_t sequence;
   // The ID of the write, or 0 for a removal.
   uint64_t update_id;
@@ -69,12 +72,15 @@ struct WriterResourceState {
   uint64_t warming_update_id = 0;
 };
 
-// The names of the statistics of a writer.
+// The names of the statistics of a writer, and whether it has the ownership statistics.
 struct WriterStatNames {
   // The prefix after dynamic_modules, for example cluster_writer.
   absl::string_view prefix;
   // The gauge of the resources that the module owns, for example clusters_owned.
   absl::string_view owned;
+  // Whether the writer notices when another source takes a resource away from the module, which
+  // the ownership statistics count.
+  bool notices_ownership_loss = true;
 };
 
 struct WriterStats {
@@ -84,8 +90,9 @@ struct WriterStats {
   Stats::Counter& update_superseded_;
   Stats::Counter& update_removed_;
   Stats::Counter& update_failed_;
-  Stats::Counter& update_ownership_lost_;
-  Stats::Counter& ownership_lost_;
+  // Set only for a writer that notices another source taking a resource away from the module.
+  OptRef<Stats::Counter> update_ownership_lost_;
+  OptRef<Stats::Counter> ownership_lost_;
   Stats::Gauge& owned_;
   Stats::Gauge& updates_pending_;
 };
@@ -121,7 +128,7 @@ protected:
    * hook.
    * @param stat_names the names of the statistics.
    * @param resource_type_url the type URL of the resources, whose dependent xDS types a pass holds
-   * back.
+   * back, or empty to hold back none.
    */
   ResourceWriter(absl::string_view extension_name,
                  Server::Configuration::ServerFactoryContext& context,
@@ -130,7 +137,8 @@ protected:
       : config_name_(extension_name.empty() ? "default" : extension_name), context_(context),
         stats_scope_(context.serverScope().store().createScope("")),
         stats_(generateWriterStats(*stats_scope_, config_name_, stat_names)),
-        resource_type_url_(resource_type_url), shared_state_(WriterSharedState::get(context)),
+        resource_type_url_(resource_type_url),
+        shared_state_(resource_type_url.empty() ? nullptr : WriterSharedState::get(context)),
         update_done_(std::move(update_done)),
         apply_callback_(context.mainThreadDispatcher().createSchedulableCallback(
             [this]() { applyQueuedOperations(); })),
@@ -141,6 +149,10 @@ protected:
   virtual void applyUpdate(WriterOperation& operation) PURE;
   // Applies a removal.
   virtual void applyRemoval(const WriterOperation& operation) PURE;
+  // Called before a pass applies an operation. It must not queue or remove operations.
+  virtual void onApplyingOperation() {}
+  // Called once a pass applied its operations.
+  virtual void onPassApplied() {}
 
   /**
    * Queues a write.
@@ -161,9 +173,9 @@ protected:
     stats_.updates_pending_.inc();
     const uint64_t sequence = next_sequence_++;
     if (state.queued == queue_.end()) {
-      state.queued = queue_.insert(queue_.end(), WriterOperation{std::string(name), sequence,
-                                                                 update_id, std::string(resource),
-                                                                 std::string(version_info)});
+      state.queued = queue_.insert(
+          queue_.end(), WriterOperation{std::string(name), sequence, sequence, update_id,
+                                        std::string(resource), std::string(version_info)});
     } else {
       // The queued operation keeps its place in the queue and takes the latest write.
       WriterOperation& operation = *state.queued;
@@ -191,8 +203,9 @@ protected:
 
     State& state = it->second;
     if (state.queued == queue_.end()) {
-      state.queued = queue_.insert(queue_.end(),
-                                   WriterOperation{std::string(name), next_sequence_++, 0, {}, {}});
+      const uint64_t sequence = next_sequence_++;
+      state.queued = queue_.insert(
+          queue_.end(), WriterOperation{std::string(name), sequence, sequence, 0, {}, {}});
     } else {
       WriterOperation& operation = *state.queued;
       if (operation.update_id != 0) {
@@ -219,6 +232,15 @@ protected:
   void startApplying() {
     clusters_initialized_ = true;
     scheduleApplyPass();
+  }
+
+  bool clustersInitialized() const { return clusters_initialized_; }
+  // The sequence number of the next submission.
+  uint64_t nextSequence() const { return next_sequence_; }
+  // The first submission of the queued operation that waits the longest, if any.
+  std::optional<uint64_t> earliestQueuedSequence() const {
+    // The queue keeps the order of the first submissions.
+    return queue_.empty() ? std::nullopt : std::make_optional(queue_.front().first_sequence);
   }
 
   /**
@@ -312,7 +334,9 @@ protected:
       stats_.update_failed_.inc();
       break;
     case WriteOutcome::OwnershipLost:
-      stats_.update_ownership_lost_.inc();
+      // Only a writer that notices another source taking a resource reports this outcome, and such
+      // a writer has the ownership statistics.
+      stats_.update_ownership_lost_->inc();
       break;
     }
     if (update_done_ == nullptr) {
@@ -339,7 +363,9 @@ protected:
     shut_down_ = true;
     apply_callback_->cancel();
     deliver_callback_->cancel();
-    shared_state_->onShutdown(this);
+    if (shared_state_ != nullptr) {
+      shared_state_->onShutdown(this);
+    }
     states_.clear();
     queue_.clear();
     undelivered_outcomes_.clear();
@@ -385,8 +411,10 @@ private:
     TimeSource& time_source = context_.mainThreadDispatcher().timeSource();
     // Send the requests of the xDS types that a burst of written resources depends on together, as
     // the xDS API of the resources does.
-    shared_state_->pauseDependentTypes(resource_type_url_, context_.xdsManager(),
-                                       time_source.monotonicTime());
+    if (shared_state_ != nullptr) {
+      shared_state_->pauseDependentTypes(resource_type_url_, context_.xdsManager(),
+                                         time_source.monotonicTime());
+    }
     // Operations queued while this pass runs wait for the next pass, so that every pass ends.
     const uint64_t sequence_cutoff = next_sequence_;
     const MonotonicTime deadline = time_source.monotonicTime() + WriterApplyPassBudget;
@@ -399,6 +427,7 @@ private:
       if (it == queue_.end() || (applied_any && time_source.monotonicTime() >= deadline)) {
         break;
       }
+      onApplyingOperation();
       WriterOperation operation = std::move(*it);
       queue_.erase(it);
       states_.find(operation.name)->second.queued = queue_.end();
@@ -409,7 +438,10 @@ private:
       }
       applied_any = true;
     }
-    shared_state_->onApplyPassDone(this, queue_.empty(), time_source.monotonicTime());
+    if (shared_state_ != nullptr) {
+      shared_state_->onApplyPassDone(this, queue_.empty(), time_source.monotonicTime());
+    }
+    onPassApplied();
     scheduleApplyPass();
   }
 
@@ -429,6 +461,7 @@ private:
   bool clusters_initialized_ = false;
   absl::string_view applying_name_;
   const std::string resource_type_url_;
+  // Null when the writer holds back no xDS types.
   const std::shared_ptr<WriterSharedState> shared_state_;
   const UpdateDoneCallback update_done_;
   std::vector<UpdateOutcome> undelivered_outcomes_;

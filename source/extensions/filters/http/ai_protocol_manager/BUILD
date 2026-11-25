@@ -107,6 +107,7 @@ envoy_cc_library(
     srcs = ["uri_pattern.cc"],
     hdrs = ["uri_pattern.h"],
     deps = [
+        "//source/common/http:header_utility_lib",
         "//source/common/http:path_utility_lib",
         "//source/extensions/path/uri_template_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
@@ -422,6 +423,7 @@ envoy_cc_library(
     hdrs = ["request_filter_manager.h"],
     deps = [
         ":ai_filter_lib",
+        ":ai_filter_state_lib",
         ":ai_request_lib",
         ":buffer_manager_lib",
         ":filter_pipeline_lib",

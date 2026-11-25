@@ -30,7 +30,7 @@ TEST(BodySizeLimitFilterFactoryTest, BodySizeLimitFilterCorrectYaml) {
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 
@@ -42,7 +42,7 @@ TEST(BodySizeLimitFilterFactoryTest, BodySizeLimitFilterCorrectProto) {
   BodySizeLimitFilterFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 
@@ -54,7 +54,7 @@ TEST(BodySizeLimitFilterFactoryTest, BodySizeLimitFilterCorrectProtoUpstreamFact
   BodySizeLimitFilterFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 
@@ -70,7 +70,7 @@ TEST(BodySizeLimitFilterFactoryTest, BodySizeLimitFilterEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 

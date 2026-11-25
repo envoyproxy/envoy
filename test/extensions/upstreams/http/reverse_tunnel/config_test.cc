@@ -1,5 +1,6 @@
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/upstreams/http/reverse_tunnel/v3/reverse_tunnel_codec.pb.h"
@@ -32,6 +33,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -74,6 +76,14 @@ constexpr int kTestSocketFd = 42;
 
 class ReverseTunnelUpstreamCodecTest : public testing::Test {
 protected:
+  std::unique_ptr<TestScopedStaticReloadableFeaturesRuntime> listener_drain_runtime_;
+
+  void setListenerDrainGuard(bool enabled) {
+    listener_drain_runtime_.reset();
+    listener_drain_runtime_ = std::make_unique<TestScopedStaticReloadableFeaturesRuntime>(
+        std::vector<std::pair<std::string, bool>>{{"reverse_tunnel_listener_drain", enabled}});
+  }
+
   ReverseTunnelUpstreamCodecTest() : dispatcher_("worker_0") {
     tls_.setDispatcher(&dispatcher_);
     EXPECT_CALL(dispatcher_, createTimer_(_))
@@ -219,18 +229,38 @@ TEST_F(ReverseTunnelUpstreamCodecTest, CallbacksObserveAndForwardGoaway) {
 // Peer GOAWAY on the drain-aware callbacks reaches the socket manager and reports to the
 // configured reverse-tunnel reporter with the node, cluster, and fd for the seeded socket.
 TEST_F(ReverseTunnelUpstreamCodecTest, PeerGoAwayReportsToReporter) {
+  setListenerDrainGuard(false);
   NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
 
   const std::string node_id = "node-1";
   const std::string cluster_id = "cluster-1";
   extension_ = makeExtension(node_id, cluster_id, kTestSocketFd);
+  auto socket = socket_manager_->getConnectionSocket(node_id);
+  ASSERT_NE(socket, nullptr);
+  socket_manager_->setMaxConnectionsPerNode(1);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), node_id);
 
   NiceMock<Envoy::Http::MockConnectionCallbacks> inner;
   DrainAwareClientCallbacks wrapper(inner, kTestSocketFd);
 
   EXPECT_CALL(*reporter, reportGoAwayEvent(Eq(node_id), Eq(cluster_id), Eq(kTestSocketFd)));
-  EXPECT_CALL(inner, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
+  EXPECT_CALL(inner, onGoAway(Envoy::Http::GoAwayErrorCode::NoError))
+      .WillOnce(Invoke([&](Envoy::Http::GoAwayErrorCode) {
+        EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), node_id);
+        EXPECT_EQ(socket_manager_->getNodeWithSocket(node_id), node_id);
+        EXPECT_EQ(socket_manager_->getClusterForNode(node_id), cluster_id);
+        EXPECT_FALSE(socket_manager_->canAcceptConnection(node_id, ""));
+        // Drain state is recorded before forwarding, even when the guard was disabled at GOAWAY.
+        setListenerDrainGuard(true);
+        EXPECT_TRUE(socket_manager_->getNodeWithSocket(cluster_id).empty());
+        EXPECT_TRUE(socket_manager_->getNodeWithSocket(node_id).empty());
+      }));
   wrapper.onGoAway(Envoy::Http::GoAwayErrorCode::NoError);
+
+  // A runtime rollback restores legacy selection for the same live, draining tunnel.
+  setListenerDrainGuard(false);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), node_id);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(node_id), node_id);
 }
 
 TEST_F(ReverseTunnelUpstreamCodecTest, PeerGoAwayNoReportWithoutTls) {
@@ -255,6 +285,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, PeerGoAwayNoReportWithoutTls) {
 }
 
 TEST_F(ReverseTunnelUpstreamCodecTest, CreateClientCodecPeerGoAwayReportsToReporter) {
+  setListenerDrainGuard(true);
   NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
 
   const std::string node_id = "node-1";
@@ -282,11 +313,100 @@ TEST_F(ReverseTunnelUpstreamCodecTest, CreateClientCodecPeerGoAwayReportsToRepor
   buffer.add(std::string(Envoy::Http::Http2::Http2Frame::makeEmptyGoAwayFrame(
       0, Envoy::Http::Http2::Http2Frame::ErrorCode::NoError)));
   EXPECT_TRUE(codec->dispatch(buffer).ok());
+  EXPECT_TRUE(socket_manager_->getNodeWithSocket(cluster_id).empty());
+}
+
+// End-to-end on a real HTTP/2 client codec: a stream-0 METADATA frame carrying the configured
+// drain key is dispatched, which drives DrainAwareClientCallbacks::onMetadata. The wrapper reports
+// a GOAWAY to the reverse-tunnel reporter (so the initiator dials a replacement), erases the
+// drain key, and forwards the remaining map to the inner callbacks. Requires the reverse-connection
+// cluster type, HTTP/2, enable_drain_with_goaway and http2_protocol_options.allow_metadata.
+TEST_F(ReverseTunnelUpstreamCodecTest, CreateClientCodecConnectionMetadataDispatched) {
+  NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
+  const std::string node_id = "node-1";
+  const std::string cluster_id = "cluster-1";
+  extension_ = makeExtension(node_id, cluster_id, kTestSocketFd);
+
+  ReverseTunnelUpstreamCodecOptions opts(makeProto(true), stats_, nullptr);
+  envoy::config::cluster::v3::Cluster::CustomClusterType custom_type;
+  custom_type.set_name("envoy.clusters.reverse_connection");
+  ON_CALL(cluster_, clusterType()).WillByDefault(Return(makeOptRef(std::as_const(custom_type))));
+  ON_CALL(cluster_, maxResponseHeadersCount()).WillByDefault(Return(100));
+  cluster_.http2_options_.set_allow_metadata(true);
+
+  EXPECT_CALL(connection_, getSocket()).WillOnce(ReturnRef(socket_));
+  EXPECT_CALL(*socket_raw_, ioHandle()).WillOnce(ReturnRef(io_handle_));
+  EXPECT_CALL(io_handle_, fdDoNotUse()).WillOnce(Return(kTestSocketFd));
+
+  auto codec = opts.createClientCodec(makeContext(Envoy::Http::CodecType::HTTP2));
+  ASSERT_NE(codec, nullptr);
+
+  // The drain key is reported as a GOAWAY to the reporter for this fd's node/cluster.
+  EXPECT_CALL(*reporter, reportGoAwayEvent(Eq(node_id), Eq(cluster_id), Eq(kTestSocketFd)));
+  // The drain key is erased before the map is forwarded to the inner callbacks, so the inner
+  // callbacks see the remaining (non-drain) entries only.
+  EXPECT_CALL(callbacks_, onMetadata(_))
+      .WillOnce(Invoke([](Envoy::Http::MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ(metadata_map_ptr->end(), metadata_map_ptr->find("envoy.reverse_tunnel.drain"));
+      }));
+
+  const Envoy::Http::MetadataMap metadata_map = {{"envoy.reverse_tunnel.drain", "true"},
+                                                 {"other", "keep"}};
+  const auto metadata_frame = Envoy::Http::Http2::Http2Frame::makeMetadataFrameFromMetadataMap(
+      0, metadata_map, Envoy::Http::Http2::Http2Frame::MetadataFlags::EndMetadata);
+
+  Buffer::OwnedImpl buffer;
+  buffer.add(std::string(Envoy::Http::Http2::Http2Frame::makeEmptySettingsFrame()));
+  buffer.add(std::string(metadata_frame));
+  EXPECT_TRUE(codec->dispatch(buffer).ok());
+}
+
+// A stream-0 METADATA frame that does NOT carry the drain key is forwarded to the inner
+// callbacks unchanged and does NOT report a GOAWAY (no replacement dial). Verifies the wrapper
+// only treats the drain key+value as a drain signal.
+TEST_F(ReverseTunnelUpstreamCodecTest, CreateClientCodecConnectionMetadataWithoutDrainKeyNoReport) {
+  NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
+  const std::string node_id = "node-1";
+  const std::string cluster_id = "cluster-1";
+  extension_ = makeExtension(node_id, cluster_id, kTestSocketFd);
+
+  ReverseTunnelUpstreamCodecOptions opts(makeProto(true), stats_, nullptr);
+  envoy::config::cluster::v3::Cluster::CustomClusterType custom_type;
+  custom_type.set_name("envoy.clusters.reverse_connection");
+  ON_CALL(cluster_, clusterType()).WillByDefault(Return(makeOptRef(std::as_const(custom_type))));
+  ON_CALL(cluster_, maxResponseHeadersCount()).WillByDefault(Return(100));
+  cluster_.http2_options_.set_allow_metadata(true);
+
+  EXPECT_CALL(connection_, getSocket()).WillOnce(ReturnRef(socket_));
+  EXPECT_CALL(*socket_raw_, ioHandle()).WillOnce(ReturnRef(io_handle_));
+  EXPECT_CALL(io_handle_, fdDoNotUse()).WillOnce(Return(kTestSocketFd));
+
+  auto codec = opts.createClientCodec(makeContext(Envoy::Http::CodecType::HTTP2));
+  ASSERT_NE(codec, nullptr);
+
+  EXPECT_CALL(*reporter, reportGoAwayEvent(_, _, _)).Times(0);
+  EXPECT_CALL(callbacks_, onMetadata(_))
+      .WillOnce(Invoke([](Envoy::Http::MetadataMapPtr&& metadata_map_ptr) {
+        // Unrelated key is forwarded unchanged.
+        EXPECT_EQ("keep", (*metadata_map_ptr)["other"]);
+      }));
+
+  const Envoy::Http::MetadataMap metadata_map = {{"other", "keep"}};
+  const auto metadata_frame = Envoy::Http::Http2::Http2Frame::makeMetadataFrameFromMetadataMap(
+      0, metadata_map, Envoy::Http::Http2::Http2Frame::MetadataFlags::EndMetadata);
+
+  Buffer::OwnedImpl buffer;
+  buffer.add(std::string(Envoy::Http::Http2::Http2Frame::makeEmptySettingsFrame()));
+  buffer.add(std::string(metadata_frame));
+  EXPECT_TRUE(codec->dispatch(buffer).ok());
 }
 
 TEST_F(ReverseTunnelUpstreamCodecTest, LocalGracefulDrainDoesNotReportGoAway) {
+  setListenerDrainGuard(false);
   NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
   extension_ = makeExtension("node-1", "cluster-1", kTestSocketFd);
+  auto socket = socket_manager_->getConnectionSocket("node-1");
+  ASSERT_NE(socket, nullptr);
 
   auto inner = std::make_unique<NiceMock<Envoy::Http::MockClientConnection>>();
   auto* inner_raw = inner.get();
@@ -296,17 +416,38 @@ TEST_F(ReverseTunnelUpstreamCodecTest, LocalGracefulDrainDoesNotReportGoAway) {
                                    /*registry=*/nullptr, /*cluster=*/"");
 
   EXPECT_CALL(*reporter, reportGoAwayEvent(_, _, _)).Times(0);
-  EXPECT_CALL(*inner_raw, shutdownNotice());
+  EXPECT_CALL(*inner_raw, encodeMetadata(_));
   EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(100), _));
   codec.startGracefulDrain(std::chrono::milliseconds(100));
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("cluster-1"), "node-1");
+
+  // Sending early drain METADATA must preserve eligibility even after a runtime opt-in.
+  setListenerDrainGuard(true);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("cluster-1"), "node-1");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("node-1"), "node-1");
+  setListenerDrainGuard(false);
 
   EXPECT_CALL(*inner_raw, goAway());
-  EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
+  EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError))
+      .WillOnce(Invoke([&](Envoy::Http::GoAwayErrorCode) {
+        EXPECT_EQ(socket_manager_->getNodeWithSocket("cluster-1"), "node-1");
+        EXPECT_EQ(socket_manager_->getNodeWithSocket("node-1"), "node-1");
+        EXPECT_EQ(socket_manager_->getClusterForNode("node-1"), "cluster-1");
+        // The local path also records drain state before forwarding while the guard is disabled.
+        setListenerDrainGuard(true);
+        EXPECT_TRUE(socket_manager_->getNodeWithSocket("cluster-1").empty());
+        EXPECT_TRUE(socket_manager_->getNodeWithSocket("node-1").empty());
+      }));
   drain_timer->invokeCallback();
+
+  // Local drain has the same selection rollback, without notifying the reporter.
+  setListenerDrainGuard(false);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("cluster-1"), "node-1");
+  EXPECT_EQ(socket_manager_->getNodeWithSocket("node-1"), "node-1");
 }
 
-// The decorator forwards ClientConnection calls and counts a sent GOAWAY.
-TEST_F(ReverseTunnelUpstreamCodecTest, ConnectionForwardsAndCountsGoawaySent) {
+// The decorator forwards ClientConnection calls.
+TEST_F(ReverseTunnelUpstreamCodecTest, ConnectionForwardsGoAwayAndShutdownNotice) {
   auto inner = std::make_unique<NiceMock<Envoy::Http::MockClientConnection>>();
   auto* inner_raw = inner.get();
   auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, kTestSocketFd);
@@ -315,17 +456,15 @@ TEST_F(ReverseTunnelUpstreamCodecTest, ConnectionForwardsAndCountsGoawaySent) {
 
   EXPECT_CALL(*inner_raw, goAway());
   codec.goAway();
-  EXPECT_EQ(1, stats_.goaway_sent_.value());
+  EXPECT_EQ(0, stats_.drain_started_.value());
 
   EXPECT_CALL(*inner_raw, shutdownNotice());
   codec.shutdownNotice();
 }
 
-// Graceful drain sends a shutdown notice immediately, then after drain_time sends the
-// final GOAWAY to the peer AND gracefully drains the local pool connection (drives onGoAway into
-// the pool's active client) instead of hard-closing it. The pool drain is what lets in-flight
-// requests finish and routes new requests onto the replacement tunnel; a hard close would abort
-// in-flight.
+// Graceful drain emits the drain METADATA frame immediately in Phase 1, then after drain_time
+// sends the final GOAWAY to the peer AND gracefully drains the local pool connection (drives
+// onGoAway into the pool's active client) instead of hard-closing it.
 TEST_F(ReverseTunnelUpstreamCodecTest, StartGracefulDrainTwoPhase) {
   auto inner = std::make_unique<NiceMock<Envoy::Http::MockClientConnection>>();
   auto* inner_raw = inner.get();
@@ -335,26 +474,32 @@ TEST_F(ReverseTunnelUpstreamCodecTest, StartGracefulDrainTwoPhase) {
   DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
                                    /*registry=*/nullptr, /*cluster=*/"");
 
-  // Phase 1: shutdown notice now, GOAWAY deferred (no goaway_sent yet).
-  EXPECT_CALL(*inner_raw, shutdownNotice());
+  // Phase 1: drain METADATA frame emitted immediately and drain timer armed.
   EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(5000), _));
+  EXPECT_CALL(*inner_raw, encodeMetadata(_))
+      .WillOnce(testing::Invoke([](const Envoy::Http::MetadataMapVector& metadata_vec) {
+        ASSERT_EQ(1, metadata_vec.size());
+        auto it = metadata_vec[0]->find("envoy.reverse_tunnel.drain");
+        ASSERT_NE(metadata_vec[0]->end(), it);
+        EXPECT_EQ("true", it->second);
+      }));
   codec.startGracefulDrain(std::chrono::milliseconds(5000));
-  EXPECT_EQ(0, stats_.goaway_sent_.value());
+  EXPECT_EQ(1, stats_.drain_started_.value());
 
   // Phase 2: timer fires -> final GOAWAY to the peer, plus a graceful pool drain driven into the
-  // local pool's active client (onGoAway on the wrapped callbacks). goaway_received_ stays 0
-  // because this is a locally-initiated drain, not an observed peer GOAWAY.
+  // local pool's active client (onGoAway on the wrapped callbacks).
   EXPECT_CALL(*inner_raw, goAway());
   EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
   drain_timer->invokeCallback();
-  EXPECT_EQ(1, stats_.goaway_sent_.value());
+  EXPECT_EQ(1, stats_.drain_started_.value());
 
   // Idempotent: a second call does nothing.
   codec.startGracefulDrain(std::chrono::milliseconds(5000));
+  EXPECT_EQ(1, stats_.drain_started_.value());
 }
 
 // The registry fans a drain out to a registered codec for the matching cluster, which triggers
-// the two-phase graceful drain (shutdownNotice now, GOAWAY after drain_time).
+// the two-phase graceful drain (drain METADATA now, GOAWAY after drain_time).
 TEST_F(ReverseTunnelUpstreamCodecTest, RegistryDrainsRegisteredCluster) {
   auto registry = std::make_shared<UpstreamCodecDrainRegistry>(tls_);
 
@@ -368,16 +513,17 @@ TEST_F(ReverseTunnelUpstreamCodecTest, RegistryDrainsRegisteredCluster) {
 
   // Draining a different cluster is a no-op for this codec.
   registry->drainCluster("other", std::chrono::milliseconds(1000));
+  EXPECT_EQ(0, stats_.drain_started_.value());
 
-  // Draining the matching cluster reaches the codec -> shutdownNotice now.
-  EXPECT_CALL(*inner_raw, shutdownNotice());
+  // Draining the matching cluster reaches the codec -> drain METADATA now.
+  EXPECT_CALL(*inner_raw, encodeMetadata(_));
   registry->drainCluster("cluster_a", std::chrono::milliseconds(1000));
+  EXPECT_EQ(1, stats_.drain_started_.value());
 
   // Timer fires -> final GOAWAY + graceful pool drain (onGoAway into the local pool), not a close.
   EXPECT_CALL(*inner_raw, goAway());
   EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
   drain_timer->invokeCallback();
-  EXPECT_EQ(1, stats_.goaway_sent_.value());
 }
 
 // An empty cluster key drains every registered codec (the "drain all" admin path).
@@ -392,7 +538,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, RegistryDrainsAllClusters) {
                                    registry, "cluster_a");
 
   // Empty key fans the drain out across all registered clusters.
-  EXPECT_CALL(*inner_raw, shutdownNotice());
+  EXPECT_CALL(*inner_raw, encodeMetadata(_));
   registry->drainCluster("", std::chrono::milliseconds(1000));
 
   EXPECT_CALL(*inner_raw, goAway());
@@ -456,36 +602,124 @@ TEST_F(ReverseTunnelUpstreamCodecTest, CreatesDrainAwareCodecForReverseConnectio
   EXPECT_EQ(Envoy::Http::Protocol::Http2, codec->protocol());
 }
 
-// End-to-end on a real HTTP/2 client codec: startGracefulDrain sends the graceful first GOAWAY via
-// the HTTP/2 subclass (sendGracefulGoAway) immediately, then the final GOAWAY and a graceful pool
-// drain after drain_time. Exercises the h2_codec_ != nullptr path that the mock-inner tests cannot
-// reach.
-TEST_F(ReverseTunnelUpstreamCodecTest, GracefulDrainTwoPhaseOnRealHttp2Codec) {
-  ON_CALL(cluster_, maxResponseHeadersCount()).WillByDefault(Return(100));
+// Counts HTTP/2 frames of `target_type` on `target_stream_id` in raw `wire` bytes, skipping an
+// optional leading HTTP/2 client connection preamble.
+int countHttp2Frames(absl::string_view wire, Envoy::Http::Http2::Http2Frame::Type target_type,
+                     uint32_t target_stream_id) {
+  constexpr absl::string_view kPreamble(Envoy::Http::Http2::Http2Frame::Preamble, 24);
+  if (absl::StartsWith(wire, kPreamble)) {
+    wire.remove_prefix(kPreamble.size());
+  }
+  int count = 0;
+  size_t offset = 0;
+  while (offset + Envoy::Http::Http2::Http2Frame::HeaderSize <= wire.size()) {
+    Envoy::Http::Http2::Http2Frame frame;
+    frame.setHeader(wire.substr(offset, Envoy::Http::Http2::Http2Frame::HeaderSize));
+    const size_t frame_size = Envoy::Http::Http2::Http2Frame::HeaderSize + frame.payloadSize();
+    if (offset + frame_size > wire.size()) {
+      break;
+    }
+    if (frame.type() == target_type && frame.streamId() == target_stream_id) {
+      ++count;
+    }
+    offset += frame_size;
+  }
+  return count;
+}
 
-  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, kTestSocketFd);
-  auto& callbacks_ref = *callbacks;
-  auto h2 = std::make_unique<DrainAwareHttp2ClientConnection>(
-      connection_, callbacks_ref, cluster_.http2CodecStats(), random_,
-      cluster_.httpProtocolOptions().http2Options(),
-      cluster_.maxResponseHeadersKb().value_or(Envoy::Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
-      cluster_.maxResponseHeadersCount(), Envoy::Http::Http2::ProdNghttp2SessionFactory::get());
-  auto* h2_raw = h2.get();
+// End-to-end through ReverseTunnelUpstreamCodecOptions::createClientCodec + registry on a real
+// HTTP/2 client codec: draining the cluster via the registry sends a stream-0 METADATA frame
+// immediately when allow_metadata is enabled, then the final GOAWAY and a graceful pool drain
+// after drain_time.
+TEST_F(ReverseTunnelUpstreamCodecTest, GracefulDrainWithMetadataOnRealHttp2Codec) {
+  auto registry = std::make_shared<UpstreamCodecDrainRegistry>(tls_);
+  ReverseTunnelUpstreamCodecOptions opts(makeProto(true), stats_, registry);
+
+  envoy::config::cluster::v3::Cluster::CustomClusterType custom_type;
+  custom_type.set_name("envoy.clusters.reverse_connection");
+  ON_CALL(cluster_, clusterType()).WillByDefault(Return(makeOptRef(std::as_const(custom_type))));
+  ON_CALL(cluster_, maxResponseHeadersCount()).WillByDefault(Return(100));
+  ON_CALL(connection_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+  cluster_.http2_options_.set_allow_metadata(true);
+
+  std::string captured_wire;
+  ON_CALL(connection_, write(_, _))
+      .WillByDefault(testing::Invoke([&captured_wire](Buffer::Instance& data, bool) {
+        captured_wire.append(data.toString());
+        data.drain(data.length());
+      }));
+
+  EXPECT_CALL(connection_, getSocket()).WillOnce(ReturnRef(socket_));
+  EXPECT_CALL(*socket_raw_, ioHandle()).WillOnce(ReturnRef(io_handle_));
+  EXPECT_CALL(io_handle_, fdDoNotUse()).WillOnce(Return(kTestSocketFd));
+
+  auto codec = opts.createClientCodec(makeContext(Envoy::Http::CodecType::HTTP2));
+  ASSERT_NE(codec, nullptr);
+  captured_wire.clear();
+
   // Registers with dispatcher_; the next createTimer() returns it.
   auto* drain_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-  DrainAwareClientConnection codec(std::move(h2), std::move(callbacks), stats_, dispatcher_,
-                                   /*registry=*/nullptr, /*cluster=*/"", h2_raw);
 
-  // Phase 1: graceful GOAWAY emitted now via the HTTP/2 subclass (counted as sent).
+  // Phase 1: stream-0 METADATA frame emitted now (no GOAWAY yet).
   EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(5000), _));
-  codec.startGracefulDrain(std::chrono::milliseconds(5000));
-  EXPECT_EQ(1, stats_.goaway_sent_.value());
+  registry->drainCluster(cluster_.name(), std::chrono::milliseconds(5000));
+  EXPECT_EQ(1, stats_.drain_started_.value());
+  EXPECT_EQ(0, cluster_.http2CodecStats().goaway_sent_.value());
+  EXPECT_EQ(0, cluster_.http2CodecStats().metadata_dropped_.value());
+  EXPECT_EQ(1, countHttp2Frames(captured_wire, Envoy::Http::Http2::Http2Frame::Type::Metadata, 0));
+  EXPECT_EQ(0, countHttp2Frames(captured_wire, Envoy::Http::Http2::Http2Frame::Type::GoAway, 0));
 
   // Phase 2: timer fires -> final GOAWAY on the codec + graceful pool drain (onGoAway into the
   // wrapped callbacks).
   EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
   drain_timer->invokeCallback();
-  EXPECT_EQ(2, stats_.goaway_sent_.value());
+  EXPECT_EQ(1, stats_.drain_started_.value());
+  EXPECT_EQ(1, cluster_.http2CodecStats().goaway_sent_.value());
+  EXPECT_EQ(1, countHttp2Frames(captured_wire, Envoy::Http::Http2::Http2Frame::Type::GoAway, 0));
+}
+
+// Twin of GracefulDrainWithMetadataOnRealHttp2Codec: no stream-0 METADATA frame is emitted on the
+// wire when `allow_metadata` is off on the cluster (the HTTP/2 codec drops it and increments
+// `http2.metadata_dropped`), while `drain_started` still increments.
+TEST_F(ReverseTunnelUpstreamCodecTest, GracefulDrainWithoutMetadataOnRealHttp2Codec) {
+  auto registry = std::make_shared<UpstreamCodecDrainRegistry>(tls_);
+  ReverseTunnelUpstreamCodecOptions opts(makeProto(true), stats_, registry);
+
+  envoy::config::cluster::v3::Cluster::CustomClusterType custom_type;
+  custom_type.set_name("envoy.clusters.reverse_connection");
+  ON_CALL(cluster_, clusterType()).WillByDefault(Return(makeOptRef(std::as_const(custom_type))));
+  ON_CALL(cluster_, maxResponseHeadersCount()).WillByDefault(Return(100));
+  ON_CALL(connection_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+  cluster_.http2_options_.set_allow_metadata(false);
+
+  std::string captured_wire;
+  ON_CALL(connection_, write(_, _))
+      .WillByDefault(testing::Invoke([&captured_wire](Buffer::Instance& data, bool) {
+        captured_wire.append(data.toString());
+        data.drain(data.length());
+      }));
+
+  EXPECT_CALL(connection_, getSocket()).WillOnce(ReturnRef(socket_));
+  EXPECT_CALL(*socket_raw_, ioHandle()).WillOnce(ReturnRef(io_handle_));
+  EXPECT_CALL(io_handle_, fdDoNotUse()).WillOnce(Return(kTestSocketFd));
+
+  auto codec = opts.createClientCodec(makeContext(Envoy::Http::CodecType::HTTP2));
+  ASSERT_NE(codec, nullptr);
+  captured_wire.clear();
+
+  auto* drain_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+
+  EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(5000), _));
+  registry->drainCluster(cluster_.name(), std::chrono::milliseconds(5000));
+  EXPECT_EQ(1, stats_.drain_started_.value());
+  EXPECT_EQ(0, cluster_.http2CodecStats().goaway_sent_.value());
+  EXPECT_EQ(1, cluster_.http2CodecStats().metadata_dropped_.value());
+  EXPECT_EQ(0, countHttp2Frames(captured_wire, Envoy::Http::Http2::Http2Frame::Type::Metadata, 0));
+
+  EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
+  drain_timer->invokeCallback();
+  EXPECT_EQ(1, cluster_.http2CodecStats().goaway_sent_.value());
+  EXPECT_EQ(1, countHttp2Frames(captured_wire, Envoy::Http::Http2::Http2Frame::Type::GoAway, 0));
 }
 
 // The DrainAwareClientCallbacks wrapper forwards the non-GOAWAY connection callbacks unchanged.
@@ -500,6 +734,134 @@ TEST_F(ReverseTunnelUpstreamCodecTest, CallbacksForwardSettingsAndMaxStreams) {
   // onMaxStreamsChanged has a default (non-pure) implementation, so it is not a gmock method;
   // exercising the forwarding path is enough for coverage.
   wrapper.onMaxStreamsChanged(42);
+}
+
+// onMetadata with the drain key present and value "true" reports a GOAWAY to the reporter,
+// erases the drain key, and forwards the remaining map to the inner callbacks.
+TEST_F(ReverseTunnelUpstreamCodecTest, OnMetadataMatchingKeyReportsAndErases) {
+  NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
+  const std::string node_id = "node-1";
+  const std::string cluster_id = "cluster-1";
+  extension_ = makeExtension(node_id, cluster_id, kTestSocketFd);
+
+  NiceMock<Envoy::Http::MockConnectionCallbacks> inner;
+  DrainAwareClientCallbacks wrapper(inner, kTestSocketFd);
+
+  EXPECT_CALL(*reporter, reportGoAwayEvent(Eq(node_id), Eq(cluster_id), Eq(kTestSocketFd)));
+  EXPECT_CALL(inner, onMetadata(_))
+      .WillOnce(Invoke([](Envoy::Http::MetadataMapPtr&& metadata_map_ptr) {
+        // The drain key was erased; only the unrelated entry remains.
+        EXPECT_EQ(metadata_map_ptr->end(), metadata_map_ptr->find("envoy.reverse_tunnel.drain"));
+        EXPECT_EQ("keep", (*metadata_map_ptr)["other"]);
+      }));
+
+  auto metadata_map = std::make_unique<Envoy::Http::MetadataMap>(
+      Envoy::Http::MetadataMap{{"envoy.reverse_tunnel.drain", "true"}, {"other", "keep"}});
+  wrapper.onMetadata(std::move(metadata_map));
+}
+
+// onMetadata with the drain key absent forwards the map unchanged and does NOT report.
+TEST_F(ReverseTunnelUpstreamCodecTest, OnMetadataKeyAbsentForwardsNoReport) {
+  NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
+  extension_ = makeExtension("node-1", "cluster-1", kTestSocketFd);
+
+  NiceMock<Envoy::Http::MockConnectionCallbacks> inner;
+  DrainAwareClientCallbacks wrapper(inner, kTestSocketFd);
+
+  EXPECT_CALL(*reporter, reportGoAwayEvent(_, _, _)).Times(0);
+  EXPECT_CALL(inner, onMetadata(_))
+      .WillOnce(Invoke([](Envoy::Http::MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ("keep", (*metadata_map_ptr)["other"]);
+      }));
+
+  auto metadata_map =
+      std::make_unique<Envoy::Http::MetadataMap>(Envoy::Http::MetadataMap{{"other", "keep"}});
+  wrapper.onMetadata(std::move(metadata_map));
+}
+
+// onMetadata with the drain key present but value != "true" forwards the map unchanged and
+// does NOT report: only the exact key+value ("true") is treated as a drain signal.
+TEST_F(ReverseTunnelUpstreamCodecTest, OnMetadataWrongValueForwardsNoReport) {
+  NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
+  extension_ = makeExtension("node-1", "cluster-1", kTestSocketFd);
+
+  NiceMock<Envoy::Http::MockConnectionCallbacks> inner;
+  DrainAwareClientCallbacks wrapper(inner, kTestSocketFd);
+
+  EXPECT_CALL(*reporter, reportGoAwayEvent(_, _, _)).Times(0);
+  EXPECT_CALL(inner, onMetadata(_))
+      .WillOnce(Invoke([](Envoy::Http::MetadataMapPtr&& metadata_map_ptr) {
+        // Key present with a non-"true" value is forwarded unchanged.
+        EXPECT_EQ("false", (*metadata_map_ptr)["envoy.reverse_tunnel.drain"]);
+      }));
+
+  auto metadata_map = std::make_unique<Envoy::Http::MetadataMap>(
+      Envoy::Http::MetadataMap{{"envoy.reverse_tunnel.drain", "false"}});
+  wrapper.onMetadata(std::move(metadata_map));
+}
+
+// The reporter is notified at most once per connection: a matching metadata frame reports, and a
+// subsequent peer GOAWAY on the same connection does NOT report again (the once-guard suppresses
+// it). The GOAWAY is still forwarded to the inner callbacks.
+TEST_F(ReverseTunnelUpstreamCodecTest, NotifyReporterFiresAtMostOnce) {
+  setListenerDrainGuard(true);
+  NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
+  const std::string node_id = "node-1";
+  const std::string cluster_id = "cluster-1";
+  extension_ = makeExtension(node_id, cluster_id, kTestSocketFd);
+  auto socket = socket_manager_->getConnectionSocket(node_id);
+  ASSERT_NE(socket, nullptr);
+
+  NiceMock<Envoy::Http::MockConnectionCallbacks> inner;
+  DrainAwareClientCallbacks wrapper(inner, kTestSocketFd);
+
+  // First trigger (matching metadata) reports exactly once.
+  EXPECT_CALL(*reporter, reportGoAwayEvent(Eq(node_id), Eq(cluster_id), Eq(kTestSocketFd)));
+  auto metadata_map = std::make_unique<Envoy::Http::MetadataMap>(
+      Envoy::Http::MetadataMap{{"envoy.reverse_tunnel.drain", "true"}});
+  wrapper.onMetadata(std::move(metadata_map));
+  // METADATA is an early notice: the tunnel remains eligible until the delayed GOAWAY.
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(cluster_id), node_id);
+  EXPECT_EQ(socket_manager_->getNodeWithSocket(node_id), node_id);
+
+  // Second trigger (peer GOAWAY) must NOT report again, but still forwards to the inner callbacks.
+  EXPECT_CALL(*reporter, reportGoAwayEvent(_, _, _)).Times(0);
+  EXPECT_CALL(inner, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
+  wrapper.onGoAway(Envoy::Http::GoAwayErrorCode::NoError);
+  EXPECT_TRUE(socket_manager_->getNodeWithSocket(cluster_id).empty());
+  EXPECT_TRUE(socket_manager_->getNodeWithSocket(node_id).empty());
+  EXPECT_EQ(socket_manager_->getClusterForNode(node_id), cluster_id);
+}
+
+// Symmetric to the above but in reverse order: a peer GOAWAY reports first, and a subsequent
+// matching metadata frame on the same connection does NOT report again (it still forwards the
+// map, with the drain key erased, to the inner callbacks).
+TEST_F(ReverseTunnelUpstreamCodecTest, NotifyReporterFiresAtMostOnceGoAwayFirst) {
+  setListenerDrainGuard(true);
+  NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
+  extension_ = makeExtension("node-1", "cluster-1", kTestSocketFd);
+  auto socket = socket_manager_->getConnectionSocket("node-1");
+  ASSERT_NE(socket, nullptr);
+
+  NiceMock<Envoy::Http::MockConnectionCallbacks> inner;
+  DrainAwareClientCallbacks wrapper(inner, kTestSocketFd);
+
+  // First trigger (peer GOAWAY) reports exactly once and forwards to the inner callbacks.
+  EXPECT_CALL(*reporter, reportGoAwayEvent(_, _, _));
+  EXPECT_CALL(inner, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
+  wrapper.onGoAway(Envoy::Http::GoAwayErrorCode::NoError);
+  EXPECT_TRUE(socket_manager_->getNodeWithSocket("cluster-1").empty());
+
+  // Second trigger (matching metadata) must NOT report again, but still forwards (key erased).
+  EXPECT_CALL(*reporter, reportGoAwayEvent(_, _, _)).Times(0);
+  EXPECT_CALL(inner, onMetadata(_))
+      .WillOnce(Invoke([](Envoy::Http::MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ(metadata_map_ptr->end(), metadata_map_ptr->find("envoy.reverse_tunnel.drain"));
+      }));
+  auto metadata_map = std::make_unique<Envoy::Http::MetadataMap>(
+      Envoy::Http::MetadataMap{{"envoy.reverse_tunnel.drain", "true"}});
+  wrapper.onMetadata(std::move(metadata_map));
+  EXPECT_TRUE(socket_manager_->getNodeWithSocket("cluster-1").empty());
 }
 
 // The decorator forwards the remaining ClientConnection surface to the wrapped codec.
@@ -530,6 +892,10 @@ TEST_F(ReverseTunnelUpstreamCodecTest, ConnectionForwardsRemainingCalls) {
 
   EXPECT_CALL(*inner_raw, onUnderlyingConnectionBelowWriteBufferLowWatermark());
   codec.onUnderlyingConnectionBelowWriteBufferLowWatermark();
+
+  Envoy::Http::MetadataMapVector metadata_vec;
+  EXPECT_CALL(*inner_raw, encodeMetadata(_));
+  codec.encodeMetadata(metadata_vec);
 }
 
 // The factory builds the options object, lazily creates the shared drain registry, and registers

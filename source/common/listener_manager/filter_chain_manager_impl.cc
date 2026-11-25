@@ -9,6 +9,7 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
 #include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"
 #include "source/common/listener_manager/fcds_api.h"
@@ -24,6 +25,7 @@
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #endif
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -35,7 +37,7 @@ namespace FilterChain {
 // Return a fake address for use when either the source or destination is unix domain socket.
 // This address will only match the fallback matcher of 0.0.0.0/0, which is the default
 // when no IP matcher is configured.
-Network::Address::InstanceConstSharedPtr fakeAddress() {
+const Network::Address::InstanceConstSharedPtr& fakeAddress() {
   CONSTRUCT_ON_FIRST_USE(Network::Address::InstanceConstSharedPtr,
                          Network::Utility::parseInternetAddressNoThrow("255.255.255.255"));
 }
@@ -167,6 +169,20 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
 }
 
+namespace {
+
+// Returns true if the filter chain messages serialize to the same bytes or are equal. The bytes are
+// compared first, so that the reflection-based comparison only runs for messages that change or
+// serialize differently.
+bool filterChainMessagesEqual(const envoy::config::listener::v3::FilterChain& lhs,
+                              const envoy::config::listener::v3::FilterChain& rhs) {
+  return MessageUtil::serializeDeterministically(lhs) ==
+             MessageUtil::serializeDeterministically(rhs) ||
+         Protobuf::util::MessageDifferencer::Equals(lhs, rhs);
+}
+
+} // namespace
+
 absl::Status FilterChainManagerImpl::addFilterChains(
     const xds::type::matcher::v3::Matcher* filter_chain_matcher,
     absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
@@ -180,25 +196,37 @@ absl::Status FilterChainManagerImpl::addFilterChains(
   FilterChainsByMatcher filter_chains;
   uint32_t new_filter_chain_size = 0;
   FilterChainsByName filter_chains_by_name;
+  const auto* origin = getOriginFilterChainManager();
 
+  FcContextsByMessageHash origin_fc_contexts;
+  if (origin != nullptr) {
+    origin_fc_contexts.reserve(origin->fc_contexts_.size());
+    for (const auto& origin_fc_context : origin->fc_contexts_) {
+      origin_fc_contexts[origin_fc_context.second.message_hash].push_back(&origin_fc_context);
+    }
+  }
+
+  fc_contexts_.reserve(filter_chain_span.size());
   for (const auto& filter_chain : filter_chain_span) {
     RETURN_IF_NOT_OK(verifyNoDuplicateMatchers(filter_chain_matcher, filter_chains, *filter_chain));
 
     // Reuse created filter chain if possible.
     // FilterChainManager maintains the lifetime of FilterChainFactoryContext
     // ListenerImpl maintains the dependencies of FilterChainFactoryContext
-    auto filter_chain_impl = findExistingFilterChain(*filter_chain);
-    if (filter_chain_impl == nullptr) {
+    std::string serialized_message = MessageUtil::serializeDeterministically(*filter_chain);
+    FcContext fc_context =
+        findExistingFilterChain(*filter_chain, serialized_message, origin_fc_contexts);
+    if (fc_context.filter_chain == nullptr) {
       auto filter_chain_or_error =
           filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator, false);
       RETURN_IF_NOT_OK(filter_chain_or_error.status());
-      filter_chain_impl = filter_chain_or_error.value();
+      fc_context.filter_chain = filter_chain_or_error.value();
       ++new_filter_chain_size;
     }
 
     RETURN_IF_NOT_OK(setupFilterChainMatcher(filter_chain_matcher, filter_chains_by_name,
-                                             *filter_chain, filter_chain_impl));
-    fc_contexts_[*filter_chain] = filter_chain_impl;
+                                             *filter_chain, fc_context.filter_chain));
+    fc_contexts_[std::move(serialized_message)] = std::move(fc_context);
   }
   RETURN_IF_NOT_OK(convertIPsToTries());
   RETURN_IF_NOT_OK(copyOrRebuildDefaultFilterChain(default_filter_chain,
@@ -207,11 +235,15 @@ absl::Status FilterChainManagerImpl::addFilterChains(
                                          parent_context_, fcds_manager, fcds_config_source,
                                          fcds_callbacks));
 
-  const auto* origin = getOriginFilterChainManager();
   if (origin != nullptr) {
-    for (const auto& message_and_filter_chain : origin->fc_contexts_) {
-      if (!fc_contexts_.contains(message_and_filter_chain.first)) {
-        origin->draining_filter_chains_.push_back(message_and_filter_chain.second);
+    absl::flat_hash_set<const Network::DrainableFilterChain*> current_filter_chains;
+    current_filter_chains.reserve(fc_contexts_.size());
+    for (const auto& [serialized_message, fc_context] : fc_contexts_) {
+      current_filter_chains.insert(fc_context.filter_chain.get());
+    }
+    for (const auto& [serialized_message, fc_context] : origin->fc_contexts_) {
+      if (!current_filter_chains.contains(fc_context.filter_chain.get())) {
+        origin->draining_filter_chains_.push_back(fc_context.filter_chain);
       }
     }
   }
@@ -399,9 +431,9 @@ absl::Status FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
 
   // Copy from original filter chain manager, or build new filter chain if the default filter chain
   // is not equivalent to the one in the original filter chain manager.
-  MessageUtil eq;
   if (origin->default_filter_chain_message_.has_value() &&
-      eq(origin->default_filter_chain_message_.value(), *default_filter_chain)) {
+      filterChainMessagesEqual(origin->default_filter_chain_message_.value(),
+                               *default_filter_chain)) {
     default_filter_chain_ = origin->default_filter_chain_;
   } else {
     auto filter_chain_or_error = filter_chain_factory_builder.buildFilterChain(
@@ -628,9 +660,9 @@ makeCidrListEntry(const std::string& cidr, const T& data, absl::Status& creation
 std::vector<absl::string_view> FilterChainManagerImpl::filterChainNames() const {
   std::vector<absl::string_view> names;
   names.reserve(fc_contexts_.size() + fcds_handles_.size() + 1);
-  for (const auto& [proto, chain] : fc_contexts_) {
-    if (!chain->name().empty()) {
-      names.push_back(chain->name());
+  for (const auto& [serialized_message, fc_context] : fc_contexts_) {
+    if (!fc_context.filter_chain->name().empty()) {
+      names.push_back(fc_context.filter_chain->name());
     }
   }
   if (default_filter_chain_ != nullptr && !default_filter_chain_->name().empty()) {
@@ -698,16 +730,16 @@ FilterChainManagerImpl::findFilterChainUsingMatcher(const Network::ConnectionSoc
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinationIP(
     const DestinationIPsTrie& destination_ips_trie, const Network::ConnectionSocket& socket) const {
-  auto address = socket.connectionInfoProvider().localAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    address = FilterChain::fakeAddress();
-  }
+  const auto& socket_address = socket.connectionInfoProvider().localAddress();
+  const auto& address = socket_address->type() == Network::Address::Type::Ip
+                            ? socket_address
+                            : FilterChain::fakeAddress();
 
   // Match on both: exact IP and wider CIDR ranges using LcTrie.
-  const auto& data = destination_ips_trie.getData(address);
-  if (!data.empty()) {
-    ASSERT(data.size() == 1);
-    return findFilterChainForServerName(*data.back(), socket);
+  const auto data = destination_ips_trie.getDataSet(address);
+  if (data.has_value()) {
+    ASSERT(data->size() == 1);
+    return findFilterChainForServerName(**data->begin(), socket);
   }
 
   return nullptr;
@@ -787,15 +819,15 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForApplicatio
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDirectSourceIP(
     const DirectSourceIPsTrie& direct_source_ips_trie,
     const Network::ConnectionSocket& socket) const {
-  auto address = socket.connectionInfoProvider().directRemoteAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    address = FilterChain::fakeAddress();
-  }
+  const auto& socket_address = socket.connectionInfoProvider().directRemoteAddress();
+  const auto& address = socket_address->type() == Network::Address::Type::Ip
+                            ? socket_address
+                            : FilterChain::fakeAddress();
 
-  const auto& data = direct_source_ips_trie.getData(address);
-  if (!data.empty()) {
-    ASSERT(data.size() == 1);
-    return findFilterChainForSourceTypes(*data.back(), socket);
+  const auto data = direct_source_ips_trie.getDataSet(address);
+  if (data.has_value()) {
+    ASSERT(data->size() == 1);
+    return findFilterChainForSourceTypes(**data->begin(), socket);
   }
 
   return nullptr;
@@ -837,19 +869,19 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceType
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAndPort(
     const SourceIPsTrie& source_ips_trie, const Network::ConnectionSocket& socket) const {
-  auto address = socket.connectionInfoProvider().remoteAddress();
-  if (address->type() != Network::Address::Type::Ip) {
-    address = FilterChain::fakeAddress();
-  }
+  const auto& socket_address = socket.connectionInfoProvider().remoteAddress();
+  const auto& address = socket_address->type() == Network::Address::Type::Ip
+                            ? socket_address
+                            : FilterChain::fakeAddress();
 
   // Match on both: exact IP and wider CIDR ranges using LcTrie.
-  const auto& data = source_ips_trie.getData(address);
-  if (data.empty()) {
+  const auto data = source_ips_trie.getDataSet(address);
+  if (!data.has_value()) {
     return nullptr;
   }
 
-  ASSERT(data.size() == 1);
-  const auto& source_ports_map = *data.back();
+  ASSERT(data->size() == 1);
+  const auto& source_ports_map = **data->begin();
   const uint32_t source_port = address->ip()->port();
   const auto port_match = source_ports_map.find(source_port);
 
@@ -932,20 +964,30 @@ absl::Status FilterChainManagerImpl::convertIPsToTries() {
   return absl::OkStatus();
 }
 
-Network::DrainableFilterChainSharedPtr FilterChainManagerImpl::findExistingFilterChain(
-    const envoy::config::listener::v3::FilterChain& filter_chain_message) {
+FilterChainManagerImpl::FcContext FilterChainManagerImpl::findExistingFilterChain(
+    const envoy::config::listener::v3::FilterChain& filter_chain_message,
+    const std::string& serialized_message, const FcContextsByMessageHash& origin_fc_contexts) {
   // Origin filter chain manager could be empty if the current is the ancestor.
   const auto* origin = getOriginFilterChainManager();
-  if (origin == nullptr) {
-    return nullptr;
+  if (origin != nullptr) {
+    const auto iter = origin->fc_contexts_.find(serialized_message);
+    if (iter != origin->fc_contexts_.end()) {
+      return iter->second;
+    }
   }
-  auto iter = origin->fc_contexts_.find(filter_chain_message);
-  if (iter != origin->fc_contexts_.end()) {
-    // copy the context to this filter chain manager.
-    fc_contexts_.emplace(filter_chain_message, iter->second);
-    return iter->second;
+  const std::size_t message_hash = MessageUtil::hash(filter_chain_message);
+  const auto iter = origin_fc_contexts.find(message_hash);
+  if (iter != origin_fc_contexts.end()) {
+    for (const auto* origin_fc_context : iter->second) {
+      // A message that fails to parse back has its filter chain rebuilt.
+      envoy::config::listener::v3::FilterChain origin_message;
+      if (origin_message.ParseFromString(origin_fc_context->first) &&
+          Protobuf::util::MessageDifferencer::Equals(origin_message, filter_chain_message)) {
+        return origin_fc_context->second;
+      }
+    }
   }
-  return nullptr;
+  return {message_hash, nullptr};
 }
 
 Configuration::FilterChainFactoryContextPtr FilterChainManagerImpl::createFilterChainFactoryContext(
@@ -1064,12 +1106,14 @@ void FcdsContextCreator::initialize(std::function<void()> completion) {
 
 FcdsSharedFilterChainManager::FcdsSharedFilterChainManager(
     Server::Configuration::ServerFactoryContext& server_context,
-    ListenerComponentFactory& listener_component_factory)
+    ListenerComponentFactory& listener_component_factory,
+    FcdsListenerManagerCallbacks& listener_manager)
     : server_context_(server_context), listener_component_factory_(listener_component_factory),
       tls_slot_(ThreadLocal::TypedSlot<ThreadLocalState>::makeUnique(server_context.threadLocal())),
       scope_(server_context_.scope().createScope("filter_chain_manager.")),
       resource_type_helper_(server_context.messageValidationContext().dynamicValidationVisitor(),
                             "name"),
+      listener_manager_(listener_manager),
       tls_update_cb_(server_context.mainThreadDispatcher().createSchedulableCallback(
           [this]() { updateTlsState(); })) {
   tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalState>(); });
@@ -1112,22 +1156,38 @@ absl::StatusOr<FcdsSubscriptionHandleSharedPtr>
 FcdsSharedFilterChainManager::subscribe(const envoy::config::core::v3::ConfigSource& config_source,
                                         const std::string& filter_chain_name,
                                         FcdsClientCallbacks& callbacks,
-                                        Init::Manager& init_manager) {
+                                        OptRef<Init::Manager> init_manager) {
   auto iter = subscriptions_.find(filter_chain_name);
+  const bool has_config_source =
+      config_source.config_source_specifier_case() !=
+      envoy::config::core::v3::ConfigSource::CONFIG_SOURCE_SPECIFIER_NOT_SET;
   // Assume config_source is the same for the same filter chain name. This would be the case for
   // xdstp names.
   if (iter == subscriptions_.end()) {
-    absl::Status creation_status;
-    auto api = std::make_unique<FcdsApiImpl>(config_source, filter_chain_name, *this,
-                                             server_context_.clusterManager(), *scope_,
-                                             resource_type_helper_, creation_status);
-    RETURN_IF_NOT_OK(creation_status);
+    std::unique_ptr<FcdsApiImpl> api;
+    if (!has_config_source) {
+      // Without a config source, a local caller provides the filter chain.
+      api = std::make_unique<FcdsApiImpl>(filter_chain_name, *this);
+    } else {
+      absl::Status creation_status;
+      api = std::make_unique<FcdsApiImpl>(config_source, filter_chain_name, *this,
+                                          server_context_.clusterManager(), *scope_,
+                                          resource_type_helper_, creation_status);
+      RETURN_IF_NOT_OK(creation_status);
+    }
     auto state = std::make_unique<SubscriptionState>();
     state->api_ = std::move(api);
     iter = subscriptions_.emplace(filter_chain_name, std::move(state)).first;
+  } else if (has_config_source != iter->second->api_->hasSubscription()) {
+    return absl::AlreadyExistsError(
+        has_config_source
+            ? fmt::format("filter chain {} is added or awaited locally", filter_chain_name)
+            : fmt::format("filter chain {} is discovered through FCDS", filter_chain_name));
   }
   SubscriptionState& state = *iter->second;
-  init_manager.add(state.api_->initTarget());
+  if (init_manager.has_value()) {
+    init_manager->add(state.api_->initTarget());
+  }
   auto result = std::make_shared<FcdsSubscriptionHandleImpl>(shared_from_this(), filter_chain_name,
                                                              callbacks);
   state.handles_.insert(result.get());
@@ -1144,6 +1204,69 @@ void FcdsSharedFilterChainManager::unsubscribe(const std::string& filter_chain_n
       subscriptions_.erase(iter);
     }
   }
+}
+
+// A local caller holds a subscription like a listener does, so the state of a name lives while any
+// listener or local caller uses it.
+class FcdsLocalSubscriptionHandleImpl : public FcdsLocalSubscriptionHandle {
+public:
+  FcdsLocalSubscriptionHandleImpl(std::shared_ptr<FcdsSharedFilterChainManager>&& shared_manager,
+                                  FcdsSubscriptionHandleSharedPtr&& subscription)
+      : shared_manager_(std::move(shared_manager)), subscription_(std::move(subscription)) {}
+
+  absl::StatusOr<bool> update(const FilterChainProto& filter_chain) override {
+    ASSERT(filter_chain.name() == subscription_->filterChainName());
+    return shared_manager_->updateLocalFilterChain(filter_chain);
+  }
+
+  void remove() override {
+    shared_manager_->removeLocalFilterChain(subscription_->filterChainName());
+  }
+
+private:
+  const std::shared_ptr<FcdsSharedFilterChainManager> shared_manager_;
+  const FcdsSubscriptionHandleSharedPtr subscription_;
+};
+
+absl::StatusOr<FcdsLocalSubscriptionHandleSharedPtr>
+FcdsSharedFilterChainManager::subscribeLocal(const std::string& filter_chain_name) {
+  // A local caller subscribes like a listener without a config source, but it waits for nothing.
+  absl::StatusOr<FcdsSubscriptionHandleSharedPtr> subscription_or_error =
+      subscribe(envoy::config::core::v3::ConfigSource(), filter_chain_name, local_caller_callbacks_,
+                std::nullopt);
+  RETURN_IF_NOT_OK(subscription_or_error.status());
+  return std::make_shared<FcdsLocalSubscriptionHandleImpl>(
+      shared_from_this(), std::move(subscription_or_error).value());
+}
+
+absl::StatusOr<bool>
+FcdsSharedFilterChainManager::updateLocalFilterChain(const FilterChainProto& filter_chain) {
+  if (committed_filter_chain_names_.contains(filter_chain.name())) {
+    // The listener manager only learns the name, so the committed version is published before this
+    // update.
+    tls_update_cb_->cancel();
+    updateTlsState();
+  }
+  // The listeners that the update warms can go away inside it, while the subscription of the local
+  // caller keeps the state.
+  FcdsApiImpl& api = *subscriptions_.find(filter_chain.name())->second->api_;
+  absl::StatusOr<bool> updated;
+  // Building a filter chain can throw.
+  TRY_ASSERT_MAIN_THREAD { updated = api.update(filter_chain); }
+  END_TRY
+  CATCH(const EnvoyException& e, { updated = absl::InvalidArgumentError(e.what()); });
+  return updated;
+}
+
+void FcdsSharedFilterChainManager::removeLocalFilterChain(absl::string_view filter_chain_name) {
+  // The listeners that the removal readies can go away inside it, while the subscription of the
+  // local caller keeps the state.
+  SubscriptionState& state = *subscriptions_.find(filter_chain_name)->second;
+  // A filter chain that still warms is not committed once removed.
+  state.warming_filter_chain_ = nullptr;
+  state.api_->remove();
+  // The removal readied the listeners that waited, and the later ones wait for the next update.
+  state.api_ = std::make_unique<FcdsApiImpl>(std::string(filter_chain_name), *this);
 }
 
 absl::Status FcdsSharedFilterChainManager::onFilterChainUpdated(const FilterChainProto& proto) {
@@ -1184,6 +1307,7 @@ void FcdsSharedFilterChainManager::onFilterChainWarmed(
   if (state.warming_filter_chain_ != filter_chain) {
     return;
   }
+  committed_filter_chain_names_.insert(iter->first);
 
   Network::DrainableFilterChainSharedPtr draining = state.api_->filterChain();
   ENVOY_LOG(debug, "FCDS: updating warmed shared filter chain name={}", filter_chain->name());
@@ -1226,7 +1350,17 @@ void FcdsSharedFilterChainManager::scheduleTlsUpdate() {
 }
 
 void FcdsSharedFilterChainManager::updateTlsState() {
-  auto filter_chains = std::make_shared<ThreadLocalState>();
+  // A worker can drop the last reference to a replaced filter chain, whose filters own objects of
+  // the main thread, so the main thread deletes the state.
+  std::shared_ptr<ThreadLocalState> filter_chains(
+      new ThreadLocalState(),
+      [&dispatcher = server_context_.mainThreadDispatcher()](ThreadLocalState* state) {
+        if (Thread::MainThread::isMainOrTestThread()) {
+          delete state;
+        } else {
+          dispatcher.deleteInDispatcherThread(Event::DispatcherThreadDeletableConstPtr(state));
+        }
+      });
   filter_chains->filter_chains_.reserve(subscriptions_.size());
   for (const auto& name_and_state : subscriptions_) {
     const auto& active_chain = name_and_state.second->api_->filterChain();
@@ -1237,6 +1371,11 @@ void FcdsSharedFilterChainManager::updateTlsState() {
   tls_slot_->set([filter_chains](Event::Dispatcher&) { return filter_chains; });
   // Resume filter chain discovery now that the update is posted to workers.
   xds_pause_.reset();
+  for (const std::string& name : std::exchange(committed_filter_chain_names_, {})) {
+    if (filter_chains->filter_chains_.contains(name)) {
+      listener_manager_.notifyFilterChainUpdateCallbacks(name);
+    }
+  }
 }
 
 bool FcdsSharedFilterChainManager::isFilterChainActive(const std::string& filter_chain_name) const {

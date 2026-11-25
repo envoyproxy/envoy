@@ -193,6 +193,11 @@ void OwnedActiveStreamListenerBase::onListenerDrainStart(
     return;
   }
   drain_event_ = drain_event;
+  // Notify the listener even if there are no accepted connections. Reverse listeners must stop
+  // pending and replacement dials before accepted connections begin their drain.
+  if (listener_ != nullptr) {
+    listener_->onDrain();
+  }
   // See onFilterChainDrainStart for why `next` is captured and `is_deleting_` is pinned.
   const bool was_deleting = is_deleting_;
   is_deleting_ = true;

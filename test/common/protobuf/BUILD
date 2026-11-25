@@ -68,7 +68,13 @@ envoy_proto_library(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":utility_test_protos_cc_proto",
         "//source/common/config:api_version_lib",
@@ -117,7 +123,9 @@ envoy_cc_benchmark_binary(
     srcs = ["utility_speed_test.cc"],
     deps = [
         ":deterministic_hash_test_proto_cc_proto",
+        "//source/common/common:assert_lib",
         "//source/common/protobuf:utility_lib",
+        "//test/proto:sensitive_proto_cc_proto",
         "//test/test_common:test_runtime_lib",
         "@benchmark",
     ],

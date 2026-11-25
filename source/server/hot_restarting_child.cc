@@ -20,19 +20,33 @@ std::string HotRestartingChild::UdpForwardingContext::key(absl::string_view netw
 void HotRestartingChild::UdpForwardingContext::registerListener(
     Network::Address::InstanceConstSharedPtr address,
     std::shared_ptr<Network::UdpListenerConfig> listener_config) {
+  // TODO(filipcacky): A listener replaced by a non-filter-chain-only LDS update isn't registered,
+  // as the old entry keeps its address. It can't replace the entry here, as addSocketFactory()
+  // registers before update failures and warming. Maybe register when it is added to the workers
+  // instead.
   const bool inserted =
       listener_map_
           .try_emplace(key(address->networkNamespace().value_or(""), address->asString()),
-                       ForwardEntry{address, listener_config})
+                       WeakForwardEntry{address, listener_config})
           .second;
   ASSERT(inserted, "Two udp listeners on the same address shouldn't be possible");
+}
+
+HotRestartingChild::UdpForwardingContext::ListenerMap::iterator
+HotRestartingChild::UdpForwardingContext::findListener(const std::string& map_key) {
+  auto it = listener_map_.find(map_key);
+  if (it != listener_map_.end() && it->second.second.expired()) {
+    listener_map_.erase(it);
+    return listener_map_.end();
+  }
+  return it;
 }
 
 std::optional<HotRestartingChild::UdpForwardingContext::ForwardEntry>
 HotRestartingChild::UdpForwardingContext::getListenerForDestination(
     const Network::Address::Instance& address) {
   const std::string ns = address.networkNamespace().value_or("");
-  auto it = listener_map_.find(key(ns, address.asString()));
+  auto it = findListener(key(ns, address.asString()));
   if (it == listener_map_.end()) {
     // If no listener on the specific address was found, check for a default route.
     // If the address is IPv6, check default route IPv6 only, otherwise check default
@@ -40,11 +54,11 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
     // packet.
     uint32_t port = address.ip()->port();
     if (address.ip()->version() == Network::Address::IpVersion::v6) {
-      it = listener_map_.find(key(ns, absl::StrCat("[::]:", port)));
+      it = findListener(key(ns, absl::StrCat("[::]:", port)));
     } else {
-      it = listener_map_.find(key(ns, absl::StrCat("0.0.0.0:", port)));
+      it = findListener(key(ns, absl::StrCat("0.0.0.0:", port)));
       if (it == listener_map_.end()) {
-        it = listener_map_.find(key(ns, absl::StrCat("[::]:", port)));
+        it = findListener(key(ns, absl::StrCat("[::]:", port)));
         if (it != listener_map_.end() && it->second.first->ip()->ipv6()->v6only()) {
           // If there is a default IPv6 route but it's set v6only, don't use it.
           it = listener_map_.end();
@@ -55,7 +69,7 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
   if (it == listener_map_.end()) {
     return std::nullopt;
   }
-  return it->second;
+  return ForwardEntry{it->second.first, it->second.second.lock()};
 }
 
 // If restart_epoch is 0 there is no parent, so it's effectively already
@@ -110,12 +124,7 @@ void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 }
 
-void HotRestartingChild::shutdown() {
-  socket_event_udp_forwarding_.reset();
-  // Listener configs can own SDS providers and other server-dependent resources. Release them
-  // while the server is still alive, rather than when the hot restart implementation is destroyed.
-  udp_forwarding_context_.clear();
-}
+void HotRestartingChild::shutdown() { socket_event_udp_forwarding_.reset(); }
 
 void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index,
                                               const Network::Address::Instance& listener_address,

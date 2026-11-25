@@ -1,5 +1,7 @@
 #include "sdk.h"
 
+#include <algorithm>
+#include <array>
 #include <format>
 #include <iostream>
 #include <string_view>
@@ -65,6 +67,36 @@ std::string readWholeRequestBody(HttpFilterHandle& handle) {
 std::string readWholeResponseBody(HttpFilterHandle& handle) {
   return getBodyContent(handle.bufferedResponseBody(), handle.receivedResponseBody(),
                         handle.receivedBufferedResponseBody());
+}
+
+// The bytes of an HTTP token (RFC 9110), which is what a header name is.
+constexpr std::array<bool, 256> TokenChars = [] {
+  std::array<bool, 256> table{};
+  for (int c = 0; c < 256; ++c) {
+    table[c] =
+        (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+        std::string_view("!#$%&'*+-.^_`|~").find(static_cast<char>(c)) != std::string_view::npos;
+  }
+  return table;
+}();
+
+bool isValidHeaderName(std::string_view name) {
+  if (name.starts_with(':')) {
+    name.remove_prefix(1);
+  }
+  return !name.empty() &&
+         std::all_of(name.begin(), name.end(), [](unsigned char c) { return TokenChars[c]; });
+}
+
+bool isValidHeaderValue(std::string_view value) {
+  // c ^ 0x16 maps tab to 0x1f and every other control character below it. Bitwise operators and
+  // no early exit keep the loop free of branches, so clang, GCC 16 and MSVC x64 vectorize it.
+  // GCC 13 to 15 keep it scalar.
+  bool valid = true;
+  for (const unsigned char c : value) {
+    valid &= ((c ^ 0x16) >= 0x1f) & (c != 0x7f);
+  }
+  return valid;
 }
 } // namespace Utility
 

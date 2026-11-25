@@ -79,6 +79,13 @@ public:
   virtual bool wasConnected() const PURE;
 
   /**
+   * Return true if the peer has fully closed its handle (e.g. close(), not shutdown(SHUT_WR)),
+   * when observable out of band (such as for in-process user-space sockets). OS sockets cannot
+   * distinguish a graceful peer close() from shutdown(SHUT_WR) on the read side and return false.
+   */
+  virtual bool wasPeerFullyClosed() const { return false; }
+
+  /**
    * Read data into given slices.
    * @param max_length supplies the maximum length to read.
    * @param slices points to the output location.
@@ -356,6 +363,15 @@ public:
    * Resets the file event.
    */
   virtual void resetFileEvents() PURE;
+
+  /**
+   * Notify a running, bound TCP listener's handle on its worker thread that the whole listener
+   * started draining, before accepted connections are notified. Handles can stop initiating
+   * connections while accepted connections complete their drain. Datagram, internal, unbound and
+   * already-stopped listeners do not receive this hook. Temporary disabling and individual
+   * filter-chain drains do not invoke it either.
+   */
+  virtual void onListenerDrain() {}
 
   /**
    * Shut down part of a full-duplex connection (see man 2 shutdown)

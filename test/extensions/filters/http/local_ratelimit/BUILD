@@ -15,7 +15,13 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.local_ratelimit"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/singleton:manager_impl_lib",
@@ -34,7 +40,17 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.local_ratelimit"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/extensions/filters/common/local_ratelimit:local_ratelimit_lib",
         "//source/extensions/filters/http/local_ratelimit:config",
@@ -48,7 +64,12 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["local_ratelimit_integration_test.cc"],
     extension_names = ["envoy.filters.http.local_ratelimit"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
+    },
     tags = [
         "cpu:3",
     ],

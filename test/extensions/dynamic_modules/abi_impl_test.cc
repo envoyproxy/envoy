@@ -574,6 +574,44 @@ TEST(CommonAbiImplTest, GetRuntimeMissingKeyReturnsDefault) {
   EXPECT_DOUBLE_EQ(2.5, envoy_dynamic_module_callback_get_runtime_number(key, 2.5));
 }
 
+TEST(CommonAbiImplTest, GetRuntimeStringReturnsTheTextOfTheValue) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  const std::string text = "80:15100,8080:15101";
+  EXPECT_CALL(context.runtime_loader_.snapshot_, get(absl::string_view("some.mapping")))
+      .WillOnce(Return(Envoy::Runtime::Snapshot::ConstStringOptRef(text)));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  envoy_dynamic_module_type_module_buffer key = {"some.mapping", 12};
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  ASSERT_TRUE(envoy_dynamic_module_callback_get_runtime_string(key, &result));
+  EXPECT_EQ(text, absl::string_view(result.ptr, result.length));
+}
+
+TEST(CommonAbiImplTest, GetRuntimeStringOfMissingKeyLeavesTheResult) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.runtime_loader_.snapshot_, get(testing::_))
+      .WillByDefault(Return(Envoy::Runtime::Snapshot::ConstStringOptRef()));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  envoy_dynamic_module_type_module_buffer key = {"missing.key", 11};
+  envoy_dynamic_module_type_envoy_buffer result = {"untouched", 9};
+  EXPECT_FALSE(envoy_dynamic_module_callback_get_runtime_string(key, &result));
+  EXPECT_EQ("untouched", absl::string_view(result.ptr, result.length));
+}
+
+TEST(CommonAbiImplTest, GetRuntimeStringHonorsBufferLength) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  const std::string text = "text";
+  EXPECT_CALL(context.runtime_loader_.snapshot_, get(absl::string_view("some.key")))
+      .WillOnce(Return(Envoy::Runtime::Snapshot::ConstStringOptRef(text)));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  // The key buffer is longer than the key: only its length counts.
+  envoy_dynamic_module_type_module_buffer key = {"some.key.and more", 8};
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_runtime_string(key, &result));
+}
+
 // Verifies that the callbacks fall back to the caller supplied default, rather than failing
 // closed on a fixed value, when the server context has not been installed.
 TEST(CommonAbiImplTest, GetRuntimeBeforeServerContextReturnsDefault) {
@@ -582,6 +620,8 @@ TEST(CommonAbiImplTest, GetRuntimeBeforeServerContextReturnsDefault) {
   EXPECT_FALSE(envoy_dynamic_module_callback_get_runtime_bool(key, false));
   EXPECT_EQ(99u, envoy_dynamic_module_callback_get_runtime_int(key, 99));
   EXPECT_DOUBLE_EQ(9.5, envoy_dynamic_module_callback_get_runtime_number(key, 9.5));
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_FALSE(envoy_dynamic_module_callback_get_runtime_string(key, &result));
 }
 
 // Verifies that calling off the main thread is legal and simply yields the default. The server
@@ -592,6 +632,7 @@ TEST(CommonAbiImplTest, GetRuntimeOffMainThreadReturnsDefaultWithoutEnvoyBug) {
   EXPECT_CALL(context.runtime_loader_.snapshot_, getBoolean(testing::_, testing::_)).Times(0);
   EXPECT_CALL(context.runtime_loader_.snapshot_, getInteger(testing::_, testing::_)).Times(0);
   EXPECT_CALL(context.runtime_loader_.snapshot_, getDouble(testing::_, testing::_)).Times(0);
+  EXPECT_CALL(context.runtime_loader_.snapshot_, get(testing::_)).Times(0);
 
   ScopedThreadLocalServerContextSetter setter(context);
   std::thread t([] {
@@ -600,6 +641,8 @@ TEST(CommonAbiImplTest, GetRuntimeOffMainThreadReturnsDefaultWithoutEnvoyBug) {
     EXPECT_FALSE(envoy_dynamic_module_callback_get_runtime_bool(key, false));
     EXPECT_EQ(7u, envoy_dynamic_module_callback_get_runtime_int(key, 7));
     EXPECT_DOUBLE_EQ(3.5, envoy_dynamic_module_callback_get_runtime_number(key, 3.5));
+    envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+    EXPECT_FALSE(envoy_dynamic_module_callback_get_runtime_string(key, &result));
   });
   t.join();
 }
@@ -667,8 +710,26 @@ WEAK_STUB(BootstrapExtensionFileWatcherAddWatch,
                                                                                    {nullptr, 0}, 0))
 WEAK_STUB(BootstrapExtensionEnableClusterLifecycle,
           envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(nullptr))
+WEAK_STUB(BootstrapExtensionSubscribeEcds,
+          envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(nullptr, {nullptr, 0},
+                                                                           {nullptr, 0}))
+WEAK_STUB(BootstrapExtensionConfigSnapshotNew,
+          envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(nullptr, nullptr, 0,
+                                                                                {nullptr, 0},
+                                                                                nullptr))
+WEAK_STUB(BootstrapExtensionConfigSnapshotSerialize,
+          envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(nullptr,
+                                                                                      nullptr,
+                                                                                      nullptr))
+WEAK_STUB(BootstrapExtensionConfigSnapshotDelete,
+          envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(nullptr))
 WEAK_STUB(BootstrapExtensionEnableListenerLifecycle,
           envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr))
+WEAK_STUB(BootstrapExtensionSetXdsNotifications,
+          envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(nullptr, true))
+WEAK_STUB(BootstrapExtensionEnableRuntimeUpdate,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(nullptr,
+                                                                                  {nullptr, 0}))
 WEAK_STUB(BootstrapExtensionRunOnAllWorkers,
           envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(nullptr, 1))
 WEAK_STUB(BootstrapExtensionEnableClusterWriter,
@@ -679,6 +740,24 @@ WEAK_STUB(BootstrapExtensionClusterWriterAddOrUpdate,
 WEAK_STUB(BootstrapExtensionClusterWriterRemove,
           envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(nullptr,
                                                                                   {nullptr, 0}))
+WEAK_STUB(BootstrapExtensionEnableListenerWriter,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(nullptr))
+WEAK_STUB(BootstrapExtensionListenerWriterAddOrUpdate,
+          envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+              nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(BootstrapExtensionListenerWriterRemove,
+          envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(nullptr,
+                                                                                   {nullptr, 0}))
+WEAK_STUB(
+    BootstrapExtensionEnableFilterChainConfigWriter,
+    envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(nullptr))
+WEAK_STUB(
+    BootstrapExtensionFilterChainConfigWriterAddOrUpdate,
+    envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+        nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(BootstrapExtensionFilterChainConfigWriterRemove,
+          envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
+              nullptr, {nullptr, 0}))
 
 WEAK_STUB(BootstrapExtensionRegisterAdminHandler,
           envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
@@ -1251,6 +1330,42 @@ WEAK_STUB(NetworkFilterHasUpstreamHost,
           envoy_dynamic_module_callback_network_filter_has_upstream_host(nullptr))
 WEAK_STUB(NetworkFilterGetUpstreamConnectionId,
           envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(nullptr))
+WEAK_STUB(NetworkFilterSetUpstreamHost,
+          envoy_dynamic_module_callback_network_filter_set_upstream_host(nullptr, {nullptr, 0},
+                                                                         {nullptr, 0}, 0))
+WEAK_STUB(NetworkFilterSetUpstreamCluster,
+          envoy_dynamic_module_callback_network_filter_set_upstream_cluster(nullptr, {nullptr, 0}))
+WEAK_STUB(NetworkFilterSetUpstreamLocalAddress,
+          envoy_dynamic_module_callback_network_filter_set_upstream_local_address(nullptr,
+                                                                                  {nullptr, 0}, 0))
+WEAK_STUB(NetworkFilterSetUpstreamTransportFailureReason,
+          envoy_dynamic_module_callback_network_filter_set_upstream_transport_failure_reason(
+              nullptr, {nullptr, 0}))
+WEAK_STUB(NetworkFilterSetUpstreamLocalCloseReason,
+          envoy_dynamic_module_callback_network_filter_set_upstream_local_close_reason(nullptr,
+                                                                                       {nullptr,
+                                                                                        0}))
+WEAK_STUB(NetworkFilterSetUpstreamDetectedCloseType,
+          envoy_dynamic_module_callback_network_filter_set_upstream_detected_close_type(
+              nullptr, envoy_dynamic_module_type_detected_close_type_Normal))
+WEAK_STUB(NetworkFilterSetUpstreamRequestAttemptCount,
+          envoy_dynamic_module_callback_network_filter_set_upstream_request_attempt_count(nullptr,
+                                                                                          0))
+WEAK_STUB(NetworkFilterRecordUpstreamTiming,
+          envoy_dynamic_module_callback_network_filter_record_upstream_timing(
+              nullptr, envoy_dynamic_module_type_upstream_timing_event_ConnectStart))
+WEAK_STUB(NetworkFilterAddUpstreamWireBytes,
+          envoy_dynamic_module_callback_network_filter_add_upstream_wire_bytes(nullptr, 0, 0))
+WEAK_STUB(NetworkFilterAddDownstreamWireBytes,
+          envoy_dynamic_module_callback_network_filter_add_downstream_wire_bytes(nullptr, 0, 0))
+WEAK_STUB(NetworkFilterSetResponseFlag,
+          envoy_dynamic_module_callback_network_filter_set_response_flag(
+              nullptr, envoy_dynamic_module_type_response_flag_UpstreamConnectionFailure))
+WEAK_STUB(NetworkFilterAddCustomFlag,
+          envoy_dynamic_module_callback_network_filter_add_custom_flag(nullptr, {nullptr, 0}))
+WEAK_STUB(NetworkFilterFlushAccessLog,
+          envoy_dynamic_module_callback_network_filter_flush_access_log(
+              nullptr, envoy_dynamic_module_type_access_log_type_TcpUpstreamConnected))
 WEAK_STUB(NetworkFilterStartDownstreamSecureTransport,
           envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(nullptr))
 WEAK_STUB(NetworkFilterStartUpstreamSecureTransport,
@@ -1821,6 +1936,22 @@ WEAK_STUB(HttpGetMetadataListString, envoy_dynamic_module_callback_http_get_meta
 WEAK_STUB(HttpGetMetadataListBool, envoy_dynamic_module_callback_http_get_metadata_list_bool(
                                        nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                        {nullptr, 0}, {nullptr, 0}, 0, nullptr))
+
+WEAK_STUB(HttpGetMetadataNestedString,
+          envoy_dynamic_module_callback_http_get_metadata_nested_string(
+              nullptr, envoy_dynamic_module_type_metadata_source_Dynamic, {nullptr, 0}, nullptr, 0,
+              nullptr))
+WEAK_STUB(HttpGetMetadataNestedNumber,
+          envoy_dynamic_module_callback_http_get_metadata_nested_number(
+              nullptr, envoy_dynamic_module_type_metadata_source_Dynamic, {nullptr, 0}, nullptr, 0,
+              nullptr))
+WEAK_STUB(HttpGetMetadataNestedBool, envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+                                         nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
+                                         {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(HttpGetMetadataNestedListSize,
+          envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+              nullptr, envoy_dynamic_module_type_metadata_source_Dynamic, {nullptr, 0}, nullptr, 0,
+              nullptr))
 
 WEAK_STUB(TracerGetTraceContextValue,
           envoy_dynamic_module_callback_tracer_get_trace_context_value(nullptr, {nullptr, 0},

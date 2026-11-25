@@ -1,4 +1,9 @@
-use crate::abi::envoy_dynamic_module_type_metrics_result;
+pub use crate::abi::envoy_dynamic_module_type_bootstrap_ecds_config_encoding as EcdsConfigEncoding;
+use crate::abi::{
+  envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update,
+  envoy_dynamic_module_type_bootstrap_config_snapshot_result as ConfigSnapshotResult,
+  envoy_dynamic_module_type_metrics_result,
+};
 use crate::buffer::EnvoyBuffer;
 use crate::{
   abi,
@@ -20,6 +25,186 @@ use crate::{
 #[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::ptr::NonNull;
+
+/// A config dump provider to include in a snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ConfigSnapshotProvider<'a> {
+  /// The server's bootstrap configuration.
+  Bootstrap,
+  /// Cluster configurations.
+  Clusters,
+  /// Endpoint assignments for active clusters. The name filter and each assignment's
+  /// `cluster_name` use the EDS service name, or the cluster name when none is set.
+  Endpoints,
+  /// Listener configurations.
+  Listeners,
+  /// Route configurations.
+  Routes,
+  /// Scoped route configurations.
+  RouteScopes,
+  /// Secret configurations.
+  Secrets,
+  /// HTTP filters configured through ECDS.
+  EcdsHttpFilters,
+  /// Upstream HTTP filters configured through ECDS.
+  EcdsUpstreamHttpFilters,
+  /// Network filters configured through ECDS.
+  EcdsNetworkFilters,
+  /// Upstream network filters configured through ECDS.
+  EcdsUpstreamNetworkFilters,
+  /// TCP listener filters configured through ECDS.
+  EcdsTcpListenerFilters,
+  /// UDP listener filters configured through ECDS.
+  EcdsUdpListenerFilters,
+  /// UDP session filters configured through ECDS.
+  EcdsUdpSessionFilters,
+  /// QUIC listener filters configured through ECDS.
+  EcdsQuicListenerFilters,
+  /// A provider registered by another extension.
+  Custom(&'a str),
+}
+
+impl ConfigSnapshotProvider<'_> {
+  fn as_str(&self) -> &str {
+    match self {
+      Self::Bootstrap => "bootstrap",
+      Self::Clusters => "clusters",
+      Self::Endpoints => "endpoint",
+      Self::Listeners => "listeners",
+      Self::Routes => "routes",
+      Self::RouteScopes => "route_scopes",
+      Self::Secrets => "secrets",
+      Self::EcdsHttpFilters => "ecds_filter_http",
+      Self::EcdsUpstreamHttpFilters => "ecds_filter_upstream_http",
+      Self::EcdsNetworkFilters => "ecds_filter_network",
+      Self::EcdsUpstreamNetworkFilters => "ecds_filter_upstream_network",
+      Self::EcdsTcpListenerFilters => "ecds_filter_tcp_listener",
+      Self::EcdsUdpListenerFilters => "ecds_filter_udp_listener",
+      Self::EcdsUdpSessionFilters => "ecds_filter_udp_session",
+      Self::EcdsQuicListenerFilters => "ecds_filter_quic_listener",
+      Self::Custom(name) => name,
+    }
+  }
+}
+
+/// A configuration snapshot that can move between threads.
+/// Drop it before its owning [`BootstrapExtensionConfig`] is destroyed. Join workers holding
+/// snapshots in the config's [`Drop`] implementation.
+#[cfg_attr(any(test, feature = "mock"), automock)]
+pub trait EnvoyBootstrapExtensionConfigSnapshot: Send {
+  /// Encodes the snapshot as ConfigDump JSON.
+  /// Encoding can be expensive; use a module-owned thread to avoid blocking Envoy's main thread or
+  /// workers.
+  /// Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
+  /// configuration may still contain sensitive data. Encoding fails for unknown or unlinked Any
+  /// types.
+  fn into_json(self: Box<Self>) -> Result<Vec<u8>, ConfigSnapshotError>;
+}
+
+#[derive(Debug)]
+struct EnvoyBootstrapExtensionConfigSnapshotImpl {
+  raw: NonNull<std::ffi::c_void>,
+}
+
+// the ABI permits exclusive use and release on any thread
+unsafe impl Send for EnvoyBootstrapExtensionConfigSnapshotImpl {}
+
+impl EnvoyBootstrapExtensionConfigSnapshot for EnvoyBootstrapExtensionConfigSnapshotImpl {
+  fn into_json(self: Box<Self>) -> Result<Vec<u8>, ConfigSnapshotError> {
+    extern "C" fn receive_json(
+      json: abi::envoy_dynamic_module_type_envoy_buffer,
+      user_data: *mut std::ffi::c_void,
+    ) {
+      let output = unsafe { &mut *user_data.cast::<Vec<u8>>() };
+      let bytes =
+        unsafe { crate::ffi_helpers::slice_from_raw_or_empty(json.ptr.cast::<u8>(), json.length) };
+      output.extend_from_slice(bytes);
+    }
+
+    let mut output = Vec::new();
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_serialize(
+        self.raw.as_ptr(),
+        Some(receive_json),
+        std::ptr::from_mut(&mut output).cast(),
+      )
+    };
+    if success {
+      Ok(output)
+    } else {
+      Err(ConfigSnapshotError::EncodingFailed)
+    }
+  }
+}
+
+impl Drop for EnvoyBootstrapExtensionConfigSnapshotImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(
+        self.raw.as_ptr(),
+      )
+    }
+  }
+}
+
+/// A collection or encoding failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfigSnapshotError {
+  /// Called off the main thread, before `on_server_initialized`, during shutdown, from a cluster
+  /// or listener lifecycle hook, whatever triggered it, from another bootstrap hook Envoy runs
+  /// inside an xDS update or a resource's destruction, or while another collection runs. A call
+  /// off the main thread also reports an Envoy bug.
+  NotAllowed,
+  /// The name filter is invalid or its RE2 program size exceeds
+  /// `re2.max_program_size.error_level`.
+  InvalidRegex,
+  /// Admin support is unavailable.
+  Unavailable,
+  /// Collection failed for another reason, such as a provider throwing or returning no message.
+  CollectionFailed,
+  /// The collected messages could not be encoded as JSON.
+  EncodingFailed,
+}
+
+impl std::fmt::Display for ConfigSnapshotError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(match self {
+      Self::NotAllowed => "config snapshot collection not allowed",
+      Self::InvalidRegex => "invalid config snapshot name regex",
+      Self::Unavailable => "config snapshot unavailable",
+      Self::CollectionFailed => "config snapshot collection failed",
+      Self::EncodingFailed => "config snapshot encoding failed",
+    })
+  }
+}
+
+impl std::error::Error for ConfigSnapshotError {}
+
+/// The source of a bootstrap extension's ECDS configuration.
+#[derive(Debug, Clone, Copy)]
+pub struct EcdsSubscription<'a> {
+  /// The name of the `envoy.config.core.v3.TypedExtensionConfig` resource.
+  pub name: &'a str,
+  /// A JSON-encoded `envoy.config.core.v3.ExtensionConfigSource`.
+  pub source_json: &'a str,
+}
+
+/// A changed or removed ECDS resource. Buffers are borrowed for the hook invocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EcdsUpdate<'a> {
+  /// A configuration with its SotW response version or Delta resource version. Filesystem
+  /// updates may have an empty version. xDS-TP names have sorted context parameters.
+  Config {
+    name: &'a str,
+    version: &'a str,
+    type_url: &'a str,
+    encoding: EcdsConfigEncoding,
+    config: &'a [u8],
+  },
+  /// An explicit removal or TTL expiry. Delta may report a missing resource before any config.
+  Removed { name: &'a str },
+}
 
 /// The kind of active resource to enumerate with
 /// [`EnvoyBootstrapExtensionConfig::active_resource_names`].
@@ -36,6 +221,25 @@ pub enum ActiveResourceKind {
   /// The names of the delivered dynamic (SDS) secrets: TLS certificates, certificate validation
   /// contexts, session ticket keys and generic secrets.
   Secret,
+}
+
+/// An xDS processing outcome or client-initiated unsubscription.
+///
+/// Versions are `version_info` for SotW or `system_version_info` for Delta, rather than
+/// per-resource versions. Nonces are scoped to the xDS stream and resource type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum XdsUpdate<'a> {
+  /// A response was accepted.
+  Accepted { version: &'a str, nonce: &'a str },
+  /// A response was rejected. The version and nonce identify the rejected response;
+  /// `error_details` is the NACK message and may quote rejected configuration.
+  Rejected {
+    version: &'a str,
+    nonce: &'a str,
+    error_details: &'a str,
+  },
+  /// The last watch on the stream dropped interest in this resource.
+  Unsubscribed { resource_name: &'a str },
 }
 
 /// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
@@ -86,7 +290,11 @@ pub trait EnvoyBootstrapExtensionConfig {
   ///
   /// When this completes the initialization of Envoy, it can run other hooks and start the workers
   /// before it returns, and it waits until every worker ran the worker events posted before it. Do
-  /// not hold a lock across this call that those hooks take.
+  /// not hold a lock across this call that those hooks take. With the listener writer enabled,
+  /// Envoy finishes initializing only once it applied the listener writes queued before this call,
+  /// or the module removed them. Writes can only be queued after the server is initialized, so a
+  /// module whose listeners must serve from the first connection calls this only after it queued
+  /// their writes.
   ///
   /// This must be called on the main thread. To call from other threads, use the scheduler
   /// mechanism to post an event to the main thread first.
@@ -275,6 +483,37 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// `--mode init_only`.
   fn enable_cluster_lifecycle(&self) -> bool;
 
+  /// Subscribes to ECDS on the main thread after server initialization. Updates call
+  /// [`BootstrapExtensionConfig::on_ecds_update`] until shutdown. Filesystem sources can invoke
+  /// the hook before this call returns; do not hold a lock across it that the hook takes.
+  ///
+  /// Returns false before server initialization, after shutdown, in `--mode init_only`, if already
+  /// subscribed, or if the name or source is invalid or in use. Another bootstrap extension cannot
+  /// use the same ADS or xDS-TP name. Filters conflict only on ADS. Default configs are
+  /// unsupported. For types Envoy does not link, use `TypedStruct`, or `BytesValue` for binary
+  /// payloads. An accepted payload that Envoy cannot render fails the whole unfiltered config dump.
+  fn subscribe_ecds<'a>(&self, source: EcdsSubscription<'a>) -> bool;
+
+  /// Collects and redacts selected providers synchronously on the main thread after initialization
+  /// and before shutdown. Missing providers are omitted, duplicates are collected once, and results
+  /// are sorted by provider key. An empty selection collects nothing.
+  /// [`ConfigSnapshotProvider::Endpoints`] includes active cluster endpoint assignments.
+  /// `name_regex` applies a full-match RE2 resource name filter where supported; `None` or an empty
+  /// expression selects all names. Cost grows with the selected resources, so combine frequent
+  /// notifications into one collection.
+  ///
+  /// Collection is refused in cluster or listener lifecycle hooks, whatever triggered them, and in
+  /// other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction. Providers
+  /// can contain partial changes under the previous version. Defer collection with
+  /// [`Self::new_scheduler`]. Callout failures during cluster removal are already reported from a
+  /// posted callback.
+  /// No admin listener is needed and admin `allow_paths` does not restrict access.
+  fn get_config_snapshot<'a>(
+    &self,
+    providers: &[ConfigSnapshotProvider<'a>],
+    name_regex: Option<&'a str>,
+  ) -> Result<Box<dyn EnvoyBootstrapExtensionConfigSnapshot>, ConfigSnapshotError>;
+
   /// Enable listener lifecycle event notifications. When enabled, the module will receive
   /// [`BootstrapExtensionConfig::on_listener_add_or_update`] and
   /// [`BootstrapExtensionConfig::on_listener_removal`] callbacks when listeners are added, updated,
@@ -288,6 +527,15 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// `--mode init_only`.
   fn enable_listener_lifecycle(&self) -> bool;
 
+  /// Enables or disables [`BootstrapExtensionConfig::on_xds_update`] notifications.
+  ///
+  /// Call on the main thread, typically during or after
+  /// [`BootstrapExtension::on_server_initialized`]. Calls are idempotent. Disabling returns `true`.
+  /// Enabling returns `false` before server initialization, after shutdown begins, or in
+  /// `--mode init_only`. Calling off the main thread reports an Envoy bug and returns `false`.
+  /// Notifications stop when shutdown begins.
+  fn set_xds_notifications(&self, enabled: bool) -> bool;
+
   /// Returns the names of the currently active resources of the given kind, each at most once. See
   /// [`ActiveResourceKind`] for what each kind reports. This must be called on the main thread. It
   /// returns nothing before the server is initialized and once the extension is destroyed.
@@ -297,10 +545,10 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// [`BootstrapExtensionConfig::on_run_on_all_workers_done`] on the main thread. The main thread
   /// does not run the worker event.
   ///
-  /// A worker runs the event after it applied every cluster and host change that Envoy posted to
-  /// it before this call. Host health, weight and metadata changes merged by the
-  /// `update_merge_window` of a cluster may reach the workers later. The workers start only after
-  /// initialization completes, so do not wait for the done hook before calling
+  /// A worker runs the event after it applied every cluster, host, listener and filter chain change
+  /// that Envoy posted to it before this call. Host health, weight and metadata changes merged by
+  /// the `update_merge_window` of a cluster may reach the workers later. The workers start only
+  /// after initialization completes, so do not wait for the done hook before calling
   /// [`EnvoyBootstrapExtensionConfig::signal_init_complete`]. That call can wait for the workers to
   /// run these events, so do not hold a lock across it that the worker event hook takes.
   ///
@@ -339,7 +587,7 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// the first request, call [`EnvoyBootstrapExtensionConfig::signal_init_complete`] only after
   /// their writes completed as active. While Envoy applies a burst of writes, it holds back the
   /// EDS, LEDS and SDS requests on the ADS stream and the xDS-TP authority streams, including their
-  /// ACKs, for about one second.
+  /// ACKs, for about one second. A burst of the listener writer extends this hold.
   ///
   /// This must be called on the main thread after the server is initialized, for example from
   /// [`BootstrapExtensionConfig::on_scheduled`].
@@ -364,6 +612,146 @@ pub trait EnvoyBootstrapExtensionConfig {
     &self,
     cluster_name: &str,
   ) -> abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result;
+
+  /// Enable the listener writer. Until this is called,
+  /// [`EnvoyBootstrapExtensionConfig::listener_writer_add_or_update`] and
+  /// [`EnvoyBootstrapExtensionConfig::listener_writer_remove`] return `NotAllowed`.
+  ///
+  /// This must be called on the main thread. It can be called before the server is initialized,
+  /// for example from the config creation function.
+  ///
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`. This
+  /// also returns `false` once the server began to shut down.
+  fn enable_listener_writer(&self) -> bool;
+
+  /// Queue a write of a listener. This needs
+  /// [`EnvoyBootstrapExtensionConfig::enable_listener_writer`] first.
+  ///
+  /// * `listener_name` is the name of the listener, which must not be empty. Only write listeners
+  ///   that no other component writes. A write of a listener that exists and that this extension
+  ///   does not own completes as `Failed`.
+  /// * `listener` is the serialized `envoy.config.listener.v3.Listener`, whose name must equal
+  ///   `listener_name`.
+  /// * `version_info` is stored with the listener when the write changes it, and shown in the
+  ///   config dump. A change of only the filter chains of an active listener can keep the previous
+  ///   version.
+  ///
+  /// This returns a tuple of (result, update_id). When the result is `Success`, the update ID is
+  /// nonzero and increases with every accepted write, and the outcome arrives in
+  /// [`BootstrapExtensionConfig::on_listener_writer_update_done`] with the same update ID. The
+  /// result is `NotAllowed` and the update ID is 0 before the writer is enabled, before
+  /// [`BootstrapExtension::on_server_initialized`], after shutdown began, or off the main thread.
+  /// A call off the main thread also reports an Envoy bug.
+  ///
+  /// A State-of-the-World LDS update that leaves the written listeners out does not remove them.
+  /// Writes queued before Envoy finishes initializing its static and CDS clusters are applied once
+  /// it has. When the listener is written again before Envoy applied the previous write, Envoy
+  /// applies only the latest write and the previous one completes as `Superseded`. The cluster and
+  /// listener writers apply their writes independently, so write a listener whose inline routes
+  /// name a written cluster only after that cluster write completed as active. A listener can be
+  /// written before the filter chains that it finds by name. The writes queued before
+  /// [`EnvoyBootstrapExtensionConfig::signal_init_complete`] are applied before Envoy finishes
+  /// initializing, and Envoy starts its workers once their listeners warmed. Their writes complete
+  /// as active once the workers started, so do not wait for them before signaling. A written
+  /// listener has the same authority as a listener delivered by LDS, so build listeners from a
+  /// schema that the module owns. While Envoy applies a burst of writes, it holds back the RDS,
+  /// SRDS, VHDS, FCDS and SDS requests on the ADS stream and the xDS-TP authority streams,
+  /// including their ACKs, for about one second. A burst of the cluster writer extends this hold.
+  ///
+  /// This must be called on the main thread after the server is initialized, for example from
+  /// [`BootstrapExtensionConfig::on_scheduled`].
+  fn listener_writer_add_or_update(
+    &self,
+    listener_name: &str,
+    listener: &[u8],
+    version_info: &str,
+  ) -> (
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_result,
+    u64,
+  );
+
+  /// Queue the removal of a listener that this extension owns. A write of the listener that is
+  /// queued or warming completes as `Removed`, unless it becomes active before Envoy applies the
+  /// removal. Returns `NotFound` when the extension neither owns nor has queued a listener with
+  /// this name, and `NotAllowed` for the same reasons as a write. A removal has no outcome of its
+  /// own. Once Envoy applies it, the workers stop accepting connections on the listener and drain
+  /// its connections. With listener lifecycle events enabled,
+  /// [`BootstrapExtensionConfig::on_listener_removal`] reports the removal.
+  ///
+  /// This must be called on the main thread after the server is initialized, for example from
+  /// [`BootstrapExtensionConfig::on_scheduled`].
+  fn listener_writer_remove(
+    &self,
+    listener_name: &str,
+  ) -> abi::envoy_dynamic_module_type_bootstrap_listener_writer_removal_result;
+
+  /// Enable the filter chain config writer. Until this is called,
+  /// [`EnvoyBootstrapExtensionConfig::filter_chain_config_writer_add_or_update`] and
+  /// [`EnvoyBootstrapExtensionConfig::filter_chain_config_writer_remove`] return `NotAllowed`.
+  ///
+  /// This must be called on the main thread. It can be called before the server is initialized,
+  /// for example from the config creation function.
+  ///
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`. This
+  /// also returns `false` once the server began to shut down.
+  fn enable_filter_chain_config_writer(&self) -> bool;
+
+  /// Queue a write of a filter chain that the listeners with `fcds_config` find by name, as FCDS
+  /// would deliver it. This needs
+  /// [`EnvoyBootstrapExtensionConfig::enable_filter_chain_config_writer`] first.
+  ///
+  /// * `filter_chain_name` is the name of the filter chain, which must not be empty. Only write
+  ///   filter chains that no other extension writes, since Envoy does not notice when another
+  ///   extension writes or removes the same filter chain.
+  /// * `filter_chain` is the serialized `envoy.config.listener.v3.FilterChain`, whose name must
+  ///   equal `filter_chain_name`.
+  ///
+  /// This returns a tuple of (result, update_id). When the result is `Success`, the update ID is
+  /// nonzero and increases with every accepted write, and the outcome arrives in
+  /// [`BootstrapExtensionConfig::on_filter_chain_config_writer_update_done`] with the same update
+  /// ID. The result is `NotAllowed` and the update ID is 0 before the writer is enabled, before
+  /// [`BootstrapExtension::on_server_initialized`], after shutdown began, or off the main thread. A
+  /// call off the main thread also reports an Envoy bug.
+  ///
+  /// A listener whose `fcds_config` has no `config_source` waits, without a timeout, until the
+  /// filter chains that it finds by name are written and finished warming, so such a listener that
+  /// Envoy creates before it starts its workers holds back the initialization of Envoy until then.
+  /// A name is either discovered through FCDS or written by an extension. Envoy rejects a listener
+  /// that requests a name of the other kind, and a write of a name that a listener requests through
+  /// FCDS completes as `Failed`. A listener keeps its names until it is removed and has finished
+  /// draining. Writes queued before Envoy finishes initializing its static and CDS clusters are
+  /// applied once it has. When the filter chain is written again before Envoy applied the previous
+  /// write, Envoy applies only the latest write and the previous one completes as `Superseded`. The
+  /// cluster and filter chain config writers apply their writes independently, so write a filter
+  /// chain whose inline routes name a written cluster only after that cluster write completed as
+  /// active. A written filter chain has the same authority as a filter chain delivered by FCDS, so
+  /// build filter chains from a schema that the module owns. A write that changes a filter chain
+  /// drains the connections of its previous version on the listeners that use it.
+  ///
+  /// This must be called on the main thread after the server is initialized, for example from
+  /// [`BootstrapExtensionConfig::on_scheduled`].
+  fn filter_chain_config_writer_add_or_update(
+    &self,
+    filter_chain_name: &str,
+    filter_chain: &[u8],
+  ) -> (
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result,
+    u64,
+  );
+
+  /// Queue the removal of a filter chain that this extension owns. A write of the filter chain that
+  /// is queued or warming completes as `Removed`, unless it becomes active before Envoy applies the
+  /// removal. Returns `NotFound` when the extension neither owns nor has queued a filter chain with
+  /// this name, and `NotAllowed` for the same reasons as a write. A removal has no outcome of its
+  /// own. Once Envoy applies it, the listeners that use the filter chain drain its connections, and
+  /// the listeners that wait for it stop waiting and can become active without it.
+  ///
+  /// This must be called on the main thread after the server is initialized, for example from
+  /// [`BootstrapExtensionConfig::on_scheduled`].
+  fn filter_chain_config_writer_remove(
+    &self,
+    filter_chain_name: &str,
+  ) -> abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result;
 }
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
@@ -396,6 +784,36 @@ pub trait EnvoyBootstrapExtension {
   /// The callback receives the gauge name and its current value.
   /// Return `true` to continue iteration, `false` to stop.
   fn iterate_gauges(&self, callback: &mut dyn FnMut(&str, u64) -> bool);
+
+  /// Watch a runtime key. The extension then receives [`BootstrapExtension::on_runtime_update`]
+  /// when the value of the key changes in a newly loaded runtime snapshot, for example on an RTDS
+  /// update, a disk layer update or a request to the admin `/runtime_modify` endpoint. Call this
+  /// once for each key to watch. The key does not need to have a value yet, and its value when this
+  /// is called is not reported.
+  ///
+  /// This can only be called from [`BootstrapExtension::on_server_initialized`]. RTDS may or may
+  /// not have delivered its layers by then, so read the current value with the runtime getters
+  /// such as [`crate::get_runtime_bool`] when starting to watch the key.
+  ///
+  /// Returns `false` if the key is empty or already watched, outside of
+  /// [`BootstrapExtension::on_server_initialized`], or once the server began to shut down.
+  fn enable_runtime_update(&self, key: &str) -> bool;
+}
+
+/// The value of a watched runtime key, as given to [`BootstrapExtension::on_runtime_update`].
+#[derive(Debug, Clone, PartialEq)]
+pub enum RuntimeValue {
+  /// A boolean, as read by [`crate::get_runtime_bool`].
+  Bool(bool),
+  /// A non-negative integer, as read exactly by [`crate::get_runtime_int`]. An integer is not
+  /// reported as [`RuntimeValue::Bool`], though [`crate::get_runtime_bool`] also reads it as one.
+  Int(u64),
+  /// Any other number, as read by [`crate::get_runtime_number`].
+  Number(f64),
+  /// A non-empty string that reads as neither a number nor a boolean, as read by
+  /// [`crate::get_runtime_string`]. The text of a structured value that is not a fractional
+  /// percent is unspecified.
+  String(String),
 }
 
 /// BootstrapExtensionConfig is the module-side bootstrap extension configuration.
@@ -458,6 +876,24 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
     _timer: &dyn EnvoyBootstrapExtensionTimer,
   ) {
+  }
+
+  /// Applies ECDS updates on the main thread with their payload encoding. Removals include TTL
+  /// expiry and can arrive before any configuration.
+  ///
+  /// Return true to accept, or false to retain the previous settings. Rejecting an update NACKs
+  /// the response, which may contain other ECDS resources and may have been partly applied.
+  /// A rejected removal is only logged.
+  /// The default rejects updates. This hook must not block.
+  ///
+  /// Initial fetch failures do not invoke this hook. A module waiting for its first configuration
+  /// before completing initialization must set its own startup timeout.
+  fn on_ecds_update(
+    &self,
+    _envoy: &mut dyn EnvoyBootstrapExtensionConfig,
+    _update: EcdsUpdate<'_>,
+  ) -> bool {
+    false
   }
 
   /// This is called when a file watched via
@@ -554,6 +990,28 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   ) {
   }
 
+  /// Reports gRPC xDS outcomes on the main thread. Must not block.
+  ///
+  /// Accepted follows successful response processing, before ACK; resources may still be warming.
+  /// Rejected precedes NACK and may follow partial application.
+  /// Unsubscribed is posted once no watch on the stream still names the resource. It can arrive
+  /// after later outcomes, such as the CDS Accepted that removed a cluster. Disabling notifications
+  /// discards pending unsubscriptions, even if re-enabled before delivery.
+  ///
+  /// [`EnvoyBootstrapExtensionConfig::get_config_snapshot`] returns
+  /// [`ConfigSnapshotError::NotAllowed`] during Accepted and Rejected. Use
+  /// [`EnvoyBootstrapExtensionConfig::new_scheduler`] to defer it. Collection can succeed during
+  /// the posted Unsubscribed callback.
+  ///
+  /// Resource payloads are not included. Update metadata is borrowed for this call.
+  fn on_xds_update(
+    &self,
+    _envoy: &mut dyn EnvoyBootstrapExtensionConfig,
+    _type_url: &str,
+    _update: XdsUpdate<'_>,
+  ) {
+  }
+
   /// This is called on every worker thread for an event posted with
   /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`]. The worker threads call it
   /// concurrently.
@@ -601,6 +1059,74 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     _update_id: u64,
     _cluster_name: &str,
     _status: abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status,
+    _error_details: &str,
+  ) {
+  }
+
+  /// This is called on the main thread with the outcome of a write accepted by
+  /// [`EnvoyBootstrapExtensionConfig::listener_writer_add_or_update`]. Envoy calls it at most once
+  /// per update ID, never from inside a call into Envoy, and not after shutdown began. It is called
+  /// exactly once unless shutdown began first, the listener never finishes warming, or the workers
+  /// never start. To end a write that stays warming, write the listener again or remove it. Once
+  /// Envoy stopped the listeners, only a removal ends the warming. Outcomes can arrive out of
+  /// update ID order. A listener that fails to listen after it warmed fails its write. If the write
+  /// added addresses in place, the workers keep serving the previous version. Otherwise Envoy
+  /// removes the listener and its previous version, and the extension no longer owns it. The error
+  /// details say which of the two happened. When Envoy fails to create the listener of a write, it
+  /// logs the error at most once every 10 seconds, and the extension keeps owning the listener if
+  /// it exists.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `update_id` is the ID returned by the write.
+  /// * `listener_name` is the name of the listener.
+  /// * `status` is the outcome of the write. `Active` means that the listener finished warming with
+  ///   this configuration or an identical one and that Envoy posted it to the workers. `Superseded`
+  ///   and `Removed` mean that a later write or a removal ended this write before it became active.
+  ///   `Failed` means that the listener failed to listen, or that Envoy rejected the write because
+  ///   the listener failed to parse or validate, its name differs from `listener_name`, it is an
+  ///   API listener, a listener with this name exists that this extension does not own, Envoy
+  ///   failed to create it, or Envoy stopped the listeners of its traffic direction and the write
+  ///   changes it. After a rejected write the workers keep serving the previous configuration, if
+  ///   any. `OwnershipLost` means that another component removed or replaced the listener before
+  ///   this write became active, so the extension no longer owns it.
+  /// * `error_details` describes the problem when the status is `Failed` or `OwnershipLost`, and is
+  ///   empty otherwise.
+  fn on_listener_writer_update_done(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _update_id: u64,
+    _listener_name: &str,
+    _status: abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_status,
+    _error_details: &str,
+  ) {
+  }
+
+  /// This is called on the main thread with the outcome of a write accepted by
+  /// [`EnvoyBootstrapExtensionConfig::filter_chain_config_writer_add_or_update`]. Envoy calls it at
+  /// most once per update ID, never from inside a call into Envoy, and not after shutdown began. It
+  /// is called exactly once unless shutdown began first, the filter chain never finishes warming,
+  /// or Envoy never finishes initializing its clusters. To end a write that stays warming, write
+  /// the filter chain again or remove it. Outcomes can arrive out of update ID order. When Envoy
+  /// fails to build the filter chain of a write, it logs the error at most once every 10 seconds,
+  /// and the extension keeps owning the filter chain if it exists.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `update_id` is the ID returned by the write.
+  /// * `filter_chain_name` is the name of the filter chain.
+  /// * `status` is the outcome of the write. `Active` means that the filter chain finished warming
+  ///   with this configuration or an identical one and that Envoy posted it to the workers.
+  ///   `Superseded` and `Removed` mean that a later write or a removal ended this write before it
+  ///   became active. `Failed` means that Envoy rejected the write because the filter chain failed
+  ///   to parse or validate, its name differs from `filter_chain_name`, a listener requests the
+  ///   name through FCDS, or Envoy failed to build it. The listeners then keep using the previous
+  ///   configuration, if any.
+  /// * `error_details` describes the problem when the status is `Failed`, and is empty otherwise.
+  fn on_filter_chain_config_writer_update_done(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _update_id: u64,
+    _filter_chain_name: &str,
+    _status: abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status,
     _error_details: &str,
   ) {
   }
@@ -669,6 +1195,27 @@ pub trait BootstrapExtension: Send + Sync {
   /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`] after the server is initialized.
   fn on_worker_thread_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
 
+  /// Called when the value of a runtime key watched via
+  /// [`EnvoyBootstrapExtension::enable_runtime_update`] changes. When several watched keys change
+  /// in the same runtime snapshot, this is called for each of them in lexicographic order of the
+  /// keys. The runtime getters such as [`crate::get_runtime_bool`] already return the new value on
+  /// the main thread when this is called.
+  ///
+  /// * `envoy_extension` can be used to interact with the underlying Envoy extension object.
+  /// * `key` is the watched runtime key whose value changed.
+  /// * `value` is the new value of the key, typed the way the runtime getters read it, or `None`
+  ///   when the key became unset. A value that is none of a boolean, a number or a non-empty string
+  ///   counts as unset. See [`RuntimeValue`]. When a runtime guard becomes unset, the guard returns
+  ///   to its value before any layer set it, normally its compiled default, while
+  ///   [`crate::get_runtime_bool`] returns the default given by the caller.
+  fn on_runtime_update(
+    &mut self,
+    _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    _key: &str,
+    _value: Option<RuntimeValue>,
+  ) {
+  }
+
   /// Called when Envoy begins draining.
   ///
   /// This is called on the main thread before workers are stopped. The module can still make HTTP
@@ -686,10 +1233,11 @@ pub trait BootstrapExtension: Send + Sync {
   /// completion to prevent Envoy from hanging.
   ///
   /// Shutdown has begun when Envoy calls this, so
-  /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`] returns false, the cluster writer calls
-  /// return `NotAllowed`, and Envoy drops the done hooks of pending worker events and the pending
-  /// cluster writer outcomes. A worker can still run the worker event hook of an event posted
-  /// before shutdown began, until the workers stop.
+  /// [`EnvoyBootstrapExtensionConfig::run_on_all_workers`] and the writer enable calls return
+  /// false, the other cluster, listener and filter chain config writer calls return `NotAllowed`,
+  /// and Envoy drops the done hooks of pending worker events and the pending writer outcomes. A
+  /// worker can still run the worker event hook of an event posted before shutdown began, until the
+  /// workers stop.
   fn on_shutdown(
     &mut self,
     _envoy_extension: &mut dyn EnvoyBootstrapExtension,
@@ -1332,9 +1880,63 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     }
   }
 
+  fn subscribe_ecds<'a>(&self, source: EcdsSubscription<'a>) -> bool {
+    let EcdsSubscription { name, source_json } = source;
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
+        self.raw,
+        str_to_module_buffer(name),
+        str_to_module_buffer(source_json),
+      )
+    }
+  }
+
+  fn get_config_snapshot(
+    &self,
+    providers: &[ConfigSnapshotProvider<'_>],
+    name_regex: Option<&str>,
+  ) -> Result<Box<dyn EnvoyBootstrapExtensionConfigSnapshot>, ConfigSnapshotError> {
+    let providers: smallvec::SmallVec<[_; 4]> = providers
+      .iter()
+      .map(|provider| str_to_module_buffer(provider.as_str()))
+      .collect();
+    let mut raw = std::ptr::null_mut();
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_new(
+        self.raw,
+        providers.as_ptr(),
+        providers.len(),
+        name_regex.map(str_to_module_buffer).unwrap_or(
+          abi::envoy_dynamic_module_type_module_buffer {
+            ptr: std::ptr::null(),
+            length: 0,
+          },
+        ),
+        &mut raw,
+      )
+    };
+    match result {
+      ConfigSnapshotResult::Success => {},
+      ConfigSnapshotResult::NotAllowed => return Err(ConfigSnapshotError::NotAllowed),
+      ConfigSnapshotResult::InvalidRegex => return Err(ConfigSnapshotError::InvalidRegex),
+      ConfigSnapshotResult::Unavailable => return Err(ConfigSnapshotError::Unavailable),
+      ConfigSnapshotResult::CollectionFailed => return Err(ConfigSnapshotError::CollectionFailed),
+    }
+    let raw = NonNull::new(raw).ok_or(ConfigSnapshotError::CollectionFailed)?;
+    Ok(Box::new(EnvoyBootstrapExtensionConfigSnapshotImpl { raw }))
+  }
+
   fn enable_listener_lifecycle(&self) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(self.raw)
+    }
+  }
+
+  fn set_xds_notifications(&self, enabled: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
+        self.raw, enabled,
+      )
     }
   }
 
@@ -1418,6 +2020,86 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
       abi::envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
         self.raw,
         str_to_module_buffer(cluster_name),
+      )
+    }
+  }
+
+  fn enable_listener_writer(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_listener_writer(self.raw)
+    }
+  }
+
+  fn listener_writer_add_or_update(
+    &self,
+    listener_name: &str,
+    listener: &[u8],
+    version_info: &str,
+  ) -> (
+    abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_result,
+    u64,
+  ) {
+    let mut update_id: u64 = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_listener_writer_add_or_update(
+        self.raw,
+        str_to_module_buffer(listener_name),
+        bytes_to_module_buffer(listener),
+        str_to_module_buffer(version_info),
+        &mut update_id,
+      )
+    };
+    (result, update_id)
+  }
+
+  fn listener_writer_remove(
+    &self,
+    listener_name: &str,
+  ) -> abi::envoy_dynamic_module_type_bootstrap_listener_writer_removal_result {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_listener_writer_remove(
+        self.raw,
+        str_to_module_buffer(listener_name),
+      )
+    }
+  }
+
+  fn enable_filter_chain_config_writer(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_filter_chain_config_writer(
+        self.raw,
+      )
+    }
+  }
+
+  fn filter_chain_config_writer_add_or_update(
+    &self,
+    filter_chain_name: &str,
+    filter_chain: &[u8],
+  ) -> (
+    abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_result,
+    u64,
+  ) {
+    let mut update_id: u64 = 0;
+    let result = unsafe {
+      envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_add_or_update(
+        self.raw,
+        str_to_module_buffer(filter_chain_name),
+        bytes_to_module_buffer(filter_chain),
+        &mut update_id,
+      )
+    };
+    (result, update_id)
+  }
+
+  fn filter_chain_config_writer_remove(
+    &self,
+    filter_chain_name: &str,
+  ) -> abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_removal_result {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_filter_chain_config_writer_remove(
+        self.raw,
+        str_to_module_buffer(filter_chain_name),
       )
     }
   }
@@ -1577,6 +2259,15 @@ impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
         Some(gauge_iterator_trampoline),
         &mut wrapper as *mut _ as *mut std::ffi::c_void,
       );
+    }
+  }
+
+  fn enable_runtime_update(&self, key: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update(
+        self.raw,
+        str_to_module_buffer(key),
+      )
     }
   }
 }
@@ -1909,6 +2600,50 @@ ffi_export! {
 }
 
 ffi_export! {
+  /// Event hook called by Envoy when an ECDS configuration is updated or removed.
+  ///
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_ecds_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    version: abi::envoy_dynamic_module_type_envoy_buffer,
+    type_url: abi::envoy_dynamic_module_type_envoy_buffer,
+    encoding: EcdsConfigEncoding,
+    has_config: bool,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> bool {
+    let module = unsafe { &**(config_ptr as *const *const dyn BootstrapExtensionConfig) };
+    let text = |buffer: abi::envoy_dynamic_module_type_envoy_buffer| {
+      let bytes = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(buffer.ptr.cast::<u8>(), buffer.length)
+      };
+      std::str::from_utf8(bytes)
+    };
+    let Ok(name) = text(name) else {
+      return false;
+    };
+    let update = if has_config {
+      let (Ok(version), Ok(type_url)) = (text(version), text(type_url)) else {
+        return false;
+      };
+      let config = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(config.ptr.cast::<u8>(), config.length)
+      };
+      EcdsUpdate::Config { name, version, type_url, encoding, config }
+    } else {
+      EcdsUpdate::Removed { name }
+    };
+    let mut envoy = EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr);
+    module.on_ecds_update(&mut envoy, update)
+  }
+  on_panic = false
+}
+
+ffi_export! {
   /// Event hook called by Envoy when a cluster is removed from the ClusterManager.
   ///
   /// # Safety
@@ -1986,6 +2721,127 @@ ffi_export! {
   }
 }
 
+fn on_runtime_update_impl(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+  key: abi::envoy_dynamic_module_type_envoy_buffer,
+  value: RuntimeValue,
+  removed: bool,
+) {
+  let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
+  let extension = unsafe { &mut *extension };
+  let key_str = unsafe { crate::ffi_helpers::str_lossy_from_raw(key.ptr as *const u8, key.length) };
+  extension.on_runtime_update(
+    &mut EnvoyBootstrapExtensionImpl::new(envoy_ptr),
+    key_str.as_ref(),
+    (!removed).then_some(value),
+  );
+}
+
+ffi_export! {
+  /// Event hook called by Envoy when a watched runtime key gets a new boolean value, or becomes
+  /// unset after having one.
+  fn envoy_dynamic_module_on_bootstrap_extension_runtime_bool_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+    key: abi::envoy_dynamic_module_type_envoy_buffer,
+    value: bool,
+    removed: bool,
+  ) {
+    on_runtime_update_impl(envoy_ptr, extension_ptr, key, RuntimeValue::Bool(value), removed);
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy when a watched runtime key gets a new non-negative integer value,
+  /// or becomes unset after having one.
+  fn envoy_dynamic_module_on_bootstrap_extension_runtime_int_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+    key: abi::envoy_dynamic_module_type_envoy_buffer,
+    value: u64,
+    removed: bool,
+  ) {
+    on_runtime_update_impl(envoy_ptr, extension_ptr, key, RuntimeValue::Int(value), removed);
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy when a watched runtime key gets any other new number, or becomes
+  /// unset after having one.
+  fn envoy_dynamic_module_on_bootstrap_extension_runtime_number_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+    key: abi::envoy_dynamic_module_type_envoy_buffer,
+    value: f64,
+    removed: bool,
+  ) {
+    on_runtime_update_impl(envoy_ptr, extension_ptr, key, RuntimeValue::Number(value), removed);
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy when a watched runtime key gets a new string value, or becomes
+  /// unset after having one.
+  fn envoy_dynamic_module_on_bootstrap_extension_runtime_string_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+    key: abi::envoy_dynamic_module_type_envoy_buffer,
+    value: abi::envoy_dynamic_module_type_envoy_buffer,
+    removed: bool,
+  ) {
+    let text =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(value.ptr as *const u8, value.length) };
+    let value = RuntimeValue::String(text.into_owned());
+    on_runtime_update_impl(envoy_ptr, extension_ptr, key, value, removed);
+  }
+}
+
+ffi_export! {
+  /// Forwards an xDS outcome to the bootstrap config.
+  ///
+  /// # Safety
+  /// All pointers and the status must satisfy the Envoy dynamic module ABI. Buffers and the
+  /// module config remain valid until this call returns.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_xds_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    type_url: abi::envoy_dynamic_module_type_envoy_buffer,
+    status: abi::envoy_dynamic_module_type_bootstrap_xds_update_status,
+    error_details: abi::envoy_dynamic_module_type_envoy_buffer,
+    version: abi::envoy_dynamic_module_type_envoy_buffer,
+    nonce: abi::envoy_dynamic_module_type_envoy_buffer,
+    resource_name: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
+    use abi::envoy_dynamic_module_type_bootstrap_xds_update_status as Status;
+
+    let config = unsafe { &**(config_ptr as *const *const dyn BootstrapExtensionConfig) };
+    let [Ok(type_url), Ok(version), Ok(nonce), Ok(resource_name)] =
+      [type_url, version, nonce, resource_name].map(|buffer| {
+        std::str::from_utf8(unsafe {
+          crate::ffi_helpers::slice_from_raw_or_empty(buffer.ptr.cast::<u8>(), buffer.length)
+        })
+      })
+    else {
+      return;
+    };
+    let error_details = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(error_details.ptr.cast::<u8>(), error_details.length)
+    };
+    let update = match status {
+      Status::Accepted => XdsUpdate::Accepted { version, nonce },
+      Status::Rejected => XdsUpdate::Rejected {
+        version,
+        nonce,
+        error_details: error_details.as_ref(),
+      },
+      Status::Unsubscribed => XdsUpdate::Unsubscribed { resource_name },
+    };
+    let mut envoy = EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr);
+    config.on_xds_update(&mut envoy, type_url, update);
+  }
+}
+
 ffi_export! {
   /// Event hook called by Envoy on every worker thread for an event posted by a bootstrap
   /// extension with `run_on_all_workers`.
@@ -2043,6 +2899,433 @@ ffi_export! {
       cluster_name_str.as_ref(),
       status,
       error_details_str.as_ref(),
+    );
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy with the outcome of a listener write by a bootstrap extension.
+  fn envoy_dynamic_module_on_bootstrap_extension_listener_writer_update_done(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    update_id: u64,
+    listener_name: abi::envoy_dynamic_module_type_envoy_buffer,
+    status: abi::envoy_dynamic_module_type_bootstrap_listener_writer_update_status,
+    error_details: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+
+    let listener_name_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(listener_name.ptr as *const u8, listener_name.length)
+    };
+    let error_details_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(error_details.ptr as *const u8, error_details.length)
+    };
+
+    extension_config.on_listener_writer_update_done(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      update_id,
+      listener_name_str.as_ref(),
+      status,
+      error_details_str.as_ref(),
+    );
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy with the outcome of a filter chain write by a bootstrap extension.
+  fn envoy_dynamic_module_on_bootstrap_extension_filter_chain_config_writer_update_done(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    update_id: u64,
+    filter_chain_name: abi::envoy_dynamic_module_type_envoy_buffer,
+    status: abi::envoy_dynamic_module_type_bootstrap_filter_chain_config_writer_update_status,
+    error_details: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+
+    let filter_chain_name_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(
+        filter_chain_name.ptr as *const u8,
+        filter_chain_name.length,
+      )
+    };
+    let error_details_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(error_details.ptr as *const u8, error_details.length)
+    };
+
+    extension_config.on_filter_chain_config_writer_update_done(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      update_id,
+      filter_chain_name_str.as_ref(),
+      status,
+      error_details_str.as_ref(),
+    );
+  }
+}
+
+#[cfg(test)]
+mod ecds_tests {
+  use super::*;
+  use std::sync::Mutex;
+
+  fn buffer(bytes: &[u8]) -> abi::envoy_dynamic_module_type_envoy_buffer {
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: if bytes.is_empty() {
+        std::ptr::null()
+      } else {
+        bytes.as_ptr().cast()
+      },
+      length: bytes.len(),
+    }
+  }
+
+  fn invoke(
+    config: &dyn BootstrapExtensionConfig,
+    payload: Option<&[u8]>,
+    encoding: EcdsConfigEncoding,
+  ) -> bool {
+    unsafe {
+      envoy_dynamic_module_on_bootstrap_extension_ecds_update(
+        std::ptr::null_mut(),
+        std::ptr::from_ref(&config).cast(),
+        buffer(b"test-config"),
+        buffer(b"v1"),
+        buffer(b"type.googleapis.com/test.Config"),
+        encoding,
+        payload.is_some(),
+        buffer(payload.unwrap_or_default()),
+      )
+    }
+  }
+
+  #[derive(Default)]
+  struct Consumer {
+    updates: Mutex<Vec<Option<Vec<u8>>>>,
+    encodings: Mutex<Vec<EcdsConfigEncoding>>,
+    panic: bool,
+  }
+
+  impl BootstrapExtensionConfig for Consumer {
+    fn new_bootstrap_extension(
+      &self,
+      _: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      unreachable!()
+    }
+
+    fn on_ecds_update(
+      &self,
+      _: &mut dyn EnvoyBootstrapExtensionConfig,
+      update: EcdsUpdate<'_>,
+    ) -> bool {
+      assert!(!self.panic, "test ECDS panic");
+      let config = match update {
+        EcdsUpdate::Config {
+          name,
+          version,
+          type_url,
+          encoding,
+          config,
+        } => {
+          assert_eq!(name, "test-config");
+          assert_eq!(version, "v1");
+          assert_eq!(type_url, "type.googleapis.com/test.Config");
+          self.encodings.lock().unwrap().push(encoding);
+          Some(config)
+        },
+        EcdsUpdate::Removed { name } => {
+          assert_eq!(name, "test-config");
+          None
+        },
+      };
+      self
+        .updates
+        .lock()
+        .unwrap()
+        .push(config.map(<[u8]>::to_vec));
+      config != Some(b"rejected".as_slice())
+    }
+  }
+
+  #[test]
+  fn update_preserves_metadata_payload_presence_and_rejection() {
+    let module = Consumer::default();
+    for (payload, accepted) in [
+      (Some(b"{}".as_slice()), true),
+      (Some(b"".as_slice()), true),
+      (None, true),
+      (Some(b"rejected".as_slice()), false),
+    ] {
+      assert_eq!(invoke(&module, payload, EcdsConfigEncoding::Json), accepted);
+    }
+    assert_eq!(
+      *module.updates.lock().unwrap(),
+      vec![
+        Some(b"{}".to_vec()),
+        Some(Vec::new()),
+        None,
+        Some(b"rejected".to_vec())
+      ]
+    );
+  }
+
+  #[test]
+  fn payload_encoding_is_forwarded() {
+    let module = Consumer::default();
+    let encodings = [
+      EcdsConfigEncoding::Protobuf,
+      EcdsConfigEncoding::Json,
+      EcdsConfigEncoding::Bytes,
+    ];
+    for encoding in encodings {
+      assert!(invoke(&module, Some(b"{}"), encoding));
+    }
+    assert_eq!(*module.encodings.lock().unwrap(), encodings);
+  }
+
+  #[test]
+  fn default_and_panicking_hooks_reject() {
+    struct DefaultConfig;
+    impl BootstrapExtensionConfig for DefaultConfig {
+      fn new_bootstrap_extension(
+        &self,
+        _: &mut dyn EnvoyBootstrapExtension,
+      ) -> Box<dyn BootstrapExtension> {
+        unreachable!()
+      }
+    }
+    assert!(!invoke(
+      &DefaultConfig,
+      Some(b"{}"),
+      EcdsConfigEncoding::Json
+    ));
+    let panicking = Consumer {
+      panic: true,
+      ..Consumer::default()
+    };
+    assert!(!invoke(&panicking, Some(b"{}"), EcdsConfigEncoding::Json));
+  }
+
+  #[test]
+  fn invalid_metadata_is_rejected_before_calling_the_hook() {
+    let module = Consumer::default();
+    let config: &dyn BootstrapExtensionConfig = &module;
+    let valid = [
+      buffer(b"test-config"),
+      buffer(b"v1"),
+      buffer(b"type.googleapis.com/test.Config"),
+    ];
+    for index in 0 .. valid.len() {
+      let mut fields = valid;
+      fields[index] = buffer(b"\xff");
+      assert!(!unsafe {
+        envoy_dynamic_module_on_bootstrap_extension_ecds_update(
+          std::ptr::null_mut(),
+          std::ptr::from_ref(&config).cast(),
+          fields[0],
+          fields[1],
+          fields[2],
+          EcdsConfigEncoding::Json,
+          true,
+          buffer(b"{}"),
+        )
+      });
+    }
+    assert!(module.updates.lock().unwrap().is_empty());
+  }
+}
+
+#[cfg(test)]
+mod snapshot_tests {
+  use super::*;
+  use crate::mod_test::config_snapshot_stubs::{TestHost, TestSnapshot};
+  use std::sync::atomic::{AtomicUsize, Ordering};
+  use std::sync::Arc;
+
+  fn snapshot(
+    json: Option<Vec<u8>>,
+    drops: Arc<AtomicUsize>,
+  ) -> Box<dyn EnvoyBootstrapExtensionConfigSnapshot> {
+    let raw = Box::into_raw(Box::new(TestSnapshot { json, drops })).cast();
+    Box::new(EnvoyBootstrapExtensionConfigSnapshotImpl {
+      raw: NonNull::new(raw).unwrap(),
+    })
+  }
+
+  #[test]
+  fn config_snapshot_can_move_to_worker_and_releases_after_encoding() {
+    let drops = Arc::new(AtomicUsize::new(0));
+    let owned = snapshot(Some(b"{\"configs\":[]}".to_vec()), Arc::clone(&drops));
+    let encoded = std::thread::spawn(move || owned.into_json())
+      .join()
+      .unwrap();
+    assert_eq!(encoded.unwrap(), b"{\"configs\":[]}");
+    assert_eq!(drops.load(Ordering::Relaxed), 1);
+  }
+
+  #[test]
+  fn config_snapshot_releases_on_encoding_failure_and_without_encoding() {
+    let drops = Arc::new(AtomicUsize::new(0));
+    assert_eq!(
+      snapshot(None, Arc::clone(&drops)).into_json(),
+      Err(ConfigSnapshotError::EncodingFailed)
+    );
+    drop(snapshot(Some(Vec::new()), Arc::clone(&drops)));
+    assert_eq!(drops.load(Ordering::Relaxed), 2);
+  }
+
+  #[test]
+  fn config_snapshot_selection_crosses_abi() {
+    let mut host = TestHost::default();
+    let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
+    let cases = [
+      (ConfigSnapshotProvider::Bootstrap, "bootstrap"),
+      (ConfigSnapshotProvider::Clusters, "clusters"),
+      (ConfigSnapshotProvider::Endpoints, "endpoint"),
+      (ConfigSnapshotProvider::Listeners, "listeners"),
+      (ConfigSnapshotProvider::Routes, "routes"),
+      (ConfigSnapshotProvider::RouteScopes, "route_scopes"),
+      (ConfigSnapshotProvider::Secrets, "secrets"),
+      (ConfigSnapshotProvider::EcdsHttpFilters, "ecds_filter_http"),
+      (
+        ConfigSnapshotProvider::EcdsUpstreamHttpFilters,
+        "ecds_filter_upstream_http",
+      ),
+      (
+        ConfigSnapshotProvider::EcdsNetworkFilters,
+        "ecds_filter_network",
+      ),
+      (
+        ConfigSnapshotProvider::EcdsUpstreamNetworkFilters,
+        "ecds_filter_upstream_network",
+      ),
+      (
+        ConfigSnapshotProvider::EcdsTcpListenerFilters,
+        "ecds_filter_tcp_listener",
+      ),
+      (
+        ConfigSnapshotProvider::EcdsUdpListenerFilters,
+        "ecds_filter_udp_listener",
+      ),
+      (
+        ConfigSnapshotProvider::EcdsUdpSessionFilters,
+        "ecds_filter_udp_session",
+      ),
+      (
+        ConfigSnapshotProvider::EcdsQuicListenerFilters,
+        "ecds_filter_quic_listener",
+      ),
+      (
+        ConfigSnapshotProvider::Custom("extension-provider\0suffix"),
+        "extension-provider\0suffix",
+      ),
+    ];
+    let providers: Vec<_> = cases.iter().map(|(provider, _)| *provider).collect();
+    assert!(matches!(
+      envoy.get_config_snapshot(&providers, Some("cluster.*\0suffix")),
+      Err(ConfigSnapshotError::Unavailable)
+    ));
+    assert!(host
+      .providers
+      .iter()
+      .map(String::as_str)
+      .eq(cases.iter().map(|(_, name)| *name)));
+    assert_eq!(host.name_regex.as_deref(), Some("cluster.*\0suffix"));
+    assert!(matches!(
+      envoy.get_config_snapshot(&[], Some("")),
+      Err(ConfigSnapshotError::Unavailable)
+    ));
+    assert_eq!(host.name_regex.as_deref(), Some(""));
+    assert!(matches!(
+      envoy.get_config_snapshot(&[], None),
+      Err(ConfigSnapshotError::Unavailable)
+    ));
+    assert!(host.providers.is_empty());
+    assert!(host.name_regex.is_none());
+  }
+
+  #[test]
+  fn config_snapshot_collection_returns_an_encodable_handle() {
+    let drops = Arc::new(AtomicUsize::new(0));
+    let mut host = TestHost {
+      snapshot: Some(TestSnapshot {
+        json: Some(b"{\"configs\":[]}".to_vec()),
+        drops: Arc::clone(&drops),
+      }),
+      ..TestHost::default()
+    };
+    let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
+    let snapshot = envoy
+      .get_config_snapshot(&[ConfigSnapshotProvider::Clusters], None)
+      .unwrap();
+    assert_eq!(snapshot.into_json().unwrap(), b"{\"configs\":[]}");
+    assert_eq!(drops.load(Ordering::Relaxed), 1);
+  }
+
+  #[test]
+  fn config_snapshot_collection_preserves_host_errors() {
+    for (result, error) in [
+      (
+        ConfigSnapshotResult::NotAllowed,
+        ConfigSnapshotError::NotAllowed,
+      ),
+      (
+        ConfigSnapshotResult::InvalidRegex,
+        ConfigSnapshotError::InvalidRegex,
+      ),
+      (
+        ConfigSnapshotResult::Unavailable,
+        ConfigSnapshotError::Unavailable,
+      ),
+      (
+        ConfigSnapshotResult::CollectionFailed,
+        ConfigSnapshotError::CollectionFailed,
+      ),
+    ] {
+      let mut host = TestHost {
+        result: Some(result),
+        ..TestHost::default()
+      };
+      let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
+      assert!(matches!(envoy.get_config_snapshot(&[], None), Err(actual) if actual == error));
+    }
+  }
+
+  #[test]
+  fn config_snapshot_rejects_success_without_a_handle() {
+    let mut host = TestHost {
+      result: Some(ConfigSnapshotResult::Success),
+      ..TestHost::default()
+    };
+    let envoy = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::from_mut(&mut host).cast());
+    assert!(matches!(
+      envoy.get_config_snapshot(&[], None),
+      Err(ConfigSnapshotError::CollectionFailed)
+    ));
+  }
+
+  #[test]
+  fn config_snapshot_can_be_mocked() {
+    let mut snapshot = MockEnvoyBootstrapExtensionConfigSnapshot::new();
+    snapshot
+      .expect_into_json()
+      .once()
+      .return_once(|| Ok(b"{}".to_vec()));
+    let mut envoy = MockEnvoyBootstrapExtensionConfig::new();
+    envoy
+      .expect_get_config_snapshot()
+      .once()
+      .return_once(move |_, _| Ok(Box::new(snapshot)));
+    assert_eq!(
+      envoy
+        .get_config_snapshot(&[], None)
+        .unwrap()
+        .into_json()
+        .unwrap(),
+      b"{}"
     );
   }
 }

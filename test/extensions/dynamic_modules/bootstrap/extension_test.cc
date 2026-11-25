@@ -4,6 +4,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -52,6 +53,22 @@ TEST_F(ExtensionTest, NullInModuleExtension) {
 
   // Verify getExtensionConfig returns the correct config.
   EXPECT_EQ(&extension->getExtensionConfig(), config.value().get());
+}
+
+TEST_F(ExtensionTest, GoInstanceFailure) {
+  const std::string path = TestEnvironment::runfilesPath(
+      "test/extensions/dynamic_modules/test_data/go/libbootstrap_integration_test.so");
+  for (const std::string mode : {"new_nil", "new_panic"}) {
+    SCOPED_TRACE(mode);
+    auto dynamic_module = Extensions::DynamicModules::newDynamicModule(path, true);
+    ASSERT_OK(dynamic_module);
+    auto config = newDynamicModuleBootstrapExtensionConfig("test", mode, DefaultMetricsNamespace,
+                                                           std::move(dynamic_module.value()),
+                                                           dispatcher_, context_, context_.store_);
+    ASSERT_OK(config);
+    auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+    EXPECT_FALSE(extension->initializeInModuleExtension());
+  }
 }
 
 TEST_F(ExtensionTest, IsDestroyedAndGetExtensionConfig) {
@@ -179,6 +196,43 @@ TEST_F(ExtensionTest, ShutdownCallbackWithCompletion) {
   EXPECT_TRUE(completion_called);
 }
 
+TEST_F(ExtensionTest, GoDrainAndRetainedShutdown) {
+  Server::DrainManager::DrainCloseCb drain;
+  EXPECT_CALL(context_.drain_manager_, addOnDrainCloseCb(Network::DrainDirection::All, _))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&drain), testing::Return(nullptr)));
+  Server::ServerLifecycleNotifier::StageCallbackWithCompletion shutdown;
+  EXPECT_CALL(
+      context_.lifecycle_notifier_,
+      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&shutdown), testing::Return(nullptr)));
+  auto module = Extensions::DynamicModules::newDynamicModule(
+      TestEnvironment::runfilesPath(
+          "test/extensions/dynamic_modules/test_data/go/libbootstrap_integration_test.so"),
+      /*do_not_close=*/true);
+  ASSERT_OK(module);
+  auto finish = module.value()->getFunctionPointer<void (*)()>("go_bootstrap_test_finish_shutdown");
+  ASSERT_OK(finish);
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "retain_shutdown", DefaultMetricsNamespace, std::move(module.value()), dispatcher_,
+      context_, context_.store_);
+  ASSERT_OK(config);
+  DynamicModuleBootstrapExtension extension(config.value());
+  ASSERT_TRUE(extension.initializeInModuleExtension());
+  NiceMock<Server::MockInstance> instance;
+  extension.onServerInitialized(instance);
+
+  ASSERT_TRUE(drain);
+  EXPECT_LOG_CONTAINS("info", "Go bootstrap drain started",
+                      EXPECT_OK(drain(std::chrono::milliseconds(0))));
+  ASSERT_TRUE(shutdown);
+  uint32_t completions = 0;
+  shutdown([&completions]() { ++completions; });
+  EXPECT_EQ(0, completions);
+  finish.value()();
+  EXPECT_EQ(1, completions);
+}
+
 TEST_F(ExtensionTest, ShutdownCallbackAfterDestroy) {
   // Allow the drain registration without crashing.
   EXPECT_CALL(context_.drain_manager_, addOnDrainCloseCb(Network::DrainDirection::All, _))
@@ -226,6 +280,9 @@ TEST_F(ExtensionTest, ShutdownCallbackStopsTheConfiguration) {
                                testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
       .WillOnce(
           testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
+  EXPECT_CALL(context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::PostInit,
+                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()));
 
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
@@ -242,6 +299,44 @@ TEST_F(ExtensionTest, ShutdownCallbackStopsTheConfiguration) {
 
   captured_shutdown_cb();
   EXPECT_FALSE(config.value()->runOnAllWorkers(2));
+}
+
+// Test that the callback before the workers start reaches the listener writer.
+TEST_F(ExtensionTest, PostInitCallbackNotifiesTheListenerWriter) {
+  Server::ServerLifecycleNotifier::StageCallback captured_post_init_cb;
+  EXPECT_CALL(context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()));
+  EXPECT_CALL(context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::PostInit,
+                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
+      .WillOnce(
+          testing::DoAll(testing::SaveArg<1>(&captured_post_init_cb), testing::Return(nullptr)));
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so",
+                                                   /*do_not_close=*/false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+  NiceMock<Server::MockInstance> instance;
+  extension->onServerInitialized(instance);
+  // Nothing is notified before the module enables the listener writer.
+  captured_post_init_cb();
+
+  // The writer creates its apply callback first, and the newest expectation matches first.
+  new NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  auto* workers_started_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  ASSERT_TRUE(config.value()->enableListenerWriter());
+  EXPECT_CALL(*workers_started_callback, scheduleCallbackNextIteration());
+  captured_post_init_cb();
 }
 
 // Test that a server that shut down before it initialized its extensions stops the configuration.

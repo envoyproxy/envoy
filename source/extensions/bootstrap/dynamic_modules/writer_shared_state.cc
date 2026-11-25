@@ -29,9 +29,12 @@ WriterSharedState::get(Server::Configuration::ServerFactoryContext& context) {
 
 void WriterSharedState::pauseDependentTypes(absl::string_view resource_type_url,
                                             Config::XdsManager& xds_manager, MonotonicTime now) {
-  if (dependent_type_pause_ == nullptr) {
-    dependent_type_pause_ = xds_manager.pause(Config::dependentTypeUrls(resource_type_url));
+  if (dependent_type_pauses_.empty()) {
     dependent_type_pause_start_ = now;
+  }
+  auto [it, inserted] = dependent_type_pauses_.try_emplace(resource_type_url);
+  if (inserted) {
+    it->second = xds_manager.pause(Config::dependentTypeUrls(resource_type_url));
   }
 }
 
@@ -43,14 +46,14 @@ void WriterSharedState::onApplyPassDone(const void* writer, bool burst_applied, 
   }
   // Modules that write all the time must not hold back these requests for long.
   if (writers_applying_.empty() || now - dependent_type_pause_start_ >= MaxDependentTypePause) {
-    dependent_type_pause_.reset();
+    dependent_type_pauses_.clear();
   }
 }
 
 void WriterSharedState::onShutdown(const void* writer) {
   writers_applying_.erase(writer);
   if (writers_applying_.empty()) {
-    dependent_type_pause_.reset();
+    dependent_type_pauses_.clear();
   }
 }
 

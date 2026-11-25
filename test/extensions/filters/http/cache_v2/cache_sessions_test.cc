@@ -306,6 +306,72 @@ TEST_F(CacheSessionsTest, CacheSessionsEntriesExpireOnAdjacentLookup) {
   EXPECT_THAT(captured_lookup_callbacks_.size(), Eq(3));
 }
 
+TEST_F(CacheSessionsTest, CacheSessionsEntryExpiresOnLookupsOfOtherResources) {
+  const std::vector<std::string> paths{"/a", "/b", "/c", "/d", "/e", "/f", "/g", "/h"};
+  for (const std::string& path : paths) {
+    // Each path is looked up in the cache when its entry is created, and again when the entry is
+    // created after it expired.
+    EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath(path), _)).Times(2);
+    EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath(path), _)).Times(2 * paths.size());
+    cache_sessions_->lookup(testLookupRequest(path), [](ActiveLookupResultPtr) {});
+  }
+  pumpDispatcher();
+  auto entries = mock_factory_context_.server_factory_context_.store_.findGaugeByString(
+      "cache.cache_sessions_entries.cache_label.mock_cache");
+  ASSERT_TRUE(entries.has_value());
+  EXPECT_EQ(entries.value().get().value(), paths.size());
+  // Each path takes a turn as the only expired entry, so the test does not depend on where the
+  // table puts any one entry.
+  for (const std::string& stale : paths) {
+    SCOPED_TRACE(stale);
+    advanceTime(std::chrono::minutes(4));
+    for (const std::string& path : paths) {
+      if (path != stale) {
+        cache_sessions_->lookup(testLookupRequest(path), [](ActiveLookupResultPtr) {});
+      }
+    }
+    // Entries expire 5 minutes after their last request, so only the stale one has expired.
+    advanceTime(std::chrono::minutes(2));
+    // Each request removes the entry after the one it touches if that entry has expired.
+    for (const std::string& path : paths) {
+      if (path != stale) {
+        cache_sessions_->lookup(testLookupRequest(path), [](ActiveLookupResultPtr) {});
+      }
+    }
+    EXPECT_EQ(entries.value().get().value(), paths.size() - 1);
+    pumpDispatcher();
+    const size_t lookups = captured_lookup_callbacks_.size();
+    // The expired entry was removed, so this request has a new lookup.
+    cache_sessions_->lookup(testLookupRequest(stale), [](ActiveLookupResultPtr) {});
+    pumpDispatcher();
+    EXPECT_EQ(captured_lookup_callbacks_.size(), lookups + 1);
+    EXPECT_EQ(entries.value().get().value(), paths.size());
+  }
+}
+
+TEST_F(CacheSessionsTest, CacheSessionsEntryExpiresOnLookupOfNewResource) {
+  constexpr size_t lookups = 9;
+  for (size_t i = 0; i < lookups; i++) {
+    const std::string path = absl::StrCat("/", i);
+    EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath(path), _));
+    EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath(path), _));
+  }
+  auto entries = mock_factory_context_.server_factory_context_.store_.findGaugeByString(
+      "cache.cache_sessions_entries.cache_label.mock_cache");
+  ASSERT_TRUE(entries.has_value());
+  cache_sessions_->lookup(testLookupRequest("/0"), [](ActiveLookupResultPtr) {});
+  // Each request creates a new entry after the previous one expired. In a table of two entries
+  // the entry after the new one is always the old one, so each request removes it.
+  for (size_t i = 1; i < lookups; i++) {
+    SCOPED_TRACE(i);
+    advanceTime(std::chrono::minutes(6));
+    cache_sessions_->lookup(testLookupRequest(absl::StrCat("/", i)), [](ActiveLookupResultPtr) {});
+    EXPECT_EQ(entries.value().get().value(), 1U);
+  }
+  pumpDispatcher();
+  EXPECT_THAT(captured_lookup_callbacks_.size(), Eq(lookups));
+}
+
 TEST_F(CacheSessionsTest, CacheDeletionDuringLookupStillCompletesLookup) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
@@ -619,6 +685,141 @@ TEST_F(CacheSessionsTest, CacheHitGoesDirectlyToCachedResponses) {
               Call(Pointee(IsSupersetOfHeaders(response_trailers)), EndStream::End));
   result->http_source_->getTrailers(trailer_callback.AsStdFunction());
   pumpDispatcher();
+}
+
+class CacheSessionsValidationTest : public CacheSessionsTest,
+                                    public testing::WithParamInterface<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(UncacheableOrVary, CacheSessionsValidationTest, testing::Bool());
+
+TEST_P(CacheSessionsValidationTest, UncacheableValidationEvictsAndRefetches) {
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(3);
+  EXPECT_CALL(*mock_http_cache_, updateHeaders).Times(0);
+  EXPECT_CALL(*mock_http_cache_, insert).Times(0);
+  ActiveLookupResultPtr result1, result2, result3;
+  auto request_headers = requestHeaders("/a");
+  request_headers.addCopy("cookie", "user=alice");
+  cache_sessions_->lookup(testLookupRequest(request_headers),
+                          [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
+  pumpDispatcher();
+
+  auto cached_headers = cacheableResponseHeaders(5);
+  cached_headers->setCopy(Http::CustomHeaders::get().CacheControl, "public, max-age=0");
+  cached_headers->setCopy(Http::CustomHeaders::get().Etag, "\"v1\"");
+  ResponseMetadata metadata;
+  metadata.response_time_ = api_->timeSource().systemTime() - std::chrono::seconds(1);
+  consumeCallback(captured_lookup_callbacks_[0])(
+      LookupResult{std::make_unique<testing::StrictMock<MockCacheReader>>(),
+                   std::move(cached_headers), nullptr, metadata, 5});
+  pumpDispatcher();
+  ASSERT_EQ(fake_upstream_sent_headers_.size(), 1);
+  EXPECT_THAT(fake_upstream_sent_headers_[0], Pointee(HasHeader("if-none-match", "\"v1\"")));
+
+  // A second user's request waits on the same validation.
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
+  const std::string validation_cache_control =
+      GetParam() ? "public, max-age=60" : "private, max-age=60";
+  EXPECT_CALL(*mock_cacheable_response_checker_,
+              isCacheableResponse(AllOf(
+                  HasHeader(":status", "200"), HasHeader("cache-control", validation_cache_control),
+                  HasHeader("content-length", "5"), HasHeader("set-cookie", "sid=alice-secret"))))
+      .WillOnce(Return(GetParam()));
+  EXPECT_CALL(*mock_http_cache_, evict(_, KeyHasPath("/a")));
+  auto validation_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl{{":status", "304"},
+                                      {"etag", "\"v1\""},
+                                      {"cache-control", validation_cache_control},
+                                      {"set-cookie", "sid=alice-secret"}});
+  if (GetParam()) {
+    // Vary must also be rejected, even if the configured checker allows it.
+    validation_headers->addCopy("vary", "cookie");
+  }
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(std::move(validation_headers),
+                                                           EndStream::End);
+  pumpDispatcher();
+  ASSERT_EQ(fake_upstream_sent_headers_.size(), 2);
+  EXPECT_THAT(fake_upstream_sent_headers_[1],
+              Pointee(AllOf(HasNoHeader("if-none-match"), HasHeader("cookie", "user=alice"))));
+  EXPECT_THAT(result1, IsNull());
+  EXPECT_THAT(result2, IsNull());
+
+  // An uncacheable full response goes only to Alice; Bob gets his own upstream.
+  EXPECT_CALL(*mock_cacheable_response_checker_, isCacheableResponse).WillOnce(Return(false));
+  auto private_headers = cacheableResponseHeaders(5);
+  private_headers->setCopy(Http::CustomHeaders::get().CacheControl, "private, max-age=60");
+  private_headers->addCopy(Http::Headers::get().SetCookie, "sid=alice-secret");
+  consumeCallback(fake_upstream_get_headers_callbacks_[1])(std::move(private_headers),
+                                                           EndStream::More);
+  pumpDispatcher();
+  ASSERT_THAT(result1, NotNull());
+  ASSERT_THAT(result2, NotNull());
+  EXPECT_EQ(result1->status_, CacheEntryStatus::Uncacheable);
+  EXPECT_EQ(result2->status_, CacheEntryStatus::Uncacheable);
+  ASSERT_EQ(fake_upstreams_.size(), 3);
+  EXPECT_EQ(result2->http_source_.get(), fake_upstreams_[2]);
+  EXPECT_THAT(fake_upstream_sent_headers_[2],
+              Pointee(AllOf(HasNoHeader("cookie"), HasNoHeader("if-none-match"))));
+
+  // Subsequent requests must also go upstream instead of using the evicted entry.
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result3](ActiveLookupResultPtr r) { result3 = std::move(r); });
+  pumpDispatcher();
+  ASSERT_THAT(result3, NotNull());
+  EXPECT_EQ(result3->status_, CacheEntryStatus::Uncacheable);
+  ASSERT_EQ(fake_upstreams_.size(), 4);
+}
+
+class CacheableValidationTest : public CacheSessionsTest,
+                                public testing::WithParamInterface<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(RequestNoStore, CacheableValidationTest, testing::Bool());
+
+TEST_P(CacheableValidationTest, ChecksMergedHeadersAndKeepsCachedEntry) {
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
+  EXPECT_CALL(*mock_http_cache_, evict).Times(0);
+  EXPECT_CALL(*mock_http_cache_, insert).Times(0);
+  auto request_headers = requestHeaders("/a");
+  request_headers.addCopy("cache-control", GetParam() ? "no-cache, no-store" : "no-cache");
+  ActiveLookupResultPtr result;
+  cache_sessions_->lookup(testLookupRequest(request_headers),
+                          [&result](ActiveLookupResultPtr r) { result = std::move(r); });
+  pumpDispatcher();
+  auto cached_headers = cacheableResponseHeaders(5);
+  cached_headers->setCopy(Http::CustomHeaders::get().CacheControl, "public, max-age=60");
+  cached_headers->setCopy(Http::CustomHeaders::get().Etag, "\"v1\"");
+  ResponseMetadata metadata;
+  metadata.response_time_ = api_->timeSource().systemTime() - std::chrono::seconds(1);
+  consumeCallback(captured_lookup_callbacks_[0])(
+      LookupResult{std::make_unique<testing::StrictMock<MockCacheReader>>(),
+                   std::move(cached_headers), nullptr, metadata, 5});
+  pumpDispatcher();
+  ASSERT_EQ(fake_upstream_get_headers_callbacks_.size(), 1);
+  // A 304 can omit Cache-Control. Check cacheability after inheriting it and the status.
+  EXPECT_CALL(*mock_cacheable_response_checker_,
+              isCacheableResponse(AllOf(HasHeader(":status", "200"),
+                                        HasHeader("cache-control", "public, max-age=60"),
+                                        HasHeader("content-length", "5"))))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*mock_http_cache_, updateHeaders(_, KeyHasPath("/a"), _, _));
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(
+      std::make_unique<Http::TestResponseHeaderMapImpl>(
+          Http::TestResponseHeaderMapImpl{{":status", "304"}, {"etag", "\"v1\""}}),
+      EndStream::End);
+  pumpDispatcher();
+  ASSERT_THAT(result, NotNull());
+  EXPECT_EQ(result->status_, CacheEntryStatus::Validated);
+
+  // The request's no-store directive must not remove the shared entry for later requests.
+  ActiveLookupResultPtr next_result;
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&next_result](ActiveLookupResultPtr r) { next_result = std::move(r); });
+  pumpDispatcher();
+  ASSERT_THAT(next_result, NotNull());
+  EXPECT_EQ(next_result->status_, CacheEntryStatus::Hit);
+  EXPECT_EQ(fake_upstream_sent_headers_.size(), 1);
 }
 
 TEST_F(CacheSessionsTest, CacheInsertFailureResetsLookupsAndWillLookupAgain) {

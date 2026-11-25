@@ -21,8 +21,9 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.network.set_filter_state"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/router:string_accessor_lib",

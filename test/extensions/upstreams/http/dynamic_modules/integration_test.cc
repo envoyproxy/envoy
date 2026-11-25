@@ -3,7 +3,6 @@
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/logging.h"
 
 namespace Envoy {
 namespace {
@@ -137,9 +136,9 @@ TEST_P(DynamicModuleBridgeIntegrationTest, LocalReplyBeforeDownstreamEndStream) 
   EXPECT_EQ("access denied", response_->body());
 }
 
-// The upstream HTTP bridge loads its module lazily on the data path and has no factory context, so
-// a missing module is visible only through the loader error log.
-TEST_P(DynamicModuleBridgeIntegrationTest, ModuleLoadFailureLogsAtRuntime) {
+// The bridge loads its module when the cluster is created, so a missing module rejects the cluster,
+// which here is a static cluster of the bootstrap.
+TEST_P(DynamicModuleBridgeIntegrationTest, ModuleLoadFailureRejectsTheCluster) {
   TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", "/should/not/find/this/path", 1);
 
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -156,14 +155,7 @@ TEST_P(DynamicModuleBridgeIntegrationTest, ModuleLoadFailureLogsAtRuntime) {
         cluster->mutable_upstream_config()->mutable_typed_config()->PackFrom(proto_config);
   });
 
-  initialize();
-
-  EXPECT_LOG_CONTAINS("error", "Unable to load dynamic module libnonexistent_module", {
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    auto response = codec_client_->makeHeaderOnlyRequest(request_headers_);
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_EQ("503", response->headers().getStatusValue());
-  });
+  EXPECT_DEATH(initialize(), "nonexistent_module");
 }
 
 } // namespace

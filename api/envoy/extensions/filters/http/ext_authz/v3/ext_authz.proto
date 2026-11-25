@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 35]
+// [#next-free-field: 36]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -77,6 +77,21 @@ message ExtAuthz {
   // Enables the filter to buffer the client request body and send it within the authorization request.
   // The ``x-envoy-auth-partial-body: false|true`` metadata header will be added to the authorization
   // request indicating whether the body data is partial.
+  //
+  // .. note::
+  //
+  //   ``with_request_body`` is intended only for standard HTTP request bodies. For WebSocket upgrade
+  //   requests (HTTP/1.1 ``Connection: upgrade`` with ``Upgrade: websocket``, or HTTP/2 and HTTP/3
+  //   extended ``CONNECT`` with ``:protocol = websocket``), request body buffering is skipped and the
+  //   authorization check is dispatched upon receiving request headers with an empty body and without
+  //   the ``x-envoy-auth-partial-body`` metadata header, even if downstream data follows on the stream.
+  //
+  //   For routes that accept ``CONNECT``, non-WebSocket extended ``CONNECT``, or non-WebSocket
+  //   ``Upgrade`` tunnels, disable request body buffering on the route via
+  //   :ref:`disable_request_body_buffering
+  //   <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.disable_request_body_buffering>`
+  //   so the filter does not wait to buffer tunnel stream data before dispatching the authorization
+  //   check.
   BufferSettings with_request_body = 5;
 
   // Clears the route cache in order to allow the external authorization service to correctly affect
@@ -317,6 +332,26 @@ message ExtAuthz {
   // It is set to ``false`` by default for backwards compatibility.
   bool encode_raw_headers = 23;
 
+  // Whether to read header values from :ref:`HeaderValue.raw_value
+  // <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` in gRPC authorization responses
+  // (:ref:`CheckResponse <envoy_v3_api_msg_service.auth.v3.CheckResponse>`).
+  //
+  // When set to ``true``, each header value in gRPC ``OK``, ``denied``, and ``error`` responses is
+  // read from ``HeaderValue.raw_value`` when non-empty, falling back to
+  // :ref:`HeaderValue.value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` when
+  // ``raw_value`` is empty. This allows gRPC authorization servers to return non-UTF-8 header
+  // values while remaining compatible with servers that populate ``value``.
+  //
+  // When set to ``false``, only ``HeaderValue.value`` is read and ``HeaderValue.raw_value`` is
+  // ignored.
+  //
+  // .. note::
+  //   This field applies exclusively to the gRPC ext_authz service and has no effect on the HTTP
+  //   service.
+  //
+  // Defaults to ``false``.
+  bool read_raw_header_value = 35;
+
   // Rules for what modifications an ext_authz server may make to the request headers before
   // continuing decoding or forwarding upstream.
   //
@@ -451,7 +486,10 @@ message ShadowDecision {
 
   // Response headers the auth server asked to set on a denied response
   // (e.g. ``WWW-Authenticate``, ``Set-Cookie``). Populated for ``DENIED`` only.
-  // Preserves ordering and duplicate header names.
+  // Preserves ordering and duplicate header names. For each header,
+  // :ref:`value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` is populated for valid
+  // UTF-8 values, and :ref:`raw_value
+  // <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` is populated for non-UTF-8 values.
   repeated config.core.v3.HeaderValue response_headers = 3;
 }
 

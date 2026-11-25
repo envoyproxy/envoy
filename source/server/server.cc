@@ -44,6 +44,7 @@
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/breaking_changes.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/runtime/runtime_keys.h"
 #include "source/common/signal/fatal_error_handler.h"
@@ -60,6 +61,8 @@
 #include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
 #include "source/server/utils.h"
+
+#include "absl/flags/flag.h"
 
 namespace Envoy {
 namespace Server {
@@ -415,6 +418,8 @@ absl::Status InstanceUtil::loadBootstrapConfig(
     bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap, validation_visitor);
+  absl::SetFlag(&FLAGS_breaking_change_observability_enabled,
+                bootstrap.enable_breaking_changes_observability());
   return absl::OkStatus();
 }
 
@@ -1243,6 +1248,10 @@ void InstanceBase::notifyCallbacksForStage(Stage stage, std::function<void()> co
 ProtobufTypes::MessagePtr InstanceBase::dumpBootstrapConfig() {
   auto config_dump = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
   config_dump->mutable_bootstrap()->MergeFrom(bootstrap_);
+  // Report the live node's dynamic context, which bootstrap extensions can set via the context
+  // provider and which otherwise only appears in xDS discovery requests.
+  *config_dump->mutable_bootstrap()->mutable_node()->mutable_dynamic_parameters() =
+      localInfo().node().dynamic_parameters();
   TimestampUtil::systemClockToTimestamp(bootstrap_config_update_time_,
                                         *(config_dump->mutable_last_updated()));
   return config_dump;

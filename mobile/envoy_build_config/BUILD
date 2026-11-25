@@ -62,6 +62,7 @@ envoy_cc_library(
         "@envoy//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
         "@envoy//source/extensions/config_subscription/grpc:grpc_mux_lib",
         "@envoy//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+        "@envoy//source/extensions/config_subscription/grpc/xds_mux:grpc_mux_lib",
     ]),
 )
 

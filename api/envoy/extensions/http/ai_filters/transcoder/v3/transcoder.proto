@@ -16,7 +16,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Transcoder AI filter]
 // Transcoder AI filter :ref:`configuration overview
-// <config_http_filters_ai_protocol_manager_ai_filters>`.
+// <config_http_ai_filters_transcoder>`.
 // [#extension: envoy.http.ai_filters.transcoder]
 
 // Rewrites an AI request or response payload from one vendor's API schema into another's, using

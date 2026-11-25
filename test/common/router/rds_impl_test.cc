@@ -562,6 +562,14 @@ TEST_F(RdsImplTest, UnknownFacotryForPerRouteTypedConfig) {
       EnvoyException,
       "Didn't find a registered implementation for 'filter.unknown' with type URL: "
       "'google.protobuf.Struct'");
+
+  // The rejected configuration is rejected again when it is resent.
+  EXPECT_THROW_WITH_MESSAGE(
+      EXPECT_OK(
+          rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info())),
+      EnvoyException,
+      "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+      "'google.protobuf.Struct'");
 }
 
 // Validates behavior when the config is delivered but it fails PGV validation.
@@ -983,6 +991,19 @@ parseRouteConfigurationFromV3Yaml(const std::string& yaml) {
   envoy::config::route::v3::RouteConfiguration route_config;
   TestUtility::loadFromYaml(yaml, route_config);
   return route_config;
+}
+
+TEST_F(RouteConfigProviderManagerImplTest, ConfigDumpDuringProviderDestruction) {
+  setup();
+  outer_init_manager_.initialize(init_watcher_);
+
+  init_watcher_.expectReady().WillOnce([this]() {
+    UniversalStringMatcher name_matcher;
+    const auto config_dump = route_config_provider_manager_->dumpRouteConfigs(name_matcher);
+    EXPECT_TRUE(config_dump->dynamic_route_configs().empty());
+  });
+
+  provider_.reset();
 }
 
 TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {

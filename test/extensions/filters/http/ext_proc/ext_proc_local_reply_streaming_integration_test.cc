@@ -457,6 +457,31 @@ TEST_P(ExtProcLocalReplyStreamingIntegrationTest, TimeoutWaitingForLocalResponse
   ASSERT_TRUE(response->waitForReset());
 }
 
+// Regression test for a streamed immediate response whose headers omit the mandatory `:status`
+// pseudo-header. Previously the header map was passed straight to encodeHeaders() and tripped an
+// ENVOY_BUG in debug builds; the filter now rejects it and surfaces the configured
+// `status_on_error` (default 500) to the downstream client.
+TEST_P(ExtProcLocalReplyStreamingIntegrationTest, LocalResponseHeadersMissingStatus) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(std::nullopt);
+
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest&, ProcessingResponse& resp) {
+        auto* local_response_headers =
+            resp.mutable_streamed_immediate_response()->mutable_headers_response();
+        local_response_headers->set_end_of_stream(true);
+        // Deliberately omit `:status` so the header map is invalid as an HTTP response.
+        auto* header = local_response_headers->mutable_headers()->add_headers();
+        header->set_key("x-some-other-header");
+        header->set_raw_value("no");
+        return true;
+      });
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyDownstreamResponse(*response, 500);
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters

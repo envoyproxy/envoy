@@ -1,5 +1,7 @@
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 
+#include "source/common/stream_info/stream_id_provider_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -85,6 +87,14 @@ void DynamicModuleNetworkFilter::initializeWriteFilterCallbacks(
 }
 
 Network::FilterStatus DynamicModuleNetworkFilter::onNewConnection() {
+  // A connection closed before this call raises no later close event to stop the flush timer.
+  if (!config_->access_logs_.empty() && connection().state() == Network::Connection::State::Open) {
+    startAccessLogs();
+    // An access logger can close the connection while it writes the start record.
+    if (connection().state() != Network::Connection::State::Open) {
+      return Network::FilterStatus::StopIteration;
+    }
+  }
   HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     if (read_callbacks_ != nullptr) {
@@ -92,6 +102,7 @@ Network::FilterStatus DynamicModuleNetworkFilter::onNewConnection() {
     }
     return Network::FilterStatus::StopIteration;
   }
+  new_connection_passed_to_module_ = true;
   auto status = config_->on_network_filter_new_connection_(thisAsVoidPtr(), in_module_filter_);
   return toEnvoyFilterStatus(status);
 }
@@ -128,12 +139,71 @@ Network::FilterStatus DynamicModuleNetworkFilter::onWrite(Buffer::Instance& data
 }
 
 void DynamicModuleNetworkFilter::onEvent(Network::ConnectionEvent event) {
+  if (!config_->access_logs_.empty() && (event == Network::ConnectionEvent::RemoteClose ||
+                                         event == Network::ConnectionEvent::LocalClose)) {
+    connection().streamInfo().downstreamTiming().onDownstreamConnectionEnd(
+        connection().dispatcher().timeSource());
+    // The filter can outlive the connection, so the timer is destroyed here on the worker.
+    access_log_flush_timer_.reset();
+  }
   HookScope hook_scope(*this);
   if (in_module_filter_ == nullptr) {
     return;
   }
   config_->on_network_filter_event_(thisAsVoidPtr(), in_module_filter_,
                                     toAbiConnectionEvent(event));
+}
+
+void DynamicModuleNetworkFilter::log(const Formatter::Context& log_context,
+                                     const StreamInfo::StreamInfo& stream_info) {
+  for (const AccessLog::InstanceSharedPtr& access_log : config_->access_logs_) {
+    access_log->log(log_context, stream_info);
+  }
+}
+
+void DynamicModuleNetworkFilter::flushAccessLog(AccessLog::AccessLogType access_log_type) {
+  if (config_->access_logs_.empty()) {
+    return;
+  }
+  const StreamInfo::StreamInfo& stream_info = connection().streamInfo();
+  const Formatter::Context log_context{nullptr, nullptr, nullptr, {}, access_log_type};
+  log(log_context, stream_info);
+  if (access_log_type != AccessLog::AccessLogType::TcpPeriodic) {
+    return;
+  }
+  const SystemTime now = connection().dispatcher().timeSource().systemTime();
+  if (const StreamInfo::BytesMeterSharedPtr& meter = stream_info.getDownstreamBytesMeter();
+      meter != nullptr) {
+    meter->takeDownstreamPeriodicLoggingSnapshot(now);
+  }
+  if (const StreamInfo::BytesMeterSharedPtr& meter = stream_info.getUpstreamBytesMeter();
+      meter != nullptr) {
+    meter->takeDownstreamPeriodicLoggingSnapshot(now);
+  }
+}
+
+void DynamicModuleNetworkFilter::startAccessLogs() {
+  StreamInfo::StreamInfo& stream_info = connection().streamInfo();
+  if (!stream_info.getStreamIdProvider().has_value()) {
+    stream_info.setStreamIdProvider(
+        std::make_shared<StreamInfo::StreamIdProviderImpl>(config_->random_generator_->uuid()));
+  }
+  if (config_->access_log_flush_interval_.has_value()) {
+    access_log_flush_timer_ =
+        connection().dispatcher().createTimer([this]() -> void { onAccessLogFlushInterval(); });
+    access_log_flush_timer_->enableTimer(*config_->access_log_flush_interval_);
+  }
+  if (config_->flush_access_log_on_start_) {
+    flushAccessLog(AccessLog::AccessLogType::TcpConnectionStart);
+  }
+}
+
+void DynamicModuleNetworkFilter::onAccessLogFlushInterval() {
+  flushAccessLog(AccessLog::AccessLogType::TcpPeriodic);
+  // An access logger can close the connection, which destroys the timer.
+  if (access_log_flush_timer_ != nullptr) {
+    access_log_flush_timer_->enableTimer(*config_->access_log_flush_interval_);
+  }
 }
 
 void DynamicModuleNetworkFilter::onScheduled(uint64_t event_id) {
