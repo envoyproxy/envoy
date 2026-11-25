@@ -299,27 +299,57 @@ TEST_P(McpAiFilterIntegrationTest, PassThroughForwardsABodyThatIsNotJson) {
   test_server_->waitForCounter("ai_protocol_manager.request_parse_error", testing::Eq(1));
 }
 
-// The manager's parser takes no body that repeats a key, so the MCP filter has no document for
-// one.
-TEST_P(McpAiFilterIntegrationTest, PassThroughForwardsABodyThatRepeatsAKey) {
+// A body that ends too soon keeps the attributes that were read, and goes upstream as it arrived.
+TEST_P(McpAiFilterIntegrationTest, PassThroughForwardsABodyThatEndsEarly) {
+  captureMetadata();
   initializeFilter();
-  const std::string body = R"({"jsonrpc": "2.0", "method": "tools/list", "id": 1, "id": 2})";
+  const std::string body = R"({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {)";
 
   auto response = roundTrip(postHeaders(), body);
 
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(body, upstream_request_->body().toString());
-  test_server_->waitForCounter("ai_protocol_manager.request_parse_error", testing::Eq(1));
+  EXPECT_THAT(metadata_json_, testing::HasSubstr(R"("method":"tools/call")"));
+  EXPECT_THAT(metadata_json_, testing::HasSubstr(R"("passthrough_reason":"mcp_parse_error")"));
+  EXPECT_EQ(0, test_server_->counter("ai_protocol_manager.mcp.invalid_json")->value());
 }
 
-TEST_P(McpAiFilterIntegrationTest, RejectModeRejectsABodyThatRepeatsAKey) {
+TEST_P(McpAiFilterIntegrationTest, RejectModeRejectsABodyThatEndsEarly) {
   initializeFilter("traffic_mode: REJECT_NO_MCP");
+
+  auto response = rejected(postHeaders(), R"({"jsonrpc": "2.0", "id": 1, "method": "tools/call")");
+
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("don't get enough data"));
+}
+
+// With the MCP filter in the chain the manager parses a body that repeats a key: the last value
+// is the one published, and the body goes upstream as it arrived.
+TEST_P(McpAiFilterIntegrationTest, TakesABodyThatRepeatsAKey) {
+  captureMetadata();
+  initializeFilter("traffic_mode: REJECT_NO_MCP");
+  const std::string body =
+      R"({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "method": "tools/call",)"
+      R"( "params": {"name": "test_tool"}})";
+
+  auto response = roundTrip(postHeaders(), body);
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(body, upstream_request_->body().toString());
+  EXPECT_THAT(metadata_json_, testing::HasSubstr(R"("method":"tools/call")"));
+  EXPECT_THAT(metadata_json_, testing::HasSubstr(R"("name":"test_tool")"));
+  EXPECT_EQ(0, test_server_->counter("ai_protocol_manager.request_parse_error")->value());
+}
+
+TEST_P(McpAiFilterIntegrationTest, RejectsABodyThatRepeatsAKeyWhenConfigured) {
+  initializeFilter("traffic_mode: REJECT_NO_MCP\nreject_duplicate_keys: true");
 
   auto response =
       rejected(postHeaders(), R"({"jsonrpc": "2.0", "method": "tools/list", "id": 1, "id": 2})");
 
   EXPECT_EQ("400", response->headers().getStatusValue());
-  EXPECT_EQ("not a valid JSON", response->body());
+  EXPECT_EQ("duplicate JSON keys detected", response->body());
+  test_server_->waitForCounter("ai_protocol_manager.mcp.duplicate_keys_rejected", testing::Eq(1));
 }
 
 TEST_P(McpAiFilterIntegrationTest, AnswersAHeaderMismatchWithAJsonRpcError) {

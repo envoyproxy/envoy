@@ -198,7 +198,14 @@ no document to run the AI filters over. Each AI filter may answer such a request
 with a local reply of its own; when none does, the request without a body is
 forwarded and the one that is not JSON is rejected with a 400. An AI filter may
 instead have a request that is not JSON forwarded as it arrived: no AI filter
-runs on it or on its response.
+runs on it or on its response. The filter is given what the parser had read of
+such a body, and whether the body ended too soon or stopped being JSON.
+
+A body in which an object repeats a key is not JSON to the filter, and is
+rejected, unless an AI filter of the chain accepts repeated keys. The body is
+then parsed, the document holds the last value of the key, and every AI filter
+of the chain sees it. Of the AI filters here only the :ref:`MCP filter
+<config_http_ai_filters_mcp>` does.
 
 A route configures an AI filter with :ref:`typed_per_filter_config
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.typed_per_filter_config>`,

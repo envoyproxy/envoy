@@ -17,6 +17,7 @@ envoy_cc_library(
         "//envoy/http:codes_interface",
         "//envoy/http:header_map_interface",
         "//envoy/stream_info:stream_info_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_request_lib",
         "//source/extensions/filters/http/mcp:mcp_filter_lib",

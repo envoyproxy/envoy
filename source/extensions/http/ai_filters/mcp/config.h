@@ -36,6 +36,7 @@ public:
   // The inspector reads attributes out of the parsed document, so it needs every string a request
   // within the body size limit can hold.
   std::optional<uint32_t> requestInlineStringBytes(const Protobuf::Message& config) override;
+  bool allowsDuplicateRequestKeys(const Protobuf::Message&) override { return true; }
 
   std::string name() const override { return "envoy.http.ai_filters.mcp"; }
 };

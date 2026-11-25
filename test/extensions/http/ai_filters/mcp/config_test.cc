@@ -97,6 +97,11 @@ TEST_F(McpAiFilterConfigTest, AsksForStringsUpToTheBodySizeLimitInline) {
   EXPECT_EQ(factory_.requestInlineStringBytes(proto), std::numeric_limits<uint32_t>::max());
 }
 
+// The inspector decides what a repeated key means, so the manager must not reject it first.
+TEST_F(McpAiFilterConfigTest, TakesRequestsThatRepeatAKey) {
+  EXPECT_TRUE(factory_.allowsDuplicateRequestKeys(McpProto()));
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace AiFilters

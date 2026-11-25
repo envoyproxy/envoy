@@ -211,6 +211,14 @@ struct AiFilterContext {
   Router::RouteSpecificFilterConfigConstSharedPtr route_config{};
   // Drops the cached route, so the request is routed again by the headers the chain leaves.
   std::function<void()> clear_route_cache{[] {}};
+  // True if the headers ended the request, so there was no body frame at all.
+  bool request_ended_on_headers{false};
+  // True if an object in the body repeated a key. The document keeps the last value. Only
+  // possible when an AI filter of the chain allows repeated keys.
+  bool request_has_duplicate_keys{false};
+  // What the parser had read of a body that is not JSON. Set only for
+  // onUnparsedRequest(InvalidJson), and valid only during that call.
+  const PartialJson* partial_request{nullptr};
 };
 
 // Creates one AiFilter per stream, or nullptr to skip the stream; built once at config load.
@@ -243,6 +251,11 @@ public:
   virtual std::optional<uint32_t> requestInlineStringBytes(const Protobuf::Message&) {
     return std::nullopt;
   }
+
+  // Whether the filter accepts a request body in which an object repeats a key. If any filter
+  // of the chain does, the manager parses such a body instead of rejecting it, and every filter
+  // of the chain sees it.
+  virtual bool allowsDuplicateRequestKeys(const Protobuf::Message&) { return false; }
 
   std::set<std::string> configTypes() override {
     std::set<std::string> config_types = TypedFactory::configTypes();

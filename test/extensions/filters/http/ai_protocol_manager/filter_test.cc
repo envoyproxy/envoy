@@ -192,7 +192,8 @@ public:
       AiFilterFactories ai_filter_factories,
       envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::
           BodyReserialization reserialize_body =
-              envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS) {
+              envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS,
+      bool allow_duplicate_request_keys = false) {
     if (filter_ != nullptr) {
       filter_->onDestroy();
     }
@@ -200,7 +201,8 @@ public:
     proto.mutable_request_handling()->set_parse_unconfigured_routes(true);
     proto.mutable_request_handling()->set_reserialize_body(reserialize_body);
     filter_ = std::make_unique<AiProtocolManagerFilter>(std::make_shared<const FilterConfig>(
-        proto, *stats_store_.rootScope(), std::move(ai_filter_factories), factory_));
+        proto, *stats_store_.rootScope(), std::move(ai_filter_factories), factory_,
+        /*min_inline_string_threshold_bytes=*/0, allow_duplicate_request_keys));
     filter_->setDecoderFilterCallbacks(callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -2985,6 +2987,135 @@ TEST_F(AiProtocolManagerFilterTest, AiFilterAnswersARequestOfOnlyTrailers) {
 
   EXPECT_THAT(seen, testing::ElementsAre(UnparsedRequest::NoBody));
   EXPECT_EQ(local_reply_calls_, 1);
+}
+
+// What the manager tells an AI filter about the request body, besides the document.
+struct SeenBody {
+  bool ended_on_headers;
+  bool has_duplicate_keys;
+  std::optional<PartialJson> partial;
+};
+
+AiFilterFactories recordingTheBody(std::vector<SeenBody>& seen) {
+  return {[&seen](const AiFilterContext& context) -> AiFilterSharedPtr {
+    seen.push_back({context.request_ended_on_headers, context.request_has_duplicate_keys,
+                    context.partial_request != nullptr
+                        ? std::make_optional(*context.partial_request)
+                        : std::nullopt});
+    return std::make_shared<PassThroughAiFilter>();
+  }};
+}
+
+TEST_F(AiProtocolManagerFilterTest, AiFilterContextTellsAHeadersOnlyRequestFromAnEmptyBody) {
+  std::vector<SeenBody> seen;
+  createFilterWithAiFilters(recordingTheBody(seen));
+  setRouteConfig();
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/chat/completions"}};
+  EXPECT_EQ(filter_->decodeHeaders(headers, true), Http::FilterHeadersStatus::Continue);
+
+  createFilterWithAiFilters(recordingTheBody(seen));
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl body;
+  filter_->decodeData(body, true);
+  drain();
+
+  ASSERT_EQ(seen.size(), 2);
+  EXPECT_TRUE(seen[0].ended_on_headers);
+  EXPECT_FALSE(seen[1].ended_on_headers);
+  EXPECT_FALSE(seen[0].partial.has_value());
+  EXPECT_FALSE(seen[1].partial.has_value());
+}
+
+// A filter that answers a payload the parser gave up on can still use what was read of it.
+TEST_F(AiProtocolManagerFilterTest, AiFilterContextCarriesWhatWasReadOfAPayloadThatEndsEarly) {
+  std::vector<SeenBody> seen;
+  createFilterWithAiFilters(recordingTheBody(seen));
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","params":{"name":)");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+
+  ASSERT_EQ(seen.size(), 1);
+  ASSERT_TRUE(seen[0].partial.has_value());
+  EXPECT_TRUE(seen[0].partial->ended_early);
+  EXPECT_EQ(seen[0].partial->json, nlohmann::json::parse(R"({"model":"gpt-4","params":{}})"));
+  EXPECT_THAT(seen[0].partial->open_keys, testing::ElementsAre("", "params"));
+  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
+}
+
+TEST_F(AiProtocolManagerFilterTest, AiFilterContextCarriesWhatWasReadOfAPayloadThatIsNotJson) {
+  std::vector<SeenBody> seen;
+  createFilterWithAiFilters(recordingTheBody(seen));
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl first(R"({"model":"gpt-4" )");
+  EXPECT_EQ(filter_->decodeData(first, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Buffer::OwnedImpl second(R"(oops})");
+  EXPECT_EQ(filter_->decodeData(second, true), Http::FilterDataStatus::StopIterationNoBuffer);
+
+  ASSERT_EQ(seen.size(), 1);
+  ASSERT_TRUE(seen[0].partial.has_value());
+  EXPECT_FALSE(seen[0].partial->ended_early);
+  EXPECT_EQ(seen[0].partial->json, nlohmann::json::parse(R"({"model":"gpt-4"})"));
+}
+
+// A repeated key is the manager's to reject unless an AI filter of the chain takes it.
+TEST_F(AiProtocolManagerFilterTest, PayloadThatRepeatsAKeyIsRejectedByDefault) {
+  std::vector<SeenBody> seen;
+  createFilterWithAiFilters(recordingTheBody(seen));
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"a","model":"b"})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+
+  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
+  EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_FALSE(seen[0].has_duplicate_keys);
+}
+
+TEST_F(AiProtocolManagerFilterTest, PayloadThatRepeatsAKeyRunsTheChainWhenAnAiFilterAllowsIt) {
+  std::vector<SeenBody> seen;
+  createFilterWithAiFilters(
+      recordingTheBody(seen),
+      envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS,
+      /*allow_duplicate_request_keys=*/true);
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"a","model":"b"})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_TRUE(seen[0].has_duplicate_keys);
+  EXPECT_FALSE(seen[0].partial.has_value());
+  // The document keeps the last value.
+  EXPECT_EQ(injected_.toString(), R"({"model":"b"})");
+  EXPECT_EQ(counterValue("request_parsed"), 1);
+}
+
+// A repeat seen before the parser gave up is still reported.
+TEST_F(AiProtocolManagerFilterTest, AiFilterContextReportsARepeatedKeyInAPayloadThatIsNotJson) {
+  std::vector<SeenBody> seen;
+  createFilterWithAiFilters(
+      recordingTheBody(seen),
+      envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS,
+      /*allow_duplicate_request_keys=*/true);
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"a","model":"b",)");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_TRUE(seen[0].has_duplicate_keys);
+  ASSERT_TRUE(seen[0].partial.has_value());
+  EXPECT_EQ(seen[0].partial->json, nlohmann::json::parse(R"({"model":"b"})"));
 }
 
 class TestAiFilterRouteConfig : public Router::RouteSpecificFilterConfig {};

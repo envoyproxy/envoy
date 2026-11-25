@@ -25,6 +25,7 @@
 #include "source/extensions/filters/http/mcp/mcp_json_parser.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "nlohmann/json_fwd.hpp"
 
 namespace Envoy {
@@ -223,13 +224,21 @@ public:
   // Parses the body as it arrives, up to maxRequestBodySize().
   Result onRequestBody(const Buffer::Instance& data, bool end_stream);
 
-  // Takes a body of `body_size` bytes that the host parsed whole, once onRequestHeaders() asked
-  // for it. A body the streaming parse would stop short in, or one the host left out a value the
-  // inspector reads, is handled as one parsed in part.
-  Result onRequestBody(const nlohmann::json& body, uint64_t body_size);
+  // The two calls below are for a host that parses the body itself. Call one of them once
+  // onRequestHeaders() has asked for the body.
+  //
+  // Takes a body of `body_size` bytes the host parsed to its end. `has_duplicate_keys` is true
+  // if an object in it repeated a key. A body over the size limit, or one whose document lacks a
+  // value the inspector reads, is handled as a body parsed in part.
+  Result onRequestBody(const nlohmann::json& body, uint64_t body_size,
+                       bool has_duplicate_keys = false);
 
-  // Takes a body that is not JSON, once onRequestHeaders() asked for it.
-  Result onInvalidRequestBody();
+  // Takes what the host had read of a body when it gave up. `open_keys` has one entry per
+  // container that was never closed, from the root inwards: the container's key in its parent
+  // object, or empty. `ended_early` is true if the body ended too soon and false if it is not
+  // JSON.
+  Result onPartialRequestBody(const nlohmann::json& body, absl::Span<const std::string> open_keys,
+                              bool ended_early, bool has_duplicate_keys);
 
   uint32_t maxRequestBodySize() const;
 
@@ -252,6 +261,8 @@ private:
   bool canEarlyTerminate();
   // Whether onRequestHeaders() asked for the body.
   bool awaitsBody() const;
+  // Rejects a body that is not JSON, or goes on with what was read, by the traffic mode.
+  Result onInvalidRequestBody();
   // Rejects a body parsed in part, or goes on with what was read, by the traffic mode.
   Result onIncompleteBody(Filters::Common::Mcp::Status reason);
 

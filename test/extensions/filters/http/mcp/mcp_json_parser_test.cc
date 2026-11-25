@@ -2398,6 +2398,102 @@ TEST_F(McpJsonParserTest, ParseDocumentClassifiesByMembersLeftOut) {
   EXPECT_FALSE(parser_->isValidMcpRequest());
 }
 
+// What another parser read of a body that ends too soon yields what the streaming parser reads
+// from the same bytes.
+TEST_F(McpJsonParserTest, ParsePartialDocumentMatchesAStreamingParseThatEndsEarly) {
+  struct Case {
+    std::string body;
+    std::string read;
+    std::vector<std::string> open_keys;
+  };
+  const std::vector<Case> cases = {
+      {R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"tool","arguments":{"a":)",
+       R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"tool","arguments":{}}})",
+       {"", "params", "arguments"}},
+      {R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"to)",
+       R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{}})",
+       {"", "params"}},
+      // The open member is not the last by key order.
+      {R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"tool"},"_meta":{"x":)",
+       R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"tool"},"_meta":{}})",
+       {"", "_meta"}},
+      {R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"list":[1,{"name":)",
+       R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"list":[1,{}]}})",
+       {"", "params", "list", ""}},
+      {R"({"jsonrpc":"2.0","id":1,"result":{"content":[)",
+       R"({"jsonrpc":"2.0","id":1,"result":{"content":[]}})",
+       {"", "result", "content"}},
+      {R"({"jsonrpc":"2.0","id":1,)", R"({"jsonrpc":"2.0","id":1})", {""}},
+      {R"([{"jsonrpc":"2.0",)", R"([{"jsonrpc":"2.0"}])", {"", ""}},
+  };
+  for (const Case& c : cases) {
+    SCOPED_TRACE(c.body);
+    McpJsonParser streaming(McpParserConfig::createDefault());
+    EXPECT_OK(streaming.parse(c.body));
+    EXPECT_FALSE(streaming.finishParse().ok());
+
+    McpJsonParser partial(McpParserConfig::createDefault());
+    partial.parsePartialDocument(nlohmann::json::parse(c.read), c.open_keys, /*ended_early=*/true);
+
+    EXPECT_EQ(partial.isValidMcpRequest(), streaming.isValidMcpRequest());
+    EXPECT_EQ(partial.isResponse(), streaming.isResponse());
+    EXPECT_EQ(partial.getMethod(), streaming.getMethod());
+    EXPECT_EQ(partial.hasAllRequiredFields(), streaming.hasAllRequiredFields());
+    EXPECT_TRUE(TestUtility::protoEqual(partial.metadata(), streaming.metadata()))
+        << partial.metadata().DebugString() << streaming.metadata().DebugString();
+  }
+}
+
+// A body that is not JSON classifies by what was read, but publishes none of it.
+TEST_F(McpJsonParserTest, ParsePartialDocumentMatchesAStreamingParseThatFails) {
+  const std::string body = R"({"jsonrpc":"2.0","id":1,"method":"tools/call" "params":{}})";
+  McpJsonParser streaming(McpParserConfig::createDefault());
+  EXPECT_FALSE(streaming.parse(body).ok());
+
+  McpJsonParser partial(McpParserConfig::createDefault());
+  partial.parsePartialDocument(
+      nlohmann::json::parse(R"({"jsonrpc":"2.0","id":1,"method":"tools/call"})"), {""},
+      /*ended_early=*/false);
+
+  EXPECT_TRUE(partial.isValidMcpRequest());
+  EXPECT_EQ(partial.isValidMcpRequest(), streaming.isValidMcpRequest());
+  EXPECT_EQ(partial.getMethod(), streaming.getMethod());
+  EXPECT_TRUE(TestUtility::protoEqual(partial.metadata(), streaming.metadata()))
+      << partial.metadata().DebugString() << streaming.metadata().DebugString();
+}
+
+// Bytes after the document: all of it was read, and it is published.
+TEST_F(McpJsonParserTest, ParsePartialDocumentPublishesADocumentThatWasClosed) {
+  parser_->parsePartialDocument(
+      nlohmann::json::parse(
+          R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"tool"}})"),
+      {}, /*ended_early=*/false);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  ASSERT_NE(parser_->getNestedValue("params.name"), nullptr);
+  EXPECT_EQ(parser_->getNestedValue("params.name")->string_value(), "tool");
+}
+
+TEST_F(McpJsonParserTest, ParsePartialDocumentOfABodyWithNoValue) {
+  parser_->parsePartialDocument(nlohmann::json(nlohmann::json::value_t::discarded), {},
+                                /*ended_early=*/true);
+
+  EXPECT_FALSE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->getMethod().empty());
+}
+
+TEST_F(McpJsonParserTest, NotesDuplicateKeysAnotherParserFound) {
+  // Nothing to note before a parse.
+  parser_->noteDuplicateKeys();
+  EXPECT_FALSE(parser_->hasDuplicateKeys());
+
+  EXPECT_TRUE(parser_->parseDocument(
+      nlohmann::json::parse(R"({"jsonrpc":"2.0","id":2,"method":"tools/list"})")));
+  EXPECT_FALSE(parser_->hasDuplicateKeys());
+  parser_->noteDuplicateKeys();
+  EXPECT_TRUE(parser_->hasDuplicateKeys());
+}
+
 TEST_F(McpJsonParserTest, ParseDocumentReplacesAnEarlierParse) {
   parseJson(R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"first"}})");
 

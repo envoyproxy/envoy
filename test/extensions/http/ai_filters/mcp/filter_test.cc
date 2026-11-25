@@ -32,6 +32,7 @@ using HttpFilters::AiProtocolManager::JsonWithExtBuf;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::LocalReplier;
 using HttpFilters::AiProtocolManager::LocalReply;
+using HttpFilters::AiProtocolManager::PartialJson;
 using HttpFilters::AiProtocolManager::UnparsedRequest;
 using McpProto = envoy::extensions::filters::http::mcp::v3::Mcp;
 using McpOverrideProto = envoy::extensions::filters::http::mcp::v3::McpOverride;
@@ -58,7 +59,20 @@ public:
                                  .request_protocol = LLMProtocol::Unspecified,
                                  .request_payload_bytes = request_payload_bytes,
                                  .route_config = route_config_,
-                                 .clear_route_cache = [this] { ++route_cache_clears_; }});
+                                 .clear_route_cache = [this] { ++route_cache_clears_; },
+                                 .request_ended_on_headers = request_ended_on_headers_,
+                                 .request_has_duplicate_keys = request_has_duplicate_keys_,
+                                 .partial_request =
+                                     partial_request_.has_value() ? &*partial_request_ : nullptr});
+  }
+
+  // What the manager's parser had read of the body when it gave up.
+  void setPartialRequest(const std::string& read, std::vector<std::string> open_keys,
+                         bool ended_early) {
+    partial_request_.emplace();
+    partial_request_->json = nlohmann::json::parse(read);
+    partial_request_->open_keys = std::move(open_keys);
+    partial_request_->ended_early = ended_early;
   }
 
   // Hands the filter the parsed body, as the manager does at the end of a JSON body.
@@ -111,6 +125,9 @@ public:
   std::unique_ptr<McpFilter> filter_;
   std::optional<LocalReply> local_reply_;
   int route_cache_clears_{0};
+  bool request_ended_on_headers_{false};
+  bool request_has_duplicate_keys_{false};
+  std::optional<PartialJson> partial_request_;
 };
 
 TEST_F(McpAiFilterTest, PublishesTheAttributesOfAParsedRequest) {
@@ -357,6 +374,7 @@ TEST_F(McpAiFilterTest, TakesABodyOverTheSizeLimitThatMayStopEarly) {
 }
 
 TEST_F(McpAiFilterTest, RejectModeAnswersARequestWithoutABodyThatIsNotMcp) {
+  request_ended_on_headers_ = true;
   request_headers_ = {{":method", "GET"}, {":path", "/mcp"}, {"accept", "text/html"}};
   makeFilter("traffic_mode: REJECT_NO_MCP");
 
@@ -369,11 +387,13 @@ TEST_F(McpAiFilterTest, RejectModeAnswersARequestWithoutABodyThatIsNotMcp) {
 
 // A POST that ends on its headers carries no JSON-RPC message.
 TEST_F(McpAiFilterTest, RejectModeAnswersAPostWithoutABody) {
+  request_ended_on_headers_ = true;
   makeFilter("traffic_mode: REJECT_NO_MCP");
   EXPECT_TRUE(filter_->onUnparsedRequest(UnparsedRequest::NoBody).has_value());
 }
 
 TEST_F(McpAiFilterTest, LeavesMcpRequestsWithoutABody) {
+  request_ended_on_headers_ = true;
   request_headers_ = {{":method", "GET"}, {":path", "/mcp"}, {"accept", "text/event-stream"}};
   makeFilter("traffic_mode: REJECT_NO_MCP");
   EXPECT_FALSE(filter_->onUnparsedRequest(UnparsedRequest::NoBody).has_value());
@@ -384,6 +404,7 @@ TEST_F(McpAiFilterTest, LeavesMcpRequestsWithoutABody) {
 }
 
 TEST_F(McpAiFilterTest, PassThroughLeavesARequestWithoutABody) {
+  request_ended_on_headers_ = true;
   request_headers_ = {{":method", "GET"}, {":path", "/mcp"}, {"accept", "text/html"}};
   makeFilter();
   EXPECT_FALSE(filter_->onUnparsedRequest(UnparsedRequest::NoBody).has_value());
@@ -391,6 +412,7 @@ TEST_F(McpAiFilterTest, PassThroughLeavesARequestWithoutABody) {
 
 // The 2026-07-28 revision has no session to end.
 TEST_F(McpAiFilterTest, AnswersASessionDeleteOfTheNewRevisionWithMethodNotAllowed) {
+  request_ended_on_headers_ = true;
   request_headers_ = {{":method", "DELETE"},
                       {":path", "/mcp"},
                       {"mcp-session-id", "session"},
@@ -427,6 +449,108 @@ TEST_F(McpAiFilterTest, PassThroughForwardsABodyThatIsNotJson) {
       R"({"status":"mcp_ok","is_mcp_request":false,"passthrough_reason":"mcp_not_jsonrpc"})"))
       << metadataJson();
   EXPECT_EQ(route_cache_clears_, 1);
+}
+
+// A body frame with no bytes is a body that ended before it began.
+TEST_F(McpAiFilterTest, PassThroughRecordsAnEmptyBody) {
+  makeFilter();
+  EXPECT_FALSE(filter_->onUnparsedRequest(UnparsedRequest::NoBody).has_value());
+  EXPECT_TRUE(TestUtility::jsonStringEqual(
+      metadataJson(),
+      R"({"status":"mcp_ok","is_mcp_request":false,"passthrough_reason":"mcp_parse_error"})"))
+      << metadataJson();
+}
+
+TEST_F(McpAiFilterTest, RejectModeAnswersAnEmptyBody) {
+  makeFilter("traffic_mode: REJECT_NO_MCP");
+
+  const std::optional<LocalReply> reply = filter_->onUnparsedRequest(UnparsedRequest::NoBody);
+  ASSERT_TRUE(reply.has_value());
+  EXPECT_EQ(reply->code, Http::Code::BadRequest);
+  EXPECT_EQ(reply->details, "mcp_parse_error");
+  EXPECT_EQ(counter("requests_rejected"), 0);
+}
+
+// A body that ends too soon still publishes the attributes that were read.
+TEST_F(McpAiFilterTest, PassThroughPublishesWhatWasReadOfABodyThatEndsEarly) {
+  setPartialRequest(R"({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{}})", {"", "params"},
+                    /*ended_early=*/true);
+  makeFilter();
+
+  EXPECT_FALSE(filter_->onUnparsedRequest(UnparsedRequest::InvalidJson).has_value());
+  EXPECT_TRUE(TestUtility::jsonStringEqual(
+      metadataJson(), R"({"jsonrpc":"2.0","id":7,"method":"tools/call","status":"mcp_ok",)"
+                      R"("is_mcp_request":true,"passthrough_reason":"mcp_parse_error"})"))
+      << metadataJson();
+  EXPECT_EQ(counter("invalid_json"), 0);
+}
+
+TEST_F(McpAiFilterTest, RejectModeAnswersABodyThatEndsEarly) {
+  setPartialRequest(R"({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{}})", {"", "params"},
+                    /*ended_early=*/true);
+  makeFilter("traffic_mode: REJECT_NO_MCP");
+
+  const std::optional<LocalReply> reply = filter_->onUnparsedRequest(UnparsedRequest::InvalidJson);
+  ASSERT_TRUE(reply.has_value());
+  EXPECT_EQ(reply->code, Http::Code::BadRequest);
+  EXPECT_EQ(reply->details, "mcp_parse_error");
+  EXPECT_EQ(counter("invalid_json"), 0);
+}
+
+// A request followed by bytes that are not JSON is still classified by the request.
+TEST_F(McpAiFilterTest, PassThroughClassifiesARequestFollowedByOtherBytes) {
+  setPartialRequest(ToolsCall, {}, /*ended_early=*/false);
+  makeFilter();
+
+  EXPECT_FALSE(filter_->onUnparsedRequest(UnparsedRequest::InvalidJson).has_value());
+  EXPECT_THAT(metadataJson(), HasSubstr(R"("is_mcp_request":true)"));
+  EXPECT_THAT(metadataJson(), HasSubstr(R"("passthrough_reason":"mcp_not_jsonrpc")"));
+  EXPECT_THAT(metadataJson(), HasSubstr(R"("name":"get_weather")"));
+  EXPECT_EQ(counter("invalid_json"), 1);
+}
+
+// The manager's parser reports a repeated key; the filter holds it to its configuration.
+TEST_F(McpAiFilterTest, RejectsARepeatedKeyWhenConfigured) {
+  request_has_duplicate_keys_ = true;
+  makeFilter("traffic_mode: REJECT_NO_MCP\nreject_duplicate_keys: true");
+
+  decode(ToolsCall);
+
+  ASSERT_TRUE(local_reply_.has_value());
+  EXPECT_EQ(local_reply_->code, Http::Code::BadRequest);
+  EXPECT_EQ(local_reply_->details, "mcp_duplicate_keys");
+  EXPECT_EQ(counter("duplicate_keys_rejected"), 1);
+}
+
+TEST_F(McpAiFilterTest, PassThroughRecordsARepeatedKeyWhenConfigured) {
+  request_has_duplicate_keys_ = true;
+  makeFilter("reject_duplicate_keys: true");
+
+  decode(ToolsCall);
+
+  EXPECT_FALSE(local_reply_.has_value());
+  EXPECT_THAT(metadataJson(), HasSubstr(R"("passthrough_reason":"mcp_duplicate_keys")"));
+}
+
+TEST_F(McpAiFilterTest, TakesARepeatedKeyByDefault) {
+  request_has_duplicate_keys_ = true;
+  makeFilter("traffic_mode: REJECT_NO_MCP");
+
+  decode(ToolsCall);
+
+  EXPECT_FALSE(local_reply_.has_value());
+  EXPECT_THAT(metadataJson(), testing::Not(HasSubstr("passthrough_reason")));
+}
+
+// A repeat seen before the parser gave up counts too.
+TEST_F(McpAiFilterTest, RejectsARepeatedKeyInABodyThatEndsEarly) {
+  request_has_duplicate_keys_ = true;
+  setPartialRequest(R"({"jsonrpc":"2.0","id":7,"method":"tools/call"})", {""},
+                    /*ended_early=*/true);
+  makeFilter("reject_duplicate_keys: true");
+
+  EXPECT_FALSE(filter_->onUnparsedRequest(UnparsedRequest::InvalidJson).has_value());
+  EXPECT_THAT(metadataJson(), HasSubstr(R"("passthrough_reason":"mcp_parse_error")"));
 }
 
 // The header checks come first, as they do for a request the manager parsed.

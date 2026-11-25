@@ -568,11 +568,15 @@ bool McpInspector::awaitsBody() const {
   return !skip_body_parsing_ && is_json_post_request_ && is_mcp_request_;
 }
 
-McpInspector::Result McpInspector::onRequestBody(const nlohmann::json& body, uint64_t body_size) {
+McpInspector::Result McpInspector::onRequestBody(const nlohmann::json& body, uint64_t body_size,
+                                                 bool has_duplicate_keys) {
   ASSERT(awaitsBody());
 
   parser_ = std::make_unique<JsonPathParser>(parserConfig());
   const bool complete = parser_->parseDocument(body);
+  if (has_duplicate_keys) {
+    parser_->noteDuplicateKeys();
+  }
   const uint32_t max_size = maxRequestBodySize();
   // The streaming parse reads up to the limit, or to the routing attributes where it may stop
   // there: a body past the limit is parsed in part unless it stopped early.
@@ -585,11 +589,21 @@ McpInspector::Result McpInspector::onRequestBody(const nlohmann::json& body, uin
   return completeParsing();
 }
 
-McpInspector::Result McpInspector::onInvalidRequestBody() {
-  if (!parser_) {
-    parser_ = std::make_unique<JsonPathParser>(parserConfig());
-  }
+McpInspector::Result McpInspector::onPartialRequestBody(const nlohmann::json& body,
+                                                        absl::Span<const std::string> open_keys,
+                                                        bool ended_early, bool has_duplicate_keys) {
+  ASSERT(awaitsBody());
 
+  parser_ = std::make_unique<JsonPathParser>(parserConfig());
+  parser_->parsePartialDocument(body, open_keys, ended_early);
+  if (has_duplicate_keys) {
+    parser_->noteDuplicateKeys();
+  }
+  return ended_early ? onIncompleteBody(Filters::Common::Mcp::Status::ParseError)
+                     : onInvalidRequestBody();
+}
+
+McpInspector::Result McpInspector::onInvalidRequestBody() {
   config_->stats().invalid_json_.inc();
   if (shouldRejectRequest()) {
     sendErrorReply("not a valid JSON", Filters::Common::Mcp::Status::NotJsonRpc);

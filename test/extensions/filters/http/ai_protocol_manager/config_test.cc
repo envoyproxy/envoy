@@ -440,6 +440,7 @@ TEST(AiProtocolManagerConfigTest, AiFilterFactoryDefaults) {
   ASSERT_TRUE(route_config.ok());
   EXPECT_EQ(*route_config, nullptr);
   EXPECT_EQ(factory.requestInlineStringBytes(config), std::nullopt);
+  EXPECT_FALSE(factory.allowsDuplicateRequestKeys(config));
   EXPECT_THAT(factory.configTypes(), testing::ElementsAre("google.protobuf.Struct"));
 }
 
@@ -462,6 +463,7 @@ public:
   std::optional<uint32_t> requestInlineStringBytes(const Protobuf::Message&) override {
     return 4096;
   }
+  bool allowsDuplicateRequestKeys(const Protobuf::Message&) override { return true; }
 };
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
@@ -537,6 +539,7 @@ TEST(AiProtocolManagerConfigTest, AiFilterNeedRaisesTheInlineStringThreshold) {
       *stats_store.rootScope(), std::make_shared<InMemoryExternalBufferFactory>());
   ASSERT_TRUE(config.ok()) << config.status();
   EXPECT_EQ((*config)->inlineStringThresholdBytes(), 4096);
+  EXPECT_TRUE((*config)->allowDuplicateRequestKeys());
   EXPECT_EQ((*config)->aiFilterName(0), "test.ai_filter");
   EXPECT_EQ((*config)->aiFilterName(1), "");
 }

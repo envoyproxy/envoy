@@ -40,6 +40,7 @@ using HttpFilters::AiProtocolManager::JsonWithExtBufParser;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::LocalReplier;
 using HttpFilters::AiProtocolManager::LocalReply;
+using HttpFilters::AiProtocolManager::PartialJson;
 using HttpFilters::AiProtocolManager::UnparsedRequest;
 using HttpFilters::Mcp::McpFilterConfig;
 using HttpFilters::Mcp::McpFilterConfigSharedPtr;
@@ -240,42 +241,49 @@ public:
   }
 
   // The MCP AI filter, given the request as the manager gives it: the document its parser built,
-  // or the reason there is none. A body that is not JSON gets the manager's reply unless the
-  // filter answers it or has it forwarded.
+  // or what that parser had read when it gave up. A body that is not JSON gets the manager's
+  // reply unless the filter answers it or has it forwarded.
   static Outcome runAiFilter(const Request& request) {
     Outcome outcome;
     outcome.request_headers = request.headers;
     NiceMock<Stats::MockIsolatedStatsStore> stats;
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     const McpProto proto = protoConfig(request);
+    const auto config = std::make_shared<McpFilterConfig>(proto, StatsPrefix, *stats.rootScope());
     const uint64_t body_size = request.body.has_value() ? request.body->size() : 0;
-    McpFilter filter(
-        std::make_shared<McpFilterConfig>(proto, StatsPrefix, *stats.rootScope()),
-        AiFilterContext{.stream_info = stream_info,
-                        .request_headers = outcome.request_headers,
-                        .request_protocol = LLMProtocol::Unspecified,
-                        .request_payload_bytes = body_size,
-                        .route_config = routeOverride(request),
-                        .clear_route_cache = [&outcome] { ++outcome.route_cache_clears; }});
+    AiFilterContext context{.stream_info = stream_info,
+                            .request_headers = outcome.request_headers,
+                            .request_protocol = LLMProtocol::Unspecified,
+                            .request_payload_bytes = body_size,
+                            .route_config = routeOverride(request),
+                            .clear_route_cache = [&outcome] { ++outcome.route_cache_clears; },
+                            .request_ended_on_headers = !request.body.has_value()};
 
     std::optional<LocalReply> reply;
     if (body_size == 0) {
-      reply = filter.onUnparsedRequest(UnparsedRequest::NoBody);
+      reply = McpFilter(config, context).onUnparsedRequest(UnparsedRequest::NoBody);
     } else {
+      McpFilterConfigFactory factory;
       JsonWithExtBufParser::Config parser_config;
       parser_config.inline_string_threshold_bytes =
           std::max(JsonWithExtBufParser::kDefaultInlineStringThresholdBytes,
-                   std::min(McpFilterConfigFactory().requestInlineStringBytes(proto).value_or(0),
+                   std::min(factory.requestInlineStringBytes(proto).value_or(0),
                             ManagerMaxInlineStringBytes));
+      parser_config.allow_duplicate_keys = factory.allowsDuplicateRequestKeys(proto);
       JsonWithExtBufParser parser(parser_config);
-      if (parser.feed(*request.body, /*end_stream=*/true).ok()) {
+      const bool parsed = parser.feed(*request.body, /*end_stream=*/true).ok();
+      context.request_has_duplicate_keys = parser.hasDuplicateKeys();
+      if (parsed) {
         AiRequest ai_request(parser.takeDocument());
-        EXPECT_TRUE(filter
+        EXPECT_TRUE(McpFilter(config, context)
                         .decodeSync(ai_request, LocalReplier([&reply](LocalReply sent) {
                                       reply = std::move(sent);
                                     }))
                         .ok());
       } else {
+        const PartialJson partial = parser.takePartial();
+        context.partial_request = &partial;
+        McpFilter filter(config, context);
         reply = filter.onUnparsedRequest(UnparsedRequest::InvalidJson);
         if (!reply.has_value() && !filter.forwardsUnparsedRequest()) {
           reply = LocalReply{.code = Http::Code::BadRequest,
@@ -680,69 +688,169 @@ TEST_F(McpFilterParityTest, HandlesABodyThatIsNotJson) {
               HasSubstr("reply: 400 details=mcp_not_jsonrpc body=not a valid JSON"));
 }
 
+// A body the manager's parser gives up on is inspected by what it had read, as the streaming
+// parser inspects it.
+TEST_F(McpFilterParityTest, HandlesABodyThatEndsEarly) {
+  const std::string tools_call = ToolsCall;
+  std::vector<Request> requests;
+  // Every prefix: inside a key, a string, a number, and each container.
+  for (size_t length = 1; length < tools_call.size(); ++length) {
+    requests.push_back(
+        {.name = absl::StrCat("first ", length, " bytes"), .body = tools_call.substr(0, length)});
+  }
+  requests.push_back(
+      {.name = "open array",
+       .body = R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"a":[1,)"});
+  requests.push_back({.name = "response", .body = R"({"jsonrpc":"2.0","id":1,"result":{"a":)"});
+  requests.push_back({.name = "empty frame", .body = ""});
+  requests.push_back({.name = "white space", .body = " \n"});
+  requests.push_back(
+      {.name = "filter state",
+       .config = "request_storage_mode: DYNAMIC_METADATA_AND_FILTER_STATE\nclear_route_cache: true",
+       .body = R"({"jsonrpc":"2.0","id":1,"method":"tools/list",)"});
+  requests.push_back({.name = "2026-07-28",
+                      .headers = newRevisionPost("tools/call", "get_weather"),
+                      .body = R"({"jsonrpc":"2.0","id":7,"method":"tools/call",)"});
+  for (const Request& request : requests) {
+    expectSameOutcomeInEachMode(request);
+  }
+
+  const std::string body = R"({"jsonrpc":"2.0","id":1,"method":"tools/list")";
+  const std::string passed = expectSameOutcome({.name = "ends early", .body = body});
+  EXPECT_THAT(passed, HasSubstr(R"("passthrough_reason":"mcp_parse_error")"));
+  EXPECT_THAT(passed, HasSubstr(R"("method":"tools/list")"));
+  EXPECT_THAT(expectSameOutcome({.name = "ends early", .config = RejectMode, .body = body}),
+              HasSubstr("reply: 400 details=mcp_parse_error"));
+  EXPECT_THAT(expectSameOutcome({.name = "empty frame", .config = RejectMode, .body = ""}),
+              HasSubstr("reply: 400 details=mcp_parse_error"));
+}
+
+TEST_F(McpFilterParityTest, HandlesABodyThatStopsBeingJson) {
+  const std::vector<Request> requests = {
+      {.name = "after the attributes",
+       .body = R"({"jsonrpc":"2.0","id":1,"method":"tools/list",oops})"},
+      {.name = "missing comma",
+       .body = R"({"jsonrpc":"2.0","id":7,"method":"tools/call" "params":{"name":"x"}})"},
+      {.name = "inside params",
+       .body = R"({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"x",oops}})"},
+      {.name = "bytes after the request", .body = absl::StrCat(ToolsCall, "garbage")},
+      {.name = "second request", .body = absl::StrCat(ToolsCall, ToolsCall)},
+      {.name = "one brace too many", .body = absl::StrCat(ToolsCall, "}")},
+      {.name = "bytes after a response", .body = absl::StrCat(ResultResponse, " x")},
+  };
+  for (const Request& request : requests) {
+    expectSameOutcomeInEachMode(request);
+  }
+
+  const std::string passed =
+      expectSameOutcome({.name = "bytes after the request", .body = absl::StrCat(ToolsCall, "x")});
+  EXPECT_THAT(passed, HasSubstr(R"("is_mcp_request":true)"));
+  EXPECT_THAT(passed, HasSubstr(R"("passthrough_reason":"mcp_not_jsonrpc")"));
+  EXPECT_THAT(passed, HasSubstr(R"("name":"get_weather")"));
+}
+
+TEST_F(McpFilterParityTest, HandlesARepeatedKey) {
+  const std::string last_wins = R"({"jsonrpc":"2.0","id":1,"method":"tools/list",)"
+                                R"("method":"tools/call","params":{"name":"get_weather"}})";
+  const std::vector<std::string> bodies = {
+      last_wins,
+      R"({"jsonrpc":"2.0","id":1,"method":"tools/call","method":"tools/list","params":{"name":"a"}})",
+      R"({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"a","name":"b"}})",
+      R"({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"a"},"params":{"name":"b"}})",
+      R"({"jsonrpc":"2.0","id":7,"id":8,"method":"tools/call","params":{"name":"a"}})",
+      R"({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"a","arguments":{"x":1,"x":2}}})",
+      R"({"jsonrpc":"2.0","id":7,"result":{},"result":{}})",
+  };
+  for (const std::string& body : bodies) {
+    for (const char* config : {"{}", "reject_duplicate_keys: true", "reject_duplicate_keys: false",
+                               "clear_route_cache: true"}) {
+      expectSameOutcomeInEachMode({.name = "repeated key", .config = config, .body = body});
+    }
+    expectSameOutcome({.name = "repeated key, override",
+                       .config = RejectMode,
+                       .route_override = "reject_duplicate_keys_override: true",
+                       .body = body});
+  }
+
+  // The last key wins.
+  const std::string passed =
+      expectSameOutcome({.name = "last wins", .config = RejectMode, .body = last_wins});
+  EXPECT_THAT(passed, HasSubstr("reply: none"));
+  EXPECT_THAT(passed, HasSubstr(R"("method":"tools/call")"));
+  EXPECT_THAT(passed, HasSubstr(R"("name":"get_weather")"));
+
+  const std::string rejected =
+      expectSameOutcome({.name = "rejected",
+                         .config = "traffic_mode: REJECT_NO_MCP\nreject_duplicate_keys: true",
+                         .body = last_wins});
+  EXPECT_THAT(rejected, HasSubstr("reply: 400 details=mcp_duplicate_keys"));
+  EXPECT_THAT(rejected, HasSubstr("duplicate_keys_rejected=1"));
+}
+
 // The hosts differ where the manager's parser and the streaming parser read a body differently.
 // Each case states what both do, so a change to either shows here.
 class McpFilterDifferenceTest : public McpFilterParityTest {};
 
-// The streaming parser reads the message a malformed body starts with; the manager has no
-// document at all.
-TEST_F(McpFilterDifferenceTest, MalformedBodyAfterTheAttributes) {
-  const Request request{.name = "malformed",
-                        .body = R"({"jsonrpc":"2.0","id":1,"method":"tools/list",oops})"};
-  EXPECT_THAT(runHttpFilter(request).describe(),
-              HasSubstr(R"({"is_mcp_request":true,"passthrough_reason":"mcp_not_jsonrpc")"));
-  EXPECT_THAT(runAiFilter(request).describe(),
-              HasSubstr(R"({"is_mcp_request":false,"passthrough_reason":"mcp_not_jsonrpc")"));
+// The manager's parser takes strict JSON only. The streaming parser also takes single quotes,
+// bare keys, trailing commas and control characters in strings.
+TEST_F(McpFilterDifferenceTest, BodyThatIsNotStrictJson) {
+  for (const std::string body : {
+           R"({'jsonrpc':'2.0','id':7,'method':'tools/call','params':{'name':'get_weather'}})",
+           R"({jsonrpc:"2.0",id:7,method:"tools/call",params:{name:"get_weather"}})",
+           R"({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"get_weather"},})",
+           "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\","
+           "\"params\":{\"name\":\"get\tweather\"}}",
+       }) {
+    SCOPED_TRACE(body);
+    Request request{.name = "not strict", .body = body};
+    const std::string http = runHttpFilter(request).describe();
+    const std::string ai = runAiFilter(request).describe();
+    EXPECT_THAT(http, HasSubstr(R"("is_mcp_request":true)"));
+    EXPECT_THAT(http, Not(HasSubstr("passthrough_reason")));
+    EXPECT_THAT(ai, HasSubstr(R"("passthrough_reason":"mcp_not_jsonrpc")"));
 
-  Request rejected = request;
-  rejected.config = RejectMode;
-  expectSameOutcome(rejected);
+    request.config = RejectMode;
+    EXPECT_THAT(runHttpFilter(request).describe(), HasSubstr("reply: none"));
+    EXPECT_THAT(runAiFilter(request).describe(), HasSubstr("reply: 400 details=mcp_not_jsonrpc"));
+  }
 }
 
-// The manager does not tell a body that ends early from one that is malformed.
-TEST_F(McpFilterDifferenceTest, BodyThatEndsEarly) {
-  Request request{.name = "ends early", .body = R"({"jsonrpc":"2.0","id":1,"method":"tools/list")"};
-  EXPECT_THAT(runHttpFilter(request).describe(),
-              HasSubstr(R"("passthrough_reason":"mcp_parse_error")"));
-  EXPECT_THAT(runAiFilter(request).describe(),
-              HasSubstr(R"("passthrough_reason":"mcp_not_jsonrpc")"));
-
-  request.config = RejectMode;
-  EXPECT_THAT(runHttpFilter(request).describe(), HasSubstr("reply: 400 details=mcp_parse_error"));
-  EXPECT_THAT(runAiFilter(request).describe(), HasSubstr("reply: 400 details=mcp_not_jsonrpc"));
-}
-
-// The manager takes no body that repeats a key, so the last key never wins.
-TEST_F(McpFilterDifferenceTest, RepeatedKey) {
-  Request request{.name = "repeated key",
+// The manager's parser stops at 16 levels of nesting; the streaming parser at 100.
+TEST_F(McpFilterDifferenceTest, DeeplyNestedArguments) {
+  std::string arguments;
+  for (int i = 0; i < 20; ++i) {
+    arguments += R"({"a":)";
+  }
+  arguments += "1" + std::string(20, '}');
+  Request request{.name = "deep",
                   .config = RejectMode,
-                  .body = R"({"jsonrpc":"2.0","id":1,"method":"tools/list","method":"tools/call",)"
-                          R"("params":{"name":"get_weather"}})"};
+                  .body = absl::StrCat(R"({"jsonrpc":"2.0","id":7,"method":"tools/call",)"
+                                       R"("params":{"name":"get_weather","arguments":)",
+                                       arguments, "}}")};
   EXPECT_THAT(runHttpFilter(request).describe(), HasSubstr("reply: none"));
-  EXPECT_THAT(runAiFilter(request).describe(),
-              HasSubstr("reply: 400 details=mcp_not_jsonrpc body=not a valid JSON"));
-
-  request.config = "traffic_mode: REJECT_NO_MCP\nreject_duplicate_keys: true";
-  EXPECT_THAT(runHttpFilter(request).describe(),
-              HasSubstr("reply: 400 details=mcp_duplicate_keys"));
   EXPECT_THAT(runAiFilter(request).describe(), HasSubstr("reply: 400 details=mcp_not_jsonrpc"));
-
-  // Forwarded alike where the request is not rejected, as a message only past the HTTP filter.
-  request.config = "{}";
-  const std::string http = runHttpFilter(request).describe();
-  const std::string ai = runAiFilter(request).describe();
-  EXPECT_THAT(http, HasSubstr("reply: none"));
-  EXPECT_THAT(http, HasSubstr(R"("is_mcp_request":true)"));
-  EXPECT_THAT(ai, HasSubstr("reply: none"));
-  EXPECT_THAT(ai, HasSubstr(R"("passthrough_reason":"mcp_not_jsonrpc")"));
 }
 
-// The manager reports a body of no bytes as a request without one.
-TEST_F(McpFilterDifferenceTest, EmptyBody) {
-  const Request request{.name = "empty body", .config = RejectMode, .body = ""};
-  EXPECT_THAT(runHttpFilter(request).describe(), HasSubstr("reply: 400 details=mcp_parse_error"));
-  EXPECT_THAT(runAiFilter(request).describe(),
-              HasSubstr("reply: 400 details=mcp_reject_no_mcp body=Only MCP traffic is allowed"));
+// The streaming parser classifies by every occurrence of a repeated key; the manager's document
+// holds the last one.
+TEST_F(McpFilterDifferenceTest, RepeatedKeyThatDecidesTheClassification) {
+  const Request request{
+      .name = "repeated jsonrpc",
+      .body =
+          R"({"jsonrpc":"2.0","jsonrpc":"1.0","id":7,"method":"tools/call","params":{"name":"a"}})"};
+  EXPECT_THAT(runHttpFilter(request).describe(), HasSubstr(R"("is_mcp_request":true)"));
+  EXPECT_THAT(runAiFilter(request).describe(), Not(HasSubstr(R"("is_mcp_request":true)")));
+}
+
+// The streaming parser looks for repeated keys outside arrays only; the manager's parser looks
+// everywhere.
+TEST_F(McpFilterDifferenceTest, RepeatedKeyInsideAnArray) {
+  const Request request{.name = "repeated key in an array",
+                        .config = "traffic_mode: REJECT_NO_MCP\nreject_duplicate_keys: true",
+                        .body = R"({"jsonrpc":"2.0","id":7,"method":"tools/call",)"
+                                R"("params":{"name":"a","arguments":[{"x":1,"x":2}]}})"};
+  EXPECT_THAT(runHttpFilter(request).describe(), HasSubstr("reply: none"));
+  EXPECT_THAT(runAiFilter(request).describe(), HasSubstr("reply: 400 details=mcp_duplicate_keys"));
 }
 
 // The streaming parser stops at the limit; the manager's document holds what comes after it.

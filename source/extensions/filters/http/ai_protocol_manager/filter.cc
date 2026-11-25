@@ -218,7 +218,8 @@ RouteConfig::create(const PerRouteProto& proto, AiFilterRouteConfigsConstSharedP
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
     Stats::Scope& scope, AiFilterFactories ai_filter_factories,
-    ExternalBufferFactorySharedPtr buffer_factory, uint32_t min_inline_string_threshold_bytes)
+    ExternalBufferFactorySharedPtr buffer_factory, uint32_t min_inline_string_threshold_bytes,
+    bool allow_duplicate_request_keys)
     : stats_(AiProtocolManagerStats{
           ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "ai_protocol_manager."))}),
       request_handling_enabled_(proto.has_request_handling()),
@@ -252,6 +253,7 @@ FilterConfig::FilterConfig(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto.response_handling().token_usage().limits(),
                                           max_parsed_sse_events, DefaultMaxParsedSseEvents)),
       ai_filter_factories_(std::move(ai_filter_factories)), ai_filter_names_(aiFilterNames(proto)),
+      allow_duplicate_request_keys_(allow_duplicate_request_keys),
       buffer_factory_(std::move(buffer_factory)) {
   ASSERT(buffer_factory_ != nullptr);
 }
@@ -265,6 +267,7 @@ absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
   }
   AiFilterFactories factories;
   uint32_t min_inline_string_threshold_bytes = 0;
+  bool allow_duplicate_request_keys = false;
   for (const auto& entry : proto.filters()) {
     auto* factory =
         Config::Utility::getAndCheckFactory<AiFilterConfigFactory>(entry, /*is_optional=*/true);
@@ -281,10 +284,12 @@ absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
     factories.push_back(std::move(cb.value()));
     min_inline_string_threshold_bytes = std::max(
         min_inline_string_threshold_bytes, factory->requestInlineStringBytes(*config).value_or(0));
+    allow_duplicate_request_keys =
+        allow_duplicate_request_keys || factory->allowsDuplicateRequestKeys(*config);
   }
-  return std::make_shared<const FilterConfig>(proto, scope, std::move(factories),
-                                              std::move(buffer_factory),
-                                              min_inline_string_threshold_bytes);
+  return std::make_shared<const FilterConfig>(
+      proto, scope, std::move(factories), std::move(buffer_factory),
+      min_inline_string_threshold_bytes, allow_duplicate_request_keys);
 }
 
 void AiProtocolManagerFilter::onDestroy() {
@@ -334,6 +339,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
   // request. (Pausing here would also deadlock, since no body would ever arrive
   // to drive the replay that releases them.)
   if (end_stream) {
+    request_ended_on_headers_ = true;
     return answerUnparsedRequest(UnparsedRequest::NoBody) == UnparsedAnswer::Replied
                ? Http::FilterHeadersStatus::StopIteration
                : Http::FilterHeadersStatus::Continue;
@@ -379,6 +385,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
 
   JsonWithExtBufParser::Config parser_config;
   parser_config.inline_string_threshold_bytes = inlineStringThresholdBytes();
+  parser_config.allow_duplicate_keys = config_->allowDuplicateRequestKeys();
   request_parser_ = std::make_unique<JsonWithExtBufParser>(parser_config);
   // Built here, not at setDecoderFilterCallbacks(), so a pass-through stream pays
   // for none of it: constructing it subscribes to upstream watermarks and claims
@@ -453,6 +460,7 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
   }
 
   if (end_stream) {
+    request_has_duplicate_keys_ = request_parser_->hasDuplicateKeys();
     request_json_ = request_parser_->takeDocument();
     request_parser_.reset();
     request_parsed_ = true;
@@ -462,8 +470,10 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
 }
 
 bool AiProtocolManagerFilter::rejectInvalidPayload(const absl::Status& status) {
+  request_has_duplicate_keys_ = request_parser_->hasDuplicateKeys();
+  const PartialJson partial = request_parser_->takePartial();
   request_parser_.reset();
-  switch (answerUnparsedRequest(UnparsedRequest::InvalidJson)) {
+  switch (answerUnparsedRequest(UnparsedRequest::InvalidJson, &partial)) {
   case UnparsedAnswer::Replied:
     return true;
   case UnparsedAnswer::Forward:
@@ -478,7 +488,8 @@ bool AiProtocolManagerFilter::rejectInvalidPayload(const absl::Status& status) {
   return true;
 }
 
-std::vector<AiFilterSharedPtr> AiProtocolManagerFilter::createAiFilters() {
+std::vector<AiFilterSharedPtr>
+AiProtocolManagerFilter::createAiFilters(const PartialJson* partial_request) {
   ASSERT(request_headers_ != nullptr);
   AiFilterContext context{.stream_info = decoder_callbacks_->streamInfo(),
                           .request_headers = *request_headers_,
@@ -488,11 +499,15 @@ std::vector<AiFilterSharedPtr> AiProtocolManagerFilter::createAiFilters() {
                           .response_protocol = route_response_protocol_,
                           .request_binding = route_request_binding_,
                           .response_binding = route_response_binding_,
-                          .clear_route_cache = [this] {
-                            if (decoder_callbacks_->downstreamCallbacks().has_value()) {
-                              decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
-                            }
-                          }};
+                          .clear_route_cache =
+                              [this] {
+                                if (decoder_callbacks_->downstreamCallbacks().has_value()) {
+                                  decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+                                }
+                              },
+                          .request_ended_on_headers = request_ended_on_headers_,
+                          .request_has_duplicate_keys = request_has_duplicate_keys_,
+                          .partial_request = partial_request};
   const AiFilterFactories& factories = config_->aiFilterFactories();
   std::vector<AiFilterSharedPtr> filters;
   filters.reserve(factories.size());
@@ -513,12 +528,13 @@ std::vector<AiFilterSharedPtr> AiProtocolManagerFilter::createAiFilters() {
 }
 
 AiProtocolManagerFilter::UnparsedAnswer
-AiProtocolManagerFilter::answerUnparsedRequest(UnparsedRequest reason) {
+AiProtocolManagerFilter::answerUnparsedRequest(UnparsedRequest reason,
+                                               const PartialJson* partial_request) {
   if (!isAiEndpoint()) {
     return UnparsedAnswer::None;
   }
   bool forward = false;
-  for (const AiFilterSharedPtr& filter : createAiFilters()) {
+  for (const AiFilterSharedPtr& filter : createAiFilters(partial_request)) {
     if (std::optional<LocalReply> reply = filter->onUnparsedRequest(reason); reply.has_value()) {
       ENVOY_LOG(debug, "ai_protocol_manager: AI filter answers the unparsed request: {} {}",
                 static_cast<uint32_t>(reply->code), reply->body);

@@ -59,12 +59,22 @@ is hosted:
   manager's :ref:`typed_per_filter_config
   <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.typed_per_filter_config>`
   under the filter's name.
-* The manager parses the body, and has no document for one that is not JSON,
-  that ends early, or that repeats a key. The filter rejects such a body in
-  ``REJECT_NO_MCP``. Otherwise it records ``passthrough_reason`` and the request
-  is forwarded as it arrived, as the HTTP filter forwards it, without the
-  attributes the HTTP filter reads before the body fails. A body that repeats a
-  key is handled this way whatever ``reject_duplicate_keys`` says.
+* The manager parses the body, and takes strict JSON only, nested at most 16
+  levels deep. The HTTP filter's parser also reads single-quoted strings,
+  unquoted keys, trailing commas and control characters in strings; here such a
+  body is not JSON, so it is rejected in ``REJECT_NO_MCP`` and forwarded without
+  attributes otherwise.
+* A body that ends too soon, or that stops being JSON part of the way, is
+  handled as the HTTP filter handles it: rejected in ``REJECT_NO_MCP``, and
+  otherwise forwarded as it arrived with ``passthrough_reason`` and the
+  attributes that were read.
+* A body that repeats a key is parsed, and :ref:`reject_duplicate_keys
+  <envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.reject_duplicate_keys>`
+  decides what becomes of it, as for the HTTP filter. With this filter in the
+  chain the manager parses such a body for the other AI filters of the chain
+  too. The last value of a repeated key is the one read; unlike the HTTP filter,
+  an earlier ``jsonrpc`` or ``method`` does not count, and a key repeated inside
+  an array does.
 * :ref:`max_request_body_size
   <envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.max_request_body_size>`
   limits the request the filter accepts, not what is buffered. A longer request
@@ -82,9 +92,13 @@ is hosted:
 * The filter only reads the request, so :ref:`reserialize_body
   <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.reserialize_body>`
   can be ``DISABLE`` unless another AI filter edits it.
+* The manager holds a request until its last byte. The HTTP filter lets one go
+  as soon as it has read up to the size limit or, with
+  ``early_terminate_when_routable``, the routing attributes.
 * A 2xx JSON or SSE response to a request the filter inspected is parsed and
   re-serialized by the manager on its way back, as for any AI filter: its JSON
-  is equivalent, not byte for byte.
+  is equivalent, not byte for byte, and a response that is not strict JSON is
+  reset.
 
 Statistics
 ----------
@@ -98,5 +112,5 @@ The filter outputs statistics in the ``ai_protocol_manager.mcp.`` namespace:
   requests_rejected, Counter, The filter rejected a request that is not MCP traffic.
   invalid_json, Counter, The filter saw a request body that is not JSON.
   body_too_large, Counter, The filter rejected a request over its body size limit.
-  duplicate_keys_rejected, Counter, Unused: the manager rejects a body that repeats a key before the filter runs.
+  duplicate_keys_rejected, Counter, The filter rejected a request body that repeats a key.
   header_mismatch, Counter, The MCP headers of a request disagreed with its body.

@@ -47,8 +47,8 @@ public:
   FilterConfig(
       const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
       Stats::Scope& scope, AiFilterFactories ai_filter_factories,
-      ExternalBufferFactorySharedPtr buffer_factory,
-      uint32_t min_inline_string_threshold_bytes = 0);
+      ExternalBufferFactorySharedPtr buffer_factory, uint32_t min_inline_string_threshold_bytes = 0,
+      bool allow_duplicate_request_keys = false);
 
   static absl::StatusOr<FilterConfigSharedPtr>
   create(const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
@@ -66,6 +66,7 @@ public:
   bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
   bool alwaysSerializeRequest() const { return always_serialize_request_; }
   uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }
+  bool allowDuplicateRequestKeys() const { return allow_duplicate_request_keys_; }
   bool tokenUsageEnabled() const { return token_usage_enabled_; }
   bool includeUnconfiguredRoutes() const { return include_unconfigured_routes_; }
   LLMProtocol defaultLLMProtocol() const { return default_llm_protocol_; }
@@ -95,6 +96,7 @@ private:
   const uint32_t max_parsed_sse_events_ = 0;
   const AiFilterFactories ai_filter_factories_;
   const std::vector<std::string> ai_filter_names_;
+  const bool allow_duplicate_request_keys_ = false;
   const ExternalBufferFactorySharedPtr buffer_factory_;
 };
 
@@ -242,8 +244,9 @@ private:
   // 400. Returns false if an AI filter has the payload forwarded instead.
   bool rejectInvalidPayload(const absl::Status& status);
 
-  // Creates the stream's AI filters.
-  std::vector<AiFilterSharedPtr> createAiFilters();
+  // Creates the stream's AI filters. `partial_request` is what the parser read of a payload it
+  // gave up on, and must outlive the filters.
+  std::vector<AiFilterSharedPtr> createAiFilters(const PartialJson* partial_request = nullptr);
 
   // How the AI filters leave a request that has no document.
   enum class UnparsedAnswer {
@@ -255,8 +258,10 @@ private:
     Replied,
   };
 
-  // Offers a declared endpoint's request that has no document to the AI filters.
-  UnparsedAnswer answerUnparsedRequest(UnparsedRequest reason);
+  // Offers a declared endpoint's request that has no document to the AI filters, with what the
+  // parser read of it when there is any.
+  UnparsedAnswer answerUnparsedRequest(UnparsedRequest reason,
+                                       const PartialJson* partial_request = nullptr);
 
   // Whether the request payload was handed to the filter -- by the route's
   // declaration or by filter state naming the client's API -- which is also
@@ -304,6 +309,8 @@ private:
   AiFilterRouteConfigsConstSharedPtr route_filter_configs_;
 
   JsonWithExtBuf request_json_;
+  bool request_ended_on_headers_{false};
+  bool request_has_duplicate_keys_{false};
   // Whether request_json_ holds the whole payload, for the AI filters to run over.
   bool request_parsed_{false};
   // Cleared once parsing is done with, whether it completed, was abandoned, or
