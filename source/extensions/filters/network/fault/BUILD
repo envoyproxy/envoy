@@ -26,8 +26,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf",
-        "//source/common/protobuf:utility_lib",
-        "//source/common/singleton:const_singleton",
         "//source/extensions/filters/network:well_known_names",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/network/fault/v3:pkg_cc_proto",

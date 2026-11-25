@@ -328,25 +328,43 @@ typed_config:
   EXPECT_THAT(log_entry, Not(HasSubstr("fault_name")));
 }
 
-class NetworkFaultDownstreamTlsIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
-      public BaseIntegrationTest {
+class BlockingConnectionCallbacks : public ConnectionStatusCallbacks {
 public:
-  NetworkFaultDownstreamTlsIntegrationTest()
-      : BaseIntegrationTest(GetParam(),
-                            NetworkFaultFilterIntegrationTest::baseFilterChainConfig()) {}
+  explicit BlockingConnectionCallbacks(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
 
+  void onEvent(Network::ConnectionEvent event) override {
+    ConnectionStatusCallbacks::onEvent(event);
+    if (waiting_) {
+      dispatcher_.exit();
+    }
+  }
+
+  void waitForConnected() {
+    waiting_ = true;
+    while (!connected() && !closed()) {
+      dispatcher_.run(Event::Dispatcher::RunType::Block);
+    }
+    waiting_ = false;
+  }
+
+  void waitForClosed() {
+    waiting_ = true;
+    while (!closed()) {
+      dispatcher_.run(Event::Dispatcher::RunType::Block);
+    }
+    waiting_ = false;
+  }
+
+private:
+  Event::Dispatcher& dispatcher_;
+  bool waiting_{false};
+};
+
+class NetworkFaultDownstreamTlsIntegrationTest : public NetworkFaultFilterIntegrationTest {
+public:
   void initializeTlsWithFaultFilter(const std::string& fault_filter_yaml) {
-    useListenerAccessLog(kFaultAccessLogFormat);
     config_helper_.addSslConfig();
-    config_helper_.addConfigModifier(
-        [fault_filter_yaml](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          envoy::config::listener::v3::Filter filter;
-          TestUtility::loadFromYaml(fault_filter_yaml, filter);
-          auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-          listener->mutable_filter_chains(0)->mutable_filters(0)->Swap(&filter);
-        });
-    BaseIntegrationTest::initialize();
+    initializeWithFaultFilter(fault_filter_yaml);
   }
 
   Network::ClientConnectionPtr makeTlsClientConnection() {
@@ -380,14 +398,11 @@ typed_config:
     fault_name: "fault0"
 )EOF");
 
-  ConnectionStatusCallbacks connect_callbacks;
+  BlockingConnectionCallbacks connect_callbacks(*dispatcher_);
   auto ssl_client = makeTlsClientConnection();
   ssl_client->addConnectionCallbacks(connect_callbacks);
   ssl_client->connect();
-
-  while (!connect_callbacks.closed()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  connect_callbacks.waitForClosed();
 
   test_server_->waitForCounter("fault.tls_test.aborts_injected", Eq(1));
   EXPECT_EQ(0U, test_server_->counter("fault.tls_test.aborts_dry_run")->value());
@@ -416,17 +431,16 @@ typed_config:
     fault_name: "fault0"
 )EOF");
 
-  ConnectionStatusCallbacks connect_callbacks;
+  BlockingConnectionCallbacks connect_callbacks(*dispatcher_);
   auto payload_reader = std::make_shared<WaitForPayloadReader>(*dispatcher_);
   auto ssl_client = makeTlsClientConnection();
   ssl_client->addConnectionCallbacks(connect_callbacks);
   ssl_client->addReadFilter(payload_reader);
   ssl_client->connect();
 
-  while (!connect_callbacks.connected()) {
-    ASSERT_FALSE(connect_callbacks.closed());
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  connect_callbacks.waitForConnected();
+  ASSERT_TRUE(connect_callbacks.connected());
+  ASSERT_FALSE(connect_callbacks.closed());
 
   Buffer::OwnedImpl write_buf("hello");
   ssl_client->write(write_buf, false);
@@ -434,9 +448,7 @@ typed_config:
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   ssl_client->close(Network::ConnectionCloseType::NoFlush);
-  while (!connect_callbacks.closed()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  connect_callbacks.waitForClosed();
 
   test_server_->waitForCounter("fault.tls_test.aborts_dry_run", Eq(1));
   EXPECT_EQ(0U, test_server_->counter("fault.tls_test.aborts_injected")->value());

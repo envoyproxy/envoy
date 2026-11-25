@@ -15,7 +15,6 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/singleton/const_singleton.h"
 
 #include "absl/strings/string_view.h"
 
@@ -59,11 +58,8 @@ public:
   const FaultFilterStats& stats() const { return stats_; }
 
 private:
-  class RuntimeKeyValues {
-  public:
-    const std::string AbortPercentKey = "fault.network.abort.abort_percent";
-  };
-  using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
+  static constexpr absl::string_view DefaultAbortPercentRuntime =
+      "fault.network.abort.abort_percent";
 
   static FaultFilterStats generateStats(absl::string_view stat_prefix, Stats::Scope& scope);
 
@@ -81,7 +77,7 @@ using FaultFilterConfigSharedPtr = std::shared_ptr<FaultFilterConfig>;
 
 /**
  * A network read filter capable of aborting incoming connections (or evaluating aborts in dry-run
- * mode) before dispatching them to downstream network filters such as tcp_proxy.
+ * mode) before dispatching them to subsequent network filters such as tcp_proxy.
  */
 class FaultFilter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:

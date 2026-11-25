@@ -5,7 +5,6 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "absl/strings/str_cat.h"
@@ -18,11 +17,10 @@ namespace Fault {
 
 namespace {
 
-struct RcDetailsValues {
-  // The fault filter injected an abort for this connection.
-  const std::string FaultAbort = "fault_filter_abort";
-};
-using RcDetails = ConstSingleton<RcDetailsValues>;
+// The fault filter injected an abort for this connection.
+constexpr absl::string_view kFaultAbortRcDetails = "fault_filter_abort";
+// Reserved dynamic metadata key recorded under envoy.filters.network.fault on dry-run abort.
+constexpr absl::string_view kDryRunAbortMetadataKey = "dry_run_abort";
 
 } // namespace
 
@@ -31,9 +29,10 @@ FaultFilterConfig::FaultFilterConfig(
     Stats::Scope& scope, Runtime::Loader& runtime)
     : has_abort_(proto_config.has_abort()), abort_percentage_(proto_config.abort().percentage()),
       dry_run_(proto_config.abort().dry_run()),
-      abort_percent_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(proto_config, abort_percent_runtime,
-                                                            RuntimeKeys::get().AbortPercentKey)),
-      has_filter_metadata_(proto_config.has_filter_metadata()),
+      abort_percent_runtime_(proto_config.abort_percent_runtime().empty()
+                                 ? std::string(DefaultAbortPercentRuntime)
+                                 : proto_config.abort_percent_runtime()),
+      has_filter_metadata_(!proto_config.filter_metadata().fields().empty()),
       filter_metadata_(proto_config.filter_metadata()), runtime_(runtime),
       stats_(generateStats(proto_config.stat_prefix(), scope)) {}
 
@@ -94,7 +93,7 @@ void FaultFilter::recordAbortDryRun() {
   auto& dynamic_metadata = read_callbacks_->connection().streamInfo().dynamicMetadata();
   auto& filter_metadata =
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().Fault];
-  (*filter_metadata.mutable_fields())["dry_run_abort"].set_bool_value(true);
+  (*filter_metadata.mutable_fields())[kDryRunAbortMetadataKey].set_bool_value(true);
 }
 
 void FaultFilter::abortConnection() {
@@ -102,11 +101,10 @@ void FaultFilter::abortConnection() {
   config_->stats().aborts_injected_.inc();
   auto& stream_info = read_callbacks_->connection().streamInfo();
   stream_info.setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected);
-  stream_info.setResponseCodeDetails(RcDetails::get().FaultAbort);
-  stream_info.setConnectionTerminationDetails(RcDetails::get().FaultAbort);
+  stream_info.setResponseCodeDetails(kFaultAbortRcDetails);
+  stream_info.setConnectionTerminationDetails(kFaultAbortRcDetails);
   recordDynamicMetadata();
-  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
-                                      RcDetails::get().FaultAbort);
+  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush, kFaultAbortRcDetails);
 }
 
 } // namespace Fault

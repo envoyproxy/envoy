@@ -165,6 +165,65 @@ abort:
   EXPECT_TRUE(stream_info_.dynamicMetadata().filter_metadata().empty());
 }
 
+TEST_F(NetworkFaultFilterTest, EnforcedAbortWithEmptyFilterMetadataDoesNotSetDynamicMetadata) {
+  envoy::extensions::filters::network::fault::v3::NetworkFault proto_config;
+  TestUtility::loadFromYamlAndValidate(R"EOF(
+stat_prefix: tcp
+abort:
+  percentage:
+    numerator: 100
+    denominator: HUNDRED
+filter_metadata: {}
+)EOF",
+                                       proto_config);
+  ASSERT_TRUE(proto_config.has_filter_metadata());
+  ASSERT_TRUE(proto_config.filter_metadata().fields().empty());
+  setUpFilter(proto_config);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled(absl::string_view("fault.network.abort.abort_percent"),
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+      .WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush,
+                                                   absl::string_view("fault_filter_abort")));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+  EXPECT_EQ(1U, config_->stats().aborts_injected_.value());
+  EXPECT_TRUE(stream_info_.dynamicMetadata().filter_metadata().empty());
+}
+
+TEST_F(NetworkFaultFilterTest, EnforcedAbortMergesIntoExistingDynamicMetadata) {
+  setUpFilter(R"EOF(
+stat_prefix: tcp
+abort:
+  percentage:
+    numerator: 100
+    denominator: HUNDRED
+filter_metadata:
+  experiment_name: "test_experiment"
+)EOF");
+
+  // Pre-populate dynamic metadata under the fault namespace (e.g., from another fault/filter).
+  auto& existing =
+      (*stream_info_.dynamicMetadata().mutable_filter_metadata())[NetworkFilterNames::get().Fault];
+  (*existing.mutable_fields())["existing_key"].set_string_value("existing_value");
+
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled(absl::string_view("fault.network.abort.abort_percent"),
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+      .WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush,
+                                                   absl::string_view("fault_filter_abort")));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  const auto& filter_meta = stream_info_.dynamicMetadata().filter_metadata();
+  const auto it = filter_meta.find(NetworkFilterNames::get().Fault);
+  ASSERT_NE(it, filter_meta.end());
+  EXPECT_EQ("existing_value", it->second.fields().at("existing_key").string_value());
+  EXPECT_EQ("test_experiment", it->second.fields().at("experiment_name").string_value());
+}
+
 TEST_F(NetworkFaultFilterTest, DryRunAbortContinuesWithoutClosingConnectionOrSettingResponseFlag) {
   setUpFilter(R"EOF(
 stat_prefix: tcp

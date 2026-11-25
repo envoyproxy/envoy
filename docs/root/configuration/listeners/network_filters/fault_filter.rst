@@ -15,7 +15,7 @@ subsequent network filters (such as :ref:`tcp_proxy <config_network_filters_tcp_
 
 When an incoming connection matches an enforced abort fault:
 
-* The connection is closed immediately (``ConnectionCloseType::NoFlush``) before downstream
+* The connection is closed immediately (``ConnectionCloseType::NoFlush``) before subsequent
   network filters run, preventing upstream connection attempts.
 * The ``FI`` (``FaultInjected``) response flag and ``fault_filter_abort`` response code /
   connection termination details are recorded on the connection's stream info.
