@@ -14,6 +14,8 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
@@ -96,22 +98,14 @@ public:
   SdsDynamicIntegrationBaseTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().ip_version),
         test_quic_(GetParam().test_quic) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat
-    // 'sds.client_cert.grpc.sds_cluster.lyft.com.streams_closed_12' and stat_prefix
-    // 'sds_cluster.lyft.com'.
-    skip_tag_extraction_rule_check_ = true;
+    skip_tag_extraction_rule_check_ = false;
   }
 
   SdsDynamicIntegrationBaseTest(Http::CodecType downstream_protocol,
                                 Network::Address::IpVersion version, const std::string& config)
       : HttpIntegrationTest(downstream_protocol, version, config),
         test_quic_(GetParam().test_quic) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat
-    // 'sds.client_cert.grpc.sds_cluster.lyft.com.streams_closed_12' and stat_prefix
-    // 'sds_cluster.lyft.com'.
-    skip_tag_extraction_rule_check_ = true;
+    skip_tag_extraction_rule_check_ = false;
   }
 
   Network::Address::IpVersion ipVersion() const override { return GetParam().ip_version; }
@@ -756,6 +750,9 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, RotatedCertificateReleasedByLastConn
 // A test that SDS server send a good server secret for a static listener.
 // The first ssl request should be OK.
 TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
+  // The mode is selected at startup. Exercise both paths using the existing IP-version matrix.
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                useExplicitStatsTags());
   on_server_init_function_ = [this]() {
     createSdsStream(*sdsUpstream());
     sendSdsResponse(getServerSecretRsa());
@@ -766,6 +763,19 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
     return makeSslClientConnection();
   };
   testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
+
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+    ASSERT_NE(nullptr, store);
+    EXPECT_EQ(useExplicitStatsTags(), store->useExplicitTags());
+    for (const auto* counter :
+         {"google_grpc_client_creation", "streams_total", "streams_closed_12"}) {
+      expectStatTags(fmt::format("sds.server_cert_rsa.grpc.sds_cluster.lyft.com.{}", counter),
+                     fmt::format("sds.grpc.{}", counter),
+                     {{"envoy.xds_resource_name", server_cert_rsa_},
+                      {"envoy.google_grpc_client_prefix", "sds_cluster.lyft.com"}});
+    }
+  }
 
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
@@ -1804,6 +1814,9 @@ TEST_P(SdsDynamicClusterIntegrationTest, ClusterRefersNonExistentSdsCluster) {
 // Validate that Envoy starts fine with a cyclic dependency between CDS and SDS clusters
 // i.e. CDS cluster refers to dynamic SDS cluster and SDS cluster refers to the same CDS cluster.
 TEST_P(SdsDynamicClusterIntegrationTest, CdsSdsCyclicDependency) {
+  // Google gRPC also uses this name as a stat prefix. Distinguish it from
+  // server.dynamic_unknown_fields.
+  sds_cluster_name_ = "cyclic_sds_cluster";
   on_server_init_function_ = [this]() {
     {
       // CDS.
@@ -1812,10 +1825,10 @@ TEST_P(SdsDynamicClusterIntegrationTest, CdsSdsCyclicDependency) {
       result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
       RELEASE_ASSERT(result, result.message());
       xds_stream_->startGrpcStream();
+      dynamic_cluster_.set_name(sds_cluster_name_);
       sendCdsResponse(true);
     }
   };
-  sds_cluster_name_ = "dynamic";
   valid_sds_cluster_ = false;
   // The secret can never be fetched: the dynamic cluster warms once the SDS initial fetch times
   // out, which is what lets the server start. Keep that short.
