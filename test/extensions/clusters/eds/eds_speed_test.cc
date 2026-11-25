@@ -272,6 +272,28 @@ BENCHMARK(duplicateUpdateWithEndpointMetadata)
     ->Ranges({{1, 100000}, {false, true}, {false, true}})
     ->Unit(benchmark::kMillisecond);
 
+// Three identical pushes, so the last one compares against hosts that a previous unchanged push
+// already kept.
+static void repeatedUnchangedUpdate(State& state) {
+  Envoy::Thread::MutexBasicLockable lock;
+  Envoy::Logger::Context logging_state(spdlog::level::warn,
+                                       Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
+
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
+    Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(1));
+    uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
+    const absl::string_view metadata_version = state.range(2) ? "v1.2.3" : "";
+
+    for (int push = 0; push < 3; ++push) {
+      speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true, metadata_version);
+    }
+  }
+}
+
+BENCHMARK(repeatedUnchangedUpdate)
+    ->Ranges({{1, 100000}, {false, true}, {false, true}})
+    ->Unit(benchmark::kMillisecond);
+
 static void metadataOnlyUpdate(State& state) {
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Context logging_state(spdlog::level::warn,
