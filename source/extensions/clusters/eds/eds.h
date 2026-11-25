@@ -42,8 +42,8 @@ public:
   InitializePhase initializePhase() const override { return initialize_phase_; }
 
   /**
-   * @return true if a host built from the endpoint would be identical to the given host, which
-   * has the same address, so the host can be reused instead.
+   * @return true only if updateDynamicHostList() would keep the given host and take nothing from
+   * a newly built one, so the host can be registered instead. A false result costs a build.
    */
   static bool
   endpointMatchesHost(const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,

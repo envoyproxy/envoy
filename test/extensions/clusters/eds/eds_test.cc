@@ -553,6 +553,14 @@ TEST_F(EdsTest, EndpointMatchesHostComparesEveryField) {
                                                             *host, metadata_pool))
         << lb_endpoint.DebugString();
     if (!reusable) {
+      // Only the host side can reject an endpoint with neither health check config nor
+      // additional addresses.
+      LbEndpoint plain = lb_endpoint;
+      plain.mutable_endpoint()->clear_health_check_config();
+      plain.mutable_endpoint()->clear_additional_addresses();
+      EXPECT_FALSE(EdsClusterImpl::endpointMatchesHost(plain, locality, *host->address(), *host,
+                                                       metadata_pool))
+          << lb_endpoint.DebugString();
       return;
     }
     for (const auto& change : endpoint_changes) {
@@ -590,6 +598,73 @@ TEST_F(EdsTest, EndpointMatchesHostComparesEveryField) {
     check_case(endpoints->lb_endpoints(i), *endpoints, host_cases[i].reusable);
   }
   check_case(other_endpoints->lb_endpoints(0), *other_endpoints, true);
+}
+
+// A new field in these messages may need a check in endpointMatchesHost() or a rule in
+// updateDynamicHostList(). Update both, then the count here.
+TEST(EdsEndpointFieldsTest, EndpointMatchesHostCoversEveryField) {
+  EXPECT_EQ(5, envoy::config::endpoint::v3::Endpoint::descriptor()->field_count());
+  EXPECT_EQ(4,
+            envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::descriptor()->field_count());
+  EXPECT_EQ(5, envoy::config::endpoint::v3::LbEndpoint::descriptor()->field_count());
+  EXPECT_EQ(8, envoy::config::endpoint::v3::LocalityLbEndpoints::descriptor()->field_count());
+}
+
+// An address repeated in one push registers one host for it, whether or not the host is reused.
+TEST_P(EdsHostReuseTest, RepeatedAddressRegistersOneHost) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.eds_reuse_unchanged_hosts", GetParam() ? "true" : "false"}});
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  const auto add_endpoint = [endpoints](const std::string& address) {
+    auto* socket_address = endpoints->add_lb_endpoints()
+                               ->mutable_endpoint()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_address(address);
+    socket_address->set_port_value(80);
+  };
+  add_endpoint("1.2.3.4");
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  add_endpoint("1.2.3.4");
+  add_endpoint("1.2.3.5");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(2, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
+// A namespace added to an existing endpoint is rejected as at creation, whether or not the host
+// could otherwise be reused.
+TEST_P(EdsHostReuseTest, NamespaceAddedToExistingEndpointIsRejected) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.eds_reuse_unchanged_hosts", GetParam() ? "true" : "false"}});
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* socket_address = cluster_load_assignment.add_endpoints()
+                             ->add_lb_endpoints()
+                             ->mutable_endpoint()
+                             ->mutable_address()
+                             ->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(80);
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const HostSharedPtr host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+
+  socket_address->set_network_namespace_filepath("/var/run/netns/blue");
+  const auto decoded_resources =
+      TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
+  EXPECT_THROW_WITH_MESSAGE(
+      EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
+      EnvoyException,
+      "Invalid host configuration: hosts cannot specify network namespaces with their address");
+  ASSERT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
 }
 
 // Verify that host weight changes cause a full rebuild.
