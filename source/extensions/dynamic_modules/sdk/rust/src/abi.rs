@@ -11293,8 +11293,9 @@ unsafe extern "C" {
 
  Collection is refused in cluster, listener or secret lifecycle hooks, whatever triggered them,
  and in other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction.
- Providers can contain partial changes under the previous version. Defer collection with the bootstrap config
- scheduler. Callout failures during cluster removal are already reported from a posted callback.
+ Providers can contain partial changes under the previous version. Defer collection with the
+ bootstrap config scheduler. Callout failures during cluster removal are already reported from a
+ posted callback.
 
  Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
  configuration may retain sensitive data. No admin listener is needed, and admin allow_paths does

@@ -152,9 +152,9 @@ impl Drop for EnvoyBootstrapExtensionConfigSnapshotImpl {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigSnapshotError {
   /// Called off the main thread, before `on_server_initialized`, during shutdown, from a cluster,
-  /// listener or secret lifecycle hook, whatever triggered it, from another bootstrap hook Envoy runs
-  /// inside an xDS update or a resource's destruction, or while another collection runs. A call
-  /// off the main thread also reports an Envoy bug.
+  /// listener or secret lifecycle hook, whatever triggered it, from another bootstrap hook Envoy
+  /// runs inside an xDS update or a resource's destruction, or while another collection runs. A
+  /// call off the main thread also reports an Envoy bug.
   NotAllowed,
   /// The name filter is invalid or its RE2 program size exceeds
   /// `re2.max_program_size.error_level`.
