@@ -52,6 +52,7 @@ RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_client_retries_respect_us
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
+RUNTIME_GUARD(envoy_reloadable_features_ext_proc_not_send_empty_data_with_false_eos);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_return_stop_iteration);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_stream_close_optimization);
 // When a filter drains the current data frame into the filter-manager buffer via
