@@ -60,8 +60,8 @@ void appendCodePoint(std::string& out, uint32_t code_point) {
 
 } // namespace
 
-WuffsJsonCursor::WuffsJsonCursor(Handler& handler, uint32_t max_depth)
-    : handler_(handler), max_depth_(static_cast<int>(std::min(max_depth, kWuffsMaxDepth))),
+WuffsJsonCursor::WuffsJsonCursor(Handler& handler, Options options)
+    : handler_(handler), max_depth_(static_cast<int>(std::min(options.max_depth, kWuffsMaxDepth))),
       levels_(1) {
   decoder_ = wuffs_json__decoder::alloc();
   token_buf_ =

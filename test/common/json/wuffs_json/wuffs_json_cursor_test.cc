@@ -643,7 +643,7 @@ TEST(WuffsJsonCursorTest, ConfiguredMaxDepth) {
   {
     MatchOnNumberHandler h;
     h.pattern.assign(depth, WuffsJsonCursor::PatternSegment{"a"});
-    WuffsJsonCursor cursor(h, depth);
+    WuffsJsonCursor cursor(h, {.max_depth = depth});
     h.cursor = &cursor;
     EXPECT_OK(cursor.feed(nested, /*closed=*/true));
     EXPECT_EQ(h.number_key, "a");
@@ -651,7 +651,7 @@ TEST(WuffsJsonCursorTest, ConfiguredMaxDepth) {
   }
   {
     CapturingHandler h;
-    WuffsJsonCursor cursor(h, depth);
+    WuffsJsonCursor cursor(h, {.max_depth = depth});
     const absl::Status status =
         cursor.feed(open + R"(1,"a":2)" + std::string(depth, '}'), /*closed=*/true);
     EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
@@ -659,7 +659,7 @@ TEST(WuffsJsonCursorTest, ConfiguredMaxDepth) {
   }
   {
     CapturingHandler h;
-    WuffsJsonCursor cursor(h, depth - 1);
+    WuffsJsonCursor cursor(h, {.max_depth = depth - 1});
     const absl::Status status = cursor.feed(nested, /*closed=*/true);
     EXPECT_EQ(status.code(), absl::StatusCode::kResourceExhausted);
     EXPECT_EQ(status.message(), "wuffs json: nesting depth exceeds " + std::to_string(depth - 1));
@@ -673,12 +673,12 @@ TEST(WuffsJsonCursorTest, MaxDepthCappedAtWuffsBound) {
   const auto nested = [](int depth) { return std::string(depth, '[') + std::string(depth, ']'); };
   {
     CapturingHandler h;
-    WuffsJsonCursor cursor(h, std::numeric_limits<uint32_t>::max());
+    WuffsJsonCursor cursor(h, {.max_depth = std::numeric_limits<uint32_t>::max()});
     EXPECT_OK(cursor.feed(nested(wuffs_bound), /*closed=*/true));
   }
   {
     CapturingHandler h;
-    WuffsJsonCursor cursor(h, std::numeric_limits<uint32_t>::max());
+    WuffsJsonCursor cursor(h, {.max_depth = std::numeric_limits<uint32_t>::max()});
     EXPECT_EQ(cursor.feed(nested(wuffs_bound + 1), /*closed=*/true).code(),
               absl::StatusCode::kResourceExhausted);
   }
