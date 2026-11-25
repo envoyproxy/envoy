@@ -5974,8 +5974,7 @@ TEST_F(DynamicModuleHttpFilterSchedulerTest,
   envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
 }
 
-// Verifies `commit()` from a foreign thread before destroy posts via the cached dispatcher and
-// that the lambda re-locks the weak_ptr correctly.
+// Verifies `commit()` from a foreign thread before destroy posts via the cached dispatcher.
 TEST_F(DynamicModuleHttpFilterSchedulerTest,
        HttpFilterSchedulerCommitFromForeignThreadBeforeDestroyPosts) {
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -5994,6 +5993,69 @@ TEST_F(DynamicModuleHttpFilterSchedulerTest,
 
   ASSERT_TRUE(captured_cb);
   captured_cb();
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleHttpFilterSchedulerTest,
+       HttpFilterConfigSchedulerCommitReleasesLastReferenceOnMainThread) {
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_config_scheduler_new(configPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  filter_.reset();
+  std::weak_ptr<DynamicModuleHttpFilterConfig> weak_config = filter_config_;
+
+  Event::PostCb captured_cb;
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+    // The main thread drops its reference while the module thread is inside `commit`.
+    filter_config_.reset();
+  });
+
+  std::thread module_thread(
+      [&]() { envoy_dynamic_module_callback_http_filter_config_scheduler_commit(scheduler, 7); });
+  module_thread.join();
+
+  // The module thread must not have destroyed the config.
+  EXPECT_FALSE(weak_config.expired());
+  ASSERT_TRUE(captured_cb);
+
+  // Running and releasing the callback on the main thread destroys it.
+  captured_cb();
+  captured_cb = nullptr;
+  EXPECT_TRUE(weak_config.expired());
+
+  envoy_dynamic_module_callback_http_filter_config_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleHttpFilterSchedulerTest,
+       HttpFilterSchedulerCommitReleasesLastReferenceOnWorkerThread) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  std::weak_ptr<DynamicModuleHttpFilter> weak_filter = filter_;
+
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+    // The worker drops its reference while the module thread is inside `commit`.
+    filter_.reset();
+  });
+
+  std::thread module_thread(
+      [&]() { envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 7); });
+  module_thread.join();
+
+  // The module thread must not have destroyed the filter.
+  EXPECT_FALSE(weak_filter.expired());
+  ASSERT_TRUE(captured_cb);
+
+  // Running and releasing the callback on the worker destroys it.
+  captured_cb();
+  captured_cb = nullptr;
+  EXPECT_TRUE(weak_filter.expired());
 
   envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
 }

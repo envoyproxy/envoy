@@ -456,16 +456,11 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerCommitOnExpiredConfigIsNoop) {
   scheduler.commit(1); // Must not crash or post.
 }
 
-// The callback posted by commit() re-locks the config, so an event that runs after the config has
-// been destroyed is dropped instead of touching freed memory.
-TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerPostedEventAfterConfigDestroyedIsDropped) {
-  // Set by the hook so the test can confirm it never ran. A lambda with no captures is required
-  // to match the C function pointer type, so the flag is reached through a static.
+TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerPostedEventKeepsConfigUntilDelivered) {
+  // The hook is a C function pointer, so it reaches the flag through a static.
   static bool hook_ran = false;
   hook_ran = false;
 
-  // Capture the posted callback instead of running it inline, simulating an event that arrives
-  // after the config has been destroyed.
   Event::PostCb posted_cb;
   EXPECT_CALL(context_.dispatcher_, post(_)).WillOnce([&posted_cb](Event::PostCb cb) {
     posted_cb = std::move(cb);
@@ -480,10 +475,14 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerPostedEventAfterConfigDestroyed
   scheduler.commit(99);
   ASSERT_TRUE(posted_cb);
 
+  std::weak_ptr<DynamicModuleStatsSinkConfig> weak_config = config;
   config.reset();
-  posted_cb(); // The re-lock fails, so the hook must be skipped.
-
-  EXPECT_FALSE(hook_ran);
+  // The posted callback owns the last reference, so the event is still delivered.
+  EXPECT_FALSE(weak_config.expired());
+  posted_cb();
+  EXPECT_TRUE(hook_ran);
+  posted_cb = nullptr;
+  EXPECT_TRUE(weak_config.expired());
 }
 
 // When a module is missing its config_new symbol, newDynamicModuleStatsSinkConfig

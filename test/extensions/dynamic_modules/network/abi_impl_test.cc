@@ -3240,10 +3240,8 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
 
   envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 123);
 
-  // Destroy the filter before invoking the callback.
+  // The posted callback keeps the filter alive.
   filter_.reset();
-
-  // The callback should not crash even though the filter is destroyed.
   captured_cb();
 
   envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
@@ -3302,11 +3300,9 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
 
   envoy_dynamic_module_callback_network_filter_config_scheduler_commit(scheduler, 456);
 
-  // Destroy the filter and config before invoking the callback.
+  // The posted callback keeps the config alive.
   filter_.reset();
   filter_config_.reset();
-
-  // The callback should not crash even though the config is destroyed.
   captured_cb();
 
   // Clean up.

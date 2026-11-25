@@ -529,16 +529,19 @@ newDynamicModuleTlsCertificateSelectorConfig(
 }
 
 void DynamicModuleTlsCertificateSelectorConfigScheduler::commit(uint64_t event_id) {
-  // Lock the config so its dispatcher member stays valid across post().
-  const auto config_shared = config_.lock();
+  // Lock the config so its dispatcher member stays valid across `post`, and to hand the
+  // reference to the posted callback below.
+  auto config_shared = config_.lock();
   if (config_shared == nullptr) {
     return;
   }
-  config_shared->main_thread_dispatcher_.post([config = config_, event_id]() {
-    if (const auto cs = config.lock(); cs != nullptr) {
-      cs->onScheduled(event_id);
-    }
-  });
+  // Move the locked config into the posted callback so the last reference is always released on
+  // the main thread (when the callback runs, or when the dispatcher is destroyed). The module may
+  // call this from a thread it manages; dropping the last reference there would run the
+  // destructor and the module's destroy hook off the main thread.
+  Event::Dispatcher& dispatcher = config_shared->main_thread_dispatcher_;
+  dispatcher.post(
+      [config = std::move(config_shared), event_id]() { config->onScheduled(event_id); });
 }
 
 DynamicModuleTlsCertificateSelector::DynamicModuleTlsCertificateSelector(

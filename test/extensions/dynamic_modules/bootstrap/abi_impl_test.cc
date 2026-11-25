@@ -252,8 +252,7 @@ TEST_F(BootstrapAbiImplTest, OnScheduledCallback) {
   envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(scheduler_ptr);
 }
 
-// Test that onScheduled handles the case when config is already destroyed.
-TEST_F(BootstrapAbiImplTest, OnScheduledAfterConfigDestroyed) {
+TEST_F(BootstrapAbiImplTest, OnScheduledAfterConfigReleased) {
   Event::PostCb captured_cb;
 
   {
@@ -281,11 +280,9 @@ TEST_F(BootstrapAbiImplTest, OnScheduledAfterConfigDestroyed) {
     // Delete the scheduler before the callback is executed.
     envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(scheduler_ptr);
 
-    // Config goes out of scope here and is destroyed.
+    // The posted callback keeps the config alive past this scope.
   }
 
-  // Execute the captured callback after config is destroyed.
-  // This should not crash - the weak_ptr should be expired.
   captured_cb();
 }
 

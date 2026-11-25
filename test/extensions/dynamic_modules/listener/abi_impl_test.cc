@@ -2418,10 +2418,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
 
   envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 123);
 
-  // Destroy the filter before invoking the callback.
+  // The posted callback keeps the filter alive.
   filter_.reset();
-
-  // Invoke the captured callback - should not crash because the scheduler holds a weak_ptr.
   captured_cb();
 
   envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
@@ -2467,11 +2465,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
 
   envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(scheduler, 456);
 
-  // Destroy the filter and config before invoking the callback.
+  // The posted callback keeps the config alive.
   filter_.reset();
   filter_config_.reset();
-
-  // Invoke the captured callback - should not crash because the scheduler holds a weak_ptr.
   captured_cb();
 
   // Clean up.

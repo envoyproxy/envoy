@@ -486,11 +486,10 @@ public:
     if (dispatcher == nullptr) {
       return;
     }
-    dispatcher->post([filter = filter_, event_id]() {
-      if (DynamicModuleHttpFilterSharedPtr fs = filter.lock()) {
-        fs->onScheduled(event_id);
-      }
-    });
+    // Move the locked filter into the posted callback so the last reference is always released on
+    // the worker thread that owns the filter, not on the module's thread that called `commit`.
+    dispatcher->post(
+        [filter = std::move(filter_shared), event_id]() { filter->onScheduled(event_id); });
   }
 
 private:
