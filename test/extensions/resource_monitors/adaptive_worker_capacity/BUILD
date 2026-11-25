@@ -28,3 +28,16 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "refill_rate_controller_test",
+    srcs = ["refill_rate_controller_test.cc"],
+    deps = [
+        "//envoy/common:time_interface",
+        "//source/extensions/resource_monitors/adaptive_worker_capacity:dynamic_token_bucket_lib",
+        "//source/extensions/resource_monitors/adaptive_worker_capacity:refill_rate_controller_lib",
+        "//source/extensions/resource_monitors/adaptive_worker_capacity:worker_utilization_tracker_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "@abseil-cpp//absl/time",
+    ],
+)

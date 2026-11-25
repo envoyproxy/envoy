@@ -31,3 +31,16 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "refill_rate_controller_lib",
+    srcs = ["refill_rate_controller.cc"],
+    hdrs = ["refill_rate_controller.h"],
+    deps = [
+        ":dynamic_token_bucket_lib",
+        ":worker_utilization_tracker_lib",
+        "//envoy/common:time_interface",
+        "//source/common/common:assert_lib",
+        "@abseil-cpp//absl/time",
+    ],
+)
