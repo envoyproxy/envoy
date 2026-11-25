@@ -132,6 +132,16 @@ go_test(
     tags = ["nocoverage"],
 )
 
+go_test(
+    name = "go_sdk_shared_test",
+    srcs = [
+        "//source/extensions/dynamic_modules:sdk/go/shared/headers_test.go",
+        "//source/extensions/dynamic_modules:sdk/go/shared/types_test.go",
+    ],
+    embed = ["//source/extensions/dynamic_modules:go_sdk_shared"],
+    tags = ["nocoverage"],
+)
+
 rust_test(
     name = "rust_sdk_test",
     crate = "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk_mock",

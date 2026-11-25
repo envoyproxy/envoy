@@ -140,6 +140,53 @@ pub fn read_whole_response_body<EHF: EnvoyHttpFilter>(envoy_filter: &mut EHF) ->
   get_body_content(envoy_filter, false)
 }
 
+/// Returns whether `name` is a header name that Envoy accepts: a non-empty HTTP token, optionally
+/// prefixed with `:` for a pseudo-header. Upper case letters are allowed.
+///
+/// Envoy does not check the header names that a module passes unless a callback's documentation
+/// says it does, so a module that builds a name from request data or other untrusted input should
+/// check it with this first. This checks syntax only: a pseudo-header such as `:authority`, or
+/// `host` or `content-length`, passes, so such a name may still need an allowlist.
+pub fn is_valid_header_name(name: impl AsRef<[u8]>) -> bool {
+  let name = name.as_ref();
+  let token = name.strip_prefix(b":").unwrap_or(name);
+  !token.is_empty() && token.iter().all(|&c| TOKEN_CHARS[usize::from(c)])
+}
+
+/// Returns whether `value` is a header value that Envoy accepts: one without a control character
+/// other than horizontal tab. Bytes above 0x7f are allowed. An empty value passes, though the
+/// HTTP filter's `set_*` methods remove the header for one and its `add_*` methods reject it.
+///
+/// Envoy does not check the header values that a module passes unless a callback's documentation
+/// says it does. A CR or LF in a value can end the header and start another on an HTTP/1
+/// connection, so a module that copies request data or other untrusted input into a header should
+/// check it with this first.
+pub fn is_valid_header_value(value: impl AsRef<[u8]>) -> bool {
+  // c ^ 0x16 maps tab to 0x1f and every other control character below it. A fold rather than
+  // all() has no early exit, so the compiler can vectorize it.
+  value
+    .as_ref()
+    .iter()
+    .fold(true, |valid, &c| valid & ((c ^ 0x16) >= 0x1f) & (c != 0x7f))
+}
+
+/// The bytes of an HTTP token (RFC 9110), which is what a header name is.
+static TOKEN_CHARS: [bool; 256] = {
+  let mut table = [false; 256];
+  let mut c = 0;
+  while c < table.len() {
+    table[c] = (c as u8).is_ascii_alphanumeric();
+    c += 1;
+  }
+  let symbols = b"!#$%&'*+-.^_`|~";
+  let mut i = 0;
+  while i < symbols.len() {
+    table[symbols[i] as usize] = true;
+    i += 1;
+  }
+  table
+};
+
 pub(crate) struct HeaderPairSlice(
   pub(crate) *const crate::abi::envoy_dynamic_module_type_module_http_header,
   pub(crate) usize,
@@ -393,5 +440,78 @@ mod tests {
       });
 
     assert_eq!(read_whole_response_body(&mut mock), b"hello world");
+  }
+
+  #[test]
+  fn test_is_valid_header_name() {
+    for name in ["x-custom", "X-Mixed-Case", ":path", "a!#$%&'*+-.^_`|~0"] {
+      assert!(is_valid_header_name(name), "{name:?}");
+    }
+    assert!(is_valid_header_name(b"x-bytes".as_slice()));
+    for name in [
+      "",
+      ":",
+      "::path",
+      "x:y",
+      "bad name",
+      "x-bad\r",
+      "x-bad\n",
+      "x-bad\0",
+      "caf\u{e9}",
+    ] {
+      assert!(!is_valid_header_name(name), "{name:?}");
+    }
+  }
+
+  #[test]
+  fn test_is_valid_header_value() {
+    for value in [&b""[..], b"value", b"a\tb c", b"\x80\xff"] {
+      assert!(is_valid_header_value(value), "{value:?}");
+    }
+    for value in [
+      &b"a\rb"[..],
+      b"a\nb",
+      b"a\0b",
+      b"bell\x07",
+      b"del\x7f",
+      b"\t\x1f",
+      b"value\r\nx-injected: 1",
+    ] {
+      assert!(!is_valid_header_value(value), "{value:?}");
+    }
+  }
+
+  #[test]
+  fn test_header_checks_take_sdk_buffers() {
+    let name = EnvoyBuffer::new(b"x-custom");
+    let value = EnvoyBuffer::new(b"a\rb");
+    assert!(is_valid_header_name(name));
+    assert!(is_valid_header_name(&name));
+    assert!(!is_valid_header_value(value));
+    assert!(!is_valid_header_value(&value));
+    static mut VALUE: [u8; 5] = *b"value";
+    let value = unsafe { EnvoyMutBuffer::new(&raw mut VALUE) };
+    assert!(is_valid_header_value(&value));
+  }
+
+  #[test]
+  fn test_header_checks_every_byte() {
+    for c in 0 ..= u8::MAX {
+      let token = c.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&c);
+      assert_eq!(is_valid_header_name([c]), token, "{c:#x}");
+      // Positions in the vector part of the loop and in its scalar remainder, for several sizes.
+      let allowed = c == b'\t' || (c >= b' ' && c != 0x7f);
+      for size in [3, 5, 12, 40, 67] {
+        for position in [0, size / 2, size - 1] {
+          let mut value = vec![b'v'; size];
+          value[position] = c;
+          assert_eq!(
+            is_valid_header_value(&value),
+            allowed,
+            "{c:#x} at {position} of {size}"
+          );
+        }
+      }
+    }
   }
 }

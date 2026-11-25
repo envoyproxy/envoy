@@ -116,6 +116,7 @@ go_library(
         "sdk/go/shared/early_header_mutation_api.go",
         "sdk/go/shared/header_formatter.go",
         "sdk/go/shared/header_formatter_api.go",
+        "sdk/go/shared/headers.go",
         "sdk/go/shared/http.go",
         "sdk/go/shared/http_api.go",
         "sdk/go/shared/listener_api.go",
@@ -131,12 +132,6 @@ go_library(
     cgo = True,
     importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared",
     visibility = ["//visibility:public"],
-)
-
-go_test(
-    name = "go_sdk_shared_test",
-    srcs = ["sdk/go/shared/types_test.go"],
-    embed = [":go_sdk_shared"],
 )
 
 go_library(
@@ -178,7 +173,11 @@ go_library(
 )
 
 exports_files(
-    ["sdk/go/internal/scheduler/scheduler_test.go"],
+    [
+        "sdk/go/internal/scheduler/scheduler_test.go",
+        "sdk/go/shared/headers_test.go",
+        "sdk/go/shared/types_test.go",
+    ],
     visibility = ["//test/extensions/dynamic_modules:__pkg__"],
 )
 

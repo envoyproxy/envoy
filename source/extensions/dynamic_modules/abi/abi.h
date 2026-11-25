@@ -25,6 +25,17 @@
 // can, which makes it impossible to enforce any security boundaries between Envoy and the modules
 // by nature. For example, we assume that modules will not try to pass invalid pointers to Envoy
 // intentionally.
+//
+// Likewise, Envoy does not check the header names and values that modules pass to it unless a
+// callback's documentation says it does. A name must be a non-empty HTTP token, optionally
+// prefixed with ':' for a pseudo-header, and a value must not hold a control character other than
+// horizontal tab. A CR, LF or NUL in a header map fails an assertion in debug builds. In release
+// builds, an upstream HTTP codec fails a request with one in a header with a 503, but on an HTTP/1
+// connection, response headers, trailers when HTTP/1 trailers are enabled, and the names a header
+// formatter returns are written as they are, and a CR or LF in them can end the header and start
+// another. The names a header formatter returns are not checked in debug builds either. A module
+// that builds a header from request data or other untrusted input should check it first; the SDKs
+// provide helpers for this.
 
 // =============================================================================
 // =========================== ABI Compatibility Policy ========================
@@ -145,7 +156,7 @@ const char* __attribute__((weak)) envoy_dynamic_modules_abi_version =
  * contains the ABI version the dynamic module was built against. Envoy logs it and does not
  * otherwise act on it. It is a diagnostic marker, not a compatibility gate, and a value that
  * differs from Envoy's own does not prevent the module from loading. See the ABI compatibility
- * policy at the top of this file.
+ * policy at the top of abi.h.
  *
  * OWNERSHIP: Module owns the pointer. Envoy copies the string immediately after on_program_init
  * returns, so it only needs to remain valid until then. Returning a static string satisfies this.
@@ -189,7 +200,8 @@ typedef struct envoy_dynamic_module_type_module_buffer {
 
 /**
  * envoy_dynamic_module_type_module_http_header represents a key-value pair of an HTTP header owned
- * by the module.
+ * by the module. Envoy does not check the key or the value; see the note on header names and values
+ * at the top of abi.h.
  */
 typedef struct envoy_dynamic_module_type_module_http_header {
   envoy_dynamic_module_type_buffer_module_ptr key_ptr;
@@ -2254,17 +2266,17 @@ bool envoy_dynamic_module_callback_http_get_headers(
     envoy_dynamic_module_type_envoy_http_header* result_headers);
 
 /**
- * envoy_dynamic_module_callback_http_add_header is called by the module to add
- * the value of the header with the given key. If the header does not exist, it will be
- * created. If the header already exists, all existing values will be removed and the new value will
- * be set. When the given value is null, the header will be removed if the key exists.
+ * envoy_dynamic_module_callback_http_add_header is called by the module to add a value to the
+ * header with the given key, keeping any existing values. If the header does not exist, it will be
+ * created. Use envoy_dynamic_module_callback_http_set_header to replace or remove a header.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param header_type is the type of the header map to add the header to (request/response
  * headers/trailers).
- * @param key is the key of the header.
- * @param value is the pointer to the buffer of the value. It can be null to remove the header.
+ * @param key is the key of the header. It must be a valid header name; Envoy does not check it.
+ * @param value is the pointer to the buffer of the value. A null or empty value is rejected.
+ * Otherwise it must be a valid header value; Envoy does not check it.
  * @return true if the operation is successful, false otherwise.
  *
  * Note that this only adds the header to the underlying Envoy object. Whether or not the header is
@@ -2281,14 +2293,15 @@ bool envoy_dynamic_module_callback_http_add_header(
  * envoy_dynamic_module_callback_http_set_header is called by the module to set
  * the value of the header with the given key. If the header does not exist, it will be
  * created. If the header already exists, all existing values will be removed and the new value will
- * be set. When the given value is null, the header will be removed if the key exists.
+ * be set. When the given value is null or empty, the header will be removed if the key exists.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param header_type is the type of the header map to set the header to (request/response
  * headers/trailers).
- * @param key is the key of the header.
- * @param value is the pointer to the buffer of the value. It can be null to remove the header.
+ * @param key is the key of the header. It must be a valid header name; Envoy does not check it.
+ * @param value is the pointer to the buffer of the value. A null or empty value removes the header.
+ * Otherwise it must be a valid header value; Envoy does not check it.
  * @return true if the operation is successful, false otherwise.
  *
  * Note that this only sets the header to the underlying Envoy object. Whether or not the header is

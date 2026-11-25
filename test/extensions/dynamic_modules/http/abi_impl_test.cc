@@ -329,7 +329,7 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, AddHeaderValue) {
   EXPECT_EQ(values2[0]->value().getStringView(), "value");
   EXPECT_EQ(values2[1]->value().getStringView(), value2);
 
-  // Existing multi key must be replaced by a single value.
+  // Existing multi key keeps its values and gains the new one.
   const std::string key3 = "multi";
   const std::string value3 = "new_value";
   EXPECT_TRUE(envoy_dynamic_module_callback_http_add_header(
@@ -416,6 +416,11 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, SetHeaderValue) {
       filter_.get(), header_type, {remove_key.data(), remove_key.size()}, {nullptr, 0}));
   auto removed_values = header_map->get(Envoy::Http::LowerCaseString(remove_key));
   EXPECT_EQ(removed_values.size(), 0);
+
+  // An empty value removes the key too.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_header(
+      filter_.get(), header_type, {key3.data(), key3.size()}, {value3.data(), 0}));
+  EXPECT_EQ(header_map->get(Envoy::Http::LowerCaseString(key3)).size(), 0);
 }
 
 TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeadersCount) {
