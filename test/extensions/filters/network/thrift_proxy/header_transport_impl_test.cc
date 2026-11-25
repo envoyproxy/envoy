@@ -189,6 +189,23 @@ TEST(HeaderTransportTest, InvalidHeaderSize) {
   }
 }
 
+TEST(HeaderTransportTest, HeaderSizeExceedsFrameSize) {
+  HeaderTransportImpl transport;
+  MessageMetadata metadata;
+
+  // header_size (8) + MinFrameStartSizeNoHeaders (10) = 18 > frame_size (14)
+  Buffer::OwnedImpl buffer;
+  buffer.writeBEInt<int32_t>(14);     // frame size (minimum valid)
+  buffer.writeBEInt<int16_t>(0x0FFF); // magic
+  buffer.writeBEInt<int16_t>(0);      // flags
+  buffer.writeBEInt<int32_t>(1);      // sequence number
+  buffer.writeBEInt<int16_t>(2);      // header size / 4 = 8 bytes
+  addRepeated(buffer, 8, 0);          // header data
+  EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
+                            "thrift header size 8 exceeds frame size 14");
+  EXPECT_THAT(metadata, IsEmptyMetadata());
+}
+
 TEST(HeaderTransportTest, NegativeStringLength) {
   HeaderTransportImpl transport;
   MessageMetadata metadata;
