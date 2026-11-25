@@ -84,17 +84,23 @@ def modify_envoy_config(config_path, perf, output_directory):
     if perf:
         return config_path, []
 
-    # Load original Envoy config (YAML or JSON).
+    # Load original Envoy config (YAML or JSON). PyYAML follows YAML 1.1, so unquoted
+    # on/off/yes/no become booleans and values like 0600 become octal integers before the
+    # config is written back as JSON, and an unquoted date makes json.dumps() below fail.
+    # Quote such values in the config if Envoy must see them as written.
     with open(config_path, 'r') as f:
-        envoy_config = yaml.safe_load(f)
+        envoy_config = yaml.safe_load(f) or {}
 
     # Add unconditional access logs for all static HTTP connection managers.
     access_log_paths = []
-    listeners = envoy_config.get('static_resources', {}).get('listeners', [])
+    listeners = (envoy_config.get('static_resources') or {}).get('listeners') or []
     for listener in listeners:
-        for filter_chain in listener.get('filter_chains', []):
-            for network_filter in filter_chain.get('filters', []):
-                config = network_filter.get('typed_config', {})
+        filter_chains = list(listener.get('filter_chains') or [])
+        if listener.get('default_filter_chain'):
+            filter_chains.append(listener['default_filter_chain'])
+        for filter_chain in filter_chains:
+            for network_filter in filter_chain.get('filters') or []:
+                config = network_filter.get('typed_config') or {}
                 if config.get('@type') != HCM_TYPE:
                     continue
                 access_log_path = os.path.join(
