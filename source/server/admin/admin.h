@@ -70,6 +70,8 @@ class AdminImpl : public Admin,
                   public std::enable_shared_from_this<AdminImpl>,
                   Logger::Loggable<Logger::Id::admin> {
 public:
+  static constexpr uint64_t ListenerTag = 0;
+
   AdminImpl(const std::string& profile_path, Server::Instance& server,
             bool ignore_global_conn_limit);
 
@@ -405,7 +407,7 @@ private:
     std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
     bool continueOnListenerFiltersTimeout() const override { return false; }
     Stats::Scope& listenerScope() override { return scope_; }
-    uint64_t listenerTag() const override { return 0; }
+    uint64_t listenerTag() const override { return AdminImpl::ListenerTag; }
     const std::string& name() const override { return name_; }
     const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
       return parent_.listener_info_;
