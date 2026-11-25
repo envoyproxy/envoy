@@ -204,7 +204,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_interface",
         "//source/extensions/filters/http/ai_protocol_manager:payload_reader_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:payload_stream_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:stream_payload_lib",
         "//test/mocks/event:event_mocks",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",

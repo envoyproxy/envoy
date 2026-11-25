@@ -132,9 +132,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "payload_stream_lib",
-    srcs = ["payload_stream.cc"],
-    hdrs = ["payload_stream.h"],
+    name = "stream_payload_lib",
+    srcs = ["stream_payload.cc"],
+    hdrs = ["stream_payload.h"],
     deps = [
         ":chain_writer_lib",
         ":payload_reader_lib",

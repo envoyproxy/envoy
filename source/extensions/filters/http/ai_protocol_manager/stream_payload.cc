@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/ai_protocol_manager/payload_stream.h"
+#include "source/extensions/filters/http/ai_protocol_manager/stream_payload.h"
 
 #include <algorithm>
 #include <cstdint>

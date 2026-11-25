@@ -12,7 +12,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/payload_reader.h"
-#include "source/extensions/filters/http/ai_protocol_manager/payload_stream.h"
+#include "source/extensions/filters/http/ai_protocol_manager/stream_payload.h"
 
 #include "test/extensions/filters/http/ai_protocol_manager/fake_bridge.h"
 #include "test/mocks/event/mocks.h"
