@@ -129,6 +129,7 @@ envoy_cc_library(
         "//source/common/upstream:priority_conn_pool_map_impl_lib",
         "//source/common/upstream:upstream_lib",
         "//source/server:generic_factory_context_lib",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

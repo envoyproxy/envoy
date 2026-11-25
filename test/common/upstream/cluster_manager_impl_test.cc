@@ -655,6 +655,21 @@ TEST_F(ClusterManagerImplTest, EdsClustersRequireEdsConfig) {
                             "cannot create an EDS cluster without an EDS config");
 }
 
+// gRPC/OTLP and other TLS-backed access loggers are rejected for async client upstream logs.
+TEST_F(ClusterManagerImplTest, AsyncClientUpstreamLogRejectsUnsupportedLogger) {
+  Bootstrap bootstrap;
+  auto* log = bootstrap.mutable_cluster_manager()->add_async_client_upstream_log();
+  log->set_name("grpc");
+  log->mutable_typed_config()->set_type_url(
+      "type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      create(bootstrap), EnvoyException,
+      "async_client_upstream_log: unsupported access logger type "
+      "'envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig'; only file and "
+      "stdout/stderr access loggers are supported");
+}
+
 // Verify that specifying a cluster provided LB, but the cluster doesn't provide one is an error.
 TEST_F(ClusterManagerImplTest, ClusterProvidedLbNoLb) {
   const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
