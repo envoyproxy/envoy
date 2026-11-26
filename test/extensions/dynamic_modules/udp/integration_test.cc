@@ -1,10 +1,13 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/filters/udp/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/base_overload_integration_test.h"
 #include "test/integration/integration.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
@@ -108,6 +111,100 @@ TEST_P(DynamicModulesUdpIntegrationTest, StopIteration) {
   Network::UdpRecvData request_datagram;
 
   EXPECT_FALSE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram, std::chrono::seconds(1)));
+}
+
+TEST_P(DynamicModulesUdpIntegrationTest, EcdsReplacesModuleAndUdpProxyIndependently) {
+  struct Resource {
+    explicit Resource(absl::string_view name)
+        : path_(TestEnvironment::temporaryPath(absl::StrCat(name, ".json"))), file_(path_) {
+      config_.set_name(std::string(name));
+    }
+
+    void subscribe(envoy::config::listener::v3::ListenerFilter& filter) {
+      config_.mutable_typed_config()->Swap(filter.mutable_typed_config());
+      filter.set_name(config_.name());
+      auto* discovery = filter.mutable_config_discovery();
+      discovery->add_type_urls(config_.typed_config().type_url());
+      discovery->mutable_config_source()->mutable_path_config_source()->set_path(path_);
+      discovery->mutable_config_source()->set_resource_api_version(envoy::config::core::v3::V3);
+      publish("1");
+    }
+
+    void publish(const std::string& version) {
+      envoy::service::discovery::v3::DiscoveryResponse response;
+      response.set_version_info(version);
+      response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
+      ASSERT_TRUE(response.add_resources()->PackFrom(config_));
+      file_.update(MessageUtil::getJsonStringFromMessageOrError(response));
+    }
+
+    const std::string path_;
+    AtomicFileUpdater file_;
+    envoy::config::core::v3::TypedExtensionConfig config_;
+  };
+  Resource module("module"), proxy("proxy");
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    module.subscribe(*listener->mutable_listener_filters(0));
+    proxy.subscribe(*listener->mutable_listener_filters(1));
+  });
+  setup();
+  auto address = Network::Utility::getAddressWithPort(
+      *Network::Test::getCanonicalLoopbackAddress(GetParam()), lookupPort("listener_0"));
+  Network::Test::UdpSyncPeer client(GetParam());
+  auto expectForwarded = [&](const std::string& payload) {
+    client.write(payload, *address);
+    Network::UdpRecvData received;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(received));
+    EXPECT_EQ(payload, received.buffer_->toString());
+  };
+  constexpr absl::string_view stats = "extension_config_discovery.udp_listener_filter.";
+  expectForwarded("initial");
+  test_server_->waitForGauge("udp.service.downstream_sess_active", testing::Eq(1));
+
+  envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter
+      module_config;
+  ASSERT_TRUE(module.config_.typed_config().UnpackTo(&module_config));
+  module_config.mutable_dynamic_module_config()->set_name("udp_stop_iteration");
+  ASSERT_TRUE(module.config_.mutable_typed_config()->PackFrom(module_config));
+  module.publish("2");
+  test_server_->waitForCounter(absl::StrCat(stats, "module.config_reload"), testing::Eq(2));
+  client.write("blocked", *address);
+  Network::UdpRecvData unexpected;
+  EXPECT_FALSE(fake_upstreams_[0]->waitForUdpDatagram(unexpected, std::chrono::milliseconds(50)));
+  module_config.mutable_dynamic_module_config()->set_name("udp_no_op");
+  ASSERT_TRUE(module.config_.mutable_typed_config()->PackFrom(module_config));
+  module.publish("3");
+  test_server_->waitForCounter(absl::StrCat(stats, "module.config_reload"), testing::Eq(3));
+  expectForwarded("restored");
+  EXPECT_EQ(1, test_server_->counter("udp.service.downstream_sess_total")->value());
+
+  envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig proxy_config;
+  ASSERT_TRUE(proxy.config_.typed_config().UnpackTo(&proxy_config));
+  // A nested session ECDS subscription would need a new listener init target after warming.
+  auto invalid = proxy_config;
+  auto* session_filter = invalid.add_session_filters();
+  session_filter->set_name("nested");
+  auto* nested = session_filter->mutable_config_discovery();
+  nested->mutable_config_source()->mutable_path_config_source()->set_path(proxy.path_);
+  nested->mutable_config_source()->set_resource_api_version(envoy::config::core::v3::V3);
+  nested->add_type_urls(
+      "type.googleapis.com/"
+      "envoy.extensions.filters.udp.udp_proxy.session.http_capsule.v3.FilterConfig");
+  ASSERT_TRUE(proxy.config_.mutable_typed_config()->PackFrom(invalid));
+  proxy.publish("2");
+  test_server_->waitForCounter(absl::StrCat(stats, "proxy.config_fail"), testing::Eq(1));
+  expectForwarded("previous proxy");
+  EXPECT_EQ(1, test_server_->counter("udp.service.downstream_sess_total")->value());
+
+  proxy_config.set_stat_prefix("replacement");
+  ASSERT_TRUE(proxy.config_.mutable_typed_config()->PackFrom(proxy_config));
+  proxy.publish("3");
+  test_server_->waitForGauge("udp.service.downstream_sess_active", testing::Eq(0));
+  expectForwarded("new session");
+  test_server_->waitForGauge("udp.replacement.downstream_sess_active", testing::Eq(1));
+  EXPECT_EQ(concurrency_,
+            test_server_->counter("listener_manager.listener_create_success")->value());
 }
 
 TEST_P(DynamicModulesUdpIntegrationTest, LargePayload) {

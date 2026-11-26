@@ -1,10 +1,13 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 
 #include "source/common/config/utility.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Network {
@@ -24,6 +27,18 @@ public:
   virtual absl::StatusOr<DnsResolverSharedPtr> createDnsResolver(
       Event::Dispatcher& dispatcher, Api::Api& api,
       const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) const PURE;
+
+  /**
+   * Validate configuration on the main thread for a resolver that can be replaced while its
+   * dispatcher serves traffic. Opt-in resolvers must cancel pending callbacks and support
+   * destruction without blocking on background lookups. Throw EnvoyException on rejection.
+   */
+  virtual void
+  validateConfigForLiveReplacement(const envoy::config::core::v3::TypedExtensionConfig&,
+                                   ProtobufMessage::ValidationVisitor&) const {
+    throwEnvoyExceptionOrPanic(
+        absl::StrCat("DNS resolver ", name(), " does not support live replacement"));
+  }
 
   std::string category() const override { return std::string(DnsResolverCategory); }
 

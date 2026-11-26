@@ -80,6 +80,10 @@ public:
               (Event::Dispatcher & dispatcher, Api::Api& api,
                const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config),
               (const, override));
+  MOCK_METHOD(void, validateConfigForLiveReplacement,
+              (const envoy::config::core::v3::TypedExtensionConfig&,
+               ProtobufMessage::ValidationVisitor&),
+              (const, override));
   std::string name() const override { return std::string(CaresDnsResolver); };
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{
@@ -734,6 +738,7 @@ public:
   ~MockUdpReadFilterCallbacks() override;
 
   MOCK_METHOD(UdpListener&, udpListener, ());
+  MOCK_METHOD(void, onFilterConfigReadinessChanged, (bool), (override));
   MOCK_METHOD(UdpHotRestartSessionHandlePtr, registerHotRestartSession,
               (const Address::InstanceConstSharedPtr& local_address,
                const Address::InstanceConstSharedPtr& peer_address));

@@ -10,6 +10,7 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/event/file_event.h"
+#include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/assert.h"
@@ -17,6 +18,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/str_join.h"
 
@@ -463,6 +465,14 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{
         new envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig()};
+  }
+
+  void validateConfigForLiveReplacement(
+      const envoy::config::core::v3::TypedExtensionConfig& config,
+      ProtobufMessage::ValidationVisitor& validation_visitor) const override {
+    MessageUtil::anyConvertAndValidate<
+        envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig>(
+        config.typed_config(), validation_visitor);
   }
 
   absl::StatusOr<DnsResolverSharedPtr>

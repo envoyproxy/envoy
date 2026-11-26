@@ -169,6 +169,9 @@ envoy_cc_test(
         "coverage": {"link": "linux_x64_small"},
     },
     deps = [
+        "//envoy/common:exception_lib",
+        "//source/common/common:callback_impl_lib",
+        "//source/common/filter:udp_listener_filter_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:udp_packet_writer_handler_lib",

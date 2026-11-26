@@ -10,6 +10,7 @@
 #include <string>
 
 #include "envoy/common/platform.h"
+#include "envoy/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
@@ -671,36 +672,35 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
 // c-ares DNS resolver factory
 class CaresDnsResolverFactory : public DnsResolverFactory,
                                 public Logger::Loggable<Logger::Id::dns> {
+  using ResolverConfig =
+      envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig;
+
 public:
   std::string name() const override { return std::string(CaresDnsResolver); }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{
-        new envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig()};
+    return std::make_unique<ResolverConfig>();
+  }
+
+  void validateConfigForLiveReplacement(
+      const envoy::config::core::v3::TypedExtensionConfig& config,
+      ProtobufMessage::ValidationVisitor& validation_visitor) const override {
+    const auto cares = MessageUtil::anyConvertAndValidate<ResolverConfig>(config.typed_config(),
+                                                                          validation_visitor);
+    THROW_IF_NOT_OK(resolveServers(cares).status());
   }
 
   absl::StatusOr<DnsResolverSharedPtr>
   createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
                     const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config)
       const override {
-    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-    std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-
+    ResolverConfig cares;
     ASSERT(dispatcher.isThreadSafe());
     // Only c-ares DNS factory will call into this function.
     // Directly unpack the typed config to a c-ares object.
     RETURN_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), cares));
 
-    if (!cares.resolvers().empty()) {
-      const auto& resolver_addrs = cares.resolvers();
-      resolvers.reserve(resolver_addrs.size());
-      for (const auto& resolver_addr : resolver_addrs) {
-        auto address_or_error = Network::Address::resolveProtoAddress(resolver_addr);
-        RETURN_IF_NOT_OK_REF(address_or_error.status());
-        resolvers.push_back(std::move(address_or_error.value()));
-      }
-    }
-    auto csv_or_error = DnsResolverImpl::maybeBuildResolversCsv(resolvers);
+    auto csv_or_error = resolveServers(cares);
     RETURN_IF_NOT_OK(csv_or_error.status());
 
     return std::make_shared<Network::DnsResolverImpl>(cares, dispatcher, csv_or_error.value(),
@@ -727,6 +727,17 @@ public:
   }
 
 private:
+  static absl::StatusOr<std::optional<std::string>> resolveServers(const ResolverConfig& cares) {
+    std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
+    resolvers.reserve(cares.resolvers_size());
+    for (const auto& resolver_addr : cares.resolvers()) {
+      auto address_or_error = Network::Address::resolveProtoAddress(resolver_addr);
+      RETURN_IF_NOT_OK_REF(address_or_error.status());
+      resolvers.push_back(std::move(*address_or_error));
+    }
+    return DnsResolverImpl::maybeBuildResolversCsv(resolvers);
+  }
+
   bool ares_library_initialized_ ABSL_GUARDED_BY(mutex_){false};
   absl::Mutex mutex_;
 };

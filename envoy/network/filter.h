@@ -747,6 +747,13 @@ public:
   virtual UdpListener& udpListener() PURE;
 
   /**
+   * Report a worker-local ECDS filter's transition between usable and missing configuration.
+   * Each missing notification must be paired with a ready notification on recovery or removal.
+   * Datagrams are dropped before dispatch while any filter is missing its configuration.
+   */
+  virtual void onFilterConfigReadinessChanged(bool ready) PURE;
+
+  /**
    * Register a session the filter is serving. For the lifetime of the returned handle the listener
    * keeps serving the session locally during hot restart drain, instead of forwarding it to the
    * child instance.

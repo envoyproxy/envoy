@@ -28,6 +28,7 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/buffer:buffer_interface",
+        "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/network:address_interface",

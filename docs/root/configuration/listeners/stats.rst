@@ -73,6 +73,8 @@ The following UDP statistics are available for UDP listeners and are rooted at
    :widths: 1, 1, 2
 
    downstream_rx_datagram_dropped, Counter, Number of datagrams dropped due to kernel overflow or truncation
+   extension_config_missing, Counter, Datagrams dropped by a UDP listener because a required filter configuration is unavailable
+   extension_config_update_failed, Counter, Worker failures to construct a UDP listener filter from an accepted ECDS configuration
 
 .. _config_listener_stats_quic:
 

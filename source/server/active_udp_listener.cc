@@ -100,7 +100,9 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
                                            Network::UdpListenerPtr&& listener,
                                            Network::ListenerConfig& config)
     : ActiveUdpListenerBase(worker_index, concurrency, parent, listen_socket, std::move(listener),
-                            &config) {
+                            &config),
+      raw_udp_stats_(
+          {ALL_RAW_UDP_LISTENER_STATS(POOL_COUNTER_PREFIX(config.listenerScope(), "udp"))}) {
   // Create the filter chain on creating a new udp listener.
   config_->filterChainFactory().createUdpListenerFilterChain(*this, *this);
 
@@ -130,6 +132,10 @@ void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) {
     return;
   }
 
+  if (missing_filter_configs_ != 0) {
+    raw_udp_stats_.extension_config_missing_.inc();
+    return;
+  }
   for (auto& read_filter : read_filters_) {
     Network::FilterStatus status = read_filter->onData(data);
     if (status == Network::FilterStatus::StopIteration) {
@@ -150,6 +156,9 @@ void ActiveRawUdpListener::onWriteReady(const Network::Socket&) {
 }
 
 void ActiveRawUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) {
+  if (missing_filter_configs_ != 0) {
+    return;
+  }
   for (auto& read_filter : read_filters_) {
     Network::FilterStatus status = read_filter->onReceiveError(error_code);
     if (status == Network::FilterStatus::StopIteration) {
@@ -160,6 +169,15 @@ void ActiveRawUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) 
 
 void ActiveRawUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& filter) {
   read_filters_.emplace_back(std::move(filter));
+}
+
+void ActiveRawUdpListener::onFilterConfigReadinessChanged(bool ready) {
+  if (ready) {
+    ASSERT(missing_filter_configs_ > 0);
+    --missing_filter_configs_;
+  } else {
+    ++missing_filter_configs_;
+  }
 }
 
 Network::UdpListener& ActiveRawUdpListener::udpListener() { return *udp_listener_; }

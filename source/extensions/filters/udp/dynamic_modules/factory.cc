@@ -7,10 +7,12 @@ namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
 namespace DynamicModules {
+namespace {
 
 Network::UdpListenerFilterFactoryCb
-DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& config, Server::Configuration::ListenerFactoryContext& context) {
+createFilterFactory(const Protobuf::Message& config,
+                    Server::Configuration::ListenerFactoryContext& context,
+                    bool require_module_filter) {
   const auto& proto_config = dynamic_cast<
       const envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter&>(
       config);
@@ -46,12 +48,30 @@ DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
         metrics_namespace);
   }
 
-  return [filter_config](Network::UdpListenerFilterManager& filter_manager,
-                         Network::UdpReadFilterCallbacks& callbacks) -> void {
+  return [filter_config, require_module_filter](Network::UdpListenerFilterManager& filter_manager,
+                                                Network::UdpReadFilterCallbacks& callbacks) {
     const uint32_t worker_index = callbacks.udpListener().dispatcher().workerId().value_or(0);
-    filter_manager.addReadFilter(
-        std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config, worker_index));
+    auto filter =
+        std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config, worker_index);
+    if (require_module_filter && !filter->hasModuleFilter()) {
+      throw EnvoyException("Dynamic module failed to create the discovered UDP listener filter");
+    }
+    filter_manager.addReadFilter(std::move(filter));
   };
+}
+
+} // namespace
+
+Network::UdpListenerFilterFactoryCb
+DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
+    const Protobuf::Message& config, Server::Configuration::ListenerFactoryContext& context) {
+  return createFilterFactory(config, context, /*require_module_filter=*/false);
+}
+
+Network::UdpListenerFilterFactoryCb
+DynamicModuleUdpListenerFilterConfigFactory::createDynamicFilterFactoryFromProto(
+    const Protobuf::Message& config, Server::Configuration::ListenerFactoryContext& context) {
+  return createFilterFactory(config, context, /*require_module_filter=*/true);
 }
 
 REGISTER_FACTORY(DynamicModuleUdpListenerFilterConfigFactory,

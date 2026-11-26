@@ -76,7 +76,8 @@ public:
   static absl::StatusOr<std::vector<Network::UdpListenerFilterFactoryCb>>
   createUdpListenerFilterFactoryListImpl(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
-      Configuration::ListenerFactoryContext& context);
+      Configuration::ListenerFactoryContext& context,
+      Filter::UdpListenerFilterConfigProviderManagerImpl& config_provider_manager);
 
   /**
    * Static worker for createQuicListenerFilterFactoryList() that can be used directly in tests.
@@ -115,7 +116,8 @@ public:
   createUdpListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
-    return createUdpListenerFilterFactoryListImpl(filters, context);
+    return createUdpListenerFilterFactoryListImpl(filters, context,
+                                                  *udp_listener_config_provider_manager_);
   }
   absl::StatusOr<Filter::QuicListenerFilterFactoriesList> createQuicListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
@@ -158,6 +160,9 @@ private:
   std::shared_ptr<Filter::NetworkFilterConfigProviderManagerImpl> network_config_provider_manager_;
   std::shared_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
       tcp_listener_config_provider_manager_;
+  std::shared_ptr<Filter::UdpListenerFilterConfigProviderManagerImpl>
+      udp_listener_config_provider_manager_{
+          std::make_shared<Filter::UdpListenerFilterConfigProviderManagerImpl>()};
   std::shared_ptr<Filter::QuicListenerFilterConfigProviderManagerImpl>
       quic_listener_config_provider_manager_;
 };

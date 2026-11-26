@@ -1,4 +1,5 @@
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -16,6 +17,7 @@
 
 #include "test/integration/filters/add_body_filter.pb.h"
 #include "test/mocks/init/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -125,15 +127,20 @@ class TestUdpListenerFilterFactory
       public Server::Configuration::NamedUdpListenerFilterConfigFactory {
 public:
   Network::UdpListenerFilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::ListenerFactoryContext&) override {
+  createFilterFactoryFromProto(const Protobuf::Message& config,
+                               Server::Configuration::ListenerFactoryContext& context) override {
+    auto callback = on_create_ ? on_create_(config, context) : noop;
     created_ = true;
-    return [](Network::UdpListenerFilterManager&, Network::UdpReadFilterCallbacks&) -> void {};
+    return callback;
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Protobuf::StringValue>();
   }
   std::string name() const override { return "envoy.test.filter"; }
+  static void noop(Network::UdpListenerFilterManager&, Network::UdpReadFilterCallbacks&) {}
+  std::function<Network::UdpListenerFilterFactoryCb(const Protobuf::Message&,
+                                                    Server::Configuration::ListenerFactoryContext&)>
+      on_create_;
 };
 
 class TestUdpSessionFilterFactory
@@ -246,13 +253,15 @@ public:
   }
 
   // Create a discovery response.
-  envoy::service::discovery::v3::DiscoveryResponse createResponse(std::string version,
-                                                                  std::string name) {
+  envoy::service::discovery::v3::DiscoveryResponse
+  createResponse(std::string version, std::string name, const std::string& value = "") {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     envoy::config::core::v3::TypedExtensionConfig extension_config;
     extension_config.set_name(name);
-    extension_config.mutable_typed_config()->set_type_url("type.googleapis.com/" + getTypeUrl());
+    Protobuf::StringValue config;
+    config.set_value(value);
+    std::ignore = extension_config.mutable_typed_config()->PackFrom(config);
     std::ignore = response.add_resources()->PackFrom(extension_config);
     return response;
   }
@@ -552,6 +561,166 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ConfigFailed) {
   EXPECT_EQ(
       1UL,
       config_discovery_test.store_.counter(config_discovery_test.getConfigFailCounter()).value());
+}
+
+TEST(FilterConfigDiscoveryTest, UdpListenerCallbacksSeePublishedConfiguration) {
+  UdpListenerFilterConfigDiscoveryImplTest test;
+  test.setup();
+  auto& reloads = test.store_.counter(test.getConfigReloadCounter());
+  size_t updates = 0;
+  bool has_config = true;
+  auto handle = test.provider_->addUpdateCallback([&]() {
+    EXPECT_EQ(has_config, test.provider_->config().has_value());
+    EXPECT_EQ(updates, reloads.value());
+    ++updates;
+  });
+  ASSERT_NE(handle, nullptr);
+  const auto decoded = TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(
+      test.createResponse("1", "foo"));
+  EXPECT_CALL(test.init_watcher_, ready());
+  ASSERT_OK(test.callbacks_->onConfigUpdate(decoded.refvec_, "1"));
+  EXPECT_EQ(1, updates);
+  EXPECT_EQ(1, reloads.value());
+
+  Protobuf::RepeatedPtrField<std::string> removed;
+  removed.Add("foo");
+  has_config = false;
+  ASSERT_OK(test.callbacks_->onConfigUpdate({}, removed, "2"));
+  EXPECT_EQ(2, updates);
+  EXPECT_EQ(2, reloads.value());
+
+  handle.reset();
+  ASSERT_OK(test.callbacks_->onConfigUpdate(decoded.refvec_, "3"));
+  EXPECT_EQ(2, updates);
+  EXPECT_EQ(3, reloads.value());
+}
+
+TEST(FilterConfigDiscoveryTest, UdpListenerValidatesDiscoveredAndDefaultFactories) {
+  UdpListenerFilterConfigDiscoveryImplTest test;
+  test.setup();
+  const auto decoded = TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(
+      test.createResponse("1", "foo"));
+  test.filter_factory_.on_create_ = [](const Protobuf::Message&, auto&) {
+    return Network::UdpListenerFilterFactoryCb{};
+  };
+  EXPECT_EQ(
+      absl::InvalidArgumentError("UDP listener filter envoy.test.filter returned an empty factory"),
+      test.callbacks_->onConfigUpdate(decoded.refvec_, "1"));
+  EXPECT_FALSE(test.provider_->config().has_value());
+  test.filter_factory_.created_ = false;
+  test.filter_factory_.on_create_ = [](const Protobuf::Message& message, auto&) {
+    if (dynamic_cast<const Protobuf::StringValue&>(message).value() != "good") {
+      throw EnvoyException("unsupported configuration");
+    }
+    return TestUdpListenerFilterFactory::noop;
+  };
+  const auto invalid = TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(
+      test.createResponse("2", "foo", "invalid"));
+  EXPECT_THROW_WITH_MESSAGE(test.callbacks_->onConfigUpdate(invalid.refvec_, "2").IgnoreError(),
+                            EnvoyException, "unsupported configuration");
+  EXPECT_FALSE(test.filter_factory_.created_);
+  EXPECT_FALSE(test.provider_->config().has_value());
+  const auto good = TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(
+      test.createResponse("3", "foo", "good"));
+  EXPECT_CALL(test.init_watcher_, ready());
+  ASSERT_OK(test.callbacks_->onConfigUpdate(good.refvec_, "3"));
+  EXPECT_TRUE(test.filter_factory_.created_);
+  test.filter_factory_.created_ = false;
+  // Check a new listener's fallback even though the subscription has a usable cached resource.
+  EXPECT_THROW_WITH_MESSAGE(test.createProvider("foo", true, true), EnvoyException,
+                            "unsupported configuration");
+  EXPECT_FALSE(test.filter_factory_.created_);
+}
+
+TEST(FilterConfigDiscoveryTest, UdpListenerRejectsNestedWarmingAfterFactoryCleanup) {
+  UdpListenerFilterConfigDiscoveryImplTest test;
+  test.setup();
+  const auto decoded = TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(
+      test.createResponse("1", "foo"));
+  bool registered = false;
+  Init::TargetImpl target("nested dependency", [] {});
+  struct WarmingExtension {
+    WarmingExtension(Init::Manager& manager, Init::Target& target, bool& registered)
+        : registered_(registered) {
+      registered_ = true;
+      manager.add(target);
+    }
+    ~WarmingExtension() { registered_ = false; }
+    bool& registered_;
+  };
+  test.filter_factory_.on_create_ = [&](const Protobuf::Message&, auto& context) {
+    auto ext = std::make_shared<WarmingExtension>(context.initManager(), target, registered);
+    return [ext](Network::UdpListenerFilterManager&, Network::UdpReadFilterCallbacks&) {};
+  };
+  EXPECT_CALL(test.init_manager_, add(_)).Times(0);
+  EXPECT_EQ(absl::FailedPreconditionError("UDP listener filter ECDS cannot register a listener "
+                                          "init target: target nested dependency"),
+            test.callbacks_->onConfigUpdate(decoded.refvec_, "1"));
+  EXPECT_TRUE(test.filter_factory_.created_);
+  EXPECT_FALSE(registered);
+  EXPECT_CALL(test.init_watcher_, ready());
+  test.callbacks_->onConfigUpdateFailed(Config::ConfigUpdateFailureReason::UpdateRejected, nullptr);
+  EXPECT_FALSE(test.provider_->config().has_value());
+}
+
+TEST(FilterConfigDiscoveryTest, UdpListenerRemovalRestoresEachPreparedDefault) {
+  size_t factory_count = 0;
+  size_t active_factory = 0;
+  UdpListenerFilterConfigDiscoveryImplTest test;
+  test.filter_factory_.on_create_ = [&](const Protobuf::Message&, auto&) {
+    return [id = ++factory_count, &active_factory](Network::UdpListenerFilterManager&,
+                                                   Network::UdpReadFilterCallbacks&) {
+      active_factory = id;
+    };
+  };
+  test.setup(true, true);
+  const auto second = test.createProvider("foo", true, true);
+  ASSERT_EQ(2, factory_count);
+
+  const auto good = TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(
+      test.createResponse("1", "foo", "discovered"));
+  EXPECT_CALL(test.init_watcher_, ready());
+  ASSERT_OK(test.callbacks_->onConfigUpdate(good.refvec_, "1"));
+
+  Protobuf::RepeatedPtrField<std::string> removed;
+  removed.Add("foo");
+  ASSERT_OK(test.callbacks_->onConfigUpdate({}, removed, "2"));
+  NiceMock<Network::MockUdpListenerFilterManager> manager;
+  NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
+  ASSERT_TRUE(test.provider_->config().has_value());
+  (*test.provider_->config())(manager, callbacks);
+  EXPECT_EQ(1, active_factory);
+  ASSERT_TRUE(second->config().has_value());
+  (*second->config())(manager, callbacks);
+  EXPECT_EQ(2, active_factory);
+}
+
+TEST(FilterConfigDiscoveryTest, UdpListenerRemovalKeepsServingDefaultFilters) {
+  UdpListenerFilterConfigDiscoveryImplTest test;
+  // The listener does not warm, so it is already serving its default.
+  test.setup(false, true);
+  size_t rebuilds = 0;
+  auto handle = test.provider_->addUpdateCallback([&]() { ++rebuilds; });
+  Protobuf::RepeatedPtrField<std::string> removed;
+  removed.Add("foo");
+  // The resource was never sent, so workers already run the default.
+  ASSERT_OK(test.callbacks_->onConfigUpdate({}, removed, "1"));
+  EXPECT_EQ(0, rebuilds);
+
+  const auto decoded = TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(
+      test.createResponse("2", "foo"));
+  ASSERT_OK(test.callbacks_->onConfigUpdate(decoded.refvec_, "2"));
+  ASSERT_OK(test.callbacks_->onConfigUpdate({}, removed, "3"));
+  EXPECT_EQ(2, rebuilds);
+  ASSERT_OK(test.callbacks_->onConfigUpdate({}, removed, "4"));
+  EXPECT_EQ(2, rebuilds);
+
+  // A skipped rebuild still completes the removal.
+  bool applied = false;
+  ASSERT_OK(test.provider_->onConfigRemoved([&applied]() { applied = true; }));
+  EXPECT_TRUE(applied);
+  EXPECT_EQ(2, rebuilds);
+  EXPECT_TRUE(test.provider_->config().has_value());
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TooManyResources) {

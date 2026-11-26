@@ -17,12 +17,17 @@ namespace Envoy {
 namespace Server {
 
 #define ALL_UDP_LISTENER_STATS(COUNTER) COUNTER(downstream_rx_datagram_dropped)
+#define ALL_RAW_UDP_LISTENER_STATS(COUNTER) COUNTER(extension_config_missing)
 
 /**
  * Wrapper struct for UDP listener stats. @see stats_macros.h
  */
 struct UdpListenerStats {
   ALL_UDP_LISTENER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+struct RawUdpListenerStats {
+  ALL_RAW_UDP_LISTENER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 class ActiveUdpListenerBase : public ActiveListenerImplBase,
@@ -139,17 +144,20 @@ public:
 
   // Network::UdpReadFilterCallbacks
   Network::UdpListener& udpListener() override;
+  void onFilterConfigReadinessChanged(bool ready) override;
   Network::UdpHotRestartSessionHandlePtr
   registerHotRestartSession(const Network::Address::InstanceConstSharedPtr& local_address,
                             const Network::Address::InstanceConstSharedPtr& peer_address) override;
 
 private:
+  RawUdpListenerStats raw_udp_stats_;
   // Sessions a filter has registered on this worker. During a hot restart the parent keeps serving
   // these and forwards datagrams of any other 4-tuple to the child instance.
   absl::flat_hash_set<Network::UdpRecvData::LocalPeerAddresses> active_sessions_;
-  // Destroying the filters unregisters their sessions, which touches active_sessions_ above.
-  std::list<Network::UdpListenerReadFilterPtr> read_filters_;
+  // The packet writer, session registry and readiness count must outlive filter teardown.
   Network::UdpPacketWriterPtr udp_packet_writer_;
+  size_t missing_filter_configs_{};
+  std::list<Network::UdpListenerReadFilterPtr> read_filters_;
   OptRef<Network::NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
 };
 

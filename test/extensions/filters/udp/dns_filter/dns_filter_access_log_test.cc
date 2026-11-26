@@ -2,6 +2,7 @@
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.validate.h"
 
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/filters/udp/dns_filter/config.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_access_log.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_constants.h"
@@ -189,6 +190,47 @@ public:
   std::unique_ptr<DnsFilter> filter_;
   std::shared_ptr<TestAccessLog> test_access_log_;
 };
+
+TEST_F(DnsFilterAccessLogTest, ReplaceableFilterValidatesResolverBeforeCreatingFileAccessLog) {
+  const auto yaml = R"EOF(
+stat_prefix: dynamic
+client_config:
+  max_pending_lookups: 1
+  typed_dns_resolver_config:
+    name: envoy.network.dns_resolver.getaddrinfo
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
+server_config:
+  inline_dns_table:
+    virtual_domains:
+    - name: example.test
+      endpoint:
+        address_list:
+          address: ["192.0.2.1"]
+access_log:
+- name: envoy.access_loggers.file
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+    path: dns-access.log
+    log_format:
+      text_format_source:
+        inline_string: "%QUERY_NAME%"
+)EOF";
+  auto config =
+      TestUtility::parseYaml<envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig>(
+          yaml);
+  DnsFilterConfigFactory factory;
+  auto& manager = listener_factory_.server_factory_context_.access_log_manager_;
+  EXPECT_CALL(manager, createAccessLog(_)).Times(0);
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createDynamicFilterFactoryFromProto(config, listener_factory_), EnvoyException,
+      "DNS resolver envoy.network.dns_resolver.getaddrinfo does not support live replacement");
+  testing::Mock::VerifyAndClearExpectations(&manager);
+
+  config.clear_client_config();
+  EXPECT_CALL(manager, createAccessLog(_));
+  EXPECT_TRUE(factory.createDynamicFilterFactoryFromProto(config, listener_factory_));
+}
 
 // Test that access log is not called when no access loggers are configured
 TEST_F(DnsFilterAccessLogTest, NoAccessLogConfigured) {

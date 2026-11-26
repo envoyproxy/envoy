@@ -16,6 +16,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/callback_impl.h"
 #include "source/common/config/resource_type_helper.h"
 #include "source/common/config/utility.h"
 #include "source/common/init/manager_impl.h"
@@ -108,6 +109,15 @@ public:
     }
     return {};
   }
+  Common::CallbackHandlePtr addUpdateCallback(std::function<void()> callback) override {
+    auto& callbacks = (*main_config_->tls_)->update_callbacks_;
+    if (!callbacks) {
+      callbacks = std::make_unique<Common::CallbackManager<void>>();
+    }
+    return callbacks->add(std::move(callback));
+  }
+
+  virtual absl::Status initializeDefaultFactory() { return absl::OkStatus(); }
 
   // Config::DynamicExtensionConfigProviderBase
   absl::Status onConfigUpdate(const Protobuf::Message& message, const std::string&,
@@ -142,15 +152,17 @@ public:
 protected:
   const std::string& getStatPrefix() const { return stat_prefix_; }
   const Network::ListenerFilterMatcherSharedPtr listener_filter_matcher_;
-
-private:
-  virtual absl::StatusOr<FactoryCb>
-  instantiateFilterFactory(const Protobuf::Message& message) const PURE;
+  const Protobuf::Message* defaultConfiguration() const { return default_configuration_.get(); }
 
   void update(std::optional<FactoryCb> config, Config::ConfigAppliedCb applied_on_all_threads) {
     // This call must not capture 'this' as it is invoked on all workers asynchronously.
     main_config_->tls_->runOnAllThreads(
-        [config](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
+        [config](OptRef<ThreadLocalConfig> tls) {
+          tls->config_ = config;
+          if (tls->update_callbacks_) {
+            tls->update_callbacks_->runCallbacks();
+          }
+        },
         [main_config = main_config_, config, applied_on_all_threads]() {
           // This happens after all workers have discarded the previous config so
           // it can be safely deleted on the main thread by an update with the new
@@ -162,9 +174,14 @@ private:
         });
   }
 
+private:
+  virtual absl::StatusOr<FactoryCb>
+  instantiateFilterFactory(const Protobuf::Message& message) const PURE;
+
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
     ThreadLocalConfig() : config_{std::nullopt} {}
     std::optional<FactoryCb> config_{};
+    std::unique_ptr<Common::CallbackManager<void>> update_callbacks_;
   };
 
   // Currently applied configuration to ensure that the main thread deletes the last reference to
@@ -340,14 +357,53 @@ class UdpListenerDynamicFilterConfigProviderImpl
 public:
   using ListenerDynamicFilterConfigProviderImpl::ListenerDynamicFilterConfigProviderImpl;
 
-private:
-  absl::StatusOr<Network::UdpListenerFilterFactoryCb>
-  instantiateFilterFactory(const Protobuf::Message& message) const override {
-    auto* factory =
-        Registry::FactoryRegistry<Server::Configuration::NamedUdpListenerFilterConfigFactory>::
-            getFactoryByType(message.GetTypeName());
-    return factory->createFilterFactoryFromProto(message, factory_context_);
+  absl::Status initializeDefaultFactory() override {
+    // A newly attached listener can already have a cached ECDS resource. Prepare its fallback
+    // now so resource removal always restores a factory validated for this listener.
+    if (const auto* config = defaultConfiguration(); config != nullptr) {
+      auto factory = instantiateFilterFactory(*config);
+      RETURN_IF_NOT_OK_REF(factory.status());
+      default_factory_ = std::move(*factory);
+    }
+    return absl::OkStatus();
   }
+
+  absl::Status onConfigUpdate(const Protobuf::Message& message, const std::string& version_info,
+                              Config::ConfigAppliedCb applied_on_all_threads) override {
+    RETURN_IF_NOT_OK(ListenerDynamicFilterConfigProviderImpl::onConfigUpdate(
+        message, version_info, std::move(applied_on_all_threads)));
+    serving_default_ = false;
+    return absl::OkStatus();
+  }
+
+  absl::Status applyDefaultConfiguration() override {
+    if (default_factory_.has_value()) {
+      publishDefault(nullptr);
+    }
+    return absl::OkStatus();
+  }
+
+  absl::Status onConfigRemoved(Config::ConfigAppliedCb applied_on_all_threads) override {
+    // Republishing an unchanged default would rebuild the filter on every worker, ending its
+    // sessions and cancelling its pending work.
+    if (!serving_default_) {
+      publishDefault(std::move(applied_on_all_threads));
+    } else if (applied_on_all_threads) {
+      applied_on_all_threads();
+    }
+    return absl::OkStatus();
+  }
+
+private:
+  void publishDefault(Config::ConfigAppliedCb applied_on_all_threads) {
+    update(default_factory_, std::move(applied_on_all_threads));
+    serving_default_ = true;
+  }
+
+  absl::StatusOr<Network::UdpListenerFilterFactoryCb>
+  instantiateFilterFactory(const Protobuf::Message& message) const override;
+  std::optional<Network::UdpListenerFilterFactoryCb> default_factory_;
+  bool serving_default_{false};
 };
 
 class UdpSessionDynamicFilterConfigProviderImpl
@@ -625,12 +681,12 @@ public:
           ProtobufTypes::MessagePtr);
     }
 
-    std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>> provider =
-        std::make_unique<DynamicFilterConfigImpl>(subscription, require_type_urls, server_context,
-                                                  factory_context, std::move(default_config),
-                                                  last_filter_in_filter_chain, filter_chain_type,
-                                                  provider_stat_prefix, listener_filter_matcher);
+    auto provider = std::make_unique<DynamicFilterConfigImpl>(
+        subscription, require_type_urls, server_context, factory_context, std::move(default_config),
+        last_filter_in_filter_chain, filter_chain_type, provider_stat_prefix,
+        listener_filter_matcher);
 
+    THROW_IF_NOT_OK(provider->initializeDefaultFactory());
     // Ensure the subscription starts if it has not already.
     if (config_source.apply_default_config_without_warming()) {
       factory_context.initManager().add(provider->initTarget());

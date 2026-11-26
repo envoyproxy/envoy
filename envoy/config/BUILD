@@ -62,6 +62,7 @@ envoy_cc_library(
     name = "extension_config_provider_interface",
     hdrs = ["extension_config_provider.h"],
     deps = [
+        "//envoy/common:callback",
         "//envoy/common:optref_lib",
         "//envoy/common:pure_lib",
     ],

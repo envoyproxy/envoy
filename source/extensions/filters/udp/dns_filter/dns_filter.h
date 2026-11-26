@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/optref.h"
 #include "envoy/event/file_event.h"
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
 #include "envoy/network/dns.h"
@@ -90,6 +91,9 @@ public:
   DnsFilterEnvoyConfig(
       Server::Configuration::ListenerFactoryContext& context,
       const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig& config);
+  static std::shared_ptr<const DnsFilterEnvoyConfig> createForLiveReplacement(
+      Server::Configuration::ListenerFactoryContext& context,
+      const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig& config);
 
   DnsFilterStats& stats() const { return stats_; }
   const absl::flat_hash_map<std::string, std::chrono::seconds>& domainTtl() const {
@@ -104,13 +108,21 @@ public:
   const envoy::config::core::v3::TypedExtensionConfig& typedDnsResolverConfig() const {
     return typed_dns_resolver_config_;
   }
-  const Network::DnsResolverFactory& dnsResolverFactory() const { return *dns_resolver_factory_; }
+  const Network::DnsResolverFactory* dnsResolverFactory() const { return dns_resolver_factory_; }
   Api::Api& api() const { return api_; }
   const RadixTree<DnsVirtualDomainConfigSharedPtr>& getDnsTrie() const { return dns_lookup_trie_; }
   const AccessLog::InstanceSharedPtrVector& accessLogs() const { return access_logs_; }
   bool caseInsensitive() const { return case_insensitive_; }
 
 private:
+  DnsFilterEnvoyConfig(
+      Server::Configuration::ListenerFactoryContext& context,
+      const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig& config,
+      OptRef<const envoy::config::core::v3::TypedExtensionConfig> fallback_resolver);
+  void initializeAccessLogs(
+      Server::Configuration::ListenerFactoryContext& context,
+      const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig& config);
+
   static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
     // dns_filter.(<stat_prefix>.)*: the stat prefix is a tag of the stats.
     const Stats::TagStringView tag{Envoy::Config::TagNames::get().DNS_FILTER_PREFIX, stat_prefix};
@@ -143,9 +155,9 @@ private:
   uint64_t retry_count_;
   std::chrono::milliseconds resolver_timeout_;
   Random::RandomGenerator& random_;
-  uint64_t max_pending_lookups_;
+  uint64_t max_pending_lookups_{};
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config_;
-  Network::DnsResolverFactory* dns_resolver_factory_;
+  const Network::DnsResolverFactory* dns_resolver_factory_{};
   AccessLog::InstanceSharedPtrVector access_logs_;
 };
 
@@ -412,7 +424,6 @@ private:
   DnsFilterResolverPtr resolver_;
   Network::Address::InstanceConstSharedPtr local_;
   Network::Address::InstanceConstSharedPtr peer_;
-  DnsFilterResolverCallback resolver_callback_;
 };
 
 } // namespace DnsFilter

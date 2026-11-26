@@ -22,6 +22,7 @@
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/network/dns_resolver/cares/dns_impl.h"
@@ -714,6 +715,10 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  EXPECT_THROW_WITH_MESSAGE(
+      dns_resolver_factory.validateConfigForLiveReplacement(
+          typed_dns_resolver_config, ProtobufMessage::getStrictValidationVisitor()),
+      EnvoyException, "DNS resolver 'foo' is not an IP address");
   EXPECT_EQ(dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
                 .status()
                 .message(),

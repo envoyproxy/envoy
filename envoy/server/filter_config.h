@@ -75,6 +75,17 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
+  /**
+   * Create a factory for a filter configured through ECDS, including its default configuration.
+   * The worker may destroy and replace this filter between datagrams while the listener is live.
+   * Override this method when that lifetime requires different validation or construction.
+   */
+  virtual Network::UdpListenerFilterFactoryCb
+  createDynamicFilterFactoryFromProto(const Protobuf::Message& config,
+                                      ListenerFactoryContext& context) {
+    return createFilterFactoryFromProto(config, context);
+  }
+
   std::string category() const override { return "envoy.filters.udp_listener"; }
 };
 

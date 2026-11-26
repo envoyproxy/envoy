@@ -1,4 +1,5 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/extension.pb.h"
 
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/thread_local_store.h"
@@ -93,6 +94,7 @@ public:
   void setupResponseParser() { histogram_.unit_ = Stats::Histogram::Unit::Milliseconds; }
 
   void TearDown() override {
+    cleanUpXdsConnection();
     if (test_server_) {
       test_server_.reset();
     }
@@ -243,6 +245,41 @@ listener_filters:
     return TestUtility::parseYaml<envoy::config::listener::v3::Listener>(config);
   }
 
+  envoy::config::core::v3::TypedExtensionConfig dnsTable(absl::string_view address,
+                                                         absl::string_view resolver_address = {}) {
+    const auto* resolver = fake_upstreams_[0]->localAddress()->ip();
+    if (resolver_address.empty()) {
+      resolver_address = resolver->addressAsString();
+    }
+    return TestUtility::parseYaml<envoy::config::core::v3::TypedExtensionConfig>(
+        fmt::format(R"EOF(
+name: dns_table
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig
+  stat_prefix: discovered_zones
+  client_config:
+    resolver_timeout: 60s
+    max_pending_lookups: 10
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.cares
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+        resolvers:
+        - socket_address: {{ address: "{}", port_value: {} }}
+        dns_resolver_options: {{ no_default_search_domain: true }}
+        query_timeout_seconds: 60
+        query_tries: 1
+  server_config:
+    inline_dns_table:
+      virtual_domains:
+      - name: service.example
+        endpoint:
+          address_list:
+            address: ["{}"]
+)EOF",
+                    resolver_address, resolver->port(), address));
+  }
+
   void setup(uint32_t upstream_count) {
     setUdpFakeUpstream(FakeUpstreamConfig::UdpConfig());
     // Adding bootstrap default DNS resolver config.
@@ -287,6 +324,17 @@ listener_filters:
         std::ignore = listener_filter->mutable_typed_config()->PackFrom(dns_filter_config);
       }
       auto listener_1 = getListener1(addr_port);
+      if (create_xds_upstream_) {
+        auto* filter = listener_1.mutable_listener_filters(0);
+        filter->set_name("dns_table");
+        auto* discovery = filter->mutable_config_discovery();
+        *discovery->mutable_default_config() = dnsTable("192.0.2.5").typed_config();
+        discovery->add_type_urls(discovery->default_config().type_url());
+        discovery->set_apply_default_config_without_warming(true);
+        auto* source = discovery->mutable_config_source();
+        source->set_resource_api_version(envoy::config::core::v3::V3);
+        source->mutable_ads();
+      }
       bootstrap.mutable_static_resources()->add_listeners()->MergeFrom(listener_1);
     });
 
@@ -363,6 +411,109 @@ TEST_P(DnsFilterIntegrationTest, ExternalLookupTest) {
 TEST_P(DnsFilterIntegrationTest, InternalLookupTest) {
   // Sending request to listener_1 triggers internal DNS lookup.
   dnsLookupTest(Network::Address::IpVersion::v4, "listener_1", DNS_RECORD_TYPE_A);
+}
+
+TEST_P(DnsFilterIntegrationTest, EcdsUpdatesVirtualDomainOnActiveListener) {
+  create_xds_upstream_ = true;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    cluster->CopyFrom(bootstrap.static_resources().clusters(0));
+    cluster->set_name("ads_cluster");
+    cluster->mutable_load_assignment()->set_cluster_name("ads_cluster");
+    ConfigHelper::setHttp2(*cluster);
+    auto* ads = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+    ads->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+    ads->set_transport_api_version(envoy::config::core::v3::V3);
+    ads->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("ads_cluster");
+  });
+  setup(2);
+  createXdsConnection();
+  ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
+  xds_stream_->startGrpcStream();
+  const std::string type_url = "type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig";
+  ASSERT_TRUE(compareDeltaDiscoveryRequest(type_url, {"dns_table"}, {}));
+  const auto listener_address = Network::Utility::getAddressWithPort(
+      *Network::Test::getCanonicalLoopbackAddress(version_), lookupPort("listener_1"));
+  auto& resolver = *fake_upstreams_[0];
+  auto& client = *fake_upstreams_[1];
+  auto expectAnswer = [&](uint16_t id, const std::string& expected) {
+    client.sendUdpDatagram(
+        Utils::buildQueryForDomain("service.example", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN, id),
+        listener_address);
+    Network::UdpRecvData response;
+    ASSERT_TRUE(client.waitForUdpDatagram(response));
+    auto context = ResponseValidator::createResponseContext(response, counters_);
+    ASSERT_TRUE(context->parse_status_);
+    EXPECT_EQ(id, context->id_);
+    ASSERT_EQ(1, context->answers_.size());
+    Utils::verifyAddress({expected}, context->answers_.begin()->second);
+  };
+  constexpr char reload[] =
+      "extension_config_discovery.udp_listener_filter.dns_table.config_reload";
+  using Extension = envoy::config::core::v3::TypedExtensionConfig;
+  auto expectAck = [&]() {
+    ASSERT_TRUE(compareDeltaDiscoveryRequest(type_url, {}, {}, Grpc::Status::Ok, "", false));
+  };
+  expectAnswer(10, "192.0.2.5");
+  sendDeltaDiscoveryResponse<Extension>(type_url, {dnsTable("192.0.2.10")}, {}, "1");
+  expectAck();
+  test_server_->waitForCounter(reload, testing::Eq(1));
+  expectAnswer(1, "192.0.2.10");
+
+  sendDeltaDiscoveryResponse<Extension>(type_url, {dnsTable("invalid-address")}, {}, "2");
+  ASSERT_TRUE(compareDeltaDiscoveryRequest(type_url, {}, {}, Grpc::Status::Internal,
+                                           "malformed IP address", false));
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_listener_filter.dns_table.config_fail", testing::Eq(1));
+  expectAnswer(2, "192.0.2.10");
+
+  // The virtual domain is valid, but a c-ares server must resolve to an IP address.
+  sendDeltaDiscoveryResponse<Extension>(
+      type_url, {dnsTable("192.0.2.99", "invalid-resolver.example")}, {}, "2b");
+  ASSERT_TRUE(compareDeltaDiscoveryRequest(type_url, {}, {}, Grpc::Status::Internal,
+                                           "malformed IP address: invalid-resolver.example",
+                                           false));
+  test_server_->waitForCounter(
+      "extension_config_discovery.udp_listener_filter.dns_table.config_fail", testing::Eq(2));
+  expectAnswer(11, "192.0.2.10");
+
+  // Hold an external answer until the filter that forwarded this transaction has been replaced.
+  client.sendUdpDatagram(
+      Utils::buildQueryForDomain("pending.example", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN, 3),
+      listener_address);
+  Network::UdpRecvData forwarded;
+  ASSERT_TRUE(resolver.waitForUdpDatagram(forwarded));
+  DnsMessageParser parser(true, dispatcher_->timeSource(), 0, random_, histogram_);
+  auto pending = parser.createQueryContext(forwarded, counters_);
+  ASSERT_TRUE(pending->parse_status_);
+  ASSERT_EQ(1, pending->queries_.size());
+  EXPECT_THAT(pending->queries_.front()->name_, testing::StrCaseEq("pending.example"));
+  ASSERT_TRUE(
+      parser.storeDnsAnswerRecord(pending, *pending->queries_.front(), std::chrono::seconds(60),
+                                  Network::Utility::parseInternetAddressNoThrow("192.0.2.30")));
+  Buffer::OwnedImpl late_answer;
+  parser.buildResponseBuffer(pending, late_answer);
+
+  const uint64_t reloads_before_replacement = test_server_->counter(reload)->value();
+  sendDeltaDiscoveryResponse<Extension>(type_url, {dnsTable("192.0.2.20")}, {}, "3");
+  expectAck();
+  test_server_->waitForCounter(reload, testing::Eq(reloads_before_replacement + 1));
+  resolver.sendUdpDatagram(late_answer.toString(), forwarded.addresses_.peer_);
+  expectAnswer(4, "192.0.2.20");
+  Network::UdpRecvData unexpected;
+  EXPECT_FALSE(client.waitForUdpDatagram(unexpected, std::chrono::milliseconds(50)));
+  sendDeltaDiscoveryResponse<Extension>(type_url, {}, {"dns_table"}, "4");
+  expectAck();
+  test_server_->waitForCounter(reload, testing::Eq(reloads_before_replacement + 2));
+  expectAnswer(5, "192.0.2.5");
+  sendDeltaDiscoveryResponse<Extension>(type_url, {dnsTable("192.0.2.40")}, {}, "5");
+  expectAck();
+  test_server_->waitForCounter(reload, testing::Eq(reloads_before_replacement + 3));
+  expectAnswer(6, "192.0.2.40");
+  EXPECT_EQ(7,
+            test_server_->counter("dns_filter.discovered_zones.downstream_tx_responses")->value());
+  EXPECT_EQ(2 * concurrency_,
+            test_server_->counter("listener_manager.listener_create_success")->value());
 }
 
 TEST_P(DnsFilterIntegrationTest, ExternalLookupTestIPv6) {

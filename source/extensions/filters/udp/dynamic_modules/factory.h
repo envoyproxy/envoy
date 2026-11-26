@@ -15,6 +15,9 @@ public:
   Network::UdpListenerFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                Server::Configuration::ListenerFactoryContext& context) override;
+  Network::UdpListenerFilterFactoryCb createDynamicFilterFactoryFromProto(
+      const Protobuf::Message& config,
+      Server::Configuration::ListenerFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<

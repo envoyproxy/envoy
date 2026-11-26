@@ -129,13 +129,13 @@ protected:
             });
     ON_CALL(listener_factory_, createUdpListenerFilterFactoryList(_, _))
         .WillByDefault(
-            [](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
-                   filters,
-               Configuration::ListenerFactoryContext& context)
+            [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+                       filters,
+                   Configuration::ListenerFactoryContext& context)
                 -> std::vector<Network::UdpListenerFilterFactoryCb> {
               return THROW_OR_RETURN_VALUE(
-                  ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(filters,
-                                                                                       context),
+                  ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
+                      filters, context, *udp_listener_config_provider_manager_),
                   std::vector<Network::UdpListenerFilterFactoryCb>);
             });
     ON_CALL(listener_factory_, createQuicListenerFilterFactoryList(_, _))
@@ -514,6 +514,9 @@ protected:
   std::shared_ptr<Filter::NetworkFilterConfigProviderManagerImpl> network_config_provider_manager_;
   std::shared_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
       tcp_listener_config_provider_manager_;
+  std::shared_ptr<Filter::UdpListenerFilterConfigProviderManagerImpl>
+      udp_listener_config_provider_manager_{
+          std::make_shared<Filter::UdpListenerFilterConfigProviderManagerImpl>()};
   std::shared_ptr<Filter::QuicListenerFilterConfigProviderManagerImpl>
       quic_listener_config_provider_manager_;
 };
