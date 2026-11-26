@@ -37,8 +37,14 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   if (alt_svc.empty()) {
     return Http::FilterHeadersStatus::Continue;
   }
+  // As an upstream filter, read this attempt's own stream info. With hedged retries, the
+  // request's stream info may already point at a newer attempt's host.
+  auto upstream_callbacks = encoder_callbacks_->upstreamCallbacks();
+  StreamInfo::StreamInfo& stream_info = upstream_callbacks.has_value()
+                                            ? upstream_callbacks->upstreamStreamInfo()
+                                            : encoder_callbacks_->streamInfo();
   Http::HttpServerPropertiesCacheSharedPtr cache;
-  const auto info = encoder_callbacks_->streamInfo().upstreamClusterInfo();
+  const auto info = stream_info.upstreamClusterInfo();
   if (info) {
     const auto& alternate_options = info->httpProtocolOptions().alternateProtocolsCacheOptions();
     if (alternate_options) {
@@ -67,12 +73,6 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   // Envoy routes request to upstream hosts not to origin servers directly. This choice would
   // allow HTTP/3 to be used on a per-upstream host basis, even for origins which are load
   // balanced across them.
-  // As an upstream filter, read this attempt's own stream info. With hedged retries, the
-  // request's stream info may already point at a newer attempt's host.
-  auto upstream_callbacks = encoder_callbacks_->upstreamCallbacks();
-  StreamInfo::StreamInfo& stream_info = upstream_callbacks.has_value()
-                                            ? upstream_callbacks->upstreamStreamInfo()
-                                            : encoder_callbacks_->streamInfo();
   const auto upstream_info = stream_info.upstreamInfo();
   Upstream::HostDescriptionConstSharedPtr host =
       upstream_info != nullptr ? upstream_info->upstreamHost() : nullptr;

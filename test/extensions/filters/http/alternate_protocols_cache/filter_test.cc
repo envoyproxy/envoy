@@ -164,11 +164,15 @@ TEST_F(FilterTest, ValidAltSvcUsesAttemptStreamInfo) {
   info->alternate_protocols_cache_options_.emplace(
       proto_config.alternate_protocols_cache_options());
 
-  // The request's stream info has no upstream host, so only the attempt's can supply the origin.
-  callbacks_.stream_info_.upstream_info_ = nullptr;
-  NiceMock<StreamInfo::MockStreamInfo> attempt_stream_info;
+  // The request's stream info points at another attempt's host, which must not be used.
+  std::string other_hostname = "other-attempt-host";
+  std::shared_ptr<const Upstream::MockHostDescription> other_hd =
+      std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
+          callbacks_.stream_info_.upstreamInfo()->upstreamHost());
+  ON_CALL(*other_hd, hostname()).WillByDefault(ReturnRef(other_hostname));
   NiceMock<Http::MockUpstreamStreamFilterCallbacks> upstream_callbacks;
-  ON_CALL(upstream_callbacks, upstreamStreamInfo()).WillByDefault(ReturnRef(attempt_stream_info));
+  StreamInfo::MockStreamInfo& attempt_stream_info = upstream_callbacks.upstream_stream_info_;
+  attempt_stream_info.upstream_cluster_info_ = info;
   ON_CALL(callbacks_, upstreamCallbacks())
       .WillByDefault(Return(OptRef<Http::UpstreamStreamFilterCallbacks>(upstream_callbacks)));
 
