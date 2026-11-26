@@ -46,7 +46,7 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig
 )EOF",
                                            filename);
-    config_helper_.prependFilter(filter);
+    config_helper_.prependFilter(filter, downstream_filter_);
 
     // Set resource tracking on connection pools so we can explicitly check when
     // they're created and torn down.
@@ -153,9 +153,16 @@ typed_config:
   bool write_alt_svc_to_file_ = false;
   // If this is set to true, the upstream host has a hostname and the cluster sets `auto_host_sni`.
   bool auto_host_sni_ = false;
+  // If this is set to false, the filter runs in the cluster's upstream filter chain instead of the
+  // HTTP connection manager's.
+  bool downstream_filter_ = true;
+
+  // Sends a request that gets an Alt-Svc response over HTTP/2, then checks that the next request
+  // goes out over HTTP/3.
+  void testAltSvc();
 };
 
-TEST_P(FilterIntegrationTest, AltSvc) {
+void FilterIntegrationTest::testAltSvc() {
   const uint64_t request_size = 0;
   const uint64_t response_size = 0;
   const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
@@ -190,6 +197,14 @@ TEST_P(FilterIntegrationTest, AltSvc) {
                                                  response_size, 1, timeout);
   checkSimpleRequestSuccess(request_size, response_size, response2.get());
   test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http3_total", Eq(1));
+}
+
+TEST_P(FilterIntegrationTest, AltSvc) { testAltSvc(); }
+
+// The filter learns Alt-Svc the same way when it runs in the cluster's upstream filter chain.
+TEST_P(FilterIntegrationTest, AltSvcUpstreamFilter) {
+  downstream_filter_ = false;
+  testAltSvc();
 }
 
 // With `auto_host_sni`, the Alt-Svc header is cached for the upstream host's hostname. The grid
