@@ -40,10 +40,7 @@ public:
 
   ListenerIntegrationTestBase(Network::Address::IpVersion version, const std::string& config)
       : HttpIntegrationTest(Http::CodecType::HTTP1, version, config) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat
-    // 'listener_manager.lds.grpc.lds_cluster.streams_closed_1' and stat_prefix 'lds_cluster'.
-    skip_tag_extraction_rule_check_ = true;
+    skip_tag_extraction_rule_check_ = false;
   }
 
   ~ListenerIntegrationTestBase() override { resetConnections(); }
@@ -379,6 +376,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerMultiAddressesIntegrati
 
 // Tests that an update with an unknown filter config proto is rejected.
 TEST_P(ListenerIntegrationTest, CleanlyRejectsUnknownFilterConfigProto) {
+  // The rejected listener contains an unknown Any. The fixture's tag check reads /config_dump,
+  // which cannot serialize that Any to JSON.
+  skip_tag_extraction_rule_check_ = true;
   on_server_init_function_ = [&]() {
     createLdsStream();
     envoy::config::listener::v3::Listener listener =
@@ -1618,10 +1618,7 @@ public:
           stat_prefix: tcp_stats
           cluster: cluster_0
 )EOF") {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat
-    // 'listener_manager.lds.grpc.lds_cluster.streams_closed_1' and stat_prefix 'lds_cluster'.
-    skip_tag_extraction_rule_check_ = true;
+    skip_tag_extraction_rule_check_ = false;
   }
 
   ~ListenerFilterIntegrationTest() override {

@@ -1730,7 +1730,7 @@ void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_cluster_host_envoy_ptr host,
     envoy_dynamic_module_type_module_buffer details) {
-  using Envoy::Extensions::Clusters::DynamicModules::DynamicModuleClusterHandleSharedPtr;
+  using Envoy::Extensions::Clusters::DynamicModules::DynamicModuleCluster;
   using Envoy::Extensions::Clusters::DynamicModules::DynamicModuleLoadBalancer;
   auto* lb_raw = static_cast<DynamicModuleLoadBalancer*>(lb_envoy_ptr);
 
@@ -1740,60 +1740,63 @@ void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
     details_str.assign(details.ptr, details.length);
   }
 
-  // The module may invoke this callback on any thread and race the load balancer destructor.
-  // Validate the raw pointer against the live registry and snapshot the state we need under the
-  // registry lock.
+  // The module may invoke this callback on any thread and race the load balancer destructor, so
+  // the raw pointer is validated against the live registry before anything is read through it.
   Envoy::Extensions::Clusters::DynamicModules::DynamicModuleAsyncHostSelectionRegistrySharedPtr
       selections;
-  Envoy::Event::Dispatcher* dispatcher = nullptr;
-  DynamicModuleClusterHandleSharedPtr handle;
+  std::weak_ptr<DynamicModuleCluster> cluster;
   const bool found = DynamicModuleLoadBalancer::withActiveInstance(
       lb_raw, [&](const DynamicModuleLoadBalancer& lb) {
         selections = lb.asyncSelections();
-        dispatcher = lb.workerDispatcher();
-        handle = lb.handle();
+        cluster = lb.handle()->cluster()->weak_from_this();
       });
   if (!found) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "async host selection for context {} completed after its load balancer "
+                        "was destroyed, dropped",
+                        context_envoy_ptr);
     return;
   }
 
   // Look the completing selection up by its own context. A load balancer serves many concurrent
-  // selections, so reading a single shared flag here would let a cancellation on one selection drop
-  // the completion of another. An absent entry means this selection was already completed or
+  // selections, so reading a single shared flag here would let a cancellation on one selection
+  // drop the completion of another. An absent entry means this selection was already completed or
   // cancelled and its `cancelable` destroyed, so the context must not be touched.
   std::shared_ptr<std::atomic<bool>> cancelled = selections->find(context_envoy_ptr);
   if (cancelled == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "async host selection for context {} completed with no selection in "
+                        "flight, dropped",
+                        context_envoy_ptr);
     return;
   }
 
-  if (dispatcher != nullptr) {
-    // Post to the worker thread. The handle keeps the cluster alive until the callback runs. The
-    // flag is re-read inside the post because the router may cancel between the post and the run.
-    dispatcher->post([context_envoy_ptr, host, details_str = std::move(details_str),
-                      cancelled = std::move(cancelled), handle = std::move(handle)]() {
-      if (cancelled->load(std::memory_order_acquire)) {
-        return;
-      }
-      auto* context = getContext(context_envoy_ptr);
-      Envoy::Upstream::HostConstSharedPtr host_shared;
-      if (host != nullptr) {
-        host_shared = handle->cluster()->findHost(host);
-      }
-      context->onAsyncHostSelection(std::move(host_shared), std::string(details_str));
-    });
-    return;
-  }
-
-  // No worker dispatcher. Complete inline on the calling thread.
-  if (cancelled->load(std::memory_order_acquire)) {
-    return;
-  }
-  auto* context = getContext(context_envoy_ptr);
-  Envoy::Upstream::HostConstSharedPtr host_shared;
-  if (host != nullptr) {
-    host_shared = handle->cluster()->findHost(host);
-  }
-  context->onAsyncHostSelection(std::move(host_shared), std::move(details_str));
+  // Post even when the module completes on the load balancer's thread, so the router never runs on
+  // a module thread or inside choose_host. The post claims the selection when it runs, since the
+  // router may cancel first and the module may complete twice, and the cluster is held weakly, so a
+  // post destroyed unrun at server teardown cannot tear it down.
+  selections->postToLoadBalancerThread(
+      [context_envoy_ptr, host, details_str = std::move(details_str),
+       cancelled = std::move(cancelled), cluster = std::move(cluster)]() mutable {
+        if (cancelled->exchange(true, std::memory_order_acq_rel)) {
+          ENVOY_LOG_TO_LOGGER(
+              Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+              "async host selection for context {} ended before its result ran, dropped",
+              context_envoy_ptr);
+          return;
+        }
+        // A cluster destroyed before the post ran resolves no host, and the router fails the
+        // request.
+        Envoy::Upstream::HostConstSharedPtr host_shared;
+        if (host != nullptr) {
+          if (const std::shared_ptr<DynamicModuleCluster> cluster_shared = cluster.lock();
+              cluster_shared != nullptr) {
+            host_shared = cluster_shared->findHost(host);
+          }
+        }
+        getContext(context_envoy_ptr)
+            ->onAsyncHostSelection(std::move(host_shared), std::move(details_str));
+      });
 }
 
 // =============================================================================

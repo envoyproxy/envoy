@@ -10,6 +10,7 @@ import "envoy/type/v3/token_bucket.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -100,7 +101,19 @@ message LocalRateLimit {
   // .. note::
   //
   //  The filter supports a range of 0 - 10 inclusively for stage numbers.
-  uint32 stage = 9 [(validate.rules).uint32 = {lte: 10}];
+  //
+  // .. attention::
+  //
+  //   This field is deprecated. It only selects the deprecated
+  //   :ref:`VirtualHost.rate_limits <envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` and
+  //   :ref:`RouteAction.rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>`
+  //   with the same :ref:`stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>` and has no
+  //   effect on the ``rate_limits`` configured in the filter config.
+  uint32 stage = 9 [
+    deprecated = true,
+    (validate.rules).uint32 = {lte: 10},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
 
   // Specifies the scope of the rate limiter's token bucket.
   // If set to false, the token bucket is shared across all worker threads,
@@ -149,8 +162,19 @@ message LocalRateLimit {
       [(validate.rules).enum = {defined_only: true}];
 
   // Specifies if the local rate limit filter should include the virtual host rate limits.
-  common.ratelimit.v3.VhRateLimitsOptions vh_rate_limits = 13
-      [(validate.rules).enum = {defined_only: true}];
+  //
+  // .. attention::
+  //
+  //   This field is deprecated. It only applies to the deprecated
+  //   :ref:`VirtualHost.rate_limits <envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` and
+  //   :ref:`RouteAction.rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>`.
+  //   Use ``rate_limits_override_option`` to control how the ``rate_limits`` of different levels
+  //   are applied instead.
+  common.ratelimit.v3.VhRateLimitsOptions vh_rate_limits = 13 [
+    deprecated = true,
+    (validate.rules).enum = {defined_only: true},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
 
   // Specifies if default token bucket should be always consumed.
   // If set to false, default token bucket will only be consumed when there is
@@ -166,7 +190,7 @@ message LocalRateLimit {
   // Rate limit configuration that is used to generate a list of descriptor entries based on
   // the request context. The generated entries will be used to find one or multiple matched rate
   // limit rule from the ``descriptors``.
-  // If this is set, then
+  // If this is set, then the deprecated
   // :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
   // :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
   // will be ignored.

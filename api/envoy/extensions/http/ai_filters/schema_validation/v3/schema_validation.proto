@@ -18,7 +18,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Schema validation AI filter]
 // Schema validation AI filter :ref:`configuration overview
-// <config_http_filters_ai_protocol_manager_schema_validation>`.
+// <config_http_ai_filters_schema_validation>`.
 // [#extension: envoy.http.ai_filters.schema_validation]
 
 // Validates the request payload against the payload schema of its wire API, and rejects a payload

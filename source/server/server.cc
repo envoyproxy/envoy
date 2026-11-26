@@ -1248,6 +1248,10 @@ void InstanceBase::notifyCallbacksForStage(Stage stage, std::function<void()> co
 ProtobufTypes::MessagePtr InstanceBase::dumpBootstrapConfig() {
   auto config_dump = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
   config_dump->mutable_bootstrap()->MergeFrom(bootstrap_);
+  // Report the live node's dynamic context, which bootstrap extensions can set via the context
+  // provider and which otherwise only appears in xDS discovery requests.
+  *config_dump->mutable_bootstrap()->mutable_node()->mutable_dynamic_parameters() =
+      localInfo().node().dynamic_parameters();
   TimestampUtil::systemClockToTimestamp(bootstrap_config_update_time_,
                                         *(config_dump->mutable_last_updated()));
   return config_dump;

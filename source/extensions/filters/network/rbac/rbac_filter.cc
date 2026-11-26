@@ -16,7 +16,8 @@ namespace NetworkFilters {
 namespace RBACFilter {
 
 absl::Status ActionValidationVisitor::performDataInputValidation(
-    const Matcher::DataInputFactory<Http::HttpMatchingData>&, absl::string_view type_url) {
+    const Matcher::DataInputFactory<Http::HttpMatchingData>& data_input,
+    absl::string_view type_url) {
   static const absl::flat_hash_set<std::string> allowed_inputs_set{
       {TypeUtil::descriptorFullNameToTypeUrl(
           envoy::extensions::matching::common_inputs::network::v3::DestinationIPInput::descriptor()
@@ -51,7 +52,8 @@ absl::Status ActionValidationVisitor::performDataInputValidation(
       {TypeUtil::descriptorFullNameToTypeUrl(
           envoy::extensions::matching::common_inputs::network::v3::FilterStateInput::descriptor()
               ->full_name())}};
-  if (allowed_inputs_set.contains(type_url)) {
+  if (allowed_inputs_set.contains(type_url) ||
+      data_input.availableAt() <= Matcher::DataInputStage::Connection) {
     return absl::OkStatus();
   }
 

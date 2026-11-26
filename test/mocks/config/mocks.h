@@ -42,6 +42,8 @@ public:
   MockXdsConfigTracker();
   ~MockXdsConfigTracker() override;
 
+  bool enabled() const override { return enabled_; }
+
   MOCK_METHOD(void, onConfigAccepted,
               (const absl::string_view type_url, const std::vector<DecodedResourcePtr>& resources),
               (override));
@@ -60,6 +62,8 @@ public:
               (override));
   MOCK_METHOD(void, onResourceUnsubscribed,
               (const absl::string_view type_url, absl::string_view resource), (override));
+
+  bool enabled_{true};
 };
 
 class MockXdsConfigTrackerFactory : public XdsConfigTrackerFactory {

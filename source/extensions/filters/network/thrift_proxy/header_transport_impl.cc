@@ -82,6 +82,11 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
     throw EnvoyException("no header data");
   }
 
+  if (header_size + static_cast<int32_t>(MinFrameStartSizeNoHeaders) > frame_size) {
+    throw EnvoyException(
+        fmt::format("thrift header size {} exceeds frame size {}", header_size, frame_size));
+  }
+
   if (buffer.length() < static_cast<uint64_t>(header_size) + MinDecodeBytes) {
     // Need more header data.
     return false;

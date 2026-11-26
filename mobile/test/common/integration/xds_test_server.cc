@@ -14,6 +14,7 @@
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
+#include "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.h"
 
 #include "test/integration/fake_upstream.h"
 #include "test/test_common/environment.h"
@@ -62,6 +63,8 @@ XdsTestServer::XdsTestServer()
   Config::forceRegisterAdsCollectionConfigSubscriptionFactory();
   Config::forceRegisterGrpcMuxFactory();
   Config::forceRegisterNewGrpcMuxFactory();
+  Config::XdsMux::forceRegisterDeltaGrpcMuxFactory();
+  Config::XdsMux::forceRegisterSotwGrpcMuxFactory();
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   auto* common_tls_context = tls_context.mutable_common_tls_context();

@@ -527,6 +527,39 @@ TEST_P(BootstrapExtensionValidationServerTest, BootstrapExtensionsCreatedDuringV
   server.shutdown();
 }
 
+// Verify that the runtime exists when bootstrap extensions are created, so that an extension can
+// watch runtime keys while it is created.
+TEST_P(BootstrapExtensionValidationServerTest, BootstrapExtensionCanUseRuntimeWhenCreated) {
+  testing::NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;
+  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly([]() {
+    return std::make_unique<test::common::config::DummyConfig>();
+  });
+  EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
+
+  Common::CallbackHandlePtr update_handle;
+  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
+      .WillOnce(
+          [&](const Protobuf::Message&,
+              Configuration::ServerFactoryContext& context) -> BootstrapExtensionCreationResult {
+            update_handle = context.runtime().addUpdateCallback([]() {});
+            EXPECT_NE(nullptr, context.runtime().threadsafeSnapshot());
+            return BootstrapExtensionPtr{std::make_unique<MockBootstrapExtension>()};
+          });
+
+  Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
+      mock_factory);
+
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  ValidationInstance server(options_, time_system.timeSystem(),
+                            Network::Address::InstanceConstSharedPtr(), stats_store,
+                            access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                            Filesystem::fileSystemForTest());
+  EXPECT_NE(nullptr, update_handle);
+  server.shutdown();
+}
+
 // Verify that a bootstrap extension factory throwing an error causes validation to fail.
 TEST_P(BootstrapExtensionValidationServerTest, BootstrapExtensionThrowingFailsValidation) {
   testing::NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;

@@ -11,6 +11,7 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/common/callback_impl.h"
 #include "source/common/grpc/common.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
@@ -59,6 +60,20 @@ public:
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
 
   const Init::Target& initTarget() { return parent_init_target_; }
+
+  /**
+   * Registers a callback for a delta xDS update that removes this
+   * subscription's RouteConfiguration. Nothing is published on removal: the
+   * configuration a provider already holds stays in place, since a listener
+   * cannot run without a route table. The callback lets an owner that can live
+   * without one, such as a scoped-RDS scope whose route table was fetched on
+   * demand, drop the provider and fetch the configuration again when it is next
+   * needed. Without a callback a removal is ignored, as before.
+   */
+  ABSL_MUST_USE_RESULT Envoy::Common::CallbackHandlePtr
+  addRemovalCallback(std::function<absl::Status()> callback) {
+    return removal_callback_manager_.add(callback);
+  }
 
 protected:
   RdsRouteConfigSubscription(RouteConfigUpdatePtr&& config_update,
@@ -122,6 +137,7 @@ protected:
   RouteConfigProvider* route_config_provider_{nullptr};
   RouteConfigUpdatePtr config_update_info_;
   Envoy::Config::OpaqueResourceDecoderSharedPtr resource_decoder_;
+  Envoy::Common::CallbackManager<absl::Status> removal_callback_manager_;
 };
 
 using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscription>;

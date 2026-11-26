@@ -176,6 +176,22 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "chain_writer_test",
+    srcs = ["chain_writer_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    deps = [
+        ":fake_bridge_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/coroutine:dispatcher_executor_lib",
+        "//source/common/coroutine:launch_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:chain_writer_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "replay_awaitable_test",
     srcs = ["replay_awaitable_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],

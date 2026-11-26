@@ -164,6 +164,14 @@ public:
 
   PassthroughStateSharedPtr passthroughState() override { return passthrough_state_; }
 
+  void mergeStateInto(envoy::config::core::v3::Metadata& metadata,
+                      StreamInfo::FilterState& filter_state) override {
+    // This must be called only once as the internal listener does not allow listener handoff.
+    if (passthrough_state_) {
+      passthrough_state_->mergeInto(metadata, filter_state);
+    }
+  }
+
 private:
   friend class IoHandleFactory;
   explicit IoHandleImpl(PassthroughStateSharedPtr passthrough_state = nullptr);

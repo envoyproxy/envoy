@@ -29,6 +29,7 @@
 #include "test/mocks/upstream/priority_set.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
@@ -172,6 +173,13 @@ cluster_type:
       value: {}
 )EOF",
                        module_name, cluster_name, cluster_config);
+  }
+
+  // Expects one post to the load balancer's thread and keeps it in `posted` instead of running it,
+  // so the test decides when the async host selection result is delivered.
+  void expectPostCaptured(Event::PostCb& posted) {
+    EXPECT_CALL(server_context_.thread_local_.dispatcher_, post(_))
+        .WillOnce([&posted](Event::PostCb cb) { posted = std::move(cb); });
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
@@ -416,6 +424,53 @@ TEST_F(DynamicModuleClusterTest, ConfigNewFail) {
 TEST_F(DynamicModuleClusterTest, ClusterNewFail) {
   auto result = createCluster(makeYamlConfig("cluster_new_fail"));
   ASSERT_THAT(result, HasStatusMessage(HasSubstr("Failed to create in-module cluster instance")));
+}
+
+absl::StatusOr<Envoy::Extensions::DynamicModules::DynamicModulePtr> loadGoClusterTestModule() {
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/go"), 1);
+  // Pin the Go runtime across configurations and tests.
+  return Envoy::Extensions::DynamicModules::newDynamicModule(
+      Envoy::Extensions::DynamicModules::testSharedObjectPath("cluster_integration_test", "go"),
+      /*do_not_close=*/true);
+}
+
+TEST_F(DynamicModuleClusterTest, GoConstructionFailures) {
+  auto module = loadGoClusterTestModule();
+  ASSERT_OK(module);
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  for (const std::string mode :
+       {"create_error", "create_nil", "create_panic", "new_nil", "new_panic"}) {
+    SCOPED_TRACE(mode);
+    auto result =
+        createCluster(makeYamlConfigWithClusterConfig("cluster_integration_test", "test", mode));
+    const std::string expected = mode.rfind("create_", 0) == 0
+                                     ? "Failed to create in-module cluster configuration"
+                                     : "Failed to create in-module cluster instance";
+    ASSERT_THAT(result, HasStatusMessage(HasSubstr(expected)));
+  }
+}
+
+TEST_F(DynamicModuleClusterTest, GoSchedulerAfterDestructionIsNoOp) {
+  auto module = loadGoClusterTestModule();
+  ASSERT_OK(module);
+  auto schedule =
+      module.value()->getFunctionPointer<void (*)()>("go_cluster_test_schedule_after_destroy");
+  ASSERT_OK(schedule);
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  {
+    auto result = createCluster(
+        makeYamlConfigWithClusterConfig("cluster_integration_test", "test", "init_sync"));
+    ASSERT_OK(result);
+    bool initialized = false;
+    result->first->initialize([&initialized]() {
+      initialized = true;
+      return absl::OkStatus();
+    });
+    EXPECT_TRUE(initialized);
+  }
+  (*schedule.value())();
 }
 
 // The cluster_config Any cannot be unpacked. This is parsed before the module is loaded, so it is
@@ -2457,6 +2512,34 @@ TEST_F(DynamicModuleClusterTest, ShutdownCallbackWithCompletion) {
   EXPECT_TRUE(completion_called);
 }
 
+TEST_F(DynamicModuleClusterTest, GoDrainAndRetainedShutdown) {
+  Server::DrainManager::DrainCloseCb drain;
+  EXPECT_CALL(server_context_.drain_manager_, addOnDrainCloseCb(Network::DrainDirection::All, _))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&drain), Return(nullptr)));
+  Server::ServerLifecycleNotifier::StageCallbackWithCompletion shutdown;
+  EXPECT_CALL(server_context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                               An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&shutdown), Return(nullptr)));
+  auto module = loadGoClusterTestModule();
+  ASSERT_OK(module);
+  auto finish = module.value()->getFunctionPointer<void (*)()>("go_cluster_test_finish_shutdown");
+  ASSERT_OK(finish);
+  auto result = createCluster(
+      makeYamlConfigWithClusterConfig("cluster_integration_test", "test", "retain_shutdown"));
+  ASSERT_OK(result);
+
+  ASSERT_TRUE(drain);
+  EXPECT_LOG_CONTAINS("info", "Go cluster drain started",
+                      EXPECT_OK(drain(std::chrono::milliseconds(0))));
+  ASSERT_TRUE(shutdown);
+  uint32_t completions = 0;
+  shutdown([&completions]() { ++completions; });
+  EXPECT_EQ(0, completions);
+  finish.value()();
+  EXPECT_EQ(1, completions);
+}
+
 // Test that shutdown completion is still called when the in-module cluster is null.
 TEST_F(DynamicModuleClusterTest, ShutdownCallbackAfterClusterDestroy) {
   // Capture the shutdown callback registered during cluster construction.
@@ -4107,7 +4190,7 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicTypedMetadata) {
 // Async Host Selection Tests
 // =================================================================================================
 
-// Test DynamicModuleAsyncHostSelectionHandle cancel calls the module's cancel function.
+// Test DynamicModuleAsyncHostSelectionHandle cancel sets the selection's cancellation flag.
 TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleCancel) {
   auto* dummy_async_handle =
       reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
@@ -4117,18 +4200,6 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleCancel) {
   DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr, cancelled);
   handle.cancel();
   EXPECT_TRUE(cancelled->load());
-}
-
-// Test DynamicModuleAsyncHostSelectionHandle cancel with null cancel_fn.
-TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleCancelNullFn) {
-  auto* dummy_async_handle =
-      reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
-  auto* dummy_lb = reinterpret_cast<envoy_dynamic_module_type_cluster_lb_module_ptr>(0xBEEF);
-
-  auto cancelled = std::make_shared<std::atomic<bool>>(false);
-  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr, cancelled);
-  // Should not crash with nullptr cancel function.
-  handle.cancel();
 }
 
 // Test async host selection complete callback with a valid host.
@@ -4158,7 +4229,7 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteWithHost) {
   auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
 
   auto* lb_envoy_ptr = static_cast<void*>(lb_instance.get());
-  auto* context_ptr = static_cast<void*>(&context);
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
   // chooseHost registers the selection on the async path. Register it directly here so the
   // completion has the in-flight entry it looks itself up by.
@@ -4186,7 +4257,7 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteNullHost) {
   auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
 
   auto* lb_envoy_ptr = static_cast<void*>(lb_instance.get());
-  auto* context_ptr = static_cast<void*>(&context);
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   lb_instance->asyncSelections()->add(context_ptr, std::make_shared<std::atomic<bool>>(false));
 
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
@@ -4211,18 +4282,17 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteEmptyDetails) {
   auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
 
   auto* lb_envoy_ptr = static_cast<void*>(lb_instance.get());
-  auto* context_ptr = static_cast<void*>(&context);
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   lb_instance->asyncSelections()->add(context_ptr, std::make_shared<std::atomic<bool>>(false));
 
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(lb_envoy_ptr, context_ptr,
                                                                          nullptr, {nullptr, 0});
 }
 
-// Two concurrent async host selections on one load balancer must not share cancellation state. A
-// downstream connection is set so the completion posts to the worker dispatcher, the path a real
-// request takes. With the old single cancellation slot the second chooseHost overwrote the first
-// selection's flag, so the first selection's completion read a cancelled flag and was dropped while
-// its stream waited for the route deadline.
+// Two concurrent async host selections on one load balancer must not share cancellation state. With
+// the old single cancellation slot the second chooseHost overwrote the first selection's flag, so
+// the first selection's completion read a cancelled flag and was dropped while its stream waited
+// for the route deadline.
 TEST_F(DynamicModuleClusterTest, ConcurrentAsyncSelectionsDoNotShareCancellation) {
   auto result = createCluster(makeYamlConfig("cluster_async_host_selection"));
   ASSERT_OK(result);
@@ -4238,14 +4308,10 @@ TEST_F(DynamicModuleClusterTest, ConcurrentAsyncSelectionsDoNotShareCancellation
       std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
   auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
 
-  // A downstream connection makes chooseHost capture the worker dispatcher, so the completion takes
-  // the posted path. The mock dispatcher runs posted callbacks inline to keep the test
-  // deterministic.
-  NiceMock<Network::MockConnection> connection;
+  // The completion posts to the load balancer's dispatcher, whose mock runs posted callbacks inline
+  // to keep the test deterministic.
   NiceMock<Upstream::MockLoadBalancerContext> first;
   NiceMock<Upstream::MockLoadBalancerContext> second;
-  ON_CALL(first, downstreamConnection()).WillByDefault(Return(&connection));
-  ON_CALL(second, downstreamConnection()).WillByDefault(Return(&connection));
 
   // Both selections park, so both get a `cancelable` and both stay in flight.
   auto first_response = lb_instance->chooseHost(&first);
@@ -4265,20 +4331,20 @@ TEST_F(DynamicModuleClusterTest, ConcurrentAsyncSelectionsDoNotShareCancellation
         first_completed = true;
       });
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
-      static_cast<void*>(lb_instance.get()), static_cast<void*>(&first), raw_host_ptr,
-      {"resolved", 8});
+      static_cast<void*>(lb_instance.get()), static_cast<Upstream::LoadBalancerContext*>(&first),
+      raw_host_ptr, {"resolved", 8});
   EXPECT_TRUE(first_completed);
 
   // The cancelled selection must not complete.
   EXPECT_CALL(second, onAsyncHostSelection(_, _)).Times(0);
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
-      static_cast<void*>(lb_instance.get()), static_cast<void*>(&second), raw_host_ptr,
-      {"resolved", 8});
+      static_cast<void*>(lb_instance.get()), static_cast<Upstream::LoadBalancerContext*>(&second),
+      raw_host_ptr, {"resolved", 8});
 }
 
-// Without a downstream connection no worker dispatcher is captured, so the completion runs inline
-// on the calling thread. A cancelled selection must still be dropped there.
-TEST_F(DynamicModuleClusterTest, InlineAsyncSelectionCompletionHonorsCancel) {
+// A selection without a downstream connection, as on an async client stream, still completes
+// through the load balancer's dispatcher, and the post drops a selection cancelled before it runs.
+TEST_F(DynamicModuleClusterTest, AsyncSelectionCompletionWithoutConnectionHonorsCancel) {
   auto result = createCluster(makeYamlConfig("cluster_async_host_selection"));
   ASSERT_OK(result);
   auto& [cluster, lb] = result.value();
@@ -4288,15 +4354,303 @@ TEST_F(DynamicModuleClusterTest, InlineAsyncSelectionCompletionHonorsCancel) {
   auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
 
   NiceMock<Upstream::MockLoadBalancerContext> context;
-  auto response = lb_instance->chooseHost(&context);
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  auto response = lb_instance->chooseHost(context_ptr);
   ASSERT_NE(response.cancelable, nullptr);
 
+  EXPECT_CALL(context, onAsyncHostSelection(_, _)).Times(0);
+  Event::PostCb posted;
+  expectPostCaptured(posted);
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+      static_cast<void*>(lb_instance.get()), context_ptr, nullptr, {"resolved", 8});
+  ASSERT_NE(posted, nullptr);
+
   response.cancelable->cancel();
+  posted();
+}
+
+// A module that completes from its own thread, for a context with no downstream connection as on an
+// async client stream or the main thread's load balancer, must not run the router on that thread.
+// The result reaches the context only when the load balancer's dispatcher runs the post.
+TEST_F(DynamicModuleClusterTest, AsyncSelectionCompletedOnAnotherThreadIsPosted) {
+  NiceMock<Event::MockDispatcher> other_dispatcher;
+  auto result = createCluster(makeYamlConfig("cluster_async_host_selection"));
+  ASSERT_OK(result);
+  auto& [cluster, lb] = result.value();
+
+  auto& module_cluster = dynamic_cast<DynamicModuleCluster&>(*cluster);
+  std::vector<Upstream::HostSharedPtr> result_hosts;
+  ASSERT_TRUE(addSimpleHosts(module_cluster, {"127.0.0.1:8080"}, {1}, result_hosts));
+  ASSERT_EQ(result_hosts.size(), 1);
+  auto* raw_host_ptr = const_cast<Upstream::Host*>(result_hosts[0].get());
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  // The post must go to the dispatcher the load balancer was built with, not to whichever one the
+  // thread-local instance reports when the module completes.
+  ON_CALL(server_context_.thread_local_, dispatcher())
+      .WillByDefault(testing::ReturnRef(other_dispatcher));
+  EXPECT_CALL(other_dispatcher, post(_)).Times(0);
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  auto response = lb_instance->chooseHost(context_ptr);
+  ASSERT_NE(response.cancelable, nullptr);
 
   EXPECT_CALL(context, onAsyncHostSelection(_, _)).Times(0);
+  Event::PostCb posted;
+  expectPostCaptured(posted);
+  auto module_thread = Thread::threadFactoryForTest().createThread([&]() {
+    envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+        static_cast<void*>(lb_instance.get()), context_ptr, raw_host_ptr, {"resolved", 8});
+  });
+  module_thread->join();
+  ASSERT_NE(posted, nullptr);
+  testing::Mock::VerifyAndClearExpectations(&context);
+
+  EXPECT_CALL(context, onAsyncHostSelection(_, _))
+      .WillOnce([&](Upstream::HostConstSharedPtr&& host, std::string&& details) {
+        EXPECT_EQ(host.get(), raw_host_ptr);
+        EXPECT_EQ(details, "resolved");
+      });
+  posted();
+}
+
+// A module may complete inside choose_host. The result must not reach the router before chooseHost
+// returns its `cancelable`, so it waits for the load balancer's dispatcher to run the post.
+TEST_F(DynamicModuleClusterTest, AsyncSelectionCompletedInsideChooseHostIsPosted) {
+  // A lambda with no captures is required to match the C function pointer type, so the load
+  // balancer the hook completes through is reached through a static.
+  static DynamicModuleLoadBalancer* completing_lb = nullptr;
+
+  auto result = createCluster(makeYamlConfig("cluster_async_host_selection"));
+  ASSERT_OK(result);
+  auto& [cluster, lb] = result.value();
+  auto module_cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(cluster);
+  module_cluster->config()->on_cluster_lb_choose_host_ =
+      [](envoy_dynamic_module_type_cluster_lb_module_ptr,
+         envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+         envoy_dynamic_module_type_cluster_host_envoy_ptr* host_out,
+         envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr* async_handle_out) {
+        envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+            completing_lb, context_envoy_ptr, nullptr, {"inline", 6});
+        *host_out = nullptr;
+        *async_handle_out = context_envoy_ptr;
+      };
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(module_cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  completing_lb = lb_instance.get();
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  EXPECT_CALL(context, onAsyncHostSelection(_, _)).Times(0);
+  Event::PostCb posted;
+  expectPostCaptured(posted);
+  auto response = lb_instance->chooseHost(&context);
+  ASSERT_NE(response.cancelable, nullptr);
+  ASSERT_NE(posted, nullptr);
+  testing::Mock::VerifyAndClearExpectations(&context);
+
+  EXPECT_CALL(context, onAsyncHostSelection(_, _))
+      .WillOnce([](Upstream::HostConstSharedPtr&& host, std::string&& details) {
+        EXPECT_EQ(host, nullptr);
+        EXPECT_EQ(details, "inline");
+      });
+  posted();
+}
+
+// A module that completes inside choose_host and then returns a host synchronously leaves nothing
+// waiting for the completion. The posted completion is dropped instead of reaching a router that
+// never parked, where it would call a host selected callback the router never set.
+TEST_F(DynamicModuleClusterTest, CompletionInsideSynchronousChooseHostIsDropped) {
+  // A lambda with no captures is required to match the C function pointer type, so the load
+  // balancer and the host the hook uses are reached through statics.
+  static DynamicModuleLoadBalancer* completing_lb = nullptr;
+  static envoy_dynamic_module_type_cluster_host_envoy_ptr selected_host = nullptr;
+
+  auto result = createCluster(makeYamlConfig("cluster_async_host_selection"));
+  ASSERT_OK(result);
+  auto& [cluster, lb] = result.value();
+  auto module_cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(cluster);
+  std::vector<Upstream::HostSharedPtr> result_hosts;
+  ASSERT_TRUE(addSimpleHosts(*module_cluster, {"127.0.0.1:8080"}, {1}, result_hosts));
+  ASSERT_EQ(result_hosts.size(), 1);
+  selected_host = const_cast<Upstream::Host*>(result_hosts[0].get());
+  module_cluster->config()->on_cluster_lb_choose_host_ =
+      [](envoy_dynamic_module_type_cluster_lb_module_ptr,
+         envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+         envoy_dynamic_module_type_cluster_host_envoy_ptr* host_out,
+         envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr* async_handle_out) {
+        envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+            completing_lb, context_envoy_ptr, selected_host, {"inline", 6});
+        *host_out = selected_host;
+        *async_handle_out = nullptr;
+      };
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(module_cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  completing_lb = lb_instance.get();
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  EXPECT_CALL(context, onAsyncHostSelection(_, _)).Times(0);
+  Event::PostCb posted;
+  expectPostCaptured(posted);
+  auto response = lb_instance->chooseHost(&context);
+  EXPECT_EQ(response.cancelable, nullptr);
+  EXPECT_EQ(response.host, result_hosts[0]);
+  ASSERT_NE(posted, nullptr);
+  posted();
+}
+
+// Envoy calls the module's cancel hook once for every async handle, when the `cancelable` is
+// destroyed, after a delivered result as well as after a cancellation, and never from cancel().
+TEST_F(DynamicModuleClusterTest, AsyncSelectionCancelHookRunsOnceForEveryHandle) {
+  // A lambda with no captures is required to match the C function pointer type, so the count is
+  // reached through a static.
+  static int cancel_hook_calls = 0;
+  cancel_hook_calls = 0;
+
+  auto result = createCluster(makeYamlConfig("cluster_async_host_selection"));
+  ASSERT_OK(result);
+  auto& [cluster, lb] = result.value();
+  auto module_cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(cluster);
+  module_cluster->config()->on_cluster_lb_cancel_host_selection_ =
+      [](envoy_dynamic_module_type_cluster_lb_module_ptr,
+         envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr) { ++cancel_hook_calls; };
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(module_cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  NiceMock<Upstream::MockLoadBalancerContext> delivered;
+  auto* delivered_ptr = static_cast<Upstream::LoadBalancerContext*>(&delivered);
+  auto delivered_response = lb_instance->chooseHost(delivered_ptr);
+  ASSERT_NE(delivered_response.cancelable, nullptr);
+  EXPECT_CALL(delivered, onAsyncHostSelection(_, _));
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
-      static_cast<void*>(lb_instance.get()), static_cast<void*>(&context), nullptr,
-      {"resolved", 8});
+      static_cast<void*>(lb_instance.get()), delivered_ptr, nullptr, {"resolved", 8});
+  EXPECT_EQ(0, cancel_hook_calls);
+  delivered_response.cancelable.reset();
+  EXPECT_EQ(1, cancel_hook_calls);
+
+  NiceMock<Upstream::MockLoadBalancerContext> cancelled;
+  auto cancelled_response = lb_instance->chooseHost(&cancelled);
+  ASSERT_NE(cancelled_response.cancelable, nullptr);
+  cancelled_response.cancelable->cancel();
+  EXPECT_EQ(1, cancel_hook_calls);
+  cancelled_response.cancelable.reset();
+  EXPECT_EQ(2, cancel_hook_calls);
+}
+
+// A module that completes one selection twice before the first result is delivered gets one
+// delivery. The router destroys the `cancelable` inside the first delivery, and that drops the
+// second completion, which was already posted.
+TEST_F(DynamicModuleClusterTest, SecondCompletionPostedBeforeDeliveryIsDropped) {
+  auto result = createCluster(makeYamlConfig("cluster_async_host_selection"));
+  ASSERT_OK(result);
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  auto response = lb_instance->chooseHost(context_ptr);
+  ASSERT_NE(response.cancelable, nullptr);
+
+  std::vector<Event::PostCb> posted;
+  EXPECT_CALL(server_context_.thread_local_.dispatcher_, post(_))
+      .Times(2)
+      .WillRepeatedly([&posted](Event::PostCb cb) { posted.push_back(std::move(cb)); });
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+      static_cast<void*>(lb_instance.get()), context_ptr, nullptr, {"first", 5});
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+      static_cast<void*>(lb_instance.get()), context_ptr, nullptr, {"second", 6});
+  ASSERT_EQ(2, posted.size());
+
+  // The router destroys the `cancelable` inside the delivery, as onAsyncHostSelection does.
+  EXPECT_CALL(context, onAsyncHostSelection(_, _))
+      .WillOnce([&response](Upstream::HostConstSharedPtr&&, std::string&& details) {
+        EXPECT_EQ(details, "first");
+        response.cancelable.reset();
+      });
+  posted[0]();
+  posted[1]();
+}
+
+// A context that keeps its `cancelable` after a delivery still gets one result for a selection the
+// module completes twice, since the post claims the selection when it runs.
+TEST_F(DynamicModuleClusterTest, SecondCompletionIsDroppedWhenTheContextKeepsItsCancelable) {
+  auto result = createCluster(makeYamlConfig("cluster_async_host_selection"));
+  ASSERT_OK(result);
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  auto response = lb_instance->chooseHost(context_ptr);
+  ASSERT_NE(response.cancelable, nullptr);
+
+  std::vector<Event::PostCb> posted;
+  EXPECT_CALL(server_context_.thread_local_.dispatcher_, post(_))
+      .Times(2)
+      .WillRepeatedly([&posted](Event::PostCb cb) { posted.push_back(std::move(cb)); });
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+      static_cast<void*>(lb_instance.get()), context_ptr, nullptr, {"first", 5});
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+      static_cast<void*>(lb_instance.get()), context_ptr, nullptr, {"second", 6});
+  ASSERT_EQ(2, posted.size());
+
+  EXPECT_CALL(context, onAsyncHostSelection(_, _))
+      .WillOnce([](Upstream::HostConstSharedPtr&&, std::string&& details) {
+        EXPECT_EQ(details, "first");
+      });
+  posted[0]();
+  posted[1]();
+}
+
+// A module thread can complete a selection while the load balancer's thread destroys the load
+// balancer. Nothing reaches the load balancer's dispatcher once the destructor has returned, which
+// a TSan run of this test also checks for the registry's dispatcher pointer.
+TEST_F(DynamicModuleClusterTest, AsyncSelectionCompletionRacesLoadBalancerDestruction) {
+  auto result = createCluster(makeYamlConfig("cluster_async_host_selection"));
+  ASSERT_OK(result);
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  void* lb_raw = lb_instance.get();
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  lb_instance->asyncSelections()->add(context_ptr, std::make_shared<std::atomic<bool>>(false));
+
+  std::atomic<bool> destroyed{false};
+  EXPECT_CALL(server_context_.thread_local_.dispatcher_, post(_))
+      .WillRepeatedly([&destroyed](Event::PostCb) { EXPECT_FALSE(destroyed.load()); });
+  std::atomic<int> attempts{0};
+  std::atomic<bool> stop{false};
+  auto module_thread = Thread::threadFactoryForTest().createThread([&]() {
+    while (!stop.load()) {
+      envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(lb_raw, context_ptr,
+                                                                             nullptr, {"late", 4});
+      attempts.fetch_add(1);
+    }
+  });
+  while (attempts.load() == 0) {
+    std::this_thread::yield();
+  }
+  lb_instance.reset();
+  destroyed.store(true);
+  const int attempts_at_destroy = attempts.load();
+  while (attempts.load() <= attempts_at_destroy) {
+    std::this_thread::yield();
+  }
+  stop.store(true);
+  module_thread->join();
 }
 
 // Destroying a `cancelable` drops its selection, so a late completion for that context is dropped
@@ -4320,7 +4674,8 @@ TEST_F(DynamicModuleClusterTest, AsyncSelectionCompleteAfterCancelableDestroyedD
 
   EXPECT_CALL(context, onAsyncHostSelection(_, _)).Times(0);
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
-      static_cast<void*>(lb_instance.get()), static_cast<void*>(&context), nullptr, {"late", 4});
+      static_cast<void*>(lb_instance.get()), static_cast<Upstream::LoadBalancerContext*>(&context),
+      nullptr, {"late", 4});
 }
 
 // A `cancelable` may outlive its load balancer. Its destructor must still be able to drop its
@@ -4344,6 +4699,129 @@ TEST_F(DynamicModuleClusterTest, AsyncSelectionCancelableOutlivesLoadBalancer) {
   response.cancelable.reset();
 }
 
+// The router can keep a `cancelable` past a CDS removal of its cluster. The `cancelable` holds the
+// cluster config, which owns the module, so the module stays loaded until the cancel hook that the
+// `cancelable` calls on destruction has run.
+TEST_F(DynamicModuleClusterTest, AsyncSelectionCancelableKeepsModuleLoaded) {
+  // A lambda with no captures is required to match the C function pointer type, so the config and
+  // what the hook saw are reached through statics.
+  static auto* config_weak = new std::weak_ptr<DynamicModuleClusterConfig>();
+  static int hook_calls = 0;
+  static int hook_calls_with_config_alive = 0;
+  hook_calls = 0;
+  hook_calls_with_config_alive = 0;
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  std::unique_ptr<Upstream::AsyncHostSelectionHandle> cancelable;
+  {
+    auto result = createCluster(makeYamlConfig("cluster_async_host_selection"));
+    ASSERT_OK(result);
+    auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+    ASSERT_NE(cluster, nullptr);
+    *config_weak = cluster->config();
+    cluster->config()->on_cluster_lb_cancel_host_selection_ =
+        [](envoy_dynamic_module_type_cluster_lb_module_ptr,
+           envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr) {
+          ++hook_calls;
+          if (!config_weak->expired()) {
+            ++hook_calls_with_config_alive;
+          }
+        };
+    auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+    auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+    cancelable = std::move(lb_instance->chooseHost(&context).cancelable);
+    ASSERT_NE(cancelable, nullptr);
+  }
+
+  EXPECT_FALSE(config_weak->expired());
+  // The test thread counts as the main thread, so the last release destroys the config in place.
+  EXPECT_CALL(server_context_.dispatcher_, deleteInDispatcherThread(_)).Times(0);
+  cancelable.reset();
+  EXPECT_EQ(1, hook_calls);
+  EXPECT_EQ(1, hook_calls_with_config_alive);
+  EXPECT_TRUE(config_weak->expired());
+}
+
+// A completion posted to a dispatcher that never runs it, as the main dispatcher after its loop has
+// exited, must not keep the cluster alive, since destroying the post would then tear the cluster
+// down during server teardown. A post that runs after the cluster is gone resolves no host.
+TEST_F(DynamicModuleClusterTest, PostedAsyncSelectionCompletionHoldsTheClusterWeakly) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::weak_ptr<DynamicModuleCluster> cluster_weak;
+  std::unique_ptr<Upstream::AsyncHostSelectionHandle> cancelable;
+  Event::PostCb posted;
+  {
+    auto result = createCluster(makeYamlConfig("cluster_async_host_selection"));
+    ASSERT_OK(result);
+    auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+    ASSERT_NE(cluster, nullptr);
+    std::vector<Upstream::HostSharedPtr> result_hosts;
+    ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:8080"}, {1}, result_hosts));
+    cluster_weak = cluster->weak_from_this();
+    auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+    auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+    cancelable = std::move(lb_instance->chooseHost(context_ptr).cancelable);
+    ASSERT_NE(cancelable, nullptr);
+
+    expectPostCaptured(posted);
+    envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+        static_cast<void*>(lb_instance.get()), context_ptr,
+        const_cast<Upstream::Host*>(result_hosts[0].get()), {"resolved", 8});
+    ASSERT_NE(posted, nullptr);
+  }
+
+  EXPECT_TRUE(cluster_weak.expired());
+  EXPECT_CALL(context, onAsyncHostSelection(_, _))
+      .WillOnce([](Upstream::HostConstSharedPtr&& host, std::string&& details) {
+        EXPECT_EQ(host, nullptr);
+        EXPECT_EQ(details, "resolved");
+      });
+  posted();
+}
+
+// A pending selection can hold the last reference to the cluster config after the cluster is gone,
+// and the router can release it on a worker. The config's destroy hook then runs on the main
+// thread, when the main dispatcher destroys the config it was handed.
+TEST_F(DynamicModuleClusterTest, ClusterConfigReleasedOffMainIsDestroyedOnMain) {
+  // A lambda with no captures is required to match the C function pointer type, so the count is
+  // reached through a static.
+  static int config_destroys = 0;
+  config_destroys = 0;
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  std::unique_ptr<Upstream::AsyncHostSelectionHandle> cancelable;
+  {
+    auto result = createCluster(makeYamlConfig("cluster_async_host_selection"));
+    ASSERT_OK(result);
+    auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+    ASSERT_NE(cluster, nullptr);
+    cluster->config()->on_cluster_config_destroy_ =
+        [](envoy_dynamic_module_type_cluster_config_module_ptr) { ++config_destroys; };
+    cluster->config()->on_cluster_lb_cancel_host_selection_ =
+        [](envoy_dynamic_module_type_cluster_lb_module_ptr,
+           envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr) {};
+    auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+    auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+    cancelable = std::move(lb_instance->chooseHost(&context).cancelable);
+    ASSERT_NE(cancelable, nullptr);
+  }
+  EXPECT_EQ(0, config_destroys);
+
+  Event::DispatcherThreadDeletableConstPtr deferred;
+  EXPECT_CALL(server_context_.dispatcher_, deleteInDispatcherThread(_))
+      .WillOnce([&deferred](Event::DispatcherThreadDeletableConstPtr deletable) {
+        deferred = std::move(deletable);
+      });
+  auto worker = Thread::threadFactoryForTest().createThread([&]() { cancelable.reset(); });
+  worker->join();
+  ASSERT_NE(deferred, nullptr);
+  EXPECT_EQ(0, config_destroys);
+
+  deferred.reset();
+  EXPECT_EQ(1, config_destroys);
+}
+
 // A synchronous chooseHost result leaves nothing in flight, so a module that later completes that
 // context is ignored rather than driving a context Envoy already finished with.
 TEST_F(DynamicModuleClusterTest, SynchronousChooseHostLeavesNoInFlightSelection) {
@@ -4362,8 +4840,8 @@ TEST_F(DynamicModuleClusterTest, SynchronousChooseHostLeavesNoInFlightSelection)
 
   EXPECT_CALL(context, onAsyncHostSelection(_, _)).Times(0);
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
-      static_cast<void*>(lb_instance.get()), static_cast<void*>(&context), nullptr,
-      {"unsolicited", 11});
+      static_cast<void*>(lb_instance.get()), static_cast<Upstream::LoadBalancerContext*>(&context),
+      nullptr, {"unsolicited", 11});
 }
 
 // Covers that `async_host_selection_complete` drops the event when the owning load balancer has
@@ -4384,7 +4862,7 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteAfterLbDestroyedDrops
   EXPECT_CALL(context, onAsyncHostSelection(_, _)).Times(0);
 
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
-      raw_lb_ptr, static_cast<void*>(&context), nullptr, {"dropped", 7});
+      raw_lb_ptr, static_cast<Upstream::LoadBalancerContext*>(&context), nullptr, {"dropped", 7});
 }
 
 // Covers pointer reuse: a new load balancer allocated at the same address as a freed one must

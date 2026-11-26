@@ -4,6 +4,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -52,6 +53,22 @@ TEST_F(ExtensionTest, NullInModuleExtension) {
 
   // Verify getExtensionConfig returns the correct config.
   EXPECT_EQ(&extension->getExtensionConfig(), config.value().get());
+}
+
+TEST_F(ExtensionTest, GoInstanceFailure) {
+  const std::string path = TestEnvironment::runfilesPath(
+      "test/extensions/dynamic_modules/test_data/go/libbootstrap_integration_test.so");
+  for (const std::string mode : {"new_nil", "new_panic"}) {
+    SCOPED_TRACE(mode);
+    auto dynamic_module = Extensions::DynamicModules::newDynamicModule(path, true);
+    ASSERT_OK(dynamic_module);
+    auto config = newDynamicModuleBootstrapExtensionConfig("test", mode, DefaultMetricsNamespace,
+                                                           std::move(dynamic_module.value()),
+                                                           dispatcher_, context_, context_.store_);
+    ASSERT_OK(config);
+    auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+    EXPECT_FALSE(extension->initializeInModuleExtension());
+  }
 }
 
 TEST_F(ExtensionTest, IsDestroyedAndGetExtensionConfig) {
@@ -177,6 +194,43 @@ TEST_F(ExtensionTest, ShutdownCallbackWithCompletion) {
   bool completion_called = false;
   captured_shutdown_cb([&completion_called]() { completion_called = true; });
   EXPECT_TRUE(completion_called);
+}
+
+TEST_F(ExtensionTest, GoDrainAndRetainedShutdown) {
+  Server::DrainManager::DrainCloseCb drain;
+  EXPECT_CALL(context_.drain_manager_, addOnDrainCloseCb(Network::DrainDirection::All, _))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&drain), testing::Return(nullptr)));
+  Server::ServerLifecycleNotifier::StageCallbackWithCompletion shutdown;
+  EXPECT_CALL(
+      context_.lifecycle_notifier_,
+      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&shutdown), testing::Return(nullptr)));
+  auto module = Extensions::DynamicModules::newDynamicModule(
+      TestEnvironment::runfilesPath(
+          "test/extensions/dynamic_modules/test_data/go/libbootstrap_integration_test.so"),
+      /*do_not_close=*/true);
+  ASSERT_OK(module);
+  auto finish = module.value()->getFunctionPointer<void (*)()>("go_bootstrap_test_finish_shutdown");
+  ASSERT_OK(finish);
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "retain_shutdown", DefaultMetricsNamespace, std::move(module.value()), dispatcher_,
+      context_, context_.store_);
+  ASSERT_OK(config);
+  DynamicModuleBootstrapExtension extension(config.value());
+  ASSERT_TRUE(extension.initializeInModuleExtension());
+  NiceMock<Server::MockInstance> instance;
+  extension.onServerInitialized(instance);
+
+  ASSERT_TRUE(drain);
+  EXPECT_LOG_CONTAINS("info", "Go bootstrap drain started",
+                      EXPECT_OK(drain(std::chrono::milliseconds(0))));
+  ASSERT_TRUE(shutdown);
+  uint32_t completions = 0;
+  shutdown([&completions]() { ++completions; });
+  EXPECT_EQ(0, completions);
+  finish.value()();
+  EXPECT_EQ(1, completions);
 }
 
 TEST_F(ExtensionTest, ShutdownCallbackAfterDestroy) {

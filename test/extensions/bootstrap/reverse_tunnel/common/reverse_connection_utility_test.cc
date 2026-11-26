@@ -402,6 +402,40 @@ TEST_F(ReverseConnectionUtilityTest, DiffMsZeroDuration) {
   EXPECT_EQ(ReverseConnectionUtility::diffMs(t, t), 0);
 }
 
+TEST_F(ReverseConnectionUtilityTest, CreateDrainMetadataContainsExpectedKeyAndValue) {
+  Http::MetadataMapVector metadata_vec = ReverseConnectionUtility::createDrainMetadata();
+  ASSERT_EQ(metadata_vec.size(), 1);
+  ASSERT_NE(metadata_vec[0], nullptr);
+  EXPECT_EQ(metadata_vec[0]->size(), 1);
+  auto it = metadata_vec[0]->find(ReverseConnectionUtility::DRAIN_METADATA_KEY);
+  ASSERT_NE(it, metadata_vec[0]->end());
+  EXPECT_EQ(it->second, ReverseConnectionUtility::DRAIN_METADATA_VALUE);
+}
+
+TEST_F(ReverseConnectionUtilityTest, EraseDrainMetadataMatchesAndErasesOnlyDrainKey) {
+  Http::MetadataMap metadata{
+      {std::string(ReverseConnectionUtility::DRAIN_METADATA_KEY),
+       std::string(ReverseConnectionUtility::DRAIN_METADATA_VALUE)},
+      {"other", "keep"},
+  };
+
+  EXPECT_TRUE(ReverseConnectionUtility::eraseDrainMetadata(metadata));
+  EXPECT_EQ(metadata.find(ReverseConnectionUtility::DRAIN_METADATA_KEY), metadata.end());
+  EXPECT_EQ(metadata["other"], "keep");
+}
+
+TEST_F(ReverseConnectionUtilityTest, EraseDrainMetadataReturnsFalseWhenMissingOrWrongValue) {
+  Http::MetadataMap missing{{"other", "keep"}};
+  EXPECT_FALSE(ReverseConnectionUtility::eraseDrainMetadata(missing));
+  EXPECT_EQ(missing["other"], "keep");
+
+  Http::MetadataMap wrong_value{
+      {std::string(ReverseConnectionUtility::DRAIN_METADATA_KEY), "false"},
+  };
+  EXPECT_FALSE(ReverseConnectionUtility::eraseDrainMetadata(wrong_value));
+  EXPECT_EQ(wrong_value[ReverseConnectionUtility::DRAIN_METADATA_KEY], "false");
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions
