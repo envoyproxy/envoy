@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.network.reverse_tunnel.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/extensions/filters/common/jwks/v3/jwt_handshake.proto";
 
 import "google/protobuf/duration.proto";
@@ -95,10 +96,31 @@ message Validation {
   string dynamic_metadata_namespace = 4 [(validate.rules).string = {max_len: 255}];
 }
 
+// Explicit HTTP/1.1 handshake configuration. When set, these fields replace the deprecated
+// top-level ``request_path``, ``request_method``, and ``use_http_upgrade`` fields; setting both
+// forms together is rejected at configuration load.
+// [#next-free-field: 4]
+message Http1HandshakeConfig {
+  // HTTP path to match for reverse tunnel requests.
+  // If not specified, defaults to ``/reverse_connections/request``.
+  string request_path = 1 [(validate.rules).string = {min_len: 1 max_len: 255 ignore_empty: true}];
+
+  // HTTP method to match for reverse tunnel requests.
+  // If not specified (``METHOD_UNSPECIFIED``), this defaults to ``GET``.
+  config.core.v3.RequestMethod request_method = 2 [(validate.rules).enum = {defined_only: true}];
+
+  // Accept the handshake as an HTTP/1.1 ``Upgrade`` exchange (``Upgrade: reverse-tunnel``,
+  // reply ``101``) so HTTP proxies can route the handshake and splice the tunnel
+  // afterward. Non-upgrade requests are rejected with ``426``. The initiator must set this
+  // flag to the same value.
+  // Defaults to ``false``.
+  bool use_http_upgrade = 3;
+}
+
 // Configuration for the reverse tunnel network filter.
 // This filter handles reverse tunnel connection acceptance and rejection by processing
 // HTTP requests where required identification values are provided via HTTP headers.
-// [#next-free-field: 12]
+// [#next-free-field: 14]
 message ReverseTunnel {
   // Ping interval for health checks on established reverse tunnel connections.
   // If not specified, defaults to ``2 seconds``.
@@ -184,4 +206,20 @@ message ReverseTunnel {
     lte {seconds: 300}
     gt {}
   }];
+
+  // Selection of the handshake protocol this filter accepts. If unset, the HTTP/1.1 handshake is
+  // derived from the top-level ``request_path``, ``request_method``, and ``use_http_upgrade``
+  // fields.
+  oneof handshake_type {
+    // Explicit HTTP/1.1 handshake configuration. Setting this field together with any of the
+    // top-level ``request_path``, ``request_method``, or ``use_http_upgrade`` fields is rejected.
+    Http1HandshakeConfig http1_handshake = 12;
+
+    // Handshake provided by an extension registered under the
+    // ``envoy.reverse_tunnel.responder_handshake`` category. The extension receives ``typed_config``
+    // and owns the handshake framing; the top-level ``request_path``, ``request_method``, and
+    // ``use_http_upgrade`` fields must not be set. The filter's identifier validation, cluster-name
+    // enforcement, JWT authentication, and connection limits still apply.
+    config.core.v3.TypedExtensionConfig custom_handshake = 13;
+  }
 }

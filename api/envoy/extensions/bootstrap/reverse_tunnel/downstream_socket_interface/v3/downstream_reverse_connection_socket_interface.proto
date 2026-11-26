@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for the downstream reverse connection socket interface.
 // This interface initiates reverse connections to upstream Envoys and provides
 // them as socket connections for downstream requests.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DownstreamReverseConnectionSocketInterface {
   // HTTP handshake settings for initiator envoy initiated reverse tunnels.
   // [#next-free-field: 6]
@@ -64,9 +64,19 @@ message DownstreamReverseConnectionSocketInterface {
   // Defaults to ``false``.
   bool enable_detailed_stats = 2;
 
-  // Optional HTTP handshake configuration. When unset, the initiator envoy uses the defaults
-  // provided by ``HttpHandshakeConfig``.
-  HttpHandshakeConfig http_handshake = 3;
+  // Selection of the handshake protocol used to establish each reverse tunnel. If unset, the
+  // defaults of ``HttpHandshakeConfig`` apply.
+  oneof handshake_type {
+    // Optional HTTP handshake configuration. When unset, the initiator envoy uses the defaults
+    // provided by ``HttpHandshakeConfig``.
+    HttpHandshakeConfig http_handshake = 3;
+
+    // Handshake provided by an extension registered under the
+    // ``envoy.reverse_tunnel.initiator_handshake`` category. The extension receives ``typed_config``
+    // and supplies the handshake implementation, including the deadline for receiving the
+    // handshake response.
+    config.core.v3.TypedExtensionConfig custom_handshake = 7;
+  }
 
   // Access log configuration for reverse tunnel initiator lifecycle events.
   // Logs are emitted on handshake success, handshake failure, connection draining, and

@@ -1,0 +1,154 @@
+#pragma once
+
+#include <chrono>
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "envoy/buffer/buffer.h"
+#include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
+#include "envoy/http/codec.h"
+
+#include "source/common/common/logger.h"
+#include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/response_decoder_impl_base.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/handshake_initiator.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
+
+#include "absl/status/status.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Bootstrap {
+namespace ReverseConnection {
+
+/**
+ * Request framing of the HTTP/1.1 handshake, fixed when its factory is built.
+ */
+struct Http1InitiatorFraming {
+  std::string request_path{ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH};
+  // Negotiate the handshake as an HTTP/1.1 Upgrade, expecting 101 instead of 200.
+  bool use_http_upgrade{false};
+  // Sent verbatim when the callbacks resolve no formatted handshake headers.
+  std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers;
+};
+using Http1InitiatorFramingConstSharedPtr = std::shared_ptr<const Http1InitiatorFraming>;
+
+/**
+ * HTTP/1.1 initiator handshake: sends the reverse tunnel request and classifies the response.
+ * One instance per dial attempt.
+ */
+class Http1HandshakeInitiator : public InitiatorHandshake,
+                                public Http::ResponseDecoderImplBase,
+                                public Http::ConnectionCallbacks,
+                                public Logger::Loggable<Logger::Id::main> {
+public:
+  Http1HandshakeInitiator(InitiatorHandshakeCallbacks& callbacks,
+                          Http1InitiatorFramingConstSharedPtr framing);
+
+  // InitiatorHandshake overrides
+  absl::Status start(std::optional<int64_t> initiation_time_ms) override;
+  void onData(Buffer::Instance& buffer) override;
+  void cancel() override;
+  Buffer::InstancePtr takeResidual() override;
+
+  // Http::ResponseDecoder overrides
+  void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
+  void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void decodeData(Buffer::Instance& data, bool end_stream) override;
+  void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {}
+  void decodeMetadata(Http::MetadataMapPtr&&) override {}
+  void dumpState(std::ostream&, int) const override {}
+
+  // Http::ConnectionCallbacks
+  void onGoAway(Http::GoAwayErrorCode) override {}
+
+  /**
+   * Parse an HTTP ``Retry-After`` header into a cool-off duration. Only the RFC 7231 delta-seconds
+   * form is supported (the form rate limiters emit); the HTTP-date form, a zero value, and
+   * malformed/absent values return ``nullopt`` so the caller falls back to its computed backoff.
+   * @param headers the response headers to inspect.
+   * @return the parsed cool-off duration, or ``nullopt`` if not present/parseable/zero.
+   */
+  static std::optional<std::chrono::milliseconds>
+  parseRetryAfter(const Http::ResponseHeaderMap& headers);
+
+private:
+  // Dispatches received bytes to the HTTP/1 codec and completes a pending handoff once dispatch
+  // returns, so residual bytes coalesced with the response are captured before the tunnel is
+  // queued.
+  void dispatchHttp1(Buffer::Instance& buffer);
+
+  // Moves any bytes remaining in ``buffer`` into handshake_residual_, allocating it on first use.
+  void captureHandshakeResidual(Buffer::Instance& buffer);
+
+  InitiatorHandshakeCallbacks& callbacks_;
+  const Http1InitiatorFramingConstSharedPtr framing_;
+  // HTTP/1 codec used to send request and parse response.
+  std::unique_ptr<Http::Http1::ClientConnectionImpl> http1_client_codec_;
+  // Base interface pointer used to call dispatch via public API.
+  Http::Connection* http1_parse_connection_{nullptr};
+  // Set when the handshake succeeds so the handoff runs after dispatch returns.
+  bool pending_handoff_{false};
+  // Guards the exactly-once contract of onHandshakeDone: after the terminal notification, late
+  // codec events (extraneous bytes after a success, a second response after a failure) are
+  // dropped.
+  bool terminal_reported_{false};
+  // Bytes the responder coalesced with the handshake response (for example the HTTP/2 preface).
+  // Null until the first such byte is captured, then carried with the tunnel.
+  Buffer::InstancePtr handshake_residual_;
+};
+
+/**
+ * Factory producing HTTP/1.1 initiator handshakes.
+ */
+class Http1HandshakeConfigurator : public InitiatorHandshakeConfigurator {
+public:
+  explicit Http1HandshakeConfigurator(
+      Http1InitiatorFraming framing = {},
+      std::chrono::milliseconds handshake_timeout = std::chrono::milliseconds{15000})
+      : framing_(std::make_shared<const Http1InitiatorFraming>(std::move(framing))),
+        handshake_timeout_(handshake_timeout) {}
+
+  std::unique_ptr<InitiatorHandshake>
+  createHandshake(InitiatorHandshakeCallbacks& callbacks) const override {
+    return std::make_unique<Http1HandshakeInitiator>(callbacks, framing_);
+  }
+
+  std::chrono::milliseconds handshakeTimeout() const override { return handshake_timeout_; }
+
+  const Http1InitiatorFraming& framing() const { return *framing_; }
+
+private:
+  const Http1InitiatorFramingConstSharedPtr framing_;
+  std::chrono::milliseconds handshake_timeout_;
+};
+
+/**
+ * Registered under the name ``envoy.reverse_tunnel.initiator_handshake.http1``. Its typed config
+ * is ``HttpHandshakeConfig``: ``request_path``, ``use_http_upgrade``, ``additional_headers`` and
+ * ``handshake_timeout`` apply as on ``http_handshake``. ``formatters`` is rejected; formatted
+ * headers are only available through ``http_handshake``.
+ */
+class Http1InitiatorHandshakeConfiguratorFactory : public InitiatorHandshakeConfiguratorFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+            DownstreamReverseConnectionSocketInterface::HttpHandshakeConfig>();
+  }
+  std::string category() const override { return "envoy.reverse_tunnel.initiator_handshake"; }
+  std::string name() const override { return "envoy.reverse_tunnel.initiator_handshake.http1"; }
+
+  InitiatorHandshakeConfiguratorSharedPtr
+  createConfigurator(const Protobuf::Message& config,
+                     Server::Configuration::ServerFactoryContext& context) override;
+};
+
+DECLARE_FACTORY(Http1InitiatorHandshakeConfiguratorFactory);
+
+} // namespace ReverseConnection
+} // namespace Bootstrap
+} // namespace Extensions
+} // namespace Envoy

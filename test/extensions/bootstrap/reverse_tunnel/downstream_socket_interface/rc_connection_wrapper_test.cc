@@ -13,6 +13,7 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
+#include "source/extensions/bootstrap/reverse_tunnel/http1/http1_handshake_initiator.h"
 
 #include "test/common/formatter/command_extension.h"
 #include "test/mocks/event/mocks.h"
@@ -22,6 +23,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -109,8 +111,13 @@ protected:
     return config;
   }
 
+  // The extension builds the handshake factory from the framing it copies into the socket config;
+  // mirror that here.
   std::unique_ptr<ReverseConnectionIOHandle>
-  createTestIOHandle(const ReverseConnectionSocketConfig& config) {
+  createTestIOHandle(ReverseConnectionSocketConfig config) {
+    config.handshake_configurator =
+        std::make_shared<Http1HandshakeConfigurator>(Http1InitiatorFraming{
+            config.request_path, config.use_http_upgrade, config.additional_headers});
     return std::make_unique<ReverseConnectionIOHandle>(-1, // dummy fd
                                                        config, cluster_manager_, extension_.get(),
                                                        *stats_scope_);
@@ -140,6 +147,81 @@ protected:
 
   void pushConnectionWrapper(std::unique_ptr<RCConnectionWrapper> wrapper) {
     io_handle_->connection_wrappers_.push_back(std::move(wrapper));
+  }
+
+  // Dials one tunnel to 192.168.1.1 through the io handle and returns the read filter the wrapper
+  // installed, so tests drive the real handshake with response bytes.
+  Network::ReadFilterSharedPtr dialOneTunnel() {
+    dial_cluster_ = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+    EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+        .WillRepeatedly(Return(dial_cluster_.get()));
+    dial_priority_set_ = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+    EXPECT_CALL(*dial_cluster_, prioritySet()).WillRepeatedly(ReturnRef(*dial_priority_set_));
+    auto host_map = std::make_shared<Upstream::HostMap>();
+    dial_host_ = createMockHost("192.168.1.1");
+    (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(dial_host_);
+    EXPECT_CALL(*dial_priority_set_, crossPriorityHostMap())
+        .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
+    addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+    auto connection = setupMockConnection();
+    Network::ReadFilterSharedPtr read_filter;
+    ON_CALL(*connection, addReadFilter(_))
+        .WillByDefault(
+            [&read_filter](Network::ReadFilterSharedPtr filter) { read_filter = filter; });
+    Upstream::MockHost::MockCreateConnectionData conn_data;
+    conn_data.connection_ = connection.get();
+    conn_data.host_description_ = dial_host_;
+    EXPECT_CALL(*dial_cluster_, tcpConn_(_)).WillOnce(Return(conn_data));
+    connection.release();
+
+    EXPECT_TRUE(initiateOneReverseConnection("test-cluster", "192.168.1.1", dial_host_));
+    EXPECT_NE(read_filter, nullptr);
+    return read_filter;
+  }
+
+  // Feeds response bytes through the wrapper's read filter.
+  static void feed(const Network::ReadFilterSharedPtr& read_filter, absl::string_view bytes) {
+    Buffer::OwnedImpl buffer(bytes);
+    read_filter->onData(buffer, false);
+  }
+
+  // Bytes the accepted tunnel carries for replay, or empty when none.
+  std::string establishedResidual() {
+    if (io_handle_->established_connections_.empty()) {
+      return "<no tunnel>";
+    }
+    const auto& residual = io_handle_->established_connections_.front().residual_bytes;
+    return residual == nullptr ? "" : residual->toString();
+  }
+
+  // Backoff the io handle scheduled for the dialed host after its last failure.
+  std::chrono::milliseconds dialedHostBackoff() {
+    const auto& info = io_handle_->host_to_conn_info_map_.at("192.168.1.1");
+    return std::chrono::duration_cast<std::chrono::milliseconds>(info.backoff_until -
+                                                                 info.last_failure_time);
+  }
+
+  // The tagged handshake counter for a result and, for failures, a reason.
+  uint64_t handshakeCount(absl::string_view result, absl::string_view reason = "") {
+    auto& scope = extension_->getStatsScope();
+    Stats::SymbolTable& symbols = scope.symbolTable();
+    Stats::StatNameManagedStorage base("reverse_connections.handshake", symbols);
+    Stats::StatNameManagedStorage worker_key("worker", symbols);
+    Stats::StatNameManagedStorage worker_value("worker_0", symbols);
+    Stats::StatNameManagedStorage cluster_key("cluster", symbols);
+    Stats::StatNameManagedStorage cluster_value("test-cluster", symbols);
+    Stats::StatNameManagedStorage result_key("result", symbols);
+    Stats::StatNameManagedStorage result_value(result, symbols);
+    Stats::StatNameManagedStorage reason_key("failure_reason", symbols);
+    Stats::StatNameManagedStorage reason_value(reason, symbols);
+    Stats::StatNameTagVector tags{{worker_key.statName(), worker_value.statName()},
+                                  {cluster_key.statName(), cluster_value.statName()},
+                                  {result_key.statName(), result_value.statName()}};
+    if (!reason.empty()) {
+      tags.push_back({reason_key.statName(), reason_value.statName()});
+    }
+    return Stats::Utility::counterFromStatNames(scope, {base.statName()}, tags).value();
   }
 
   // Test Data Setup Helpers.
@@ -208,6 +290,11 @@ protected:
 
   // Mock socket for testing.
   std::unique_ptr<Network::ConnectionSocket> mock_socket_;
+
+  // Upstream state backing dialOneTunnel().
+  std::shared_ptr<NiceMock<Upstream::MockThreadLocalCluster>> dial_cluster_;
+  std::shared_ptr<NiceMock<Upstream::MockPrioritySet>> dial_priority_set_;
+  Upstream::HostConstSharedPtr dial_host_;
 };
 
 // Test RCConnectionWrapper::connect() method with HTTP/1.1 handshake success
@@ -921,6 +1008,10 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeSuccess) {
 
   // Create a mock connection with proper socket setup.
   auto mock_connection = setupMockConnection();
+  // Capture the read filter the handshake installs so responses can be fed through it.
+  Network::ReadFilterSharedPtr read_filter;
+  ON_CALL(*mock_connection, addReadFilter(_))
+      .WillByDefault([&](Network::ReadFilterSharedPtr filter) { read_filter = filter; });
   Upstream::MockHost::MockCreateConnectionData success_conn_data;
   success_conn_data.connection_ = mock_connection.get();
   success_conn_data.host_description_ = mock_host;
@@ -973,10 +1064,11 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeSuccess) {
       Stats::Utility::counterFromStatNames(stats_scope, {stat_storage.statName()}, tags);
   uint64_t initial_handshake_success_count = handshake_success_counter.value();
 
-  // Drive a 200 handshake response through the real dispatch path. Success is deferred to the
-  // handoff that runs once dispatch returns, which updates the connected stats.
+  // Drive a 200 handshake response through the read filter installed by the handshake. Success is
+  // deferred to the handoff that runs once dispatch returns, which updates the connected stats.
+  ASSERT_NE(read_filter, nullptr);
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
-  wrapper_ptr->dispatchHttp1(response);
+  read_filter->onData(response, false);
 
   // Get stats after the handshake completed.
   auto final_stats = extension_->getCrossWorkerStatMap();
@@ -1074,10 +1166,11 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeFailure) {
       Stats::Utility::counterFromStatNames(stats_scope, {stat_storage.statName()}, tags);
   uint64_t initial_handshake_failed_count = handshake_failed_counter.value();
 
-  // Call onHandshakeFailure with HTTP status error.
-  wrapper_ptr->onHandshakeFailure(HandshakeFailureReason::httpStatusError("401"));
+  // Report the handshake failure with an HTTP status error.
+  wrapper_ptr->onHandshakeDone(
+      HandshakeOutcome::failure(HandshakeFailureReason::httpStatusError("401")), std::nullopt);
 
-  // Get stats after onHandshakeFailure.
+  // Get stats after onHandshakeDone.
   auto final_stats = extension_->getCrossWorkerStatMap();
 
   // Verify that failed stats were incremented.
@@ -1168,8 +1261,9 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeFailureEncodeError) {
       Stats::Utility::counterFromStatNames(stats_scope, {stat_storage.statName()}, tags);
   uint64_t initial_handshake_failed_count = handshake_failed_counter.value();
 
-  // Call onHandshakeFailure with EncodeError.
-  wrapper_ptr->onHandshakeFailure(HandshakeFailureReason::encodeError());
+  // Report the handshake failure with an encode error.
+  wrapper_ptr->onHandshakeDone(HandshakeOutcome::failure(HandshakeFailureReason::encodeError()),
+                               std::nullopt);
 
   // Verify that handshake failure stat was incremented.
   EXPECT_EQ(handshake_failed_counter.value(), initial_handshake_failed_count + 1);
@@ -1368,110 +1462,6 @@ TEST_F(RCConnectionWrapperTest, OnEventWithNullConnection) {
   // The exact behavior depends on the implementation, but it should not crash.
 }
 
-// Test decodeHeaders handles HTTP 200 status by calling success path.
-TEST_F(RCConnectionWrapperTest, DecodeHeadersOk) {
-  auto mock_connection = setupMockConnection();
-  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
-
-  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
-
-  Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
-  headers->setStatus(200);
-
-  wrapper.decodeHeaders(std::move(headers), true);
-}
-
-// Test decodeHeaders handles non-200 status by calling failure path.
-TEST_F(RCConnectionWrapperTest, DecodeHeadersNonOk) {
-  auto mock_connection = setupMockConnection();
-  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
-
-  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
-
-  Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
-  headers->setStatus(404);
-
-  wrapper.decodeHeaders(std::move(headers), true);
-}
-
-// In upgrade mode, a 101 Switching Protocols response is treated as handshake success
-// and a 200 response is treated as a protocol mismatch.
-TEST_F(RCConnectionWrapperTest, DecodeHeadersUpgradeMode) {
-  ReverseConnectionSocketConfig upgrade_config = createDefaultTestConfig();
-  upgrade_config.use_http_upgrade = true;
-  auto upgrade_io_handle = createTestIOHandle(upgrade_config);
-
-  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
-
-  // 101 -> success path.
-  {
-    auto mock_connection = setupMockConnection();
-    RCConnectionWrapper wrapper(*upgrade_io_handle, std::move(mock_connection), mock_host,
-                                "test-cluster");
-    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
-    headers->setStatus(101);
-    wrapper.decodeHeaders(std::move(headers), true);
-  }
-  // 200 in upgrade mode -> failure path (server didn't switch protocols).
-  {
-    auto mock_connection = setupMockConnection();
-    RCConnectionWrapper wrapper(*upgrade_io_handle, std::move(mock_connection), mock_host,
-                                "test-cluster");
-    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
-    headers->setStatus(200);
-    wrapper.decodeHeaders(std::move(headers), true);
-  }
-}
-
-// parseRetryAfter honors the RFC 7231 delta-seconds form, clamps it (overflow guard) at one hour,
-// and returns nullopt for absent/zero/HTTP-date/malformed values so the caller falls back to its
-// computed backoff.
-TEST_F(RCConnectionWrapperTest, ParseRetryAfter) {
-  {
-    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
-    headers->addCopy(Http::LowerCaseString("retry-after"), "7");
-    auto result = RCConnectionWrapper::parseRetryAfter(*headers);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->count(), 7000);
-  }
-  {
-    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
-    EXPECT_FALSE(RCConnectionWrapper::parseRetryAfter(*headers).has_value());
-  }
-  {
-    // A zero cool-off must be treated as absent so it cannot short-circuit the backoff.
-    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
-    headers->addCopy(Http::LowerCaseString("retry-after"), "0");
-    EXPECT_FALSE(RCConnectionWrapper::parseRetryAfter(*headers).has_value());
-  }
-  {
-    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
-    headers->addCopy(Http::LowerCaseString("retry-after"), "Wed, 21 Oct 2026 07:28:00 GMT");
-    EXPECT_FALSE(RCConnectionWrapper::parseRetryAfter(*headers).has_value());
-  }
-  {
-    Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
-    headers->addCopy(Http::LowerCaseString("retry-after"), "100000"); // > 1h.
-    auto result = RCConnectionWrapper::parseRetryAfter(*headers);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->count(), 3600 * 1000);
-  }
-}
-
-// A 429 carrying Retry-After is handled by decodeHeaders via the failure/cool-off path.
-TEST_F(RCConnectionWrapperTest, DecodeHeadersRateLimited) {
-  auto mock_connection = setupMockConnection();
-  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
-
-  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
-
-  Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
-  headers->setStatus(429);
-  headers->addCopy(Http::LowerCaseString("retry-after"), "5");
-
-  wrapper.decodeHeaders(std::move(headers), true);
-}
-
 // In upgrade mode, connect() emits `Connection: Upgrade` + `Upgrade: reverse-tunnel`
 // in the handshake request. Verifies by capturing the bytes written by the encoder.
 TEST_F(RCConnectionWrapperTest, ConnectEmitsUpgradeHeaders) {
@@ -1509,13 +1499,17 @@ TEST_F(RCConnectionWrapperTest, ConnectEmitsUpgradeHeaders) {
   EXPECT_THAT(written, testing::HasSubstr("connection: upgrade"));
 }
 
-// Test dispatchHttp1 error path by initializing codec via connect() and
-// then feeding invalid bytes to the parser.
+// Feed invalid bytes through the handshake's read filter after connect() to exercise the
+// codec dispatch error path.
 TEST_F(RCConnectionWrapperTest, DispatchHttp1ErrorPath) {
   auto mock_connection = getDeletableConn(dispatcher_);
 
+  // Capture the read filter the handshake installs.
+  Network::ReadFilterSharedPtr read_filter;
+  ON_CALL(*mock_connection, addReadFilter(_))
+      .WillByDefault([&](Network::ReadFilterSharedPtr filter) { read_filter = filter; });
+
   EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
-  EXPECT_CALL(*mock_connection, addReadFilter(_));
   EXPECT_CALL(*mock_connection, connect());
   EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(42));
   EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
@@ -1537,18 +1531,24 @@ TEST_F(RCConnectionWrapperTest, DispatchHttp1ErrorPath) {
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
   RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
-  // Initialize codec inside the wrapper.
+  // Initialize the handshake inside the wrapper.
   (void)wrapper.connect("tenant", "cluster", "node");
 
-  // Feed clearly invalid/non-HTTP bytes to exercise error log path.
+  // Feed clearly invalid/non-HTTP bytes through the filter to exercise the error log path.
+  ASSERT_NE(read_filter, nullptr);
   Buffer::OwnedImpl invalid_bytes("\x00\x01garbage");
-  wrapper.dispatchHttp1(invalid_bytes);
+  read_filter->onData(invalid_bytes, false);
 }
 
 // 403 responses have a body, so decodeHeaders() runs inside Http1::dispatch().
 // close() must happen after dispatch returns (wrapper shutdown), not on that stack.
 TEST_F(RCConnectionWrapperTest, DispatchForbiddenWithBodyDoesNotCloseDuringDispatch) {
   auto mock_connection = getDeletableConn(dispatcher_);
+
+  // Capture the read filter the handshake installs.
+  Network::ReadFilterSharedPtr read_filter;
+  ON_CALL(*mock_connection, addReadFilter(_))
+      .WillByDefault([&](Network::ReadFilterSharedPtr filter) { read_filter = filter; });
 
   EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
   EXPECT_CALL(*mock_connection, addReadFilter(_));
@@ -1582,12 +1582,13 @@ TEST_F(RCConnectionWrapperTest, DispatchForbiddenWithBodyDoesNotCloseDuringDispa
   pushConnectionWrapper(std::move(wrapper));
   addWrapperToHostMap(wrapper_ptr, "10.0.0.1:80");
 
+  ASSERT_NE(read_filter, nullptr);
   Buffer::OwnedImpl response("HTTP/1.1 403 Forbidden\r\n"
                              "Content-Type: text/plain\r\n"
                              "Content-Length: 18\r\n"
                              "\r\n"
                              "validation_failed");
-  wrapper_ptr->dispatchHttp1(response);
+  read_filter->onData(response, false);
 
   EXPECT_TRUE(getConnectionWrappers().empty());
   EXPECT_TRUE(getConnWrapperToHostMap().empty());
@@ -1638,6 +1639,8 @@ TEST_F(RCConnectionWrapperTest, HandshakeTimeoutReleasesSlot) {
   EXPECT_TRUE(getConnWrapperToHostMap().empty());
   auto stat_map = extension_->getCrossWorkerStatMap();
   EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.failed"], 1);
+  EXPECT_EQ(handshakeCount("failed", "timeout"), 1);
+  EXPECT_EQ(handshakeCount("failed", "connection_close"), 0);
 
   while (!dispatcher_.to_delete_.empty()) {
     dispatcher_.to_delete_.pop_front();
@@ -1720,17 +1723,34 @@ TEST_F(RCConnectionWrapperTest, ReleaseConnection) {
   EXPECT_EQ(wrapper.getConnection(), nullptr);
 }
 
-// releaseConnection() must detach the wrapper's connection callbacks and read filter before
-// transferring ownership, so the handed-off connection no longer references the soon-to-be-deleted
-// wrapper. A second call must be a safe no-op (no double detach).
+// releaseConnection() must detach the wrapper's connection callbacks and the handshake's read
+// filter before transferring ownership, so the handed-off connection no longer references the
+// soon-to-be-deleted wrapper. A second call must be a safe no-op (no double detach).
 TEST_F(RCConnectionWrapperTest, ReleaseConnectionDetachesCallbacksAndReadFilter) {
-  auto mock_connection = setupMockConnection();
-  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto mock_connection = getDeletableConn(dispatcher_);
 
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
   EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_));
   EXPECT_CALL(*mock_connection, removeReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(43));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+  EXPECT_CALL(*mock_connection, write(_, _)).WillRepeatedly([](Buffer::Instance& buffer, bool) {
+    buffer.drain(buffer.length());
+  });
+  auto mock_remote = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 80);
+  auto mock_local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 10001);
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
+        static auto provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local, mock_remote);
+        return *provider;
+      });
 
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
   RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+  (void)wrapper.connect("tenant", "cluster", "node");
 
   auto released_connection = wrapper.releaseConnection();
   EXPECT_NE(released_connection, nullptr);
@@ -1743,16 +1763,31 @@ TEST_F(RCConnectionWrapperTest, ReleaseConnectionDetachesCallbacksAndReadFilter)
 // shutdown() must detach callbacks/filters, close an open connection, then hand it to the
 // dispatcher's deferred-delete queue so ConnectionImpl is not destroyed with an open socket.
 TEST_F(RCConnectionWrapperTest, ShutdownDetachesAndDefersConnectionDeletion) {
-  auto mock_connection = setupMockConnection();
-  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto mock_connection = getDeletableConn(dispatcher_);
 
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
   EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_));
   EXPECT_CALL(*mock_connection, removeReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
   EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
   EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(4242));
+  EXPECT_CALL(*mock_connection, write(_, _)).WillRepeatedly([](Buffer::Instance& buffer, bool) {
+    buffer.drain(buffer.length());
+  });
+  auto mock_remote = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 80);
+  auto mock_local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 10001);
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
+        static auto provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local, mock_remote);
+        return *provider;
+      });
 
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
   RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+  (void)wrapper.connect("tenant", "cluster", "node");
 
   const size_t deferred_before = dispatcher_.to_delete_.size();
   wrapper.shutdown();
@@ -1918,158 +1953,6 @@ TEST_F(RCConnectionWrapperTest, Shutdown) {
   }
 }
 
-// Test SimpleConnReadFilter::onData method.
-class SimpleConnReadFilterTest : public testing::Test {
-protected:
-  void SetUp() override {
-    stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
-
-    io_handle_ = std::make_unique<ReverseConnectionIOHandle>(
-        -1, // dummy fd
-        ReverseConnectionSocketConfig{}, cluster_manager_,
-        nullptr,        // extension
-        *stats_scope_); // Use the created scope
-  }
-
-  void TearDown() override {
-    io_handle_.reset();
-    dispatcher_.clearDeferredDeleteList();
-  }
-
-  // Helper to create a mock RCConnectionWrapper.
-  std::unique_ptr<RCConnectionWrapper> createMockWrapper() {
-    auto mock_connection = getDeletableConn(dispatcher_);
-    auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
-    return std::make_unique<RCConnectionWrapper>(*io_handle_, std::move(mock_connection), mock_host,
-                                                 "test-cluster");
-  }
-
-  // Helper to create SimpleConnReadFilter.
-  std::unique_ptr<SimpleConnReadFilter> createFilter(void* parent) {
-    return std::make_unique<SimpleConnReadFilter>(parent);
-  }
-
-  NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  Stats::IsolatedStoreImpl stats_store_;
-  Stats::ScopeSharedPtr stats_scope_;
-  std::unique_ptr<ReverseConnectionIOHandle> io_handle_;
-  NiceMock<Event::MockDispatcher> dispatcher_{"worker_0"};
-};
-
-TEST_F(SimpleConnReadFilterTest, OnDataWithNullParent) {
-  // Create filter with null parent.
-  auto filter = createFilter(nullptr);
-
-  // Create a buffer with some data.
-  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n\r\n");
-
-  // Call onData - should return StopIteration when parent is null.
-  auto result = filter->onData(buffer, false);
-  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
-}
-
-TEST_F(SimpleConnReadFilterTest, OnDataAfterClearParent) {
-  auto wrapper = createMockWrapper();
-  auto filter = createFilter(wrapper.get());
-
-  filter->clearParent();
-
-  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n\r\n");
-  auto result = filter->onData(buffer, false);
-  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
-}
-
-TEST_F(SimpleConnReadFilterTest, OnDataWithHttp200Response) {
-  // Create wrapper and filter.
-  auto wrapper = createMockWrapper();
-  auto filter = createFilter(wrapper.get());
-
-  // Create a buffer with HTTP 200 response.
-  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n\r\n");
-
-  // Call onData - the filter always stops iteration after dispatch.
-  auto result = filter->onData(buffer, false);
-  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
-}
-
-TEST_F(SimpleConnReadFilterTest, OnDataWithHttp2Response) {
-  // Create wrapper and filter.
-  auto wrapper = createMockWrapper();
-  auto filter = createFilter(wrapper.get());
-
-  // Create a buffer with HTTP/2 response but invalid protobuf.
-  Buffer::OwnedImpl buffer("HTTP/2 200\r\n\r\nACCEPTED");
-
-  // Call onData - should return StopIteration for invalid response format.
-  auto result = filter->onData(buffer, false);
-  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
-}
-
-TEST_F(SimpleConnReadFilterTest, OnDataWithIncompleteHeaders) {
-  // Create wrapper and filter.
-  auto wrapper = createMockWrapper();
-  auto filter = createFilter(wrapper.get());
-
-  // Create a buffer with incomplete HTTP headers.
-  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n");
-
-  // Call onData - the filter always stops iteration after dispatch.
-  auto result = filter->onData(buffer, false);
-  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
-}
-
-TEST_F(SimpleConnReadFilterTest, OnDataWithEmptyResponseBody) {
-  // Create wrapper and filter.
-  auto wrapper = createMockWrapper();
-  auto filter = createFilter(wrapper.get());
-
-  // Create a buffer with HTTP 200 but empty body.
-  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n\r\n");
-
-  // Call onData - the filter always stops iteration after dispatch.
-  auto result = filter->onData(buffer, false);
-  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
-}
-
-TEST_F(SimpleConnReadFilterTest, OnDataWithNon200Response) {
-  // Create wrapper and filter.
-  auto wrapper = createMockWrapper();
-  auto filter = createFilter(wrapper.get());
-
-  // Create a buffer with HTTP 404 response.
-  Buffer::OwnedImpl buffer("HTTP/1.1 404 Not Found\r\n\r\n");
-
-  // Call onData - should return StopIteration for error response.
-  auto result = filter->onData(buffer, false);
-  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
-}
-
-TEST_F(SimpleConnReadFilterTest, OnDataWithHttp2ErrorResponse) {
-  // Create wrapper and filter.
-  auto wrapper = createMockWrapper();
-  auto filter = createFilter(wrapper.get());
-
-  // Create a buffer with HTTP/2 error response.
-  Buffer::OwnedImpl buffer("HTTP/2 500\r\n\r\n");
-
-  // Call onData - should return StopIteration for error response.
-  auto result = filter->onData(buffer, false);
-  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
-}
-
-TEST_F(SimpleConnReadFilterTest, OnDataWithPartialData) {
-  // Create wrapper and filter.
-  auto wrapper = createMockWrapper();
-  auto filter = createFilter(wrapper.get());
-
-  // Create a buffer with partial data (no HTTP response yet)
-  Buffer::OwnedImpl buffer("partial data");
-
-  // Call onData - the filter always stops iteration after dispatch.
-  auto result = filter->onData(buffer, false);
-  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
-}
-
 // Test all no-op methods in RCConnectionWrapper.
 TEST_F(RCConnectionWrapperTest, NoOpMethods) {
   // Create a mock connection with proper socket setup.
@@ -2082,30 +1965,6 @@ TEST_F(RCConnectionWrapperTest, NoOpMethods) {
   // Test Network::ConnectionCallbacks no-op methods
   wrapper.onAboveWriteBufferHighWatermark();
   wrapper.onBelowWriteBufferLowWatermark();
-
-  // Test Http::ResponseDecoder no-op methods
-  wrapper.decode1xxHeaders(nullptr);
-
-  Buffer::OwnedImpl data("test data");
-  wrapper.decodeData(data, false);
-  wrapper.decodeData(data, true);
-
-  wrapper.decodeTrailers(nullptr);
-  wrapper.decodeMetadata(nullptr);
-
-  std::ostringstream output;
-  wrapper.dumpState(output, 0);
-  wrapper.dumpState(output, 2);
-
-  // Test Http::ConnectionCallbacks no-op methods
-  wrapper.onGoAway(Http::GoAwayErrorCode::NoError);
-  wrapper.onGoAway(Http::GoAwayErrorCode::Other);
-
-  NiceMock<Http::MockReceivedSettings> settings;
-  wrapper.onSettings(settings);
-
-  wrapper.onMaxStreamsChanged(0);
-  wrapper.onMaxStreamsChanged(100);
 }
 
 // Verify shutdown with already-null connection doesn't crash.
@@ -2124,6 +1983,129 @@ TEST_F(RCConnectionWrapperTest, ShutdownIsIdempotent) {
   ASSERT_EQ(wrapper->getConnection(), nullptr);
 
   wrapper.reset();
+}
+
+// A read filter cleared on teardown swallows data without reaching the wrapper.
+TEST_F(RCConnectionWrapperTest, ClearedReadFilterSwallowsData) {
+  auto mock_connection = getDeletableConn(dispatcher_);
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+  SimpleConnReadFilter filter(wrapper);
+  filter.clearParent();
+
+  const std::string response = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n";
+  Buffer::OwnedImpl buffer(response);
+  EXPECT_EQ(filter.onData(buffer, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(buffer.toString(), response);
+}
+
+// Bytes the responder coalesced with a 200 reach the accepted tunnel for replay.
+TEST_F(RCConnectionWrapperTest, ResidualCoalescedWith200ReachesTunnel) {
+  auto read_filter = dialOneTunnel();
+  feed(read_filter, "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\nresidual-bytes");
+
+  EXPECT_TRUE(getConnectionWrappers().empty());
+  EXPECT_EQ(establishedResidual(), "residual-bytes");
+}
+
+// Post-101 bytes in upgrade mode reach the accepted tunnel for replay.
+TEST_F(RCConnectionWrapperTest, ResidualAfter101ReachesTunnel) {
+  ReverseConnectionSocketConfig upgrade_config = createDefaultTestConfig();
+  upgrade_config.use_http_upgrade = true;
+  io_handle_ = createTestIOHandle(upgrade_config);
+
+  auto read_filter = dialOneTunnel();
+  feed(read_filter, "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\n"
+                    "upgrade: reverse-tunnel\r\n\r\npost-upgrade");
+
+  EXPECT_TRUE(getConnectionWrappers().empty());
+  EXPECT_EQ(establishedResidual(), "post-upgrade");
+}
+
+// A response split across reads completes on the second read only.
+TEST_F(RCConnectionWrapperTest, ResponseSplitAcrossReads) {
+  auto read_filter = dialOneTunnel();
+  const uint64_t successes = handshakeCount("success");
+
+  feed(read_filter, "HTTP/1.1 200 OK\r\ncont");
+  EXPECT_EQ(getConnectionWrappers().size(), 1);
+  EXPECT_EQ(handshakeCount("success"), successes);
+  EXPECT_EQ(establishedResidual(), "<no tunnel>");
+
+  feed(read_filter, "ent-length: 0\r\n\r\n");
+  EXPECT_TRUE(getConnectionWrappers().empty());
+  EXPECT_EQ(handshakeCount("success"), successes + 1);
+  EXPECT_EQ(establishedResidual(), "");
+}
+
+// A 429 Retry-After hint becomes the host's backoff instead of the computed one.
+TEST_F(RCConnectionWrapperTest, RetryAfterSetsHostBackoff) {
+  auto read_filter = dialOneTunnel();
+  feed(read_filter, "HTTP/1.1 429 Too Many Requests\r\ncontent-length: 0\r\n"
+                    "retry-after: 7\r\n\r\n");
+
+  EXPECT_TRUE(getConnectionWrappers().empty());
+  EXPECT_EQ(handshakeCount("failed", "http.429"), 1);
+  EXPECT_GE(dialedHostBackoff(), std::chrono::milliseconds(7000));
+}
+
+// A socket config without a handshake factory fails the dial loudly instead of dereferencing it.
+TEST_F(RCConnectionWrapperTest, ConnectWithoutConfiguratorFails) {
+  ReverseConnectionSocketConfig bare_config = createDefaultTestConfig();
+  auto bare_handle = std::make_unique<ReverseConnectionIOHandle>(-1, bare_config, cluster_manager_,
+                                                                 extension_.get(), *stats_scope_);
+  auto mock_connection = getDeletableConn(dispatcher_);
+  EXPECT_CALL(*mock_connection, addReadFilter(_)).Times(0);
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  RCConnectionWrapper wrapper(*bare_handle, std::move(mock_connection), mock_host, "test-cluster");
+
+  EXPECT_ENVOY_BUG(EXPECT_FALSE(wrapper.connect("test-tenant", "test-cluster", "test-node").ok()),
+                   "socket config carries no handshake configurator");
+}
+
+namespace {
+
+// Handshake that reports a terminal outcome from start() and still returns ok.
+class TerminalInStartHandshake : public InitiatorHandshake {
+public:
+  explicit TerminalInStartHandshake(InitiatorHandshakeCallbacks& callbacks)
+      : callbacks_(callbacks) {}
+  absl::Status start(std::optional<int64_t>) override {
+    callbacks_.onHandshakeDone(HandshakeOutcome::failure("finished early"), std::nullopt);
+    return absl::OkStatus();
+  }
+  void onData(Buffer::Instance&) override {}
+  void cancel() override {}
+  Buffer::InstancePtr takeResidual() override { return nullptr; }
+
+private:
+  InitiatorHandshakeCallbacks& callbacks_;
+};
+
+class TerminalInStartConfigurator : public InitiatorHandshakeConfigurator {
+public:
+  std::unique_ptr<InitiatorHandshake>
+  createHandshake(InitiatorHandshakeCallbacks& callbacks) const override {
+    return std::make_unique<TerminalInStartHandshake>(callbacks);
+  }
+};
+
+} // namespace
+
+// An attempt that ended inside start() with an ok status is a contract violation: connect()
+// reports it rather than arming a deadline on a finished attempt.
+TEST_F(RCConnectionWrapperTest, TerminalOutcomeInsideStartWithOkStatusFails) {
+  ReverseConnectionSocketConfig config = createDefaultTestConfig();
+  config.handshake_configurator = std::make_shared<TerminalInStartConfigurator>();
+  auto handle = std::make_unique<ReverseConnectionIOHandle>(-1, config, cluster_manager_,
+                                                            extension_.get(), *stats_scope_);
+  auto mock_connection = getDeletableConn(dispatcher_);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  RCConnectionWrapper wrapper(*handle, std::move(mock_connection), mock_host, "test-cluster");
+
+  EXPECT_ENVOY_BUG(EXPECT_FALSE(wrapper.connect("test-tenant", "test-cluster", "test-node").ok()),
+                   "returned ok");
 }
 
 } // namespace ReverseConnection
