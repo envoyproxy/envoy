@@ -152,6 +152,43 @@ TEST_F(FilterTest, ValidAltSvc) {
   filter_->onDestroy();
 }
 
+// As an upstream filter, the origin comes from the attempt's own stream info, not the request's,
+// which may already point at another attempt's host when retries are hedged.
+TEST_F(FilterTest, ValidAltSvcUsesAttemptStreamInfo) {
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"alt-svc", "h3=\":443\"; ma=60"}};
+  Http::HttpServerPropertiesCache::Origin expected_origin("https", "attempt-host", 443);
+
+  envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
+  auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  callbacks_.stream_info_.upstream_cluster_info_ = info;
+  info->alternate_protocols_cache_options_.emplace(
+      proto_config.alternate_protocols_cache_options());
+
+  // The request's stream info has no upstream host, so only the attempt's can supply the origin.
+  callbacks_.stream_info_.upstream_info_ = nullptr;
+  NiceMock<StreamInfo::MockStreamInfo> attempt_stream_info;
+  NiceMock<Http::MockUpstreamStreamFilterCallbacks> upstream_callbacks;
+  ON_CALL(upstream_callbacks, upstreamStreamInfo()).WillByDefault(ReturnRef(attempt_stream_info));
+  ON_CALL(callbacks_, upstreamCallbacks())
+      .WillByDefault(Return(OptRef<Http::UpstreamStreamFilterCallbacks>(upstream_callbacks)));
+
+  std::shared_ptr<Network::MockResolvedAddress> address =
+      std::make_shared<Network::MockResolvedAddress>("1.2.3.4:443", "1.2.3.4:443");
+  Network::MockIp ip;
+  std::string hostname = "attempt-host";
+  std::shared_ptr<const Upstream::MockHostDescription> hd =
+      std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
+          attempt_stream_info.upstreamInfo()->upstreamHost());
+  EXPECT_CALL(*hd, hostname()).WillOnce(ReturnRef(hostname));
+  EXPECT_CALL(*hd, address()).WillOnce(Return(address));
+  EXPECT_CALL(*address, ip()).WillOnce(Return(&ip));
+  EXPECT_CALL(ip, port()).WillOnce(Return(443));
+  EXPECT_CALL(*alternate_protocols_cache_, setAlternatives(expected_origin, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  filter_->onDestroy();
+}
+
 TEST_F(FilterTest, ValidAltSvcNullAddress) {
   Http::TestResponseHeaderMapImpl headers{
       {":status", "200"}, {"alt-svc", "h3-29=\":443\"; ma=86400, h3=\":443\"; ma=60"}};
