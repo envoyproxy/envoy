@@ -14,6 +14,7 @@
 #include "source/common/http/exception.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/http2/codec_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
 #include "test/common/http/common.h"
@@ -1095,6 +1096,65 @@ TEST_P(Http2CodecImplTest, ResetBeforeHeadersSent) {
   EXPECT_EQ(1, TestUtility::findGauge(client_stats_store_, "http2.streams_active")->value());
   request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
   EXPECT_EQ(0, TestUtility::findGauge(client_stats_store_, "http2.streams_active")->value());
+}
+
+// A connection-level reset on an internal listener connection passes the connection's transport
+// failure reason to client stream reset callbacks.
+TEST_P(Http2CodecImplTest, InternalListenerConnectionResetReportsFailureReason) {
+  initialize();
+  client_connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener"));
+  ON_CALL(client_connection_, transportFailureReason()).WillByDefault(Return("connection failure"));
+
+  for (const auto reason :
+       {StreamResetReason::ConnectionTermination, StreamResetReason::LocalConnectionFailure,
+        StreamResetReason::RemoteConnectionFailure}) {
+    MockResponseDecoder response_decoder;
+    Http::RequestEncoder& request_encoder = client_->newStream(response_decoder);
+    MockStreamCallbacks callbacks;
+    request_encoder.getStream().addCallbacks(callbacks);
+    EXPECT_CALL(callbacks, onResetStream(reason, "connection failure"));
+    request_encoder.getStream().resetStream(reason);
+  }
+}
+
+TEST_P(Http2CodecImplTest, InternalListenerStreamResetIgnoresFailureReason) {
+  initialize();
+  client_connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener"));
+  ON_CALL(client_connection_, transportFailureReason()).WillByDefault(Return("connection failure"));
+
+  MockStreamCallbacks callbacks;
+  request_encoder_->getStream().addCallbacks(callbacks);
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::LocalReset, ""));
+  request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+}
+
+TEST_P(Http2CodecImplTest, NonInternalConnectionResetIgnoresFailureReason) {
+  initialize();
+  client_connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 80));
+  ON_CALL(client_connection_, transportFailureReason()).WillByDefault(Return("connection failure"));
+
+  MockStreamCallbacks callbacks;
+  request_encoder_->getStream().addCallbacks(callbacks);
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination, ""));
+  request_encoder_->getStream().resetStream(StreamResetReason::ConnectionTermination);
+}
+
+TEST_P(Http2CodecImplTest, InternalListenerConnectionResetRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_reset_with_connection_failure_reason", "false"}});
+  initialize();
+  client_connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener"));
+  ON_CALL(client_connection_, transportFailureReason()).WillByDefault(Return("connection failure"));
+
+  MockStreamCallbacks callbacks;
+  request_encoder_->getStream().addCallbacks(callbacks);
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination, ""));
+  request_encoder_->getStream().resetStream(StreamResetReason::ConnectionTermination);
 }
 
 TEST_P(Http2CodecImplTest, InvalidHeadersFrameMissing) {

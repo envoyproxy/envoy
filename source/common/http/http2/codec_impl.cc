@@ -860,11 +860,29 @@ void ConnectionImpl::ServerStreamImpl::resetStream(StreamResetReason reason) {
   StreamImpl::resetStream(reason);
 }
 
+absl::string_view
+ConnectionImpl::ClientStreamImpl::resetTransportFailureReason(StreamResetReason reason) const {
+  // When the connection closes, CodecClient resets active streams without details. For a
+  // connection to an internal listener, pass the connection's transport failure reason so the
+  // router can distinguish why the internal listener closed the connection.
+  // Other connections are excluded: e.g. a TLS connection may or may not record a failure reason
+  // for the same close depending on whether the peer reset the TCP connection, which would make
+  // reset details nondeterministic.
+  const auto& remote_address = parent_.connection_.connectionInfoProvider().remoteAddress();
+  if (Http::Utility::isConnectionResetReason(reason) && remote_address != nullptr &&
+      remote_address->type() == Network::Address::Type::EnvoyInternal &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.router_reset_with_connection_failure_reason")) {
+    return parent_.connection_.transportFailureReason();
+  }
+  return {};
+}
+
 void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   reset_reason_ = reason;
 
   // Higher layers expect calling resetStream() to immediately raise reset callbacks.
-  runResetCallbacks(reason, absl::string_view());
+  runResetCallbacks(reason, resetTransportFailureReason(reason));
 
   // If we've bufferedOnStreamClose for this stream, we shouldn't propagate this
   // reset as nghttp2 will have forgotten about the stream.

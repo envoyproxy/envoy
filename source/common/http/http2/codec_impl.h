@@ -346,6 +346,7 @@ protected:
     virtual HeaderMap& headers() PURE;
     virtual void allocTrailers() PURE;
     virtual HeaderMapPtr cloneTrailers(const HeaderMap& trailers) PURE;
+    virtual absl::string_view resetTransportFailureReason(StreamResetReason) const { return {}; }
 
     // Http::StreamEncoder
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -557,6 +558,7 @@ protected:
     HeadersState headersState() const override { return headers_state_; }
     // Do not use deferred reset on upstream connections.
     bool useDeferredReset() const override { return false; }
+    absl::string_view resetTransportFailureReason(StreamResetReason reason) const override;
     StreamDecoder* decoder() override { return &response_decoder_; }
     void decodeHeaders() override;
     void decodeTrailers() override;

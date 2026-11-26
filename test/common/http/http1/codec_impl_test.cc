@@ -15,6 +15,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/http1/legacy_parser_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
@@ -2831,6 +2832,71 @@ TEST_F(Http1ClientConnectionImplTest, Reset) {
   request_encoder.getStream().addCallbacks(callbacks);
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::LocalReset, _));
   request_encoder.getStream().resetStream(StreamResetReason::LocalReset);
+}
+
+// A connection-level reset on an internal listener connection passes the connection's transport
+// failure reason to stream reset callbacks.
+TEST_F(Http1ClientConnectionImplTest, InternalListenerConnectionResetReportsFailureReason) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener"));
+  ON_CALL(connection_, transportFailureReason()).WillByDefault(Return("connection failure"));
+
+  for (const auto reason :
+       {StreamResetReason::ConnectionTermination, StreamResetReason::LocalConnectionFailure,
+        StreamResetReason::RemoteConnectionFailure}) {
+    initialize();
+    MockResponseDecoder response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    Http::MockStreamCallbacks callbacks;
+    request_encoder.getStream().addCallbacks(callbacks);
+    EXPECT_CALL(callbacks, onResetStream(reason, "connection failure"));
+    request_encoder.getStream().resetStream(reason);
+  }
+}
+
+TEST_F(Http1ClientConnectionImplTest, InternalListenerStreamResetIgnoresFailureReason) {
+  initialize();
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener"));
+  ON_CALL(connection_, transportFailureReason()).WillByDefault(Return("connection failure"));
+
+  MockResponseDecoder response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  Http::MockStreamCallbacks callbacks;
+  request_encoder.getStream().addCallbacks(callbacks);
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::LocalReset, ""));
+  request_encoder.getStream().resetStream(StreamResetReason::LocalReset);
+}
+
+TEST_F(Http1ClientConnectionImplTest, NonInternalConnectionResetIgnoresFailureReason) {
+  initialize();
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 80));
+  ON_CALL(connection_, transportFailureReason()).WillByDefault(Return("connection failure"));
+
+  MockResponseDecoder response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  Http::MockStreamCallbacks callbacks;
+  request_encoder.getStream().addCallbacks(callbacks);
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination, ""));
+  request_encoder.getStream().resetStream(StreamResetReason::ConnectionTermination);
+}
+
+TEST_F(Http1ClientConnectionImplTest, InternalListenerConnectionResetRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_reset_with_connection_failure_reason", "false"}});
+  initialize();
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener"));
+  ON_CALL(connection_, transportFailureReason()).WillByDefault(Return("connection failure"));
+
+  MockResponseDecoder response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  Http::MockStreamCallbacks callbacks;
+  request_encoder.getStream().addCallbacks(callbacks);
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination, ""));
+  request_encoder.getStream().resetStream(StreamResetReason::ConnectionTermination);
 }
 
 // Verify that we correctly enable reads on the connection when the final response is

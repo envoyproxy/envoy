@@ -55,18 +55,8 @@ protected:
 
 class HttpUpstream : public Router::GenericUpstream, public Envoy::Http::StreamCallbacks {
 public:
-  /**
-   * @param upstream_request supplies the callbacks to the router's upstream request.
-   * @param encoder supplies the encoder of the upstream stream.
-   * @param connection_info optionally supplies the stream info of the connection that carries the
-   * stream. If supplied and the connection is to an internal listener, a reset caused by the
-   * connection reports the connection's transport failure reason. It is only read from stream
-   * callbacks, while the connection is still alive.
-   */
-  HttpUpstream(Router::UpstreamToDownstream& upstream_request, Envoy::Http::RequestEncoder* encoder,
-               const StreamInfo::StreamInfo* connection_info = nullptr)
-      : upstream_request_(upstream_request), request_encoder_(encoder),
-        connection_info_(connection_info) {
+  HttpUpstream(Router::UpstreamToDownstream& upstream_request, Envoy::Http::RequestEncoder* encoder)
+      : upstream_request_(upstream_request), request_encoder_(encoder) {
     request_encoder_->getStream().addCallbacks(*this);
   }
 
@@ -100,7 +90,9 @@ public:
 
   // Http::StreamCallbacks
   void onResetStream(Envoy::Http::StreamResetReason reason,
-                     absl::string_view transport_failure_reason) override;
+                     absl::string_view transport_failure_reason) override {
+    upstream_request_.onResetStream(reason, transport_failure_reason);
+  }
 
   void onAboveWriteBufferHighWatermark() override {
     upstream_request_.onAboveWriteBufferHighWatermark();
@@ -117,7 +109,6 @@ public:
 private:
   Router::UpstreamToDownstream& upstream_request_;
   Envoy::Http::RequestEncoder* request_encoder_{};
-  const StreamInfo::StreamInfo* connection_info_{};
 };
 
 } // namespace Http

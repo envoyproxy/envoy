@@ -537,9 +537,9 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
 
     stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
   }
-  // For a reset caused by a connection to an internal listener, the details are the connection's
-  // transport failure reason (see HttpUpstream::onResetStream()). Record it, as onPoolFailure()
-  // does for a connection that fails before the stream is attached to it.
+  // For a reset caused by a connection to an internal listener, the codec supplies the
+  // connection's transport failure reason. Record it, as onPoolFailure() does for a connection
+  // that fails before the stream is attached to it.
   if (Http::Utility::isConnectionResetReason(reason) && !transport_failure_reason.empty() &&
       isInternalListenerAddress(stream_info_.upstreamInfo()->upstreamRemoteAddress()) &&
       Runtime::runtimeFeatureEnabled(

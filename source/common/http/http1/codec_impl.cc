@@ -1636,7 +1636,21 @@ CallbackResult ClientConnectionImpl::onMessageCompleteBase() {
 void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
   // Only raise reset if we did not already dispatch a complete response.
   if (pending_response_.has_value() && !pending_response_done_) {
-    pending_response_.value().encoder_.runResetCallbacks(reason, absl::string_view());
+    // When the connection closes, CodecClient resets the active stream without details. For a
+    // connection to an internal listener, pass the connection's transport failure reason so the
+    // router can distinguish why the internal listener closed the connection.
+    // Other connections are excluded: e.g. a TLS connection may or may not record a failure reason
+    // for the same close depending on whether the peer reset the TCP connection, which would make
+    // reset details nondeterministic.
+    absl::string_view transport_failure_reason;
+    const auto& remote_address = connection_.connectionInfoProvider().remoteAddress();
+    if (Utility::isConnectionResetReason(reason) && remote_address != nullptr &&
+        remote_address->type() == Network::Address::Type::EnvoyInternal &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.router_reset_with_connection_failure_reason")) {
+      transport_failure_reason = connection_.transportFailureReason();
+    }
+    pending_response_.value().encoder_.runResetCallbacks(reason, transport_failure_reason);
     pending_response_done_ = true;
     pending_response_.reset();
   }
