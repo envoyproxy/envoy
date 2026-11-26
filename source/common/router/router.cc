@@ -1091,12 +1091,10 @@ GenericConnPoolPtr Filter::createConnPoolOrHandleFailure(Upstream::HostConstShar
 
 void Filter::sendNoHealthyUpstreamResponse(absl::string_view optional_details,
                                            std::optional<Http::Code> failure_status) {
-  if (upstream_requests_.empty() && callbacks_->streamInfo().upstreamInfo() != nullptr) {
-    callbacks_->streamInfo().upstreamInfo()->setUpstreamHost(nullptr);
-  }
   const Http::Code status_code = failure_status.value_or(Http::Code::ServiceUnavailable);
   callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(status_code, {}, false);
+  completeRetry();
   absl::string_view details = optional_details.empty()
                                   ? StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream
                                   : optional_details;
@@ -2119,6 +2117,11 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   callbacks_->streamInfo().setUpstreamInfo(final_upstream_request_->streamInfo().upstreamInfo());
   resetOtherUpstreams(upstream_request);
 
+  // Cancel any pending retry timers before finalizing/modifying response headers so
+  // onRetryComplete() always precedes onResponseHeaders() and StreamInfo updates are visible to
+  // response formatters.
+  completeRetry();
+
   // Modify response headers after we have set the final upstream info because we may need to
   // modify the headers based on the upstream host.
   //
@@ -2136,9 +2139,6 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
                                              &callbacks_->activeSpan());
   route_entry_->finalizeResponseHeaders(*headers, formatter_context, callbacks_->streamInfo());
   modify_headers_(*headers);
-
-  // Cancel any pending retry timers since we may not call cleanup() if end_stream is false.
-  completeRetry();
 
   if (end_stream) {
     onUpstreamComplete(upstream_request);

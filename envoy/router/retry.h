@@ -241,9 +241,11 @@ public:
                                  StreamInfo::StreamInfo& /*stream_info*/) {}
 
   /**
-   * Called once when retries finish, are abandoned, or clean up, while keeping this RetryState
-   * alive until stream destruction so onResponseHeaders() can still run on immediate or deferred
-   * local replies.
+   * Called once when retries finish, are abandoned, or clean up, always prior to
+   * onResponseHeaders() (and response header finalization) so any StreamInfo updates made here are
+   * visible to response header formatters and onResponseHeaders(). The RetryState remains alive
+   * until stream destruction so onResponseHeaders() can still run on immediate or deferred local
+   * replies.
    *
    * Implementations MUST cancel and clean up all pending retry timers and callbacks in this
    * method so that no retry callback can fire after onRetryComplete() returns, as firing a retry
