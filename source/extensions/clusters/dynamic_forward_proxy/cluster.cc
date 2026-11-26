@@ -356,15 +356,19 @@ absl::Status Cluster::onDnsHostAddOrUpdate(
 }
 
 bool Cluster::coalesceHostUpdates() {
-  if (host_update_flush_ == nullptr) {
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.dfp_cluster_coalesce_host_updates")) {
-      return false;
+  // Outlier detection and health checking attach per-host state from the member update callback,
+  // which has to run before the DNS cache wakes the requests waiting on the host.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dfp_cluster_coalesce_host_updates") &&
+      outlierDetector() == nullptr && healthChecker() == nullptr) {
+    if (host_update_flush_ == nullptr) {
+      host_update_flush_ =
+          main_thread_dispatcher_.createSchedulableCallback([this]() { flushHostUpdates(); });
     }
-    host_update_flush_ =
-        main_thread_dispatcher_.createSchedulableCallback([this]() { flushHostUpdates(); });
+    return true;
   }
-  return true;
+  // Keep queueing until the scheduled flush runs, so every publish carries its exact delta.
+  return host_update_flush_ != nullptr && host_update_flush_->enabled();
 }
 
 void Cluster::queueHostUpdate(const Upstream::HostVector& hosts_added,
@@ -372,10 +376,10 @@ void Cluster::queueHostUpdate(const Upstream::HostVector& hosts_added,
   ASSERT(main_thread_dispatcher_.isThreadSafe());
   pending_hosts_added_.insert(hosts_added.begin(), hosts_added.end());
   for (const auto& host : hosts_removed) {
-    // A host added and removed before the next publish was never seen by workers: drop both.
-    if (pending_hosts_added_.erase(host) == 0) {
-      pending_hosts_removed_.push_back(host);
-    }
+    // A host added and removed before the next publish is not added, but is still published as
+    // removed: workers may have opened connection pools to it through the host map.
+    pending_hosts_added_.erase(host);
+    pending_hosts_removed_.push_back(host);
   }
   if (!host_update_flush_->enabled()) {
     host_update_flush_->scheduleCallbackNextIteration();

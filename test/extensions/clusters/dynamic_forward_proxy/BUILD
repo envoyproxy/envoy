@@ -36,6 +36,8 @@ envoy_extension_cc_test(
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:options_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:health_checker_mocks",
+        "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:load_balancer_mocks",
         "//test/mocks/upstream:priority_set_mocks",

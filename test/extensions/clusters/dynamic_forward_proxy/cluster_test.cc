@@ -17,6 +17,8 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/upstream/health_checker.h"
+#include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
@@ -410,7 +412,8 @@ TEST_F(ClusterTest, CoalescedAddsPublishOnce) {
   EXPECT_EQ(3UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 }
 
-// A host added and removed in the same pass is never published.
+// A host added and removed in the same pass is published only as removed, so workers drain any
+// connection pools they opened to it through the host map.
 TEST_F(ClusterTest, CoalescedAddThenRemove) {
   initialize(default_yaml_config_, false, true);
   makeTestHost("host1:0", "1.2.3.4");
@@ -418,9 +421,101 @@ TEST_F(ClusterTest, CoalescedAddThenRemove) {
   EXPECT_CALL(*this, onMemberUpdateCb(_, _)).Times(0);
   EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
   update_callbacks_->onDnsHostRemove("host1:0");
+  testing::Mock::VerifyAndClearExpectations(this);
+
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(0), SizeIs(1)));
   host_update_flush_->invokeCallback();
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")).host);
+}
+
+// An address change that replaces a published host publishes the old host as removed and the new
+// host as added in one update.
+TEST_F(ClusterTest, CoalescedReplace) {
+  initialize(R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    skip_draining_on_resolution: false
+    dns_cache_config:
+      name: foo
+      dns_lookup_family: AUTO
+)EOF",
+             false, true);
+  makeTestHost("host1:0", "1.2.3.4");
+
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  host_update_flush_->invokeCallback();
+  const auto old_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+
+  updateTestHostAddress("host1:0", "2.3.4.5");
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), testing::ElementsAre(old_host)));
+  host_update_flush_->invokeCallback();
+  // Release the matcher's reference to the old host before the stats store is torn down.
+  testing::Mock::VerifyAndClearExpectations(this);
+  ASSERT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ("2.3.4.5:0",
+            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
+}
+
+// Turning the guard off at runtime stops coalescing once the pending publish has run.
+TEST_F(ClusterTest, CoalescedGuardTurnedOff) {
+  initialize(default_yaml_config_, false, true);
+  makeTestHost("host1:0", "1.2.3.4");
+  makeTestHost("host2:0", "1.2.3.5");
+  makeTestHost("host3:0", "1.2.3.6");
+
+  EXPECT_CALL(*this, onMemberUpdateCb(_, _)).Times(0);
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.dfp_cluster_coalesce_host_updates", "false"}});
+  // A publish is still pending, so this result joins it.
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host2:0", host_map_["host2:0"]).ok());
+  testing::Mock::VerifyAndClearExpectations(this);
+
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(2), SizeIs(0)));
+  host_update_flush_->invokeCallback();
+  testing::Mock::VerifyAndClearExpectations(this);
+
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host3:0", host_map_["host3:0"]).ok());
+  EXPECT_EQ(3UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
+// With an outlier detector the member update is published immediately, so the detector monitors
+// the host before any request can use it.
+TEST_F(ClusterTest, NoCoalescingWithOutlierDetector) {
+  initialize(default_yaml_config_, false);
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.dfp_cluster_coalesce_host_updates", "true"}});
+  cluster_->setOutlierDetector(std::make_shared<NiceMock<Upstream::Outlier::MockDetector>>());
+  makeTestHost("host1:0", "1.2.3.4");
+
+  EXPECT_CALL(server_context_.dispatcher_, createSchedulableCallback_(_)).Times(0);
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(0), SizeIs(1)));
+  update_callbacks_->onDnsHostRemove("host1:0");
+}
+
+// With a health checker the member update is published immediately.
+TEST_F(ClusterTest, NoCoalescingWithHealthChecker) {
+  initialize(default_yaml_config_, false);
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.dfp_cluster_coalesce_host_updates", "true"}});
+  cluster_->setHealthChecker(std::make_shared<NiceMock<Upstream::MockHealthChecker>>());
+  makeTestHost("host1:0", "1.2.3.4");
+
+  EXPECT_CALL(server_context_.dispatcher_, createSchedulableCallback_(_)).Times(0);
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 }
 
 // A published host removed and re-added in the same pass ends up present.

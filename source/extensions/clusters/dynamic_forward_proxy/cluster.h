@@ -251,7 +251,8 @@ private:
                            const Upstream::HostVector& hosts_removed)
       ABSL_LOCKS_EXCLUDED(host_map_lock_);
   // True if host-set changes are queued and published once per main-loop pass instead of once per
-  // DNS result (dfp_cluster_coalesce_host_updates). Creates the flush callback on first use.
+  // DNS result (dfp_cluster_coalesce_host_updates). Never true with outlier detection or health
+  // checking. Creates the flush callback on first use.
   bool coalesceHostUpdates();
   void queueHostUpdate(const Upstream::HostVector& hosts_added,
                        const Upstream::HostVector& hosts_removed);
