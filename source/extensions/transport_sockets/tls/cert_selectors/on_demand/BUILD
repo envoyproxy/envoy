@@ -26,6 +26,7 @@ envoy_cc_extension(
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:fair_sieve_cache_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:thread_lib",
         "//source/common/config:utility_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
         "//source/common/tls:context_lib",

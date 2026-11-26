@@ -59,8 +59,7 @@ message Config {
   //   object share a single default tenant bucket, reducing the policy to global SIEVE.
   // * Eviction selects the tenant with the largest active secret count (max-min fair sharing),
   //   breaking ties in favor of evicting from the incoming tenant and rotating across other tied
-  //   tenants to avoid hash-order starvation (and sweeping across visited singleton tenants when
-  //   the maximum active count is 1).
+  //   tenants to avoid hash-order starvation.
   // * Within the selected tenant's intrusive FIFO queue, a moving SIEVE hand sweeps from tail
   //   toward head. If a shared secret was most recently hit by a different tenant whose active
   //   count is strictly smaller by at least two, ownership transfers in O(1) to that tenant's queue

@@ -17,6 +17,7 @@
 
 #include "source/common/common/fair_sieve_cache.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/tls/context_impl.h"

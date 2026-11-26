@@ -810,53 +810,95 @@ TEST(FairSievePolicyTest, PendingOnlyModeLatchesMultiTenantModeOnRejectedNamedAr
   EXPECT_TRUE(policy.canAdmitPending(named));
 }
 
-TEST(FairSievePolicyTest, HotSingletonTenantsSurviveEphemeralTenantChurnWhenTExceedsC) {
-  // When `T > C` (`max_size == 1`), repeatedly hit singleton tenants must get a SIEVE second
-  // chance across the singleton ring rather than being evicted on single-element wrap-around by a
-  // stream of ephemeral one-shot tenants.
-  constexpr size_t kCapacity = 8;
+TEST(FairSievePolicyTest, SingletonEvictionRotatesRoundRobinAndSkipsRedundantVisitedConsume) {
+  // When `max_size == 1`, both non-incoming band rotation and incoming self-eviction evict the
+  // sole entry of the chosen tenant directly in O(1) without redundant `consumeVisited()` calls.
+  constexpr size_t kCapacity = 4;
   Policy policy(kCapacity, /*max_pending=*/0);
+  const std::vector<TenantId> tenants = sortedTenants(kCapacity + 2);
   std::optional<Policy::EvictionResult> evicted;
 
-  std::vector<TenantId> hot_tenants;
-  std::vector<HitStateSharedPtr> hot_states;
-  for (int i = 0; i < 4; ++i) {
-    const TenantId tid = computeTenantId(absl::StrCat("hot-core-", i));
-    const std::string key = absl::StrCat("hot-key-", i);
-    hot_tenants.push_back(tid);
-    policy.onPendingAdded(key, tid);
-    hot_states.push_back(policy.onActivated(key, evicted));
+  std::vector<HitStateSharedPtr> states;
+  states.reserve(kCapacity);
+  for (size_t i = 0; i < kCapacity; ++i) {
+    const std::string key = absl::StrCat("s-", i);
+    policy.onPendingAdded(key, tenants[i]);
+    auto hs = policy.onActivated(key, evicted);
+    ASSERT_NE(nullptr, hs);
     ASSERT_FALSE(evicted.has_value());
+    hs->recordHit(tenants[i]);
+    states.push_back(std::move(hs));
   }
 
-  for (int eph = 0; eph < 60; ++eph) {
-    for (size_t i = 0; i < hot_tenants.size(); ++i) {
-      hot_states[i]->recordHit(hot_tenants[i]);
-    }
-    const TenantId eph_tid = computeTenantId(absl::StrCat("ephemeral-", eph));
-    const std::string eph_key = absl::StrCat("eph-key-", eph);
-    policy.onPendingAdded(eph_key, eph_tid);
-    policy.onActivated(eph_key, evicted);
-    if (evicted.has_value()) {
-      EXPECT_FALSE(evicted->evicted_key.starts_with("hot-key-"))
-          << "Evicted hot singleton key: " << evicted->evicted_key;
-    }
-  }
-
-  for (TenantId tid : hot_tenants) {
-    EXPECT_EQ(1, policy.tenantActiveCount(tid));
-  }
-  EXPECT_EQ(kCapacity, policy.activeCount());
-
-  // Self-eviction at `max_size == 1` must remain intact: if a hot singleton tenant adds a second
-  // key, it must evict its own key rather than a peer's key.
-  policy.onPendingAdded("hot-key-0-second", hot_tenants[0]);
-  policy.onActivated("hot-key-0-second", evicted);
+  // Non-incoming eviction at `max_size == 1`: evicts tenants[0] directly via `victim_cursor_`
+  // without touching `visited_` on either the evicted entry or its peers.
+  policy.onPendingAdded("incoming-4", tenants[4]);
+  auto hs4 = policy.onActivated("incoming-4", evicted);
   ASSERT_TRUE(evicted.has_value());
-  EXPECT_EQ("hot-key-0", evicted->evicted_key);
-  for (TenantId tid : hot_tenants) {
-    EXPECT_EQ(1, policy.tenantActiveCount(tid));
+  EXPECT_EQ("s-0", evicted->evicted_key);
+  EXPECT_EQ(0, evicted->ownership_transfers);
+  for (const auto& hs : states) {
+    EXPECT_TRUE(hs->visited_.load(std::memory_order_relaxed));
   }
+
+  // Next non-incoming arrival advances `victim_cursor_` to tenants[1].
+  policy.onPendingAdded("incoming-5", tenants[5]);
+  policy.onActivated("incoming-5", evicted);
+  ASSERT_TRUE(evicted.has_value());
+  EXPECT_EQ("s-1", evicted->evicted_key);
+
+  // Self-eviction at `max_size == 1`: tenants[4] evicts its own visited entry directly without
+  // touching peers or performing a redundant `consumeVisited()`.
+  hs4->recordHit(tenants[4]);
+  ASSERT_TRUE(hs4->visited_.load(std::memory_order_relaxed));
+  policy.onPendingAdded("incoming-4-second", tenants[4]);
+  policy.onActivated("incoming-4-second", evicted);
+  ASSERT_TRUE(evicted.has_value());
+  EXPECT_EQ("incoming-4", evicted->evicted_key);
+  EXPECT_TRUE(hs4->visited_.load(std::memory_order_relaxed));
+  EXPECT_EQ(1, policy.tenantActiveCount(tenants[4]));
+  EXPECT_EQ(1, policy.tenantActiveCount(tenants[2]));
+  EXPECT_EQ(1, policy.tenantActiveCount(tenants[3]));
+  EXPECT_EQ(1, policy.tenantActiveCount(tenants[5]));
+}
+
+TEST(FairSievePolicyTest, SelfEvictingFlooderDoesNotClobberVictimCursorAndPinIdlePeers) {
+  constexpr size_t kCapacity = 3;
+  Policy policy(kCapacity, /*max_pending=*/0);
+  const std::vector<TenantId> tenants = sortedTenants(4); // t0 < t1 < t2 < t3
+  std::optional<Policy::EvictionResult> evicted;
+
+  // Initial state: flooder t0, active peer t1, and permanently idle peer t3 occupy 3/3 slots.
+  policy.onPendingAdded("t0-init", tenants[0]);
+  policy.onActivated("t0-init", evicted);
+  policy.onPendingAdded("t1-init", tenants[1]);
+  policy.onActivated("t1-init", evicted);
+  policy.onPendingAdded("t3-idle", tenants[3]);
+  policy.onActivated("t3-idle", evicted);
+  ASSERT_FALSE(evicted.has_value());
+
+  // Between every non-incoming arrival from {t1, t2}, t0 continuously self-evicts. Self-evictions
+  // must NOT reset `victim_cursor_` to `t0 + 1` (which would ping-pong t1/t2 and pin t3 forever).
+  bool idle_t3_evicted = false;
+  for (int round = 0; round < 10 && !idle_t3_evicted; ++round) {
+    const std::string flood_key = absl::StrCat("t0-flood-", round);
+    policy.onPendingAdded(flood_key, tenants[0]);
+    policy.onActivated(flood_key, evicted);
+    ASSERT_TRUE(evicted.has_value());
+    EXPECT_EQ(1, policy.tenantActiveCount(tenants[0]));
+
+    const TenantId absent_peer =
+        (policy.tenantActiveCount(tenants[2]) == 0) ? tenants[2] : tenants[1];
+    const std::string peer_key = absl::StrCat("peer-", round);
+    policy.onPendingAdded(peer_key, absent_peer);
+    policy.onActivated(peer_key, evicted);
+    ASSERT_TRUE(evicted.has_value());
+    if (evicted->evicted_key == "t3-idle") {
+      idle_t3_evicted = true;
+    }
+  }
+  EXPECT_TRUE(idle_t3_evicted);
+  EXPECT_EQ(0, policy.tenantActiveCount(tenants[3]));
 }
 
 } // namespace

@@ -126,10 +126,10 @@ using HitStateSharedPtr = std::shared_ptr<const HitState>;
  *         preventing ping-pong livelocks and guaranteeing `active_size(t*) >= 1` post-transfer).
  *      c) Intra-tenant SIEVE sweep: otherwise, if `visited` is set, clear it (lazy promotion) and
  *         step `hand` toward head (wrapping to tail); if `visited` is clear, evict the node in O(1)
- *         (quick demotion of one-hit-wonder scans). When `max_size == 1` and the incoming tenant is
- *         not tied at `max_size`, visited singletons receive a SIEVE second chance across the
- *         singleton ring in O(1) per iterator step so hot singleton tenants survive ephemeral
- *         one-shot tenant churn when `T > max_active`.
+ *         (quick demotion of one-hit-wonder scans). Any length-1 victim queue (including
+ *         `max_size == 1` when `T >= max_active`) evicts its sole entry directly in O(1) without
+ *         redundant `consumeVisited()` wrap-around, relying on guarded `victim_cursor_` rotation
+ *         for simple, deterministic O(log T) inter-tenant fairness.
  *      d) Strict linear worst-case step bound under concurrent worker writes: cumulative transfer
  *         and sweep counters are capped at `initial_active` and `saturatingDouble(initial_active)`
  *         respectively across a single eviction call. By the monotonic peak / no-re-entry property,

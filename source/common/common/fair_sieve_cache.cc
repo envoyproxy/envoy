@@ -257,46 +257,50 @@ Policy::EvictionResult Policy::evictOne(TenantId incoming_tenant) {
     //    Break ties in favor of `incoming_tenant` so a tenant at the fair-share ceiling evicts
     //    from itself instead of dipping a peer. For non-incoming ties at `max_size`, rotate using
     //    `victim_cursor_` in O(log T) so low-hash tenants are never permanently pinned when
-    //    `T > C` or `C % T >= 2`. Because every picked donor still has `active_size == max_size`,
-    //    the No-Re-Entry Lemma and fair-share floor invariants are preserved unchanged.
+    //    `T > C` or `C % T >= 2`. Only non-incoming band evictions advance `victim_cursor_` so a
+    //    continuously self-evicting flooder cannot repeatedly reset the cursor and pin peers.
     const size_t max_size = std::prev(active_tenants_by_size_.end())->first;
     TenantId victim_tenant = kDefaultTenantId;
+    auto q_it = tenants_.end();
+    bool used_victim_cursor = false;
     if (const auto incoming_it = tenants_.find(incoming_tenant);
         incoming_it != tenants_.end() && incoming_it->second.active_size == max_size) {
       victim_tenant = incoming_tenant;
+      q_it = incoming_it;
     } else {
+      used_victim_cursor = true;
       auto candidate_it = active_tenants_by_size_.lower_bound({max_size, victim_cursor_});
       if (candidate_it == active_tenants_by_size_.end() || candidate_it->first != max_size) {
         candidate_it = active_tenants_by_size_.lower_bound({max_size, 0});
       }
       ASSERT(candidate_it != active_tenants_by_size_.end() && candidate_it->first == max_size);
-      // When `max_size == 1` and `incoming_tenant` is not tied at `max_size`, every entry in
-      // `active_tenants_by_size_` is a singleton (`first == 1`). Inside a length-1 queue,
-      // intra-tenant SIEVE wrap-around would immediately evict a visited entry without inspecting
-      // peers; sweeping the singleton ring in O(1) per iterator step gives visited singletons a
-      // SIEVE second chance while preserving the cumulative `max_sweep_steps` (`<= 2A`) bound.
-      if (max_size == 1) {
-        while (sweep_steps < max_sweep_steps) {
-          const auto candidate_q = tenants_.find(candidate_it->second);
-          ASSERT(candidate_q != tenants_.end() && candidate_q->second.tail != nullptr);
-          if (!candidate_q->second.tail->hit_state->consumeVisited()) {
-            break;
-          }
-          ++sweep_steps;
-          ++candidate_it;
-          if (candidate_it == active_tenants_by_size_.end()) {
-            candidate_it = active_tenants_by_size_.begin();
-          }
-        }
-      }
       victim_tenant = candidate_it->second;
+      q_it = tenants_.find(victim_tenant);
     }
 
-    const auto q_it = tenants_.find(victim_tenant);
     ASSERT(q_it != tenants_.end());
     TenantQueue& q = q_it->second;
     Entry* curr = (q.hand != nullptr) ? q.hand : q.tail;
     ASSERT(curr != nullptr);
+
+    // Fast path for any length-1 queue (incoming self-eviction or `max_size == 1`):
+    // ownership transfer (`last_size + 1 < 1`) is impossible and no alternate intra-tenant node
+    // exists, so evicting directly avoids redundant `consumeVisited()` calls and prevents spinning
+    // in place on a single node under concurrent worker hits.
+    if (q.active_size == 1) {
+      result.evicted_key = curr->key;
+      q.remove(curr);
+      updateTenantActiveIndex(victim_tenant, 1, 0);
+      ASSERT(active_count_ > 0);
+      --active_count_;
+      entries_.erase(result.evicted_key);
+      maybeEraseTenant(victim_tenant);
+      if (used_victim_cursor) {
+        // Unsigned wrap-around (`UINT64_MAX + 1 == 0`) naturally wraps back to the band start.
+        victim_cursor_ = victim_tenant + 1;
+      }
+      return result;
+    }
 
     while (curr != nullptr) {
       // 2. Lazy cross-tenant ownership transfer (Non-Blocking FairRide):
@@ -357,8 +361,10 @@ Policy::EvictionResult Policy::evictOne(TenantId incoming_tenant) {
         // keep their `shared_ptr<const HitState>` alive and race-free until updated.
         entries_.erase(result.evicted_key);
         maybeEraseTenant(victim_tenant);
-        // Unsigned wrap-around (`UINT64_MAX + 1 == 0`) naturally wraps back to the band start.
-        victim_cursor_ = victim_tenant + 1;
+        if (used_victim_cursor) {
+          // Unsigned wrap-around (`UINT64_MAX + 1 == 0`) naturally wraps back to the band start.
+          victim_cursor_ = victim_tenant + 1;
+        }
         return result;
       }
     }
