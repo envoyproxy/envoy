@@ -358,6 +358,7 @@ envoy_cc_library(
         "//source/common/config:resource_type_helper_lib",
         "//source/common/config:well_known_names",
         "//source/common/config:xds_resource_lib",
+        "//source/common/event:deferred_task",
         "//source/common/init:manager_lib",
         "//source/common/init:watcher_lib",
         "//source/common/protobuf:utility_lib",

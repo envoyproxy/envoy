@@ -165,6 +165,13 @@ private:
     // If route provider has not been initialized, initialize it.
     void maybeInitRdsConfigProvider();
 
+    // Returns an on-demand scope whose route configuration the server removed
+    // to the state it had before the first request: the RDS provider (and with
+    // it the subscription, once no other scope shares it) is dropped and the
+    // scope's route configuration is cleared, so that the next matching request
+    // fetches it again. A no-op for eager scopes.
+    void onRouteConfigRemoved();
+
     // Initialize route provider and register for rds update.
     void initRdsConfigProvider(
         envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
@@ -177,6 +184,7 @@ private:
     // This handle_ is owned by the route config provider's RDS subscription, when the helper
     // destructs, the handle is deleted as well.
     Common::CallbackHandlePtr rds_update_callback_handle_;
+    Common::CallbackHandlePtr rds_removal_callback_handle_;
     std::vector<std::function<void()>> on_demand_update_callbacks_;
   };
 
