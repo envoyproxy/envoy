@@ -1,4 +1,5 @@
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -16,6 +17,7 @@
 
 #include "test/integration/filters/add_body_filter.pb.h"
 #include "test/mocks/init/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -83,8 +85,11 @@ class TestNetworkFilterFactory
       public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
 public:
   absl::StatusOr<Network::FilterFactoryCb>
-  createFilterFactoryFromProto(const Protobuf::Message&,
+  createFilterFactoryFromProto(const Protobuf::Message& message,
                                Server::Configuration::FactoryContext&) override {
+    if (on_create_) {
+      return on_create_(message);
+    }
     created_ = true;
     return [](Network::FilterManager&) -> void {};
   }
@@ -102,6 +107,7 @@ public:
                                Server::Configuration::ServerFactoryContext&) override {
     return true;
   }
+  std::function<absl::StatusOr<Network::FilterFactoryCb>(const Protobuf::Message&)> on_create_;
 };
 
 class TestListenerFilterFactory : public TestFilterFactory,
@@ -246,13 +252,15 @@ public:
   }
 
   // Create a discovery response.
-  envoy::service::discovery::v3::DiscoveryResponse createResponse(std::string version,
-                                                                  std::string name) {
+  envoy::service::discovery::v3::DiscoveryResponse
+  createResponse(std::string version, std::string name, const std::string& value = "") {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     envoy::config::core::v3::TypedExtensionConfig extension_config;
     extension_config.set_name(name);
-    extension_config.mutable_typed_config()->set_type_url("type.googleapis.com/" + getTypeUrl());
+    Protobuf::StringValue config;
+    config.set_value(value);
+    std::ignore = extension_config.mutable_typed_config()->PackFrom(config);
     std::ignore = response.add_resources()->PackFrom(extension_config);
     return response;
   }
@@ -552,6 +560,128 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ConfigFailed) {
   EXPECT_EQ(
       1UL,
       config_discovery_test.store_.counter(config_discovery_test.getConfigFailCounter()).value());
+}
+
+TYPED_TEST(FilterConfigDiscoveryImplTestParameter, InitialRemovalCompletesWarming) {
+  for (bool with_default : {false, true}) {
+    TypeParam test;
+    test.setup(true, with_default);
+    Protobuf::RepeatedPtrField<std::string> removed;
+    removed.Add("foo");
+    EXPECT_CALL(test.init_watcher_, ready());
+    ASSERT_OK(test.callbacks_->onConfigUpdate({}, removed, "1"));
+    EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&test.init_watcher_));
+    EXPECT_EQ(with_default, test.provider_->config().has_value());
+    EXPECT_EQ(0, test.store_.counter(test.getConfigReloadCounter()).value());
+  }
+}
+
+TEST(FilterConfigDiscoveryTest, InitialRemovalCanReleaseLastProviderDuringWarming) {
+  NetworkFilterConfigDiscoveryImplTest test;
+  test.setup();
+  const auto subscription =
+      static_cast<FilterConfigSubscription&>(*test.callbacks_).weak_from_this();
+  EXPECT_CALL(test.init_watcher_, ready()).WillOnce([&] { test.provider_.reset(); });
+  Protobuf::RepeatedPtrField<std::string> removed;
+  removed.Add("foo");
+  ASSERT_OK(test.callbacks_->onConfigUpdate({}, removed, "1"));
+  EXPECT_EQ(nullptr, test.provider_);
+  EXPECT_FALSE(subscription.expired());
+  test.server_factory_context_.dispatcher_.clearDeferredDeleteList();
+  EXPECT_TRUE(subscription.expired());
+}
+
+TEST(FilterConfigDiscoveryTest, NetworkFilterRemovalPreservesAnActiveDefault) {
+  NetworkFilterConfigDiscoveryImplTest test;
+  test.setup(false, true);
+  auto& reloads = test.store_.counter(test.getConfigReloadCounter());
+  Protobuf::RepeatedPtrField<std::string> removed;
+  removed.Add("foo");
+
+  ASSERT_TRUE(test.provider_->config().has_value());
+  test.filter_factory_.created_ = false;
+  ASSERT_OK(test.callbacks_->onConfigUpdate({}, removed, "1"));
+  EXPECT_FALSE(test.filter_factory_.created_);
+  EXPECT_TRUE(test.provider_->config().has_value());
+  EXPECT_EQ(0, reloads.value());
+
+  const auto decoded = TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(
+      test.createResponse("2", "foo", "discovered"));
+  ASSERT_OK(test.callbacks_->onConfigUpdate(decoded.refvec_, "2"));
+  test.filter_factory_.created_ = false;
+  ASSERT_OK(test.callbacks_->onConfigUpdate({}, removed, "3"));
+  EXPECT_TRUE(test.filter_factory_.created_);
+  EXPECT_EQ(2, reloads.value());
+
+  test.filter_factory_.created_ = false;
+  ASSERT_OK(test.callbacks_->onConfigUpdate({}, removed, "4"));
+  EXPECT_FALSE(test.filter_factory_.created_);
+  EXPECT_TRUE(test.provider_->config().has_value());
+  EXPECT_EQ(2, reloads.value());
+}
+
+TEST(FilterConfigDiscoveryTest, RejectedSharedNetworkFilterChangeKeepsLastAcceptedResource) {
+  // Both resource updates and removals prepare one factory per subscriber. A removal selects
+  // each subscriber's default and can fail when constructing one of those defaults.
+  for (bool removing : {false, true}) {
+    SCOPED_TRACE(removing);
+    std::string active_value;
+    size_t rejected_attempts = 0;
+    std::function<absl::Status()> reject;
+    NetworkFilterConfigDiscoveryImplTest test;
+    test.filter_factory_.on_create_ =
+        [&](const Protobuf::Message& message) -> absl::StatusOr<Network::FilterFactoryCb> {
+      // Fail on the second factory regardless of the order of subscribers.
+      if (reject && ++rejected_attempts % 2 == 0) {
+        return reject();
+      }
+      return [&, value = dynamic_cast<const Protobuf::StringValue&>(message).value()](
+                 Network::FilterManager&) { active_value = value; };
+    };
+    test.setup(true, true);
+    const auto second = test.createProvider("foo", true, true);
+    auto& reloads = test.store_.counter(test.getConfigReloadCounter());
+    const auto good = TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(
+        test.createResponse("1", "foo", "good"));
+    EXPECT_CALL(test.init_watcher_, ready());
+    ASSERT_OK(test.callbacks_->onConfigUpdate(good.refvec_, "1"));
+
+    NiceMock<Network::MockFilterManager> manager;
+    auto expectServesGoodConfig = [&](const auto& provider) {
+      auto factory = provider->config();
+      ASSERT_TRUE(factory.has_value());
+      active_value.clear();
+      (*factory)(manager);
+      EXPECT_EQ("good", active_value);
+    };
+    const auto bad = TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(
+        test.createResponse("2", "foo", "bad"));
+    Protobuf::RepeatedPtrField<std::string> removed;
+    removed.Add("foo");
+    auto applyChange = [&] {
+      return removing ? test.callbacks_->onConfigUpdate({}, removed, "2")
+                      : test.callbacks_->onConfigUpdate(bad.refvec_, "2");
+    };
+    auto verifyLastAccepted = [&] {
+      expectServesGoodConfig(test.provider_);
+      expectServesGoodConfig(second);
+      EXPECT_EQ(1, reloads.value());
+      reject = nullptr;
+      expectServesGoodConfig(test.createProvider("foo", true, false));
+    };
+
+    const auto error = absl::InvalidArgumentError("second subscriber rejected config");
+    reject = [&] { return error; };
+    EXPECT_EQ(error, applyChange());
+    verifyLastAccepted();
+
+    // Retry the identical change with a factory that reports rejection by throwing.
+    reject = []() -> absl::Status { throw EnvoyException("second subscriber threw"); };
+    EXPECT_THROW_WITH_MESSAGE(applyChange().IgnoreError(), EnvoyException,
+                              "second subscriber threw");
+    verifyLastAccepted();
+    EXPECT_EQ(4, rejected_attempts);
+  }
 }
 
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TooManyResources) {
