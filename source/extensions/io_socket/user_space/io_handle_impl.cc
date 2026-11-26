@@ -55,8 +55,9 @@ const Network::Address::InstanceConstSharedPtr& IoHandleImpl::getCommonInternalA
                              "internal_address_for_user_space_io_handle"));
 }
 
-IoHandleImpl::IoHandleImpl(PassthroughStateSharedPtr passthrough_state)
-    : pending_received_data_([&]() -> void { this->onBelowLowWatermark(); },
+IoHandleImpl::IoHandleImpl(PassthroughStateSharedPtr passthrough_state, bool is_client_handle)
+    : is_client_handle_(is_client_handle),
+      pending_received_data_([&]() -> void { this->onBelowLowWatermark(); },
                              [&]() -> void { this->onAboveHighWatermark(); }, []() -> void {}),
       passthrough_state_(passthrough_state) {}
 
@@ -446,8 +447,9 @@ IoHandleFactory::createIoHandlePair(PassthroughStatePtr state) {
   } else {
     shared_state = std::make_shared<PassthroughStateImpl>();
   }
-  auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(shared_state),
-                                                       new IoHandleImpl(shared_state)};
+  auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{
+      new IoHandleImpl(shared_state, /*is_client_handle=*/true),
+      new IoHandleImpl(shared_state, /*is_client_handle=*/false)};
   p.first->setPeerHandle(p.second.get());
   p.second->setPeerHandle(p.first.get());
   return p;
@@ -461,8 +463,9 @@ IoHandleFactory::createBufferLimitedIoHandlePair(uint32_t buffer_size, Passthrou
   } else {
     shared_state = std::make_shared<PassthroughStateImpl>();
   }
-  auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(shared_state),
-                                                       new IoHandleImpl(shared_state)};
+  auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{
+      new IoHandleImpl(shared_state, /*is_client_handle=*/true),
+      new IoHandleImpl(shared_state, /*is_client_handle=*/false)};
   // This buffer watermark setting emulates the OS socket buffer parameter
   // `/proc/sys/net/ipv4/tcp_{r,w}mem`.
   p.first->setWatermarks(buffer_size);
