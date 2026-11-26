@@ -190,10 +190,18 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
 * `debug <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c dbg`.
 * `debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
+* `debug.test_only` &mdash; run tests under `-c dbg`, without building the Envoy static binary.
+* `debug.test_only <test>` &mdash; run a specified test or test dir under `-c dbg`, without building the Envoy static binary.
 * `dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with clang.
 * `dev <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c fastbuild` with clang.
+* `dev.server_only` &mdash; build Envoy static binary under `-c fastbuild` with clang.
+* `dev.test_only` &mdash; run tests under `-c fastbuild` with clang, without building the Envoy static binary.
+* `dev.test_only <test>` &mdash; run a specified test or test dir under `-c fastbuild` with clang, without building the Envoy static binary.
 * `dev.contrib` &mdash; build Envoy static binary with contrib and run tests under `-c fastbuild` with clang.
 * `dev.contrib <test>` &mdash; build Envoy static binary with contrib and run a specified test or test dir under `-c fastbuild` with clang.
+* `dev.contrib.server_only` &mdash; build Envoy static binary with contrib under `-c fastbuild` with clang.
+* `dev.contrib.test_only` &mdash; run tests under `-c fastbuild` with clang, without building the Envoy static binary with contrib.
+* `dev.contrib.test_only <test>` &mdash; run a specified test or test dir under `-c fastbuild` with clang, without building the Envoy static binary with contrib.
 * `release` &mdash; build Envoy static binary and run tests under `-c opt` with clang.
 * `release <test>` &mdash; build Envoy static binaries and run a specified test or test dir under `-c opt` with clang.
 * `release.server_only` &mdash; build Envoy static binaries under `-c opt` with clang.

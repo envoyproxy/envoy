@@ -770,22 +770,21 @@ case $CI_TARGET in
               //test/server:cgroup_cpu_simple_integration_test
         ;;
 
-    debug)
-        echo "Testing ${TEST_TARGETS[*]}"
-        # Make sure that there are no regressions to building Envoy with autolink disabled.
-        EXTRA_OPTIONS=(
-            "--define" "library_autolink=disabled")
-        bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
-              "${EXTRA_OPTIONS[@]}" \
-              -c dbg \
-              "${TEST_TARGETS[@]}"
-        echo "bazel debug build with tests..."
-        bazel_envoy_binary_build debug
-        ;;
-
-    debug.server_only)
-        echo "bazel debug build..."
-        bazel_envoy_binary_build debug
+    debug|debug.test_only|debug.server_only)
+        if [[ "$CI_TARGET" != "debug.server_only" ]]; then
+            echo "Testing ${TEST_TARGETS[*]}"
+            # Make sure that there are no regressions to building Envoy with autolink disabled.
+            EXTRA_OPTIONS=(
+                "--define" "library_autolink=disabled")
+            bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+                  "${EXTRA_OPTIONS[@]}" \
+                  -c dbg \
+                  "${TEST_TARGETS[@]}"
+        fi
+        if [[ "$CI_TARGET" != "debug.test_only" ]]; then
+            echo "bazel debug build..."
+            bazel_envoy_binary_build debug
+        fi
         ;;
 
     deps)
@@ -830,25 +829,35 @@ case $CI_TARGET in
         deps_update "${DEPENDENCY_ARGS[@]}"
         ;;
 
-    dev)
+    dev|dev.test_only|dev.server_only)
         # This doesn't go into CI but is available for developer convenience.
-        echo "bazel fastbuild build with tests..."
-        echo "Building..."
-        bazel_envoy_binary_build fastbuild
-        echo "Testing ${TEST_TARGETS[*]}"
-        bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
-              -c fastbuild "${TEST_TARGETS[@]}"
+        # TODO(wbpcode): run the tests before the binary build, as `debug` and `release` do, so
+        # test failures are reported before the slower binary link.
+        if [[ "$CI_TARGET" != "dev.test_only" ]]; then
+            echo "bazel fastbuild build..."
+            bazel_envoy_binary_build fastbuild
+        fi
+        if [[ "$CI_TARGET" != "dev.server_only" ]]; then
+            echo "Testing ${TEST_TARGETS[*]}"
+            bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+                  -c fastbuild "${TEST_TARGETS[@]}"
+        fi
         ;;
 
-    dev.contrib)
+    dev.contrib|dev.contrib.test_only|dev.contrib.server_only)
         # This doesn't go into CI but is available for developer convenience.
-        echo "bazel fastbuild build with contrib extensions and tests..."
-        echo "Building..."
-        bazel_contrib_binary_build fastbuild
-        echo "Testing ${TEST_TARGETS[*]}"
-        bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
-              -c fastbuild \
-              "${TEST_TARGETS[@]}"
+        # TODO(wbpcode): run the tests before the binary build, as `debug` and `release` do, so
+        # test failures are reported before the slower binary link.
+        if [[ "$CI_TARGET" != "dev.contrib.test_only" ]]; then
+            echo "bazel fastbuild build with contrib extensions..."
+            bazel_contrib_binary_build fastbuild
+        fi
+        if [[ "$CI_TARGET" != "dev.contrib.server_only" ]]; then
+            echo "Testing ${TEST_TARGETS[*]}"
+            bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+                  -c fastbuild \
+                  "${TEST_TARGETS[@]}"
+        fi
         ;;
 
     dockerhub-publish)
