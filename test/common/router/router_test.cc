@@ -9514,7 +9514,11 @@ TEST_F(RouterTest, RetryStatePerAttemptHooksAndResponseHeaderModification) {
 
   EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
       .WillOnce(Return(RetryStatus::No));
+  testing::Sequence completion_seq;
+  EXPECT_CALL(*router_->retry_state_, onRetryComplete(Ref(callbacks_.stream_info_)))
+      .InSequence(completion_seq);
   EXPECT_CALL(*router_->retry_state_, onResponseHeaders(_, Ref(callbacks_.stream_info_)))
+      .InSequence(completion_seq)
       .WillOnce([](Http::ResponseHeaderMap& resp_headers, StreamInfo::StreamInfo&) {
         EXPECT_EQ("2", resp_headers.getEnvoyAttemptCountValue());
         resp_headers.setCopy(Http::LowerCaseString("x-routed-model"), "candidate-2");
@@ -9610,6 +9614,50 @@ TEST_F(RouterTest, DoRetryAfterRetryCompleteTriggersEnvoyBugAndNoOps) {
   EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_)).Times(0);
   EXPECT_ENVOY_BUG(router_->retry_state_->callback_(), "doRetry called after retry completion");
 
+  router_->onDestroy();
+}
+
+TEST_F(RouterTest, NoHealthyUpstreamOnRetryInvokesOnRetryCompleteBeforeOnResponseHeaders) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  router_->retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(503)));
+  ASSERT(response_decoder);
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+
+  EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_))
+      .WillOnce(Return(Upstream::HostSelectionResponse{nullptr}));
+
+  testing::Sequence completion_seq;
+  EXPECT_CALL(*router_->retry_state_, onRetryComplete(Ref(callbacks_.stream_info_)))
+      .InSequence(completion_seq);
+  EXPECT_CALL(*router_->retry_state_, onResponseHeaders(_, Ref(callbacks_.stream_info_)))
+      .InSequence(completion_seq);
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream));
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _))
+      .WillOnce([](Http::Code, absl::string_view,
+                   std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                   const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        ASSERT_TRUE(static_cast<bool>(modify_headers));
+        Http::TestResponseHeaderMapImpl local_headers{{":status", "503"}};
+        modify_headers(local_headers);
+      });
+
+  router_->retry_state_->callback_();
   router_->onDestroy();
 }
 
