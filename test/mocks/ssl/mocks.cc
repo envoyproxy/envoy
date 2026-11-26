@@ -30,6 +30,7 @@ MockClientContextConfig::MockClientContextConfig() {
   ON_CALL(*this, ecdhCurves()).WillByDefault(testing::ReturnRef(curves_));
   ON_CALL(*this, minProtocolVersion()).WillByDefault(testing::Return(0));
   ON_CALL(*this, maxProtocolVersion()).WillByDefault(testing::Return(0));
+  ON_CALL(*this, maxSendFragment()).WillByDefault(testing::Return(std::nullopt));
   ON_CALL(*this, capabilities()).WillByDefault(testing::Return(capabilities_));
   ON_CALL(*this, alpnProtocols()).WillByDefault(testing::ReturnRef(alpn_));
   ON_CALL(*this, signatureAlgorithms()).WillByDefault(testing::ReturnRef(sigalgs_));
@@ -48,6 +49,7 @@ MockServerContextConfig::MockServerContextConfig() {
   ON_CALL(*this, ecdhCurves()).WillByDefault(testing::ReturnRef(curves_));
   ON_CALL(*this, minProtocolVersion()).WillByDefault(testing::Return(0));
   ON_CALL(*this, maxProtocolVersion()).WillByDefault(testing::Return(0));
+  ON_CALL(*this, maxSendFragment()).WillByDefault(testing::Return(std::nullopt));
   ON_CALL(*this, capabilities()).WillByDefault(testing::Return(capabilities_));
   ON_CALL(*this, alpnProtocols()).WillByDefault(testing::ReturnRef(alpn_));
   ON_CALL(*this, signatureAlgorithms()).WillByDefault(testing::ReturnRef(sigalgs_));

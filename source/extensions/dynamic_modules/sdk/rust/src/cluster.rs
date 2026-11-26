@@ -30,7 +30,9 @@ type WorkerSlotPayload = Box<dyn Any + Send + Sync>;
 ///
 /// This trait must be implemented by the module to handle cluster configuration.
 /// The object is created when the corresponding Envoy cluster configuration is loaded, and
-/// it is dropped when the corresponding Envoy cluster configuration is destroyed.
+/// it is dropped when the corresponding Envoy cluster configuration is destroyed. Envoy drops it
+/// on the main thread, once nothing that uses the configuration remains, which can be after the
+/// [`Cluster`] when a worker slot payload or a pending async host selection outlives it.
 ///
 /// Implementations must be `Send + Sync` since they may be accessed from multiple threads.
 pub trait ClusterConfig: Send + Sync {
@@ -160,14 +162,25 @@ pub enum PackedAddress {
   V6([u8; 16], u16),
 }
 
-/// A handle for canceling an in-progress asynchronous host selection.
+/// A handle that Envoy releases once it is done with an asynchronous host selection.
 ///
-/// When the stream is destroyed before async host selection completes (e.g., due to a timeout),
-/// Envoy calls [`AsyncHostSelectionHandle::cancel`]. After cancellation, the module must not
-/// call the async completion callback for this operation.
+/// Envoy calls [`AsyncHostSelectionHandle::cancel`] once it is done with the selection. That
+/// happens when the request gives the selection up first, such as on a stream timeout, and also
+/// after Envoy delivered the result the module passed to
+/// [`EnvoyAsyncHostSelectionComplete::complete`]. The handle is dropped right after the call. A
+/// module that must know whether it already completed the selection records whether it called
+/// `complete`, and after a cancellation it must not call the async completion callback for this
+/// operation.
+///
+/// Envoy calls `cancel` on the thread that called [`ClusterLb::choose_host`], and a module thread
+/// can be inside `complete` for the same selection at that moment. A request can hold the
+/// selection after its cluster was removed or replaced, so `cancel` and the drop can run after the
+/// [`ClusterLb`] and the [`Cluster`] are dropped, though always before the [`ClusterConfig`] is.
+/// The handle therefore must not reach load balancer or cluster state it does not own.
 pub trait AsyncHostSelectionHandle: Send {
-  /// Cancel the async host selection. After this call, the module must not deliver a result
-  /// for this operation.
+  /// Called once when Envoy is done with the selection, after a delivered result as well as on a
+  /// cancellation. After this call, the module must not deliver a result for this operation. The
+  /// selection's request context may already be gone, so this must not read it.
   fn cancel(&mut self);
 }
 
@@ -178,9 +191,21 @@ pub trait AsyncHostSelectionHandle: Send {
 /// [`EnvoyAsyncHostSelectionComplete::complete`] to deliver the async result.
 #[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyAsyncHostSelectionComplete: Send {
-  /// Delivers the async host selection result and consumes the completion. `host` is the selected
-  /// host, or `None` on failure; `details` describes the outcome. Taking `self` by value means the
-  /// context borrowed via `request_context` cannot be read after the result is delivered.
+  /// Passes the async host selection result to Envoy and consumes the completion. `host` is the
+  /// selected host, or `None` on failure; `details` describes the outcome. Taking `self` by value
+  /// means the context borrowed via `request_context` cannot be read after the result is passed.
+  ///
+  /// The module may call this from any thread, inside [`ClusterLb::choose_host`] included. Envoy
+  /// delivers the result later on the thread that called `choose_host`, never inside this call.
+  /// Envoy drops the result when `choose_host` answered synchronously and when the selection was
+  /// cancelled first. It also drops a result for a load balancer that is already gone, so the
+  /// request then waits for its own timeout, which is a known limitation. Envoy tells selections
+  /// apart by their request context, which every attempt of the same request shares and which a
+  /// later request can reuse once the earlier one is gone, so a result that arrives after another
+  /// selection with the same context has started on this load balancer counts as the result of
+  /// that selection. A module that holds one lock across `complete` and
+  /// [`AsyncHostSelectionHandle::cancel`] for a selection, and skips `complete` once `cancel` has
+  /// run, never hands Envoy such a result.
   fn complete(
     self: Box<Self>,
     host: Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>,
@@ -189,7 +214,10 @@ pub trait EnvoyAsyncHostSelectionComplete: Send {
 
   /// The request context `choose_host` received, or `None` when there was none (e.g. health-check
   /// selections). The view's lifetime is tied to the completion, so it cannot outlive it or
-  /// survive `complete`.
+  /// survive `complete`. Envoy reports a cancellation only through
+  /// [`AsyncHostSelectionHandle::cancel`], so a read from another thread can race the request's
+  /// teardown, and a module that completes from another thread copies what it needs inside
+  /// [`ClusterLb::choose_host`].
   fn request_context<'a>(&'a self) -> Option<ClusterLbContextRef<'a>>;
 }
 
@@ -391,9 +419,11 @@ pub trait ClusterLbContext {
 
   /// Creates a per-worker timer on this request's worker dispatcher.
   ///
-  /// The worker dispatcher is captured on this load balancer for the duration of host selection,
-  /// so this is callable during [`ClusterLb::choose_host`]. The timer is not armed on creation;
-  /// call [`EnvoyClusterWorkerTimer::enable`] to arm it. When it fires,
+  /// The worker dispatcher is captured on this load balancer during host selection for a request
+  /// with a downstream connection, so this is callable during [`ClusterLb::choose_host`] once such
+  /// a request has run on this worker. A worker whose load balancer has only served async client
+  /// streams gets `None`. The timer is not armed on creation. Call
+  /// [`EnvoyClusterWorkerTimer::enable`] to arm it. When it fires,
   /// [`ClusterLb::on_worker_timer_fired`] is invoked on this same worker thread.
   ///
   /// Returns `None` if no worker dispatcher is available. The returned handle owns the underlying

@@ -11,114 +11,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-FilterChainBridge::~FilterChainBridge() {
-  detached_ = true;
-  replay_handler_ = nullptr;
-  // BufferManager::onDestroy() calls unregisterBufferManager(), erasing itself from
-  // registered_managers_. Re-querying begin() on each iteration avoids holding an iterator across
-  // flat_hash_set mutations.
-  while (!registered_managers_.empty()) {
-    (*registered_managers_.begin())->onDestroy();
-  }
-}
-
-void FilterChainBridge::addUnacked(uint64_t bytes) {
-  unacked_ += bytes;
-  updateIngestBackpressure();
-}
-
-void FilterChainBridge::releaseUnacked(uint64_t bytes) {
-  ASSERT(unacked_ >= bytes);
-  unacked_ -= bytes;
-  updateIngestBackpressure();
-}
-
-void FilterChainBridge::updateIngestBackpressure() {
-  if (detached_ || high_watermark_ == 0) {
-    return; // Detached or ingest flow control disabled.
-  }
-  if (!source_paused_ && unacked_ > high_watermark_) {
-    source_paused_ = true;
-    ENVOY_LOG(debug, "ai_protocol_manager: ingest high watermark ({} bytes not durable)", unacked_);
-    // Expect at most one synchronous self-echo while pauseSource() is on the stack, then clear any
-    // unconsumed expectation on return (e.g. for non-echoing mocks, AsyncStream, or teardown) so a
-    // later genuine watermark is never swallowed.
-    const uint32_t prev_expected_echoes = expected_high_watermark_echoes_++;
-    pauseSource();
-    expected_high_watermark_echoes_ =
-        std::min(expected_high_watermark_echoes_, prev_expected_echoes);
-    // Snapshot registered_managers_ in case a synchronous write completion/error unregisters a
-    // manager while iterating.
-    const std::vector<BufferManager*> managers(registered_managers_.begin(),
-                                               registered_managers_.end());
-    for (BufferManager* manager : managers) {
-      if (registered_managers_.contains(manager)) {
-        manager->onIngestPaused();
-      }
-    }
-    return;
-  }
-  if (source_paused_ && unacked_ <= low_watermark_) {
-    source_paused_ = false;
-    ENVOY_LOG(debug, "ai_protocol_manager: ingest low watermark ({} bytes not durable)", unacked_);
-    const uint32_t prev_expected_echoes = expected_low_watermark_echoes_++;
-    resumeSource();
-    expected_low_watermark_echoes_ = std::min(expected_low_watermark_echoes_, prev_expected_echoes);
-  }
-}
-
-void FilterChainBridge::detachFromFilterChain() {
-  if (!detached_) {
-    detached_ = true;
-    unsubscribeReplayWatermarks();
-  }
-  replay_handler_ = nullptr;
-  // BufferManager::onDestroy() calls unregisterBufferManager(), erasing itself from
-  // registered_managers_. Re-querying begin() on each iteration avoids holding an iterator across
-  // flat_hash_set mutations.
-  while (!registered_managers_.empty()) {
-    (*registered_managers_.begin())->onDestroy();
-  }
-}
-
-void FilterChainBridge::onAboveReplayWatermark() {
-  if (expected_high_watermark_echoes_ > 0) {
-    --expected_high_watermark_echoes_;
-    return;
-  }
-  ++replay_high_watermark_count_;
-  ENVOY_LOG(debug, "ai_protocol_manager: replay high watermark (depth={})",
-            replay_high_watermark_count_);
-}
-
-void FilterChainBridge::onBelowReplayWatermark() {
-  if (expected_low_watermark_echoes_ > 0) {
-    --expected_low_watermark_echoes_;
-    return;
-  }
-  ASSERT(replay_high_watermark_count_ > 0);
-  --replay_high_watermark_count_;
-  ENVOY_LOG(debug, "ai_protocol_manager: replay low watermark (depth={})",
-            replay_high_watermark_count_);
-  if (replay_high_watermark_count_ == 0 && replay_handler_ != nullptr) {
-    replay_handler_->onReplayResumed();
-  }
-}
-
-bool FilterChainBridge::tryConsumeInjectBudget() {
-  if (inject_budget_used_ >= InjectChunksPerIteration) {
-    return false;
-  }
-  ++inject_budget_used_;
-  return true;
-}
-
-void FilterChainBridge::resetInjectBudget() { inject_budget_used_ = 0; }
-
 BufferManager::BufferManager(Config config, ExternalBufferFactory& buffer_factory,
                              FilterChainBridge& bridge)
     : config_(config), buffer_factory_(buffer_factory), bridge_(bridge) {
-  bridge_.registerBufferManager(*this);
+  bridge_.registerClient(bridge_adapter_);
+}
+
+void BufferManager::armWriteResumeCallback() {
+  bridge_.setWriteResumeCallback([this]() { onWriteResumed(); });
 }
 
 Event::SchedulableCallback& BufferManager::replayCallback() {
@@ -136,7 +36,7 @@ void BufferManager::onDestroy() {
     return;
   }
   destroyed_ = true;
-  bridge_.unregisterBufferManager(*this);
+  bridge_.unregisterClient(bridge_adapter_);
   // Cancel any requested or in-flight replay operation and disarm callbacks.
   cancelReplay();
   const bool had_buffer = (buffer_ != nullptr);
@@ -248,8 +148,9 @@ void BufferManager::inject(Buffer::Instance& data, ReplayDoneCallback done) {
 void BufferManager::cancelReplay() {
   replay_cancelled_ = true;
   replay_requested_ = false;
-  replaying_ = false;
-  bridge_.clearReplayHandler(*this);
+  if (std::exchange(replaying_, false)) {
+    bridge_.clearWriteResumeCallback();
+  }
   replay_source_ = ReplaySource::None;
   replay_done_ = nullptr;
   inject_data_.drain(inject_data_.length());
@@ -341,7 +242,7 @@ void BufferManager::maybeStartReplay() {
   replaying_ = true;
   // Take the bridge's handler slot for the duration of the range: back-pressure only needs to
   // reach whoever is injecting, and only one manager on a path injects at a time.
-  bridge_.setReplayHandler(*this);
+  armWriteResumeCallback();
   if (replay_source_ == ReplaySource::Injected) {
     maybeDrainInjected();
   } else if (replay_source_ == ReplaySource::ExternalBuffer) {
@@ -357,7 +258,7 @@ void BufferManager::maybeDrainInjected() {
   }
 
   while (inject_data_.length() > 0) {
-    if (bridge_.replayPaused()) {
+    if (bridge_.writePaused()) {
       ENVOY_LOG(trace, "ai_protocol_manager: inject paused (chain back-pressure)");
       return;
     }
@@ -390,10 +291,10 @@ void BufferManager::maybeReadNextChunk() {
   if (!replaying_ || read_in_flight_) {
     return;
   }
-  // Pause while the chain we feed is backed up; onReplayResumed() restarts us
+  // Pause while the chain we feed is backed up; onWriteResumed() restarts us
   // once it drains. This bounds how much replayed data piles up in the chain when
   // it is slow.
-  if (bridge_.replayPaused()) {
+  if (bridge_.writePaused()) {
     ENVOY_LOG(trace, "ai_protocol_manager: replay paused at offset {} (chain back-pressure)",
               replay_offset_);
     return;
@@ -534,7 +435,7 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
 void BufferManager::finishReplay() {
   replaying_ = false;
   replay_source_ = ReplaySource::None;
-  bridge_.clearReplayHandler(*this);
+  bridge_.clearWriteResumeCallback();
   ENVOY_LOG(trace, "ai_protocol_manager: replay complete");
   // Hand control back to the caller. Its callback may start the next sub-range or
   // terminate the stream; move the callback out first so it can re-arm replay().
@@ -550,7 +451,10 @@ void BufferManager::onExternalBufferError() {
   bridge_.onUnrecoverableError();
 }
 
-void BufferManager::onReplayResumed() {
+void BufferManager::onWriteResumed() {
+  if (replaying_) {
+    armWriteResumeCallback();
+  }
   if (budget_yielded_) {
     // Already scheduled for next iteration to refill the inject budget; do not overwrite with
     // scheduleCallbackCurrentIteration().

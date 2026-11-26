@@ -474,6 +474,35 @@ TEST_P(IntegrationAdminTest, Admin) {
   test_server_->waitForCounter("listener_manager.listener_stopped", Eq(1));
 }
 
+// The bootstrap config dump reports the node's live dynamic context params, which bootstrap
+// extensions set via the context provider and which otherwise only appear in xDS discovery
+// requests.
+TEST_P(IntegrationAdminTest, ConfigDumpNodeDynamicParameters) {
+  initialize();
+
+  absl::Status status;
+  absl::Notification param_set;
+  test_server_->server().dispatcher().post([&]() {
+    status = test_server_->server().localInfo().contextProvider().setDynamicContextParam(
+        "type.googleapis.com/some.resource.Type", "some_key", "some_value");
+    param_set.Notify();
+  });
+  param_set.WaitForNotification();
+  ASSERT_OK(status);
+
+  BufferingStreamDecoderPtr response;
+  EXPECT_EQ("200", request("admin", "GET", "/config_dump?mask=bootstrap", response));
+  envoy::admin::v3::ConfigDump config_dump;
+  TestUtility::loadFromJson(response->body(), config_dump);
+  ASSERT_EQ(1, config_dump.configs_size());
+  envoy::admin::v3::BootstrapConfigDump bootstrap_dump;
+  ASSERT_TRUE(config_dump.configs(0).UnpackTo(&bootstrap_dump));
+  const auto& dynamic_params = bootstrap_dump.bootstrap().node().dynamic_parameters();
+  ASSERT_TRUE(dynamic_params.contains("type.googleapis.com/some.resource.Type"));
+  EXPECT_EQ("some_value",
+            dynamic_params.at("type.googleapis.com/some.resource.Type").params().at("some_key"));
+}
+
 // Test Prometheus protobuf format with content negotiation via Accept header, and
 // correct response content type.
 TEST_P(IntegrationAdminTest, AdminPrometheusProtobufFormat) {

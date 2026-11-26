@@ -16,7 +16,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Request info AI filter]
 // Request info AI filter :ref:`configuration overview
-// <config_http_filters_ai_protocol_manager_ai_filters>`.
+// <config_http_ai_filters_request_info>`.
 // [#extension: envoy.http.ai_filters.request_info]
 
 // Publishes :ref:`RequestInfo <envoy_v3_api_msg_data.ai.v3.RequestInfo>` as typed

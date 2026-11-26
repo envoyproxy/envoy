@@ -100,10 +100,11 @@ public:
     ASSERT_FALSE(queue_.empty());
     auto entry = std::move(queue_.front());
     queue_.pop();
-    auto action =
-        dynamic_cast<TypedMockAsyncFileAction<absl::AnyInvocable<void(T)>>*>(entry.action_.get());
+    auto* mock_action = static_cast<MockAsyncFileAction*>(entry.action_.get());
+    auto* action =
+        dynamic_cast<TypedMockAsyncFileAction<absl::AnyInvocable<void(T)>>*>(mock_action);
     ASSERT_TRUE(action != nullptr)
-        << "mismatched type for nextActionCompletes: action is " << action->describe()
+        << "mismatched type for nextActionCompletes: action is " << mock_action->describe()
         << ", nextActionCompletes was given " << typeid(T).name();
     if (entry.dispatcher_) {
       entry.dispatcher_->post([action = std::move(entry.action_), state = std::move(entry.state_),

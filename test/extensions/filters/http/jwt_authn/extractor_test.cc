@@ -211,6 +211,91 @@ TEST_F(ExtractorTest, TestDefaultParamLocation) {
   EXPECT_EQ(query_params.getFirstValue("access_token").has_value(), false);
 }
 
+// Removing the token leaves the rest of the query string untouched: original order, original
+// percent-encoding, and valueless parameters stay valueless. With the runtime guard off, the old
+// code decodes the query, sorts it by name and writes it back without encoding it again, which
+// changes the meaning of percent-encoded values.
+TEST_F(ExtractorTest, TestRemoveParamTokenKeepsOtherParams) {
+  struct TestCase {
+    std::string path;
+    std::string in_place;
+    std::string legacy;
+  };
+  const std::vector<TestCase> test_cases = {
+      {"/p?z=1&access_token=T&a=2", "/p?z=1&a=2", "/p?a=2&z=1"},
+      {"/p?b=1&a=x&b=2&access_token=T", "/p?b=1&a=x&b=2", "/p?a=x&b=1&b=2"},
+      {"/p?flag&access_token=T", "/p?flag", "/p?flag="},
+      {"/p?q=a%26b%3Dc&access_token=T", "/p?q=a%26b%3Dc", "/p?q=a&b=c"},
+      {"/p?next=%2Fhome%23top&access_token=T", "/p?next=%2Fhome%23top", "/p?next=/home#top"},
+      {"/p?sum=1%2B1&access_token=T", "/p?sum=1%2B1", "/p?sum=1+1"},
+      {"/p?name=John%20Doe&access_token=T", "/p?name=John%20Doe", "/p?name=John Doe"},
+      {"/p?v=%2525&access_token=T", "/p?v=%2525", "/p?v=%25"},
+      {"/p?&a=1&access_token=T", "/p?&a=1", "/p?=&a=1"},
+  };
+
+  for (const bool in_place : {true, false}) {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.jwt_authn_remove_query_param_in_place",
+                                 in_place ? "true" : "false"}});
+    for (const auto& test_case : test_cases) {
+      SCOPED_TRACE(absl::StrCat(test_case.path, in_place ? " (in place)" : " (legacy)"));
+      auto headers = TestRequestHeaderMapImpl{{":path", test_case.path}};
+      auto tokens = extractor_->extract(headers);
+      ASSERT_EQ(tokens.size(), 1);
+      EXPECT_EQ(tokens[0]->token(), "T");
+
+      tokens[0]->removeJwt(headers);
+      EXPECT_EQ(headers.getPathValue(), in_place ? test_case.in_place : test_case.legacy);
+    }
+  }
+}
+
+// The extractor matches percent-encoded parameter names, so removal must match them too. Every
+// occurrence of the parameter is removed, and the "?" is dropped when nothing is left.
+TEST_F(ExtractorTest, TestRemoveParamTokenEncodedNameAndDuplicates) {
+  auto headers =
+      TestRequestHeaderMapImpl{{":path", "/path?access%5Ftoken=jwt_token&access_token=other"}};
+  auto tokens = extractor_->extract(headers);
+  ASSERT_EQ(tokens.size(), 1);
+  EXPECT_EQ(tokens[0]->token(), "jwt_token");
+
+  tokens[0]->removeJwt(headers);
+  EXPECT_EQ(headers.getPathValue(), "/path");
+}
+
+// Each token parameter goes together with one "&" next to it, so no stray "?" or "&" is left
+// where the token was, and empty segments elsewhere in the query are kept as sent.
+TEST_F(ExtractorTest, TestRemoveParamTokenEmptySegments) {
+  const std::vector<std::pair<std::string, std::string>> test_cases = {
+      {"/path?access_token=T&", "/path"},
+      {"/path?&access_token=T", "/path"},
+      {"/path?a=1&&access_token=T&b", "/path?a=1&&b"},
+      {"/path?a=1&&b=2&access_token=T", "/path?a=1&&b=2"},
+      {"/path?access_token=T&&", "/path?&"},
+  };
+  for (const auto& [path, expected] : test_cases) {
+    SCOPED_TRACE(path);
+    auto headers = TestRequestHeaderMapImpl{{":path", path}};
+    auto tokens = extractor_->extract(headers);
+    ASSERT_EQ(tokens.size(), 1);
+
+    tokens[0]->removeJwt(headers);
+    EXPECT_EQ(headers.getPathValue(), expected);
+  }
+}
+
+// If the query string is gone by the time removeJwt runs (e.g. a filter rewrote the path),
+// the path is left as it is.
+TEST_F(ExtractorTest, TestRemoveParamTokenPathWithoutQuery) {
+  auto headers = TestRequestHeaderMapImpl{{":path", "/path?access_token=jwt_token"}};
+  auto tokens = extractor_->extract(headers);
+  ASSERT_EQ(tokens.size(), 1);
+
+  headers.setPath("/other");
+  tokens[0]->removeJwt(headers);
+  EXPECT_EQ(headers.getPathValue(), "/other");
+}
+
 // Test extracting token from the custom header: "token-header"
 TEST_F(ExtractorTest, TestCustomHeaderToken) {
   auto headers = TestRequestHeaderMapImpl{{"token-header", "jwt_token"}};

@@ -42,6 +42,10 @@ pub trait EarlyHeaderMutationConfig: Send + Sync {
 /// The read accessors borrow `&self` and return [`EnvoyBuffer`]s pointing at Envoy-owned memory,
 /// while the mutating accessors take `&mut self`. The borrow checker therefore prevents holding a
 /// header buffer across a mutation that could invalidate it.
+///
+/// Envoy does not check the header names and values given to the setters. Check any that come from
+/// request data or other untrusted input with [`crate::is_valid_header_name`] and
+/// [`crate::is_valid_header_value`] first.
 pub struct EarlyHeaderMutationContext {
   envoy_ptr: *mut c_void,
 }

@@ -342,6 +342,12 @@ public:
   Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
 };
 
+// Declare factories for unified xDS clients, so they can force linked in Envoy mobile.
+class DeltaGrpcMuxFactory;
+DECLARE_FACTORY(DeltaGrpcMuxFactory);
+class SotwGrpcMuxFactory;
+DECLARE_FACTORY(SotwGrpcMuxFactory);
+
 } // namespace XdsMux
 } // namespace Config
 } // namespace Envoy

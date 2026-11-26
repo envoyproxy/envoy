@@ -17,6 +17,7 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/background_fetch_manager.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
+#include "source/extensions/dynamic_modules/program_init_state.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
@@ -65,28 +66,34 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
   void* handle = dlopen(object_file_absolute_path.c_str(), RTLD_NOLOAD | binding_mode);
   if (handle != nullptr) {
     // This means the module is already loaded, and the return value is the handle of the already
-    // loaded module. We don't need to call the init function again.
-    return std::make_unique<DynamicModule>(handle);
-  }
-  int mode = binding_mode;
-  if (load_globally) {
-    mode |= RTLD_GLOBAL;
+    // loaded module. We don't need to call the init function again, unless it failed.
+    if (programInitSucceeded(handle) ||
+        !Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.dynamic_modules_rerun_failed_program_init")) {
+      return std::make_unique<DynamicModule>(handle);
+    }
   } else {
-    // RTLD_LOCAL is used by default to avoid collisions between multiple modules.
-    mode |= RTLD_LOCAL;
-  }
-  if (do_not_close) {
-    mode |= RTLD_NODELETE;
-  }
-  handle = dlopen(object_file_absolute_path.c_str(), mode);
-  if (handle == nullptr) {
-    // `dlerror()` returns null when no error is pending, so do not pass it along unchecked.
-    const char* dlopen_error = dlerror();
-    const absl::string_view reason =
-        dlopen_error != nullptr ? dlopen_error : "unknown dlopen error";
-    logModuleLoadFailure(object_file_absolute_path.c_str(), reason);
-    return absl::InvalidArgumentError(absl::StrCat(
-        "Failed to load dynamic module: ", object_file_absolute_path.c_str(), " : ", reason));
+    int mode = binding_mode;
+    if (load_globally) {
+      mode |= RTLD_GLOBAL;
+    } else {
+      // RTLD_LOCAL is used by default to avoid collisions between multiple modules.
+      mode |= RTLD_LOCAL;
+    }
+    if (do_not_close) {
+      mode |= RTLD_NODELETE;
+    }
+    handle = dlopen(object_file_absolute_path.c_str(), mode);
+    if (handle == nullptr) {
+      // `dlerror()` returns null when no error is pending, so do not pass it along unchecked.
+      const char* dlopen_error = dlerror();
+      const absl::string_view reason =
+          dlopen_error != nullptr ? dlopen_error : "unknown dlopen error";
+      logModuleLoadFailure(object_file_absolute_path.c_str(), reason);
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Failed to load dynamic module: ", object_file_absolute_path.c_str(), " : ", reason));
+    }
+    setProgramInitSucceeded(handle, false);
   }
 
   DynamicModulePtr dynamic_module = std::make_unique<DynamicModule>(handle);
@@ -107,6 +114,7 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to initialize dynamic module: ", object_file_absolute_path.c_str()));
   }
+  setProgramInitSucceeded(handle, true);
   // Copy the version out of module memory right away, since the returned pointer is only
   // guaranteed valid immediately after on_program_init returns.
   const std::string module_abi_version(abi_version);

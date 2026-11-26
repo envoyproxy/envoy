@@ -1,5 +1,6 @@
 #include "source/extensions/filters/network/ext_proc/ext_proc.h"
 
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
@@ -175,8 +176,7 @@ Network::FilterStatus NetworkExtProcFilter::onData(Buffer::Instance& data, bool 
   ENVOY_CONN_LOG(debug, "ext_proc: received {} bytes of data, end stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
 
-  if (config_->processingMode().process_read() ==
-      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP) {
+  if (config_->processingMode().process_read() == ProcessingMode::SKIP) {
     return Network::FilterStatus::Continue;
   }
 
@@ -193,8 +193,7 @@ Network::FilterStatus NetworkExtProcFilter::onWrite(Buffer::Instance& data, bool
   ENVOY_CONN_LOG(debug, "ext_proc: writing {} bytes of data, end stream={}",
                  write_callbacks_->connection(), data.length(), end_stream);
 
-  if (config_->processingMode().process_write() ==
-      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP) {
+  if (config_->processingMode().process_write() == ProcessingMode::SKIP) {
     return Network::FilterStatus::Continue;
   }
 
@@ -238,7 +237,7 @@ void NetworkExtProcFilter::updateCloseCallbackStatus(bool enable, bool is_read) 
     if (enable) {
       disable_count_read_++;
       read_callbacks_->disableClose(true);
-    } else {
+    } else if (disable_count_read_ > 0) {
       disable_count_read_--;
       if (disable_count_read_ == 0) {
         read_callbacks_->disableClose(false);
@@ -248,7 +247,7 @@ void NetworkExtProcFilter::updateCloseCallbackStatus(bool enable, bool is_read) 
     if (enable) {
       disable_count_write_++;
       write_callbacks_->disableClose(true);
-    } else {
+    } else if (disable_count_write_ > 0) {
       disable_count_write_--;
       if (disable_count_write_ == 0) {
         write_callbacks_->disableClose(false);
@@ -381,6 +380,11 @@ void NetworkExtProcFilter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse
   }
 
   auto response = std::move(res);
+  if (isSpuriousResponse(*response)) {
+    stats_.spurious_msgs_received_.inc();
+    return;
+  }
+
   ENVOY_CONN_LOG(debug, "Received response from external processor", read_callbacks_->connection());
   stats_.stream_msgs_received_.inc();
   bool is_read = response->has_read_data();
@@ -582,6 +586,29 @@ void NetworkExtProcFilter::handleConnectionStatus(const ProcessingResponse& resp
                    read_callbacks_->connection());
     break;
   }
+}
+
+bool NetworkExtProcFilter::isSpuriousResponse(const ProcessingResponse& response) const {
+  const bool both_directions_set = response.has_read_data() && response.has_write_data();
+  const bool read_skipped =
+      response.has_read_data() && config_->processingMode().process_read() == ProcessingMode::SKIP;
+  const bool write_skipped = response.has_write_data() &&
+                             config_->processingMode().process_write() == ProcessingMode::SKIP;
+  if (!both_directions_set && !read_skipped && !write_skipped) {
+    return false;
+  }
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.network_ext_proc_enforce_processing_mode")) {
+    return false;
+  }
+  if (both_directions_set) {
+    ENVOY_CONN_LOG(warn, "Ignoring response message: both read_data and write_data are set",
+                   read_callbacks_->connection());
+  } else {
+    ENVOY_CONN_LOG(warn, "Ignoring {} response message: direction is configured as SKIP",
+                   read_callbacks_->connection(), read_skipped ? "read_data" : "write_data");
+  }
+  return true;
 }
 
 void NetworkExtProcFilter::addDynamicMetadata(ProcessingRequest& req) {

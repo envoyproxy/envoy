@@ -63,9 +63,13 @@ envoy_extension_cc_dyn_module_test(
     size = "large",
     srcs = ["integration_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/rust:memory_tracking_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:resource_monitor_test",
     ],
-    extension_names = ["envoy.resource_monitors.dynamic_modules"],
+    extension_names = [
+        "envoy.filters.http.dynamic_modules",
+        "envoy.resource_monitors.dynamic_modules",
+    ],
     rbe_pool = {
         "gcc": {"build": "linux_x64_small"},
         "openssl": {"link": "linux_x64_small"},
@@ -73,6 +77,8 @@ envoy_extension_cc_dyn_module_test(
         "tsan": {"link": "linux_x64_small"},
     },
     deps = [
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
+        "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//source/extensions/resource_monitors/dynamic_modules:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:environment_lib",

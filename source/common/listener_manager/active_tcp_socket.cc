@@ -22,6 +22,10 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
           StreamInfo::FilterState::LifeSpan::Connection)) {
   listener_.stats_.downstream_pre_cx_active_.inc();
 
+  // Transfer any connection-scoped state carried by the accepted IoHandle before listener filters
+  // and filter-chain matching run.
+  socket_->ioHandle().mergeStateInto(stream_info_->dynamicMetadata(), *stream_info_->filterState());
+
   // Automatically populate network namespace from listener address if present.
   if (network_namespace && !network_namespace->empty()) {
     stream_info_->filterState()->setIndexedData(

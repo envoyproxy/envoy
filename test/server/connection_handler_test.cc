@@ -61,6 +61,11 @@ public:
                Server::ThreadLocalOverloadStateOptRef overload_state));
 };
 
+class DrainAwareMockListener : public Network::MockListener {
+public:
+  MOCK_METHOD(void, onDrain, (), (override));
+};
+
 class ConnectionHandlerTest : public testing::Test,
                               protected Logger::Loggable<Logger::Id::main>,
                               public Event::TestUsingSimulatedTime {
@@ -2008,9 +2013,8 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
       });
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   Network::MockIoHandle io_handle;
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
+  ON_CALL(*accepted_socket, ioHandle()).WillByDefault(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
   EXPECT_CALL(io_handle,
               createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
                                Event::FileReadyType::Read | Event::FileReadyType::Closed));
@@ -2062,8 +2066,7 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
       });
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   Network::IoSocketHandleImpl io_handle{42};
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
+  ON_CALL(*accepted_socket, ioHandle()).WillByDefault(ReturnRef(io_handle));
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
 
@@ -2120,9 +2123,8 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
         return Network::FilterStatus::StopIteration;
       });
   Network::MockIoHandle io_handle;
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle));
+  ON_CALL(*accepted_socket, ioHandle()).WillByDefault(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle));
 
   Event::FileReadyCb file_event_callback;
   EXPECT_CALL(io_handle,
@@ -2182,9 +2184,8 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
       });
   Network::MockIoHandle io_handle;
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
+  ON_CALL(*accepted_socket, ioHandle()).WillByDefault(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
   EXPECT_CALL(io_handle,
               createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
                                Event::FileReadyType::Read | Event::FileReadyType::Closed));
@@ -2848,7 +2849,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerDrainFilterChainsNotifiesConnections) {
   InSequence s;
   uint64_t listener_tag = 1;
   Network::TcpListenerCallbacks* listener_callbacks;
-  auto listener = new NiceMock<Network::MockListener>();
+  auto listener = new NiceMock<DrainAwareMockListener>();
   TestListener* test_listener =
       addListener(listener_tag, true, false, "test_listener", listener, &listener_callbacks);
   handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
@@ -2865,6 +2866,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerDrainFilterChainsNotifiesConnections) {
   const std::list<const Network::FilterChain*> filter_chains{filter_chain_.get()};
   // onFilterChainDrain must call onDrain() on every connection owned by the listed filter chains
   // without closing them.
+  EXPECT_CALL(*listener, onDrain()).Times(0);
   EXPECT_CALL(*server_connection, onDrain(_));
   handler_->onFilterChainDrain(listener_tag, filter_chains, Network::ConnectionDrainEvent{});
   // Connection remains tracked; only when filter chains are actually removed does it close.
@@ -2883,7 +2885,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerDrainListenersNotifiesAllConnections) {
   InSequence s;
   uint64_t listener_tag = 1;
   Network::TcpListenerCallbacks* listener_callbacks;
-  auto listener = new NiceMock<Network::MockListener>();
+  auto listener = new NiceMock<DrainAwareMockListener>();
   TestListener* test_listener =
       addListener(listener_tag, true, false, "test_listener", listener, &listener_callbacks);
   handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
@@ -2895,7 +2897,8 @@ TEST_F(ConnectionHandlerTest, TcpListenerDrainListenersNotifiesAllConnections) {
   EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
 
-  // onListenerDrain should fan out onDrain() to every connection in the listener.
+  // The listener is notified before accepted connections so it can stop initiating new ones.
+  EXPECT_CALL(*listener, onDrain());
   EXPECT_CALL(*server_connection, onDrain(_));
   handler_->onListenerDrain(listener_tag, Network::ConnectionDrainEvent{});
   EXPECT_EQ(1UL, handler_->numConnections());
@@ -2914,6 +2917,29 @@ TEST_F(ConnectionHandlerTest, TcpListenerDrainListenersNotifiesAllConnections) {
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   EXPECT_CALL(*listener, onDestroy());
   handler_.reset();
+}
+
+TEST_F(ConnectionHandlerTest, TcpListenerDrainWithoutConnections) {
+  auto listener = new NiceMock<DrainAwareMockListener>();
+  TestListener* test_listener = addListener(1, true, false, "test_listener", listener);
+  handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
+  EXPECT_EQ(0UL, handler_->numConnections());
+
+  // A reverse listener can have pending dials even before it accepts its first connection.
+  EXPECT_CALL(*listener, onDrain());
+  handler_->onListenerDrain(1, Network::ConnectionDrainEvent{});
+  handler_->onListenerDrain(1, Network::ConnectionDrainEvent{});
+}
+
+TEST_F(ConnectionHandlerTest, TcpListenerDrainAfterStop) {
+  auto listener = new NiceMock<DrainAwareMockListener>();
+  TestListener* test_listener = addListener(1, true, false, "test_listener", listener);
+  handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
+
+  EXPECT_CALL(*listener, onDrain()).Times(0);
+  EXPECT_CALL(*listener, onDestroy());
+  handler_->stopListeners(1, {});
+  handler_->onListenerDrain(1, Network::ConnectionDrainEvent{});
 }
 
 TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChain) {

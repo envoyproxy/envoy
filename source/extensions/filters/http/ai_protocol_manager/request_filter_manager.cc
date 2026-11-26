@@ -6,6 +6,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/coroutine/status_macros.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_pipeline.h"
 #include "source/extensions/filters/http/ai_protocol_manager/replay_awaitable.h"
 #include "source/extensions/filters/http/ai_protocol_manager/serializer.h"
@@ -157,6 +158,7 @@ private:
 
     final_req_ = std::move(*res);
     ASSERT(final_req_ != nullptr);
+    publishRequestProtocol();
 
     if (always_serialize_) {
       CO_RETURN_IF_ERROR(co_await serializeFinalRequest());
@@ -190,6 +192,18 @@ private:
     publishPayloadIndex(final_req_->takeRequestIndex());
     setContentLength(length);
     co_return co_await ReplayAwaitable(*buffer_manager_, 0, length);
+  }
+
+  // Names the API a filter detected, which makes the request an AI call to whatever reads the key.
+  void publishRequestProtocol() {
+    const LLMProtocol protocol = final_req_->protocol();
+    if (protocol == LLMProtocol::Unspecified || stream_info_.filterState() == nullptr ||
+        stream_info_.filterState()->hasDataWithName(FilterStateKeys::LlmProtocolRequest)) {
+      return;
+    }
+    stream_info_.filterState()->setData(FilterStateKeys::LlmProtocolRequest,
+                                        std::make_shared<RequestLlmProtocol>(protocol),
+                                        StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
   void publishPayloadIndex(JsonWithExtBuf index) {

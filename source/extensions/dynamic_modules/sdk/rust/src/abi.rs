@@ -7,7 +7,7 @@ pub const envoy_dynamic_modules_abi_version: &[u8; 7] = b"v0.2.0\0";
  contains the ABI version the dynamic module was built against. Envoy logs it and does not
  otherwise act on it. It is a diagnostic marker, not a compatibility gate, and a value that
  differs from Envoy's own does not prevent the module from loading. See the ABI compatibility
- policy at the top of this file.
+ policy at the top of abi.h.
 
  OWNERSHIP: Module owns the pointer. Envoy copies the string immediately after on_program_init
  returns, so it only needs to remain valid until then. Returning a static string satisfies this.*/
@@ -70,7 +70,8 @@ const _: () = {
     ][::std::mem::offset_of!(envoy_dynamic_module_type_module_buffer, length) - 8usize];
 };
 /** envoy_dynamic_module_type_module_http_header represents a key-value pair of an HTTP header owned
- by the module.*/
+ by the module. Envoy does not check the key or the value; see the note on header names and values
+ at the top of abi.h.*/
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct envoy_dynamic_module_type_module_http_header {
@@ -833,8 +834,8 @@ pub type envoy_dynamic_module_type_load_shed_point_envoy_ptr = *mut ::std::os::r
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
     /** envoy_dynamic_module_on_program_init is called by the main thread exactly when the module is
- loaded. The function returns the ABI version of the dynamic module. If null is returned, the
- module will be unloaded immediately.
+ loaded. The function returns the ABI version of the dynamic module. If null is returned, the load
+ fails, and the next load of the module calls this function again.
 
  For Envoy, the return value is recorded and logged for diagnostics only. Envoy does not
  validate it against its own ABI version, so returning a version that differs from Envoy's does
@@ -848,7 +849,7 @@ unsafe extern "C" {
  report an error to Envoy.
 
  @return envoy_dynamic_module_type_abi_version_module_ptr is the ABI version the dynamic module
- was built against. Null means the error and the module will be unloaded immediately.*/
+ was built against. Null means the error and the load fails.*/
     pub fn envoy_dynamic_module_on_program_init() -> envoy_dynamic_module_type_abi_version_module_ptr;
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
@@ -980,6 +981,28 @@ unsafe extern "C" {
         key: envoy_dynamic_module_type_module_buffer,
         default_value: f64,
     ) -> f64;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_get_runtime_string is called by the module to read a runtime value
+ as a string, which is the text of the value in the topmost layer that sets the key. A number or a
+ boolean has a text too, for example "80" or "true", so this reads a value of any type. Unlike the
+ callbacks above it takes no default value: the result tells whether the key has a value.
+
+ @param key is the runtime key to look up.
+ @param result is the pointer to the buffer variable where the text of the value will be stored.
+ It is left untouched when this returns false.
+ @return true if the key has a value, false if the key does not exist or the runtime is not
+ reachable from the calling thread.
+
+ Note that the buffer stored in result is owned by Envoy, and it is guaranteed to be valid until
+ the end of the current event hook. A module that needs the text for longer must copy it.
+ As for the callbacks above, key must not name one of Envoy's own `envoy.reloadable_features.*`
+ or `envoy.restart_features.*` guards.*/
+    pub fn envoy_dynamic_module_callback_get_runtime_string(
+        key: envoy_dynamic_module_type_module_buffer,
+        result: *mut envoy_dynamic_module_type_envoy_buffer,
+    ) -> bool;
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
@@ -2391,17 +2414,17 @@ unsafe extern "C" {
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
-    /** envoy_dynamic_module_callback_http_add_header is called by the module to add
- the value of the header with the given key. If the header does not exist, it will be
- created. If the header already exists, all existing values will be removed and the new value will
- be set. When the given value is null, the header will be removed if the key exists.
+    /** envoy_dynamic_module_callback_http_add_header is called by the module to add a value to the
+ header with the given key, keeping any existing values. If the header does not exist, it will be
+ created. Use envoy_dynamic_module_callback_http_set_header to replace or remove a header.
 
  @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  corresponding HTTP filter.
  @param header_type is the type of the header map to add the header to (request/response
  headers/trailers).
- @param key is the key of the header.
- @param value is the pointer to the buffer of the value. It can be null to remove the header.
+ @param key is the key of the header. It must be a valid header name; Envoy does not check it.
+ @param value is the pointer to the buffer of the value. A null or empty value is rejected.
+ Otherwise it must be a valid header value; Envoy does not check it.
  @return true if the operation is successful, false otherwise.
 
  Note that this only adds the header to the underlying Envoy object. Whether or not the header is
@@ -2420,14 +2443,15 @@ unsafe extern "C" {
     /** envoy_dynamic_module_callback_http_set_header is called by the module to set
  the value of the header with the given key. If the header does not exist, it will be
  created. If the header already exists, all existing values will be removed and the new value will
- be set. When the given value is null, the header will be removed if the key exists.
+ be set. When the given value is null or empty, the header will be removed if the key exists.
 
  @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  corresponding HTTP filter.
  @param header_type is the type of the header map to set the header to (request/response
  headers/trailers).
- @param key is the key of the header.
- @param value is the pointer to the buffer of the value. It can be null to remove the header.
+ @param key is the key of the header. It must be a valid header name; Envoy does not check it.
+ @param value is the pointer to the buffer of the value. A null or empty value removes the header.
+ Otherwise it must be a valid header value; Envoy does not check it.
  @return true if the operation is successful, false otherwise.
 
  Note that this only sets the header to the underlying Envoy object. Whether or not the header is
@@ -11386,6 +11410,19 @@ unsafe extern "C" {
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
+    /** envoy_dynamic_module_on_bootstrap_extension_runtime_string_update is called when a watched
+ runtime key gets a new string value, or becomes unset after having one. The value is owned by
+ Envoy and valid only for the duration of the call.*/
+    pub fn envoy_dynamic_module_on_bootstrap_extension_runtime_string_update(
+        extension_envoy_ptr: envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+        extension_module_ptr: envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+        key: envoy_dynamic_module_type_envoy_buffer,
+        value: envoy_dynamic_module_type_envoy_buffer,
+        removed: bool,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
     /** envoy_dynamic_module_callback_bootstrap_extension_enable_runtime_update is called by the module
  to watch a runtime key, so that the runtime update hooks above are called on the bootstrap
  extension when its value changes. Call it once for each key to watch. The key does not need to
@@ -11990,7 +12027,10 @@ pub type envoy_dynamic_module_type_cluster_host_envoy_ptr = *mut ::std::os::raw:
  OWNERSHIP: Envoy owns the pointer. The pointer is valid only during the
  envoy_dynamic_module_on_cluster_lb_choose_host call, unless async host selection is used. When
  async host selection is used, the context remains valid until the async completion callback is
- called or the selection is canceled.*/
+ called or the selection is canceled. Envoy tells a module of a cancellation only when it calls
+ envoy_dynamic_module_on_cluster_lb_cancel_host_selection, so a module that completes from another
+ thread copies what it needs from the context inside
+ envoy_dynamic_module_on_cluster_lb_choose_host.*/
 pub type envoy_dynamic_module_type_cluster_lb_context_envoy_ptr = *mut ::std::os::raw::c_void;
 /** envoy_dynamic_module_type_cluster_scheduler_envoy_ptr is a raw pointer to the
  DynamicModuleClusterScheduler class in Envoy. This is used to schedule events to the main thread
@@ -12009,10 +12049,12 @@ pub type envoy_dynamic_module_type_cluster_scheduler_module_ptr = *mut ::std::os
  envoy_dynamic_module_on_cluster_lb_choose_host when the module needs to perform asynchronous
  work (e.g., DNS resolution) before selecting a host.
 
- OWNERSHIP: The module owns the pointer. The module must keep it valid until either
- envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called or
- envoy_dynamic_module_on_cluster_lb_cancel_host_selection is called. After either event, the
- module may release the handle.*/
+ OWNERSHIP: The module owns the pointer. The module must keep it valid until Envoy calls
+ envoy_dynamic_module_on_cluster_lb_cancel_host_selection for it. Envoy calls that hook once for
+ every handle, after it has delivered the result the module passed to
+ envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete as well as when the
+ request gives the selection up first, so the module releases the handle in that hook and not
+ when it calls the completion callback.*/
 pub type envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr = *mut ::std::os::raw::c_void;
 /** envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr is a module-owned opaque pointer
  stored in the cluster's worker thread-local slot. Envoy treats the value as opaque and never
@@ -12054,7 +12096,9 @@ unsafe extern "C" {
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
     /** envoy_dynamic_module_on_cluster_config_destroy is called when the cluster configuration is
- destroyed. The module should release any resources associated with the configuration.
+ destroyed. The module should release any resources associated with the configuration. Envoy
+ calls this on the main thread, once nothing that uses the configuration remains, which can be
+ after the cluster when a worker slot payload or a pending async host selection outlives it.
 
  @param config_module_ptr is the pointer to the in-module cluster configuration.*/
     pub fn envoy_dynamic_module_on_cluster_config_destroy(
@@ -12157,13 +12201,30 @@ unsafe extern "C" {
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
-    /** envoy_dynamic_module_on_cluster_lb_cancel_host_selection is called when the stream is destroyed
- before async host selection completes (e.g., stream timeout). After this call, the module must
- not call envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete for this handle.
+    /** envoy_dynamic_module_on_cluster_lb_cancel_host_selection is called once for every async handle
+ that envoy_dynamic_module_on_cluster_lb_choose_host returned, when Envoy is done with the
+ selection. That happens when the request gives the selection up before the result arrives, such
+ as on a stream timeout, and also after Envoy has delivered the result the module passed to
+ envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete. The module releases the
+ handle here, and a module that must know whether it already completed the selection records
+ whether it called the completion callback for the handle. After this call, the module must not
+ call envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete for this handle.
+
+ Envoy calls this on the thread that called envoy_dynamic_module_on_cluster_lb_choose_host for
+ the selection, and a module thread can be inside
+ envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete for the same handle at
+ that moment. A request can hold the selection after its cluster was removed or replaced, so
+ Envoy can call this after envoy_dynamic_module_on_cluster_lb_destroy and
+ envoy_dynamic_module_on_cluster_destroy, though always before
+ envoy_dynamic_module_on_cluster_config_destroy. The module therefore releases the handle here
+ and touches only state it owns. It uses neither the load balancer nor the cluster through
+ ``lb_module_ptr`` or any Envoy pointer it kept, and it does not read the selection's context,
+ which may already be gone.
 
  This is optional. Only modules that use asynchronous host selection need to implement this.
 
- @param lb_module_ptr is the pointer to the in-module load balancer.
+ @param lb_module_ptr is the pointer to the in-module load balancer, which
+ envoy_dynamic_module_on_cluster_lb_destroy may already have destroyed.
  @param async_handle_module_ptr is the in-module async handle that was previously returned from
  envoy_dynamic_module_on_cluster_lb_choose_host.*/
     pub fn envoy_dynamic_module_on_cluster_lb_cancel_host_selection(
@@ -13093,13 +13154,15 @@ unsafe extern "C" {
 
  This must be called on a worker thread from within an
  envoy_dynamic_module_on_cluster_lb_choose_host call, so that the worker dispatcher has been
- captured for this load balancer. When the timer fires,
- envoy_dynamic_module_on_cluster_worker_timer_fired is called on the same worker thread.
+ captured for this load balancer. Envoy captures it only during a choose_host for a request with a
+ downstream connection, so a worker whose load balancer has only served async client streams gets
+ NULL. When the timer fires, envoy_dynamic_module_on_cluster_worker_timer_fired is called on the
+ same worker thread.
 
  @param lb_envoy_ptr is the pointer to the Envoy-side load balancer. The module receives this as
  the second parameter to envoy_dynamic_module_on_cluster_lb_new.
  @return the pointer to the created timer, or NULL if no worker dispatcher has been captured yet
- (no choose_host has run on this worker).
+ (no choose_host for a request with a downstream connection has run on this worker).
 
  NOTE: it is the caller's responsibility to delete the timer using
  envoy_dynamic_module_callback_cluster_worker_timer_delete when it is no longer needed, on the
@@ -13790,9 +13853,21 @@ unsafe extern "C" {
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
     /** envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module
- to deliver the result of an asynchronous host selection. This must be called exactly once for
- each async handle returned from envoy_dynamic_module_on_cluster_lb_choose_host, unless
+ to pass the result of an asynchronous host selection to Envoy. This must be called exactly once
+ for each async handle returned from envoy_dynamic_module_on_cluster_lb_choose_host, unless
  envoy_dynamic_module_on_cluster_lb_cancel_host_selection was called first.
+
+ The module may call this from any thread, including from inside
+ envoy_dynamic_module_on_cluster_lb_choose_host. Envoy delivers the result later on the thread
+ that called envoy_dynamic_module_on_cluster_lb_choose_host for this selection, never inside this
+ call. Envoy drops the result when that call answered synchronously and when the selection was
+ cancelled first. It also drops a result for a load balancer that is already gone, so the request
+ then waits for its own timeout, which is a known limitation. Envoy tells selections apart by
+ ``context_envoy_ptr``, which every attempt of the same request shares and which a later request
+ can reuse once the earlier one is gone, so a result that arrives after another selection with the
+ same pointer has started on this load balancer counts as the result of that selection. A module
+ that holds one lock across this call and its cancel hook for a handle, and skips this call once
+ the hook has run, never hands Envoy such a result.
 
  After calling this, the module must not use the ``lb_envoy_ptr`` for this async operation again.
 

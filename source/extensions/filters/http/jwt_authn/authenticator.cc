@@ -419,8 +419,7 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
   }
 
   if (!provider.forward()) {
-    // TODO(potatop) remove JWT from queries.
-    // Remove JWT from headers.
+    // Remove the JWT from the header or query parameter it was extracted from.
     curr_token_->removeJwt(*headers_);
   }
 

@@ -332,6 +332,38 @@ dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump));
+
+  testing::StrictMock<MockStringMatcher> mock_matcher;
+  EXPECT_CALL(mock_matcher, match("foo")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("foo2")).WillOnce(Return(true));
+  message =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          mock_matcher);
+  const auto& filtered_config_dump =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(*message);
+  TestUtility::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
+  - name: foo-scoped-routes
+    scoped_route_configs:
+     - name: foo2
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
+       route_configuration:
+         name: foo2
+         virtual_hosts:
+           - name: bar2
+             domains: ["*"]
+             routes:
+               - match: { prefix: "/" }
+                 route: { cluster: baz }
+       key:
+         fragments: { string_key: "172.10.10.20" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_scoped_route_configs:
+)EOF",
+                            expected_config_dump);
+  EXPECT_THAT(expected_config_dump, ProtoEq(filtered_config_dump));
 }
 
 class ScopedRdsTest : public ScopedRoutesTestBase {
@@ -2403,6 +2435,139 @@ key:
   EXPECT_EQ(1UL, on_demand_scopes_.value());
 }
 
+// A delta RDS removal of a route table fetched on demand unloads it: the scope
+// goes back to its never-fetched state, Envoy unsubscribes from the table, and
+// the next matching request fetches it again. An eager scope keeps its table,
+// as before.
+TEST_F(ScopedRdsTest, OnDemandRouteConfigRemovalUnloadsScope) {
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+  const std::string eager_resource = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  const std::string lazy_resource = R"EOF(
+name: bar_scope
+route_configuration_name: bar_routes
+on_demand: true
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  srdsUpdateWithYaml({eager_resource, lazy_resource}, "1");
+  EXPECT_EQ(1UL, active_scopes_.value());
+  EXPECT_EQ(1UL, on_demand_scopes_.value());
+
+  // The on-demand scope is requested and its table fetched.
+  {
+    ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
+        TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
+    getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_, [](bool) {});
+  }
+  EXPECT_CALL(event_dispatcher_, post(_));
+  pushRdsConfig({"foo_routes", "bar_routes"}, "111");
+  EXPECT_EQ(2UL, active_scopes_.value());
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
+                ->name(),
+            "bar_routes");
+
+  // The server removes bar_routes: the on-demand scope drops its table and
+  // provider.
+  Protobuf::RepeatedPtrField<std::string> removed;
+  *removed.Add() = "bar_routes";
+  ASSERT_TRUE(rds_subscription_by_name_.contains("bar_routes"));
+  EXPECT_OK(rds_subscription_by_name_["bar_routes"]->onConfigUpdate({}, removed, "112"));
+  // The provider is released once the update that removed its table has
+  // returned (end of the event-loop iteration).
+  server_factory_context_.dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ(1UL, active_scopes_.value());
+  EXPECT_EQ(1UL, on_demand_scopes_.value());
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
+              IsNull());
+
+  // Removing the eager scope's table is ignored, as before.
+  Protobuf::RepeatedPtrField<std::string> removed_eager;
+  *removed_eager.Add() = "foo_routes";
+  EXPECT_OK(rds_subscription_by_name_["foo_routes"]->onConfigUpdate({}, removed_eager, "113"));
+  EXPECT_EQ(1UL, active_scopes_.value());
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
+                ->name(),
+            "foo_routes");
+
+  // The next request on the on-demand scope pauses and starts a new fetch,
+  // which the next push satisfies.
+  bool resumed = false;
+  {
+    ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
+        TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
+    getScopedRdsProvider()->onDemandRdsUpdate(
+        std::move(scope_key), event_dispatcher_,
+        [&resumed](bool scope_exist) { resumed = scope_exist; });
+  }
+  EXPECT_FALSE(resumed);
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce([](Event::PostCb cb) { cb(); });
+  pushRdsConfig({"bar_routes"}, "114");
+  EXPECT_TRUE(resumed);
+  EXPECT_EQ(2UL, active_scopes_.value());
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
+                ->name(),
+            "bar_routes");
+}
+
+// A removal that arrives while requests are still paused on the on-demand
+// scope (its table was requested but never delivered) resumes them; they
+// re-resolve the scope like a fresh request.
+TEST_F(ScopedRdsTest, OnDemandRouteConfigRemovalResumesPausedRequests) {
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+  const std::string lazy_resource = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+on_demand: true
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  srdsUpdateWithYaml({lazy_resource}, "1");
+
+  bool resumed = false;
+  {
+    ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
+        TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
+    getScopedRdsProvider()->onDemandRdsUpdate(
+        std::move(scope_key), event_dispatcher_,
+        [&resumed](bool scope_exist) { resumed = scope_exist; });
+  }
+  EXPECT_EQ(1UL, active_scopes_.value());
+  EXPECT_FALSE(resumed);
+
+  Protobuf::RepeatedPtrField<std::string> removed;
+  *removed.Add() = "foo_routes";
+  ASSERT_TRUE(rds_subscription_by_name_.contains("foo_routes"));
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce([](Event::PostCb cb) { cb(); });
+  EXPECT_OK(rds_subscription_by_name_["foo_routes"]->onConfigUpdate({}, removed, "2"));
+  server_factory_context_.dispatcher_.clearDeferredDeleteList();
+  EXPECT_TRUE(resumed);
+  EXPECT_EQ(0UL, active_scopes_.value());
+  EXPECT_EQ(1UL, on_demand_scopes_.value());
+}
+
 TEST_F(ScopedRdsTest, DanglingSubscriptionOnDemandUpdate) {
   setup();
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
@@ -2581,6 +2746,119 @@ key:
   // The callback should have been invoked with false (no RDS provider for inline scope).
   EXPECT_TRUE(callback_called);
   EXPECT_FALSE(callback_value);
+}
+
+// Verify capacity pre-reservation across initial empty-map loads, incremental net-new scope
+// additions, inline-to-RDS / RDS-to-inline transitions (where net_new_scopes == 0 while
+// net_new_rds_scopes > 0), and in-place RDS updates (where both counts are 0).
+TEST_F(ScopedRdsTest, PreReservesCapacityAcrossInitialAndInPlaceUpdates) {
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+
+  // 1. Initial load with one RDS scope and one inline scope into empty maps.
+  const auto scope1_rds = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope1
+route_configuration_name: shared_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF");
+  const auto scope2_inline = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope2
+route_configuration:
+  name: inline_routes_2
+  virtual_hosts:
+    - name: inline_vhost
+      domains: ["*"]
+      routes:
+        - match: { prefix: "/" }
+          route: { cluster: baz }
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF");
+  const auto decoded_initial = TestUtility::decodeResources({scope1_rds, scope2_inline});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_initial.refvec_, {}, "1"));
+  pushRdsConfig({"shared_routes"}, "111");
+  EXPECT_EQ(2UL, all_scopes_.value());
+  EXPECT_EQ(1UL, active_scopes_.value());
+
+  // 2. Incremental addition of a net-new RDS scope into non-empty maps.
+  const auto scope3_rds = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope3
+route_configuration_name: shared_routes
+key:
+  fragments:
+    - string_key: x-baz-key
+)EOF");
+  const auto decoded_incremental = TestUtility::decodeResources({scope3_rds});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_incremental.refvec_, {}, "2"));
+  EXPECT_EQ(3UL, all_scopes_.value());
+  EXPECT_EQ(2UL, active_scopes_.value());
+
+  // 3. Transition foo_scope1 from RDS to inline and foo_scope2 from inline to RDS in the same
+  // batch (net_new_scopes == 0, net_new_rds_scopes == 1).
+  const auto scope1_inline = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope1
+route_configuration:
+  name: inline_routes_1
+  virtual_hosts:
+    - name: inline_vhost
+      domains: ["*"]
+      routes:
+        - match: { prefix: "/" }
+          route: { cluster: baz }
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF");
+  const auto scope2_rds = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope2
+route_configuration_name: shared_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF");
+  const auto decoded_transition = TestUtility::decodeResources({scope1_inline, scope2_rds});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_transition.refvec_, {}, "3"));
+  EXPECT_EQ(3UL, all_scopes_.value());
+  EXPECT_EQ(2UL, active_scopes_.value());
+
+  auto worker_route_config = [this](absl::string_view key) {
+    return getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+        scope_key_builder_->computeScopeKey(
+            TestRequestHeaderMapImpl{{"Addr", absl::StrCat("x-foo-key;", key)}}));
+  };
+  ASSERT_THAT(worker_route_config("x-foo-key"), Not(IsNull()));
+  EXPECT_EQ(worker_route_config("x-foo-key")->name(), "inline_routes_1");
+  ASSERT_THAT(worker_route_config("x-bar-key"), Not(IsNull()));
+  EXPECT_EQ(worker_route_config("x-bar-key")->name(), "shared_routes");
+
+  // 4. In-place RDS update of foo_scope2 and foo_scope3 (net_new_scopes == 0,
+  // net_new_rds_scopes == 0).
+  const auto scope2_rds_v2 = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope2
+route_configuration_name: other_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF");
+  const auto scope3_rds_v2 = parseScopedRouteConfigurationFromYaml(R"EOF(
+name: foo_scope3
+route_configuration_name: other_routes
+key:
+  fragments:
+    - string_key: x-baz-key
+)EOF");
+  const auto decoded_inplace = TestUtility::decodeResources({scope2_rds_v2, scope3_rds_v2});
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_inplace.refvec_, {}, "4"));
+  pushRdsConfig({"other_routes"}, "222");
+  ASSERT_THAT(worker_route_config("x-bar-key"), Not(IsNull()));
+  EXPECT_EQ(worker_route_config("x-bar-key")->name(), "other_routes");
+  ASSERT_THAT(worker_route_config("x-baz-key"), Not(IsNull()));
+  EXPECT_EQ(worker_route_config("x-baz-key")->name(), "other_routes");
 }
 
 } // namespace

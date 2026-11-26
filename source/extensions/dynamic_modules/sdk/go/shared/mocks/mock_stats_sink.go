@@ -468,6 +468,20 @@ func (mr *MockStatSinkHandleMockRecorder) GetScheduler() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetScheduler", reflect.TypeOf((*MockStatSinkHandle)(nil).GetScheduler))
 }
 
+// GetServerConcurrency mocks base method.
+func (m *MockStatSinkHandle) GetServerConcurrency() uint32 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetServerConcurrency")
+	ret0, _ := ret[0].(uint32)
+	return ret0
+}
+
+// GetServerConcurrency indicates an expected call of GetServerConcurrency.
+func (mr *MockStatSinkHandleMockRecorder) GetServerConcurrency() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServerConcurrency", reflect.TypeOf((*MockStatSinkHandle)(nil).GetServerConcurrency))
+}
+
 // Log mocks base method.
 func (m *MockStatSinkHandle) Log(level shared.LogLevel, format string, args ...any) {
 	m.ctrl.T.Helper()

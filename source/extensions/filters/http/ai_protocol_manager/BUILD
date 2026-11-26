@@ -64,16 +64,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "buffer_manager_lib",
-    srcs = ["buffer_manager.cc"],
-    hdrs = ["buffer_manager.h"],
+    name = "filter_chain_bridge_lib",
+    srcs = ["filter_chain_bridge.cc"],
+    hdrs = ["filter_chain_bridge.h"],
     deps = [
-        ":external_buffer_interface",
+        ":stats_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/common:pure_lib",
         "//envoy/event:dispatcher_interface",
+        "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
-        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/functional:any_invocable",
@@ -81,14 +82,51 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "filter_chain_bridge_lib",
-    srcs = ["filter_chain_bridge.cc"],
-    hdrs = ["filter_chain_bridge.h"],
+    name = "filter_chain_awaitables_lib",
+    srcs = ["filter_chain_awaitables.cc"],
+    hdrs = ["filter_chain_awaitables.h"],
     deps = [
-        ":buffer_manager_lib",
-        ":stats_lib",
-        "//envoy/http:codes_interface",
-        "//envoy/http:filter_interface",
+        ":filter_chain_bridge_lib",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:schedulable_cb_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/coroutine:leaf_awaitable_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
+    ],
+)
+
+envoy_cc_library(
+    name = "chain_writer_lib",
+    srcs = ["chain_writer.cc"],
+    hdrs = ["chain_writer.h"],
+    deps = [
+        ":filter_chain_awaitables_lib",
+        ":filter_chain_bridge_lib",
+        "//envoy/buffer:buffer_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/coroutine:leaf_awaitable_lib",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/coroutine:task_lib",
+        "@abseil-cpp//absl/status",
+    ],
+)
+
+envoy_cc_library(
+    name = "buffer_manager_lib",
+    srcs = ["buffer_manager.cc"],
+    hdrs = ["buffer_manager.h"],
+    deps = [
+        ":external_buffer_interface",
+        ":filter_chain_bridge_lib",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/event:schedulable_cb_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
     ],
 )
 
@@ -107,6 +145,7 @@ envoy_cc_library(
     srcs = ["uri_pattern.cc"],
     hdrs = ["uri_pattern.h"],
     deps = [
+        "//source/common/http:header_utility_lib",
         "//source/common/http:path_utility_lib",
         "//source/extensions/path/uri_template_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
@@ -422,6 +461,7 @@ envoy_cc_library(
     hdrs = ["request_filter_manager.h"],
     deps = [
         ":ai_filter_lib",
+        ":ai_filter_state_lib",
         ":ai_request_lib",
         ":buffer_manager_lib",
         ":filter_pipeline_lib",

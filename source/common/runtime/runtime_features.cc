@@ -60,6 +60,11 @@ RUNTIME_GUARD(envoy_reloadable_features_default_client_tls_max_version_is_1_3);
 RUNTIME_GUARD(envoy_reloadable_features_direct_local_reply_flush_saved_response_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_redirect_prefix_rewrite_with_path_match_policy);
+// When enabled, which is the default, a load of a dynamic module that is already loaded runs its
+// envoy_dynamic_module_on_program_init again if it failed before, for example on a module that
+// do_not_close keeps loaded. Disable to restore the previous behavior, in which such a load skips
+// the init function and uses the module without it.
+RUNTIME_GUARD(envoy_reloadable_features_dynamic_modules_rerun_failed_program_init);
 // When enabled, which is the default, dynamic modules are loaded with RTLD_NOW so that every
 // referenced symbol is resolved at load time instead of lazily on first use. A module that
 // references a symbol the main program does not provide then fails to load rather than crashing
@@ -68,6 +73,7 @@ RUNTIME_GUARD(envoy_reloadable_features_dynamic_modules_rtld_now);
 // When enabled, the filter factory of an ECDS HTTP filter uses the stats prefix of its parent
 // (e.g. "http.<stat_prefix>.") rather than "extension_config_discovery.<type>.<name>.".
 RUNTIME_GUARD(envoy_reloadable_features_ecds_filter_use_parent_stats_prefix);
+RUNTIME_GUARD(envoy_reloadable_features_eds_reuse_unchanged_hosts);
 // When enabled, per-priority host updates that arrive during a main-thread batch host update are
 // posted to the worker threads as a single batched cross-thread update at the end of the batch,
 // instead of one post per priority. Combined with
@@ -110,9 +116,12 @@ RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_held_trailers);
 // When resuming filter chain iteration, compute end_stream from whether the end of the stream has
 // reached the resuming filter, instead of from the stream-level flag. When enabled,
 // envoy.reloadable_features.ext_proc_inject_data_with_state_update is ignored.
-// TODO(wbpcode): flip to true once per-filter body buffering lands behind this flag. This is the
-// first part of that change (https://github.com/envoyproxy/envoy/pull/48660), so the flag is
-// incomplete until then.
+// Also buffer the body data stopped at each filter in that filter's own buffer instead of the
+// buffer shared by the whole stream. decodingBuffer()/encodingBuffer() then only return the data
+// held by the calling filter.
+// Disabled by default because out-of-tree extensions may read the body buffered by other filters
+// through decodingBuffer()/encodingBuffer(), which no longer return it when this is enabled.
+// TODO(wbpcode): flip to true once those extensions have had time to adapt.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_filter_manager_per_filter_buffer);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
 RUNTIME_GUARD(envoy_reloadable_features_geoip_sanitize_geo_headers);
@@ -145,6 +154,7 @@ RUNTIME_GUARD(envoy_reloadable_features_ja4_alpn_hex_conversion_fix);
 RUNTIME_GUARD(envoy_reloadable_features_ja4_filter_grease_signature_algorithms);
 RUNTIME_GUARD(envoy_reloadable_features_json_formatter_omit_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_add_verification_status_header);
+RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_remove_query_param_in_place);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_sanitize_payload_headers_filter_wide);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_select_key_by_x5t);
 // A SotW LDS update removes only the listeners received through LDS, so it no longer removes the
@@ -159,6 +169,7 @@ RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_shadow_mode_no_short_cir
 RUNTIME_GUARD(envoy_reloadable_features_match_headers_individually);
 RUNTIME_GUARD(envoy_reloadable_features_metadata_formatter_only_truncate_string);
 RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
+RUNTIME_GUARD(envoy_reloadable_features_network_ext_proc_enforce_processing_mode);
 // When enabled, a non-graceful admin drain (/drain_listeners without `graceful`) also starts a
 // drain sequence and notifies the connections of the covered listeners that a drain has begun,
 // instead of only stopping the listeners, and accepts `skip_exit` to drain without stopping them.
@@ -188,6 +199,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_enable_reset_ssl_after_handsh
 RUNTIME_GUARD(envoy_reloadable_features_quic_hot_restart_time_wait_before_forward);
 RUNTIME_GUARD(envoy_reloadable_features_quic_mtls_resumption_disabled_by_default);
 RUNTIME_GUARD(envoy_reloadable_features_quic_mtls_server_enabled);
+RUNTIME_GUARD(envoy_reloadable_features_quic_report_zero_stream_limit_before_handshake);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_all_clients);
@@ -223,6 +235,7 @@ RUNTIME_GUARD(envoy_reloadable_features_udp_send_zero_length_datagrams);
 RUNTIME_GUARD(envoy_reloadable_features_udp_set_do_not_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_unambiguous_tls_session_context_id);
+RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_bind_config_fix_port_exhaustion);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_http_filters_correct_stats_prefix);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_wasm_filter_uses_root_scope);
@@ -257,6 +270,9 @@ RUNTIME_GUARD(envoy_restart_features_defer_worker_routing_init);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
 
+// Opt in to reverse-tunnel listener drain handling and responder exclusion of draining nodes.
+// TODO: flip to true after operators have validated the new drain behavior.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_reverse_tunnel_listener_drain);
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_srds_partial_acceptance);
@@ -268,8 +284,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_stats_explicit_tags);
 // descriptor_value fields by default.
 FALSE_RUNTIME_GUARD(
     envoy_reloadable_features_enable_formatter_for_ratelimit_action_descriptor_value);
-// TODO(adisuissa) reset to true to enable unified mux by default
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 // OAuth2 filter cookie encryption: when true, encrypt() emits AES-256-GCM ciphertexts with a
 // "gcm." marker; when false (the default), it emits the legacy AES-256-CBC format with no
 // marker. The default is false so that newly upgraded instances stay wire-compatible with
@@ -462,7 +476,10 @@ bool isLegacyRuntimeFeature(absl::string_view feature) {
 }
 
 bool runtimeFeatureEnabled(absl::string_view feature) {
-  absl::CommandLineFlag* flag = RuntimeFeaturesDefaults::get().getFlag(feature);
+  return runtimeFeatureEnabled(RuntimeFeaturesDefaults::get().getFlag(feature), feature);
+}
+
+bool runtimeFeatureEnabled(absl::CommandLineFlag* flag, absl::string_view feature) {
   if (flag == nullptr) {
     IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", feature));
     return false;

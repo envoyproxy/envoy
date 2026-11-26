@@ -137,9 +137,12 @@ envoy_cc_test(
     srcs = ["metadata_test.cc"],
     deps = [
         "//envoy/common:base_includes",
+        "//source/common/common:base64_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
         "//source/common/protobuf:utility_lib",
+        "//source/common/singleton:manager_impl_lib",
+        "//test/mocks/event:event_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -342,6 +345,43 @@ envoy_cc_test(
     },
     deps = [
         "//envoy/common:exception_lib",
+        "//source/common/config:xds_manager_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
+# Delete this test when removing the envoy.reloadable_features.unified_mux feature flag
+envoy_cc_test(
+    name = "xds_manager_impl_legacy_test",
+    srcs = ["xds_manager_impl_test.cc"],
+    args = [
+        "--envoy_reloadable_features_unified_mux=false",
+    ],
+    rbe_pool = {
+        "default": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+            "test": "linux_x64_medium",
+        },
+        "msan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_large",
+        },
+    },
+    deps = [
         "//source/common/config:xds_manager_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",

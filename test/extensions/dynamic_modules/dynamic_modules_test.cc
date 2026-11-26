@@ -13,12 +13,14 @@
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -57,6 +59,55 @@ TEST(DynamicModuleTestGeneral, TruncatedSharedObject) {
                 HasStatusCode(absl::StatusCode::kInvalidArgument));
   });
   std::filesystem::remove(truncated);
+}
+
+// The parameter is the value of the dynamic_modules_rerun_failed_program_init runtime guard.
+class RerunFailedProgramInitTest : public testing::TestWithParam<bool> {
+protected:
+  RerunFailedProgramInitTest() {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.dynamic_modules_rerun_failed_program_init",
+          GetParam() ? "true" : "false"}});
+  }
+
+  TestScopedRuntime scoped_runtime_;
+};
+
+INSTANTIATE_TEST_SUITE_P(RuntimeGuard, RerunFailedProgramInitTest, testing::Bool(),
+                         testing::PrintToStringParamName());
+
+TEST_P(RerunFailedProgramInitTest, NextLoadAfterAFailedProgramInit) {
+  // Every run loads a copy of its own, since do_not_close keeps the module loaded after its program
+  // init function fails.
+  static int runs = 0;
+  const std::filesystem::path path =
+      TestEnvironment::temporaryPath(absl::StrCat("program_init_fail_once_", ++runs, ".so"));
+  // A copy that an earlier process left behind is read-only, like the shared object that it copies.
+  std::filesystem::remove(path);
+  std::filesystem::copy_file(testSharedObjectPath("program_init_fail_once", "c"), path);
+  EXPECT_LOG_CONTAINS("error", "envoy_dynamic_module_on_program_init returned null", {
+    EXPECT_THAT(newDynamicModule(path, /*do_not_close=*/true),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+  });
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModule(path, /*do_not_close=*/true);
+  ASSERT_OK(module);
+  const auto get_init_calls = (*module)->getFunctionPointer<int (*)()>("get_init_calls");
+  ASSERT_OK(get_init_calls);
+  // Without the runtime guard, the next load uses the module without its program init function.
+  EXPECT_EQ(GetParam() ? 2 : 1, (*get_init_calls)());
+}
+
+TEST(DynamicModuleTestGeneral, ProgramInitRunsAgainAfterTheModuleIsUnloaded) {
+  for (int load = 0; load < 2; ++load) {
+    SCOPED_TRACE(load);
+    absl::StatusOr<DynamicModulePtr> module =
+        newDynamicModule(testSharedObjectPath("program_init_count", "c"), /*do_not_close=*/false);
+    ASSERT_OK(module);
+    const auto get_init_calls = (*module)->getFunctionPointer<int (*)()>("get_init_calls");
+    ASSERT_OK(get_init_calls);
+    // The previous load unloaded its copy, so every load initializes a fresh one.
+    EXPECT_EQ(1, (*get_init_calls)());
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages, testing::Values("c", "rust"),

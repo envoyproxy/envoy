@@ -3204,6 +3204,276 @@ TEST_F(ClusterManagerImplTest, ShutdownCancelsCdsPauseBeforeMuxTeardown) {
   EXPECT_FALSE(cds_resumed);
 }
 
+TEST_F(ClusterManagerImplTest, StaticClusterWireFormatAny) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: static_cluster
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: static_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  const auto bootstrap = parseBootstrapFromV3Yaml(yaml);
+  const auto& expected_cluster = bootstrap.static_resources().clusters(0);
+  create(bootstrap);
+
+  const auto& active_clusters = cluster_manager_->activeClusterData();
+  auto it = active_clusters.find("static_cluster");
+  ASSERT_NE(it, active_clusters.end());
+
+  const Protobuf::Any& cluster_any = it->second->clusterConfigAny();
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  EXPECT_EQ("type.googleapis.com/envoy.config.cluster.v3.Cluster", cluster_any.type_url());
+#else
+  EXPECT_EQ("envoy.config.cluster.v3.Cluster", cluster_any.type_url());
+#endif
+
+  Protobuf::Any expected_any;
+  MessageUtil::packFrom(expected_any, expected_cluster);
+  EXPECT_EQ(expected_any.type_url(), cluster_any.type_url());
+  EXPECT_EQ(expected_any.value(), cluster_any.value());
+
+  checkConfigDump(R"EOF(
+static_clusters:
+  - cluster:
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+      name: static_cluster
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: static_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_active_clusters:
+dynamic_warming_clusters:
+)EOF");
+
+  Matchers::MockStringMatcher mock_matcher;
+  EXPECT_CALL(mock_matcher, match("static_cluster")).WillOnce(Return(false));
+  checkConfigDump(R"EOF(
+static_clusters:
+dynamic_active_clusters:
+dynamic_warming_clusters:
+)EOF",
+                  mock_matcher);
+}
+
+TEST_F(ClusterManagerImplTest, DynamicWarmingClusterWireFormatAny) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
+  createWithBasicStaticCluster();
+
+  const std::string warming_cluster_yaml_v1 = R"EOF(
+    name: warming_cluster
+    connect_timeout: 0.25s
+    type: EDS
+    eds_cluster_config:
+      eds_config:
+        path_config_source:
+          path: /dev/null
+  )EOF";
+  auto warming_cluster_config_v1 = parseClusterFromV3Yaml(warming_cluster_yaml_v1);
+
+  // Mock the cluster creation for the initial warming cluster.
+  std::shared_ptr<MockClusterMockPrioritySet> warming_cluster_v1 =
+      std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
+  warming_cluster_v1->info_->name_ = "warming_cluster";
+  std::function<void()> cluster_init_callback_v1;
+  EXPECT_CALL(*warming_cluster_v1, initialize(_)).WillOnce(SaveArg<0>(&cluster_init_callback_v1));
+  EXPECT_CALL(factory_, clusterFromProto_(ProtoEq(warming_cluster_config_v1), _, true))
+      .WillOnce(Return(std::make_pair(warming_cluster_v1, nullptr)));
+
+  // Add the cluster.
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(warming_cluster_config_v1, "version1"));
+
+  // Verify it is in warmingClusterData().
+  EXPECT_EQ(1, cluster_manager_->warmingClusterData().size());
+  auto it_v1 = cluster_manager_->warmingClusterData().find("warming_cluster");
+  ASSERT_NE(it_v1, cluster_manager_->warmingClusterData().end());
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  EXPECT_EQ("type.googleapis.com/envoy.config.cluster.v3.Cluster",
+            it_v1->second->clusterConfigAny().type_url());
+#else
+  EXPECT_EQ("envoy.config.cluster.v3.Cluster", it_v1->second->clusterConfigAny().type_url());
+#endif
+
+  // Replace the already-warming cluster to exercise the cluster_entry_it != cluster_map.end()
+  // branch of loadCluster.
+  const std::string warming_cluster_yaml_v2 = R"EOF(
+    name: warming_cluster
+    connect_timeout: 1s
+    type: EDS
+    eds_cluster_config:
+      eds_config:
+        path_config_source:
+          path: /dev/null
+  )EOF";
+  auto warming_cluster_config_v2 = parseClusterFromV3Yaml(warming_cluster_yaml_v2);
+  std::shared_ptr<MockClusterMockPrioritySet> warming_cluster_v2 =
+      std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
+  warming_cluster_v2->info_->name_ = "warming_cluster";
+  std::function<void()> cluster_init_callback_v2;
+  EXPECT_CALL(*warming_cluster_v2, initialize(_)).WillOnce(SaveArg<0>(&cluster_init_callback_v2));
+  EXPECT_CALL(factory_, clusterFromProto_(ProtoEq(warming_cluster_config_v2), _, true))
+      .WillOnce(Return(std::make_pair(warming_cluster_v2, nullptr)));
+
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(warming_cluster_config_v2, "version2"));
+
+  // Verify warmingClusterData() holds updated clusterConfigAny().
+  EXPECT_EQ(1, cluster_manager_->warmingClusterData().size());
+  auto it_v2 = cluster_manager_->warmingClusterData().find("warming_cluster");
+  ASSERT_NE(it_v2, cluster_manager_->warmingClusterData().end());
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  EXPECT_EQ("type.googleapis.com/envoy.config.cluster.v3.Cluster",
+            it_v2->second->clusterConfigAny().type_url());
+#else
+  EXPECT_EQ("envoy.config.cluster.v3.Cluster", it_v2->second->clusterConfigAny().type_url());
+#endif
+  Protobuf::Any expected_v2_any;
+  MessageUtil::packFrom(expected_v2_any, warming_cluster_config_v2);
+  EXPECT_EQ(expected_v2_any.value(), it_v2->second->clusterConfigAny().value());
+
+  // Verify checkConfigDump outputs dynamic_warming_clusters.
+  checkConfigDump(R"EOF(
+static_clusters:
+  - cluster:
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+      name: cluster_1
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_active_clusters:
+dynamic_warming_clusters:
+  - version_info: version2
+    cluster:
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+      name: warming_cluster
+      connect_timeout: 1s
+      type: EDS
+      eds_cluster_config:
+        eds_config:
+          path_config_source:
+            path: /dev/null
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+)EOF");
+
+  // Verify name_matcher filtering on warming clusters.
+  {
+    Matchers::MockStringMatcher mock_matcher;
+    EXPECT_CALL(mock_matcher, match("cluster_1")).WillOnce(Return(true));
+    EXPECT_CALL(mock_matcher, match("warming_cluster")).WillOnce(Return(false));
+    checkConfigDump(R"EOF(
+static_clusters:
+  - cluster:
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+      name: cluster_1
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_active_clusters:
+dynamic_warming_clusters:
+)EOF",
+                    mock_matcher);
+  }
+
+  // Finish initialization. This moves the cluster from warming to active.
+  cluster_init_callback_v2();
+
+  // Verify warmingClusterData() is now empty and activeClusterData() has warming_cluster.
+  EXPECT_TRUE(cluster_manager_->warmingClusterData().empty());
+  auto active_it = cluster_manager_->activeClusterData().find("warming_cluster");
+  ASSERT_NE(active_it, cluster_manager_->activeClusterData().end());
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  EXPECT_EQ("type.googleapis.com/envoy.config.cluster.v3.Cluster",
+            active_it->second->clusterConfigAny().type_url());
+#else
+  EXPECT_EQ("envoy.config.cluster.v3.Cluster", active_it->second->clusterConfigAny().type_url());
+#endif
+  EXPECT_EQ(expected_v2_any.value(), active_it->second->clusterConfigAny().value());
+
+  // Verify checkConfigDump populates dynamic_active_clusters.
+  checkConfigDump(R"EOF(
+static_clusters:
+  - cluster:
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+      name: cluster_1
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_active_clusters:
+  - version_info: version2
+    cluster:
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+      name: warming_cluster
+      connect_timeout: 1s
+      type: EDS
+      eds_cluster_config:
+        eds_config:
+          path_config_source:
+            path: /dev/null
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_warming_clusters:
+)EOF");
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
