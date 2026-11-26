@@ -50,6 +50,7 @@
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_factory.h"
 #include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
+#include "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.h"
 #include "source/common/tls/cert_validator/default_validator.h"
 #endif // ENVOY_MOBILE_XDS
 
@@ -208,6 +209,8 @@ void ExtensionRegistry::registerFactories() {
   Config::forceRegisterAdsCollectionConfigSubscriptionFactory();
   Config::forceRegisterGrpcMuxFactory();
   Config::forceRegisterNewGrpcMuxFactory();
+  Config::XdsMux::forceRegisterDeltaGrpcMuxFactory();
+  Config::XdsMux::forceRegisterSotwGrpcMuxFactory();
   Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
 #endif // ENVOY_MOBILE_XDS
 }

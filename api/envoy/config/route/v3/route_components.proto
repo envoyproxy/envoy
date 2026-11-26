@@ -113,7 +113,20 @@ message VirtualHost {
 
   // Specifies a set of rate limit configurations that will be applied to the
   // virtual host.
-  repeated RateLimit rate_limits = 6;
+  //
+  // .. attention::
+  //
+  //   This field is deprecated. Please use :ref:`RateLimitPerRoute.rate_limits
+  //   <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>` via
+  //   ``typed_per_filter_config`` or the filter level :ref:`RateLimit.rate_limits
+  //   <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits>` instead. For
+  //   the local rate limit filter, use :ref:`LocalRateLimit.rate_limits
+  //   <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limits>`.
+  //   The :ref:`stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>` and
+  //   :ref:`disable_key <envoy_v3_api_field_config.route.v3.RateLimit.disable_key>` fields are not
+  //   supported by these replacements.
+  repeated RateLimit rate_limits = 6
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Specifies a list of HTTP headers that should be added to each request
   // handled by this virtual host. Headers specified at this level are applied
@@ -199,7 +212,6 @@ message VirtualHost {
   // independently (e.g., values are not inherited).
   RetryPolicy retry_policy = 16;
 
-  // [#not-implemented-hide:]
   // Specifies the configuration for retry policy extension. Note that setting a route level entry
   // will take precedence over this config and it'll be treated independently (e.g., values are not
   // inherited). :ref:`Retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>` should not be
@@ -1493,7 +1505,6 @@ message RouteAction {
   // (e.g., policies are not merged, the most internal one becomes the enforced policy).
   RetryPolicy retry_policy = 9;
 
-  // [#not-implemented-hide:]
   // Specifies the configuration for retry policy extension. Note that if this is set, it'll take
   // precedence over the virtual host level retry policy entirely (e.g., policies are not merged,
   // the most internal one becomes the enforced policy). :ref:`Retry policy <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>`
@@ -1511,7 +1522,20 @@ message RouteAction {
 
   // Specifies a set of rate limit configurations that could be applied to the
   // route.
-  repeated RateLimit rate_limits = 13;
+  //
+  // .. attention::
+  //
+  //   This field is deprecated. Please use :ref:`RateLimitPerRoute.rate_limits
+  //   <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>` via
+  //   ``typed_per_filter_config`` or the filter level :ref:`RateLimit.rate_limits
+  //   <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits>` instead. For
+  //   the local rate limit filter, use :ref:`LocalRateLimit.rate_limits
+  //   <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limits>`.
+  //   The :ref:`stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>` and
+  //   :ref:`disable_key <envoy_v3_api_field_config.route.v3.RateLimit.disable_key>` fields are not
+  //   supported by these replacements.
+  repeated RateLimit rate_limits = 13
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Specifies if the rate limit filter should include the virtual host rate
   // limits. By default, if the route configured rate limits, the virtual host

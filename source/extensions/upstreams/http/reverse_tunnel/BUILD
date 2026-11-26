@@ -17,7 +17,6 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
         "drain_aware_client_connection.h",
-        "drain_aware_http2_client_connection.h",
         "drain_registry.h",
         "reverse_tunnel_codec_stats.h",
     ],

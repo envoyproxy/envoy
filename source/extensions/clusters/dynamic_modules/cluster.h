@@ -8,6 +8,7 @@
 #include "envoy/common/callback.h"
 #include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/event/dispatcher_thread_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
@@ -82,12 +83,14 @@ public:
    * @param stats_scope the stats scope for creating custom metrics.
    * @param persistent_host_partitions_allowed whether the module may opt the cluster into
    * persistent host partitions, which requires lb_policy CLUSTER_PROVIDED.
+   * @param main_thread_dispatcher the main thread's dispatcher, which destroys the config when its
+   * last reference is released on another thread.
    * @return a shared pointer to the config, or an error status.
    */
   static absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>>
   create(const std::string& cluster_name, const std::string& cluster_config,
          Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope,
-         bool persistent_host_partitions_allowed);
+         bool persistent_host_partitions_allowed, Event::Dispatcher& main_thread_dispatcher);
 
   ~DynamicModuleClusterConfig();
 
@@ -452,6 +455,12 @@ private:
  */
 class DynamicModuleAsyncHostSelectionRegistry {
 public:
+  // `dispatcher` belongs to the load balancer's thread. The registry holds no reference to the
+  // cluster, its handle or its config, since a module thread can hold it for a whole completion
+  // call. A `cancelable` pins only the config.
+  explicit DynamicModuleAsyncHostSelectionRegistry(Event::Dispatcher& dispatcher)
+      : dispatcher_(&dispatcher) {}
+
   /**
    * Records a new in-flight selection. The caller keeps a copy of `cancelled` in the `cancelable`
    * it returns to the router, so cancellation state outlives this entry.
@@ -480,6 +489,23 @@ public:
     return it == entries_.end() ? nullptr : it->second;
   }
 
+  /**
+   * Posts `callback` to the load balancer's thread, or drops it once the load balancer is gone,
+   * since that thread may destroy its dispatcher next.
+   */
+  void postToLoadBalancerThread(Event::PostCb callback) {
+    absl::MutexLock lock(&dispatcher_mutex_);
+    if (dispatcher_ != nullptr) {
+      dispatcher_->post(std::move(callback));
+    }
+  }
+
+  /** Called by the load balancer's destructor, after which nothing is posted to its thread. */
+  void onLoadBalancerDestroyed() {
+    absl::MutexLock lock(&dispatcher_mutex_);
+    dispatcher_ = nullptr;
+  }
+
   /** Number of in-flight selections. */
   size_t sizeForTest() const {
     absl::MutexLock lock(&mutex_);
@@ -487,6 +513,9 @@ public:
   }
 
 private:
+  // Separate from `mutex_`, so the entry updates every chooseHost makes never wait behind a post.
+  absl::Mutex dispatcher_mutex_;
+  Event::Dispatcher* dispatcher_ ABSL_GUARDED_BY(dispatcher_mutex_);
   mutable absl::Mutex mutex_;
   absl::flat_hash_map<envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
                       std::shared_ptr<std::atomic<bool>>>
@@ -499,20 +528,21 @@ using DynamicModuleAsyncHostSelectionRegistrySharedPtr =
 /**
  * Async host selection handle that bridges the dynamic module's async host selection to Envoy's
  * LoadBalancerContext::onAsyncHostSelection. This is created when the module returns an async
- * pending result from choose_host, and destroyed after the module delivers the result or the
- * selection is canceled.
+ * pending result from choose_host, and destroyed after Envoy delivers the result or the selection
+ * is canceled.
  */
 class DynamicModuleAsyncHostSelectionHandle : public Upstream::AsyncHostSelectionHandle {
 public:
-  // `registry` and `context` drop this selection's entry on destruction. Both may be null or unset
-  // in unit tests that exercise cancellation without a registry.
+  // `config` supplies the module's cancel hook. `registry` and `context` drop this selection's
+  // entry on destruction. Each may be null or unset in unit tests that exercise cancellation
+  // without a module or a registry.
   DynamicModuleAsyncHostSelectionHandle(
       envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle,
       envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb,
-      OnClusterLbCancelHostSelectionType cancel_fn, std::shared_ptr<std::atomic<bool>> cancelled,
+      DynamicModuleClusterConfigSharedPtr config, std::shared_ptr<std::atomic<bool>> cancelled,
       DynamicModuleAsyncHostSelectionRegistrySharedPtr registry = nullptr,
       envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context = nullptr)
-      : async_handle_(async_handle), in_module_lb_(in_module_lb), cancel_fn_(cancel_fn),
+      : async_handle_(async_handle), in_module_lb_(in_module_lb), config_(std::move(config)),
         cancelled_(std::move(cancelled)), registry_(std::move(registry)), context_(context) {}
 
   ~DynamicModuleAsyncHostSelectionHandle() override;
@@ -522,7 +552,9 @@ public:
 private:
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_{nullptr};
-  OnClusterLbCancelHostSelectionType cancel_fn_;
+  // Owns the module, so the cancel hook this handle calls on destruction never runs after the
+  // module is unloaded, even when the router keeps the handle past a cluster removal.
+  DynamicModuleClusterConfigSharedPtr config_;
   // Per-selection cancellation flag. The completion path reads the same object through the
   // registry, so setting it here is observed there. The router may destroy this handle right after
   // cancel(), which is why the flag is shared rather than owned.
@@ -591,11 +623,10 @@ public:
   }
 
   /**
-   * Returns the worker thread's dispatcher captured during chooseHost, or nullptr if no chooseHost
-   * has run on this worker yet. Used by the async completion callback to post to the owning worker
-   * without touching the LoadBalancerContext from a background thread, and by the worker timer ABI
-   * callbacks to create timers on the correct dispatcher. Sticky and atomic, since the completion
-   * may read it from any thread while the worker writes it.
+   * Returns the worker thread's dispatcher captured during a chooseHost with a downstream
+   * connection, or nullptr if no such chooseHost has run on this worker yet. Used by the worker
+   * timer ABI callbacks to create timers on the correct dispatcher. Sticky and atomic, so a read
+   * from another thread is not a data race.
    */
   Event::Dispatcher* workerDispatcher() const {
     return worker_dispatcher_.load(std::memory_order_acquire);
@@ -639,13 +670,13 @@ private:
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
 
   // In-flight async host selections keyed by LoadBalancerContext pointer. Shared with every
-  // `cancelable` handed to the router so one outliving this load balancer stays safe.
-  const DynamicModuleAsyncHostSelectionRegistrySharedPtr async_selections_{
-      std::make_shared<DynamicModuleAsyncHostSelectionRegistry>()};
+  // `cancelable` handed to the router so one outliving this load balancer stays safe. It posts each
+  // result to the thread that built this load balancer, which every chooseHost runs on.
+  const DynamicModuleAsyncHostSelectionRegistrySharedPtr async_selections_;
 
-  // Worker thread dispatcher captured during chooseHost, used for async completion posting and to
-  // create worker timers. Sticky: once captured it is never cleared, since the worker dispatcher is
-  // stable for the worker's life. Atomic because a module completion may read it from any thread.
+  // Worker thread dispatcher captured during chooseHost, used to create worker timers. Sticky: once
+  // captured it is never cleared, since the worker dispatcher is stable for the worker's life.
+  // Atomic so a read from another thread is not a data race.
   std::atomic<Event::Dispatcher*> worker_dispatcher_{nullptr};
 
   // Per-host data storage keyed by (priority, index). This is per-LB-instance (per-worker).

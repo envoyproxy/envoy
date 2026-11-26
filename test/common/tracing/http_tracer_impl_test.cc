@@ -28,6 +28,7 @@ using testing::AnyNumber;
 using testing::Eq;
 using testing::InSequence;
 using testing::NiceMock;
+using testing::Optional;
 using testing::Return;
 using testing::ReturnPointee;
 
@@ -847,9 +848,11 @@ TEST(HttpTraceContextTest, HttpTraceContextTest) {
     // Set.
     trace_context.set("foo", "bar");
     EXPECT_EQ(request_headers.get_("foo"), "bar");
+    trace_context.set("foo", "blah");
+    EXPECT_EQ(request_headers.get_("foo"), "blah");
 
     // Get.
-    EXPECT_EQ(trace_context.get("foo").value(), "bar");
+    EXPECT_THAT(trace_context.get("foo"), Optional(Eq("blah")));
 
     // Remove.
     trace_context.remove("foo");

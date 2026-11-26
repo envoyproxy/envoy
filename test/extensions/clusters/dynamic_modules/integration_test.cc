@@ -11,12 +11,15 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
+#include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include "test/config/utility.h"
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -82,6 +85,58 @@ public:
       std::ignore =
           cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
     });
+  }
+
+  void initializeWithGoCluster(const std::string& mode) {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/go"), 1);
+    config_helper_.addConfigModifier([mode](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+      cluster->clear_load_assignment();
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig config;
+      config.mutable_dynamic_module_config()->set_name("cluster_integration_test");
+      config.mutable_dynamic_module_config()->set_do_not_close(true);
+      config.set_cluster_name("test");
+      Protobuf::StringValue value;
+      value.set_value(mode);
+      std::ignore = config.mutable_cluster_config()->PackFrom(value);
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      std::ignore = cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(config);
+    });
+    HttpIntegrationTest::initialize();
+  }
+
+  void testGoWorkerEvents(const std::string& mode) {
+    auto module = Envoy::Extensions::DynamicModules::newDynamicModule(
+        Envoy::Extensions::DynamicModules::testSharedObjectPath("cluster_integration_test", "go"),
+        /*do_not_close=*/true);
+    ASSERT_OK(module);
+    auto start =
+        module.value()->getFunctionPointer<bool (*)()>("go_cluster_test_start_worker_events");
+    auto wait = module.value()->getFunctionPointer<bool (*)(uint32_t, uint32_t)>(
+        "go_cluster_test_wait_for_stage");
+    auto release = module.value()->getFunctionPointer<void (*)()>("go_cluster_test_release_worker");
+    auto count =
+        module.value()->getFunctionPointer<uint32_t (*)()>("go_cluster_test_completion_count");
+    ASSERT_OK(start);
+    ASSERT_OK(wait);
+    ASSERT_OK(release);
+    ASSERT_OK(count);
+    // Unblock the worker even when an assertion fails, so server teardown cannot hang.
+    Cleanup unblock([&]() { (*release.value())(); });
+    // Exercise completion accounting with different server worker counts.
+    concurrency_ = mode == "blocked" ? 3 : 2;
+    initializeWithGoCluster(mode);
+    ASSERT_TRUE((*start.value())());
+    if (mode == "blocked") {
+      ASSERT_TRUE((*wait.value())(/*partial=*/0, TestUtility::DefaultTimeout.count()));
+      EXPECT_EQ(concurrency_ - 1, (*count.value())());
+      (*release.value())();
+    }
+    ASSERT_TRUE((*wait.value())(/*complete=*/1, TestUtility::DefaultTimeout.count()));
+    EXPECT_EQ(concurrency_, (*count.value())());
   }
 
   void initializeWithDecCluster(const std::string& cluster_name,
@@ -197,6 +252,38 @@ TEST_P(DynamicModuleClusterIntegrationTest, AsyncHostSelection) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// An async client stream, here a dynamic module HTTP filter's stream callout, selects its host
+// through a cluster whose module completes from a thread it started. The downstream request gets
+// its reply from the filter, so the cluster's load balancer never serves a downstream connection,
+// and the result must still reach the router on the worker that owns the load balancer. The callout
+// carries no body, since an async client stream resets on request data while its host selection is
+// pending.
+TEST_P(DynamicModuleClusterIntegrationTest, AsyncHostSelectionForAsyncClientStream) {
+  constexpr absl::string_view stream_filter_config = R"EOF(
+name: envoy.extensions.filters.http.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+  dynamic_module_config:
+    name: http_integration_test
+  filter_name: http_stream_basic
+  filter_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: cluster_0
+)EOF";
+  config_helper_.prependFilter(std::string(stream_filter_config));
+  initializeWithDecCluster("async_host_selection");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData("response_from_upstream", true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("stream_callout_success", response->body());
 }
 
 // Exercise asynchronous selection and TLS together using one client context and distinct
@@ -345,6 +432,32 @@ TEST_P(DynamicModuleClusterIntegrationTest, RunOnAllWorkersFiresOnEachWorker) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(DynamicModuleClusterIntegrationTest, GoWorkerEvents) {
+  testGoWorkerEvents("normal");
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({{"info", "Go cluster instance destroyed"},
+                                                         {"info", "Go cluster config destroyed"}}),
+                             { test_server_.reset(); });
+}
+
+TEST_P(DynamicModuleClusterIntegrationTest, GoBlockedWorkerDefersCompletion) {
+  testGoWorkerEvents("blocked");
+}
+
+TEST_P(DynamicModuleClusterIntegrationTest, GoShutdownPanicCompletes) {
+  testGoWorkerEvents("shutdown_panic");
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({{"error", "cluster shutdown panic"},
+                                                         {"info", "Go cluster config destroyed"}}),
+                             { test_server_.reset(); });
+}
+
+TEST_P(DynamicModuleClusterIntegrationTest, GoDestroyPanicCleansUp) {
+  testGoWorkerEvents("destroy_panic");
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"error", "cluster instance destroy panic"}, {"error", "cluster config destroy panic"}}),
+      { test_server_.reset(); });
 }
 
 // Exercises the worker local priority set path across multiple workers end to end. Each worker

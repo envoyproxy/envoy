@@ -57,6 +57,8 @@ public:
                                                               : makeHttpDriver();
   }
 
+  ~OpenTelemetryIntegrationTest() override { cleanup(); }
+
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
 
@@ -144,9 +146,12 @@ public:
                                                               std::chrono::milliseconds(10))) {
         break;
       }
-      VERIFY_ASSERTION(pending->waitForEndStream(*dispatcher_));
-      driver_.sendResponse(pending);
-      otlp_collector_requests_.push_back(std::move(pending));
+      // Retain ownership before the fallible wait: if waitForEndStream() times out and
+      // VERIFY_ASSERTION returns, the stream is already held, so a later reset cannot invoke its
+      // callback on a destroyed object.
+      FakeStreamPtr& stream = otlp_collector_requests_.emplace_back(std::move(pending));
+      VERIFY_ASSERTION(stream->waitForEndStream(*dispatcher_));
+      driver_.sendResponse(stream);
     }
 
     EXPECT_TRUE(known_counter_exists);
@@ -204,6 +209,10 @@ public:
       RELEASE_ASSERT(result, result.message());
       result = fake_metrics_service_connection_->waitForDisconnect();
       RELEASE_ASSERT(result, result.message());
+      // Ensure no posted stream callbacks remain in flight before the streams are destroyed.
+      result = fake_metrics_service_connection_->waitForNoPost();
+      RELEASE_ASSERT(result, result.message());
+      fake_metrics_service_connection_.reset();
     }
   }
 

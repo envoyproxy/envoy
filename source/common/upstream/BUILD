@@ -10,6 +10,21 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "endpoint_config_dump_lib",
+    srcs = ["endpoint_config_dump.cc"],
+    hdrs = ["endpoint_config_dump.h"],
+    deps = [
+        "//envoy/common:matchers_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/network:utility_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "cds_api_helper_lib",
     srcs = ["cds_api_helper.cc"],
     hdrs = ["cds_api_helper.h"],
@@ -80,7 +95,6 @@ envoy_cc_library(
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     deps = [
         ":cds_api_lib",
         ":cluster_discovery_manager_lib",
@@ -101,6 +115,7 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/common:enum_to_int",
+        "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:custom_config_validators_lib",
         "//source/common/config:dependent_type_urls_lib",
@@ -308,12 +323,18 @@ envoy_cc_library(
     srcs = ["load_stats_reporter_impl.cc"],
     hdrs = ["load_stats_reporter_impl.h"],
     deps = [
+        "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/stats:stats_macros",
         "//envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:host_description_interface",
         "//envoy/upstream:load_stats_reporter_interface",
+        "//envoy/upstream:upstream_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/grpc:async_client_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/load_stats/v3:pkg_cc_proto",
     ],
 )
@@ -441,6 +462,7 @@ envoy_cc_library(
         "//envoy/network:dns_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/registry",
+        "//envoy/router:router_interface",
         "//envoy/ssl:context_interface",
         "//envoy/upstream:health_checker_interface",
         "//source/common/common:dns_utils_lib",

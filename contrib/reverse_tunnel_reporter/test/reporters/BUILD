@@ -11,6 +11,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "event_reporter_test",
     srcs = ["event_reporter_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/reverse_tunnel_reporter/source/reporters/event_reporter:event_reporter_lib",
         "//envoy/common:logger",

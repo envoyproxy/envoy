@@ -232,11 +232,27 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   stream_->sendHeaders(headers_message_->headers(), false);
 }
 
+bool AsyncStreamImpl::checkWaitingToDeletedOnRemoteClose() {
+  // It is expected that the server only sends trailers or closed the stream
+  // when the client is waiting for a half-close. If we got headers or data,
+  // then reset the stream.
+  if (waiting_to_delete_on_remote_close_) {
+    waiting_to_delete_on_remote_close_ = false;
+    resetStream();
+    return true;
+  }
+  return false;
+}
+
 // TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
 // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
 // Pending on https://github.com/envoyproxy/envoy/issues/39054, we are not doing "-bin" decoding
 // right now.
 void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
+  if (checkWaitingToDeletedOnRemoteClose()) {
+    return;
+  }
+
   const auto http_response_status = Http::Utility::getResponseStatus(*headers);
   const auto grpc_status = Common::getGrpcStatus(*headers);
 
@@ -279,6 +295,10 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
 }
 
 void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
+  if (checkWaitingToDeletedOnRemoteClose()) {
+    return;
+  }
+
   decoded_frames_.clear();
   auto status = decoder_.decode(data, decoded_frames_);
 
@@ -400,9 +420,7 @@ void AsyncStreamImpl::cleanup() {
     options_.sidestream_watermark_callbacks = nullptr;
   }
 
-  // Do not reset if the stream is being cleaning up after server has half-closed. The stream may
-  // also be null if it was never successfully started.
-  if (!http_reset_ && !waiting_to_delete_on_remote_close_) {
+  if (!http_reset_) {
     http_reset_ = true;
     if (stream_ != nullptr) {
       stream_->reset();

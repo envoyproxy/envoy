@@ -83,6 +83,12 @@ impl std::ops::Deref for EnvoyBuffer<'_> {
   }
 }
 
+impl AsRef<[u8]> for EnvoyBuffer<'_> {
+  fn as_ref(&self) -> &[u8] {
+    self.as_slice()
+  }
+}
+
 impl PartialEq for EnvoyBuffer<'_> {
   fn eq(&self, other: &Self) -> bool {
     self.as_slice() == other.as_slice()
@@ -218,6 +224,12 @@ impl Default for EnvoyMutBuffer<'_> {
 impl std::ops::Deref for EnvoyMutBuffer<'_> {
   type Target = [u8];
   fn deref(&self) -> &[u8] {
+    self.as_slice()
+  }
+}
+
+impl AsRef<[u8]> for EnvoyMutBuffer<'_> {
+  fn as_ref(&self) -> &[u8] {
     self.as_slice()
   }
 }

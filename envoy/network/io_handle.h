@@ -16,6 +16,16 @@
 
 #include "absl/container/fixed_array.h"
 
+namespace envoy {
+namespace config {
+namespace core {
+namespace v3 {
+class Metadata;
+} // namespace v3
+} // namespace core
+} // namespace config
+} // namespace envoy
+
 namespace Envoy {
 namespace Buffer {
 struct RawSlice;
@@ -25,6 +35,10 @@ class Instance;
 namespace Event {
 class Dispatcher;
 } // namespace Event
+
+namespace StreamInfo {
+class FilterState;
+} // namespace StreamInfo
 
 using RawSliceArrays = absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>;
 
@@ -77,6 +91,13 @@ public:
    * Use isOpen() to check if the socket is still connected or not.
    */
   virtual bool wasConnected() const PURE;
+
+  /**
+   * Return true if the peer has fully closed its handle (e.g. close(), not shutdown(SHUT_WR)),
+   * when observable out of band (such as for in-process user-space sockets). OS sockets cannot
+   * distinguish a graceful peer close() from shutdown(SHUT_WR) on the read side and return false.
+   */
+  virtual bool wasPeerFullyClosed() const { return false; }
 
   /**
    * Read data into given slices.
@@ -358,6 +379,15 @@ public:
   virtual void resetFileEvents() PURE;
 
   /**
+   * Notify a running, bound TCP listener's handle on its worker thread that the whole listener
+   * started draining, before accepted connections are notified. Handles can stop initiating
+   * connections while accepted connections complete their drain. Datagram, internal, unbound and
+   * already-stopped listeners do not receive this hook. Temporary disabling and individual
+   * filter-chain drains do not invoke it either.
+   */
+  virtual void onListenerDrain() {}
+
+  /**
    * Shut down part of a full-duplex connection (see man 2 shutdown)
    */
   virtual Api::SysCallIntResult shutdown(int how) PURE;
@@ -381,6 +411,18 @@ public:
    * @return the interface name for the socket, if the OS supports it. Otherwise, std::nullopt.
    */
   virtual std::optional<std::string> interfaceName() PURE;
+
+  /**
+   * Merge connection-scoped state from this IoHandle into the accepted socket's stream info,
+   * before listener filters and filter chain matching run. Datagram listeners never call it. It
+   * runs on the thread that holds the socket after any balancing by that listener. An original
+   * destination hand-off can call it again with a fresh stream info, possibly on another worker,
+   * so a handle accepted where a hand-off can happen must keep its state rather than consume it.
+   * @param metadata dynamic metadata to merge into.
+   * @param filter_state filter state to populate.
+   */
+  virtual void mergeStateInto(envoy::config::core::v3::Metadata& /*metadata*/,
+                              StreamInfo::FilterState& /*filter_state*/) {}
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

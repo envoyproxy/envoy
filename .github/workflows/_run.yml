@@ -23,6 +23,10 @@ on:
       bazel-rbe-jobs:
         type: number
         default: 200
+      # The remote execution priority (within the cluster's range), rather than the default.
+      bazel-rbe-priority:
+        type: string
+        default:
       bind-mount:
         type: boolean
         default: true
@@ -81,11 +85,8 @@ on:
       docker-cpus:
         type: number
         default: 0
-      docker-ci:
-        type: boolean
-        default: true
-      # Use the devtools image. Only respected by branches whose `ci/run_envoy_docker.sh` defaults
-      # CI to the minimal `ci` image; older branches select the image with `docker-ci`.
+      # Use the devtools image, rather than the minimal `ci` image that `ci/run_envoy_docker.sh`
+      # defaults to under GitHub Actions.
       devtools:
         type: boolean
         default: false
@@ -158,7 +159,7 @@ on:
       summary-post:
         type: string
         default: |
-          - uses: envoyproxy/toolshed/actions/envoy/run/summary@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+          - uses: envoyproxy/toolshed/actions/envoy/run/summary@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
             with:
               context: %{{ inputs.context }}
       steps-pre:
@@ -225,7 +226,7 @@ jobs:
     name: ${{ inputs.target-suffix && format('[{0}] ', inputs.target-suffix) || '' }}${{ inputs.command }} ${{ inputs.target }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/jq@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       id: started
       name: Create timestamp
       with:
@@ -233,7 +234,7 @@ jobs:
         filter: |
           now
     # This controls which input vars are exposed to the run action (and related steps)
-    - uses: envoyproxy/toolshed/actions/jq@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/jq@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       name: Context
       id: context
       with:
@@ -266,14 +267,14 @@ jobs:
         fi
         echo "mnt-available=$MNT_AVAILABLE" >> "$GITHUB_OUTPUT"
       id: disk
-    - uses: envoyproxy/toolshed/actions/github/remnt@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/github/remnt@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       if: steps.disk.outputs.should-remnt == 'true'
-    - uses: envoyproxy/toolshed/actions/bind-mounts@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/bind-mounts@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       if: inputs.bind-mount && steps.disk.outputs.mnt-available == 'true'
       with:
         mounts: ${{ inputs.bind-mounts }}
     - name: Free diskspace
-      uses: envoyproxy/toolshed/actions/diskspace@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+      uses: envoyproxy/toolshed/actions/diskspace@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       if: inputs.diskspace-hack || steps.disk.outputs.mnt-available != 'true'
       with:
         to_remove: ${{ inputs.diskspace-hack-paths }}
@@ -281,7 +282,7 @@ jobs:
         mount
         df -h
 
-    - uses: envoyproxy/toolshed/actions/bson@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/bson@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       name: Configure Docker
       if: runner.os == 'Linux'
       with:
@@ -296,7 +297,7 @@ jobs:
             else . end
           | "${{ inputs.template-docker-configure }}"
 
-    - uses: envoyproxy/toolshed/actions/appauth@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/appauth@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       id: appauth
       name: Appauth
       if: ${{ inputs.trusted }}
@@ -307,7 +308,7 @@ jobs:
         # - the workaround is to allow the token to be passed through.
         token: ${{ github.token }}
         token-ok: true
-    - uses: envoyproxy/toolshed/actions/github/checkout@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/github/checkout@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -350,7 +351,7 @@ jobs:
               || 'origin' }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
-    - uses: envoyproxy/toolshed/actions/github/checkout@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/github/checkout@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       id: checkout-extra
       name: Checkout extra repository (for publishing)
       if: ${{ inputs.checkout-extra }}
@@ -361,7 +362,7 @@ jobs:
     - name: Stage signing key material
       id: signing
       if: ${{ inputs.signing }}
-      uses: envoyproxy/toolshed/actions/gpg/write@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+      uses: envoyproxy/toolshed/actions/gpg/write@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       with:
         key: ${{ secrets.gpg-key }}
         passphrase: ${{ secrets.gpg-key-password }}
@@ -389,7 +390,7 @@ jobs:
         DOCKERHUB_TOKEN: ${{ secrets.dockerhub-token }}
     - name: Login to Docker Hub (read-only)
       if: inputs.container-command != '' && steps.dockerhub.outputs.login == 'true'
-      uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4  # v4.3.0
+      uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
       with:
         username: ${{ vars.DOCKERHUB_USERNAME }}
         password: ${{ secrets.dockerhub-token }}
@@ -397,7 +398,7 @@ jobs:
 
     # NOTE: This is where untrusted code can be run!!!
     #  It MUST be the last step in the workflow
-    - uses: envoyproxy/toolshed/actions/github/run@b8e8bab66621205ad9799e134ccf01199df6abb6  # actions-v0.4.32
+    - uses: envoyproxy/toolshed/actions/github/run@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       id: ci-run
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
@@ -440,7 +441,11 @@ jobs:
           ${{ inputs.bazel-extra }}
           ${{ inputs.rbe == true && format('--jobs={0}', inputs.bazel-rbe-jobs) || '' }}
           ${{ github.event_name == 'schedule' && '--nocache_test_results' || '' }}
-          ${{ inputs.rbe == true && inputs.trusted && '--remote_execution_priority=1' || '' }}
+          ${{ inputs.rbe == true
+              && (inputs.bazel-rbe-priority
+                  && format('--remote_execution_priority={0}', inputs.bazel-rbe-priority)
+                  || inputs.trusted && '--remote_execution_priority=1')
+              || '' }}
         CI_BRANCH: >-
           ${{ inputs.trusted
               && format('refs/heads/{0}', fromJSON(inputs.request).request.target-branch)
@@ -450,7 +455,6 @@ jobs:
         ENVOY_SIGNING_KEY_PATH: ${{ inputs.signing && '/build/signing/signing-key.asc' || '' }}
         ENVOY_SIGNING_PASSPHRASE_PATH: ${{ inputs.signing && '/build/signing/passphrase' || '' }}
         ENVOY_DOCKER_CPUS: ${{ inputs.docker-cpus }}
-        ENVOY_DOCKER_CI: ${{ inputs.docker-ci && 'true' || '' }}
         ENVOY_DOCKER_DEVTOOLS: ${{ inputs.devtools && 'true' || '' }}
         ENVOY_COMMIT: ${{ fromJSON(inputs.request).request.sha }}
         ENVOY_REPO: ${{ github.repository }}

@@ -15,6 +15,7 @@ envoy_cc_mock(
     deps = [
         "//envoy/runtime:runtime_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:callback_impl_lib",
         "//test/mocks:common_lib",
         "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",

@@ -105,6 +105,18 @@ A sample filter configuration for a gRPC authorization server:
   <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.raw_body>` is set and :ref:`body
   <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body>` is empty.
 
+  Request body buffering via :ref:`with_request_body
+  <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>` is intended
+  only for standard HTTP request bodies. For WebSocket upgrade requests (HTTP/1.1
+  ``Connection: upgrade`` with ``Upgrade: websocket``, or HTTP/2 and HTTP/3 extended ``CONNECT`` with
+  ``:protocol = websocket``), request body buffering is skipped and the authorization check is sent
+  immediately upon receiving request headers with an empty body and without
+  ``x-envoy-auth-partial-body``, even if downstream data follows on the stream. For routes that accept
+  ``CONNECT``, non-WebSocket extended ``CONNECT``, or non-WebSocket ``Upgrade`` tunnels, disable
+  request body buffering via :ref:`disable_request_body_buffering
+  <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.disable_request_body_buffering>`
+  so the filter does not wait to buffer tunnel stream data before sending the authorization check.
+
 A sample filter configuration for a raw HTTP authorization server:
 
 .. literalinclude:: _include/ext-authz-http-filter.yaml

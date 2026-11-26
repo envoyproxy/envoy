@@ -15,7 +15,13 @@ envoy_cc_test(
     name = "codec_impl_test",
     size = "large",
     srcs = ["codec_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     shard_count = 5,
     deps = [
         ":codec_impl_test_util",
@@ -59,7 +65,14 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/http/http2:conn_pool_lib",
@@ -124,8 +137,8 @@ envoy_cc_test(
         "response_header_corpus/simple_example_plain",
     ],
     rbe_pool = {
-        "asan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
     },
     deps = [
         ":frame_replay_lib",
@@ -178,7 +191,10 @@ envoy_cc_fuzz_test(
     name = "response_header_fuzz_test",
     srcs = ["response_header_fuzz_test.cc"],
     corpus = "response_header_corpus",
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":frame_replay_lib",
         "//test/common/http/http2:codec_impl_test_util",
@@ -190,7 +206,10 @@ envoy_cc_fuzz_test(
     name = "request_header_fuzz_test",
     srcs = ["request_header_fuzz_test.cc"],
     corpus = "request_header_corpus",
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":frame_replay_lib",
         "//test/common/http/http2:codec_impl_test_util",
@@ -226,7 +245,17 @@ envoy_cc_fuzz_test(
     srcs = ["http2_connection_fuzz_test.cc"],
     corpus = "http2_connection_corpus",
     external_deps = ["nghttp2"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {"build": "default"},
+        "tsan": {"build": "default"},
+        "msan": {"build": "default"},
+        "fuzz_coverage": {
+            "build": "default",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":http2_connection_proto_cc_proto",
         "//source/common/http/http2:codec_lib",

@@ -1253,13 +1253,46 @@ TEST_F(IoHandleImplTest, PassthroughState) {
   ASSERT_EQ(object->value_, dest_object->value_);
 }
 
-// A full peer close() surfaces as ECONNRESET once pending data is drained, while a peer
-// shutdown(WR) stays a plain EOF. This is how half-close-enabled consumers distinguish a peer
-// that is fully gone from one that only stopped writing.
-TEST_F(IoHandleImplTest, PeerCloseEmitsConnectionResetAfterDrain) {
+TEST_F(IoHandleImplTest, MergeStateInto) {
+  auto source_metadata = std::make_unique<envoy::config::core::v3::Metadata>();
+  Protobuf::Struct& map = (*source_metadata->mutable_filter_metadata())["envoy.test"];
+  Protobuf::Value val;
+  val.set_string_value("val");
+  (*map.mutable_fields())["key"] = val;
+  StreamInfo::FilterState::Objects source_filter_state;
+  auto object = std::make_shared<TestObject>(1000);
+  source_filter_state.push_back(
+      {object, StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection,
+       "object_key"});
+  ASSERT_NE(nullptr, io_handle_->passthroughState());
+  io_handle_->passthroughState()->initialize(std::move(source_metadata), source_filter_state);
+
+  StreamInfo::FilterStateImpl dest_filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  envoy::config::core::v3::Metadata dest_metadata;
+  static_cast<Network::IoHandle&>(*io_handle_peer_)
+      .mergeStateInto(dest_metadata, dest_filter_state);
+  EXPECT_THAT(
+      dest_metadata.filter_metadata(),
+      Contains(Pair("envoy.test", HasStructFields(Contains(IsStructString("key", "val"))))));
+  auto dest_object = dest_filter_state.getDataReadOnly<TestObject>("object_key");
+  ASSERT_NE(nullptr, dest_object);
+  EXPECT_EQ(object->value_, dest_object->value_);
+}
+
+// A full peer close() drains pending data and returns clean EOF on read/readv/recv while latching
+// wasPeerFullyClosed() so half-close connections distinguish close() from shutdown(WR) without
+// corrupting end_stream into an I/O error.
+TEST_F(IoHandleImplTest, PeerCloseSetsWasPeerFullyClosedAndStaysEof) {
+  EXPECT_FALSE(io_handle_->wasPeerFullyClosed());
   Buffer::OwnedImpl buf_to_write("hello");
   io_handle_peer_->write(buf_to_write);
   io_handle_peer_->close();
+  EXPECT_TRUE(io_handle_->wasPeerFullyClosed());
+
+  char peek_buf[5] = {};
+  auto peek_res = io_handle_->recv(peek_buf, sizeof(peek_buf), MSG_PEEK);
+  EXPECT_TRUE(peek_res.ok());
+  EXPECT_EQ(5, peek_res.return_value_);
 
   Buffer::OwnedImpl read_buf;
   auto read_res = io_handle_->read(read_buf, 1024);
@@ -1267,16 +1300,20 @@ TEST_F(IoHandleImplTest, PeerCloseEmitsConnectionResetAfterDrain) {
   EXPECT_EQ(5, read_res.return_value_);
   EXPECT_EQ("hello", read_buf.toString());
 
-  auto reset_res = io_handle_->read(read_buf, 1024);
-  EXPECT_FALSE(reset_res.ok());
-  EXPECT_EQ(0, reset_res.return_value_);
-  ASSERT_NE(nullptr, reset_res.err_);
-  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, reset_res.err_->getErrorCode());
+  auto eof_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(eof_res.ok());
+  EXPECT_EQ(0, eof_res.return_value_);
+  EXPECT_EQ(nullptr, eof_res.err_);
+
+  auto peek_eof_res = io_handle_->recv(peek_buf, sizeof(peek_buf), MSG_PEEK);
+  EXPECT_TRUE(peek_eof_res.ok());
+  EXPECT_EQ(0, peek_eof_res.return_value_);
 }
 
-TEST_F(IoHandleImplTest, PeerShutdownWriteStaysEof) {
+TEST_F(IoHandleImplTest, PeerShutdownWriteStaysEofAndNotFullyClosed) {
   io_handle_peer_->shutdown(ENVOY_SHUT_WR);
   EXPECT_TRUE(io_handle_->hasReceivedEof());
+  EXPECT_FALSE(io_handle_->wasPeerFullyClosed());
 
   Buffer::OwnedImpl read_buf;
   auto read_res = io_handle_->read(read_buf, 1024);
@@ -1284,8 +1321,9 @@ TEST_F(IoHandleImplTest, PeerShutdownWriteStaysEof) {
   EXPECT_EQ(0, read_res.return_value_);
 }
 
-TEST_F(IoHandleImplTest, PeerShutdownWriteThenCloseEmitsConnectionReset) {
+TEST_F(IoHandleImplTest, PeerShutdownWriteThenCloseTransitionsWasPeerFullyClosed) {
   io_handle_peer_->shutdown(ENVOY_SHUT_WR);
+  EXPECT_FALSE(io_handle_->wasPeerFullyClosed());
 
   Buffer::OwnedImpl read_buf;
   auto eof_res = io_handle_->read(read_buf, 1024);
@@ -1293,10 +1331,11 @@ TEST_F(IoHandleImplTest, PeerShutdownWriteThenCloseEmitsConnectionReset) {
   EXPECT_EQ(0, eof_res.return_value_);
 
   io_handle_peer_->close();
-  auto reset_res = io_handle_->read(read_buf, 1024);
-  EXPECT_FALSE(reset_res.ok());
-  ASSERT_NE(nullptr, reset_res.err_);
-  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, reset_res.err_->getErrorCode());
+  EXPECT_TRUE(io_handle_->wasPeerFullyClosed());
+  auto after_close_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(after_close_res.ok());
+  EXPECT_EQ(0, after_close_res.return_value_);
+  EXPECT_EQ(nullptr, after_close_res.err_);
 }
 
 TEST_F(IoHandleImplTest, ShutdownWriteFollowedByPeerCloseEmitsEof) {
@@ -1345,6 +1384,7 @@ TEST_F(IoHandleImplTest, PeerCloseEmitsEofGuardDisabled) {
 
   io_handle_peer_->close();
   EXPECT_TRUE(io_handle_->hasReceivedEof());
+  EXPECT_FALSE(io_handle_->wasPeerFullyClosed());
 
   Buffer::OwnedImpl read_buf;
   auto read_res = io_handle_->read(read_buf, 1024);

@@ -11,6 +11,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "pool_test",
     srcs = ["pool_test.cc"],
+    rbe_pool = {"build": "linux_x64_small"},
     deps = [
         "//contrib/istio/filters/network/hbone/source:hbone_lib",
         "//contrib/istio/filters/network/hbone/source:pool_config",

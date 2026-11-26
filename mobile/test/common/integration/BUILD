@@ -219,6 +219,7 @@ envoy_cc_test_library(
         "@envoy//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
         "@envoy//source/extensions/config_subscription/grpc:grpc_mux_lib",
         "@envoy//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+        "@envoy//source/extensions/config_subscription/grpc/xds_mux:grpc_mux_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//test/integration:utility_lib",
         "@envoy//test/mocks/server:server_factory_context_mocks",

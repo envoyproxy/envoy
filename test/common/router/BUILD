@@ -32,9 +32,9 @@ envoy_cc_test(
     name = "config_impl_test",
     size = "large",
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+        "tsan": {"link": "linux_x64_small"},
         "msan": {"test": "linux_x64_small"},
-        "gcc": {"build": "linux_x64_small"},
     },
     shard_count = 4,
     tags = ["skip_on_windows"],
@@ -44,13 +44,13 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "config_impl_test_lib",
     srcs = ["config_impl_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
-    rbe_pool = {"build": "linux_x64_small"},
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "gcc": {"build": "linux_x64_large"},
+    },
     tags = ["skip_on_windows"],
     deps = [
         ":route_fuzz_proto_cc_proto",
@@ -85,7 +85,6 @@ envoy_cc_test_library(
 # envoy_cc_test_binary is generating mostly static binary regardless of config
 envoy_cc_test_binary(
     name = "config_impl_test_static",
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
     tags = ["skip_on_windows"],
     deps = [
         ":config_impl_test_lib",
@@ -136,8 +135,10 @@ envoy_cc_test(
         "config_impl_integration_test.cc",
     ],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/protobuf",
@@ -155,8 +156,10 @@ envoy_cc_test(
     size = "large",
     srcs = ["route_specifier_integration_test.cc"],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//envoy/router:route_specifier_interface",
@@ -198,7 +201,10 @@ envoy_cc_fuzz_test(
     name = "header_parser_fuzz_test",
     srcs = ["header_parser_fuzz_test.cc"],
     corpus = "header_parser_corpus",
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "fuzz_coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         ":header_parser_fuzz_proto_cc_proto",
         "//source/common/http:header_map_lib",
@@ -224,7 +230,18 @@ envoy_cc_test(
     srcs = ["rds_impl_test.cc"],
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
-        "msan": "linux_x64_small",
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "msan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_small",
+        },
     },
     deps = [
         "//source/common/config:utility_lib",
@@ -250,7 +267,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "static_route_provider_impl_test",
     srcs = ["static_route_provider_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/init:manager_lib",
         "//source/common/router:route_provider_manager_lib",
@@ -272,7 +295,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "scoped_config_impl_test",
     srcs = ["scoped_config_impl_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/router:scoped_config_lib",
         "//test/mocks/router:router_mocks",
@@ -286,7 +312,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "scoped_rds_test",
     srcs = ["scoped_rds_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/config:subscription_interface",
         "//envoy/init:manager_interface",
@@ -321,7 +357,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "vhds_test",
     srcs = ["vhds_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
@@ -342,7 +388,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "retry_policy_impl_test",
     srcs = ["retry_policy_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//envoy/registry",
         "//envoy/router:retry_interface",
@@ -361,7 +413,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "retry_state_impl_test",
     srcs = ["retry_state_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/router:reset_header_parser_lib",
@@ -399,7 +457,13 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["route_fuzz_test.cc"],
     corpus = ":route_corpus",
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "fuzz_coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":route_fuzz_proto_cc_proto",
         "//source/common/router:config_lib",
@@ -412,15 +476,23 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "router_ratelimit_test",
     srcs = ["router_ratelimit_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
-        "msan": "linux_x64_small",
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "msan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_small",
+        },
     },
     tags = ["skip_on_windows"],
     deps = [
@@ -467,8 +539,19 @@ envoy_cc_test(
     ],
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
-        "msan": "linux_x64_small",
         "gcc": {"build": "linux_x64_large"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "tsan": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+        "msan": {
+            "build": "linux_x64_small",
+            "test": "linux_x64_small",
+        },
     },
     shard_count = 5,
     deps = [
@@ -543,7 +626,13 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "router_upstream_log_test",
     srcs = ["router_upstream_log_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -571,7 +660,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "router_upstream_filter_test",
     srcs = ["router_upstream_filter_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:filter_chain_helper_lib",
@@ -602,7 +697,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "router_outlier_detection_test",
     srcs = ["router_outlier_detection_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         ":router_test_base_lib",
         "//source/common/router:router_lib",
@@ -613,7 +714,15 @@ envoy_cc_test(
 envoy_cc_test(
     name = "shadow_writer_impl_test",
     srcs = ["shadow_writer_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "cto": {"build": "default"},
+        "openssl": {"build": "default"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
@@ -628,7 +737,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "header_formatter_test",
     srcs = ["header_formatter_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/config:metadata_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -663,7 +778,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/router:router_lib",
         "//test/common/http:common_lib",
@@ -686,7 +807,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "route_specifier_impl_test",
     srcs = ["route_specifier_impl_test.cc"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     deps = [
         "//source/common/router:config_lib",
         "//source/common/router:delegating_route_lib",
@@ -705,7 +832,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "delegating_route_impl_test",
     srcs = ["delegating_route_impl_test.cc"],
-    rbe_pool = {"gcc": {"build": "linux_x64_small"}},
+    rbe_pool = {
+        "gcc": {"build": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_small"},
+    },
     deps = [
         "//source/common/router:config_lib",
         "//source/common/router:delegating_route_lib",

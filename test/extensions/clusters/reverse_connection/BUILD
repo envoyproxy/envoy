@@ -14,12 +14,14 @@ envoy_package()
 envoy_extension_cc_test(
     name = "reverse_connection_cluster_test",
     srcs = ["reverse_connection_cluster_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
-        "//conditions:default": [],
-    }),
     extension_names = ["envoy.clusters.reverse_connection"],
-    rbe_pool = {"build": "linux_x64_small"},
+    rbe_pool = {
+        "default": {"build": "linux_x64_small"},
+        "coverage": {
+            "build": "linux_x64_small",
+            "link": "linux_x64_small",
+        },
+    },
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
@@ -34,6 +36,7 @@ envoy_extension_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -55,8 +58,10 @@ envoy_extension_cc_test(
         "envoy.transport_sockets.tls",
     ],
     rbe_pool = {
-        "tsan": {"build": "linux_x64_small"},
         "gcc": {"build": "linux_x64_small"},
+        "openssl": {"link": "linux_x64_small"},
+        "coverage": {"link": "linux_x64_large"},
+        "tsan": {"link": "linux_x64_small"},
     },
     deps = [
         "//source/common/protobuf:utility_lib",

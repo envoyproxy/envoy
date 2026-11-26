@@ -1,7 +1,7 @@
 #include "test/test_common/environment.h"
-#include "test/tools/schema_validator/validator.h"
 
 #include "gtest/gtest.h"
+#include "tools/schema_validator/validator.h"
 
 namespace Envoy {
 

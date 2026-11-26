@@ -54,6 +54,12 @@ message DeniedHttpResponse {
   // false when used in this message.
   // The :ref:`keep_empty_value field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.keep_empty_value>`
   // is not supported.
+  // When :ref:`read_raw_header_value
+  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.read_raw_header_value>` is
+  // set to ``true``, each header value is read from :ref:`HeaderValue.raw_value
+  // <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` when non-empty, falling back to
+  // :ref:`HeaderValue.value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` when
+  // ``raw_value`` is empty. Otherwise, only ``HeaderValue.value`` is read.
   repeated config.core.v3.HeaderValueOption headers = 2;
 
   // This field allows the authorization service to send a response body data
@@ -76,6 +82,12 @@ message OkHttpResponse {
   // one if there is a match.
   // The :ref:`keep_empty_value field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.keep_empty_value>`
   // is not supported.
+  // When :ref:`read_raw_header_value
+  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.read_raw_header_value>` is
+  // set to ``true``, each header value is read from :ref:`HeaderValue.raw_value
+  // <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` when non-empty, falling back to
+  // :ref:`HeaderValue.value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` when
+  // ``raw_value`` is empty. Otherwise, only ``HeaderValue.value`` is read.
   repeated config.core.v3.HeaderValueOption headers = 2;
 
   // HTTP entity headers to remove from the original request before dispatching
@@ -107,6 +119,12 @@ message OkHttpResponse {
   // defaults to false when used in this message.
   // The :ref:`keep_empty_value field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.keep_empty_value>`
   // is not supported.
+  // When :ref:`read_raw_header_value
+  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.read_raw_header_value>` is
+  // set to ``true``, each header value is read from :ref:`HeaderValue.raw_value
+  // <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` when non-empty, falling back to
+  // :ref:`HeaderValue.value <envoy_v3_api_field_config.core.v3.HeaderValue.value>` when
+  // ``raw_value`` is empty. Otherwise, only ``HeaderValue.value`` is read.
   repeated config.core.v3.HeaderValueOption response_headers_to_add = 6;
 
   // This field allows the authorization service to set (and overwrite) query
@@ -140,14 +158,17 @@ message CheckResponse {
     // Supplies http attributes for an ok response.
     OkHttpResponse ok_response = 3;
 
-    // Supplies http attributes for an error response. This is used when the authorization
+    // Supplies HTTP attributes for an error response. This is used when the authorization
     // service encounters an internal error and wants to return custom headers and body to the
-    // downstream client. When ``error_response`` is set, the ext_authz filter increments the
-    // ``ext_authz_error`` stat and respects the :ref:`failure_mode_allow
+    // downstream client. The top-level :ref:`status
+    // <envoy_v3_api_field_service.auth.v3.CheckResponse.status>` must be non-``OK`` for this field
+    // to be processed. If ``status`` is ``OK`` or omitted, the request is allowed and this field
+    // is ignored. When processed, the ext_authz filter increments the ``ext_authz_error`` stat and
+    // respects the :ref:`failure_mode_allow
     // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow>`
     // configuration. The HTTP status code, headers, and body are taken from the
     // :ref:`DeniedHttpResponse <envoy_v3_api_msg_service.auth.v3.DeniedHttpResponse>` message.
-    // If the status field is not set, Envoy sends the status code configured via
+    // If ``error_response.status`` is not set, Envoy sends the status code configured via
     // :ref:`status_on_error <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.status_on_error>`,
     // which defaults to ``403 Forbidden``.
     DeniedHttpResponse error_response = 5;

@@ -91,6 +91,11 @@ using DynamicModulePtr = std::unique_ptr<DynamicModule>;
  * The binding mode is not a parameter: the loader binds now (RTLD_NOW) by default and falls back to
  * lazy binding (RTLD_LAZY) when the ``envoy.reloadable_features.dynamic_modules_rtld_now`` runtime
  * guard is disabled.
+ *
+ * A call that finds the module already loaded runs its envoy_dynamic_module_on_program_init again
+ * only if it failed, and never when the
+ * ``envoy.reloadable_features.dynamic_modules_rerun_failed_program_init`` runtime guard is
+ * disabled.
  */
 absl::StatusOr<DynamicModulePtr>
 newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,

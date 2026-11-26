@@ -1,5 +1,10 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <string>
+
+#include "envoy/config/endpoint/v3/load_report.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
@@ -10,6 +15,8 @@
 #include "source/common/common/logger.h"
 #include "source/common/grpc/async_client_impl.h"
 #include "source/common/grpc/typed_async_client.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -25,7 +32,7 @@ namespace Upstream {
  * reporting interval. Reporting on non-zero `rq_active_` is needed to report long-lived
  * connections/requests (e.g., when web-sockets are used).
  *
- * The following runtime feature controls the behavior of the load reporter:
+ * The following runtime features control the behavior of the load reporter:
  * - envoy.reloadable_features.report_load_for_non_zero_stats: If true, load reports for a
  *   locality are sent if any of the following conditions are met for the sum of host stats in that
  *   locality:
@@ -60,11 +67,37 @@ public:
   const uint32_t RETRY_DELAY_MS = 5000;
 
 private:
+  // Per-cluster state tracked between load reports.
+  struct ClusterLoadReportState {
+    explicit ClusterLoadReportState(std::chrono::steady_clock::duration interval_start)
+        : interval_start(interval_start) {}
+
+    // Start of the current measurement interval.
+    std::chrono::steady_clock::duration interval_start;
+    // Generation stamp assigned by startLoadReportPeriod(). Entries that were not (re)selected in
+    // the current generation are no longer tracked.
+    uint64_t generation{0};
+  };
+
   void setRetryTimer();
   void establishNewStream();
   void sendLoadStatsRequest();
   void handleFailure();
   void startLoadReportPeriod();
+
+  // Appends the ClusterStats of a tracked cluster to request and starts its next measurement
+  // interval.
+  void addClusterStats(envoy::service::load_stats::v3::LoadStatsRequest& request,
+                       absl::string_view cluster_name, const Cluster& cluster,
+                       ClusterLoadReportState& state, bool report_load_for_non_zero_stats);
+  // Latches the load stats of all hosts of cluster and appends the resulting locality (and
+  // optionally endpoint) stats to cluster_stats.
+  void addLocalityStats(envoy::config::endpoint::v3::ClusterStats& cluster_stats,
+                        const Cluster& cluster, bool report_load_for_non_zero_stats);
+  // Marks cluster_name as selected for the current generation and, if it was not tracked yet,
+  // starts tracking it with a measurement interval starting now.
+  // @return whether cluster_name was not tracked before.
+  bool trackCluster(absl::string_view cluster_name, std::chrono::steady_clock::duration now);
 
   ClusterManager& cm_;
   LoadReporterStats stats_;
@@ -77,8 +110,11 @@ private:
   Event::TimerPtr response_timer_;
   const envoy::service::load_stats::v3::LoadStatsRequest request_template_;
   Grpc::ResponsePtr<envoy::service::load_stats::v3::LoadStatsResponse> message_{nullptr};
-  // Map from cluster name to start of measurement interval.
-  absl::node_hash_map<std::string, std::chrono::steady_clock::duration> clusters_;
+  // Map from cluster name to the load reporting state of the cluster. Only holds clusters selected
+  // by the latest LoadStatsResponse.
+  absl::flat_hash_map<std::string, ClusterLoadReportState> clusters_;
+  // Generation of the latest startLoadReportPeriod() call, see ClusterLoadReportState::generation.
+  uint64_t generation_{0};
   TimeSource& time_source_;
 };
 
