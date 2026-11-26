@@ -2885,7 +2885,7 @@ TEST_F(Http1ClientConnectionImplTest, NonInternalConnectionResetIgnoresFailureRe
 TEST_F(Http1ClientConnectionImplTest, InternalListenerConnectionResetRuntimeGuardDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.router_reset_with_connection_failure_reason", "false"}});
+      {{"envoy.reloadable_features.internal_listener_propagate_close_details", "false"}});
   initialize();
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener"));

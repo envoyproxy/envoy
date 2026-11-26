@@ -70,7 +70,8 @@ omitting empty fields. Nothing is reported for closes initiated by the client si
 a failure reason of its own, e.g. from its transport socket.
 
 An HTTP router using the internal listener as its upstream reports this reason in ``%UPSTREAM_TRANSPORT_FAILURE_REASON%``
-and its response code details, e.g. ``upstream_reset_before_response_started{connection_termination|<reason>}``. A
+and its response code details, e.g. ``upstream_reset_before_response_started{connection_termination|<reason>}`` (it is
+omitted from the 503 response body by default while ``hide_transport_failure_reason_in_response_body`` is enabled). A
 connection closed while the internal listener accepts it instead fails to connect, which the router reports as a
 connection pool failure (``remote_connection_failure``) before sending the request.
 

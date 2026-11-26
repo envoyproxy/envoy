@@ -1647,7 +1647,7 @@ void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
     if (Utility::isConnectionResetReason(reason) && remote_address != nullptr &&
         remote_address->type() == Network::Address::Type::EnvoyInternal &&
         Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.router_reset_with_connection_failure_reason")) {
+            "envoy.reloadable_features.internal_listener_propagate_close_details")) {
       transport_failure_reason = connection_.transportFailureReason();
     }
     pending_response_.value().encoder_.runResetCallbacks(reason, transport_failure_reason);

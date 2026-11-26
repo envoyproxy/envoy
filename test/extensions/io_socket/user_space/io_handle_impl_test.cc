@@ -1459,22 +1459,11 @@ TEST(PassthroughStateImplTest, CloseDetails) {
   auto [io_handle, io_handle_peer] = IoHandleFactory::createIoHandlePair();
   EXPECT_EQ("", io_handle->passthroughState()->closeDetails());
 
-  io_handle_peer->passthroughState()->setCloseDetails("local_close_reason",
-                                                      "upstream_failure_reason");
+  io_handle_peer->passthroughState()->setCloseDetails("close_details");
   io_handle_peer->close();
-  EXPECT_EQ("internal_listener_close:local_close_reason|"
-            "internal_listener_upstream_failure:upstream_failure_reason",
-            io_handle->passthroughState()->closeDetails());
+  EXPECT_EQ("close_details", io_handle->passthroughState()->closeDetails());
 
-  io_handle_peer->passthroughState()->setCloseDetails("local_close_reason", "");
-  EXPECT_EQ("internal_listener_close:local_close_reason",
-            io_handle->passthroughState()->closeDetails());
-
-  io_handle_peer->passthroughState()->setCloseDetails("", "upstream_failure_reason");
-  EXPECT_EQ("internal_listener_upstream_failure:upstream_failure_reason",
-            io_handle->passthroughState()->closeDetails());
-
-  io_handle_peer->passthroughState()->setCloseDetails("", "");
+  io_handle_peer->passthroughState()->setCloseDetails("");
   EXPECT_EQ("", io_handle->passthroughState()->closeDetails());
   io_handle->close();
 }

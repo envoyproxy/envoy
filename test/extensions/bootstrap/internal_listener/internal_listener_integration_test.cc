@@ -766,7 +766,7 @@ public:
   void initialize() override {
     useAccessLog("%RESPONSE_CODE% %RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS% "
                  "%UPSTREAM_TRANSPORT_FAILURE_REASON%");
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* bootstrap_extension = bootstrap.add_bootstrap_extensions();
       bootstrap_extension->set_name("envoy.bootstrap.internal_listener");
       envoy::extensions::bootstrap::internal_listener::v3::InternalListener
@@ -776,6 +776,9 @@ public:
       // The cluster of the HTTP route, which points to the internal listener.
       auto* internal_cluster = bootstrap.mutable_static_resources()->add_clusters();
       internal_cluster->set_name("cluster_internal");
+      if (internal_cluster_http2_) {
+        ConfigHelper::setHttp2(*internal_cluster);
+      }
       auto* load_assignment = internal_cluster->mutable_load_assignment();
       load_assignment->set_cluster_name("cluster_internal");
       load_assignment->add_endpoints()
@@ -834,6 +837,8 @@ public:
     codec_client_->close();
     return waitForAccessLog(access_log_name_);
   }
+
+  bool internal_cluster_http2_{false};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, InternalListenerCloseDetailsIntegrationTest,
@@ -856,18 +861,24 @@ TEST_P(InternalListenerCloseDetailsIntegrationTest, TunnelRejectionReachesRouter
                   close_details, "} ", close_details)));
 }
 
-TEST_P(InternalListenerCloseDetailsIntegrationTest, PropagationDisabledOnListenerSide) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.internal_listener_propagate_close_details", "false");
+// Same as TunnelRejectionReachesRouter, but using HTTP/2 between the router and the internal
+// listener, exercising the HTTP/2 client codec reset path end-to-end.
+TEST_P(InternalListenerCloseDetailsIntegrationTest, TunnelRejectionReachesRouterHttp2) {
+  internal_cluster_http2_ = true;
   initialize();
+  const std::string close_details =
+      absl::StrCat("internal_listener_close:",
+                   StreamInfo::LocalCloseReasons::get().TcpProxyInitializationFailure,
+                   "0|internal_listener_upstream_failure:tunnel_response:403");
   EXPECT_THAT(rejectTunnel(Http::Code::Forbidden),
-              testing::HasSubstr("503 UC upstream_reset_before_response_started{connection_"
-                                 "termination} -"));
+              testing::HasSubstr(absl::StrCat(
+                  "503 UC upstream_reset_before_response_started{connection_termination|",
+                  close_details, "} ", close_details)));
 }
 
-TEST_P(InternalListenerCloseDetailsIntegrationTest, PropagationDisabledOnRouterSide) {
+TEST_P(InternalListenerCloseDetailsIntegrationTest, PropagationDisabled) {
   config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.router_reset_with_connection_failure_reason", "false");
+      "envoy.reloadable_features.internal_listener_propagate_close_details", "false");
   initialize();
   EXPECT_THAT(rejectTunnel(Http::Code::Forbidden),
               testing::HasSubstr("503 UC upstream_reset_before_response_started{connection_"

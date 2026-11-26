@@ -872,7 +872,7 @@ ConnectionImpl::ClientStreamImpl::resetTransportFailureReason(StreamResetReason 
   if (Http::Utility::isConnectionResetReason(reason) && remote_address != nullptr &&
       remote_address->type() == Network::Address::Type::EnvoyInternal &&
       Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.router_reset_with_connection_failure_reason")) {
+          "envoy.reloadable_features.internal_listener_propagate_close_details")) {
     return parent_.connection_.transportFailureReason();
   }
   return {};

@@ -1145,7 +1145,7 @@ TEST_P(Http2CodecImplTest, NonInternalConnectionResetIgnoresFailureReason) {
 TEST_P(Http2CodecImplTest, InternalListenerConnectionResetRuntimeGuardDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.router_reset_with_connection_failure_reason", "false"}});
+      {{"envoy.reloadable_features.internal_listener_propagate_close_details", "false"}});
   initialize();
   client_connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener"));
@@ -1155,6 +1155,27 @@ TEST_P(Http2CodecImplTest, InternalListenerConnectionResetRuntimeGuardDisabled) 
   request_encoder_->getStream().addCallbacks(callbacks);
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination, ""));
   request_encoder_->getStream().resetStream(StreamResetReason::ConnectionTermination);
+}
+
+// Server-side streams do not propagate transportFailureReason on reset, even over an internal
+// listener connection.
+TEST_P(Http2CodecImplTest, InternalListenerServerStreamResetIgnoresFailureReason) {
+  initialize();
+  server_connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener"));
+  ON_CALL(server_connection_, transportFailureReason()).WillByDefault(Return("connection failure"));
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, false));
+  driveToCompletion();
+
+  EXPECT_CALL(server_stream_callbacks_,
+              onResetStream(StreamResetReason::ConnectionTermination, ""));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  response_encoder_->getStream().resetStream(StreamResetReason::ConnectionTermination);
+  driveToCompletion();
 }
 
 TEST_P(Http2CodecImplTest, InvalidHeadersFrameMissing) {

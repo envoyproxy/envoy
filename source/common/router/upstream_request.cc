@@ -543,7 +543,7 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
   if (Http::Utility::isConnectionResetReason(reason) && !transport_failure_reason.empty() &&
       isInternalListenerAddress(stream_info_.upstreamInfo()->upstreamRemoteAddress()) &&
       Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.router_reset_with_connection_failure_reason")) {
+          "envoy.reloadable_features.internal_listener_propagate_close_details")) {
     stream_info_.upstreamInfo()->setUpstreamTransportFailureReason(transport_failure_reason);
   }
   clearRequestEncoder();

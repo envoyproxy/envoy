@@ -322,6 +322,28 @@ TEST_F(ActiveInternalConnectionTest, LocalCloseWithoutUpstreamInfo) {
             client_io_handle_->passthroughState()->closeDetails());
 }
 
+// A local close with only an upstream transport failure reason omits the local close prefix.
+TEST_F(ActiveInternalConnectionTest, LocalCloseWithOnlyUpstreamFailureReason) {
+  auto* connection = acceptConnection();
+  connection->local_close_reason_.clear();
+  connection->stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  connection->stream_info_.upstreamInfo()->setUpstreamTransportFailureReason("connection_failure");
+  connection->raiseEvent(Network::ConnectionEvent::LocalClose);
+  dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ("internal_listener_upstream_failure:connection_failure",
+            client_io_handle_->passthroughState()->closeDetails());
+}
+
+// A local close with neither local close reason nor upstream failure reason records nothing.
+TEST_F(ActiveInternalConnectionTest, LocalCloseWithoutReasonsRecordsNothing) {
+  auto* connection = acceptConnection();
+  connection->local_close_reason_.clear();
+  connection->stream_info_.upstream_info_ = nullptr;
+  connection->raiseEvent(Network::ConnectionEvent::LocalClose);
+  dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ("", client_io_handle_->passthroughState()->closeDetails());
+}
+
 // A close initiated by the client side records nothing.
 TEST_F(ActiveInternalConnectionTest, RemoteCloseDoesNotRecordCloseDetails) {
   auto* connection = acceptConnection();
@@ -329,11 +351,13 @@ TEST_F(ActiveInternalConnectionTest, RemoteCloseDoesNotRecordCloseDetails) {
   EXPECT_EQ("", client_io_handle_->passthroughState()->closeDetails());
 }
 
-TEST_F(ActiveInternalConnectionTest, RuntimeGuardDisabled) {
+// Flipping the runtime guard to false takes effect immediately, even for already-accepted
+// connections.
+TEST_F(ActiveInternalConnectionTest, RuntimeGuardDisabledAfterAccept) {
+  auto* connection = acceptConnection();
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.internal_listener_propagate_close_details", "false"}});
-  auto* connection = acceptConnection();
   closeConnection(*connection, Network::ConnectionEvent::LocalClose);
   EXPECT_EQ("", client_io_handle_->passthroughState()->closeDetails());
 }

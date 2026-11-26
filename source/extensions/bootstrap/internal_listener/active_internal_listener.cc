@@ -9,6 +9,8 @@
 #include "source/common/stats/timespan_impl.h"
 #include "source/extensions/io_socket/user_space/io_handle.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
@@ -16,14 +18,31 @@ namespace InternalListener {
 
 namespace {
 
-// Returns the state shared with the client side of the connection, if the connection's socket is a
-// user space socket and propagating close details is enabled. Otherwise returns nullptr.
+constexpr absl::string_view CloseDetailsLocalClosePrefix = "internal_listener_close:";
+constexpr absl::string_view CloseDetailsUpstreamFailurePrefix =
+    "internal_listener_upstream_failure:";
+
+// Formats the local close reason and upstream transport failure reason of an internal listener
+// connection, omitting empty fields.
+std::string formatCloseDetails(absl::string_view local_close_reason,
+                               absl::string_view upstream_transport_failure_reason) {
+  if (local_close_reason.empty() && upstream_transport_failure_reason.empty()) {
+    return {};
+  }
+  if (upstream_transport_failure_reason.empty()) {
+    return absl::StrCat(CloseDetailsLocalClosePrefix, local_close_reason);
+  }
+  if (local_close_reason.empty()) {
+    return absl::StrCat(CloseDetailsUpstreamFailurePrefix, upstream_transport_failure_reason);
+  }
+  return absl::StrCat(CloseDetailsLocalClosePrefix, local_close_reason, "|",
+                      CloseDetailsUpstreamFailurePrefix, upstream_transport_failure_reason);
+}
+
+// Returns the state shared with the client side of the connection if the connection's socket is a
+// user space socket. Otherwise returns nullptr.
 IoSocket::UserSpace::PassthroughStateSharedPtr
 closeDetailsPassthroughState(const Network::Connection& connection) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.internal_listener_propagate_close_details")) {
-    return nullptr;
-  }
   auto* io_handle =
       dynamic_cast<IoSocket::UserSpace::IoHandle*>(&connection.getSocket()->ioHandle());
   return io_handle != nullptr ? io_handle->passthroughState() : nullptr;
@@ -42,15 +61,20 @@ ActiveInternalConnection::ActiveInternalConnection(
 void ActiveInternalConnection::onEvent(Network::ConnectionEvent event) {
   // Record why this side closed the connection. A close initiated by the client side is not
   // recorded, as the client side already knows why it closed.
-  if (event == Network::ConnectionEvent::LocalClose && passthrough_state_ != nullptr) {
+  if (event == Network::ConnectionEvent::LocalClose && passthrough_state_ != nullptr &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.internal_listener_propagate_close_details")) {
     const StreamInfo::StreamInfo& stream_info = connection_->streamInfo();
     absl::string_view upstream_transport_failure_reason;
     if (stream_info.upstreamInfo().has_value()) {
       upstream_transport_failure_reason =
           stream_info.upstreamInfo()->upstreamTransportFailureReason();
     }
-    passthrough_state_->setCloseDetails(connection_->localCloseReason(),
-                                        upstream_transport_failure_reason);
+    const std::string details =
+        formatCloseDetails(connection_->localCloseReason(), upstream_transport_failure_reason);
+    if (!details.empty()) {
+      passthrough_state_->setCloseDetails(details);
+    }
   }
   Server::ActiveTcpConnection::onEvent(event);
 }
@@ -116,7 +140,9 @@ void ActiveInternalListener::newActiveConnection(
     std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
   auto& active_connections = getOrCreateActiveConnections(filter_chain);
   IoSocket::UserSpace::PassthroughStateSharedPtr passthrough_state =
-      closeDetailsPassthroughState(*server_conn_ptr);
+      server_conn_ptr->state() != Network::Connection::State::Closed
+          ? closeDetailsPassthroughState(*server_conn_ptr)
+          : nullptr;
   Server::ActiveConnectionPtr active_connection = std::make_unique<ActiveInternalConnection>(
       active_connections, std::move(server_conn_ptr), dispatcher().timeSource(),
       std::move(stream_info), std::move(passthrough_state));

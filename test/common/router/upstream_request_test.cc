@@ -183,7 +183,7 @@ TEST_F(UpstreamRequestTest, StreamResetDoesNotRecordTransportFailureReason) {
 TEST_F(UpstreamRequestTest, ConnectionResetTransportFailureReasonRuntimeGuardDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.router_reset_with_connection_failure_reason", "false"}});
+      {{"envoy.reloadable_features.internal_listener_propagate_close_details", "false"}});
   initialize();
   upstream_request_->streamInfo().upstreamInfo()->setUpstreamRemoteAddress(
       std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener"));
