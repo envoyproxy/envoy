@@ -64,11 +64,13 @@ absl::StatusOr<AiFilterRouteConfigsConstSharedPtr> resolveAiFilterRouteConfigs(
     auto* factory = Config::Utility::getFactoryByType<AiFilterConfigFactory>(typed_config);
     const ProtobufTypes::MessagePtr config =
         factory != nullptr ? factory->createEmptyRouteConfigProto() : nullptr;
-    if (config == nullptr) {
+    const std::string type = Config::Utility::getFactoryType(typed_config);
+    // A factory is found by its filter configuration type as well.
+    if (config == nullptr || config->GetTypeName() != type) {
       return absl::InvalidArgumentError(
           fmt::format("ai_protocol_manager: no AI filter takes the per-route configuration '{}' "
                       "with type URL '{}'",
-                      name, Config::Utility::getFactoryType(typed_config)));
+                      name, type));
     }
     RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(typed_config, validator, *config));
     absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr> filter_config =

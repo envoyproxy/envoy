@@ -458,6 +458,19 @@ TEST_F(McpJsonRestBridgeFilterTest, GivesAHeadersOnlyResponseABody) {
   EXPECT_EQ(response_headers_.getContentLengthValue(), std::to_string(body.size()));
 }
 
+// Bytes an earlier filter gives a headers-only response would overrun the content-length.
+TEST_F(McpJsonRestBridgeFilterTest, DropsBytesGivenToAHeadersOnlyResponse) {
+  makeFilter();
+  decode(CreateApiKey);
+  response_headers_.setStatus(204);
+
+  EXPECT_EQ(manager_->onResponseHeaders(response_headers_, /*end_stream=*/true), ResponseMode::Raw);
+  const std::string body = encode({"added"});
+
+  EXPECT_EQ(json::parse(body)["result"]["content"][0]["text"], "");
+  EXPECT_EQ(response_headers_.getContentLengthValue(), std::to_string(body.size()));
+}
+
 TEST_F(McpJsonRestBridgeFilterTest, TranslatesAStreamedResponseChunkByChunk) {
   makeFilter();
   decode(toolsCall("stream_logs"));

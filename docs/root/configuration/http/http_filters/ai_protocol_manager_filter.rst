@@ -191,11 +191,13 @@ forwarded and the one that is not JSON is rejected with a 400.
 
 An AI filter is handed a 2xx SSE or JSON response as the manager parses it. It
 may instead take a response as bytes, whatever its status and content type, and
-rewrite its headers; token usage is not extracted from such a response.
+rewrite its headers. Such a response is bytes to every AI filter of the chain,
+and token usage is not extracted from it.
 
 A route configures an AI filter with :ref:`typed_per_filter_config
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.typed_per_filter_config>`,
-keyed by the filter's name in ``filters``.
+keyed by the filter's name in ``filters``. A route's ``AiProtocolManagerPerRoute``
+replaces the virtual host's as a whole, this map included.
 
 Once the AI filters finish, the parsed document is re-serialized as the
 request body by default. With :ref:`reserialize_body
@@ -639,6 +641,10 @@ What differs from the HTTP filter is where the bridge is hosted:
   <envoy_v3_api_field_extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge.max_request_body_size>`,
   at most 1MiB, on every route of the filter. A request with a longer string
   value is rejected as too large.
+* ``max_request_body_size`` is checked once the manager has received the whole
+  body, so it limits what the bridge accepts, not what the manager holds. A body
+  that is not JSON is rejected with the parse error as soon as the manager finds
+  that out, where the HTTP filter answers an oversized one with a 413.
 * A request the bridge does not handle is still a declared endpoint's: the
   manager parses and re-serializes its JSON body, where the HTTP filter forwards
   it byte for byte. Declare only the routes MCP clients use.

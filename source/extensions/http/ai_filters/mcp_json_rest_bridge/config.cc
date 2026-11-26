@@ -53,7 +53,7 @@ McpJsonRestBridgeFilterConfigFactory::createRouteConfig(
 std::optional<uint32_t>
 McpJsonRestBridgeFilterConfigFactory::requestInlineStringBytes(const Protobuf::Message& config) {
   const uint32_t max_request_body_size = Bridge::McpJsonRestBridgeFilterConfig::maxRequestBodySize(
-      dynamic_cast<const BridgeProto&>(config));
+      Protobuf::DynamicCastMessage<BridgeProto>(config));
   return max_request_body_size > 0 ? max_request_body_size : std::numeric_limits<uint32_t>::max();
 }
 

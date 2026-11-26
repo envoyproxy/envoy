@@ -44,7 +44,7 @@ public:
   void setProtocol(LLMProtocol protocol) { protocol_ = protocol; }
 
   // Whether the request leaves with a body. A filter that maps it onto a request without one
-  // drops the body, and the document with it.
+  // drops the body: the document is not sent, though the filters after it still read it.
   bool hasBody() const { return has_body_; }
   void dropBody() { has_body_ = false; }
 

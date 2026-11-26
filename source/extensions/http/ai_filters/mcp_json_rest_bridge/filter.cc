@@ -43,6 +43,15 @@ Buffer::InstancePtr toBuffer(absl::string_view data) {
   return std::make_unique<Buffer::OwnedImpl>(data);
 }
 
+Coroutine::Task<absl::Status> discardBody(RawResponseReceiver receive) {
+  while (true) {
+    ASSIGN_OR_CO_RETURN(std::optional<Buffer::InstancePtr> chunk, co_await receive());
+    if (!chunk.has_value()) {
+      co_return absl::OkStatus();
+    }
+  }
+}
+
 } // namespace
 
 McpJsonRestBridgeFilter::McpJsonRestBridgeFilter(
@@ -133,7 +142,9 @@ Coroutine::Task<absl::Status> McpJsonRestBridgeFilter::encodeRaw(RawResponseRece
   case ResponseStatus::PassThrough:
     break;
   case ResponseStatus::Complete:
-    co_return co_await propagate(toBuffer(response_body_));
+    CO_RETURN_IF_ERROR(co_await propagate(toBuffer(response_body_)));
+    // The headers already frame this body, so nothing an earlier filter adds may follow it.
+    co_return co_await discardBody(std::move(receive));
   case ResponseStatus::Streaming:
     co_return co_await encodeStreaming(std::move(receive), std::move(propagate),
                                        std::move(reply_locally));

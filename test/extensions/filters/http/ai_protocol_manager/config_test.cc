@@ -515,6 +515,17 @@ TEST(AiProtocolManagerConfigTest, RejectsPerRouteConfigNoAiFilterTakes) {
   expect_rejected(Protobuf::Struct());
 }
 
+// A filter's own configuration type finds its factory, but is not its per-route configuration.
+TEST(AiProtocolManagerConfigTest, RejectsFilterConfigAsPerRouteConfig) {
+  RouteConfiguredAiFilterConfigFactory test_factory;
+  Registry::InjectFactory<AiFilterConfigFactory> registration(test_factory);
+
+  const auto route_config = routeConfigWithAiFilterConfig(Protobuf::Struct());
+  EXPECT_EQ(route_config.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(std::string(route_config.status().message()),
+              testing::HasSubstr("no AI filter takes the per-route configuration"));
+}
+
 TEST(AiProtocolManagerConfigTest, PropagatesPerRouteAiFilterConfigError) {
   RouteConfiguredAiFilterConfigFactory test_factory;
   test_factory.error_ = "bad per-route config";

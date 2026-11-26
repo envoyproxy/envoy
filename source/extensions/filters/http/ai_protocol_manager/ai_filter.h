@@ -126,14 +126,16 @@ enum class UnparsedRequest {
   InvalidJson,
 };
 
-// How a filter takes a response.
+// How a filter takes a response. The order matters: the chain takes a response in the highest
+// mode any of its filters asks for.
 enum class ResponseMode {
   // As the manager parses it, through encodeSSE() or encodeUnary(): a 2xx SSE or JSON response.
   Parsed,
   // As bytes, through encodeRaw(), whatever its status and content type.
   Raw,
-  // As Raw, with the headers held until the filter propagates bytes, ends the body, or replies
-  // locally, so it can rewrite them once it has seen the body.
+  // As Raw, with the headers held until the chain forwards bytes, the body ends, or a filter
+  // replies locally, so the filter can rewrite them once it has seen the body. A filter after it
+  // that forwards bytes of its own first releases them early.
   RawHoldHeaders,
 };
 

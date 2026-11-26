@@ -304,6 +304,8 @@ private:
   // Cleared once parsing is done with, whether it completed, was abandoned, or
   // failed the request.
   std::unique_ptr<JsonWithExtBufParser> request_parser_;
+  // Counts a frame before it is parsed, so a filter answering a payload that is not JSON sees it.
+  uint64_t request_payload_bytes_{0};
 
   // Once set, later frames on the dying stream are dropped, not offloaded.
   bool payload_rejected_{false};

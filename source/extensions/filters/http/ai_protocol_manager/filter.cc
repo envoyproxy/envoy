@@ -475,8 +475,7 @@ std::vector<AiFilterSharedPtr> AiProtocolManagerFilter::createAiFilters() {
   AiFilterContext context{.stream_info = decoder_callbacks_->streamInfo(),
                           .request_headers = *request_headers_,
                           .request_protocol = request_protocol_,
-                          .request_payload_bytes =
-                              decode_manager_ != nullptr ? decode_manager_->length() : 0,
+                          .request_payload_bytes = request_payload_bytes_,
                           .response_protocol = route_response_protocol_,
                           .request_binding = route_request_binding_,
                           .response_binding = route_response_binding_,
@@ -531,6 +530,7 @@ Http::FilterDataStatus AiProtocolManagerFilter::decodeData(Buffer::Instance& dat
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
+  request_payload_bytes_ += data.length();
   if (request_parser_ != nullptr) {
     // The framing promised a body but no byte of one arrived -- a chunked request
     // whose only chunk is the terminator, or an empty terminal DATA frame. There

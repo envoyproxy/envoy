@@ -2733,6 +2733,25 @@ TEST_F(AiProtocolManagerFilterTest, PayloadThatIsNotJsonGetsA400WhenNoAiFilterAn
   EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
 }
 
+// The filters are given the size of the payload up to the end of the frame that is not JSON.
+TEST_F(AiProtocolManagerFilterTest, PayloadThatIsNotJsonCountsItsLastFrame) {
+  uint64_t payload_bytes = 0;
+  createFilterWithAiFilters({[&payload_bytes](const AiFilterContext& context) -> AiFilterSharedPtr {
+    payload_bytes = context.request_payload_bytes;
+    return std::make_shared<PassThroughAiFilter>();
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl first(R"({"a":1,)");
+  EXPECT_EQ(filter_->decodeData(first, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Buffer::OwnedImpl second("not json");
+  EXPECT_EQ(filter_->decodeData(second, true), Http::FilterDataStatus::StopIterationNoBuffer);
+
+  EXPECT_EQ(payload_bytes, 15);
+  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
+}
+
 // A body announced but never sent is a request without one.
 TEST_F(AiProtocolManagerFilterTest, AiFilterAnswersAnEmptyBody) {
   std::vector<UnparsedRequest> seen;
