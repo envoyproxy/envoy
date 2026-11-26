@@ -229,6 +229,7 @@ public:
 
   void TearDown() override {
     cleanUpXdsConnection();
+    test_server_.reset();
     extra_contexts_.clear();
   }
 

@@ -1,10 +1,14 @@
 #include "source/extensions/transport_sockets/tls/cert_selectors/on_demand/config.h"
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 
+#include "envoy/common/time.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/router/string_accessor.h"
 #include "envoy/ssl/handshaker.h"
@@ -17,6 +21,11 @@
 #include "source/common/tls/context_impl.h"
 #include "source/server/generic_factory_context.h"
 
+#include "absl/container/flat_hash_set.h"
+#include "absl/functional/function_ref.h"
+#include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -133,6 +142,68 @@ SecretManager::SecretManager(const ConfigProto& config,
   }
 }
 
+SecretManager::~SecretManager() {
+  // Release Accumulate gauges so replacing a filter chain (which shares the parent listener stats
+  // scope in ThreadLocalStoreImpl) does not permanently leak cached/pending counts.
+  size_t pending_count = 0;
+  for (const auto& [name, entry] : cache_) {
+    if (entry->cert_context_ == nullptr) {
+      ++pending_count;
+    }
+  }
+  stats_->cert_active_.sub(cache_.size());
+  stats_->cert_pending_.sub(pending_count);
+}
+
+void SecretManager::reclaimAbandonedPending(FairSieve::TenantId incoming_tenant) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  const MonotonicTime now = factory_context_.timeSource().monotonicTime();
+  // Two-pass scan in O(max_pending): prefer reclaiming peer-owned abandoned slots before reclaiming
+  // the incoming tenant's own abandoned slots, and require each entry to exceed
+  // `kMinAbandonedPendingAge` so fast-disconnecting clients cannot bypass `max_pending_secrets` and
+  // amplify upstream SDS/signing load.
+  for (const bool only_other_tenants : {true, false}) {
+    for (auto it = pending_on_demand_keys_.begin();
+         it != pending_on_demand_keys_.end() && !policy_.canAdmitPending(incoming_tenant);) {
+      auto cache_it = cache_.find(*it);
+      if (cache_it == cache_.end() || cache_it->second->cert_context_ != nullptr) {
+        pending_on_demand_keys_.erase(it++);
+        continue;
+      }
+      if (only_other_tenants && cache_it->second->owner_tenant_ == incoming_tenant) {
+        ++it;
+        continue;
+      }
+      if ((now - cache_it->second->created_at_) < kMinAbandonedPendingAge) {
+        ++it;
+        continue;
+      }
+      auto& callbacks = cache_it->second->callbacks_;
+      callbacks.erase(
+          std::remove_if(callbacks.begin(), callbacks.end(),
+                         [](const PendingCallback& cb) { return cb.handle_.expired(); }),
+          callbacks.end());
+      if (!callbacks.empty()) {
+        ++it;
+        continue;
+      }
+      // All waiting client handshakes for this non-prefetched pending fetch have disconnected and
+      // the cooldown has elapsed.
+      const std::string key = *it;
+      pending_on_demand_keys_.erase(it++);
+      policy_.onRemoved(key);
+      if (cache_it->second->cert_config_ != nullptr) {
+        factory_context_.mainThreadDispatcher().deferredDelete(
+            std::move(cache_it->second->cert_config_));
+      }
+      cache_.erase(cache_it);
+      stats_->cert_active_.dec();
+      stats_->cert_pending_.dec();
+      ENVOY_LOG(debug, "Reclaimed abandoned pending certificate subscription for '{}'", key);
+    }
+  }
+}
+
 void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSharedPtr handle,
                                          OptRef<Init::Manager> init_manager,
                                          FairSieve::TenantId tenant_id) {
@@ -147,8 +218,13 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
         handle->notify(entry.cert_context_);
       } else {
         // Duplicate handshakes for an already-pending secret coalesce without consuming another
-        // pending slot.
-        entry.callbacks_.push_back(handle);
+        // pending slot. Compact expired waiters before appending so retries from disconnected
+        // clients cannot grow `callbacks_` without bound.
+        entry.callbacks_.erase(
+            std::remove_if(entry.callbacks_.begin(), entry.callbacks_.end(),
+                           [](const PendingCallback& cb) { return cb.handle_.expired(); }),
+            entry.callbacks_.end());
+        entry.callbacks_.push_back(PendingCallback{handle, tenant_id, /*is_coalesced_=*/true});
       }
     }
     return;
@@ -156,21 +232,30 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
 
   // Enforce Phase 1 pending admission control (Choudhury & Hahne Dynamic Thresholds) for
   // on-demand client-triggered fetches (`handle != nullptr`). Prefetched secrets are always
-  // admitted and tracked.
+  // admitted and tracked. Before rejecting, reclaim any non-prefetched pending fetches whose
+  // waiting handshakes have all disconnected.
   if (handle && !policy_.canAdmitPending(tenant_id)) {
-    stats_->cert_pending_rejected_.inc();
-    ENVOY_LOG(debug, "Rejected pending on-demand certificate fetch for '{}' (tenant={})",
-              secret_name, tenant_id);
-    handle->notify(nullptr);
-    return;
+    reclaimAbandonedPending(tenant_id);
+    if (!policy_.canAdmitPending(tenant_id)) {
+      stats_->cert_pending_rejected_.inc();
+      ENVOY_LOG(debug, "Rejected pending on-demand certificate fetch for '{}' (tenant={})",
+                secret_name, tenant_id);
+      handle->notify(nullptr);
+      return;
+    }
   }
 
   auto entry = std::make_unique<CacheEntry>();
   const uint64_t generation = next_entry_generation_++;
   entry->generation_ = generation;
+  entry->owner_tenant_ = tenant_id;
+  entry->created_at_ = factory_context_.timeSource().monotonicTime();
   CacheEntry* entry_ptr = entry.get();
   if (handle) {
-    entry_ptr->callbacks_.push_back(handle);
+    entry_ptr->callbacks_.push_back(PendingCallback{handle, tenant_id, /*is_coalesced_=*/false});
+    if (policy_.pendingLimitEnabled()) {
+      pending_on_demand_keys_.emplace(secret_name);
+    }
   }
   cache_.emplace(std::string(secret_name), std::move(entry));
 
@@ -214,6 +299,7 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
   const bool was_pending = (entry->cert_context_ == nullptr);
   if (was_pending) {
     stats_->cert_pending_.dec();
+    pending_on_demand_keys_.erase(secret_name);
   }
 
   std::optional<FairSieve::Policy::EvictionResult> evicted;
@@ -229,8 +315,8 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
     }
     evicted_name = std::move(evicted->evicted_key);
     if (auto ev_it = cache_.find(*evicted_name); ev_it != cache_.end()) {
-      for (const auto& fetch_handle : ev_it->second->callbacks_) {
-        if (auto handle = fetch_handle.lock(); handle) {
+      for (const auto& pending_cb : ev_it->second->callbacks_) {
+        if (auto handle = pending_cb.handle_.lock(); handle) {
           handle->notify(nullptr);
         }
       }
@@ -240,6 +326,7 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
         factory_context_.mainThreadDispatcher().deferredDelete(
             std::move(ev_it->second->cert_config_));
       }
+      pending_on_demand_keys_.erase(*evicted_name);
       cache_.erase(ev_it);
       stats_->cert_active_.dec();
     }
@@ -248,12 +335,20 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
   }
 
   // Update the future lookups (coalescing any victim removal into a single cross-thread
-  // broadcast) and notify pending callbacks.
+  // broadcast) and notify pending callbacks. Preserve hit attribution for live coalesced waiters
+  // so shared resources requested by a secondary tenant while pending become eligible for lazy
+  // ownership transfer without marking single-request scans as visited.
   updateContexts(secret_name, CachedCert{cert_context, std::move(hit_state)}, evicted_name);
 
   size_t notify_count = 0;
-  for (const auto& fetch_handle : entry->callbacks_) {
-    if (auto handle = fetch_handle.lock(); handle) {
+  for (const auto& pending_cb : entry->callbacks_) {
+    if (auto handle = pending_cb.handle_.lock(); handle) {
+      if (pending_cb.is_coalesced_ && entry->hit_state_ != nullptr) {
+        const FairSieve::TenantId attr_tenant = (pending_cb.tenant_id_ != entry->owner_tenant_)
+                                                    ? pending_cb.tenant_id_
+                                                    : FairSieve::kDefaultTenantId;
+        entry->hit_state_->recordHit(attr_tenant);
+      }
       handle->notify(cert_context);
       notify_count++;
     }
@@ -267,17 +362,22 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
 absl::Status SecretManager::updateAll() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   for (auto& [secret_name, entry] : cache_) {
-    if (entry->cert_config_ == nullptr) {
+    // Skip entries that are still pending (`cert_context_ == nullptr`); promoting them here would
+    // bypass `policy_.onActivated()`, strand waiting handles, and leak `cert_pending_`.
+    if (entry->cert_context_ == nullptr || entry->cert_config_ == nullptr) {
       continue;
     }
     const auto& cert_config = entry->cert_config_->certConfig();
     // Refresh only if there is a certificate present and skip notifying.
     if (cert_config) {
       absl::Status creation_status = absl::OkStatus();
-      entry->cert_context_ =
+      auto new_context =
           context_factory_(*stats_scope_, factory_context_, *cert_config, creation_status);
-      updateContexts(secret_name, CachedCert{entry->cert_context_, entry->hit_state_});
+      // Validate status BEFORE mutating `entry->cert_context_` or broadcasting to workers because
+      // `std::make_shared<ServerAsyncContext>` returns a non-null pointer even on failure.
       RETURN_IF_NOT_OK(creation_status);
+      entry->cert_context_ = std::move(new_context);
+      updateContexts(secret_name, CachedCert{entry->cert_context_, entry->hit_state_});
     }
   }
   return absl::OkStatus();
@@ -315,13 +415,14 @@ void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name,
   }
   const bool was_pending = (it->second->cert_context_ == nullptr);
   size_t notify_count = 0;
-  for (const auto& fetch_handle : it->second->callbacks_) {
-    if (auto handle = fetch_handle.lock(); handle) {
+  for (const auto& pending_cb : it->second->callbacks_) {
+    if (auto handle = pending_cb.handle_.lock(); handle) {
       handle->notify(nullptr);
       notify_count++;
     }
   }
   policy_.onRemoved(secret_name);
+  pending_on_demand_keys_.erase(secret_name);
   cache_.erase(it);
   updateContexts(secret_name, CachedCert{});
   stats_->cert_active_.dec();
@@ -386,11 +487,23 @@ SecretManager::getContext(absl::string_view secret_name, FairSieve::TenantId ten
   return {};
 }
 
-Ssl::SelectionResult BaseAsyncSelector::doSelectTlsContext(const std::string& name,
-                                                           const bool client_ocsp_capable,
-                                                           Ssl::CertificateSelectionCallbackPtr cb,
-                                                           FairSieve::TenantId tenant_id) {
-  auto current_context = secret_manager_->getContext(name, tenant_id);
+Ssl::SelectionResult
+BaseAsyncSelector::doSelectTlsContext(const std::string& name, const bool client_ocsp_capable,
+                                      Ssl::CertificateSelectionCallbackPtr cb,
+                                      absl::FunctionRef<FairSieve::TenantId()> extract_tenant) {
+  std::optional<FairSieve::TenantId> cached_tenant_id;
+  auto get_tenant_id = [&]() -> FairSieve::TenantId {
+    if (!cached_tenant_id.has_value()) {
+      cached_tenant_id = extract_tenant();
+    }
+    return *cached_tenant_id;
+  };
+
+  // Defer FilterState lookup + xxHash64 on cache hits when active eviction is disabled
+  // (`hit_state_` is always nullptr in unbounded and pending-only modes).
+  const FairSieve::TenantId hit_tenant_id =
+      secret_manager_->activeLimitEnabled() ? get_tenant_id() : FairSieve::kDefaultTenantId;
+  auto current_context = secret_manager_->getContext(name, hit_tenant_id);
   if (current_context) {
     ENVOY_LOG(trace, "Using an existing certificate '{}'", name);
     const Ssl::TlsContext* tls_context = &current_context.value()->tlsContext();
@@ -405,10 +518,12 @@ Ssl::SelectionResult BaseAsyncSelector::doSelectTlsContext(const std::string& na
     };
   }
   ENVOY_LOG(trace, "Requesting a certificate '{}'", name);
+  const FairSieve::TenantId miss_tenant_id =
+      secret_manager_->trackingEnabled() ? get_tenant_id() : FairSieve::kDefaultTenantId;
   return Ssl::SelectionResult{
       .status = Ssl::SelectionResult::SelectionStatus::Pending,
-      .handle =
-          secret_manager_->fetchCertificate(name, std::move(cb), client_ocsp_capable, tenant_id),
+      .handle = secret_manager_->fetchCertificate(name, std::move(cb), client_ocsp_capable,
+                                                  miss_tenant_id),
   };
 }
 
@@ -416,20 +531,18 @@ Ssl::SelectionResult AsyncSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl
                                                      Ssl::CertificateSelectionCallbackPtr cb) {
   const std::string name = mapper_->deriveFromClientHello(ssl_client_hello);
   const bool client_ocsp_capable = isClientOcspCapable(ssl_client_hello);
-  const FairSieve::TenantId tenant_id = secret_manager_->trackingEnabled()
-                                            ? extractTenantIdFromSsl(ssl_client_hello.ssl)
-                                            : FairSieve::kDefaultTenantId;
-  return doSelectTlsContext(name, client_ocsp_capable, std::move(cb), tenant_id);
+  return doSelectTlsContext(name, client_ocsp_capable, std::move(cb), [&ssl_client_hello]() {
+    return extractTenantIdFromSsl(ssl_client_hello.ssl);
+  });
 }
 
 Ssl::SelectionResult UpstreamAsyncSelector::selectTlsContext(
     const SSL& ssl, const Network::TransportSocketOptionsConstSharedPtr& options,
     Ssl::CertificateSelectionCallbackPtr cb) {
   const std::string name = mapper_->deriveFromServerHello(ssl, options);
-  const FairSieve::TenantId tenant_id = secret_manager_->trackingEnabled()
-                                            ? extractTenantIdFromOptionsOrSsl(ssl, options)
-                                            : FairSieve::kDefaultTenantId;
-  return doSelectTlsContext(name, false, std::move(cb), tenant_id);
+  return doSelectTlsContext(name, false, std::move(cb), [&ssl, &options]() {
+    return extractTenantIdFromOptionsOrSsl(ssl, options);
+  });
 }
 
 Ssl::TlsCertificateSelectorPtr
@@ -455,6 +568,16 @@ createCertificateSelectorFactory(const Protobuf::Message& proto_config,
                                  AsyncContextFactory&& context_factory) {
   const ConfigProto& config = MessageUtil::downcastAndValidate<const ConfigProto&>(
       proto_config, factory_context.messageValidationVisitor());
+  const uint32_t max_active = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_active_secrets, 0);
+  if (max_active > 0 && !config.prefetch_secret_names().empty()) {
+    absl::flat_hash_set<absl::string_view> unique_prefetches(config.prefetch_secret_names().begin(),
+                                                             config.prefetch_secret_names().end());
+    if (unique_prefetches.size() > max_active) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Number of unique prefetch_secret_names (", unique_prefetches.size(),
+                       ") exceeds max_active_secrets (", max_active, ")"));
+    }
+  }
   MapperFactory& mapper_config =
       Config::Utility::getAndCheckFactory<MapperFactory>(config.certificate_mapper());
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(

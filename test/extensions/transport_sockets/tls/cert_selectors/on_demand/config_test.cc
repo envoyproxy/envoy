@@ -1,38 +1,65 @@
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
+#include "envoy/init/manager.h"
+#include "envoy/secret/secret_provider.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/tls_certificate_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stream_info/filter_state.h"
 
+#include "source/common/common/callback_impl.h"
+#include "source/common/common/fair_sieve_cache.h"
 #include "source/common/config/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/ssl/tls_certificate_config_impl.h"
+#include "source/common/stats/allocator.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/tls/context_impl.h"
+#include "source/extensions/transport_sockets/tls/cert_selectors/common/async_context.h"
 #include "source/extensions/transport_sockets/tls/cert_selectors/on_demand/config.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/status/status.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
+#include "spdlog/common.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -214,6 +241,29 @@ TEST_F(OnDemandTest, StaleQueuedRemovalDoesNotEraseReinsertedEntry) {
   EXPECT_EQ(0, gauge_value("on_demand_secret.cert_pending"));
 }
 
+TEST(FilterStateMapper, Derivation) {
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
+  Ssl::UpstreamTlsCertificateMapperConfigFactory& mapper_factory =
+      Config::Utility::getAndCheckFactoryByName<Ssl::UpstreamTlsCertificateMapperConfigFactory>(
+          "envoy.tls.upstream_certificate_mappers.filter_state_override");
+  envoy::extensions::transport_sockets::tls::cert_mappers::filter_state_override::v3::Config config;
+  TestUtility::loadFromYaml("default_value: test", config);
+  auto mapper_status = mapper_factory.createTlsCertificateMapperFactory(config, factory_context);
+  ASSERT_OK(mapper_status);
+  auto mapper = mapper_status.value()();
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
+  EXPECT_EQ("test", mapper->deriveFromServerHello(*ssl, nullptr));
+  auto filter_state_object = std::make_shared<Router::StringAccessorImpl>("new_value");
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData("envoy.tls.certificate_mappers.on_demand_secret", filter_state_object,
+                       StreamInfo::FilterState::LifeSpan::Connection,
+                       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  auto transport_socket_options =
+      Network::TransportSocketOptionsUtility::fromFilterState(filter_state);
+  EXPECT_EQ("new_value", mapper->deriveFromServerHello(*ssl, transport_socket_options));
+}
+
 class FakeAsyncContext : public AsyncContext {
 public:
   explicit FakeAsyncContext(Stats::Scope& scope) : AsyncContext(scope) {}
@@ -233,21 +283,112 @@ public:
               (OptRef<const Ssl::TlsContext> selected_ctx, bool staple));
 };
 
-std::string boundedConfig() {
-  return R"EOF(
-    config_source:
-      ads: {}
-    certificate_mapper:
-      name: static-name
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
-        name: server
-    max_active_secrets: 2
-    max_pending_secrets: 2
-  )EOF";
-}
+class FakeTlsCertificateConfigProvider : public Secret::TlsCertificateConfigProvider {
+public:
+  const envoy::extensions::transport_sockets::tls::v3::TlsCertificate* secret() const override {
+    return has_secret_ ? &secret_ : nullptr;
+  }
 
-TEST_F(OnDemandTest, UpdateAndRemoveUnknownSecretAreNoops) {
+  ::Envoy::Common::CallbackHandlePtr addValidationCallback(
+      std::function<absl::Status(
+          const envoy::extensions::transport_sockets::tls::v3::TlsCertificate&)>) override {
+    return nullptr;
+  }
+
+  ::Envoy::Common::CallbackHandlePtr
+  addUpdateCallback(std::function<absl::Status()> callback) override {
+    return update_callbacks_.add(std::move(callback));
+  }
+
+  ::Envoy::Common::CallbackHandlePtr
+  addRemoveCallback(std::function<absl::Status()> callback) override {
+    return remove_callbacks_.add(std::move(callback));
+  }
+
+  void start() override {}
+
+  absl::Status deliverSecret() {
+    secret_.mutable_certificate_chain()->set_inline_string("fake-cert-pem");
+    secret_.mutable_private_key()->set_inline_string("fake-key-pem");
+    has_secret_ = true;
+    return update_callbacks_.runCallbacks();
+  }
+
+private:
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate secret_;
+  bool has_secret_{false};
+  ::Envoy::Common::CallbackManager<absl::Status> update_callbacks_;
+  ::Envoy::Common::CallbackManager<absl::Status> remove_callbacks_;
+};
+
+class CountingFilterState : public StreamInfo::FilterStateImpl {
+public:
+  explicit CountingFilterState(FilterState::LifeSpan life_span)
+      : StreamInfo::FilterStateImpl(life_span) {}
+
+  const Object* getDataReadOnlyGeneric(absl::string_view data_name) const override {
+    ++read_lookups_;
+    return StreamInfo::FilterStateImpl::getDataReadOnlyGeneric(data_name);
+  }
+
+  size_t readLookups() const { return read_lookups_; }
+  void resetLookups() const { read_lookups_ = 0; }
+
+private:
+  mutable size_t read_lookups_{0};
+};
+
+class OnDemandSecretManagerTest : public Event::TestUsingSimulatedTime, public OnDemandTest {
+protected:
+  void TearDown() override {
+    factory_context_.server_context_.dispatcher_.clearDeferredDeleteList();
+  }
+
+  std::string boundedConfig() const {
+    return R"EOF(
+      config_source:
+        ads: {}
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+      max_active_secrets: 2
+      max_pending_secrets: 2
+    )EOF";
+  }
+
+  uint64_t gaugeValue(absl::string_view name) {
+    return factory_context_.store_.gauge(std::string(name), Stats::Gauge::ImportMode::Accumulate)
+        .value();
+  }
+
+  uint64_t counterValue(absl::string_view name) {
+    return factory_context_.store_.counter(std::string(name)).value();
+  }
+
+  std::shared_ptr<FakeTlsCertificateConfigProvider>
+  registerFakeProvider(absl::string_view secret_name) {
+    auto provider = std::make_shared<FakeTlsCertificateConfigProvider>();
+    ON_CALL(factory_context_.server_context_, secretManager())
+        .WillByDefault(::testing::ReturnRef(mock_secret_manager_));
+    ON_CALL(mock_secret_manager_, findOrCreateTlsCertificateProvider(_, _, _, _, _))
+        .WillByDefault([provider, target = std::string(secret_name)](
+                           const envoy::config::core::v3::ConfigSource&, const std::string& name,
+                           Server::Configuration::ServerFactoryContext&, OptRef<Init::Manager>,
+                           bool) -> Secret::TlsCertificateConfigProviderSharedPtr {
+          if (name == target) {
+            return provider;
+          }
+          return std::make_shared<FakeTlsCertificateConfigProvider>();
+        });
+    return provider;
+  }
+
+  NiceMock<Secret::MockSecretManager> mock_secret_manager_;
+};
+
+TEST_F(OnDemandSecretManagerTest, UpdateAndRemoveUnknownSecretAreNoops) {
   envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
   TestUtility::loadFromYaml(defaultConfig(), config);
 
@@ -268,12 +409,10 @@ TEST_F(OnDemandTest, UpdateAndRemoveUnknownSecretAreNoops) {
   EXPECT_OK(secret_manager->removeCertificateConfig("unknown.com"));
   ASSERT_EQ(1, queued_posts.size());
   queued_posts[0]();
-  EXPECT_EQ(0, factory_context_.store_
-                   .gauge("on_demand_secret.cert_active", Stats::Gauge::ImportMode::Accumulate)
-                   .value());
+  EXPECT_EQ(0, gaugeValue("on_demand_secret.cert_active"));
 }
 
-TEST_F(OnDemandTest, MainThreadFetchOfActiveSecretNotifiesImmediately) {
+TEST_F(OnDemandSecretManagerTest, MainThreadFetchOfActiveSecretNotifiesImmediately) {
   envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
   TestUtility::loadFromYaml(boundedConfig(), config);
 
@@ -311,13 +450,11 @@ TEST_F(OnDemandTest, MainThreadFetchOfActiveSecretNotifiesImmediately) {
   ASSERT_EQ(1, queued_posts.size());
   queued_posts[0]();
 
-  EXPECT_EQ(1, factory_context_.store_.counter("on_demand_secret.cert_requested").value());
-  EXPECT_EQ(1, factory_context_.store_
-                   .gauge("on_demand_secret.cert_active", Stats::Gauge::ImportMode::Accumulate)
-                   .value());
+  EXPECT_EQ(1, counterValue("on_demand_secret.cert_requested"));
+  EXPECT_EQ(1, gaugeValue("on_demand_secret.cert_active"));
 }
 
-TEST_F(OnDemandTest, DownstreamTenantExtraction) {
+TEST_F(OnDemandSecretManagerTest, DownstreamTenantExtraction) {
   std::vector<Event::PostCb> queued_posts;
   EXPECT_CALL(factory_context_.server_context_.dispatcher_, post(_))
       .WillRepeatedly([&queued_posts](Event::PostCb cb) { queued_posts.push_back(std::move(cb)); });
@@ -361,7 +498,7 @@ TEST_F(OnDemandTest, DownstreamTenantExtraction) {
   EXPECT_EQ(5, queued_posts.size());
 }
 
-TEST_F(OnDemandTest, UpstreamTenantExtraction) {
+TEST_F(OnDemandSecretManagerTest, UpstreamTenantExtraction) {
   std::vector<Event::PostCb> queued_posts;
   EXPECT_CALL(factory_context_.server_context_.dispatcher_, post(_))
       .WillRepeatedly([&queued_posts](Event::PostCb cb) { queued_posts.push_back(std::move(cb)); });
@@ -421,27 +558,495 @@ TEST_F(OnDemandTest, UpstreamTenantExtraction) {
   EXPECT_EQ(3, queued_posts.size());
 }
 
-TEST(FilterStateMapper, Derivation) {
-  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
-  Ssl::UpstreamTlsCertificateMapperConfigFactory& mapper_factory =
-      Config::Utility::getAndCheckFactoryByName<Ssl::UpstreamTlsCertificateMapperConfigFactory>(
-          "envoy.tls.upstream_certificate_mappers.filter_state_override");
-  envoy::extensions::transport_sockets::tls::cert_mappers::filter_state_override::v3::Config config;
-  TestUtility::loadFromYaml("default_value: test", config);
-  auto mapper_status = mapper_factory.createTlsCertificateMapperFactory(config, factory_context);
-  ASSERT_OK(mapper_status);
-  auto mapper = mapper_status.value()();
+TEST_F(OnDemandSecretManagerTest, UpdateAllDoesNotPromoteFailedPendingEntryOrBypassLimit) {
+  envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
+  TestUtility::loadFromYaml(boundedConfig(), config);
+
+  std::vector<Event::PostCb> queued_posts;
+  auto& dispatcher = factory_context_.server_context_.dispatcher_;
+  EXPECT_CALL(dispatcher, post(_)).WillRepeatedly([&queued_posts](Event::PostCb cb) {
+    queued_posts.push_back(std::move(cb));
+  });
+
+  auto provider = registerFakeProvider("example.com");
+  bool fail_factory = true;
+  auto secret_manager = std::make_shared<SecretManager>(
+      config, factory_context_,
+      [&fail_factory](Stats::Scope& scope, Server::Configuration::ServerFactoryContext&,
+                      const Ssl::TlsCertificateConfig&, absl::Status& status) {
+        if (fail_factory) {
+          status = absl::InvalidArgumentError("parent tls config mismatch");
+        }
+        return std::make_shared<FakeAsyncContext>(scope);
+      });
+
+  auto cb = std::make_unique<NiceMock<MockCertificateSelectionCallback>>();
+  ON_CALL(*cb, dispatcher()).WillByDefault(::testing::ReturnRef(dispatcher));
+  auto handle = std::make_shared<Handle>(std::move(cb), false);
+  secret_manager->addCertificateConfig("example.com", handle, {});
+  ASSERT_EQ(1, gaugeValue("on_demand_secret.cert_pending"));
+
+  EXPECT_FALSE(provider->deliverSecret().ok());
+  ASSERT_EQ(1, gaugeValue("on_demand_secret.cert_pending"));
+  ASSERT_FALSE(secret_manager->getContext("example.com").has_value());
+
+  fail_factory = false;
+  EXPECT_OK(secret_manager->updateAll());
+  EXPECT_FALSE(secret_manager->getContext("example.com").has_value());
+
+  // Activate 2 additional secrets; max_active_secrets=2 must still hold.
+  NiceMock<Ssl::MockTlsCertificateConfig> cert_config;
+  for (const char* name : {"s2", "s3"}) {
+    secret_manager->addCertificateConfig(name, nullptr, {});
+    EXPECT_OK(secret_manager->updateCertificate(name, cert_config));
+  }
+  size_t active_in_tls = 0;
+  for (const char* name : {"example.com", "s2", "s3"}) {
+    if (secret_manager->getContext(name).has_value()) {
+      ++active_in_tls;
+    }
+  }
+  EXPECT_EQ(2, active_in_tls);
+
+  EXPECT_OK(secret_manager->removeCertificateConfig("example.com"));
+  for (auto& post : queued_posts) {
+    post();
+  }
+  EXPECT_EQ(0, gaugeValue("on_demand_secret.cert_pending"));
+}
+
+TEST_F(OnDemandSecretManagerTest, UpdateAllDoesNotBroadcastBrokenContextOnFailure) {
+  envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
+  TestUtility::loadFromYaml(defaultConfig(), config);
+
+  auto provider = registerFakeProvider("example.com");
+  bool fail_factory = false;
+  AsyncContextSharedPtr good_ctx;
+  AsyncContextSharedPtr broken_ctx;
+  auto secret_manager = std::make_shared<SecretManager>(
+      config, factory_context_,
+      [&](Stats::Scope& scope, Server::Configuration::ServerFactoryContext&,
+          const Ssl::TlsCertificateConfig&, absl::Status& status) {
+        auto ctx = std::make_shared<FakeAsyncContext>(scope);
+        if (fail_factory) {
+          status = absl::InvalidArgumentError("broken context");
+          broken_ctx = ctx;
+        } else {
+          good_ctx = ctx;
+        }
+        return ctx;
+      });
+
+  secret_manager->addCertificateConfig("example.com", nullptr, {});
+  ASSERT_OK(provider->deliverSecret());
+  ASSERT_EQ(good_ctx, secret_manager->getContext("example.com").value_or(nullptr));
+
+  fail_factory = true;
+  EXPECT_FALSE(secret_manager->updateAll().ok());
+  ASSERT_NE(nullptr, broken_ctx);
+  EXPECT_EQ(good_ctx, secret_manager->getContext("example.com").value_or(nullptr));
+}
+
+TEST_F(OnDemandSecretManagerTest, ServerAsyncContextReturnsNonNullOnInvalidPem) {
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate cert_proto;
+  cert_proto.mutable_certificate_chain()->set_inline_string("not-a-valid-pem-cert");
+  cert_proto.mutable_private_key()->set_inline_string("not-a-valid-pem-key");
+  Server::GenericFactoryContextImpl generic_context(factory_context_.server_context_,
+                                                    factory_context_.messageValidationVisitor());
+  auto cert_config_or = Ssl::TlsCertificateConfigImpl::create(
+      cert_proto, generic_context, factory_context_.server_context_.api(), "bad.example");
+  ASSERT_OK(cert_config_or);
+
+  absl::Status creation_status = absl::OkStatus();
+  auto ctx = std::make_shared<ServerAsyncContext>(*factory_context_.store_.rootScope(),
+                                                  factory_context_.server_context_, server_context_,
+                                                  *cert_config_or, creation_status);
+  EXPECT_FALSE(creation_status.ok());
+  EXPECT_NE(nullptr, ctx);
+}
+
+TEST_F(OnDemandSecretManagerTest, DestroySecretManagerReleasesAccumulateGauges) {
+  envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
+  TestUtility::loadFromYaml(boundedConfig(), config);
+
+  {
+    auto secret_manager = std::make_shared<SecretManager>(
+        config, factory_context_,
+        [](Stats::Scope& scope, Server::Configuration::ServerFactoryContext&,
+           const Ssl::TlsCertificateConfig&,
+           absl::Status&) { return std::make_shared<FakeAsyncContext>(scope); });
+    NiceMock<Ssl::MockTlsCertificateConfig> cert_config;
+    secret_manager->addCertificateConfig("active-1", nullptr, {});
+    EXPECT_OK(secret_manager->updateCertificate("active-1", cert_config));
+    secret_manager->addCertificateConfig("pending-1", nullptr, {});
+    ASSERT_EQ(2, gaugeValue("on_demand_secret.cert_active"));
+    ASSERT_EQ(1, gaugeValue("on_demand_secret.cert_pending"));
+  }
+
+  EXPECT_EQ(0, gaugeValue("on_demand_secret.cert_active"));
+  EXPECT_EQ(0, gaugeValue("on_demand_secret.cert_pending"));
+}
+
+TEST_F(OnDemandSecretManagerTest, FilterChainUpdateDoesNotLeakSharedGaugesInThreadLocalStore) {
+  Stats::SymbolTableImpl symbol_table;
+  Stats::Allocator alloc(symbol_table);
+  Stats::ThreadLocalStoreImpl store(alloc);
+  Stats::ScopeSharedPtr listener_scope = store.rootScope()->createScope("listener.0.0.0.0_443.");
+
+  envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
+  TestUtility::loadFromYaml(boundedConfig(), config);
+
+  NiceMock<Server::Configuration::MockGenericFactoryContext> fc1_ctx;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> fc2_ctx;
+  Stats::ScopeSharedPtr fc1_scope = listener_scope->createScope("");
+  Stats::ScopeSharedPtr fc2_scope = listener_scope->createScope("");
+  ON_CALL(fc1_ctx, scope()).WillByDefault(::testing::ReturnRef(*fc1_scope));
+  ON_CALL(fc2_ctx, scope()).WillByDefault(::testing::ReturnRef(*fc2_scope));
+
+  auto make_ctx = [](Stats::Scope& scope, Server::Configuration::ServerFactoryContext&,
+                     const Ssl::TlsCertificateConfig&,
+                     absl::Status&) { return std::make_shared<FakeAsyncContext>(scope); };
+
+  auto sm1 = std::make_shared<SecretManager>(config, fc1_ctx, make_ctx);
+  NiceMock<Ssl::MockTlsCertificateConfig> cert_config;
+  sm1->addCertificateConfig("active-1", nullptr, {});
+  EXPECT_OK(sm1->updateCertificate("active-1", cert_config));
+  sm1->addCertificateConfig("pending-1", nullptr, {});
+
+  // Overlapping LDS filter-chain replacement shares the same underlying listener gauges.
+  auto sm2 = std::make_shared<SecretManager>(config, fc2_ctx, make_ctx);
+  sm1.reset();
+  fc1_scope.reset();
+
+  auto read_store_gauge = [&](absl::string_view full_name) -> std::optional<uint64_t> {
+    for (const auto& gauge : store.gauges()) {
+      if (gauge->name() == full_name) {
+        return gauge->value();
+      }
+    }
+    return std::nullopt;
+  };
+
+  auto active_val = read_store_gauge("listener.0.0.0.0_443.on_demand_secret.cert_active");
+  auto pending_val = read_store_gauge("listener.0.0.0.0_443.on_demand_secret.cert_pending");
+  ASSERT_TRUE(active_val.has_value());
+  ASSERT_TRUE(pending_val.has_value());
+  EXPECT_EQ(0, *active_val);
+  EXPECT_EQ(0, *pending_val);
+}
+
+TEST_F(OnDemandSecretManagerTest, CoalescedPendingMissPreservesSecondaryTenantAttribution) {
+  envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
+  TestUtility::loadFromYaml(R"EOF(
+    config_source:
+      ads: {}
+    certificate_mapper:
+      name: static-name
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+        name: server
+    max_active_secrets: 4
+    max_pending_secrets: 4
+  )EOF",
+                            config);
+
+  auto& dispatcher = factory_context_.server_context_.dispatcher_;
+  EXPECT_CALL(dispatcher, post(_)).WillRepeatedly([](Event::PostCb cb) { cb(); });
+
+  auto secret_manager = std::make_shared<SecretManager>(
+      config, factory_context_,
+      [](Stats::Scope& scope, Server::Configuration::ServerFactoryContext&,
+         const Ssl::TlsCertificateConfig&,
+         absl::Status&) { return std::make_shared<FakeAsyncContext>(scope); });
+
+  const FairSieve::TenantId flooder_a = FairSieve::computeTenantId("flooder-a");
+  const FairSieve::TenantId healthy_b = FairSieve::computeTenantId("healthy-b");
+
+  auto make_handle = [&]() {
+    auto cb = std::make_unique<NiceMock<MockCertificateSelectionCallback>>();
+    ON_CALL(*cb, dispatcher()).WillByDefault(::testing::ReturnRef(dispatcher));
+    return std::make_shared<Handle>(std::move(cb), false);
+  };
+
+  // Flooder A starts fetching "shared.com"; healthy tenant B coalesces before SDS responds.
+  auto handle_a = make_handle();
+  auto handle_b = make_handle();
+  secret_manager->addCertificateConfig("shared.com", handle_a, {}, flooder_a);
+  secret_manager->addCertificateConfig("shared.com", handle_b, {}, healthy_b);
+
+  NiceMock<Ssl::MockTlsCertificateConfig> cert_config;
+  ASSERT_OK(secret_manager->updateCertificate("shared.com", cert_config));
+
+  // Flooder A scans 4 unique keys; "shared.com" must transfer to B rather than being evicted.
+  for (int i = 1; i <= 4; ++i) {
+    const std::string noise = absl::StrCat("noise-", i);
+    secret_manager->addCertificateConfig(noise, make_handle(), {}, flooder_a);
+    ASSERT_OK(secret_manager->updateCertificate(noise, cert_config));
+  }
+
+  EXPECT_TRUE(secret_manager->getContext("shared.com").has_value());
+  EXPECT_GE(counterValue("on_demand_secret.cert_ownership_transferred"), 1);
+}
+
+TEST_F(OnDemandSecretManagerTest, DisconnectedPendingClientsCompactCallbacksAndReclaimSlots) {
+  envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
+  TestUtility::loadFromYaml(R"EOF(
+    config_source:
+      ads: {}
+    certificate_mapper:
+      name: static-name
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+        name: server
+    max_pending_secrets: 2
+  )EOF",
+                            config);
+
+  auto& dispatcher = factory_context_.server_context_.dispatcher_;
+  EXPECT_CALL(dispatcher, post(_)).WillRepeatedly([](Event::PostCb cb) { cb(); });
+
+  auto secret_manager = std::make_shared<SecretManager>(
+      config, factory_context_,
+      [](Stats::Scope& scope, Server::Configuration::ServerFactoryContext&,
+         const Ssl::TlsCertificateConfig&,
+         absl::Status&) { return std::make_shared<FakeAsyncContext>(scope); });
+
+  auto make_handle = [&]() {
+    auto cb = std::make_unique<NiceMock<MockCertificateSelectionCallback>>();
+    ON_CALL(*cb, dispatcher()).WillByDefault(::testing::ReturnRef(dispatcher));
+    return std::make_shared<Handle>(std::move(cb), false);
+  };
+
+  {
+    auto h1 = make_handle();
+    auto h2 = make_handle();
+    secret_manager->addCertificateConfig("bogus-1", h1, {});
+    secret_manager->addCertificateConfig("bogus-2", h2, {});
+  }
+
+  // 50 disconnected retries must compact expired weak_ptrs rather than growing callbacks_ to 51.
+  for (int i = 0; i < 50; ++i) {
+    auto retry_handle = make_handle();
+    secret_manager->addCertificateConfig("bogus-1", retry_handle, {});
+  }
+
+  NiceMock<Ssl::MockTlsCertificateConfig> cert_config;
+  bool observed_compacted_callbacks = false;
+  {
+    LogLevelSetter log_setter(spdlog::level::trace);
+    StartStopRecording recorder(GetLogSink());
+    EXPECT_OK(secret_manager->updateCertificate("bogus-1", cert_config));
+    for (const auto& msg : recorder.messages()) {
+      if (absl::StrContains(
+              msg, "Notified 0 pending connections about certificate 'bogus-1', out of queued 1")) {
+        observed_compacted_callbacks = true;
+      }
+    }
+  }
+  EXPECT_TRUE(observed_compacted_callbacks);
+
+  // Re-occupy the second slot with a fast-disconnecting waiter. Before `kMinAbandonedPendingAge`
+  // elapses, abandoned slots must NOT be reclaimed so fast disconnects cannot bypass
+  // `max_pending_secrets` and amplify SDS load.
+  {
+    auto h3 = make_handle();
+    secret_manager->addCertificateConfig("bogus-3", h3, {});
+  }
+  simTime().advanceTimeWait(SecretManager::kMinAbandonedPendingAge - std::chrono::seconds(1));
+  {
+    auto blocked = make_handle();
+    secret_manager->addCertificateConfig("blocked.com", blocked, {});
+  }
+  EXPECT_EQ(1, counterValue("on_demand_secret.cert_pending_rejected"));
+  EXPECT_EQ(2, gaugeValue("on_demand_secret.cert_pending"));
+
+  // Once `kMinAbandonedPendingAge` has elapsed, an incoming healthy fetch must reclaim an
+  // abandoned slot instead of rejecting.
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  auto healthy = make_handle();
+  secret_manager->addCertificateConfig("healthy.com", healthy, {});
+  EXPECT_EQ(1, counterValue("on_demand_secret.cert_pending_rejected"));
+  EXPECT_EQ(2, gaugeValue("on_demand_secret.cert_pending"));
+}
+
+TEST_F(OnDemandSecretManagerTest, ReclaimAbandonedPendingPrefersPeerTenantBeforeSelf) {
+  envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
+  TestUtility::loadFromYaml(R"EOF(
+    config_source:
+      ads: {}
+    certificate_mapper:
+      name: static-name
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+        name: server
+    max_pending_secrets: 4
+  )EOF",
+                            config);
+
+  auto& dispatcher = factory_context_.server_context_.dispatcher_;
+  EXPECT_CALL(dispatcher, post(_)).WillRepeatedly([](Event::PostCb cb) { cb(); });
+
+  auto secret_manager = std::make_shared<SecretManager>(
+      config, factory_context_,
+      [](Stats::Scope& scope, Server::Configuration::ServerFactoryContext&,
+         const Ssl::TlsCertificateConfig&,
+         absl::Status&) { return std::make_shared<FakeAsyncContext>(scope); });
+
+  const FairSieve::TenantId tenant_a = FairSieve::computeTenantId("tenant-a");
+  const FairSieve::TenantId tenant_b = FairSieve::computeTenantId("tenant-b");
+  const FairSieve::TenantId tenant_c = FairSieve::computeTenantId("tenant-c");
+  auto make_handle = [&]() {
+    auto cb = std::make_unique<NiceMock<MockCertificateSelectionCallback>>();
+    ON_CALL(*cb, dispatcher()).WillByDefault(::testing::ReturnRef(dispatcher));
+    return std::make_shared<Handle>(std::move(cb), false);
+  };
+
+  // Fill 4/4 pending slots: tenant_b holds 2 abandoned slots, tenant_a holds 1 abandoned slot,
+  // and tenant_c holds 1 live slot.
+  auto hc_live = make_handle();
+  {
+    auto hb1 = make_handle();
+    auto hb2 = make_handle();
+    auto ha1 = make_handle();
+    secret_manager->addCertificateConfig("b-abandoned-1", hb1, {}, tenant_b);
+    secret_manager->addCertificateConfig("b-abandoned-2", hb2, {}, tenant_b);
+    secret_manager->addCertificateConfig("a-abandoned", ha1, {}, tenant_a);
+    secret_manager->addCertificateConfig("c-live", hc_live, {}, tenant_c);
+  }
+  ASSERT_EQ(4, gaugeValue("on_demand_secret.cert_pending"));
+  simTime().advanceTimeWait(SecretManager::kMinAbandonedPendingAge);
+
+  // Tenant A requests a new pending slot: peer tenant B's two abandoned slots are reclaimed first
+  // (dropping pending_total from 4 -> 2 so `p_A (1) < 4 - 2 (2)` succeeds), leaving A's own
+  // `a-abandoned` untouched.
+  auto ha_fresh = make_handle();
+  secret_manager->addCertificateConfig("a-fresh", ha_fresh, {}, tenant_a);
+  EXPECT_EQ(0, counterValue("on_demand_secret.cert_pending_rejected"));
+  EXPECT_EQ(3, gaugeValue("on_demand_secret.cert_pending"));
+
+  NiceMock<Ssl::MockTlsCertificateConfig> cert_config;
+  ASSERT_OK(secret_manager->updateCertificate("a-abandoned", cert_config));
+  EXPECT_TRUE(secret_manager->getContext("a-abandoned").has_value());
+  ASSERT_OK(secret_manager->updateCertificate("b-abandoned-1", cert_config));
+  EXPECT_FALSE(secret_manager->getContext("b-abandoned-1").has_value());
+  ASSERT_OK(secret_manager->updateCertificate("b-abandoned-2", cert_config));
+  EXPECT_FALSE(secret_manager->getContext("b-abandoned-2").has_value());
+}
+
+TEST_F(OnDemandSecretManagerTest, RejectsUniquePrefetchExceedingMaxActiveSecrets) {
+  const std::string invalid_yaml = R"EOF(
+    config_source:
+      ads: {}
+    certificate_mapper:
+      name: static-name
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+        name: server
+    prefetch_secret_names: ["p1", "p2", "p3", "p4"]
+    max_active_secrets: 2
+  )EOF";
+  EXPECT_THAT(create(invalid_yaml), StatusIs(absl::StatusCode::kInvalidArgument));
+
+  const std::string duplicate_valid_yaml = R"EOF(
+    config_source:
+      ads: {}
+    certificate_mapper:
+      name: static-name
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+        name: server
+    prefetch_secret_names: ["p1", "p1", "p2"]
+    max_active_secrets: 2
+  )EOF";
+  EXPECT_OK(create(duplicate_valid_yaml));
+}
+
+TEST_F(OnDemandSecretManagerTest, PendingOnlyModeSkipsFilterStateExtractionOnCacheHit) {
+  envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
+  TestUtility::loadFromYaml(R"EOF(
+    config_source:
+      ads: {}
+    certificate_mapper:
+      name: sni
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+        default_value: fallback
+    max_pending_secrets: 4
+  )EOF",
+                            config);
+
+  registerFakeProvider("example.com");
+  auto secret_manager = std::make_shared<SecretManager>(
+      config, factory_context_,
+      [](Stats::Scope& scope, Server::Configuration::ServerFactoryContext&,
+         const Ssl::TlsCertificateConfig&,
+         absl::Status&) { return std::make_shared<FakeAsyncContext>(scope); });
+
+  secret_manager->addCertificateConfig("example.com", nullptr, {});
+  NiceMock<Ssl::MockTlsCertificateConfig> cert_config;
+  ASSERT_OK(secret_manager->updateCertificate("example.com", cert_config));
+
+  auto& mapper_config = Config::Utility::getAndCheckFactory<Ssl::TlsCertificateMapperConfigFactory>(
+      config.certificate_mapper());
+  auto msg = Config::Utility::translateAnyToFactoryConfig(
+      config.certificate_mapper().typed_config(), factory_context_.messageValidationVisitor(),
+      mapper_config);
+  auto mapper_factory = mapper_config.createTlsCertificateMapperFactory(*msg, factory_context_);
+  ASSERT_OK(mapper_factory);
+  AsyncSelector selector((*mapper_factory)(), secret_manager);
+
   bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
   bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
-  EXPECT_EQ("test", mapper->deriveFromServerHello(*ssl, nullptr));
-  auto filter_state_object = std::make_shared<Router::StringAccessorImpl>("new_value");
-  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state.setData("envoy.tls.certificate_mappers.on_demand_secret", filter_state_object,
-                       StreamInfo::FilterState::LifeSpan::Connection,
-                       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
-  auto transport_socket_options =
-      Network::TransportSocketOptionsUtility::fromFilterState(filter_state);
-  EXPECT_EQ("new_value", mapper->deriveFromServerHello(*ssl, transport_socket_options));
+  NiceMock<Network::MockTransportSocketCallbacks> callbacks;
+  ASSERT_EQ(1, SSL_set_ex_data(ssl.get(), ContextImpl::sslSocketIndex(), &callbacks));
+  auto counting_fs =
+      std::make_shared<CountingFilterState>(StreamInfo::FilterState::LifeSpan::Connection);
+  counting_fs->setData(TenantIdFilterStateKey,
+                       std::make_shared<Router::StringAccessorImpl>("tenant-a"),
+                       StreamInfo::FilterState::LifeSpan::Connection);
+  callbacks.connection_.stream_info_.filter_state_ = counting_fs;
+
+  SSL_CLIENT_HELLO hello{};
+  hello.ssl = ssl.get();
+
+  ASSERT_EQ(1, SSL_set_tlsext_host_name(ssl.get(), "example.com"));
+  counting_fs->resetLookups();
+  auto hit_res = selector.selectTlsContext(
+      hello, std::make_unique<NiceMock<MockCertificateSelectionCallback>>());
+  EXPECT_EQ(Ssl::SelectionResult::SelectionStatus::Success, hit_res.status);
+  EXPECT_EQ(0, counting_fs->readLookups());
+
+  // On a cache miss in pending-only mode, tenant extraction must still run once.
+  ASSERT_EQ(1, SSL_set_tlsext_host_name(ssl.get(), "miss.example.com"));
+  counting_fs->resetLookups();
+  auto miss_res = selector.selectTlsContext(
+      hello, std::make_unique<NiceMock<MockCertificateSelectionCallback>>());
+  EXPECT_EQ(Ssl::SelectionResult::SelectionStatus::Pending, miss_res.status);
+  EXPECT_EQ(1, counting_fs->readLookups());
+
+  SSL_set_ex_data(ssl.get(), ContextImpl::sslSocketIndex(), nullptr);
+}
+
+TEST_F(OnDemandSecretManagerTest, CertActiveGaugeTracksReadyPlusPending) {
+  envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
+  TestUtility::loadFromYaml(boundedConfig(), config);
+
+  auto secret_manager = std::make_shared<SecretManager>(
+      config, factory_context_,
+      [](Stats::Scope& scope, Server::Configuration::ServerFactoryContext&,
+         const Ssl::TlsCertificateConfig&,
+         absl::Status&) { return std::make_shared<FakeAsyncContext>(scope); });
+  NiceMock<Ssl::MockTlsCertificateConfig> cert_config;
+
+  secret_manager->addCertificateConfig("a1", nullptr, {});
+  ASSERT_OK(secret_manager->updateCertificate("a1", cert_config));
+  secret_manager->addCertificateConfig("a2", nullptr, {});
+  ASSERT_OK(secret_manager->updateCertificate("a2", cert_config));
+  secret_manager->addCertificateConfig("p1", nullptr, {});
+  secret_manager->addCertificateConfig("p2", nullptr, {});
+
+  EXPECT_EQ(2, gaugeValue("on_demand_secret.cert_pending"));
+  EXPECT_EQ(4, gaugeValue("on_demand_secret.cert_active"));
 }
 
 } // namespace

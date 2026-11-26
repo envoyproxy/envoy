@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -670,6 +671,191 @@ TEST(FairSievePolicyTest, ConcurrentWorkerHitsUnderActiveEvictionAreRaceFreeAndT
   stop.store(true, std::memory_order_relaxed);
   for (auto& w : workers) {
     w.join();
+  }
+}
+
+std::vector<TenantId> sortedTenants(size_t count) {
+  std::vector<TenantId> tenants;
+  tenants.reserve(count);
+  for (size_t i = 0; i < count; ++i) {
+    tenants.push_back(computeTenantId(absl::StrCat("sim-tenant-", i)));
+  }
+  std::sort(tenants.begin(), tenants.end());
+  return tenants;
+}
+
+TEST(FairSievePolicyTest, RotatingTieBreakingAvoidsHighHashStarvationWhenTExceedsC) {
+  constexpr size_t kCapacity = 4;
+  constexpr size_t kTenants = 8;
+  Policy policy(kCapacity, /*max_pending=*/0);
+  const std::vector<TenantId> tenants = sortedTenants(kTenants);
+  std::optional<Policy::EvictionResult> evicted;
+
+  // Populate the C - 1 lowest-hash tenants (which then stay completely silent) plus one peer.
+  for (size_t i = 0; i < kCapacity; ++i) {
+    const std::string key = absl::StrCat("k-t", i);
+    policy.onPendingAdded(key, tenants[i]);
+    ASSERT_NE(nullptr, policy.onActivated(key, evicted));
+    ASSERT_FALSE(evicted.has_value());
+  }
+
+  // Higher-hash tenants continuously activate and hit keys; idle low-hash tenants must be evicted
+  // rather than remaining pinned forever by static max-TenantId tie-breaking.
+  size_t idle_low_hash_evictions = 0;
+  for (int round = 0; round < 50; ++round) {
+    for (size_t i = kCapacity - 1; i < kTenants; ++i) {
+      const std::string key = absl::StrCat("k-t", i, "-r", round);
+      policy.onPendingAdded(key, tenants[i]);
+      auto hit = policy.onActivated(key, evicted);
+      ASSERT_NE(nullptr, hit);
+      hit->recordHit(tenants[i]);
+      ASSERT_TRUE(evicted.has_value());
+      if (evicted->evicted_key == "k-t0" || evicted->evicted_key == "k-t1" ||
+          evicted->evicted_key == "k-t2") {
+        ++idle_low_hash_evictions;
+      }
+    }
+  }
+
+  EXPECT_EQ(3, idle_low_hash_evictions);
+  size_t live_slots = 0;
+  for (size_t i = kCapacity - 1; i < kTenants; ++i) {
+    live_slots += policy.tenantActiveCount(tenants[i]);
+  }
+  EXPECT_EQ(kCapacity, live_slots);
+}
+
+TEST(FairSievePolicyTest, RotatingTieBreakingEliminatesRemainderSlotBiasWhenTLeqC) {
+  constexpr size_t kCapacity = 6;
+  constexpr size_t kTenants = 4; // Fair share = 1 with 2 remainder slots (r = 2).
+  Policy policy(kCapacity, /*max_pending=*/0);
+  const std::vector<TenantId> tenants = sortedTenants(kTenants);
+  std::optional<Policy::EvictionResult> evicted;
+  absl::flat_hash_set<std::string> live;
+
+  std::vector<size_t> total_occupancy(kTenants, 0);
+  constexpr int kRounds = 100;
+  for (int round = 0; round < kRounds; ++round) {
+    for (size_t t = 0; t < kTenants; ++t) {
+      const std::string key = absl::StrCat("t", t, "-k", round % 2);
+      if (!live.contains(key)) {
+        policy.onPendingAdded(key, tenants[t]);
+        policy.onActivated(key, evicted);
+        live.insert(key);
+        if (evicted.has_value()) {
+          live.erase(evicted->evicted_key);
+        }
+      }
+      for (size_t i = 0; i < kTenants; ++i) {
+        total_occupancy[i] += policy.tenantActiveCount(tenants[i]);
+      }
+    }
+  }
+
+  const double lowest_avg = static_cast<double>(total_occupancy.front()) / (kRounds * kTenants);
+  const double highest_avg = static_cast<double>(total_occupancy.back()) / (kRounds * kTenants);
+  EXPECT_NEAR(lowest_avg, highest_avg, 0.15);
+}
+
+TEST(FairSievePolicyTest, PendingOnlyModeLatchesMultiTenantModeAcrossDrains) {
+  constexpr size_t kMaxPending = 10;
+  Policy policy(/*max_active=*/0, kMaxPending);
+  const TenantId named_a = computeTenantId("named-tenant-a");
+  const TenantId named_b = computeTenantId("named-tenant-b");
+  std::optional<Policy::EvictionResult> evicted;
+
+  // Named tenant A fetches and completes one secret; in pending-only mode its bucket is erased.
+  ASSERT_TRUE(policy.canAdmitPending(named_a));
+  policy.onPendingAdded("n1", named_a);
+  EXPECT_EQ(nullptr, policy.onActivated("n1", evicted));
+  ASSERT_EQ(0, policy.pendingCount());
+  ASSERT_EQ(0, policy.tenantCount());
+
+  // Subsequent unattributed traffic must stay capped at <= ceil(M/2) rather than re-enabling
+  // the single-bucket 100% bypass.
+  size_t default_admitted = 0;
+  for (size_t i = 0; i < kMaxPending; ++i) {
+    if (policy.canAdmitPending(kDefaultTenantId)) {
+      policy.onPendingAdded(absl::StrCat("def-", i), kDefaultTenantId);
+      ++default_admitted;
+    }
+  }
+  EXPECT_LE(default_admitted, kMaxPending / 2);
+  EXPECT_TRUE(policy.canAdmitPending(named_b));
+}
+
+TEST(FairSievePolicyTest, PendingOnlyModeLatchesMultiTenantModeOnRejectedNamedArrival) {
+  // Even if `kDefaultTenantId` fills `M/M` slots before any named tenant arrives, the first
+  // rejected `canAdmitPending(named)` call must latch multi-tenant mode so default traffic cannot
+  // reclaim all drained slots and continue starving named tenants.
+  constexpr size_t kMaxPending = 4;
+  Policy policy(/*max_active=*/0, kMaxPending);
+  const TenantId named = computeTenantId("named-tenant");
+  std::optional<Policy::EvictionResult> evicted;
+
+  for (size_t i = 0; i < kMaxPending; ++i) {
+    ASSERT_TRUE(policy.canAdmitPending(kDefaultTenantId));
+    policy.onPendingAdded(absl::StrCat("def-", i), kDefaultTenantId);
+  }
+  ASSERT_EQ(kMaxPending, policy.pendingCount());
+
+  // Saturated: named arrival is rejected, but observing it latches `saw_named_tenant_`.
+  EXPECT_FALSE(policy.canAdmitPending(named));
+
+  // Drain two default slots (`pending_count == 2`, `default_pending == 2`).
+  // With the latch active, `2 < 4 - 2` is false, so default is capped and headroom is preserved.
+  EXPECT_EQ(nullptr, policy.onActivated("def-0", evicted));
+  EXPECT_EQ(nullptr, policy.onActivated("def-1", evicted));
+  EXPECT_FALSE(policy.canAdmitPending(kDefaultTenantId));
+  EXPECT_TRUE(policy.canAdmitPending(named));
+}
+
+TEST(FairSievePolicyTest, HotSingletonTenantsSurviveEphemeralTenantChurnWhenTExceedsC) {
+  // When `T > C` (`max_size == 1`), repeatedly hit singleton tenants must get a SIEVE second
+  // chance across the singleton ring rather than being evicted on single-element wrap-around by a
+  // stream of ephemeral one-shot tenants.
+  constexpr size_t kCapacity = 8;
+  Policy policy(kCapacity, /*max_pending=*/0);
+  std::optional<Policy::EvictionResult> evicted;
+
+  std::vector<TenantId> hot_tenants;
+  std::vector<HitStateSharedPtr> hot_states;
+  for (int i = 0; i < 4; ++i) {
+    const TenantId tid = computeTenantId(absl::StrCat("hot-core-", i));
+    const std::string key = absl::StrCat("hot-key-", i);
+    hot_tenants.push_back(tid);
+    policy.onPendingAdded(key, tid);
+    hot_states.push_back(policy.onActivated(key, evicted));
+    ASSERT_FALSE(evicted.has_value());
+  }
+
+  for (int eph = 0; eph < 60; ++eph) {
+    for (size_t i = 0; i < hot_tenants.size(); ++i) {
+      hot_states[i]->recordHit(hot_tenants[i]);
+    }
+    const TenantId eph_tid = computeTenantId(absl::StrCat("ephemeral-", eph));
+    const std::string eph_key = absl::StrCat("eph-key-", eph);
+    policy.onPendingAdded(eph_key, eph_tid);
+    policy.onActivated(eph_key, evicted);
+    if (evicted.has_value()) {
+      EXPECT_FALSE(evicted->evicted_key.starts_with("hot-key-"))
+          << "Evicted hot singleton key: " << evicted->evicted_key;
+    }
+  }
+
+  for (TenantId tid : hot_tenants) {
+    EXPECT_EQ(1, policy.tenantActiveCount(tid));
+  }
+  EXPECT_EQ(kCapacity, policy.activeCount());
+
+  // Self-eviction at `max_size == 1` must remain intact: if a hot singleton tenant adds a second
+  // key, it must evict its own key rather than a peer's key.
+  policy.onPendingAdded("hot-key-0-second", hot_tenants[0]);
+  policy.onActivated("hot-key-0-second", evicted);
+  ASSERT_TRUE(evicted.has_value());
+  EXPECT_EQ("hot-key-0", evicted->evicted_key);
+  for (TenantId tid : hot_tenants) {
+    EXPECT_EQ(1, policy.tenantActiveCount(tid));
   }
 }
 

@@ -1,10 +1,13 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
+#include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.validate.h"
@@ -19,6 +22,8 @@
 #include "source/common/tls/server_context_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_selectors/common/async_context.h"
 
+#include "absl/container/flat_hash_set.h"
+#include "absl/functional/function_ref.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -122,6 +127,7 @@ public:
   SecretManager(const ConfigProto& config,
                 Server::Configuration::GenericFactoryContext& factory_context,
                 AsyncContextFactory&& context_factory);
+  ~SecretManager();
 
   /**
    * Start a subscription to the secret and register a handle on updates.
@@ -172,16 +178,40 @@ public:
    */
   bool trackingEnabled() const { return policy_.trackingEnabled(); }
 
+  /**
+   * Minimum age an abandoned (all waiting handles disconnected) non-prefetched pending entry must
+   * reach before `reclaimAbandonedPending()` may reclaim its slot. Prevents fast-disconnecting
+   * clients from bypassing `max_pending_secrets` and amplifying SDS/signing load while still
+   * recovering cleanly from wedged SDS subscriptions after client handshake timeouts.
+   */
+  static constexpr std::chrono::seconds kMinAbandonedPendingAge{5};
+
+  /**
+   * Returns true if `max_active_secrets` is configured (so hits update `HitState`).
+   */
+  bool activeLimitEnabled() const { return policy_.activeLimitEnabled(); }
+
 private:
   struct CachedCert {
     AsyncContextConstSharedPtr context_;
     FairSieve::HitStateSharedPtr hit_state_;
   };
 
+  struct PendingCallback {
+    std::weak_ptr<Handle> handle_;
+    FairSieve::TenantId tenant_id_{FairSieve::kDefaultTenantId};
+    bool is_coalesced_{false};
+  };
+
   void updateContexts(absl::string_view secret_name, CachedCert cached_cert,
                       const std::optional<std::string>& evicted_name = std::nullopt);
   void doRemoveCertificateConfig(absl::string_view secret_name,
                                  std::optional<uint64_t> expected_generation);
+  // Reclaims abandoned non-prefetched pending entries (all waiting handles disconnected and age >=
+  // `kMinAbandonedPendingAge`) under admission pressure until
+  // `policy_.canAdmitPending(incoming_tenant)` succeeds or none remain, preferring other-tenant
+  // abandoned entries first.
+  void reclaimAbandonedPending(FairSieve::TenantId incoming_tenant);
   const Stats::ScopeSharedPtr stats_scope_;
   // Gauge conservation invariants (main thread, outside active mutations):
   //  - `cert_active == cache_.size() == n_ready + n_pending`
@@ -201,12 +231,19 @@ private:
   // newly inserted pending entry can never self-evict during its own activation).
   struct CacheEntry {
     uint64_t generation_{0};
+    FairSieve::TenantId owner_tenant_{FairSieve::kDefaultTenantId};
+    MonotonicTime created_at_{};
     AsyncContextConfigConstPtr cert_config_;
     AsyncContextConstSharedPtr cert_context_;
     FairSieve::HitStateSharedPtr hit_state_;
-    std::vector<std::weak_ptr<Handle>> callbacks_;
+    std::vector<PendingCallback> callbacks_;
   };
   absl::flat_hash_map<std::string, std::unique_ptr<CacheEntry>> cache_;
+
+  // Tracks in-flight non-prefetched pending secret names when `max_pending_secrets` is enabled so
+  // abandoned pending subscriptions can be reclaimed in O(max_pending) without scanning active
+  // entries.
+  absl::flat_hash_set<std::string> pending_on_demand_keys_;
 
   // Lock-free map to retrieve ready TLS contexts by name.
   struct ThreadLocalCerts : public ThreadLocal::ThreadLocalObject {
@@ -223,7 +260,7 @@ public:
 protected:
   Ssl::SelectionResult doSelectTlsContext(const std::string& name, const bool client_ocsp_capable,
                                           Ssl::CertificateSelectionCallbackPtr cb,
-                                          FairSieve::TenantId tenant_id);
+                                          absl::FunctionRef<FairSieve::TenantId()> extract_tenant);
   std::shared_ptr<SecretManager> secret_manager_;
 };
 

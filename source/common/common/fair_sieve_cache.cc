@@ -65,9 +65,15 @@ void Policy::TenantQueue::remove(Entry* entry) noexcept {
   --active_size;
 }
 
-bool Policy::canAdmitPending(TenantId tenant_id) const {
+bool Policy::canAdmitPending(TenantId tenant_id) {
   if (max_pending_ == 0) {
     return true;
+  }
+  // Latch multi-tenant mode immediately upon observing any named tenant, even if this arrival is
+  // rejected while `kDefaultTenantId` has momentarily saturated `max_pending_`, so subsequent
+  // default-bucket arrivals obey dynamic thresholds as soon as pending slots drain.
+  if (tenant_id != kDefaultTenantId) {
+    saw_named_tenant_ = true;
   }
   // Short-circuit guarantees `pending_count_ < max_pending_` below so unsigned subtraction
   // `max_pending_ - pending_count_` can never underflow (even if prefetched bypasses pushed
@@ -82,13 +88,13 @@ bool Policy::canAdmitPending(TenantId tenant_id) const {
   if (tenant_pending == 0) {
     return true;
   }
-  // In default single-bucket mode (no named tenant tracked yet), allow full utilization of
-  // `max_pending_`. Trade-off: in a mixed-mode proxy where unattributed traffic floods *before*
-  // any named tenant arrives, `kDefaultTenantId` can momentarily fill `max_pending_` until a fetch
-  // completes. Invariant: the instant *any* named tenant owns a pending or active entry
-  // (`tenants_.size() >= 2`), `kDefaultTenantId` ceases bypassing and strictly obeys the dynamic
-  // threshold below.
-  if (tenant_id == kDefaultTenantId && tenants_.size() <= 1) {
+  // In default single-bucket mode (before any named tenant has been observed), allow full
+  // utilization of `max_pending_`. Trade-off: in a mixed-mode proxy where unattributed traffic
+  // floods *before* the very first named tenant arrives, `kDefaultTenantId` can momentarily fill
+  // `max_pending_` until a fetch completes. Invariant: once *any* named tenant has been tracked
+  // (`saw_named_tenant_ == true`), `kDefaultTenantId` permanently ceases bypassing and obeys the
+  // dynamic threshold below even in pending-only mode when `tenants_` empties between fetches.
+  if (tenant_id == kDefaultTenantId && !saw_named_tenant_) {
     return true;
   }
   // Multi-tenant Choudhury & Hahne Dynamic Thresholds (alpha = 1).
@@ -96,7 +102,7 @@ bool Policy::canAdmitPending(TenantId tenant_id) const {
   // slots and starve an idle peer. Invariants maintained for named tenants:
   //  - Single flooder ceiling: `tenant_pending <= ceil(max_pending_ / 2)`, reserving at least
   //    `floor(max_pending_ / 2)` headroom for all `max_pending_ >= 2`.
-  //  - Symmetric K-flooder equilibrium: `ceil(M/(K+1)) <= p <= floor((M+1)/(K+1))`.
+  //  - K-flooder steady-state equilibrium: `floor(M/(K+1)) <= p_i <= ceil(M/(K+1))`.
   //  - Monotonicity / self-healing: for `p_a > p_b`, whenever `a` is admissible `b` is also
   //    admissible, so smaller tenants claim drained headroom before saturated flooders.
   return tenant_pending < (max_pending_ - pending_count_);
@@ -105,6 +111,9 @@ bool Policy::canAdmitPending(TenantId tenant_id) const {
 void Policy::onPendingAdded(absl::string_view key, TenantId tenant_id) {
   if (!trackingEnabled()) {
     return;
+  }
+  if (tenant_id != kDefaultTenantId) {
+    saw_named_tenant_ = true;
   }
   if (entries_.contains(key)) {
     return;
@@ -244,17 +253,43 @@ Policy::EvictionResult Policy::evictOne(TenantId incoming_tenant) {
   size_t sweep_steps = 0;
 
   while (!active_tenants_by_size_.empty()) {
-    // 1. Inter-tenant max-min fairness: pick the tenant with the largest active queue size.
+    // 1. Inter-tenant max-min fairness: pick a tenant with the largest active queue size.
     //    Break ties in favor of `incoming_tenant` so a tenant at the fair-share ceiling evicts
-    //    from itself instead of dipping a peer. Fair-share floor invariant: any peer with
-    //    `active_size <= active_size(incoming_tenant)` or strictly below the mean (`< C / T`)
-    //    cannot be chosen as victim by `incoming_tenant`.
-    const auto max_it = std::prev(active_tenants_by_size_.end());
-    const size_t max_size = max_it->first;
-    TenantId victim_tenant = max_it->second;
+    //    from itself instead of dipping a peer. For non-incoming ties at `max_size`, rotate using
+    //    `victim_cursor_` in O(log T) so low-hash tenants are never permanently pinned when
+    //    `T > C` or `C % T >= 2`. Because every picked donor still has `active_size == max_size`,
+    //    the No-Re-Entry Lemma and fair-share floor invariants are preserved unchanged.
+    const size_t max_size = std::prev(active_tenants_by_size_.end())->first;
+    TenantId victim_tenant = kDefaultTenantId;
     if (const auto incoming_it = tenants_.find(incoming_tenant);
         incoming_it != tenants_.end() && incoming_it->second.active_size == max_size) {
       victim_tenant = incoming_tenant;
+    } else {
+      auto candidate_it = active_tenants_by_size_.lower_bound({max_size, victim_cursor_});
+      if (candidate_it == active_tenants_by_size_.end() || candidate_it->first != max_size) {
+        candidate_it = active_tenants_by_size_.lower_bound({max_size, 0});
+      }
+      ASSERT(candidate_it != active_tenants_by_size_.end() && candidate_it->first == max_size);
+      // When `max_size == 1` and `incoming_tenant` is not tied at `max_size`, every entry in
+      // `active_tenants_by_size_` is a singleton (`first == 1`). Inside a length-1 queue,
+      // intra-tenant SIEVE wrap-around would immediately evict a visited entry without inspecting
+      // peers; sweeping the singleton ring in O(1) per iterator step gives visited singletons a
+      // SIEVE second chance while preserving the cumulative `max_sweep_steps` (`<= 2A`) bound.
+      if (max_size == 1) {
+        while (sweep_steps < max_sweep_steps) {
+          const auto candidate_q = tenants_.find(candidate_it->second);
+          ASSERT(candidate_q != tenants_.end() && candidate_q->second.tail != nullptr);
+          if (!candidate_q->second.tail->hit_state->consumeVisited()) {
+            break;
+          }
+          ++sweep_steps;
+          ++candidate_it;
+          if (candidate_it == active_tenants_by_size_.end()) {
+            candidate_it = active_tenants_by_size_.begin();
+          }
+        }
+      }
+      victim_tenant = candidate_it->second;
     }
 
     const auto q_it = tenants_.find(victim_tenant);
@@ -276,6 +311,7 @@ Policy::EvictionResult Policy::evictOne(TenantId incoming_tenant) {
       if (result.ownership_transfers < max_transfers) {
         const TenantId last_t = curr->hit_state->lastHitTenant();
         if (last_t != victim_tenant && last_t != kDefaultTenantId) {
+          saw_named_tenant_ = true;
           const auto last_it = tenants_.find(last_t);
           const size_t last_size = (last_it != tenants_.end()) ? last_it->second.active_size : 0;
           if (last_size + 1 < q.active_size) {
@@ -321,6 +357,8 @@ Policy::EvictionResult Policy::evictOne(TenantId incoming_tenant) {
         // keep their `shared_ptr<const HitState>` alive and race-free until updated.
         entries_.erase(result.evicted_key);
         maybeEraseTenant(victim_tenant);
+        // Unsigned wrap-around (`UINT64_MAX + 1 == 0`) naturally wraps back to the band start.
+        victim_cursor_ = victim_tenant + 1;
         return result;
       }
     }

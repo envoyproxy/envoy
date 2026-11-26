@@ -14,6 +14,7 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     external_deps = ["ssl"],
     deps = [
+        "//envoy/common:time_interface",
         "//envoy/event:deferred_deletable",
         "//envoy/network:transport_socket_interface",
         "//envoy/registry",
@@ -31,6 +32,9 @@ envoy_cc_extension(
         "//source/extensions/filters/network/set_filter_state:config",
         "//source/extensions/transport_sockets/tls/cert_selectors/common:async_context_lib",
         "//source/server:generic_factory_context_lib",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/functional:function_ref",
+        "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3:pkg_cc_proto",
     ],

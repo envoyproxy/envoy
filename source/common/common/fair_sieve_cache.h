@@ -96,14 +96,16 @@ using HitStateSharedPtr = std::shared_ptr<const HitState>;
  * bounded multi-tenant on-demand resource caches:
  *
  * 1. Phase 1 — Pending (warming) admission control (Choudhury & Hahne Dynamic Thresholds, alpha=1):
- *    Bounds in-flight resource fetches waiting for initial delivery (`max_pending`). In default
- *    single-bucket mode (when only `kDefaultTenantId` is tracked), the default bucket may use the
- *    full budget `max_pending`. When named tenants are active, a tenant is admitted iff:
+ *    Bounds in-flight resource fetches waiting for initial delivery (`max_pending`). Before any
+ *    named tenant has been observed, the default bucket may use the full budget `max_pending`.
+ *    Once any named tenant has been tracked (latched), all tenants—including `kDefaultTenantId`—
+ *    are admitted iff:
  *      pending_total < max_pending &&
  *      (tenant_pending == 0 || tenant_pending < max_pending - pending_total)
  *    This keeps a single flooding named tenant at `<= ceil(max_pending / 2)`, converges K
- *    simultaneous flooding tenants to `~max_pending / (K + 1)` pending slots each, and preserves
- *    immediate headroom for sparse healthy tenants whenever global space remains.
+ *    simultaneous flooding tenants to `[floor(max_pending / (K + 1)), ceil(max_pending / (K + 1))]`
+ *    pending slots each, and preserves immediate headroom for sparse healthy tenants whenever
+ *    global space remains.
  *
  * 2. Phase 2 — Active resource eviction (Work-Conserving Fair-SIEVE with Lazy Ownership Transfer):
  *    Each tenant with at least one tracked resource maintains an intrusive doubly-linked FIFO
@@ -112,9 +114,10 @@ using HitStateSharedPtr = std::shared_ptr<const HitState>;
  *    and empty tenant buckets are immediately erased), so total policy memory is strictly
  *    `O(max_active + max_pending)`, independent of the number of tenants sharing cached resources.
  *    When `active_count >= max_active`:
- *      a) Inter-tenant max-min fairness: pick the tenant `t*` with the largest active queue size
+ *      a) Inter-tenant max-min fairness: pick a tenant `t*` with the largest active queue size
  *         (via `active_tenants_by_size_` in O(log T)), breaking ties in favor of the incoming
- *         tenant so a tenant already at the fair-share ceiling evicts from itself.
+ *         tenant so a tenant already at the fair-share ceiling evicts from itself, and rotating
+ *         across other tied tenants via `victim_cursor_` so low-hash tenants cannot stay pinned.
  *      b) Lazy cross-tenant ownership transfer (Non-Blocking FairRide, Pu et al., NSDI '16):
  *         inspect the node at `t*`'s hand. If a different named tenant `last_t` most recently hit
  *         this shared resource and `active_size(last_t) + 1 < active_size(t*)`, splice the node in
@@ -123,7 +126,10 @@ using HitStateSharedPtr = std::shared_ptr<const HitState>;
  *         preventing ping-pong livelocks and guaranteeing `active_size(t*) >= 1` post-transfer).
  *      c) Intra-tenant SIEVE sweep: otherwise, if `visited` is set, clear it (lazy promotion) and
  *         step `hand` toward head (wrapping to tail); if `visited` is clear, evict the node in O(1)
- *         (quick demotion of one-hit-wonder scans).
+ *         (quick demotion of one-hit-wonder scans). When `max_size == 1` and the incoming tenant is
+ *         not tied at `max_size`, visited singletons receive a SIEVE second chance across the
+ *         singleton ring in O(1) per iterator step so hot singleton tenants survive ephemeral
+ *         one-shot tenant churn when `T > max_active`.
  *      d) Strict linear worst-case step bound under concurrent worker writes: cumulative transfer
  *         and sweep counters are capped at `initial_active` and `saturatingDouble(initial_active)`
  *         respectively across a single eviction call. By the monotonic peak / no-re-entry property,
@@ -142,8 +148,10 @@ public:
       : max_active_(max_active), max_pending_(max_pending) {}
 
   // Returns whether a new pending fetch for `tenant_id` is allowed under `max_pending`.
-  // Always returns true when `max_pending == 0`.
-  bool canAdmitPending(TenantId tenant_id) const;
+  // Always returns true when `max_pending == 0`. Observing any named tenant
+  // (`tenant_id != kDefaultTenantId`) permanently latches multi-tenant dynamic-threshold
+  // enforcement for `kDefaultTenantId`, even if this call returns false due to saturation.
+  bool canAdmitPending(TenantId tenant_id);
 
   // Records a newly opened pending (warming) fetch for `key` owned by `tenant_id`.
   // No-op if `key` is already tracked or both limits are disabled.
@@ -235,6 +243,15 @@ private:
   // Bijection invariant: `(s, t) in active_tenants_by_size_ <=> (tenants_.contains(t) &&
   // tenants_[t].active_size == s && s > 0)`, so `active_tenants_by_size_.size() <= active_count_`.
   absl::btree_set<std::pair<size_t, TenantId>> active_tenants_by_size_;
+
+  // Rotating cursor used to break non-incoming ties at `max_size` across `active_tenants_by_size_`
+  // so low-hash tenants are not permanently pinned when `T > C` or `C % T >= 2`.
+  TenantId victim_cursor_{0};
+
+  // Latched once any named (`tenant_id != kDefaultTenantId`) tenant is observed, ensuring
+  // `kDefaultTenantId` never re-enables the single-bucket 100% pending bypass in pending-only mode
+  // when named tenants momentarily have zero in-flight fetches.
+  bool saw_named_tenant_{false};
 };
 
 } // namespace FairSieve
