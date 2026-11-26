@@ -576,19 +576,27 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, InitialRemovalCompletesWarmin
   }
 }
 
-TEST(FilterConfigDiscoveryTest, InitialRemovalCanReleaseLastProviderDuringWarming) {
-  NetworkFilterConfigDiscoveryImplTest test;
-  test.setup();
-  const auto subscription =
-      static_cast<FilterConfigSubscription&>(*test.callbacks_).weak_from_this();
-  EXPECT_CALL(test.init_watcher_, ready()).WillOnce([&] { test.provider_.reset(); });
-  Protobuf::RepeatedPtrField<std::string> removed;
-  removed.Add("foo");
-  ASSERT_OK(test.callbacks_->onConfigUpdate({}, removed, "1"));
-  EXPECT_EQ(nullptr, test.provider_);
-  EXPECT_FALSE(subscription.expired());
-  test.server_factory_context_.dispatcher_.clearDeferredDeleteList();
-  EXPECT_TRUE(subscription.expired());
+TEST(FilterConfigDiscoveryTest, SubscriptionOutlivesLastProviderReleasedDuringWarming) {
+  for (bool initial_removal : {true, false}) {
+    SCOPED_TRACE(initial_removal ? "initial removal" : "fetch timeout");
+    NetworkFilterConfigDiscoveryImplTest test;
+    test.setup();
+    const auto subscription =
+        static_cast<FilterConfigSubscription&>(*test.callbacks_).weak_from_this();
+    EXPECT_CALL(test.init_watcher_, ready()).WillOnce([&] { test.provider_.reset(); });
+    if (initial_removal) {
+      Protobuf::RepeatedPtrField<std::string> removed;
+      removed.Add("foo");
+      ASSERT_OK(test.callbacks_->onConfigUpdate({}, removed, "1"));
+    } else {
+      test.callbacks_->onConfigUpdateFailed(Config::ConfigUpdateFailureReason::FetchTimedout,
+                                            nullptr);
+    }
+    EXPECT_EQ(nullptr, test.provider_);
+    EXPECT_FALSE(subscription.expired());
+    test.server_factory_context_.dispatcher_.clearDeferredDeleteList();
+    EXPECT_TRUE(subscription.expired());
+  }
 }
 
 TEST(FilterConfigDiscoveryTest, NetworkFilterRemovalPreservesAnActiveDefault) {
