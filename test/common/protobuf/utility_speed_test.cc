@@ -1,9 +1,11 @@
 // Note: this should be run with --compilation_mode=opt, and would benefit from a
 // quiescent system with disabled cstate power management.
 
+#include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"
 
 #include "test/common/protobuf/deterministic_hash_test.pb.h"
+#include "test/proto/sensitive.pb.h"
 
 #include "benchmark/benchmark.h"
 
@@ -64,5 +66,26 @@ static void bmHashByDeterministicHash(benchmark::State& state,
 BENCHMARK_CAPTURE(bmHashByDeterministicHash, map, testProtoWithMaps());
 BENCHMARK_CAPTURE(bmHashByDeterministicHash, recursion, testProtoWithRecursion());
 BENCHMARK_CAPTURE(bmHashByDeterministicHash, repeatedFields, testProtoWithRepeatedFields());
+
+namespace {
+
+void bmRedactRepeatedAny(benchmark::State& state) {
+  envoy::test::Sensitive sensitive;
+  sensitive.set_sensitive_string("secret");
+  envoy::test::Sensitive message;
+  for (int64_t i = 0; i < state.range(0); ++i) {
+    RELEASE_ASSERT(message.add_insensitive_repeated_any()->PackFrom(sensitive),
+                   "could not pack benchmark message");
+  }
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    MessageUtil::redact(message);
+    benchmark::DoNotOptimize(message);
+  }
+}
+BENCHMARK(bmRedactRepeatedAny)->Arg(1)->Arg(100)->Arg(10000);
+
+} // namespace
 
 } // namespace Envoy

@@ -80,6 +80,12 @@ public:
         module, R"EOF("
         )EOF"));
     config_helper_.prependFilter(yaml, downstream);
+    if (!downstream) {
+      // On the legacy shared buffer, UpstreamCodecFilter::continueDecoding() after the upstream
+      // connects can drain body data buffered by the stopped Wasm filter.
+      config_helper_.addRuntimeOverride(
+          "envoy.reloadable_features.filter_manager_per_filter_buffer", "true");
+    }
 
     // Set buffer limit for HTTP1 to same value with the default limit of HTTP2.
     config_helper_.setBufferLimits(65535, 65535);
@@ -297,11 +303,6 @@ TEST_P(WasmFilterIntegrationTest, PanicReturn503) {
 }
 
 TEST_P(WasmFilterIntegrationTest, LargeRequestHitBufferLimit) {
-  // TODO(wbpcode): upstream HTTP filter couldn't stop the iteration correctly.
-  if (bool downstream = std::get<2>(GetParam()); !downstream) {
-    return;
-  }
-
   setupWasmFilter("", "body");
   HttpIntegrationTest::initialize();
 

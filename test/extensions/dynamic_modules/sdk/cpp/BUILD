@@ -1,6 +1,9 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_package")
 
 licenses(["notice"])  # Apache 2
+
+envoy_package()
 
 # Mock implementations for plugin handle interfaces.
 # Used for testing.
@@ -38,6 +41,32 @@ cc_test(
     deps = [
         "//source/extensions/dynamic_modules/sdk/cpp:sdk_fake",
         "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "sdk_utility_test",
+    srcs = ["sdk_utility_test.cc"],
+    tags = [
+        "no_san",
+        "nocoverage",
+    ],
+    deps = [
+        "//source/extensions/dynamic_modules/sdk/cpp:sdk",
+        "@googletest//:gtest_main",
+    ],
+)
+
+envoy_cc_test(
+    name = "sdk_utility_envoy_test",
+    srcs = ["sdk_utility_envoy_test.cc"],
+    tags = [
+        "no_san",
+        "nocoverage",
+    ],
+    deps = [
+        "//source/common/http:header_utility_lib",
+        "//source/extensions/dynamic_modules/sdk/cpp:sdk",
     ],
 )
 

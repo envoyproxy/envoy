@@ -7,7 +7,9 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/config/utility.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/eds/eds.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -388,6 +390,283 @@ TEST_F(EdsTest, EndpointWeightChangeCausesRebuild) {
   EXPECT_EQ(new_hosts[0]->weight(), 31);
 }
 
+// Verify that an unchanged endpoint keeps its host, and that changes still apply, with host reuse
+// on and off.
+class EdsHostReuseTest : public EdsTest, public testing::WithParamInterface<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(ReuseUnchangedHosts, EdsHostReuseTest, testing::Bool());
+
+TEST_P(EdsHostReuseTest, UnchangedEndpointKeepsHost) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.eds_reuse_unchanged_hosts", GetParam() ? "true" : "false"}});
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  endpoints->mutable_locality()->set_zone("z1");
+  auto* endpoint = endpoints->add_lb_endpoints();
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+  endpoint->mutable_endpoint()->set_hostname("foo");
+  endpoint->mutable_load_balancing_weight()->set_value(30);
+  (*endpoint->mutable_metadata()->mutable_filter_metadata())["x"] =
+      MessageUtil::keyValueStruct("k", "v");
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const HostSharedPtr host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+
+  // Building a host resolves its transport socket, so the default match count shows whether
+  // the unchanged push built a new host.
+  const uint64_t matches =
+      stats_.findCounterByString("cluster.name.default.total_match_count").value().get().value();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(
+      matches + (GetParam() ? 0 : 1),
+      stats_.findCounterByString("cluster.name.default.total_match_count").value().get().value());
+  EXPECT_EQ(1UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
+  ASSERT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+
+  endpoint->mutable_load_balancing_weight()->set_value(31);
+  endpoint->set_health_status(envoy::config::core::v3::DEGRADED);
+  (*endpoint->mutable_metadata()->mutable_filter_metadata())["x"] =
+      MessageUtil::keyValueStruct("k", "w");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const HostSharedPtr updated = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_EQ(31, updated->weight());
+  EXPECT_EQ(Host::HealthStatus::DEGRADED, updated->edsHealthStatus());
+  EXPECT_EQ("w",
+            Config::Metadata::metadataValue(updated->metadata().get(), "x", "k").string_value());
+
+  endpoint->mutable_endpoint()->set_hostname("bar");
+  endpoints->mutable_locality()->set_zone("z2");
+  endpoints->set_priority(1);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().empty());
+  const HostSharedPtr moved = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts()[0];
+  EXPECT_EQ("bar", moved->hostname());
+  EXPECT_EQ("z2", moved->locality().zone());
+  EXPECT_EQ(1, moved->priority());
+}
+
+// Every endpoint field a host is built from must either be compared or force a new host.
+TEST_F(EdsTest, EndpointMatchesHostComparesEveryField) {
+  using LbEndpoint = envoy::config::endpoint::v3::LbEndpoint;
+  using Locality = envoy::config::endpoint::v3::LocalityLbEndpoints;
+
+  // Each host is built from its own endpoint: first the ones a host can be reused for, then the
+  // ones that always get a new host.
+  struct HostCase {
+    std::function<void(LbEndpoint&)> setup;
+    bool reusable;
+  };
+  const std::vector<HostCase> host_cases = {
+      {[](LbEndpoint&) {}, true},
+      {[](LbEndpoint& e) {
+         (*e.mutable_metadata()->mutable_filter_metadata())["x"] =
+             MessageUtil::keyValueStruct("k", "v");
+       },
+       true},
+      {[](LbEndpoint& e) {
+         e.mutable_endpoint()->set_observability_name("obs0");
+         e.set_health_status(envoy::config::core::v3::DEGRADED);
+         e.mutable_load_balancing_weight()->set_value(40);
+       },
+       true},
+      {[](LbEndpoint& e) {
+         e.mutable_endpoint()->mutable_health_check_config()->set_port_value(81);
+       },
+       false},
+      {[](LbEndpoint& e) {
+         e.mutable_endpoint()->mutable_health_check_config()->set_hostname("hc");
+       },
+       false},
+      {[](LbEndpoint& e) {
+         e.mutable_endpoint()->mutable_health_check_config()->set_disable_active_health_check(true);
+       },
+       false},
+      {[](LbEndpoint& e) {
+         auto* address = e.mutable_endpoint()
+                             ->add_additional_addresses()
+                             ->mutable_address()
+                             ->mutable_socket_address();
+         address->set_address("10.0.0.1");
+         address->set_port_value(80);
+       },
+       false},
+  };
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  endpoints->mutable_locality()->set_zone("z1");
+  for (size_t i = 0; i < host_cases.size(); ++i) {
+    auto* endpoint = endpoints->add_lb_endpoints();
+    auto* address = endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+    address->set_address(absl::StrCat("1.2.3.", i + 1));
+    address->set_port_value(80);
+    endpoint->mutable_endpoint()->set_hostname("foo");
+    endpoint->mutable_load_balancing_weight()->set_value(30);
+    host_cases[i].setup(*endpoint);
+  }
+  // A second locality with a non-default priority.
+  auto* other_endpoints = cluster_load_assignment.add_endpoints();
+  other_endpoints->set_priority(1);
+  other_endpoints->mutable_locality()->set_region("r1");
+  other_endpoints->mutable_locality()->set_zone("z2");
+  other_endpoints->mutable_locality()->set_sub_zone("s1");
+  auto* other_endpoint = other_endpoints->add_lb_endpoints();
+  other_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
+      "1.2.4.1");
+  other_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
+      80);
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const auto host_map = cluster_->prioritySet().crossPriorityHostMap();
+  const auto metadata_pool = cluster_->constMetadataSharedPool();
+
+  const std::vector<std::function<void(LbEndpoint&)>> endpoint_changes = {
+      [](LbEndpoint& e) { e.mutable_endpoint()->set_hostname("bar"); },
+      [](LbEndpoint& e) { e.mutable_endpoint()->set_observability_name("changed"); },
+      [](LbEndpoint& e) { e.mutable_load_balancing_weight()->set_value(77); },
+      [](LbEndpoint& e) { e.set_health_status(envoy::config::core::v3::UNHEALTHY); },
+      [](LbEndpoint& e) {
+        (*e.mutable_metadata()->mutable_filter_metadata())["x"] =
+            MessageUtil::keyValueStruct("k", "changed");
+      },
+  };
+  const std::vector<std::function<void(Locality&)>> locality_changes = {
+      [](Locality& l) { l.set_priority(7); },
+      [](Locality& l) { l.mutable_locality()->set_region("changed"); },
+      [](Locality& l) { l.mutable_locality()->set_zone("changed"); },
+      [](Locality& l) { l.mutable_locality()->set_sub_zone("changed"); },
+  };
+  const auto check_case = [&](const LbEndpoint& lb_endpoint, const Locality& locality,
+                              bool reusable) {
+    const std::string address = lb_endpoint.endpoint().address().socket_address().address();
+    const HostSharedPtr host = host_map->findHost(absl::StrCat(address, ":80"));
+    ASSERT_NE(nullptr, host);
+    EXPECT_EQ(reusable, EdsClusterImpl::endpointMatchesHost(lb_endpoint, locality, *host->address(),
+                                                            *host, metadata_pool))
+        << lb_endpoint.DebugString();
+    if (!reusable) {
+      // Only the host side can reject an endpoint with neither health check config nor
+      // additional addresses.
+      LbEndpoint plain = lb_endpoint;
+      plain.mutable_endpoint()->clear_health_check_config();
+      plain.mutable_endpoint()->clear_additional_addresses();
+      EXPECT_FALSE(EdsClusterImpl::endpointMatchesHost(plain, locality, *host->address(), *host,
+                                                       metadata_pool))
+          << lb_endpoint.DebugString();
+      return;
+    }
+    for (const auto& change : endpoint_changes) {
+      LbEndpoint changed = lb_endpoint;
+      change(changed);
+      EXPECT_FALSE(EdsClusterImpl::endpointMatchesHost(changed, locality, *host->address(), *host,
+                                                       metadata_pool))
+          << changed.DebugString();
+    }
+    for (const auto& change : locality_changes) {
+      Locality changed = locality;
+      change(changed);
+      EXPECT_FALSE(EdsClusterImpl::endpointMatchesHost(lb_endpoint, changed, *host->address(),
+                                                       *host, metadata_pool))
+          << changed.DebugString();
+    }
+    // Removing metadata, or adding it to an endpoint that has none, must not match either.
+    LbEndpoint toggled_metadata = lb_endpoint;
+    if (lb_endpoint.has_metadata()) {
+      toggled_metadata.clear_metadata();
+    } else {
+      (*toggled_metadata.mutable_metadata()->mutable_filter_metadata())["x"] =
+          MessageUtil::keyValueStruct("k", "v");
+    }
+    EXPECT_FALSE(EdsClusterImpl::endpointMatchesHost(toggled_metadata, locality, *host->address(),
+                                                     *host, metadata_pool));
+    // Same address string, different network namespace.
+    const Network::Address::Ipv4Instance other_namespace(address, 80, nullptr,
+                                                         std::string("/var/run/netns/other"));
+    EXPECT_FALSE(EdsClusterImpl::endpointMatchesHost(lb_endpoint, locality, other_namespace, *host,
+                                                     metadata_pool));
+  };
+
+  for (size_t i = 0; i < host_cases.size(); ++i) {
+    check_case(endpoints->lb_endpoints(i), *endpoints, host_cases[i].reusable);
+  }
+  check_case(other_endpoints->lb_endpoints(0), *other_endpoints, true);
+}
+
+// A new field in these messages may need a check in endpointMatchesHost() or a rule in
+// updateDynamicHostList(). Update both, then the count here.
+TEST(EdsEndpointFieldsTest, EndpointMatchesHostCoversEveryField) {
+  EXPECT_EQ(5, envoy::config::endpoint::v3::Endpoint::descriptor()->field_count());
+  EXPECT_EQ(4,
+            envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::descriptor()->field_count());
+  EXPECT_EQ(5, envoy::config::endpoint::v3::LbEndpoint::descriptor()->field_count());
+  EXPECT_EQ(8, envoy::config::endpoint::v3::LocalityLbEndpoints::descriptor()->field_count());
+}
+
+// An address repeated in one push registers one host for it, whether or not the host is reused.
+TEST_P(EdsHostReuseTest, RepeatedAddressRegistersOneHost) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.eds_reuse_unchanged_hosts", GetParam() ? "true" : "false"}});
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  const auto add_endpoint = [endpoints](const std::string& address) {
+    auto* socket_address = endpoints->add_lb_endpoints()
+                               ->mutable_endpoint()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_address(address);
+    socket_address->set_port_value(80);
+  };
+  add_endpoint("1.2.3.4");
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  add_endpoint("1.2.3.4");
+  add_endpoint("1.2.3.5");
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(2, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
+// A namespace added to an existing endpoint is rejected as at creation, whether or not the host
+// could otherwise be reused.
+TEST_P(EdsHostReuseTest, NamespaceAddedToExistingEndpointIsRejected) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.eds_reuse_unchanged_hosts", GetParam() ? "true" : "false"}});
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* socket_address = cluster_load_assignment.add_endpoints()
+                             ->add_lb_endpoints()
+                             ->mutable_endpoint()
+                             ->mutable_address()
+                             ->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(80);
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  const HostSharedPtr host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+
+  socket_address->set_network_namespace_filepath("/var/run/netns/blue");
+  const auto decoded_resources =
+      TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
+  EXPECT_THROW_WITH_MESSAGE(
+      EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok()),
+      EnvoyException,
+      "Invalid host configuration: hosts cannot specify network namespaces with their address");
+  ASSERT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+}
+
 // Verify that host weight changes cause a full rebuild.
 TEST_F(EdsTest, DualStackEndpoint) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
@@ -621,6 +900,34 @@ TEST_F(EdsTest, EndpointMetadata) {
                                             Config::MetadataFilters::get().ENVOY_LB, "version")
                 .string_value(),
             "v3");
+}
+
+// Validate that onConfigUpdate() keeps the endpoint metadata when only the serialization of its Any
+// payload changes.
+TEST_F(EdsTest, EndpointMetadataWithReserializedAnyIsKept) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints();
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+  // The same struct with its two fields serialized in two orders.
+  Protobuf::Any& any =
+      (*endpoint->mutable_metadata()->mutable_typed_filter_metadata())["custom_namespace"];
+  any.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(0UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
+  const MetadataConstSharedPtr metadata =
+      cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->metadata();
+
+  any.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(1UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
+  EXPECT_EQ(metadata, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->metadata());
 }
 
 // Test verifies that updating metadata updates

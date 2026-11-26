@@ -1672,6 +1672,18 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(GrpcMuxImpl, GrpcMuxImplConfigTrackerTest, ::testing::Bool());
 
+TEST_P(GrpcMuxImplConfigTrackerTest, XdsConfigTrackerSkipsUnsubscriptionsWhileDisabled) {
+  xds_config_tracker_.enabled_ = false;
+  auto watch = grpc_mux_->addWatch(type_url_, {"x", "y"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(xds_config_tracker_, onResourceUnsubscribed(_, _)).Times(0);
+  watch->update({"y"});
+  testing::Mock::VerifyAndClearExpectations(&xds_config_tracker_);
+
+  xds_config_tracker_.enabled_ = true;
+  EXPECT_CALL(xds_config_tracker_, onResourceUnsubscribed(type_url_, "y"));
+  watch.reset();
+}
+
 TEST_P(GrpcMuxImplConfigTrackerTest, XdsConfigTrackerUnsubscriptionTest) {
   // 1. Add watch1 for {"x", "y"}
   auto watch1 = grpc_mux_->addWatch(type_url_, {"x", "y"}, callbacks_, resource_decoder_, {});

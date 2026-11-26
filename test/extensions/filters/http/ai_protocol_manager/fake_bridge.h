@@ -12,11 +12,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-// Hand-written FilterChainBridge that records everything the BufferManager / FilterManager does
-// to the (notional) filter chain, so the path-agnostic offload/replay logic can
-// be unit-tested without any HTTP filter mocks. Tests drive replay back-pressure
-// through raiseReplayWatermark()/lowerReplayWatermark(), exactly as a real
-// decoder/encoder bridge would when the connection manager raises a watermark.
+// Hand-written FilterChainBridge that records everything ingest managers, ChainWriter, and
+// FilterManager do to the (notional) filter chain, so path-agnostic ingestion and emission logic
+// can be unit-tested without HTTP filter mocks. Tests drive write back-pressure through
+// raiseWriteWatermark()/lowerWriteWatermark(), matching a real decoder/encoder bridge when the
+// connection manager raises a watermark.
 class FakeBridge : public FilterChainBridge {
 public:
   // The bridge samples the ingest buffer limit at construction, so a test that exercises ingest
@@ -33,11 +33,11 @@ public:
     if (on_inject_ != nullptr) {
       on_inject_();
     }
-    // Simulate downstream back-pressure arising mid-replay: when configured, raise
-    // the replay high watermark right after the Nth injected chunk, as a real
-    // chain would when its write buffer fills.
-    if (subscribed_ && inject_calls_ == raise_replay_watermark_at_inject_) {
-      onAboveReplayWatermark();
+    // Simulate downstream/upstream back-pressure arising mid-write: when configured, raise the
+    // write high watermark right after the Nth injected chunk, as a real chain would when its
+    // write buffer fills.
+    if (subscribed_ && inject_calls_ == raise_write_watermark_at_inject_) {
+      onAboveWriteWatermark();
     }
   }
   void pauseSource() override { ++pause_source_calls_; }
@@ -47,7 +47,7 @@ public:
       on_resume_source_();
     }
   }
-  void unsubscribeReplayWatermarks() override { subscribed_ = false; }
+  void unsubscribeWriteWatermarks() override { subscribed_ = false; }
   void onUnrecoverableError() override {
     ++error_calls_;
     if (on_error_ != nullptr) {
@@ -55,9 +55,9 @@ public:
     }
   }
 
-  // Drives replay back-pressure as the connection manager would.
-  void raiseReplayWatermark() { onAboveReplayWatermark(); }
-  void lowerReplayWatermark() { onBelowReplayWatermark(); }
+  // Drives write back-pressure as the connection manager would.
+  void raiseWriteWatermark() { onAboveWriteWatermark(); }
+  void lowerWriteWatermark() { onBelowWriteWatermark(); }
 
   Event::Dispatcher& dispatcher_;
   // A real adapter subscribes to the path's watermarks in its constructor.
@@ -68,7 +68,7 @@ public:
   int pause_source_calls_{0};
   int resume_source_calls_{0};
   int error_calls_{0};
-  int raise_replay_watermark_at_inject_{0}; // 0 = never.
+  int raise_write_watermark_at_inject_{0}; // 0 = never.
   std::function<void()> on_inject_;
   std::function<void()> on_error_;
   std::function<void()> on_resume_source_;

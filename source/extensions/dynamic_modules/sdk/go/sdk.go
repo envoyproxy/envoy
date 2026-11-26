@@ -15,6 +15,61 @@ var udpListenerFilterConfigFactoryRegistry = make(map[string]shared.UdpListenerF
 var statSinkConfigFactoryRegistry = make(map[string]shared.StatSinkConfigFactory)
 var earlyHeaderMutationConfigFactoryRegistry = make(map[string]shared.EarlyHeaderMutationConfigFactory)
 var headerFormatterConfigFactoryRegistry = make(map[string]shared.HeaderFormatterConfigFactory)
+var bootstrapExtensionConfigFactoryRegistry = make(map[string]shared.BootstrapExtensionConfigFactory)
+
+// NewBootstrapExtensionConfig creates a bootstrap configuration for the given name and config.
+func NewBootstrapExtensionConfig(handle shared.BootstrapExtensionConfigHandle, name string,
+	unparsedConfig []byte) (shared.BootstrapExtensionConfig, error) {
+	factory := bootstrapExtensionConfigFactoryRegistry[name]
+	if factory == nil {
+		return nil, fmt.Errorf("failed to get bootstrap extension config factory for %s", name)
+	}
+	return factory.Create(handle, unparsedConfig)
+}
+
+// GetBootstrapExtensionConfigFactory gets the bootstrap configuration factory for name.
+func GetBootstrapExtensionConfigFactory(name string) shared.BootstrapExtensionConfigFactory {
+	return bootstrapExtensionConfigFactoryRegistry[name]
+}
+
+// RegisterBootstrapExtensionConfigFactories registers bootstrap configuration factories.
+// This function MUST only be called from init() functions.
+func RegisterBootstrapExtensionConfigFactories(factories map[string]shared.BootstrapExtensionConfigFactory) {
+	for name, factory := range factories {
+		if _, ok := bootstrapExtensionConfigFactoryRegistry[name]; ok {
+			panic("bootstrap extension config factory already registered: " + name)
+		}
+		bootstrapExtensionConfigFactoryRegistry[name] = factory
+	}
+}
+
+var clusterConfigFactoryRegistry = make(map[string]shared.ClusterConfigFactory)
+
+// NewClusterConfig creates a configuration for the named cluster implementation.
+func NewClusterConfig(handle shared.ClusterConfigHandle, name string,
+	unparsedConfig []byte) (shared.ClusterConfig, error) {
+	factory := clusterConfigFactoryRegistry[name]
+	if factory == nil {
+		return nil, fmt.Errorf("failed to get cluster config factory for %s", name)
+	}
+	return factory.Create(handle, unparsedConfig)
+}
+
+// GetClusterConfigFactory gets the cluster configuration factory for name.
+func GetClusterConfigFactory(name string) shared.ClusterConfigFactory {
+	return clusterConfigFactoryRegistry[name]
+}
+
+// RegisterClusterConfigFactories registers cluster configuration factories.
+// This function MUST only be called from init() functions.
+func RegisterClusterConfigFactories(factories map[string]shared.ClusterConfigFactory) {
+	for name, factory := range factories {
+		if _, ok := clusterConfigFactoryRegistry[name]; ok {
+			panic("cluster config factory already registered: " + name)
+		}
+		clusterConfigFactoryRegistry[name] = factory
+	}
+}
 
 // NewHttpFilterFactory creates a new plugin factory for the given plugin name and unparsed config.
 func NewHttpFilterFactory(handle shared.HttpFilterConfigHandle, name string,

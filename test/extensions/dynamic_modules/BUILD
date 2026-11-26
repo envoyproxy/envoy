@@ -1,3 +1,4 @@
+load("@rules_go//go:def.bzl", "go_test")
 load(
     "@rules_rust//rust:defs.bzl",
     "rust_clippy",
@@ -26,7 +27,9 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:program_child",
         "//test/extensions/dynamic_modules/test_data/c:program_global",
         "//test/extensions/dynamic_modules/test_data/c:program_init_assert",
+        "//test/extensions/dynamic_modules/test_data/c:program_init_count",
         "//test/extensions/dynamic_modules/test_data/c:program_init_fail",
+        "//test/extensions/dynamic_modules/test_data/c:program_init_fail_once",
         "//test/extensions/dynamic_modules/test_data/rust:abi_version_mismatch",
         "//test/extensions/dynamic_modules/test_data/rust:no_op",
         "//test/extensions/dynamic_modules/test_data/rust:no_program_init",
@@ -56,9 +59,11 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/rust:no_op_static",
         "//test/mocks/init:init_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
@@ -124,6 +129,23 @@ envoy_cc_test_library(
 )
 
 # We have targets for the tests of SDK itself here so that //test/... will be able to run them.
+go_test(
+    name = "go_sdk_scheduler_test",
+    srcs = ["//source/extensions/dynamic_modules:sdk/go/internal/scheduler/scheduler_test.go"],
+    embed = ["//source/extensions/dynamic_modules:go_sdk_internal_scheduler"],
+    tags = ["nocoverage"],
+)
+
+go_test(
+    name = "go_sdk_shared_test",
+    srcs = [
+        "//source/extensions/dynamic_modules:sdk/go/shared/headers_test.go",
+        "//source/extensions/dynamic_modules:sdk/go/shared/types_test.go",
+    ],
+    embed = ["//source/extensions/dynamic_modules:go_sdk_shared"],
+    tags = ["nocoverage"],
+)
+
 rust_test(
     name = "rust_sdk_test",
     crate = "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk_mock",

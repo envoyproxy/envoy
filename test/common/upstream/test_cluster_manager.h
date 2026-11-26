@@ -165,12 +165,25 @@ public:
     return cluster_manager;
   }
 
+  using ClusterData = ClusterManagerImpl::ClusterData;
+  using ClusterMap = ClusterManagerImpl::ClusterMap;
+
+  const ClusterMap& activeClusterData() const { return active_clusters_; }
+  const ClusterMap& warmingClusterData() const { return warming_clusters_; }
+
   std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
     std::map<std::string, std::reference_wrapper<Cluster>> clusters;
     for (auto& cluster : active_clusters_) {
       clusters.emplace(cluster.first, *cluster.second->cluster_);
     }
     return clusters;
+  }
+
+  uint64_t activeClusterSerializedConfigHash(const std::string& name) const {
+    return active_clusters_.at(name)->serialized_config_hash_;
+  }
+  void setActiveClusterSerializedConfigHash(const std::string& name, uint64_t hash) {
+    active_clusters_.at(name)->serialized_config_hash_ = hash;
   }
 
   const ClusterInitializationMap& clusterInitializationMap() const {

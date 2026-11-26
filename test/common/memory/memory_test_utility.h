@@ -55,19 +55,29 @@ private:
 };
 
 // Compares the memory consumed against an exact expected value, but only on
-// canonical platforms, or when the expected value is zero. Canonical platforms
-// currently include only for 'release' tests in ci. On other platforms an info
-// log is emitted, indicating that the test is being skipped.
+// canonical platforms, or when the expected value is zero and memory usage can
+// be measured. Canonical platforms currently include only for 'release' tests in
+// ci. On other platforms an info log is emitted, indicating that the test is
+// being skipped.
+//
+// The zero case is not checked where memory usage cannot be measured (see
+// `MemoryTest::mode()`). In particular, with jemalloc the total changes when a
+// thread cache is refilled, so an allocation that is freed again can still be
+// reported as consumed memory, depending on what the process allocated before.
 #define EXPECT_MEMORY_EQ(consumed_bytes, expected_value)                                           \
   do {                                                                                             \
-    if (expected_value == 0 || ::Envoy::Memory::TestUtil::MemoryTest::mode() ==                    \
-                                   ::Envoy::Memory::TestUtil::MemoryTest::Mode::Canonical) {       \
-      EXPECT_EQ(consumed_bytes, expected_value);                                                   \
+    /* Read the memory consumed first: `MemoryTest::mode()` allocates. */                          \
+    const auto memory_test_consumed_bytes = consumed_bytes;                                        \
+    const auto memory_test_mode = ::Envoy::Memory::TestUtil::MemoryTest::mode();                   \
+    if ((expected_value == 0 &&                                                                    \
+         memory_test_mode != ::Envoy::Memory::TestUtil::MemoryTest::Mode::Disabled) ||             \
+        memory_test_mode == ::Envoy::Memory::TestUtil::MemoryTest::Mode::Canonical) {              \
+      EXPECT_EQ(memory_test_consumed_bytes, expected_value) << #consumed_bytes;                    \
     } else {                                                                                       \
       ENVOY_LOG_MISC(info,                                                                         \
                      "Skipping exact memory test of actual={} versus expected={} "                 \
                      "bytes as platform is non-canonical",                                         \
-                     consumed_bytes, expected_value);                                              \
+                     memory_test_consumed_bytes, expected_value);                                  \
     }                                                                                              \
   } while (false)
 

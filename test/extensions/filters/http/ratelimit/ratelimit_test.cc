@@ -2284,7 +2284,7 @@ TEST_F(HttpRateLimitFilterTest, PerRouteDomainSet) {
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
 }
 
-TEST_F(HttpRateLimitFilterTest, ConfigValueTest) {
+TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ConfigValueTest)) {
   std::string stage_filter_config = R"EOF(
   {
     "domain": "foo",

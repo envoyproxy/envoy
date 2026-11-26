@@ -54,6 +54,11 @@ envoy_cc_extension(
     deps = [
         ":abi_impl",
         ":upstream_request_lib",
+        "//envoy/server:factory_context_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:macros",
+        "//source/common/common:thread_lib",
+        "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "@abseil-cpp//absl/strings",

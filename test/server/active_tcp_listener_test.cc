@@ -54,6 +54,20 @@ public:
                Server::ThreadLocalOverloadStateOptRef overload_state));
 };
 
+class StateCarryingIoHandle : public NiceMock<Network::MockIoHandle> {
+public:
+  void mergeStateInto(envoy::config::core::v3::Metadata& metadata,
+                      StreamInfo::FilterState& filter_state) override {
+    merged_metadata_ = &metadata;
+    merged_filter_state_ = &filter_state;
+    ++merge_calls_;
+  }
+
+  const envoy::config::core::v3::Metadata* merged_metadata_{nullptr};
+  const StreamInfo::FilterState* merged_filter_state_{nullptr};
+  int merge_calls_{0};
+};
+
 class ActiveTcpListenerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {
 public:
   ActiveTcpListenerTest() {
@@ -750,6 +764,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
 
 // Verify that the server connection with recovered address is rebalanced at redirected listener.
 TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
+  StateCarryingIoHandle state_io_handle;
   // Prepare Listener1.
   NiceMock<Network::MockListenerConfig> listener_config1;
   NiceMock<Network::MockConnectionBalancer> balancer1;
@@ -800,6 +815,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   auto* test_filter = new NiceMock<Network::MockListenerFilter>();
   EXPECT_CALL(*test_filter, destroy_());
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(state_io_handle));
   bool redirected = false;
 
   // 1. Listener1 re-balance. Set the balance target to the the active listener itself.
@@ -827,6 +843,9 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
       });
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        EXPECT_EQ(state_io_handle.merge_calls_, 1);
+        EXPECT_EQ(state_io_handle.merged_metadata_, &cb.dynamicMetadata());
+        EXPECT_EQ(state_io_handle.merged_filter_state_, &cb.filterState());
         cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
         return Network::FilterStatus::Continue;
       });
@@ -858,6 +877,9 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   auto* connection = new NiceMock<Network::MockServerConnection>();
   EXPECT_CALL(dispatcher_, createServerConnection_(_))
       .WillOnce([&](StreamInfo::StreamInfo& info) -> Network::ServerConnection* {
+        EXPECT_EQ(state_io_handle.merge_calls_, 2);
+        EXPECT_EQ(state_io_handle.merged_metadata_, &info.dynamicMetadata());
+        EXPECT_EQ(state_io_handle.merged_filter_state_, info.filterState().get());
         EXPECT_TRUE(
             info.filterState()->hasIndexedData(StreamInfo::FilterStateIndex::NetworkNamespace));
         const auto* obj = info.filterState()->getIndexedDataReadOnlyGeneric(
@@ -1158,6 +1180,35 @@ TEST_F(ActiveTcpListenerTest, RebalancedSocketRebindsOverloadStateToDestinationW
   active_listener1.reset();
   EXPECT_CALL(listener2, onDestroy());
   active_listener2.reset();
+}
+
+TEST_F(ActiveTcpListenerTest, IoHandleMergeStateIntoPopulatesStreamInfoBeforeListenerFilters) {
+  initializeWithFilter();
+
+  StateCarryingIoHandle state_io_handle;
+  auto accepted_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(state_io_handle));
+
+  // Verify mergeStateInto is invoked on the stream's metadata/filter state before listener filters.
+  EXPECT_CALL(*filter_, onAccept(_))
+      .WillOnce([&state_io_handle](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        EXPECT_EQ(state_io_handle.merge_calls_, 1);
+        EXPECT_EQ(state_io_handle.merged_metadata_, &cb.dynamicMetadata());
+        EXPECT_EQ(state_io_handle.merged_filter_state_, &cb.filterState());
+        return Network::FilterStatus::Continue;
+      });
+
+  // Verify the same metadata/filter state reaches filter-chain matching.
+  EXPECT_CALL(manager_, findFilterChain(_, _))
+      .WillOnce(
+          [&state_io_handle](const Network::ConnectionSocket&,
+                             const StreamInfo::StreamInfo& info) -> const Network::FilterChain* {
+            EXPECT_EQ(state_io_handle.merged_metadata_, &info.dynamicMetadata());
+            EXPECT_EQ(state_io_handle.merged_filter_state_, &info.filterState());
+            return nullptr;
+          });
+
+  generic_active_listener_->onAcceptWorker(std::move(accepted_socket), false, true, {});
 }
 
 } // namespace

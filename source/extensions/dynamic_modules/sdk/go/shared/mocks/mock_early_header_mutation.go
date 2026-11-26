@@ -284,6 +284,20 @@ func (mr *MockEarlyHeaderMutationConfigHandleMockRecorder) GetRuntimeNumber(key,
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRuntimeNumber", reflect.TypeOf((*MockEarlyHeaderMutationConfigHandle)(nil).GetRuntimeNumber), key, defaultValue)
 }
 
+// GetServerConcurrency mocks base method.
+func (m *MockEarlyHeaderMutationConfigHandle) GetServerConcurrency() uint32 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetServerConcurrency")
+	ret0, _ := ret[0].(uint32)
+	return ret0
+}
+
+// GetServerConcurrency indicates an expected call of GetServerConcurrency.
+func (mr *MockEarlyHeaderMutationConfigHandleMockRecorder) GetServerConcurrency() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServerConcurrency", reflect.TypeOf((*MockEarlyHeaderMutationConfigHandle)(nil).GetServerConcurrency))
+}
+
 // IsLogLevelEnabled mocks base method.
 func (m *MockEarlyHeaderMutationConfigHandle) IsLogLevelEnabled(level shared.LogLevel) bool {
 	m.ctrl.T.Helper()

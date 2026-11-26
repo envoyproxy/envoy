@@ -196,11 +196,32 @@ absl::Status RdsRouteConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   if (!removed_resources.empty()) {
-    // TODO(#2500) when on-demand resource loading is supported, an RDS removal may make sense
-    // (see discussion in #6879), and so we should do something other than ignoring here.
-    ENVOY_LOG(trace,
-              "Server sent a delta {} update attempting to remove a resource (name: {}). Ignoring.",
-              rds_type_, removed_resources[0]);
+    // A removal never unpublishes the configuration a provider holds: a
+    // listener cannot run without a route table (see #6879). It is reported to
+    // the owners that registered for it, which lets a route table that was
+    // fetched on demand (an on-demand scoped-RDS scope) be dropped and fetched
+    // again when next needed; owners without such a callback keep the
+    // configuration as before.
+    bool removes_this = false;
+    for (const std::string& name : removed_resources) {
+      if (name == route_config_name_) {
+        removes_this = true;
+        break;
+      }
+    }
+    if (removes_this) {
+      ENVOY_LOG(debug, "Server sent a delta {} update removing route config '{}'", rds_type_,
+                route_config_name_);
+      if (const absl::Status status = removal_callback_manager_.runCallbacks(); !status.ok()) {
+        ENVOY_LOG(warn, "rds: removal callback failed for route config '{}': {}",
+                  route_config_name_, status.message());
+      }
+    } else {
+      ENVOY_LOG(trace,
+                "Server sent a delta {} update attempting to remove a resource "
+                "(name: {}). Ignoring.",
+                rds_type_, removed_resources[0]);
+    }
   }
   if (!added_resources.empty()) {
     return onConfigUpdate(added_resources, added_resources[0].get().version());

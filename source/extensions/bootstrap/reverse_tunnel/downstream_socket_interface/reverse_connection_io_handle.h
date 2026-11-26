@@ -207,6 +207,9 @@ public:
    */
   void resetFileEvents() override;
 
+  // When enabled, stop the dial loop even when the listener has no accepted connections to notify.
+  void onListenerDrain() override;
+
   /**
    * Triggers the reverse connection workflow.
    * @param dispatcher the event dispatcher.
@@ -353,6 +356,17 @@ public:
    */
   void markTunnelDrainingAndDialReplacement(const std::string& connection_key,
                                             uint64_t connection_id);
+
+  /**
+   * Stop creating tunnels when the listener begins draining. Must run on the worker dispatcher.
+   * Cancels pending handshakes and queued accepts while preserving accepted tunnel sockets.
+   * This is permanent for this listener, including an admin drain with skip_exit. Repeated calls
+   * are harmless; restarting tunnel initiation requires replacing the listener.
+   */
+  void stopInitiatingConnections();
+
+  // A draining listener becomes ineligible as soon as the runtime guard is enabled.
+  bool canInitiateConnections() const;
 
   /**
    * Remove a connection key from per-host tracking (the key set and its state gauge). Shared by the
@@ -583,6 +597,9 @@ private:
 
   // Single retry timer for all clusters
   Event::TimerPtr rev_conn_retry_timer_;
+
+  bool listener_draining_{false};
+  bool connections_stopped_{false};
 
   // Set while waiting for parentStopAcceptingRequested(); cleared after scheduling the one-shot
   // drain-propagation grace timer so fresh starts dial immediately.

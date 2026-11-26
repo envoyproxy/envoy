@@ -45,14 +45,14 @@ jobs:
       env: ${{ steps.data.outputs.value }}
       config: ${{ steps.config.outputs.config }}
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: envoyproxy/toolshed/actions/jq@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       id: started
       name: Create timestamp
       with:
         options: -r
         filter: |
           now
-    - uses: envoyproxy/toolshed/actions/github/checkout@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+    - uses: envoyproxy/toolshed/actions/github/checkout@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       id: checkout
       name: Checkout Envoy repository (requested)
       with:
@@ -70,7 +70,7 @@ jobs:
     # *ALL* variables collected should be treated as untrusted and should be sanitized before
     # use
     - name: Generate environment variables from commit
-      uses: envoyproxy/toolshed/actions/envoy/ci/request@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: envoyproxy/toolshed/actions/envoy/ci/request@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       id: env
       with:
         branch-name: ${{ steps.checkout.outputs.branch-name }}
@@ -83,7 +83,7 @@ jobs:
 
     - name: Request summary
       id: summary
-      uses: envoyproxy/toolshed/actions/github/env/summary@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: envoyproxy/toolshed/actions/github/env/summary@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       with:
         actor: ${{ toJSON(fromJSON(steps.env.outputs.data).request.actor) }}
         base-sha: ${{ fromJSON(steps.env.outputs.data).request.base-sha }}
@@ -99,7 +99,7 @@ jobs:
         target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
 
     - name: Environment data
-      uses: envoyproxy/toolshed/actions/jq@e8ab1b7c39d474eadc1b9340055df55407d2c77e  # actions-v0.4.33
+      uses: envoyproxy/toolshed/actions/jq@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
       id: data
       with:
         input: |

@@ -6,7 +6,6 @@
 #include "source/common/listener_manager/active_stream_listener_base.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/stats/timespan_impl.h"
-#include "source/extensions/io_socket/user_space/io_handle.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -57,15 +56,8 @@ void ActiveInternalListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   // connections.
   incNumConnections();
 
-  auto* io_handle = dynamic_cast<Extensions::IoSocket::UserSpace::IoHandle*>(&socket->ioHandle());
   auto active_socket = std::make_unique<Server::ActiveTcpSocket>(
       *this, std::move(socket), false /* do not hand off at internal listener */, std::nullopt);
-  // Transfer internal passthrough state to the active socket from downstream.
-  if (io_handle != nullptr && io_handle->passthroughState()) {
-    io_handle->passthroughState()->mergeInto(active_socket->dynamicMetadata(),
-                                             active_socket->filterState());
-  }
-
   onSocketAccepted(std::move(active_socket));
 }
 
