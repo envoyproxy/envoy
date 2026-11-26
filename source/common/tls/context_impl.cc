@@ -103,6 +103,7 @@ ContextImpl::ContextImpl(
 
     int rc = SSL_CTX_set_app_data(ctx.ssl_ctx_.get(), this);
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    SSL_CTX_set_info_callback(ctx.ssl_ctx_.get(), infoCallback);
 
     ctx.provides_ciphers_and_curves_ = capabilities_.provides_ciphers_and_curves;
     ctx.provides_sigalgs_ = capabilities_.provides_sigalgs;
@@ -393,6 +394,23 @@ void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
   ASSERT(ctx != nullptr);
   ctx->maybeWriteKeyLog(line, callbacks->connection().connectionInfoProvider().localAddress().get(),
                         callbacks->connection().connectionInfoProvider().remoteAddress().get());
+}
+
+void ContextImpl::infoCallback(const SSL* ssl, int type, int) {
+  // A resumed TLS 1.2 handshake still reports the signature algorithm it would have used.
+  if (type != SSL_CB_HANDSHAKE_DONE || SSL_session_reused(ssl)) {
+    return;
+  }
+  const uint16_t sigalg_id = SSL_get_signature_algorithm_used(ssl);
+  if (sigalg_id == 0) {
+    return;
+  }
+  const auto* ctx = static_cast<const ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
+  ASSERT(ctx != nullptr);
+  ctx->incCounter(ctx->builtin_stat_names_->ssl_local_sigalgs_,
+                  ctx->builtin_stat_names_->ssl_sigalg_tag_name_,
+                  SSL_get_signature_algorithm_name(sigalg_id, 1 /* include curve */),
+                  ctx->builtin_stat_names_->unknown_ssl_algorithm_);
 }
 
 void ContextImpl::maybeWriteKeyLog(const char* line, const Network::Address::Instance* local_addr,

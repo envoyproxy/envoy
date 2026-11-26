@@ -56,6 +56,7 @@ public:
   const Stats::StatName ssl_versions_;
   const Stats::StatName ssl_curves_;
   const Stats::StatName ssl_sigalgs_;
+  const Stats::StatName ssl_local_sigalgs_;
   // The names of the tags of the handshake stats. The cipher tag matches the
   // legacy extraction rules: "envoy.ssl_cipher" for the server (listener) side and "cipher_suite"
   // for the client (cluster) side.
