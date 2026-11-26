@@ -12027,7 +12027,10 @@ pub type envoy_dynamic_module_type_cluster_host_envoy_ptr = *mut ::std::os::raw:
  OWNERSHIP: Envoy owns the pointer. The pointer is valid only during the
  envoy_dynamic_module_on_cluster_lb_choose_host call, unless async host selection is used. When
  async host selection is used, the context remains valid until the async completion callback is
- called or the selection is canceled.*/
+ called or the selection is canceled. Envoy tells a module of a cancellation only when it calls
+ envoy_dynamic_module_on_cluster_lb_cancel_host_selection, so a module that completes from another
+ thread copies what it needs from the context inside
+ envoy_dynamic_module_on_cluster_lb_choose_host.*/
 pub type envoy_dynamic_module_type_cluster_lb_context_envoy_ptr = *mut ::std::os::raw::c_void;
 /** envoy_dynamic_module_type_cluster_scheduler_envoy_ptr is a raw pointer to the
  DynamicModuleClusterScheduler class in Envoy. This is used to schedule events to the main thread
@@ -12046,10 +12049,12 @@ pub type envoy_dynamic_module_type_cluster_scheduler_module_ptr = *mut ::std::os
  envoy_dynamic_module_on_cluster_lb_choose_host when the module needs to perform asynchronous
  work (e.g., DNS resolution) before selecting a host.
 
- OWNERSHIP: The module owns the pointer. The module must keep it valid until either
- envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called or
- envoy_dynamic_module_on_cluster_lb_cancel_host_selection is called. After either event, the
- module may release the handle.*/
+ OWNERSHIP: The module owns the pointer. The module must keep it valid until Envoy calls
+ envoy_dynamic_module_on_cluster_lb_cancel_host_selection for it. Envoy calls that hook once for
+ every handle, after it has delivered the result the module passed to
+ envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete as well as when the
+ request gives the selection up first, so the module releases the handle in that hook and not
+ when it calls the completion callback.*/
 pub type envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr = *mut ::std::os::raw::c_void;
 /** envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr is a module-owned opaque pointer
  stored in the cluster's worker thread-local slot. Envoy treats the value as opaque and never
@@ -12091,7 +12096,9 @@ unsafe extern "C" {
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
     /** envoy_dynamic_module_on_cluster_config_destroy is called when the cluster configuration is
- destroyed. The module should release any resources associated with the configuration.
+ destroyed. The module should release any resources associated with the configuration. Envoy
+ calls this on the main thread, once nothing that uses the configuration remains, which can be
+ after the cluster when a worker slot payload or a pending async host selection outlives it.
 
  @param config_module_ptr is the pointer to the in-module cluster configuration.*/
     pub fn envoy_dynamic_module_on_cluster_config_destroy(
@@ -12194,13 +12201,30 @@ unsafe extern "C" {
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
-    /** envoy_dynamic_module_on_cluster_lb_cancel_host_selection is called when the stream is destroyed
- before async host selection completes (e.g., stream timeout). After this call, the module must
- not call envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete for this handle.
+    /** envoy_dynamic_module_on_cluster_lb_cancel_host_selection is called once for every async handle
+ that envoy_dynamic_module_on_cluster_lb_choose_host returned, when Envoy is done with the
+ selection. That happens when the request gives the selection up before the result arrives, such
+ as on a stream timeout, and also after Envoy has delivered the result the module passed to
+ envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete. The module releases the
+ handle here, and a module that must know whether it already completed the selection records
+ whether it called the completion callback for the handle. After this call, the module must not
+ call envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete for this handle.
+
+ Envoy calls this on the thread that called envoy_dynamic_module_on_cluster_lb_choose_host for
+ the selection, and a module thread can be inside
+ envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete for the same handle at
+ that moment. A request can hold the selection after its cluster was removed or replaced, so
+ Envoy can call this after envoy_dynamic_module_on_cluster_lb_destroy and
+ envoy_dynamic_module_on_cluster_destroy, though always before
+ envoy_dynamic_module_on_cluster_config_destroy. The module therefore releases the handle here
+ and touches only state it owns. It uses neither the load balancer nor the cluster through
+ ``lb_module_ptr`` or any Envoy pointer it kept, and it does not read the selection's context,
+ which may already be gone.
 
  This is optional. Only modules that use asynchronous host selection need to implement this.
 
- @param lb_module_ptr is the pointer to the in-module load balancer.
+ @param lb_module_ptr is the pointer to the in-module load balancer, which
+ envoy_dynamic_module_on_cluster_lb_destroy may already have destroyed.
  @param async_handle_module_ptr is the in-module async handle that was previously returned from
  envoy_dynamic_module_on_cluster_lb_choose_host.*/
     pub fn envoy_dynamic_module_on_cluster_lb_cancel_host_selection(
@@ -13130,13 +13154,15 @@ unsafe extern "C" {
 
  This must be called on a worker thread from within an
  envoy_dynamic_module_on_cluster_lb_choose_host call, so that the worker dispatcher has been
- captured for this load balancer. When the timer fires,
- envoy_dynamic_module_on_cluster_worker_timer_fired is called on the same worker thread.
+ captured for this load balancer. Envoy captures it only during a choose_host for a request with a
+ downstream connection, so a worker whose load balancer has only served async client streams gets
+ NULL. When the timer fires, envoy_dynamic_module_on_cluster_worker_timer_fired is called on the
+ same worker thread.
 
  @param lb_envoy_ptr is the pointer to the Envoy-side load balancer. The module receives this as
  the second parameter to envoy_dynamic_module_on_cluster_lb_new.
  @return the pointer to the created timer, or NULL if no worker dispatcher has been captured yet
- (no choose_host has run on this worker).
+ (no choose_host for a request with a downstream connection has run on this worker).
 
  NOTE: it is the caller's responsibility to delete the timer using
  envoy_dynamic_module_callback_cluster_worker_timer_delete when it is no longer needed, on the
@@ -13827,9 +13853,21 @@ unsafe extern "C" {
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
     /** envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module
- to deliver the result of an asynchronous host selection. This must be called exactly once for
- each async handle returned from envoy_dynamic_module_on_cluster_lb_choose_host, unless
+ to pass the result of an asynchronous host selection to Envoy. This must be called exactly once
+ for each async handle returned from envoy_dynamic_module_on_cluster_lb_choose_host, unless
  envoy_dynamic_module_on_cluster_lb_cancel_host_selection was called first.
+
+ The module may call this from any thread, including from inside
+ envoy_dynamic_module_on_cluster_lb_choose_host. Envoy delivers the result later on the thread
+ that called envoy_dynamic_module_on_cluster_lb_choose_host for this selection, never inside this
+ call. Envoy drops the result when that call answered synchronously and when the selection was
+ cancelled first. It also drops a result for a load balancer that is already gone, so the request
+ then waits for its own timeout, which is a known limitation. Envoy tells selections apart by
+ ``context_envoy_ptr``, which every attempt of the same request shares and which a later request
+ can reuse once the earlier one is gone, so a result that arrives after another selection with the
+ same pointer has started on this load balancer counts as the result of that selection. A module
+ that holds one lock across this call and its cancel hook for a handle, and skips this call once
+ the hook has run, never hands Envoy such a result.
 
  After calling this, the module must not use the ``lb_envoy_ptr`` for this async operation again.
 

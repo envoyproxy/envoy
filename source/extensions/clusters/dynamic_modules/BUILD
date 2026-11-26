@@ -20,6 +20,7 @@ envoy_cc_library(
     ],
     deps = [
         ":persistent_host_set_lib",
+        "//envoy/event:dispatcher_interface",
         "//envoy/event:dispatcher_thread_deletable",
         "//envoy/http:async_client_interface",
         "//envoy/stats:stats_interface",
