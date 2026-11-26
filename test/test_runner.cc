@@ -123,7 +123,7 @@ bool isDeathTestChild(int argc, char** argv) {
 
 int TestRunner::runTests(int argc, char** argv) {
   const bool is_death_test_child = isDeathTestChild(argc, argv);
-  // Take the runtime override flags out before googletest sees them, since it discards flags it
+  // Take the runtime override flags out before gtest sees them, since it discards flags it
   // does not recognize. This allows doing test overrides of Envoy runtime features without adding
   // test flags to the Envoy production command line.
   const std::regex ENABLE_PATTERN{"--runtime-feature-override-for-tests=(.*)",
