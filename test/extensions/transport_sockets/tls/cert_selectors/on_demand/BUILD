@@ -55,6 +55,7 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/tls/cert_selectors/common:async_context_lib",
         "//source/extensions/transport_sockets/tls/cert_selectors/on_demand:config",
         "//source/server:generic_factory_context_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:server_factory_context_mocks",

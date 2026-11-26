@@ -9,6 +9,7 @@
 
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
+#include "envoy/event/timer.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -207,11 +208,11 @@ private:
                       const std::optional<std::string>& evicted_name = std::nullopt);
   void doRemoveCertificateConfig(absl::string_view secret_name,
                                  std::optional<uint64_t> expected_generation);
-  // Reclaims abandoned non-prefetched pending entries (all waiting handles disconnected and age >=
-  // `kMinAbandonedPendingAge`) under admission pressure until
-  // `policy_.canAdmitPending(incoming_tenant)` succeeds or none remain, preferring other-tenant
-  // abandoned entries first.
-  void reclaimAbandonedPending(FairSieve::TenantId incoming_tenant);
+  // Periodically reclaims abandoned non-prefetched pending entries (all waiting handles
+  // disconnected and age >= `kMinAbandonedPendingAge`) off the admission hot path, re-arming
+  // `reclaim_timer_` only while `pending_on_demand_keys_` remains non-empty.
+  void reclaimAbandonedPending();
+  void disableReclaimTimerIfIdle();
   const Stats::ScopeSharedPtr stats_scope_;
   // Gauge conservation invariants (main thread, outside active mutations):
   //  - `cert_active == cache_.size() == n_ready + n_pending`
@@ -241,8 +242,8 @@ private:
   absl::flat_hash_map<std::string, std::unique_ptr<CacheEntry>> cache_;
 
   // Tracks in-flight non-prefetched pending secret names when `max_pending_secrets` is enabled so
-  // abandoned pending subscriptions can be reclaimed in O(max_pending) without scanning active
-  // entries.
+  // `reclaim_timer_` can sweep abandoned pending subscriptions in O(max_pending) without scanning
+  // active entries or adding per-rejection overhead.
   absl::flat_hash_set<std::string> pending_on_demand_keys_;
 
   // Lock-free map to retrieve ready TLS contexts by name.
@@ -250,6 +251,10 @@ private:
     absl::flat_hash_map<std::string, CachedCert> ctx_by_name_;
   };
   ThreadLocal::TypedSlot<ThreadLocalCerts> cert_contexts_;
+
+  // Idle-disarmed main-thread timer (declared last so it is destroyed first) that periodically
+  // invokes `reclaimAbandonedPending()` while `pending_on_demand_keys_` is non-empty.
+  Event::TimerPtr reclaim_timer_;
 };
 
 class BaseAsyncSelector : protected Logger::Loggable<Logger::Id::connection> {

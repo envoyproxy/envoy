@@ -43,6 +43,7 @@
 #include "source/extensions/transport_sockets/tls/cert_selectors/on_demand/config.h"
 #include "source/server/generic_factory_context.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -804,12 +805,14 @@ TEST_F(OnDemandSecretManagerTest, DisconnectedPendingClientsCompactCallbacksAndR
 
   auto& dispatcher = factory_context_.server_context_.dispatcher_;
   EXPECT_CALL(dispatcher, post(_)).WillRepeatedly([](Event::PostCb cb) { cb(); });
+  auto* reclaim_timer = new NiceMock<Event::MockTimer>(&dispatcher);
 
   auto secret_manager = std::make_shared<SecretManager>(
       config, factory_context_,
       [](Stats::Scope& scope, Server::Configuration::ServerFactoryContext&,
          const Ssl::TlsCertificateConfig&,
          absl::Status&) { return std::make_shared<FakeAsyncContext>(scope); });
+  EXPECT_FALSE(reclaim_timer->enabled_);
 
   auto make_handle = [&]() {
     auto cb = std::make_unique<NiceMock<MockCertificateSelectionCallback>>();
@@ -823,6 +826,7 @@ TEST_F(OnDemandSecretManagerTest, DisconnectedPendingClientsCompactCallbacksAndR
     secret_manager->addCertificateConfig("bogus-1", h1, {});
     secret_manager->addCertificateConfig("bogus-2", h2, {});
   }
+  EXPECT_TRUE(reclaim_timer->enabled_);
 
   // 50 disconnected retries must compact expired weak_ptrs rather than growing callbacks_ to 51.
   for (int i = 0; i < 50; ++i) {
@@ -844,15 +848,19 @@ TEST_F(OnDemandSecretManagerTest, DisconnectedPendingClientsCompactCallbacksAndR
     }
   }
   EXPECT_TRUE(observed_compacted_callbacks);
+  EXPECT_TRUE(reclaim_timer->enabled_);
 
   // Re-occupy the second slot with a fast-disconnecting waiter. Before `kMinAbandonedPendingAge`
-  // elapses, abandoned slots must NOT be reclaimed so fast disconnects cannot bypass
-  // `max_pending_secrets` and amplify SDS load.
+  // elapses, firing the periodic reclaim timer must NOT reclaim abandoned slots so fast disconnects
+  // cannot bypass `max_pending_secrets` and amplify SDS load.
   {
     auto h3 = make_handle();
     secret_manager->addCertificateConfig("bogus-3", h3, {});
   }
   simTime().advanceTimeWait(SecretManager::kMinAbandonedPendingAge - std::chrono::seconds(1));
+  reclaim_timer->invokeCallback();
+  EXPECT_TRUE(reclaim_timer->enabled_);
+  EXPECT_EQ(2, gaugeValue("on_demand_secret.cert_pending"));
   {
     auto blocked = make_handle();
     secret_manager->addCertificateConfig("blocked.com", blocked, {});
@@ -860,16 +868,23 @@ TEST_F(OnDemandSecretManagerTest, DisconnectedPendingClientsCompactCallbacksAndR
   EXPECT_EQ(1, counterValue("on_demand_secret.cert_pending_rejected"));
   EXPECT_EQ(2, gaugeValue("on_demand_secret.cert_pending"));
 
-  // Once `kMinAbandonedPendingAge` has elapsed, an incoming healthy fetch must reclaim an
-  // abandoned slot instead of rejecting.
+  // Once `kMinAbandonedPendingAge` has elapsed, the periodic reclaim timer sweeps both abandoned
+  // pending entries and disarms itself, unblocking subsequent healthy fetches in O(1).
   simTime().advanceTimeWait(std::chrono::seconds(1));
+  reclaim_timer->invokeCallback();
+  EXPECT_FALSE(reclaim_timer->enabled_);
+  EXPECT_EQ(0, gaugeValue("on_demand_secret.cert_pending"));
+  EXPECT_EQ(1, gaugeValue("on_demand_secret.cert_active"));
+
   auto healthy = make_handle();
   secret_manager->addCertificateConfig("healthy.com", healthy, {});
   EXPECT_EQ(1, counterValue("on_demand_secret.cert_pending_rejected"));
-  EXPECT_EQ(2, gaugeValue("on_demand_secret.cert_pending"));
+  EXPECT_EQ(1, gaugeValue("on_demand_secret.cert_pending"));
+  EXPECT_TRUE(reclaim_timer->enabled_);
 }
 
-TEST_F(OnDemandSecretManagerTest, ReclaimAbandonedPendingPrefersPeerTenantBeforeSelf) {
+TEST_F(OnDemandSecretManagerTest,
+       ReclaimTimerSweepsAbandonedWhilePreservingLiveWaitersAndDisarmsWhenIdle) {
   envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config config;
   TestUtility::loadFromYaml(R"EOF(
     config_source:
@@ -885,12 +900,14 @@ TEST_F(OnDemandSecretManagerTest, ReclaimAbandonedPendingPrefersPeerTenantBefore
 
   auto& dispatcher = factory_context_.server_context_.dispatcher_;
   EXPECT_CALL(dispatcher, post(_)).WillRepeatedly([](Event::PostCb cb) { cb(); });
+  auto* reclaim_timer = new NiceMock<Event::MockTimer>(&dispatcher);
 
   auto secret_manager = std::make_shared<SecretManager>(
       config, factory_context_,
       [](Stats::Scope& scope, Server::Configuration::ServerFactoryContext&,
          const Ssl::TlsCertificateConfig&,
          absl::Status&) { return std::make_shared<FakeAsyncContext>(scope); });
+  EXPECT_FALSE(reclaim_timer->enabled_);
 
   const FairSieve::TenantId tenant_a = FairSieve::computeTenantId("tenant-a");
   const FairSieve::TenantId tenant_b = FairSieve::computeTenantId("tenant-b");
@@ -901,36 +918,45 @@ TEST_F(OnDemandSecretManagerTest, ReclaimAbandonedPendingPrefersPeerTenantBefore
     return std::make_shared<Handle>(std::move(cb), false);
   };
 
-  // Fill 4/4 pending slots: tenant_b holds 2 abandoned slots, tenant_a holds 1 abandoned slot,
-  // and tenant_c holds 1 live slot.
+  // Occupy 3/4 pending slots (below saturation): two abandoned entries and one live waiter.
   auto hc_live = make_handle();
   {
-    auto hb1 = make_handle();
-    auto hb2 = make_handle();
-    auto ha1 = make_handle();
-    secret_manager->addCertificateConfig("b-abandoned-1", hb1, {}, tenant_b);
-    secret_manager->addCertificateConfig("b-abandoned-2", hb2, {}, tenant_b);
-    secret_manager->addCertificateConfig("a-abandoned", ha1, {}, tenant_a);
+    auto ha = make_handle();
+    auto hb = make_handle();
+    secret_manager->addCertificateConfig("a-abandoned", ha, {}, tenant_a);
+    secret_manager->addCertificateConfig("b-abandoned", hb, {}, tenant_b);
     secret_manager->addCertificateConfig("c-live", hc_live, {}, tenant_c);
   }
-  ASSERT_EQ(4, gaugeValue("on_demand_secret.cert_pending"));
-  simTime().advanceTimeWait(SecretManager::kMinAbandonedPendingAge);
+  ASSERT_EQ(3, gaugeValue("on_demand_secret.cert_pending"));
+  EXPECT_TRUE(reclaim_timer->enabled_);
 
-  // Tenant A requests a new pending slot: peer tenant B's two abandoned slots are reclaimed first
-  // (dropping pending_total from 4 -> 2 so `p_A (1) < 4 - 2 (2)` succeeds), leaving A's own
-  // `a-abandoned` untouched.
-  auto ha_fresh = make_handle();
-  secret_manager->addCertificateConfig("a-fresh", ha_fresh, {}, tenant_a);
-  EXPECT_EQ(0, counterValue("on_demand_secret.cert_pending_rejected"));
-  EXPECT_EQ(3, gaugeValue("on_demand_secret.cert_pending"));
+  // Periodic timer sweep proactively reclaims abandoned subscriptions even below saturation,
+  // preserves entries with live waiters, and stays armed while any pending entry remains.
+  simTime().advanceTimeWait(SecretManager::kMinAbandonedPendingAge);
+  reclaim_timer->invokeCallback();
+  EXPECT_EQ(1, gaugeValue("on_demand_secret.cert_pending"));
+  EXPECT_EQ(1, gaugeValue("on_demand_secret.cert_active"));
+  EXPECT_TRUE(reclaim_timer->enabled_);
 
   NiceMock<Ssl::MockTlsCertificateConfig> cert_config;
   ASSERT_OK(secret_manager->updateCertificate("a-abandoned", cert_config));
-  EXPECT_TRUE(secret_manager->getContext("a-abandoned").has_value());
-  ASSERT_OK(secret_manager->updateCertificate("b-abandoned-1", cert_config));
-  EXPECT_FALSE(secret_manager->getContext("b-abandoned-1").has_value());
-  ASSERT_OK(secret_manager->updateCertificate("b-abandoned-2", cert_config));
-  EXPECT_FALSE(secret_manager->getContext("b-abandoned-2").has_value());
+  EXPECT_FALSE(secret_manager->getContext("a-abandoned").has_value());
+  ASSERT_OK(secret_manager->updateCertificate("b-abandoned", cert_config));
+  EXPECT_FALSE(secret_manager->getContext("b-abandoned").has_value());
+
+  // Activating the last pending entry disarms the reclaim timer immediately (zero idle wakeups).
+  ASSERT_OK(secret_manager->updateCertificate("c-live", cert_config));
+  EXPECT_TRUE(secret_manager->getContext("c-live").has_value());
+  EXPECT_EQ(0, gaugeValue("on_demand_secret.cert_pending"));
+  EXPECT_FALSE(reclaim_timer->enabled_);
+
+  // Removing the last pending entry via SDS removal also disarms the timer.
+  auto ephemeral = make_handle();
+  secret_manager->addCertificateConfig("ephemeral-pending", ephemeral, {}, tenant_a);
+  EXPECT_TRUE(reclaim_timer->enabled_);
+  ASSERT_OK(secret_manager->removeCertificateConfig("ephemeral-pending"));
+  EXPECT_EQ(0, gaugeValue("on_demand_secret.cert_pending"));
+  EXPECT_FALSE(reclaim_timer->enabled_);
 }
 
 TEST_F(OnDemandSecretManagerTest, RejectsUniquePrefetchExceedingMaxActiveSecrets) {

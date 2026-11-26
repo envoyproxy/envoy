@@ -77,12 +77,11 @@ message Config {
   // Maximum number of in-flight (pending) secret subscriptions waiting for an initial SDS response.
   // When unset, pending subscriptions are unbounded.
   //
-  // When this limit is reached, new on-demand secret fetches are rejected (failing the requesting
-  // handshake and incrementing ``cert_pending_rejected``) while duplicate handshakes for an
-  // already-pending secret continue to coalesce. If admission would reject while non-prefetched
-  // pending entries have no remaining live waiters (all waiting handshakes disconnected) and have
-  // been pending for at least 5 seconds, those abandoned subscriptions are reclaimed first (the
-  // cooldown prevents fast-disconnecting clients from bypassing ``max_pending_secrets`` and
+  // When this limit is reached, new on-demand secret fetches are rejected in O(1) (failing the
+  // requesting handshake and incrementing ``cert_pending_rejected``) while duplicate handshakes for
+  // an already-pending secret continue to coalesce. Abandoned non-prefetched pending subscriptions
+  // (all waiting handshakes disconnected) are periodically reclaimed after a 5-second grace period
+  // (the cooldown prevents fast-disconnecting clients from bypassing ``max_pending_secrets`` and
   // amplifying SDS load). For full fail-fast release of unresolvable
   // secrets, pair this setting with Delta SDS ``removed_resources`` responses. When per-tenant
   // filter state is in use, multi-tenant admission applies dynamic thresholds (Choudhury & Hahne,

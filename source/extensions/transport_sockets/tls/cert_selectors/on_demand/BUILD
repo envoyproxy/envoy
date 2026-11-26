@@ -16,6 +16,7 @@ envoy_cc_extension(
     deps = [
         "//envoy/common:time_interface",
         "//envoy/event:deferred_deletable",
+        "//envoy/event:timer_interface",
         "//envoy/network:transport_socket_interface",
         "//envoy/registry",
         "//envoy/router:string_accessor_interface",

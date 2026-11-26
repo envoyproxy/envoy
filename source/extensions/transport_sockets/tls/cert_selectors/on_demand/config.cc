@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "envoy/common/time.h"
+#include "envoy/event/timer.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/router/string_accessor.h"
 #include "envoy/ssl/handshaker.h"
@@ -137,12 +138,19 @@ SecretManager::SecretManager(const ConfigProto& config,
               PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_pending_secrets, 0)),
       cert_contexts_(factory_context_.threadLocal()) {
   cert_contexts_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
+  if (policy_.pendingLimitEnabled()) {
+    reclaim_timer_ = factory_context_.mainThreadDispatcher().createTimer(
+        [this]() { reclaimAbandonedPending(); });
+  }
   for (const auto& name : config.prefetch_secret_names()) {
     addCertificateConfig(name, nullptr, factory_context.initManager());
   }
 }
 
 SecretManager::~SecretManager() {
+  if (reclaim_timer_ != nullptr) {
+    reclaim_timer_->disableTimer();
+  }
   // Release Accumulate gauges so replacing a filter chain (which shares the parent listener stats
   // scope in ThreadLocalStoreImpl) does not permanently leak cached/pending counts.
   size_t pending_count = 0;
@@ -155,52 +163,52 @@ SecretManager::~SecretManager() {
   stats_->cert_pending_.sub(pending_count);
 }
 
-void SecretManager::reclaimAbandonedPending(FairSieve::TenantId incoming_tenant) {
+void SecretManager::disableReclaimTimerIfIdle() {
+  if (pending_on_demand_keys_.empty() && reclaim_timer_ != nullptr && reclaim_timer_->enabled()) {
+    reclaim_timer_->disableTimer();
+  }
+}
+
+void SecretManager::reclaimAbandonedPending() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   const MonotonicTime now = factory_context_.timeSource().monotonicTime();
-  // Two-pass scan in O(max_pending): prefer reclaiming peer-owned abandoned slots before reclaiming
-  // the incoming tenant's own abandoned slots, and require each entry to exceed
-  // `kMinAbandonedPendingAge` so fast-disconnecting clients cannot bypass `max_pending_secrets` and
-  // amplify upstream SDS/signing load.
-  for (const bool only_other_tenants : {true, false}) {
-    for (auto it = pending_on_demand_keys_.begin();
-         it != pending_on_demand_keys_.end() && !policy_.canAdmitPending(incoming_tenant);) {
-      auto cache_it = cache_.find(*it);
-      if (cache_it == cache_.end() || cache_it->second->cert_context_ != nullptr) {
-        pending_on_demand_keys_.erase(it++);
-        continue;
-      }
-      if (only_other_tenants && cache_it->second->owner_tenant_ == incoming_tenant) {
-        ++it;
-        continue;
-      }
-      if ((now - cache_it->second->created_at_) < kMinAbandonedPendingAge) {
-        ++it;
-        continue;
-      }
-      auto& callbacks = cache_it->second->callbacks_;
-      callbacks.erase(
-          std::remove_if(callbacks.begin(), callbacks.end(),
-                         [](const PendingCallback& cb) { return cb.handle_.expired(); }),
-          callbacks.end());
-      if (!callbacks.empty()) {
-        ++it;
-        continue;
-      }
-      // All waiting client handshakes for this non-prefetched pending fetch have disconnected and
-      // the cooldown has elapsed.
-      const std::string key = *it;
+  // Single O(max_pending) pass executed off the admission hot path at most once per
+  // `kMinAbandonedPendingAge`, decoupling main-thread work from denied request rates while
+  // preventing fast-disconnecting clients from bypassing `max_pending_secrets`.
+  for (auto it = pending_on_demand_keys_.begin(); it != pending_on_demand_keys_.end();) {
+    auto cache_it = cache_.find(*it);
+    if (cache_it == cache_.end() || cache_it->second->cert_context_ != nullptr) {
       pending_on_demand_keys_.erase(it++);
-      policy_.onRemoved(key);
-      if (cache_it->second->cert_config_ != nullptr) {
-        factory_context_.mainThreadDispatcher().deferredDelete(
-            std::move(cache_it->second->cert_config_));
-      }
-      cache_.erase(cache_it);
-      stats_->cert_active_.dec();
-      stats_->cert_pending_.dec();
-      ENVOY_LOG(debug, "Reclaimed abandoned pending certificate subscription for '{}'", key);
+      continue;
     }
+    if ((now - cache_it->second->created_at_) < kMinAbandonedPendingAge) {
+      ++it;
+      continue;
+    }
+    auto& callbacks = cache_it->second->callbacks_;
+    callbacks.erase(std::remove_if(callbacks.begin(), callbacks.end(),
+                                   [](const PendingCallback& cb) { return cb.handle_.expired(); }),
+                    callbacks.end());
+    if (!callbacks.empty()) {
+      ++it;
+      continue;
+    }
+    // All waiting client handshakes for this non-prefetched pending fetch have disconnected and
+    // the cooldown has elapsed.
+    const std::string key = *it;
+    pending_on_demand_keys_.erase(it++);
+    policy_.onRemoved(key);
+    if (cache_it->second->cert_config_ != nullptr) {
+      factory_context_.mainThreadDispatcher().deferredDelete(
+          std::move(cache_it->second->cert_config_));
+    }
+    cache_.erase(cache_it);
+    stats_->cert_active_.dec();
+    stats_->cert_pending_.dec();
+    ENVOY_LOG(debug, "Reclaimed abandoned pending certificate subscription for '{}'", key);
+  }
+  if (!pending_on_demand_keys_.empty() && reclaim_timer_ != nullptr) {
+    reclaim_timer_->enableTimer(kMinAbandonedPendingAge);
   }
 }
 
@@ -230,19 +238,16 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
     return;
   }
 
-  // Enforce Phase 1 pending admission control (Choudhury & Hahne Dynamic Thresholds) for
+  // Enforce Phase 1 pending admission control (Choudhury & Hahne Dynamic Thresholds) in O(1) for
   // on-demand client-triggered fetches (`handle != nullptr`). Prefetched secrets are always
-  // admitted and tracked. Before rejecting, reclaim any non-prefetched pending fetches whose
-  // waiting handshakes have all disconnected.
+  // admitted and tracked. Abandoned pending fetches are reclaimed periodically off this hot path
+  // by `reclaim_timer_`.
   if (handle && !policy_.canAdmitPending(tenant_id)) {
-    reclaimAbandonedPending(tenant_id);
-    if (!policy_.canAdmitPending(tenant_id)) {
-      stats_->cert_pending_rejected_.inc();
-      ENVOY_LOG(debug, "Rejected pending on-demand certificate fetch for '{}' (tenant={})",
-                secret_name, tenant_id);
-      handle->notify(nullptr);
-      return;
-    }
+    stats_->cert_pending_rejected_.inc();
+    ENVOY_LOG(debug, "Rejected pending on-demand certificate fetch for '{}' (tenant={})",
+              secret_name, tenant_id);
+    handle->notify(nullptr);
+    return;
   }
 
   auto entry = std::make_unique<CacheEntry>();
@@ -255,6 +260,9 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
     entry_ptr->callbacks_.push_back(PendingCallback{handle, tenant_id, /*is_coalesced_=*/false});
     if (policy_.pendingLimitEnabled()) {
       pending_on_demand_keys_.emplace(secret_name);
+      if (reclaim_timer_ != nullptr && !reclaim_timer_->enabled()) {
+        reclaim_timer_->enableTimer(kMinAbandonedPendingAge);
+      }
     }
   }
   cache_.emplace(std::string(secret_name), std::move(entry));
@@ -300,6 +308,7 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
   if (was_pending) {
     stats_->cert_pending_.dec();
     pending_on_demand_keys_.erase(secret_name);
+    disableReclaimTimerIfIdle();
   }
 
   std::optional<FairSieve::Policy::EvictionResult> evicted;
@@ -423,6 +432,7 @@ void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name,
   }
   policy_.onRemoved(secret_name);
   pending_on_demand_keys_.erase(secret_name);
+  disableReclaimTimerIfIdle();
   cache_.erase(it);
   updateContexts(secret_name, CachedCert{});
   stats_->cert_active_.dec();
