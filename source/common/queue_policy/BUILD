@@ -17,9 +17,11 @@ envoy_cc_library(
         "queue_policy_base.h",
     ],
     deps = [
+        "//envoy/common:optref_lib",
         "//envoy/common:time_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/protobuf:message_validator_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/functional:function_ref",

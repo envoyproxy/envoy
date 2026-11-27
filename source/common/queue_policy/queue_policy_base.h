@@ -3,9 +3,11 @@
 #include <cstddef>
 #include <memory>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/time.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "absl/functional/function_ref.h"
 #include "absl/status/statusor.h"
@@ -17,6 +19,7 @@ namespace QueuePolicy {
 // Metadata associated with an item when it is added to a queue.
 struct QueueItemMetadata {
   MonotonicTime enqueue_time_;
+  OptRef<const StreamInfo::StreamInfo> stream_info_;
 };
 
 // Base class that handles queuing for objects. Implementations are free to choose any internal
