@@ -1,3 +1,5 @@
+#include <thread>
+
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"
 
@@ -6,6 +8,8 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -21,6 +25,77 @@ namespace {
 ClusterCircuitBreakersStats clusterCircuitBreakersStats(Stats::Store& store) {
   return {
       ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(c, POOL_GAUGE(store), h, tr, GENERATE_STATNAME_STRUCT)};
+}
+
+class ConnectionCapacityTest : public testing::Test {
+public:
+  ConnectionCapacityTest()
+      : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher("owner")),
+        resource_manager_(runtime_, "test.", 1, 1, 1, 1, 1, 100,
+                          clusterCircuitBreakersStats(store_), std::nullopt, std::nullopt,
+                          std::nullopt, *dispatcher_) {}
+
+  Event::SimulatedTimeSystemHelper time_system_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  Stats::IsolatedStoreImpl store_;
+  ResourceManagerImpl resource_manager_;
+};
+
+TEST_F(ConnectionCapacityTest, ReleaseFromAnotherThread) {
+  auto& connections = resource_manager_.connections();
+  connections.inc();
+  connections.inc();
+  const auto owner = std::this_thread::get_id();
+  unsigned calls = 0;
+  auto handle = resource_manager_.addConnectionCapacityCallback(*dispatcher_, [&]() {
+    EXPECT_EQ(owner, std::this_thread::get_id());
+    ++calls;
+  });
+
+  // The first release still leaves the cluster at its limit.
+  std::thread first_release([&]() { connections.dec(); });
+  first_release.join();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(0, calls);
+
+  std::thread second_release([&]() { connections.dec(); });
+  second_release.join();
+  EXPECT_EQ(0, calls);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(1, calls);
+}
+
+TEST_F(ConnectionCapacityTest, RegistrationAfterRelease) {
+  auto& connections = resource_manager_.connections();
+  connections.inc();
+  EXPECT_FALSE(connections.canCreate());
+  connections.dec();
+
+  unsigned calls = 0;
+  auto handle = resource_manager_.addConnectionCapacityCallback(*dispatcher_, [&]() { ++calls; });
+  EXPECT_EQ(0, calls);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(1, calls);
+}
+
+TEST_F(ConnectionCapacityTest, CoalescesReleasesAndCancelsQueuedNotification) {
+  unsigned calls = 0;
+  auto handle = resource_manager_.addConnectionCapacityCallback(*dispatcher_, [&]() { ++calls; });
+  auto& connections = resource_manager_.connections();
+  for (unsigned i = 0; i < 100; ++i) {
+    connections.inc();
+    connections.dec();
+  }
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(1, calls);
+
+  connections.inc();
+  connections.dec();
+  handle.reset();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(1, calls);
 }
 
 TEST(ResourceManagerImplTest, RuntimeResourceManager) {
