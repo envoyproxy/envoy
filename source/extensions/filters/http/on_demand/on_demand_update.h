@@ -3,10 +3,12 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.h"
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.validate.h"
 #include "envoy/http/filter.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/filter_state.h"
@@ -33,8 +35,14 @@ namespace OnDemand {
   COUNTER(cluster_discovery_missing)                                                               \
   COUNTER(cluster_discovery_timeout)                                                               \
   COUNTER(cluster_discovery_cancelled)                                                             \
+  COUNTER(shadow_cluster_discovery_requested)                                                      \
+  COUNTER(shadow_cluster_discovery_available)                                                      \
+  COUNTER(shadow_cluster_discovery_missing)                                                        \
+  COUNTER(shadow_cluster_discovery_timeout)                                                        \
+  COUNTER(shadow_cluster_discovery_cancelled)                                                      \
   GAUGE(route_discovery_pending, Accumulate)                                                       \
   GAUGE(cluster_discovery_pending, Accumulate)                                                     \
+  GAUGE(shadow_cluster_discovery_pending, Accumulate)                                              \
   HISTOGRAM(route_discovery_duration, Milliseconds)                                                \
   HISTOGRAM(cluster_discovery_duration, Milliseconds)
 
@@ -143,6 +151,12 @@ class OnDemandRouteUpdate;
 class DecodeHeadersBehavior;
 using DecodeHeadersBehaviorPtr = std::unique_ptr<DecodeHeadersBehavior>;
 
+// Settings for mirror cluster discovery. The references outlive the filter.
+struct ShadowDiscoveryOptions {
+  Upstream::ClusterManager& cluster_manager_;
+  Runtime::Loader& runtime_;
+};
+
 // DecodeHeadersBehavior implementations are used by OnDemandRouteUpdate in its decodeHeaders
 // method.
 class DecodeHeadersBehavior {
@@ -152,13 +166,19 @@ public:
   // The returned object will perform route discovery if it's missing,
   // then after route is successfully discovered, it will proceed to
   // on-demand cluster discovery if the cluster is missing. The latter
-  // discovery will be done with the passed OdCdsApi and timeout.
-  static DecodeHeadersBehaviorPtr cdsRds(Upstream::OdCdsApiHandlePtr odcds,
-                                         std::chrono::milliseconds timeout);
+  // discovery will be done with the passed OdCdsApi and timeout. If shadow_discovery is set,
+  // mirror clusters are also discovered, without blocking.
+  static DecodeHeadersBehaviorPtr
+  cdsRds(Upstream::OdCdsApiHandlePtr odcds, std::chrono::milliseconds timeout,
+         std::optional<ShadowDiscoveryOptions> shadow_discovery = std::nullopt);
 
   virtual ~DecodeHeadersBehavior() = default;
 
   virtual void decodeHeaders(OnDemandRouteUpdate& filter) PURE;
+
+  // Called when the request's cluster was discovered, before it resumes. Must not change the
+  // iteration state.
+  virtual void onClusterDiscovered(OnDemandRouteUpdate&) {}
 };
 
 using DecodeHeadersBehaviorPtr = std::unique_ptr<DecodeHeadersBehavior>;
@@ -174,18 +194,19 @@ public:
   // Constructs config from extension's proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
-      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-      absl::Status& creation_status);
+      Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+      ProtobufMessage::ValidationVisitor& validation_visitor, absl::Status& creation_status);
   // Also creates the stats as "<stats_prefix>on_demand.<name>" in scope.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
-      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-      absl::Status& creation_status, Stats::Scope& scope, const std::string& stats_prefix);
+      Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+      ProtobufMessage::ValidationVisitor& validation_visitor, absl::Status& creation_status,
+      Stats::Scope& scope, const std::string& stats_prefix);
   // Constructs config from extension's per-route proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
-      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-      absl::Status& creation_status);
+      Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+      ProtobufMessage::ValidationVisitor& validation_visitor, absl::Status& creation_status);
 
   DecodeHeadersBehavior& decodeHeadersBehavior() const { return *behavior_; }
 
@@ -217,9 +238,14 @@ public:
   // is missing.
   void handleOnDemandCds(const Router::Route& route, Upstream::OdCdsApiHandle& odcds,
                          std::chrono::milliseconds timeout);
+  // Best-effort discovery of the request's missing mirror clusters. Never pauses the request.
+  void handleShadowDiscovery(Upstream::OdCdsApiHandle& odcds, std::chrono::milliseconds timeout,
+                             const ShadowDiscoveryOptions& options);
   // Get the per-route config if it's available, otherwise the
   // extension's config.
   const OnDemandFilterConfig* getConfig();
+
+  Http::FilterHeadersStatus filterIterationState() const { return filter_iteration_state_; }
 
   void setFilterIterationState(Envoy::Http::FilterHeadersStatus status) {
     filter_iteration_state_ = status;
@@ -248,6 +274,8 @@ private:
   void recordVirtualHost();
   void startClusterDiscovery(MonotonicTime start, absl::string_view cluster_name);
   void finishClusterDiscovery(Upstream::ClusterDiscoveryStatus cluster_status);
+  // Records stats only; never resumes the request.
+  void finishShadowClusterDiscovery(Upstream::ClusterDiscoveryStatus cluster_status);
 
   OnDemandFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -266,6 +294,10 @@ private:
   bool cluster_discovery_in_flight_{false};
   MonotonicTime route_discovery_start_;
   MonotonicTime cluster_discovery_start_;
+  // Mirror cluster discoveries, tracked apart from the request's own.
+  bool shadow_discovery_started_{false};
+  uint32_t shadow_discovery_in_flight_{0};
+  std::vector<Upstream::ClusterDiscoveryCallbackHandlePtr> shadow_discovery_handles_;
 };
 
 } // namespace OnDemand
