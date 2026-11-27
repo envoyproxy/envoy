@@ -75,7 +75,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   // balanced across them.
   const auto upstream_info = stream_info.upstreamInfo();
   Upstream::HostDescriptionConstSharedPtr host =
-      upstream_info != nullptr ? upstream_info->upstreamHost() : nullptr;
+      upstream_info.has_value() ? upstream_info->upstreamHost() : nullptr;
   if (host == nullptr) {
     // There is no upstream host, for example when a local reply carrying an alt-svc header is sent
     // before an upstream request was created. Without a host there is no origin to associate the
