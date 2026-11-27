@@ -42,6 +42,7 @@ import (
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 	_ "github.com/envoyproxy/envoy/contrib/golang/common/go/api_impl"
+	"github.com/envoyproxy/envoy/contrib/golang/common/go/utils"
 )
 
 const (
@@ -219,6 +220,7 @@ func (c *httpCApiImpl) HttpCopyHeaders(s unsafe.Pointer, num uint64, bytes uint6
 	buf := make([]byte, bytes)
 	res := C.envoyGoFilterHttpCopyHeaders(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.SliceData(strs)), unsafe.Pointer(unsafe.SliceData(buf)))
 	handleCApiStatus(res)
+	utils.BuildStringsFromBuffer(strs[:num*2], buf)
 
 	m := make(map[string][]string, num)
 	for i := uint64(0); i < num*2; i += 2 {
@@ -310,6 +312,7 @@ func (c *httpCApiImpl) HttpCopyTrailers(s unsafe.Pointer, num uint64, bytes uint
 	buf := make([]byte, bytes)
 	res := C.envoyGoFilterHttpCopyTrailers(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.SliceData(strs)), unsafe.Pointer(unsafe.SliceData(buf)))
 	handleCApiStatus(res)
+	utils.BuildStringsFromBuffer(strs[:num*2], buf)
 
 	m := make(map[string][]string, num)
 	for i := uint64(0); i < num*2; i += 2 {
@@ -400,6 +403,13 @@ func (c *httpCApiImpl) HttpGetDynamicMetadata(r unsafe.Pointer, filterName strin
 
 	var valueData C.uint64_t
 	var valueLen C.int
+	// On CAPIYield Envoy keeps these addresses and writes through them from the
+	// dispatcher thread after the cgo call has returned, so they stay pinned
+	// until the callback wait is over.
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+	pinner.Pin(&valueData)
+	pinner.Pin(&valueLen)
 	res := C.envoyGoFilterHttpGetDynamicMetadata(unsafe.Pointer(req.req),
 		unsafe.Pointer(unsafe.StringData(filterName)), C.int(len(filterName)), &valueData, &valueLen)
 	if res == C.CAPIYield {
@@ -453,6 +463,13 @@ func (c *httpCApiImpl) HttpGetStringFilterState(r unsafe.Pointer, key string) st
 	req.mutex.Lock()
 	defer req.mutex.Unlock()
 	req.markMayWaitingCallback()
+	// On CAPIYield Envoy keeps these addresses and writes through them from the
+	// dispatcher thread after the cgo call has returned, so they stay pinned
+	// until the callback wait is over.
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+	pinner.Pin(&valueData)
+	pinner.Pin(&valueLen)
 	res := C.envoyGoFilterHttpGetStringFilterState(unsafe.Pointer(req.req),
 		unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen)
 	if res == C.CAPIYield {
@@ -474,6 +491,14 @@ func (c *httpCApiImpl) HttpGetStringProperty(r unsafe.Pointer, key string) (stri
 	req.mutex.Lock()
 	defer req.mutex.Unlock()
 	req.markMayWaitingCallback()
+	// On CAPIYield Envoy keeps these addresses and writes through them from the
+	// dispatcher thread after the cgo call has returned, so they stay pinned
+	// until the callback wait is over.
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+	pinner.Pin(&valueData)
+	pinner.Pin(&valueLen)
+	pinner.Pin(&rc)
 	res := C.envoyGoFilterHttpGetStringProperty(unsafe.Pointer(req.req),
 		unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen, &rc)
 	if res == C.CAPIYield {
@@ -499,6 +524,13 @@ func (c *httpCApiImpl) HttpGetStringSecret(r unsafe.Pointer, key string) (string
 	req.mutex.Lock()
 	defer req.mutex.Unlock()
 	req.markMayWaitingCallback()
+	// On CAPIYield Envoy keeps these addresses and writes through them from the
+	// dispatcher thread after the cgo call has returned, so they stay pinned
+	// until the callback wait is over.
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+	pinner.Pin(&valueData)
+	pinner.Pin(&valueLen)
 	res := C.envoyGoFilterHttpGetStringSecret(unsafe.Pointer(req.req), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen)
 	if res == C.CAPIYield {
 		req.checkOrWaitCallback()

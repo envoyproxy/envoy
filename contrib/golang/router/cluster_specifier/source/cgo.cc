@@ -52,11 +52,11 @@ int envoyGoClusterSpecifierGetHeader(unsigned long long header_ptr, void* key, v
   return static_cast<int>(GetHeaderResult::Mising);
 }
 
-// Copies the request headers from `header_ptr` into the provided buffer `buf` and populates `strs`
-// with the string metadata of each key and value. `strs` points into `buf` which stores
-// concatenated raw header bytes in the format `key1val1key2val2...`. Note the buffer should
-// be allocated with sufficient memory to store the headers and `strs` is expected to be of length
-// twice the number of headers.
+// Copies the request headers from `header_ptr` into the provided buffer `buf` as concatenated raw
+// header bytes in the format `key1val1key2val2...`, and stores the length of each key and value in
+// `strs`. The data pointers of `strs` are left for the Go side to set from `buf`, so that no Go
+// pointer is written into Go memory from C++. Note the buffer should be allocated with sufficient
+// memory to store the headers and `strs` is expected to be of length twice the number of headers.
 void envoyGoClusterSpecifierGetAllHeaders(unsigned long long header_ptr, void* strs, void* buf) {
   auto headers = reinterpret_cast<Http::RequestHeaderMap*>(header_ptr);
   auto go_strs = reinterpret_cast<GoString*>(strs);
@@ -68,8 +68,9 @@ void envoyGoClusterSpecifierGetAllHeaders(unsigned long long header_ptr, void* s
         auto value = header.value().getStringView();
 
         auto len = key.length();
+        // Only the length is stored; the Go side sets the data pointers from go_buf, so that
+        // no Go pointer is written into Go memory from C++.
         go_strs[i].n = len;
-        go_strs[i].p = go_buf;
         // go_buf is allocated in go heap memory with sufficient space for all headers.
         memcpy(go_buf, key.data(), len); // NOLINT(safe-memcpy)
         go_buf += len;
@@ -78,7 +79,6 @@ void envoyGoClusterSpecifierGetAllHeaders(unsigned long long header_ptr, void* s
         len = value.length();
         go_strs[i].n = len;
         if (len > 0) {
-          go_strs[i].p = go_buf;
           memcpy(go_buf, value.data(), len); // NOLINT(safe-memcpy)
           go_buf += len;
         }
