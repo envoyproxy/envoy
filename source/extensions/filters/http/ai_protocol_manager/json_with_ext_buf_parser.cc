@@ -58,6 +58,10 @@ void JsonWithExtBufParser::setError(absl::Status status) {
 }
 
 absl::StatusOr<nlohmann::json*> JsonWithExtBufParser::attach(nlohmann::json&& value) {
+  // After an error the stack may no longer match the cursor; attach nothing.
+  if (!status_.ok()) {
+    return status_;
+  }
   if (++node_count_ > config_.max_nodes) {
     return absl::InvalidArgumentError("ai json: document exceeds the node budget");
   }
@@ -155,6 +159,10 @@ void JsonWithExtBufParser::closeStringCapture(absl::string_view, int, size_t tok
 }
 
 absl::Status JsonWithExtBufParser::onKey(absl::string_view key, int, size_t) {
+  // Return the recorded error so the cursor stops instead of moving on to the value.
+  if (!status_.ok()) {
+    return status_;
+  }
   pending_key_.assign(key.data(), key.size());
   return absl::OkStatus();
 }
