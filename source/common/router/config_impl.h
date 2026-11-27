@@ -601,7 +601,7 @@ private:
   HeaderMutationsPtr request_headers_mutations_;
   ShadowPolicyStatsSharedPtr stats_;
   RetryPolicyConstSharedPtr retry_policy_;
-  const std::optional<std::chrono::milliseconds> timeout_;
+  std::optional<std::chrono::milliseconds> timeout_;
 };
 
 /**

@@ -1005,7 +1005,7 @@ message RouteAction {
     // timeout of the primary request, also applies with :ref:`respect_expected_rq_timeout
     // <envoy_v3_api_field_extensions.filters.http.router.v3.Router.respect_expected_rq_timeout>`
     // instead of the per try timeout of the primary request.
-    google.protobuf.Duration timeout = 11;
+    google.protobuf.Duration timeout = 11 [(validate.rules).duration = {gte {}}];
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer

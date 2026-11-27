@@ -5158,6 +5158,8 @@ virtual_hosts:
                           EnvoyException, "Proto constraint validation failed.*");
 }
 
+// A negative timeout is rejected by the config validation, and by the mirror policy itself if the
+// config was not validated.
 TEST_F(RouteMatcherTest, RequestMirrorPoliciesNegativeTimeout) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -5174,9 +5176,15 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
-                                         true, creation_status_),
-                          EnvoyException, "Invalid duration: Expected positive duration");
+  EXPECT_THROW_WITH_REGEX(parseRouteConfigurationFromYaml(yaml), EnvoyException,
+                          "Invalid duration: Expected positive duration");
+
+  envoy::config::route::v3::RouteConfiguration route_config;
+  TestUtility::loadFromYaml(yaml, route_config);
+  factory_context_.cluster_manager_.initializeClusters({"www2", "some_cluster"}, {});
+  TestConfigImpl config(route_config, factory_context_, true, creation_status_);
+  EXPECT_THAT(creation_status_.message(),
+              testing::HasSubstr("Invalid duration: Expected positive duration"));
 }
 
 // Test for request mirror policies with headers - verifies header mutations are applied correctly.
