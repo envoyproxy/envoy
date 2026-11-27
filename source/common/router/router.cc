@@ -960,14 +960,14 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
       // NOLINTNEXTLINE(bugprone-use-after-move)
       shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*original_shadow_headers);
     }
-    applyShadowPolicyHeaders(shadow_policy, *shadow_headers);
     if (shadow_policy.timeout().has_value() || shadow_policy.retryPolicy() != nullptr) {
       // With respect_expected_rq_timeout, the mirror's router would take its timeout from the
       // headers of the primary request, which may hold the primary's per try timeout, instead of
-      // the timeout covering all the mirror attempts.
+      // the timeout covering all the mirror attempts. The header mutations can still set them.
       shadow_headers->removeEnvoyExpectedRequestTimeoutMs();
       shadow_headers->removeEnvoyUpstreamRequestTimeoutMs();
     }
+    applyShadowPolicyHeaders(shadow_policy, *shadow_headers);
     auto options =
         Http::AsyncClient::RequestOptions()
             .setTimeout(shadow_policy.timeout().value_or(timeout_.global_timeout_))
@@ -990,7 +990,7 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
     if (shadow_policy.retryPolicy() != nullptr) {
       // TODO(wdauchy): share the body with the primary's buffer, e.g. via ref-counted read-only
       // slices, instead of a copy per mirror.
-      options.setRetryPolicy(shadow_policy.retryPolicy()).setBufferBodyForRetry(true);
+      options.setRetryPolicy(shadow_policy.retryPolicy()).setBufferBodyForRetry(!end_stream);
     }
 
     // The last policy can move the metadata since no later policy needs it.

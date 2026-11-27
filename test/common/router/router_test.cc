@@ -6763,6 +6763,84 @@ TEST_P(RouterShadowingTest, ShadowTimeoutDropsPrimaryTimeoutHeaders) {
   router_->onDestroy();
 }
 
+// A header-only mirror with a retry policy has no body to buffer. A timeout of 0 disables the
+// mirror timeout and still drops the timeout headers of the primary request, while the header
+// mutations of the mirror can set them.
+TEST_P(RouterShadowingTest, ShadowHeaderOnlyZeroTimeoutAndTimeoutHeaderMutation) {
+  shadow_writer_ = new MockShadowWriter();
+  config_ = std::make_shared<FilterConfig>(
+      factory_context_, *stats_store_.rootScope(), pool_.add("test"), *stats_store_.rootScope(),
+      cm_, runtime_, random_, ShadowWriterPtr{shadow_writer_}, true, false, false,
+      true /* respect_expected_rq_timeout */, false, false, false,
+      Protobuf::RepeatedPtrField<std::string>{}, test_time_.timeSystem(), http_context_,
+      router_context_);
+  router_ = std::make_unique<RouterTestFilter>(config_, config_->default_stats_);
+  router_->setDecoderFilterCallbacks(callbacks_);
+  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(host_address_);
+  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80"));
+
+  envoy::config::route::v3::RouteAction::RequestMirrorPolicy config;
+  config.set_cluster("foo");
+  config.mutable_runtime_fraction()->set_runtime_key("bar");
+  config.mutable_retry_policy()->set_retry_on("5xx");
+  config.mutable_timeout()->set_seconds(0);
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(THROW_OR_RETURN_VALUE(
+      ShadowPolicyImpl::create(config, factory_context_), std::shared_ptr<ShadowPolicyImpl>));
+  envoy::config::route::v3::RouteAction::RequestMirrorPolicy mutation_config;
+  mutation_config.set_cluster("baz");
+  mutation_config.mutable_runtime_fraction()->set_runtime_key("bar");
+  mutation_config.mutable_retry_policy()->set_retry_on("5xx");
+  TestUtility::loadFromYaml(R"EOF(
+append:
+  header:
+    key: "x-envoy-upstream-rq-timeout-ms"
+    value: "500"
+  append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
+)EOF",
+                            *mutation_config.add_request_headers_mutations());
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(
+      THROW_OR_RETURN_VALUE(ShadowPolicyImpl::create(mutation_config, factory_context_),
+                            std::shared_ptr<ShadowPolicyImpl>));
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .Times(2)
+      .WillRepeatedly(Return(true));
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-expected-rq-timeout-ms", "50"},
+                                         {"x-envoy-upstream-rq-timeout-ms", "60"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(*shadow_writer_, shadow_("foo", _, _))
+      .WillOnce([&](const std::string&, Http::RequestMessagePtr& request,
+                    const Http::AsyncClient::RequestOptions& options) {
+        EXPECT_EQ(std::chrono::milliseconds(0), options.timeout);
+        EXPECT_EQ(nullptr, request->headers().EnvoyExpectedRequestTimeoutMs());
+        EXPECT_EQ(nullptr, request->headers().EnvoyUpstreamRequestTimeoutMs());
+        EXPECT_NE(nullptr, options.parsed_retry_policy);
+        EXPECT_FALSE(options.buffer_body_for_retry);
+      });
+  EXPECT_CALL(*shadow_writer_, shadow_("baz", _, _))
+      .WillOnce([&](const std::string&, Http::RequestMessagePtr& request,
+                    const Http::AsyncClient::RequestOptions& options) {
+        EXPECT_EQ(std::chrono::milliseconds(50), options.timeout);
+        EXPECT_EQ(nullptr, request->headers().EnvoyExpectedRequestTimeoutMs());
+        EXPECT_EQ("500", request->headers().getEnvoyUpstreamRequestTimeoutMsValue());
+        EXPECT_FALSE(options.buffer_body_for_retry);
+      });
+
+  router_->decodeHeaders(headers, true);
+  router_->onDestroy();
+}
+
 TEST_P(RouterShadowingTest, ShadowWithHeaderManipulation) {
   const std::vector<std::string> mutation_yamls = {
       R"EOF(
