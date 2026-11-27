@@ -5,6 +5,7 @@ package envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -27,7 +28,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // Similar to the regular SDS, the certificate is configured using the outer common TLS context,
 // e.g. by setting the FIPS compliance policy on the loaded certificate.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Config {
   // Defines the configuration source of the secrets.
   config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
@@ -69,8 +70,8 @@ message Config {
   // Stats note: ``on_demand_secret.cert_active`` tracks all cached entries (both loaded and
   // in-flight pending, so it can reach up to ``max_active_secrets + max_pending_secrets``; ready
   // secrets equal ``cert_active - cert_pending``). Bounded eviction also exports
-  // ``cert_evicted``, ``cert_ownership_transferred``, ``cert_pending_rejected``, and
-  // ``cert_pending``.
+  // ``cert_evicted``, ``cert_idle_expired``, ``cert_ownership_transferred``,
+  // ``cert_pending_rejected``, and ``cert_pending``.
   google.protobuf.UInt32Value max_active_secrets = 4 [(validate.rules).uint32 = {gt: 0}];
 
   // Maximum number of in-flight (pending) secret subscriptions waiting for an initial SDS response.
@@ -87,4 +88,20 @@ message Config {
   // alpha=1) so a single flooding tenant cannot consume all pending capacity and starve sparse
   // tenants.
   google.protobuf.UInt32Value max_pending_secrets = 5 [(validate.rules).uint32 = {gt: 0}];
+
+  // Maximum idle duration for loaded secrets. When unset, loaded secrets do not expire due to
+  // inactivity and remain cached until evicted for capacity or removed by the SDS server.
+  //
+  // When set, a loaded secret that no handshake selects for at least this duration is removed:
+  // its SDS subscription is cancelled and its TLS context is dropped from all workers
+  // (connections already using that context keep it until they close), freeing its active slot
+  // and per-tenant fair share. The next handshake for that name fetches the secret on demand.
+  //
+  // Idleness is sampled periodically (4 sweeps per ``idle_timeout``) via lock-free hit marks
+  // rather than per-handshake timestamps, so an unused secret expires between 1x and 1.25x
+  // ``idle_timeout`` after its last use. Removals are paced across main-thread event-loop ticks
+  // to bound per-tick work after large bursts. Secrets listed in ``prefetch_secret_names`` are
+  // exempt from idle expiration. Requires ``max_active_secrets`` to be set. Expired secrets
+  // increment ``on_demand_secret.cert_idle_expired``.
+  google.protobuf.Duration idle_timeout = 6 [(validate.rules).duration = {gte {seconds: 1}}];
 }

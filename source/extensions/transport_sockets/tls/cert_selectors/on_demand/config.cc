@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "envoy/common/time.h"
 #include "envoy/event/timer.h"
@@ -143,6 +144,18 @@ SecretManager::SecretManager(const ConfigProto& config,
     reclaim_timer_ = factory_context_.mainThreadDispatcher().createTimer(
         [this]() { reclaimAbandonedPending(); });
   }
+  if (policy_.activeLimitEnabled() && config.has_idle_timeout()) {
+    // Sample idleness `kIdleSweepsPerTimeout` times per timeout so worker handshakes only set a
+    // relaxed atomic flag instead of reading a clock. Populate `prefetched_names_` before starting
+    // prefetch subscriptions so synchronous activation honors the exemption immediately.
+    const uint64_t idle_ms = PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 0);
+    idle_sweep_interval_ =
+        std::chrono::milliseconds(std::max<uint64_t>(1, idle_ms / kIdleSweepsPerTimeout));
+    prefetched_names_.insert(config.prefetch_secret_names().begin(),
+                             config.prefetch_secret_names().end());
+    idle_timer_ =
+        factory_context_.mainThreadDispatcher().createTimer([this]() { sweepIdleSecrets(); });
+  }
   for (const auto& name : config.prefetch_secret_names()) {
     addCertificateConfig(name, nullptr, factory_context.initManager());
   }
@@ -151,6 +164,9 @@ SecretManager::SecretManager(const ConfigProto& config,
 SecretManager::~SecretManager() {
   if (reclaim_timer_ != nullptr) {
     reclaim_timer_->disableTimer();
+  }
+  if (idle_timer_ != nullptr) {
+    idle_timer_->disableTimer();
   }
   // Release Accumulate gauges so replacing a filter chain (which shares the parent listener stats
   // scope in ThreadLocalStoreImpl) does not permanently leak cached/pending counts.
@@ -168,6 +184,116 @@ void SecretManager::disableReclaimTimerIfIdle() {
   if (pending_on_demand_keys_.empty() && reclaim_timer_ != nullptr && reclaim_timer_->enabled()) {
     reclaim_timer_->disableTimer();
   }
+}
+
+bool SecretManager::hasActiveNonPrefetchedSecret() const {
+  if (policy_.activeCount() == 0) {
+    return false;
+  }
+  if (prefetched_names_.empty()) {
+    return true;
+  }
+  for (const auto& [name, entry] : cache_) {
+    if (entry->cert_context_ != nullptr && !prefetched_names_.contains(name)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void SecretManager::disableIdleTimerIfIdle() {
+  if (idle_timer_ == nullptr) {
+    return;
+  }
+  if (!hasActiveNonPrefetchedSecret()) {
+    if (pending_idle_removals_.capacity() > kMaxIdleRemovalsPerTick) {
+      std::vector<PendingIdleRemoval>().swap(pending_idle_removals_);
+    } else {
+      pending_idle_removals_.clear();
+    }
+    if (idle_timer_->enabled()) {
+      idle_timer_->disableTimer();
+    }
+  }
+}
+
+void SecretManager::sweepIdleSecrets() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  if (pending_idle_removals_.empty()) {
+    std::vector<std::string> idle_names;
+    policy_.collectIdle(kIdleSweepsPerTimeout, idle_names);
+    pending_idle_removals_.reserve(idle_names.size());
+    for (std::string& name : idle_names) {
+      if (prefetched_names_.contains(name)) {
+        continue;
+      }
+      auto it = cache_.find(name);
+      if (it == cache_.end() || it->second->cert_context_ == nullptr) {
+        continue;
+      }
+      pending_idle_removals_.push_back(
+          PendingIdleRemoval{std::move(name), it->second->generation_});
+    }
+  }
+
+  const size_t batch_size = std::min(kMaxIdleRemovalsPerTick, pending_idle_removals_.size());
+  std::vector<std::string> removed_names;
+  removed_names.reserve(batch_size);
+  for (size_t i = 0; i < batch_size; ++i) {
+    PendingIdleRemoval item = std::move(pending_idle_removals_.back());
+    pending_idle_removals_.pop_back();
+    auto it = cache_.find(item.name_);
+    // ABA-safe check: skip entries already evicted/removed or superseded by a newer generation.
+    if (it == cache_.end() || it->second->generation_ != item.generation_ ||
+        it->second->cert_context_ == nullptr) {
+      continue;
+    }
+    // Skip entries hit on a worker between paced drain ticks; the next scheduled sweep will
+    // consume `used_since_idle_sweep_` and reset their idle counter.
+    if (it->second->hit_state_ != nullptr && it->second->hit_state_->usedSinceIdleSweep()) {
+      continue;
+    }
+    ASSERT(it->second->callbacks_.empty());
+    policy_.onRemoved(item.name_);
+    if (it->second->cert_config_ != nullptr) {
+      factory_context_.mainThreadDispatcher().deferredDelete(std::move(it->second->cert_config_));
+    }
+    cache_.erase(it);
+    stats_->cert_active_.dec();
+    stats_->cert_idle_expired_.inc();
+    removed_names.push_back(std::move(item.name_));
+  }
+
+  if (!removed_names.empty()) {
+    ENVOY_LOG(debug, "Removed {} idle certificates ({} remaining in sweep)", removed_names.size(),
+              pending_idle_removals_.size());
+    removeContexts(std::move(removed_names));
+  }
+
+  if (!pending_idle_removals_.empty()) {
+    // Yield to the main-thread event loop before draining the next batch so large post-flood
+    // sweeps do not stall handshakes, SDS updates, or admin probes.
+    idle_timer_->enableTimer(std::chrono::milliseconds(0));
+    return;
+  }
+  if (pending_idle_removals_.capacity() > kMaxIdleRemovalsPerTick) {
+    std::vector<PendingIdleRemoval>().swap(pending_idle_removals_);
+  }
+  if (hasActiveNonPrefetchedSecret()) {
+    idle_timer_->enableTimer(idle_sweep_interval_);
+  }
+}
+
+void SecretManager::removeContexts(std::vector<std::string>&& secret_names) {
+  // One broadcast for the whole batch; the names are shared with the workers, not copied.
+  auto names = std::make_shared<const std::vector<std::string>>(std::move(secret_names));
+  cert_contexts_.runOnAllThreads(
+      [names](OptRef<ThreadLocalCerts> certs) {
+        for (const std::string& name : *names) {
+          certs->ctx_by_name_.erase(name);
+        }
+      },
+      [stats_scope = stats_scope_, stats = stats_] { stats->cert_updated_.inc(); });
 }
 
 void SecretManager::reclaimAbandonedPending() {
@@ -343,6 +469,15 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
     ENVOY_LOG(debug, "Evicted certificate '{}' upon activation of '{}' (transfers={})",
               *evicted_name, secret_name, evicted->ownership_transfers);
   }
+  if (idle_timer_ != nullptr) {
+    if (!prefetched_names_.contains(secret_name)) {
+      if (!idle_timer_->enabled()) {
+        idle_timer_->enableTimer(idle_sweep_interval_);
+      }
+    } else if (evicted.has_value()) {
+      disableIdleTimerIfIdle();
+    }
+  }
 
   // Update the future lookups (coalescing any victim removal into a single cross-thread
   // broadcast) and notify pending callbacks. Preserve hit attribution for live coalesced waiters
@@ -435,6 +570,7 @@ void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name,
   pending_on_demand_keys_.erase(secret_name);
   disableReclaimTimerIfIdle();
   cache_.erase(it);
+  disableIdleTimerIfIdle();
   updateContexts(secret_name, CachedCert{});
   stats_->cert_active_.dec();
   if (was_pending) {
@@ -588,6 +724,9 @@ createCertificateSelectorFactory(const Protobuf::Message& proto_config,
           absl::StrCat("Number of unique prefetch_secret_names (", unique_prefetches.size(),
                        ") exceeds max_active_secrets (", max_active, ")"));
     }
+  }
+  if (config.has_idle_timeout() && max_active == 0) {
+    return absl::InvalidArgumentError("idle_timeout requires max_active_secrets");
   }
   MapperFactory& mapper_config =
       Config::Utility::getAndCheckFactory<MapperFactory>(config.certificate_mapper());

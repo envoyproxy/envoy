@@ -43,6 +43,7 @@ inline constexpr absl::string_view TenantIdFilterStateKey =
   COUNTER(cert_requested)                                                                          \
   COUNTER(cert_updated)                                                                            \
   COUNTER(cert_evicted)                                                                            \
+  COUNTER(cert_idle_expired)                                                                       \
   COUNTER(cert_ownership_transferred)                                                              \
   COUNTER(cert_pending_rejected)                                                                   \
   GAUGE(cert_active, Accumulate)                                                                   \
@@ -188,6 +189,20 @@ public:
   static constexpr std::chrono::seconds kMinAbandonedPendingAge{5};
 
   /**
+   * Number of idle sweeps per configured `idle_timeout`. A loaded non-prefetched secret expires
+   * once no handshake selects it during this many consecutive sweep intervals, i.e., between 1x
+   * and `(1 + 1 / kIdleSweepsPerTimeout)x` `idle_timeout` after its last use.
+   */
+  static constexpr uint32_t kIdleSweepsPerTimeout{4};
+
+  /**
+   * Maximum number of idle secrets inspected and removed per main-thread event-loop tick during
+   * an idle sweep. Larger sweeps yield via a 0 ms timer so post-flood expiration batches do not
+   * stall handshakes, SDS callbacks, or admin probes on the main thread.
+   */
+  static constexpr size_t kMaxIdleRemovalsPerTick{256};
+
+  /**
    * Returns true if `max_active_secrets` is configured (so hits update `HitState`).
    */
   bool activeLimitEnabled() const { return policy_.activeLimitEnabled(); }
@@ -213,11 +228,20 @@ private:
   // `reclaim_timer_` only while `pending_on_demand_keys_` remains non-empty.
   void reclaimAbandonedPending();
   void disableReclaimTimerIfIdle();
+  // Runs or continues a paced idle sweep, removing at most `kMaxIdleRemovalsPerTick` idle
+  // non-prefetched secrets per tick and yielding via a 0 ms timer while a sweep remains in
+  // progress. Re-arms at `idle_sweep_interval_` once complete if any non-prefetched active secret
+  // remains.
+  void sweepIdleSecrets();
+  bool hasActiveNonPrefetchedSecret() const;
+  void disableIdleTimerIfIdle();
+  // Drops `secret_names` from every worker's lookup map with one cross-thread broadcast.
+  void removeContexts(std::vector<std::string>&& secret_names);
   const Stats::ScopeSharedPtr stats_scope_;
   // Gauge conservation invariants (main thread, outside active mutations):
   //  - `cert_active == cache_.size() == n_ready + n_pending`
   //  - `cert_pending == n_pending`
-  //  - `cert_requested == cert_active + cert_evicted + n_removed`
+  //  - `cert_requested == cert_active + cert_evicted + cert_idle_expired + n_removed`
   CertSelectionStatsSharedPtr stats_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   const envoy::config::core::v3::ConfigSource config_source_;
@@ -255,6 +279,22 @@ private:
   // Idle-disarmed main-thread timer (declared last so it is destroyed first) that periodically
   // invokes `reclaimAbandonedPending()` while `pending_on_demand_keys_` is non-empty.
   Event::TimerPtr reclaim_timer_;
+
+  struct PendingIdleRemoval {
+    std::string name_;
+    uint64_t generation_{0};
+  };
+
+  // Prefetched secret names exempt from `idle_timeout` expiration (populated only when
+  // `idle_timeout` is enabled).
+  absl::flat_hash_set<std::string> prefetched_names_;
+  // ABA-tagged secrets queued for paced removal across event-loop ticks during an active sweep.
+  std::vector<PendingIdleRemoval> pending_idle_removals_;
+  // `idle_timeout / kIdleSweepsPerTimeout`, and the idle-disarmed main-thread timer driving
+  // `sweepIdleSecrets()` while any non-prefetched active secret is loaded. Null unless both
+  // `idle_timeout` and `max_active_secrets` are configured.
+  std::chrono::milliseconds idle_sweep_interval_{0};
+  Event::TimerPtr idle_timer_;
 };
 
 class BaseAsyncSelector : protected Logger::Loggable<Logger::Id::connection> {

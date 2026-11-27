@@ -1,12 +1,14 @@
 #include "source/common/common/fair_sieve_cache.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "source/common/common/assert.h"
 
@@ -221,6 +223,29 @@ bool Policy::onRemoved(absl::string_view key) {
   entries_.erase(it);
   maybeEraseTenant(owner);
   return was_pending;
+}
+
+void Policy::collectIdle(uint32_t max_idle_sweeps, std::vector<std::string>& idle_keys_out) {
+  if (!activeLimitEnabled() || max_idle_sweeps == 0) {
+    return;
+  }
+  for (const auto& [key, entry_ptr] : entries_) {
+    Entry& entry = *entry_ptr;
+    if (!entry.is_active) {
+      continue;
+    }
+    ASSERT(entry.hit_state != nullptr);
+    if (entry.hit_state->consumeUsedSinceIdleSweep()) {
+      entry.idle_sweeps = 0;
+    } else {
+      if (entry.idle_sweeps < max_idle_sweeps) {
+        ++entry.idle_sweeps;
+      }
+      if (entry.idle_sweeps >= max_idle_sweeps) {
+        idle_keys_out.push_back(entry.key);
+      }
+    }
+  }
 }
 
 size_t Policy::tenantActiveCount(TenantId tenant_id) const {

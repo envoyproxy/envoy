@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "source/common/common/hash.h"
 
@@ -58,6 +59,9 @@ inline TenantId computeTenantId(absl::string_view tenant_name) noexcept {
  *  - Post-eviction lifetime safety: because callers hold `std::shared_ptr<const HitState>` in
  *    thread-local snapshots, late worker calls to `recordHit()` after eviction remain memory-safe
  *    and data-race-free until asynchronous snapshot updates drop the last reference.
+ *  - Idle-sweep tracking: `used_since_idle_sweep_` is a second relaxed TTAS mark with the same
+ *    benign lost-update property, consumed only by `Policy::collectIdle()`. It is separate from
+ *    `visited_` because the SIEVE hand clears `visited_` on its own eviction schedule.
  */
 struct HitState {
   explicit HitState(TenantId owner_tenant = kDefaultTenantId) noexcept
@@ -66,6 +70,9 @@ struct HitState {
   void recordHit(TenantId tenant_id) const noexcept {
     if (!visited_.load(std::memory_order_relaxed)) {
       visited_.store(true, std::memory_order_relaxed);
+    }
+    if (!used_since_idle_sweep_.load(std::memory_order_relaxed)) {
+      used_since_idle_sweep_.store(true, std::memory_order_relaxed);
     }
     if (tenant_id != kDefaultTenantId &&
         last_hit_tenant_.load(std::memory_order_relaxed) != tenant_id) {
@@ -81,11 +88,28 @@ struct HitState {
     return true;
   }
 
+  // Returns whether the resource has been hit since the previous idle sweep without clearing
+  // the mark. Used by owners pacing idle removals across ticks to skip recently reused entries.
+  bool usedSinceIdleSweep() const noexcept {
+    return used_since_idle_sweep_.load(std::memory_order_relaxed);
+  }
+
+  // Returns whether the resource was hit since the previous idle sweep and clears the mark.
+  bool consumeUsedSinceIdleSweep() const noexcept {
+    if (!used_since_idle_sweep_.load(std::memory_order_relaxed)) {
+      return false;
+    }
+    used_since_idle_sweep_.store(false, std::memory_order_relaxed);
+    return true;
+  }
+
   TenantId lastHitTenant() const noexcept {
     return last_hit_tenant_.load(std::memory_order_relaxed);
   }
 
   mutable std::atomic<bool> visited_{false};
+  // Starts set so a newly activated resource always survives one full idle timeout.
+  mutable std::atomic<bool> used_since_idle_sweep_{true};
   mutable std::atomic<TenantId> last_hit_tenant_{kDefaultTenantId};
 };
 
@@ -167,6 +191,21 @@ public:
   // Returns true if the removed entry was in the pending state, false otherwise.
   bool onRemoved(absl::string_view key);
 
+  // Clock-style idle detection for active resources, invoked by the owner once per sweep
+  // interval on the main thread. Any active resource not hit during `max_idle_sweeps` consecutive
+  // intervals is appended to `idle_keys_out`. The policy does not remove reported entries: the
+  // owner removes them via its normal teardown path ending in `onRemoved()`. An unremoved entry's
+  // idle counter saturates at `max_idle_sweeps` and it continues to be reported on subsequent
+  // sweeps until hit or removed.
+  //
+  // A newly activated resource starts marked as used for its initial interval. With
+  // `interval = timeout / max_idle_sweeps`, an unused resource is reported once it has been idle
+  // for `[timeout, timeout + interval)`.
+  //
+  // Pending resources are never reported. No-op when active eviction is disabled or
+  // `max_idle_sweeps == 0`. Cost: a single `O(active_count + pending_count)` pass.
+  void collectIdle(uint32_t max_idle_sweeps, std::vector<std::string>& idle_keys_out);
+
   size_t activeCount() const { return active_count_; }
   size_t pendingCount() const { return pending_count_; }
   size_t tenantCount() const { return tenants_.size(); }
@@ -187,6 +226,8 @@ private:
     std::string key;
     TenantId owner_tenant{kDefaultTenantId};
     bool is_active{false};
+    // Consecutive `collectIdle()` sweeps observed without a hit (saturates at `max_idle_sweeps`).
+    uint32_t idle_sweeps{0};
     HitStateSharedPtr hit_state;
     Entry* prev{nullptr};
     Entry* next{nullptr};

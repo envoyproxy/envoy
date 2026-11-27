@@ -1398,6 +1398,65 @@ TEST_P(OnDemandIntegrationTest, ListenerSetFilterStateTenantIntegration) {
   test_server_->waitForGauge(onDemandStat("cert_pending"), Eq(0));
 }
 
+TEST_P(OnDemandIntegrationTest, IdleTimeoutExpiresUnusedSecretExemptsPrefetchAndRefetchesOnDemand) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "SNI mapper only works on downstream";
+  }
+  on_server_init_function_ = [&]() {
+    createXdsConnection();
+    waitSendSdsResponse("prefetch", "server");
+  };
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: "*"
+  prefetch_secret_names:
+  - prefetch
+  max_active_secrets: 4
+  idle_timeout: 1s
+  )EOF");
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+
+  // Fetch an on-demand secret "idle" and complete a TLS handshake.
+  {
+    auto conn = createClientConnectionWithSni("idle");
+    waitCertsRequested(2);
+    waitSendSdsResponse("idle", "server");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(2));
+  EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_active"))->value());
+
+  // Wait for the real main-thread idle timer to expire "idle" (between 1.0s and 1.25s).
+  test_server_->waitForCounter(onDemandStat("cert_idle_expired"), Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForGauge(onDemandStat("cert_active"), Eq(1), TestUtility::DefaultTimeout);
+
+  // "prefetch" was loaded before "idle" and never hit, yet must remain cached (no new SDS fetch).
+  {
+    auto conn = createClientConnectionWithSni("prefetch");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  EXPECT_EQ(2, test_server_->counter(onDemandStat("cert_requested"))->value());
+  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_idle_expired"))->value());
+
+  // Reconnecting to "idle" must trigger a fresh on-demand SDS fetch and succeed.
+  {
+    auto conn = createClientConnectionWithSni("idle");
+    waitCertsRequested(3);
+    waitSendSdsResponse("idle", "server");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(4));
+  EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, OnDemandIntegrationTest,
                          testing::ValuesIn(testParams()), testParamsToString);
 

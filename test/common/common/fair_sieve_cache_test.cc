@@ -901,6 +901,186 @@ TEST(FairSievePolicyTest, SelfEvictingFlooderDoesNotClobberVictimCursorAndPinIdl
   EXPECT_EQ(0, policy.tenantActiveCount(tenants[3]));
 }
 
+TEST(HitStateTest, UsedSinceIdleSweepStartsSetAndIsIndependentOfVisited) {
+  HitState state(computeTenantId("tenant-owner"));
+  // A new resource counts as used once; the SIEVE visited mark is not involved.
+  EXPECT_TRUE(state.usedSinceIdleSweep());
+  EXPECT_TRUE(state.consumeUsedSinceIdleSweep());
+  EXPECT_FALSE(state.usedSinceIdleSweep());
+  EXPECT_FALSE(state.consumeUsedSinceIdleSweep());
+  EXPECT_FALSE(state.consumeVisited());
+
+  // One hit sets both marks, and consuming one leaves the other in place.
+  state.recordHit(kDefaultTenantId);
+  EXPECT_TRUE(state.usedSinceIdleSweep());
+  EXPECT_TRUE(state.consumeVisited());
+  EXPECT_TRUE(state.usedSinceIdleSweep());
+  EXPECT_TRUE(state.consumeUsedSinceIdleSweep());
+  EXPECT_FALSE(state.usedSinceIdleSweep());
+  EXPECT_FALSE(state.consumeUsedSinceIdleSweep());
+}
+
+TEST(FairSievePolicyIdleTest, ReportsOnlyResourcesIdleForMaxSweeps) {
+  Policy policy(/*max_active=*/8, /*max_pending=*/0);
+  const TenantId a = computeTenantId("tenant-a");
+  const TenantId b = computeTenantId("tenant-b");
+  std::optional<Policy::EvictionResult> evicted;
+  policy.onPendingAdded("used", a);
+  const HitStateSharedPtr used = policy.onActivated("used", evicted);
+  policy.onPendingAdded("idle", b);
+  policy.onActivated("idle", evicted);
+  policy.onPendingAdded("pending", b); // Never activated.
+
+  constexpr uint32_t kSweeps = 4;
+  std::vector<std::string> idle;
+  // Sweep 1 consumes the initial mark of both resources; sweeps 2 to 4 count three idle
+  // intervals for "idle", one short of the limit.
+  for (int sweep = 1; sweep <= 4; ++sweep) {
+    used->recordHit(a);
+    policy.collectIdle(kSweeps, idle);
+    EXPECT_TRUE(idle.empty()) << "sweep " << sweep;
+  }
+  // Sweep 5: "idle" has now gone four consecutive intervals without a hit.
+  used->recordHit(a);
+  policy.collectIdle(kSweeps, idle);
+  ASSERT_EQ(1, idle.size());
+  EXPECT_EQ("idle", idle[0]);
+
+  // The policy only reports. Left in place, the key is reported again by the next sweep.
+  EXPECT_EQ(2, policy.activeCount());
+  idle.clear();
+  used->recordHit(a);
+  policy.collectIdle(kSweeps, idle);
+  ASSERT_EQ(1, idle.size());
+  EXPECT_EQ("idle", idle[0]);
+
+  // The owner removes it through the normal path.
+  EXPECT_FALSE(policy.onRemoved("idle"));
+  EXPECT_EQ(1, policy.activeCount());
+  EXPECT_EQ(0, policy.tenantActiveCount(b));
+  EXPECT_EQ(1, policy.tenantPendingCount(b));
+
+  // A pending resource is never reported, however long it stays pending.
+  idle.clear();
+  for (int sweep = 0; sweep < 10; ++sweep) {
+    used->recordHit(a);
+    policy.collectIdle(kSweeps, idle);
+  }
+  EXPECT_TRUE(idle.empty());
+  EXPECT_EQ(1, policy.pendingCount());
+  EXPECT_EQ(1, policy.activeCount());
+}
+
+TEST(FairSievePolicyIdleTest, HitResetsIdleCountAndRemovalKeepsQueuesUsable) {
+  Policy policy(/*max_active=*/4, /*max_pending=*/0);
+  const TenantId a = computeTenantId("tenant-a");
+  std::optional<Policy::EvictionResult> evicted;
+  std::vector<HitStateSharedPtr> states;
+  for (int i = 0; i < 4; ++i) {
+    const std::string key = absl::StrCat("k", i);
+    policy.onPendingAdded(key, a);
+    states.push_back(policy.onActivated(key, evicted));
+  }
+
+  std::vector<std::string> idle;
+  policy.collectIdle(2, idle); // Consumes the initial marks.
+  policy.collectIdle(2, idle); // One idle interval each.
+  EXPECT_TRUE(idle.empty());
+  states[0]->recordHit(a); // "k0" is used just before it would be reported.
+  policy.collectIdle(2, idle);
+  const absl::flat_hash_set<std::string> reported(idle.begin(), idle.end());
+  EXPECT_EQ((absl::flat_hash_set<std::string>{"k1", "k2", "k3"}), reported);
+  EXPECT_EQ(3, idle.size());
+
+  for (const std::string& key : idle) {
+    policy.onRemoved(key);
+  }
+  EXPECT_EQ(1, policy.activeCount());
+  EXPECT_EQ(1, policy.tenantActiveCount(a));
+
+  // The freed capacity is reusable without eviction, and eviction works as usual afterwards
+  // (the tenant's SIEVE hand was not left dangling by the removals).
+  for (int i = 0; i < 3; ++i) {
+    const std::string key = absl::StrCat("n", i);
+    policy.onPendingAdded(key, a);
+    policy.onActivated(key, evicted);
+    EXPECT_FALSE(evicted.has_value());
+  }
+  policy.onPendingAdded("overflow", a);
+  policy.onActivated("overflow", evicted);
+  ASSERT_TRUE(evicted.has_value());
+  EXPECT_EQ(4, policy.activeCount());
+}
+
+TEST(FairSievePolicyIdleTest, NoOpWithoutActiveLimitOrWithZeroSweeps) {
+  std::vector<std::string> idle;
+  Policy pending_only(/*max_active=*/0, /*max_pending=*/4);
+  pending_only.onPendingAdded("p", kDefaultTenantId);
+  for (int sweep = 0; sweep < 5; ++sweep) {
+    pending_only.collectIdle(1, idle);
+  }
+  EXPECT_TRUE(idle.empty());
+
+  Policy bounded(/*max_active=*/2, /*max_pending=*/0);
+  std::optional<Policy::EvictionResult> evicted;
+  bounded.onPendingAdded("a", kDefaultTenantId);
+  bounded.onActivated("a", evicted);
+  for (int sweep = 0; sweep < 5; ++sweep) {
+    bounded.collectIdle(0, idle);
+  }
+  EXPECT_TRUE(idle.empty());
+  EXPECT_EQ(1, bounded.activeCount());
+}
+
+TEST(FairSievePolicyIdleTest, ConcurrentWorkerHitsWithCollectIdleAreRaceFree) {
+  constexpr size_t kCapacity = 16;
+  Policy policy(kCapacity, /*max_pending=*/0);
+  std::optional<Policy::EvictionResult> evicted;
+
+  std::vector<TenantId> tenants;
+  for (int t = 0; t < 4; ++t) {
+    tenants.push_back(computeTenantId(absl::StrCat("idle-worker-tenant-", t)));
+  }
+
+  std::vector<HitStateSharedPtr> hot_states;
+  for (size_t i = 0; i < kCapacity; ++i) {
+    const std::string key = absl::StrCat("init-", i);
+    policy.onPendingAdded(key, tenants[i % tenants.size()]);
+    hot_states.push_back(policy.onActivated(key, evicted));
+  }
+
+  std::atomic<bool> stop{false};
+  std::vector<std::thread> workers;
+  for (int w = 0; w < 4; ++w) {
+    workers.emplace_back([&, w]() {
+      size_t iter = 0;
+      while (!stop.load(std::memory_order_relaxed)) {
+        const auto& st = hot_states[(iter + w) % hot_states.size()];
+        st->recordHit(tenants[(iter + w) % tenants.size()]);
+        ++iter;
+      }
+    });
+  }
+
+  std::vector<std::string> idle;
+  for (int round = 0; round < 100; ++round) {
+    idle.clear();
+    policy.collectIdle(2, idle);
+    for (const std::string& key : idle) {
+      policy.onRemoved(key);
+    }
+    const std::string key = absl::StrCat("churn-", round);
+    policy.onPendingAdded(key, tenants[round % tenants.size()]);
+    policy.onActivated(key, evicted);
+    EXPECT_LE(policy.activeCount(), kCapacity);
+  }
+
+  stop.store(true, std::memory_order_relaxed);
+  for (auto& w : workers) {
+    w.join();
+  }
+}
+
 } // namespace
 } // namespace FairSieve
 } // namespace Envoy
