@@ -217,9 +217,14 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ParentTeardownDetachesChild) {
   io_handle_.reset();
   EXPECT_TRUE(child->listenerStopped());
 
-  // Drain and close must not crash after detach (parent back-pointer is null).
+  // Drain, connectionInfo, and close must not crash after detach (parent back-pointer is null).
+  EXPECT_EQ(child->connectionInfo(), "test-node:test-cluster:");
   child->markTunnelDrainingAndDialReplacement();
   EXPECT_EQ(child->close().err_, nullptr);
+
+  // A handle constructed without a parent must also report connectionInfo() safely.
+  auto orphan = createHandle(nullptr, "no_parent_key");
+  EXPECT_TRUE(orphan->connectionInfo().empty());
 }
 
 // Test close() method and all edge cases.

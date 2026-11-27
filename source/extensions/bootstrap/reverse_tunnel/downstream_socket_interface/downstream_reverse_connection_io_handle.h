@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
@@ -16,7 +17,8 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
-// Forward declaration.
+// Forward declarations.
+class DownstreamSocketThreadLocal;
 class ReverseConnectionIOHandle;
 
 /**
@@ -93,7 +95,8 @@ public:
   void markTunnelDrainingAndDialReplacement();
 
   /**
-   * @return the parent's source identifiers, used as the /reverse_tunnel/tunnels admin key.
+   * @return the parent's source identifiers cached at construction, used as the
+   * /reverse_tunnel/tunnels admin key. Safe to call after detachParent().
    */
   std::string connectionInfo() const;
 
@@ -110,6 +113,11 @@ private:
   // Bytes the responder coalesced with the handshake response, served before the socket. Null once
   // nothing is left to replay.
   Buffer::InstancePtr residual_bytes_;
+  // Cached parent source identifiers ("<node>:<cluster>:<tenant>"), safe after detachParent().
+  std::string connection_info_;
+  // Weak reference to the worker-local registry where this handle registered at construction,
+  // ensuring unregistration in the destructor even if detachParent() cleared parent_.
+  std::weak_ptr<DownstreamSocketThreadLocal> local_registry_;
 };
 
 } // namespace ReverseConnection

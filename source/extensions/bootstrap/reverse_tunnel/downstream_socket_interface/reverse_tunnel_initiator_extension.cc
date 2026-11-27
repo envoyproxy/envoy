@@ -545,7 +545,7 @@ void ReverseTunnelInitiatorExtension::activeTunnels(
         }
 
         auto index = local->index();
-        if (!index.has_value()) {
+        if (!index.has_value() || index.value() >= active_tunnels.size()) {
           return;
         }
         local->activeTunnels(active_tunnels[index.value()]);
