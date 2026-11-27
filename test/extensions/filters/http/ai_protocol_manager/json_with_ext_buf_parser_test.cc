@@ -249,6 +249,37 @@ TEST_F(JsonWithExtBufParserTest, FeedAfterCompletionIsRejected) {
               HasStatusCode(absl::StatusCode::kFailedPrecondition));
 }
 
+// The filter forwards the raw body, so a second document in a non-final chunk
+// must fail the parse, not be skipped. Rejected on the feed() that carries it.
+TEST_F(JsonWithExtBufParserTest, TrailingDocumentInNonFinalChunkIsRejected) {
+  {
+    JsonWithExtBufParser parser(config_);
+    EXPECT_THAT(parser.feed(R"({"valid":1} {"smuggled":"data"})", /*end_stream=*/false),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+    EXPECT_THAT(parser.feed("", /*end_stream=*/true),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+    EXPECT_TRUE(parser.takeDocument().json().is_null());
+  }
+  {
+    JsonWithExtBufParser parser(config_);
+    ASSERT_OK(parser.feed(R"({"valid":1})", /*end_stream=*/false));
+    EXPECT_THAT(parser.feed(R"({"smuggled":"data"})", /*end_stream=*/false),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+    EXPECT_THAT(parser.feed("", /*end_stream=*/true),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+    EXPECT_TRUE(parser.takeDocument().json().is_null());
+  }
+}
+
+// Trailing whitespace over several non-final chunks is fine.
+TEST_F(JsonWithExtBufParserTest, TrailingWhitespaceAcrossChunksIsAccepted) {
+  JsonWithExtBufParser parser(config_);
+  ASSERT_OK(parser.feed(R"({"valid":1})", /*end_stream=*/false));
+  ASSERT_OK(parser.feed(" \n", /*end_stream=*/false));
+  ASSERT_OK(parser.feed("\t", /*end_stream=*/true));
+  EXPECT_EQ(parser.takeDocument().json(), nlohmann::json::parse(R"({"valid":1})"));
+}
+
 // Errors are sticky: the same failure comes back rather than half a document.
 TEST_F(JsonWithExtBufParserTest, ErrorsAreTerminal) {
   JsonWithExtBufParser parser(config_);
