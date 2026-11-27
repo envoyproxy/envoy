@@ -67,7 +67,7 @@ jobs:
       uploads: |
         docs: generated/docs
       steps-post: |
-        - uses: envoyproxy/toolshed/actions/jq@b3d9bef5de9b18fa54b67945b3da50934767841f  # actions-v0.4.34
+        - uses: envoyproxy/toolshed/actions/jq@e0d2ffaac17df9f2cb36ff437b87d0d00d265335  # actions-v0.4.36
           with:
             output-path: generated/docs/gcs-metadata.json
             input-format: yaml
