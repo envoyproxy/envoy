@@ -10,7 +10,6 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
-#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/io_handle.h"
 #include "envoy/network/socket.h"
 #include "envoy/stats/scope.h"
@@ -23,6 +22,7 @@
 #include "source/common/network/socket_interface.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/handshake_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.h"
@@ -41,7 +41,6 @@ namespace ReverseConnection {
 // Forward declarations.
 class ReverseTunnelInitiatorExtension;
 class ReverseConnectionIOHandle;
-struct HandshakeHeader;
 
 namespace {
 // HTTP protocol constants.
@@ -89,12 +88,9 @@ struct ReverseConnectionSocketConfig {
   std::string src_cluster_id; // Cluster identifier of local envoy instance.
   std::string src_node_id;    // Node identifier of local envoy instance.
   std::string src_tenant_id;  // Tenant identifier of local envoy instance.
-  std::string request_path{
-      std::string(ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH)};
-  std::vector<envoy::config::core::v3::HeaderValueOption>
-      additional_headers;       // Additional headers for the handshake request.
-  bool use_http_upgrade{false}; // Negotiate handshake as HTTP/1.1 Upgrade -> 101.
-  std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
+  // Creates the per-connection initiator handshake. Always set by the extension; a dial without
+  // one fails.
+  std::shared_ptr<const InitiatorHandshakeConfigurator> handshake_configurator;
   // How often to re-check each host and dial missing tunnels.
   uint64_t maintain_interval_ms{ReverseConnectionUtility::kDefaultMaintainIntervalMs};
   // Deadline for receiving the handshake response after a dial opens the connection.
@@ -269,13 +265,14 @@ public:
    * Called when a reverse connection handshake completes. This method wakes up accept() if the
    * reverse connection handshake was successful. If not, it performs necessary cleanup and triggers
    * backoff for the host.
-   * @param error error message if the handshake failed, empty string if successful.
+   * @param outcome the terminal handshake outcome; success flag drives accept, message drives the
+   * access log on failure.
    * @param wrapper pointer to the connection wrapper that wraps over the established connection.
    * @param closed whether the connection was closed during handshake.
    * @param retry_after optional server-provided cool-off hint (from a ``Retry-After`` header on a
    * 429 handshake response) to use as the per-host backoff; ignored when unset.
    */
-  void onConnectionDone(const std::string& error, RCConnectionWrapper* wrapper, bool closed,
+  void onConnectionDone(const HandshakeOutcome& outcome, RCConnectionWrapper* wrapper, bool closed,
                         std::optional<std::chrono::milliseconds> retry_after = std::nullopt);
 
   // Backoff logic for connection failures.
@@ -402,34 +399,18 @@ public:
   ReverseTunnelInitiatorExtension* getDownstreamExtension() const;
 
   /**
-   * @return reference to the configured HTTP handshake request path.
-   */
-  const std::string& requestPath() const { return config_.request_path; }
-
-  /**
-   * @return reference to the additional headers for the handshake request.
-   */
-  const std::vector<envoy::config::core::v3::HeaderValueOption>& additionalHeaders() const {
-    return config_.additional_headers;
-  }
-
-  /**
-   * @return whether the handshake is negotiated as an HTTP/1.1 Upgrade exchange.
-   */
-  bool useHttpUpgrade() const { return config_.use_http_upgrade; }
-
-  /**
-   * @return handshake headers (key + append action + value formatter), or nullptr if none.
-   */
-  const std::shared_ptr<const std::vector<HandshakeHeader>>& handshakeHeaders() const {
-    return config_.handshake_headers;
-  }
-
-  /**
    * @return the handshake response deadline applied to each dial attempt.
    */
   std::chrono::milliseconds handshakeTimeout() const {
     return std::chrono::milliseconds(config_.handshake_timeout_ms);
+  }
+
+  /**
+   * @return the factory creating per-connection initiator handshakes. Null only when the socket
+   * was built without the extension, in which case a dial fails.
+   */
+  const InitiatorHandshakeConfigurator* handshakeConfigurator() const {
+    return config_.handshake_configurator.get();
   }
 
   /**

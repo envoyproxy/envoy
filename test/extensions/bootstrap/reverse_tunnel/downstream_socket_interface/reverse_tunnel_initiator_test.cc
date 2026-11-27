@@ -256,7 +256,7 @@ TEST_F(ReverseTunnelInitiatorTest, SocketMethodWithReverseConnectionAddress) {
   EXPECT_NE(reverse_handle, nullptr);
 }
 
-TEST_F(ReverseTunnelInitiatorTest, SocketUsesCustomHandshakeRequestPathFromExtension) {
+TEST_F(ReverseTunnelInitiatorTest, SocketUsesHandshakeConfiguratorFromExtension) {
   config_.mutable_http_handshake()->set_request_path("/custom/handshake");
   extension_ = std::make_unique<ReverseTunnelInitiatorExtension>(context_, config_);
   setupThreadLocalSlot();
@@ -274,7 +274,7 @@ TEST_F(ReverseTunnelInitiatorTest, SocketUsesCustomHandshakeRequestPathFromExten
   ASSERT_NE(socket, nullptr);
   auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
   ASSERT_NE(reverse_handle, nullptr);
-  EXPECT_EQ(reverse_handle->requestPath(), "/custom/handshake");
+  EXPECT_EQ(reverse_handle->handshakeConfigurator(), extension_->handshakeConfigurator().get());
 }
 
 TEST_F(ReverseTunnelInitiatorTest, CreateReverseConnectionSocketStreamIPv4) {

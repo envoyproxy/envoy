@@ -11,6 +11,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
+#include "source/extensions/bootstrap/reverse_tunnel/http1/http1_handshake_responder.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
@@ -222,6 +223,24 @@ public:
     req += fmt::format("Content-Length: {}\r\n\r\n", body.size());
     req += body;
     return req;
+  }
+
+  // Sends a request without identifiers through a filter built from `config` and returns the
+  // reply. A request whose method and path match the config reaches the identifier checks (400);
+  // one that does not is a 404.
+  std::string replyFor(const ReverseTunnelFilterConfigSharedPtr& config, const std::string& method,
+                       const std::string& path) {
+    auto written = std::make_shared<std::string>();
+    EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+        .WillRepeatedly([written](Buffer::Instance& data, bool) {
+          written->append(data.toString());
+          data.drain(data.length());
+        });
+    ReverseTunnelFilter filter(config, *stats_store_.rootScope(), overload_manager_);
+    filter.initializeReadFilterCallbacks(callbacks_);
+    Buffer::OwnedImpl request(makeHttpRequest(method, path));
+    filter.onData(request, false);
+    return *written;
   }
 
   // Helper to build reverse tunnel headers block.
@@ -506,6 +525,43 @@ TEST_F(ReverseTunnelFilterUnitTest, FullFlowParseError) {
   EXPECT_EQ(1, parse_error->value());
 }
 
+TEST_F(ReverseTunnelFilterUnitTest, FullFlowBodyRejected) {
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      });
+
+  Buffer::OwnedImpl request(
+      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t", "hello"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+  EXPECT_THAT(written, testing::HasSubstr("400 Bad Request"));
+  auto body_rejected =
+      TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.body_rejected");
+  ASSERT_NE(nullptr, body_rejected);
+  EXPECT_EQ(1, body_rejected->value());
+}
+
+TEST_F(ReverseTunnelFilterUnitTest, FullFlowRejectsWithoutSocketManager) {
+  clearRegisteredUpstreamExtension();
+
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      });
+
+  Buffer::OwnedImpl request(
+      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+  // Without the worker-local socket manager the tunnel cannot be registered, so the handshake
+  // is answered with 503.
+  EXPECT_THAT(written, testing::HasSubstr("503 Service Unavailable"));
+  EXPECT_EQ(1, handshakeCounter(stats_store_, "reverse_tunnel.handshake.registration_failed"));
+}
+
 TEST_F(ReverseTunnelFilterUnitTest, NotFoundForNonReverseTunnelPath) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
@@ -588,6 +644,87 @@ TEST_F(ReverseTunnelFilterUnitTest, HandshakeTimeoutClosesConnection) {
   EXPECT_EQ(1, handshakeCounter(stats_store_, "reverse_tunnel.handshake.timeout"));
 }
 
+// A rejection reply ends the handshake, so it disarms the deadline before the close.
+TEST_F(ReverseTunnelFilterUnitTest, RejectionDisarmsHandshakeDeadline) {
+  auto* timer = new NiceMock<Event::MockTimer>(&callbacks_.connection_.dispatcher_);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(*timer, disableTimer()).Times(testing::AtLeast(1));
+  Buffer::OwnedImpl request(
+      makeHttpRequestWithRtHeaders("GET", "/not-reverse-tunnel", "n", "c", "t"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+  testing::Mock::VerifyAndClearExpectations(timer);
+}
+
+// A malformed request ends the handshake too, so the deadline is disarmed before the close.
+TEST_F(ReverseTunnelFilterUnitTest, CodecErrorDisarmsHandshakeDeadline) {
+  auto* timer = new NiceMock<Event::MockTimer>(&callbacks_.connection_.dispatcher_);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  {
+    testing::InSequence order;
+    // The codec's 400 reply disarms it, and the dispatch error disarms it again.
+    EXPECT_CALL(*timer, disableTimer()).Times(testing::AtLeast(1));
+    EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  }
+  Buffer::OwnedImpl request("NOT AN HTTP REQUEST\r\n\r\n");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+  testing::Mock::VerifyAndClearExpectations(timer);
+  EXPECT_EQ(0, handshakeCounter(stats_store_, "reverse_tunnel.handshake.timeout"));
+}
+
+// Reads stop before the acceptance reply, so no pipelined request is dispatched during handoff.
+TEST_F(ReverseTunnelFilterUnitTest, AcceptanceStopsReadingBeforeReply) {
+  std::string written;
+  {
+    testing::InSequence order;
+    EXPECT_CALL(callbacks_.connection_, readDisable(true));
+    EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+        .WillRepeatedly([&written](Buffer::Instance& data, bool) {
+          written.append(data.toString());
+          data.drain(data.length());
+        });
+  }
+
+  Buffer::OwnedImpl request(
+      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+}
+
+// The filter disables reads itself when it accepts a tunnel request, before any reply.
+TEST_F(ReverseTunnelFilterUnitTest, TunnelRequestAcceptDisablesReads) {
+  Http::TestRequestHeaderMapImpl headers;
+  const Bootstrap::ReverseConnection::TunnelRequest request{"n",          "c", "t", headers,
+                                                            std::nullopt, "",  ""};
+  EXPECT_CALL(callbacks_.connection_, readDisable(true));
+  EXPECT_TRUE(filter_->onTunnelRequest(request).accepted);
+}
+
+// A connection carries one tunnel request; a second is a bug and is refused.
+TEST_F(ReverseTunnelFilterUnitTest, SecondTunnelRequestIsRefused) {
+  Http::TestRequestHeaderMapImpl headers;
+  const Bootstrap::ReverseConnection::TunnelRequest request{"n",          "c", "t", headers,
+                                                            std::nullopt, "",  ""};
+  ASSERT_TRUE(filter_->onTunnelRequest(request).accepted);
+
+  EXPECT_ENVOY_BUG(EXPECT_FALSE(filter_->onTunnelRequest(request).accepted),
+                   "second tunnel request on one connection");
+#if defined(NDEBUG) || defined(ENVOY_CONFIG_COVERAGE)
+  // Where ENVOY_BUG only logs, the refusal released the socket the first request prepared, so the
+  // first acceptance's flush registers nothing.
+  Network::Connection::BytesSentCb bytes_sent_cb;
+  EXPECT_CALL(callbacks_.connection_, addBytesSentCallback(testing::_))
+      .WillOnce(
+          [&bytes_sent_cb](Network::Connection::BytesSentCb cb) { bytes_sent_cb = std::move(cb); });
+  filter_->onAcceptanceResponseEncoded(1);
+  ASSERT_NE(bytes_sent_cb, nullptr);
+  EXPECT_FALSE(bytes_sent_cb(1));
+  EXPECT_EQ(0, handshakeCounter(stats_store_, "reverse_tunnel.handshake.accepted"));
+  EXPECT_EQ(2, handshakeCounter(stats_store_, "reverse_tunnel.handshake.registration_failed"));
+#endif
+}
+
 // The acceptance flush callback accumulates per-write byte counts, so a response split across
 // several writes still completes the handshake once the cumulative bytes reach the full response.
 TEST_F(ReverseTunnelFilterUnitTest, AcceptanceCompletesAcrossSplitWrites) {
@@ -647,14 +784,17 @@ TEST_F(ReverseTunnelFilterUnitTest, PipelinedRequestsUseCodecStatsAfterFirstDisp
 }
 
 // Exercise RequestDecoder interface methods by obtaining the decoder via
-// ReverseTunnelFilter::newStream (avoids accessing the private impl type).
+// Http1HandshakeResponder::newStream (avoids accessing the private impl type).
 TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderInterfaceCoverageViaNewStream) {
   // Ensure filter has callbacks initialized so decoder can access time source.
   filter_->initializeReadFilterCallbacks(callbacks_);
 
-  // Get a decoder instance via newStream.
+  // Get a decoder instance via newStream on a standalone HTTP/1 responder.
   Http::MockResponseEncoder encoder;
-  Http::RequestDecoder& decoder = filter_->newStream(encoder, false);
+  Http::Http1::CodecStats::AtomicPtr codec_stats;
+  const ReverseConnection::HandshakeRequestSpec spec;
+  ReverseConnection::Http1HandshakeResponder responder(*filter_, codec_stats, spec);
+  Http::RequestDecoder& decoder = responder.newStream(encoder, false);
 
   // Provide minimal headers so processIfComplete paths are safe if triggered.
   auto headers = Http::RequestHeaderMapImpl::create();
@@ -685,8 +825,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationCustomPingInterval) {
   ASSERT_OK(config_or_error);
   auto config = config_or_error.value();
   EXPECT_EQ(std::chrono::milliseconds(10000), config->pingInterval());
-  EXPECT_EQ("/custom/path", config->requestPath());
-  EXPECT_EQ("PUT", config->requestMethod());
+  EXPECT_THAT(replyFor(config, "PUT", "/custom/path"), testing::HasSubstr("400 Bad Request"));
+  EXPECT_THAT(replyFor(config, "GET", "/custom/path"), testing::HasSubstr("404 Not Found"));
+  EXPECT_THAT(replyFor(config, "PUT", "/reverse_connections/request"),
+              testing::HasSubstr("404 Not Found"));
 }
 
 // Ensure defaults remain stable.
@@ -695,7 +837,8 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaultsRemainStable) {
   auto config_or_error = ReverseTunnelFilterConfig::create(proto_config, factory_context_);
   ASSERT_OK(config_or_error);
   auto config = config_or_error.value();
-  EXPECT_EQ("/reverse_connections/request", config->requestPath());
+  EXPECT_THAT(replyFor(config, "GET", "/reverse_connections/request"),
+              testing::HasSubstr("400 Bad Request"));
 }
 
 // Test configuration with default values.
@@ -708,8 +851,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaults) {
   auto config = config_or_error.value();
   EXPECT_EQ(std::chrono::milliseconds(2000), config->pingInterval());
   EXPECT_EQ(std::chrono::milliseconds(10000), config->handshakeTimeout());
-  EXPECT_EQ("/reverse_connections/request", config->requestPath());
-  EXPECT_EQ("GET", config->requestMethod());
+  EXPECT_THAT(replyFor(config, "GET", "/reverse_connections/request"),
+              testing::HasSubstr("400 Bad Request"));
+  EXPECT_THAT(replyFor(config, "PUT", "/reverse_connections/request"),
+              testing::HasSubstr("404 Not Found"));
   EXPECT_FALSE(config->skipRebalancing());
 }
 
@@ -924,7 +1069,11 @@ TEST_F(ReverseTunnelFilterUnitTest, WrongHttpMethod) {
 // Test onGoAway method coverage.
 TEST_F(ReverseTunnelFilterUnitTest, OnGoAway) {
   // onGoAway is a no-op, but we need to test it for coverage.
-  filter_->onGoAway(Http::GoAwayErrorCode::NoError);
+  filter_->initializeReadFilterCallbacks(callbacks_);
+  Http::Http1::CodecStats::AtomicPtr codec_stats;
+  const ReverseConnection::HandshakeRequestSpec spec;
+  ReverseConnection::Http1HandshakeResponder responder(*filter_, codec_stats, spec);
+  responder.onGoAway(Http::GoAwayErrorCode::NoError);
   // No assertions needed as it's a no-op method.
 }
 
@@ -1073,7 +1222,10 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderSendLocalReplyHeaderModifier) 
       });
 
   // Obtain a decoder and call sendLocalReply with a modifier.
-  Http::RequestDecoder& decoder = filter_->newStream(encoder, false);
+  Http::Http1::CodecStats::AtomicPtr codec_stats;
+  const ReverseConnection::HandshakeRequestSpec spec;
+  ReverseConnection::Http1HandshakeResponder responder(*filter_, codec_stats, spec);
+  Http::RequestDecoder& decoder = responder.newStream(encoder, false);
   decoder.sendLocalReply(
       Http::Code::Forbidden, "",
       [](Http::ResponseHeaderMap& h) { h.addCopy(Http::LowerCaseString("x-custom-mod"), "v"); },
@@ -1258,8 +1410,8 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationAllBranches) {
     auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
     ASSERT_OK(config_or_error);
     auto config = config_or_error.value();
-    EXPECT_EQ("/reverse_connections/request", config->requestPath());
-    EXPECT_EQ("GET", config->requestMethod());
+    EXPECT_THAT(replyFor(config, "GET", "/reverse_connections/request"),
+                testing::HasSubstr("400 Bad Request"));
   }
 }
 
@@ -1409,8 +1561,19 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationHandshakeTimeoutDefault) {
   ASSERT_OK(config_or_error);
   auto config = config_or_error.value();
   EXPECT_EQ(std::chrono::milliseconds(10000), config->handshakeTimeout());
-  EXPECT_EQ("/test", config->requestPath());
-  EXPECT_EQ("PUT", config->requestMethod());
+  EXPECT_THAT(replyFor(config, "PUT", "/test"), testing::HasSubstr("400 Bad Request"));
+  EXPECT_THAT(replyFor(config, "GET", "/test"), testing::HasSubstr("404 Not Found"));
+}
+
+// With upgrade negotiation on, a request that matches method and path but carries no
+// `Upgrade: reverse-tunnel` is answered 426.
+TEST_F(ReverseTunnelFilterUnitTest, ConfigurationUpgradeRequiresUpgradeHeader) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.set_use_http_upgrade(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_OK(config_or_error);
+  EXPECT_THAT(replyFor(config_or_error.value(), "GET", "/reverse_connections/request"),
+              testing::HasSubstr("426 Upgrade Required"));
 }
 
 // Test decodeData with multiple chunks.

@@ -1,11 +1,10 @@
 #pragma once
 
-#include <functional>
+#include <memory>
 
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/formatter/substitution_formatter.h"
-#include "envoy/http/codec.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/overload/overload_manager.h"
@@ -15,10 +14,9 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
-#include "source/common/http/header_map_impl.h"
-#include "source/common/http/http1/codec_stats.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/handshake_responder.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/filters/network/reverse_tunnel/jwt_handshake_validator.h"
@@ -70,14 +68,7 @@ public:
 
   std::chrono::milliseconds pingInterval() const { return ping_interval_; }
   std::chrono::milliseconds handshakeTimeout() const { return handshake_timeout_; }
-  const std::string& requestPath() const { return request_path_; }
 
-  // Returns the shared HTTP/1 codec stats, allocated once on the owning scope. Owning the stats on
-  // the config keeps them alive for the whole life of every per-connection handshake codec.
-  Http::Http1::CodecStats& http1CodecStats(Stats::Scope& scope) const {
-    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, scope);
-  }
-  const std::string& requestMethod() const { return request_method_string_; }
   static constexpr absl::string_view tenantDelimiter() {
     return Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
         TENANT_SCOPE_DELIMITER;
@@ -126,11 +117,14 @@ public:
   // Returns the required cluster name for validation.
   const std::string& requiredClusterName() const { return required_cluster_name_; }
 
-  // Returns whether the handshake is negotiated as an HTTP/1.1 Upgrade exchange.
-  bool useHttpUpgrade() const { return use_http_upgrade_; }
-
   // Returns whether worker-thread rebalancing should be skipped for accepted connections.
   bool skipRebalancing() const { return skip_rebalancing_; }
+
+  // Returns the responder handshake factory; HTTP/1.1 is the only built-in handshake.
+  const Bootstrap::ReverseConnection::ResponderHandshakeConfigurator&
+  handshakeConfigurator() const {
+    return *handshake_configurator_;
+  }
 
 private:
   ReverseTunnelFilterConfig(
@@ -167,22 +161,23 @@ private:
   // JWT handshake authentication (experimental). nullptr when `jwt_validator` is not set.
   const JwtHandshakeValidatorPtr jwt_validator_;
 
-  // HTTP/1 handshake codec stats, owned here so they outlive every per-connection codec.
-  mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
+  std::shared_ptr<const Bootstrap::ReverseConnection::ResponderHandshakeConfigurator>
+      handshake_configurator_;
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;
 
 /**
- * Network filter that handles reverse tunnel connection acceptance/rejection.
- * This filter processes HTTP requests to a specific endpoint and uses
- * HTTP headers to receive required identifiers.
+ * Network filter that handles reverse tunnel connection acceptance/rejection. The handshake
+ * protocol (HTTP/1.1 by default) is delegated to a
+ * Bootstrap::ReverseConnection::ResponderHandshake; this filter owns the policy checks, the stats,
+ * and the two-phase socket acceptance.
  *
  * The filter operates as a terminal filter when processing reverse tunnel requests,
  * meaning it stops the filter chain after processing and manages connection lifecycle.
  */
 class ReverseTunnelFilter : public Network::ReadFilter,
-                            public Http::ServerConnectionCallbacks,
+                            public Bootstrap::ReverseConnection::ResponderHandshakeCallbacks,
                             public Logger::Loggable<Logger::Id::filter> {
 public:
   ReverseTunnelFilter(ReverseTunnelFilterConfigSharedPtr config, Stats::Scope& stats_scope,
@@ -193,10 +188,16 @@ public:
   Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
-  // Http::ServerConnectionCallbacks
-  Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder,
-                                  bool is_internally_created) override;
-  void onGoAway(Http::GoAwayErrorCode) override {}
+  // Bootstrap::ReverseConnection::ResponderHandshakeCallbacks
+  Network::Connection& connection() override;
+  Stats::Scope& statsScope() override;
+  Server::OverloadManager& overloadManager() override;
+  Bootstrap::ReverseConnection::TunnelDecision
+  onTunnelRequest(const Bootstrap::ReverseConnection::TunnelRequest& request) override;
+  void
+  onFramingRejection(Bootstrap::ReverseConnection::HandshakeFramingRejection rejection) override;
+  void onTerminalRejection() override;
+  void onAcceptanceResponseEncoded(uint64_t response_wire_bytes) override;
 
 private:
 // Stats definition.
@@ -226,18 +227,17 @@ private:
   // Disables the handshake deadline timer once the handshake reaches a terminal outcome.
   void disarmHandshakeTimer();
 
+  // Identity, authentication, and authorization checks on a framed request: empty tenant,
+  // tenant-isolation delimiters, required cluster name, JWT authentication, and identifier
+  // validation. Increments its own stats.
+  Bootstrap::ReverseConnection::TunnelDecision
+  evaluatePolicy(const Bootstrap::ReverseConnection::TunnelRequest& request);
+
   // Phase one of acceptance. Resolves the socket manager and duplicates the fd before the response
   // is sent. Returns false if the tunnel cannot be registered, so the caller answers 503 without
-  // leaving a duplicated fd behind. On success the duplicated socket and identifiers are held until
-  // the acceptance response is flushed.
-  bool prepareAcceptedConnection(absl::string_view node_id, absl::string_view cluster_id,
-                                 absl::string_view tenant_id, int64_t initiation_time_ms,
-                                 absl::string_view initiator_worker_id,
-                                 absl::string_view initiator_connection_id);
-
-  // Installs the bytes-sent callback that runs phase two once the acceptance response of
-  // response_wire_bytes bytes has reached the wire.
-  void installAcceptanceFlushCallback(uint64_t response_wire_bytes);
+  // leaving a duplicated fd behind. On success the duplicated socket is held until the acceptance
+  // response is flushed.
+  bool prepareAcceptedConnectionInternal();
 
   // Phase two of acceptance. Registers the prepared socket, then detaches and closes the handshake
   // connection so the duplicated fd is the tunnel's single reader.
@@ -246,8 +246,6 @@ private:
   ReverseTunnelFilterConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{nullptr};
 
-  // HTTP/1 codec and wiring.
-  Http::ServerConnectionPtr codec_;
   Stats::Scope& stats_scope_;
   Server::OverloadManager& overload_manager_;
 
@@ -257,8 +255,11 @@ private:
   // Handshake deadline timer, spanning the first byte to registration.
   Event::TimerPtr handshake_timer_;
 
+  // Set by the first onTunnelRequest(); a connection carries at most one tunnel request.
+  bool tunnel_requested_{false};
+
   // Socket duplicated in phase one and registered in phase two, held between the two phases along
-  // with the identifiers needed to register it.
+  // with the identifiers the policy approved.
   Network::ConnectionSocketPtr pending_socket_;
   std::string pending_node_id_;
   std::string pending_cluster_id_;
@@ -267,43 +268,8 @@ private:
   std::string pending_initiator_connection_id_;
   int64_t pending_initiation_time_ms_{0};
 
-  // Per-request decoder to buffer body and respond via encoder.
-  class RequestDecoderImpl : public Http::RequestDecoder {
-  public:
-    RequestDecoderImpl(ReverseTunnelFilter& parent, Http::ResponseEncoder& encoder)
-        : parent_(parent), encoder_(encoder),
-          stream_info_(parent_.read_callbacks_->connection().streamInfo().timeSource(), nullptr,
-                       StreamInfo::FilterState::LifeSpan::Connection) {}
-
-    void decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) override;
-    void decodeData(Buffer::Instance& data, bool end_stream) override;
-    void decodeTrailers(Http::RequestTrailerMapPtr&&) override;
-    void decodeMetadata(Http::MetadataMapPtr&&) override;
-    void sendLocalReply(Http::Code code, absl::string_view body,
-                        const std::function<void(Http::ResponseHeaderMap& headers)>&,
-                        const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) override;
-    StreamInfo::StreamInfo& streamInfo() override;
-    AccessLog::InstanceSharedPtrVector accessLogHandlers() override;
-    Http::RequestDecoderHandlePtr getRequestDecoderHandle() override;
-
-  private:
-    void processIfComplete(bool end_stream);
-
-    // Rejects a handshake request that carries a body, which reverse tunnel handshakes never do.
-    void rejectBody();
-
-    ReverseTunnelFilter& parent_;
-    Http::ResponseEncoder& encoder_;
-    Http::RequestHeaderMapSharedPtr headers_;
-    bool complete_{false};
-    StreamInfo::StreamInfoImpl stream_info_;
-
-    // Liveness token for the weak request decoder handle. Reset when this decoder is destroyed so a
-    // held handle reports the decoder as gone rather than dangling.
-    const std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
-  };
-
-  std::unique_ptr<RequestDecoderImpl> active_decoder_;
+  // The per-connection handshake, created on the first read.
+  Bootstrap::ReverseConnection::ResponderHandshakePtr handshake_;
 };
 
 } // namespace ReverseTunnel

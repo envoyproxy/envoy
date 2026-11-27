@@ -18,7 +18,9 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/access_log/access_log_impl.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/handshake_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/http1/http1_handshake_initiator.h"
 #include "source/server/generic_factory_context.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -44,13 +46,6 @@ struct AttachedTunnelsRequest {
 };
 using AttachedTunnelsRequestSharedPtr = std::shared_ptr<AttachedTunnelsRequest>;
 
-struct HandshakeHeader {
-  Http::LowerCaseString key;
-  envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action;
-  Formatter::FormatterPtr value_formatter;
-};
-using HandshakeHeadersConstSharedPtr = std::shared_ptr<const std::vector<HandshakeHeader>>;
-
 /**
  * Bootstrap extension for ReverseTunnelInitiator.
  */
@@ -58,6 +53,7 @@ class ReverseTunnelInitiatorExtension : public Server::BootstrapExtension,
                                         public Logger::Loggable<Logger::Id::connection> {
   // Friend class for testing
   friend class ReverseTunnelInitiatorExtensionTest;
+  friend class ReverseTunnelInitiatorExtensionPeer;
 
 public:
   ReverseTunnelInitiatorExtension(
@@ -144,28 +140,11 @@ public:
   uint64_t handshakeTimeoutMs() const { return handshake_timeout_ms_; }
 
   /**
-   * @return reference to the configured HTTP handshake request path.
+   * @return the factory creating per-connection initiator handshakes. Never null.
    */
-  const std::string& handshakeRequestPath() const { return handshake_request_path_; }
-
-  /**
-   * @return reference to the additional headers to include in the handshake request.
-   */
-  const std::vector<envoy::config::core::v3::HeaderValueOption>&
-  handshakeAdditionalHeaders() const {
-    return additional_headers_;
+  const std::shared_ptr<const InitiatorHandshakeConfigurator>& handshakeConfigurator() const {
+    return handshake_configurator_;
   }
-
-  /**
-   * @return whether the handshake is negotiated as an HTTP/1.1 Upgrade exchange.
-   */
-  bool handshakeUsesHttpUpgrade() const { return use_http_upgrade_; }
-
-  /**
-   * @return handshake headers (key + append action + value formatter), or nullptr if no
-   * handshake config is set.
-   */
-  const HandshakeHeadersConstSharedPtr& handshakeHeaders() const { return handshake_headers_; }
 
   /**
    * @return reference to the configured access loggers for reverse tunnel lifecycle events.
@@ -238,10 +217,12 @@ private:
   uint64_t max_reconnect_backoff_ms_{};
   uint64_t maintain_interval_ms_{};
   uint64_t handshake_timeout_ms_{};
-  std::string handshake_request_path_;
   std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers_;
-  bool use_http_upgrade_{false};
-  HandshakeHeadersConstSharedPtr handshake_headers_;
+  // Formatted handshake headers, shared with the HTTP/1 handshake factory and published in
+  // onServerInitialized().
+  const Http1HandshakeHeadersSharedPtr handshake_headers_{
+      std::make_shared<Http1HandshakeHeaders>()};
+  std::shared_ptr<const InitiatorHandshakeConfigurator> handshake_configurator_;
   AccessLog::InstanceSharedPtrVector access_logs_;
 
   // Makes a histogram with the given name and stats store.

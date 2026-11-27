@@ -16,6 +16,7 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
+#include "source/extensions/bootstrap/reverse_tunnel/http1/http1_handshake_initiator.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/tls/mock_ssl_handshaker.h"
@@ -142,6 +143,8 @@ protected:
     config.src_node_id = "test-node";
     config.enable_circuit_breaker = true;
     config.remote_clusters.push_back(RemoteClusterConnectionConfig("remote-cluster", 2));
+    // The extension always supplies this in production; mirror that here.
+    config.handshake_configurator = std::make_shared<Http1HandshakeConfigurator>();
     return config;
   }
 
@@ -457,20 +460,6 @@ TEST_F(ReverseConnectionIOHandleTest, BasicSetup) {
 
   // Verify the IO handle has a valid file descriptor.
   EXPECT_TRUE(SOCKET_VALID(io_handle_->fdDoNotUse()));
-}
-
-TEST_F(ReverseConnectionIOHandleTest, RequestPathDefaultsAndOverrides) {
-  auto default_config = createDefaultTestConfig();
-  io_handle_ = createTestIOHandle(default_config);
-  ASSERT_NE(io_handle_, nullptr);
-  EXPECT_EQ(io_handle_->requestPath(),
-            ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
-
-  ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
-  custom_config.request_path = "/custom/handshake";
-  auto custom_handle = createTestIOHandle(custom_config);
-  ASSERT_NE(custom_handle, nullptr);
-  EXPECT_EQ(custom_handle->requestPath(), "/custom/handshake");
 }
 
 // listen() is a no-op for the initiator
@@ -1050,6 +1039,32 @@ TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureHonorsRetryAfter) {
   EXPECT_EQ(getBackoffDelayMs("192.168.1.2"), 33999);
 }
 
+// A hint below one second is ignored, so the computed backoff applies; one second or more is
+// honored.
+TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureIgnoresSubSecondRetryAfter) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  // First failure with no usable hint: 1000 (base) + 3999 % 150 = 1099ms.
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+  trackConnectionFailureWithRetryAfter("192.168.1.1", "test-cluster",
+                                       std::chrono::milliseconds(500));
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.1"), 1099);
+
+  addHostConnectionInfo("192.168.1.2", "test-cluster", 1);
+  trackConnectionFailureWithRetryAfter("192.168.1.2", "test-cluster", std::chrono::milliseconds(0));
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.2"), 1099);
+
+  // A 2s hint is honored: 2000 + 3999 % 300 = 2099ms.
+  addHostConnectionInfo("192.168.1.3", "test-cluster", 1);
+  trackConnectionFailureWithRetryAfter("192.168.1.3", "test-cluster",
+                                       std::chrono::milliseconds(2000));
+  EXPECT_EQ(getBackoffDelayMs("192.168.1.3"), 2099);
+}
+
 // Test that max_reconnect_backoff caps the exponential schedule. With a 5s cap, the schedule
 // saturates at 5000ms (then jittered) instead of continuing to 8s/16s/etc.
 TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureRespectsConfiguredMaxBackoff) {
@@ -1326,6 +1341,7 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateReverseConnectionWithCustomScope) 
   auto custom_extension =
       std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
   custom_extension->setTestOnlyTLSRegistry(std::move(tls_slot_));
+  custom_prefix_config.handshake_configurator = custom_extension->handshakeConfigurator();
 
   // Replace the class member io_handle_ with our custom one for this test
   auto original_io_handle = std::move(io_handle_);
@@ -1874,7 +1890,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneEarlyReturns) {
   EXPECT_NE(io_handle_, nullptr);
 
   // Test 1.1: Null wrapper - should return early
-  io_handle_->onConnectionDone("test error", nullptr, false);
+  io_handle_->onConnectionDone(HandshakeOutcome::failure("test error"), nullptr, false);
 
   // Verify no stats were updated.
   auto stat_map = extension_->getCrossWorkerStatMap();
@@ -1888,7 +1904,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneEarlyReturns) {
   const auto& wrapper_to_host_map = getConnWrapperToHostMap();
   EXPECT_EQ(wrapper_to_host_map.size(), 0);
 
-  io_handle_->onConnectionDone("test error", wrapper_ptr, false);
+  io_handle_->onConnectionDone(HandshakeOutcome::failure("test error"), wrapper_ptr, false);
 
   // Verify no stats were updated.
   stat_map = extension_->getCrossWorkerStatMap();
@@ -1902,7 +1918,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneEarlyReturns) {
   const auto& host_to_conn_info_map = getHostToConnInfoMap();
   EXPECT_EQ(host_to_conn_info_map.size(), 0);
 
-  io_handle_->onConnectionDone("test error", wrapper_ptr, false);
+  io_handle_->onConnectionDone(HandshakeOutcome::failure("test error"), wrapper_ptr, false);
 
   // Verify wrapper was removed from map but no stats updated.
   EXPECT_EQ(getConnWrapperToHostMap().size(), 0);
@@ -1974,7 +1990,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccess) {
   EXPECT_EQ(getEstablishedConnectionsSize(), 0);
 
   // Call onConnectionDone to simulate successful connection completion.
-  io_handle_->onConnectionDone("reverse connection accepted", wrapper_ptr, false);
+  io_handle_->onConnectionDone(HandshakeOutcome::success(), wrapper_ptr, false);
 
   // Verify wrapper was removed from tracking (cleanup should happen)
   EXPECT_EQ(getConnWrapperToHostMap().size(), 0);
@@ -2023,7 +2039,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccessWhenListenerDisable
 
   EXPECT_TRUE(initiateOneReverseConnection("test-cluster", "192.168.1.1", mock_host));
   RCConnectionWrapper* wrapper_ptr = getConnectionWrappers()[0].get();
-  io_handle_->onConnectionDone("reverse connection accepted", wrapper_ptr, false);
+  io_handle_->onConnectionDone(HandshakeOutcome::success(), wrapper_ptr, false);
 
   // Queued even though the listener is disabled; re-enable will re-arm via maybePushConn.
   EXPECT_EQ(getEstablishedConnectionsSize(), 1);
@@ -2122,7 +2138,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneFailureAndRecovery) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.connecting"], 1);
 
   // Step 2: Simulate connection failure by calling onConnectionDone with error.
-  io_handle_->onConnectionDone("connection timeout", wrapper_ptr, true);
+  io_handle_->onConnectionDone(HandshakeOutcome::failure("connection timeout"), wrapper_ptr, true);
 
   // Verify wrapper was removed from tracking maps after failure.
   EXPECT_EQ(getConnWrapperToHostMap().size(), 0);
@@ -2186,7 +2202,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneFailureAndRecovery) {
             0); // Not recovered until success
 
   // Step 4: Simulate connection success (recovery) by calling onConnectionDone with success.
-  io_handle_->onConnectionDone("reverse connection accepted", wrapper_ptr2, false);
+  io_handle_->onConnectionDone(HandshakeOutcome::success(), wrapper_ptr2, false);
 
   // Verify wrapper was removed from tracking maps after success.
   EXPECT_EQ(getConnWrapperToHostMap().size(), 0);
@@ -2285,7 +2301,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
   EXPECT_EQ(getEstablishedConnectionsSize(), 0);
 
   // Step 2: Simulate successful connection completion.
-  io_handle_->onConnectionDone("reverse connection accepted", wrapper_ptr, false);
+  io_handle_->onConnectionDone(HandshakeOutcome::success(), wrapper_ptr, false);
 
   // Verify wrapper was removed from tracking (cleanup should happen)
   EXPECT_EQ(getConnWrapperToHostMap().size(), 0);
@@ -2383,7 +2399,7 @@ TEST_F(ReverseConnectionIOHandleTest, EpisodeInitiationTimeClearedOnlyAtTargetCo
     RCConnectionWrapper* wrapper_ptr = wrapper.get();
     addWrapperToHostMap(wrapper_ptr, "192.168.1.1");
     pushConnectionWrapper(std::move(wrapper));
-    io_handle_->onConnectionDone("reverse connection accepted", wrapper_ptr, false);
+    io_handle_->onConnectionDone(HandshakeOutcome::success(), wrapper_ptr, false);
   };
 
   // First handshake completes: still below target, timestamp must remain.
@@ -3149,7 +3165,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneTlsConnectionQuietShutdown
 
   // Call onConnectionDone with success - this should trigger the SSL quiet shutdown code path.
   // The dynamic_cast will succeed, and SSL_set_quiet_shutdown(ssl, 1) will be called.
-  io_handle_->onConnectionDone("reverse connection accepted", wrapper_ptr, false);
+  io_handle_->onConnectionDone(HandshakeOutcome::success(), wrapper_ptr, false);
 
   // Verify SSL_set_quiet_shutdown was called by checking the SSL object's quiet_shutdown flag.
   EXPECT_EQ(SSL_get_quiet_shutdown(mock_ssl), 1);
@@ -3223,7 +3239,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneTlsConnectionDynamicCastFa
   // Call onConnectionDone with success, this should trigger the SSL quiet shutdown code path.
   // Since we're using a mock SSL connection info that doesn't derive from SslHandshakerImpl,
   // the dynamic_cast will fail.
-  io_handle_->onConnectionDone("reverse connection accepted", wrapper_ptr, false);
+  io_handle_->onConnectionDone(HandshakeOutcome::success(), wrapper_ptr, false);
 
   // Verify wrapper was cleaned up.
   EXPECT_EQ(getConnWrapperToHostMap().size(), 0);
@@ -4078,7 +4094,7 @@ TEST_F(ReverseConnectionIOHandleTest, ListenerDrainRejectsHandshakeHandoffAfterG
 
   // Handshake callbacks must finish without synchronously destroying their codec. The accept
   // boundary observes the opt-in, rejects the completed tunnel and cancels the remaining handshake.
-  io_handle_->onConnectionDone("reverse connection accepted", completed, false);
+  io_handle_->onConnectionDone(HandshakeOutcome::success(), completed, false);
   handoff_complete = true;
   ASSERT_EQ(getEstablishedConnectionsSize(), 1);
   ASSERT_EQ(getConnectionWrappers().size(), 1);
@@ -4135,7 +4151,7 @@ TEST_F(ReverseConnectionIOHandleTest, TunnelSetupTimeRecordsSampleOnCapacity) {
   simTime().advanceTimeWait(setup_latency);
 
   RCConnectionWrapper* wrapper = getConnectionWrappers()[0].get();
-  io_handle_->onConnectionDone("reverse connection accepted", wrapper, false);
+  io_handle_->onConnectionDone(HandshakeOutcome::success(), wrapper, false);
 
   EXPECT_FALSE(getHostConnectionInfo("192.168.1.1").episode_initiation_time_ms.has_value());
   EXPECT_EQ(getHostConnectionInfo("192.168.1.1").setup_time_span, nullptr);
@@ -4171,7 +4187,7 @@ TEST_F(ReverseConnectionIOHandleTest, TunnelSetupTimeWaitsForFullCapacity) {
   EXPECT_TRUE(initiateOneReverseConnection("test-cluster", "192.168.1.1", mock_host));
 
   RCConnectionWrapper* wrapper = getConnectionWrappers()[0].get();
-  io_handle_->onConnectionDone("reverse connection accepted", wrapper, false);
+  io_handle_->onConnectionDone(HandshakeOutcome::success(), wrapper, false);
   EXPECT_TRUE(getHostConnectionInfo("192.168.1.1").episode_initiation_time_ms.has_value());
   EXPECT_NE(getHostConnectionInfo("192.168.1.1").setup_time_span, nullptr);
   EXPECT_THAT(setupTimeSamples(), testing::IsEmpty())
@@ -4190,7 +4206,7 @@ TEST_F(ReverseConnectionIOHandleTest, TunnelSetupTimeWaitsForFullCapacity) {
   RCConnectionWrapper* wrapper2_ptr = wrapper2.get();
   addWrapperToHostMap(wrapper2_ptr, "192.168.1.1");
   pushConnectionWrapper(std::move(wrapper2));
-  io_handle_->onConnectionDone("reverse connection accepted", wrapper2_ptr, false);
+  io_handle_->onConnectionDone(HandshakeOutcome::success(), wrapper2_ptr, false);
 
   EXPECT_FALSE(getHostConnectionInfo("192.168.1.1").episode_initiation_time_ms.has_value());
   EXPECT_EQ(getHostConnectionInfo("192.168.1.1").setup_time_span, nullptr);
@@ -4268,7 +4284,8 @@ TEST_F(ReverseConnectionIOHandleTest, TunnelSetupTimeIncludesFailedAttemptBefore
 
   constexpr std::chrono::milliseconds failed_attempt_latency{100};
   simTime().advanceTimeWait(failed_attempt_latency);
-  io_handle_->onConnectionDone("connection timeout", getConnectionWrappers()[0].get(), true);
+  io_handle_->onConnectionDone(HandshakeOutcome::failure("connection timeout"),
+                               getConnectionWrappers()[0].get(), true);
 
   EXPECT_TRUE(getHostConnectionInfo("192.168.1.1").episode_initiation_time_ms.has_value());
   EXPECT_EQ(*getHostConnectionInfo("192.168.1.1").episode_initiation_time_ms, episode_stamp);
@@ -4291,7 +4308,7 @@ TEST_F(ReverseConnectionIOHandleTest, TunnelSetupTimeIncludesFailedAttemptBefore
 
   constexpr std::chrono::milliseconds successful_attempt_latency{400};
   simTime().advanceTimeWait(successful_attempt_latency);
-  io_handle_->onConnectionDone("reverse connection accepted", getConnectionWrappers()[0].get(),
+  io_handle_->onConnectionDone(HandshakeOutcome::success(), getConnectionWrappers()[0].get(),
                                false);
 
   EXPECT_THAT(setupTimeSamples(),
@@ -4369,7 +4386,7 @@ TEST_F(ReverseConnectionIOHandleTest, TunnelSetupTimeStartsNewEpisodeAfterCapaci
 
     ASSERT_TRUE(initiateOneReverseConnection("test-cluster", "192.168.1.1", mock_host));
     simTime().advanceTimeWait(setup_latency);
-    io_handle_->onConnectionDone("reverse connection accepted", getConnectionWrappers()[0].get(),
+    io_handle_->onConnectionDone(HandshakeOutcome::success(), getConnectionWrappers()[0].get(),
                                  false);
   };
 
@@ -4611,7 +4628,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneWithReleasedConnectionUses
   wrapper_ptr->releaseConnection();
   ASSERT_EQ(wrapper_ptr->getConnection(), nullptr);
 
-  io_handle_->onConnectionDone("connection reset", wrapper_ptr, true);
+  io_handle_->onConnectionDone(HandshakeOutcome::failure("connection reset"), wrapper_ptr, true);
 
   EXPECT_EQ(getConnWrapperToHostMap().size(), 0);
   auto stat_map = extension_->getCrossWorkerStatMap();

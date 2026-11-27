@@ -11,6 +11,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
@@ -23,6 +24,7 @@
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
@@ -55,6 +57,60 @@ namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
+
+// Reads the formatted handshake headers the extension publishes.
+class ReverseTunnelInitiatorExtensionPeer {
+public:
+  static HandshakeHeadersConstSharedPtr formattedHeaders(ReverseTunnelInitiatorExtension& ext) {
+    return ext.handshake_headers_->headers;
+  }
+};
+
+// Captures the handshake request an initiator handshake factory sends on a mock connection.
+class HandshakeRequestCapture : public InitiatorHandshakeCallbacks {
+public:
+  HandshakeRequestCapture() {
+    ON_CALL(connection_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+        *Network::Utility::resolveUrl("tcp://10.0.0.5:9443"));
+    ON_CALL(connection_, write(_, _)).WillByDefault([this](Buffer::Instance& data, bool) -> void {
+      absl::StrAppend(&written_, data.toString());
+      data.drain(data.length());
+    });
+    ON_CALL(*host_, cluster()).WillByDefault(ReturnRef(*cluster_info_));
+  }
+
+  // Starts one handshake from the factory and returns the request bytes it wrote.
+  std::string send(const InitiatorHandshakeConfigurator& configurator) {
+    written_.clear();
+    auto handshake = configurator.createHandshake(*this);
+    EXPECT_TRUE(handshake->start(std::nullopt).ok());
+    handshake->cancel();
+    return written_;
+  }
+
+  // InitiatorHandshakeCallbacks
+  Network::ClientConnection& connection() override { return connection_; }
+  Upstream::HostDescriptionConstSharedPtr host() override { return host_; }
+  const std::string& clusterName() override { return cluster_name_; }
+  const std::string& srcTenantId() override { return tenant_id_; }
+  const std::string& srcClusterId() override { return cluster_id_; }
+  const std::string& srcNodeId() override { return node_id_; }
+  void onHandshakeDone(HandshakeOutcome, std::optional<std::chrono::milliseconds>) override {}
+
+private:
+  NiceMock<Event::MockDispatcher> dispatcher_{"worker_0"};
+  NiceMock<Network::MockClientConnection> connection_;
+  std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_{
+      std::make_shared<NiceMock<Upstream::MockClusterInfo>>()};
+  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
+      std::make_shared<NiceMock<Upstream::MockHostDescription>>()};
+  std::string cluster_name_{"remote-cluster"};
+  std::string tenant_id_{"test-tenant"};
+  std::string cluster_id_{"test-cluster"};
+  std::string node_id_{"test-node"};
+  std::string written_;
+};
 
 class ReverseTunnelInitiatorExtensionTest : public testing::Test {
 protected:
@@ -187,8 +243,12 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, InitializeWithCustomStatPrefix) {
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeRequestPathDefaults) {
-  EXPECT_EQ(extension_->handshakeRequestPath(),
-            ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
+  HandshakeRequestCapture capture;
+  const std::string request = capture.send(*extension_->handshakeConfigurator());
+  EXPECT_THAT(request, HasSubstr(absl::StrCat(
+                           "GET ", ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH,
+                           " HTTP/1.1\r\n")));
+  EXPECT_THAT(request, testing::Not(HasSubstr("upgrade:")));
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeRequestPathOverride) {
@@ -196,7 +256,20 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeRequestPathOverride) {
   custom_config.mutable_http_handshake()->set_request_path("/custom/handshake");
   auto custom_extension =
       std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
-  EXPECT_EQ(custom_extension->handshakeRequestPath(), "/custom/handshake");
+  HandshakeRequestCapture capture;
+  EXPECT_THAT(capture.send(*custom_extension->handshakeConfigurator()),
+              HasSubstr("GET /custom/handshake HTTP/1.1\r\n"));
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeUsesHttpUpgrade) {
+  auto custom_config = config_;
+  custom_config.mutable_http_handshake()->set_use_http_upgrade(true);
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  HandshakeRequestCapture capture;
+  const std::string request = capture.send(*custom_extension->handshakeConfigurator());
+  EXPECT_THAT(request, HasSubstr("connection: upgrade\r\n"));
+  EXPECT_THAT(request, HasSubstr("upgrade: reverse-tunnel\r\n"));
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, MaxReconnectBackoffDefaults) {
@@ -239,10 +312,6 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, TunnelSetupTimeHistogramName) {
             "test_scope.reverse_connections.tunnel_setup_time");
 }
 
-TEST_F(ReverseTunnelInitiatorExtensionTest, AdditionalHeadersDefaults) {
-  EXPECT_TRUE(extension_->handshakeAdditionalHeaders().empty());
-}
-
 TEST_F(ReverseTunnelInitiatorExtensionTest, AdditionalHeadersOverride) {
   auto custom_config = config_;
   auto* hdr1 = custom_config.mutable_http_handshake()->add_additional_headers();
@@ -255,16 +324,10 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, AdditionalHeadersOverride) {
   // hdr2 defaults to APPEND_IF_EXISTS_OR_ADD (proto default = 0).
   auto custom_extension =
       std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
-  const auto& headers = custom_extension->handshakeAdditionalHeaders();
-  ASSERT_EQ(headers.size(), 2);
-  EXPECT_EQ(headers[0].header().key(), "x-custom-auth");
-  EXPECT_EQ(headers[0].header().value(), "token123");
-  EXPECT_EQ(headers[0].append_action(),
-            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
-  EXPECT_EQ(headers[1].header().key(), "x-request-id");
-  EXPECT_EQ(headers[1].header().value(), "abc-def");
-  EXPECT_EQ(headers[1].append_action(),
-            envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+  HandshakeRequestCapture capture;
+  const std::string request = capture.send(*custom_extension->handshakeConfigurator());
+  EXPECT_THAT(request, HasSubstr("x-custom-auth: token123\r\n"));
+  EXPECT_THAT(request, HasSubstr("x-request-id: abc-def\r\n"));
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeHeaderFormatters) {
@@ -281,17 +344,13 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeHeaderFormatters) {
 
   auto custom_extension =
       std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
-  // The handshake formatters are built in onServerInitialized(), so they are absent until it runs.
-  EXPECT_EQ(custom_extension->handshakeHeaders(), nullptr);
+  // The handshake formatters are built in onServerInitialized(); until then the literal is sent.
+  HandshakeRequestCapture capture;
+  EXPECT_THAT(capture.send(*custom_extension->handshakeConfigurator()),
+              HasSubstr("authorization: Bearer %COMMAND_EXTENSION()%\r\n"));
   custom_extension->onServerInitialized(server_);
-  const auto& handshake_headers = custom_extension->handshakeHeaders();
-  ASSERT_NE(handshake_headers, nullptr);
-  ASSERT_EQ(handshake_headers->size(), 1);
-  EXPECT_EQ((*handshake_headers)[0].key.get(), "authorization");
-
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_EQ((*handshake_headers)[0].value_formatter->format({}, stream_info),
-            "Bearer TestFormatter");
+  EXPECT_THAT(capture.send(*custom_extension->handshakeConfigurator()),
+              HasSubstr("authorization: Bearer TestFormatter\r\n"));
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeUnknownFormatterThrows) {
@@ -315,9 +374,10 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeHeadersLiteralWithoutFormat
 
   auto custom_extension =
       std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
-  EXPECT_EQ(custom_extension->handshakeHeaders(), nullptr);
-  ASSERT_EQ(custom_extension->handshakeAdditionalHeaders().size(), 1);
-  EXPECT_EQ(custom_extension->handshakeAdditionalHeaders()[0].header().value(), "100% literal");
+  custom_extension->onServerInitialized(server_);
+  HandshakeRequestCapture capture;
+  EXPECT_THAT(capture.send(*custom_extension->handshakeConfigurator()),
+              HasSubstr("x-literal: 100% literal\r\n"));
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, OnServerInitialized) {
@@ -1341,12 +1401,15 @@ TEST(ReverseTunnelInitiatorExtensionFileContentTest, FileContentResolvesOnWorker
   // Build the handshake formatters now that the worker is registered. This creates the
   // file_content provider's ThreadLocal slot and propagates its content to the worker thread.
   extension->onServerInitialized(server);
-  ASSERT_NE(extension->handshakeHeaders(), nullptr);
-  ASSERT_EQ(extension->handshakeHeaders()->size(), 1);
   main_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
 
-  // Evaluate the handshake header value on the real worker OS thread, exactly like
-  // RCConnectionWrapper::connect() does on the worker dispatcher.
+  const HandshakeHeadersConstSharedPtr formatted =
+      ReverseTunnelInitiatorExtensionPeer::formattedHeaders(*extension);
+  ASSERT_NE(formatted, nullptr);
+  ASSERT_EQ(formatted->size(), 1);
+
+  // Evaluate the handshake header value on the real worker OS thread, exactly like the HTTP/1
+  // handshake does on the worker dispatcher.
   std::string worker_value;
   Thread::ThreadPtr worker_thread = api->threadFactory().createThread([&]() {
     // Drain the dispatcher so the queued thread registration and slot set() posts are applied to
@@ -1354,7 +1417,7 @@ TEST(ReverseTunnelInitiatorExtensionFileContentTest, FileContentResolvesOnWorker
     worker_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
     StreamInfo::StreamInfoImpl stream_info(api->timeSource(), nullptr,
                                            StreamInfo::FilterState::LifeSpan::Connection);
-    worker_value = extension->handshakeHeaders()->at(0).value_formatter->format({}, stream_info);
+    worker_value = formatted->at(0).value_formatter->format({}, stream_info);
   });
   worker_thread->join();
 

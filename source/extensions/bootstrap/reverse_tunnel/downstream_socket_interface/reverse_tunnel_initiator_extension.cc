@@ -22,6 +22,7 @@
 #include "source/common/stats/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
+#include "source/extensions/bootstrap/reverse_tunnel/http1/http1_handshake_initiator.h"
 #include "source/server/generic_factory_context.h"
 
 namespace Envoy {
@@ -75,16 +76,15 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
   // Deadline for receiving the handshake response. Defaults to 15s.
   handshake_timeout_ms_ =
       PROTOBUF_GET_MS_OR_DEFAULT(config.http_handshake(), handshake_timeout, 15000);
+  Http1InitiatorFraming framing;
   if (config.has_http_handshake() && !config.http_handshake().request_path().empty()) {
-    handshake_request_path_ = config.http_handshake().request_path();
-  } else {
-    handshake_request_path_ =
-        std::string(ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
+    framing.request_path = config.http_handshake().request_path();
   }
   if (config.has_http_handshake()) {
     additional_headers_ = {config.http_handshake().additional_headers().begin(),
                            config.http_handshake().additional_headers().end()};
-    use_http_upgrade_ = config.http_handshake().use_http_upgrade();
+    framing.additional_headers = additional_headers_;
+    framing.use_http_upgrade = config.http_handshake().use_http_upgrade();
     // The formatters that evaluate these headers are built in onServerInitialized(), once the
     // worker threads are registered with the ThreadLocal system that provider-backed formatters
     // depend on.
@@ -100,6 +100,11 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
             "ReverseTunnelInitiatorExtension: creating downstream reverse connection "
             "socket interface with stat_prefix: {}, access_logs: {}",
             stat_prefix_, access_logs_.size());
+
+  // HTTP/1 is the only built-in handshake; it is selected here, before any socket can be created,
+  // and carried on the socket config so every dial negotiates the same protocol.
+  framing.formatted_headers = handshake_headers_;
+  handshake_configurator_ = std::make_shared<Http1HandshakeConfigurator>(std::move(framing));
 }
 
 void ReverseTunnelInitiatorExtension::emitAccessLog(
@@ -179,7 +184,7 @@ void ReverseTunnelInitiatorExtension::onServerInitialized(Server::Instance& serv
                                                    header.append_action(),
                                                    std::move(value_formatter)});
     }
-    handshake_headers_ = std::move(handshake_headers);
+    handshake_headers_->headers = std::move(handshake_headers);
   }
 }
 

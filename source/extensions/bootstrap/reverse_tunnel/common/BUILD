@@ -44,3 +44,27 @@ envoy_cc_library(
         "//source/common/network:io_socket_error_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "handshake_initiator_lib",
+    hdrs = ["handshake_initiator.h"],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/upstream:upstream_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "handshake_responder_lib",
+    hdrs = ["handshake_responder.h"],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/server/overload:overload_manager_interface",
+        "//envoy/stats:scope_interface",
+    ],
+)
