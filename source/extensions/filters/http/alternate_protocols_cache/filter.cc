@@ -40,7 +40,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   // Upstream callbacks are only set when the filter runs in an upstream filter chain. Then read
   // this attempt's own stream info. Otherwise it is a downstream filter, so read the request's.
   auto upstream_callbacks = encoder_callbacks_->upstreamCallbacks();
-  StreamInfo::StreamInfo& stream_info = upstream_callbacks.has_value()
+  const StreamInfo::StreamInfo& stream_info = upstream_callbacks.has_value()
                                             ? upstream_callbacks->upstreamStreamInfo()
                                             : encoder_callbacks_->streamInfo();
   Http::HttpServerPropertiesCacheSharedPtr cache;
