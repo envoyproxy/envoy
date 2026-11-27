@@ -195,7 +195,9 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers, const Formatter::Co
   // readability.
   std::string value_buffer;
   for (const auto& [key, entry] : headers_to_add_) {
-    if (entry->append_action_ == HeaderValueOption::ADD_IF_ABSENT && !headers.get(key).empty()) {
+    if ((entry->append_action_ == HeaderValueOption::ADD_IF_ABSENT && !headers.get(key).empty()) ||
+        (entry->append_action_ == HeaderValueOption::OVERWRITE_IF_EXISTS &&
+         headers.get(key).empty())) {
       continue;
     }
     absl::string_view value;
@@ -212,16 +214,10 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers, const Formatter::Co
       switch (entry->append_action_) {
         PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-        headers_to_add.emplace_back(key, value);
-        break;
       case HeaderValueOption::ADD_IF_ABSENT:
         headers_to_add.emplace_back(key, value);
         break;
       case HeaderValueOption::OVERWRITE_IF_EXISTS:
-        if (headers.get(key).empty()) {
-          break;
-        }
-        FALLTHRU;
       case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
         headers_to_overwrite.emplace_back(key, value);
         break;

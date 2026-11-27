@@ -930,7 +930,7 @@ response_headers_to_add:
     append_action: ADD_IF_ABSENT
   - header:
       key: "x-overwrite"
-      value: "overwritten"
+      value: "%PROTOCOL%"
     append_action: OVERWRITE_IF_EXISTS
 )EOF";
 
@@ -938,9 +938,11 @@ response_headers_to_add:
   HeaderParserPtr resp_header_parser =
       HeaderParser::configure(route.response_headers_to_add()).value();
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.protocol_ = Http::Protocol::Http11;
 
   {
     Http::TestResponseHeaderMapImpl header_map;
+    EXPECT_CALL(stream_info, protocol()).Times(0);
     resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
@@ -948,6 +950,7 @@ response_headers_to_add:
     // If the response headers do not contain "x-overwrite" header,
     // the final set should also not contain it.
     EXPECT_FALSE(header_map.has("x-overwrite"));
+    testing::Mock::VerifyAndClearExpectations(&stream_info);
   }
 
   {
@@ -958,7 +961,7 @@ response_headers_to_add:
     EXPECT_EQ("per", header_map.get_("x-per-header"));
     // If the response headers contain "x-overwrite" header it should
     // be overwritten with the new value.
-    EXPECT_EQ("overwritten", header_map.get_("x-overwrite"));
+    EXPECT_EQ("HTTP/1.1", header_map.get_("x-overwrite"));
   }
 }
 

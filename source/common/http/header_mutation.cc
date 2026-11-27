@@ -24,6 +24,12 @@ public:
 
   void evaluateHeaders(Http::HeaderMap& headers, const Formatter::Context& context,
                        const StreamInfo::StreamInfo& stream_info) const override {
+    if ((append_action_ == HeaderValueOption::ADD_IF_ABSENT &&
+         !headers.get(header_name_).empty()) ||
+        (append_action_ == HeaderValueOption::OVERWRITE_IF_EXISTS &&
+         headers.get(header_name_).empty())) {
+      return;
+    }
     std::string value_buffer;
     absl::string_view value;
     if (formatter_ != nullptr) {
@@ -39,21 +45,10 @@ public:
       switch (append_action_) {
         PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-        headers.addReferenceKey(header_name_, value);
-        return;
-      case HeaderValueOption::ADD_IF_ABSENT: {
-        auto header = headers.get(header_name_);
-        if (!header.empty()) {
-          return;
-        }
+      case HeaderValueOption::ADD_IF_ABSENT:
         headers.addReferenceKey(header_name_, value);
         break;
-      }
       case HeaderValueOption::OVERWRITE_IF_EXISTS:
-        if (headers.get(header_name_).empty()) {
-          return;
-        }
-        FALLTHRU;
       case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
         headers.setReferenceKey(header_name_, value);
         break;
