@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <list>
+#include <utility>
 
 #include "envoy/extensions/queue_policy/fifo/v3/fifo.pb.h"
 
@@ -113,7 +114,14 @@ public:
     return item;
   }
 
+  PendingStream* peekToDrop(MonotonicTime) override {
+    return drop_on_dequeue_ || std::exchange(drop_oldest_once_, false) ? items_.front() : nullptr;
+  }
+
   bool isOverloaded() const override { return items_.size() > 1; }
+
+  bool drop_on_dequeue_{false};
+  bool drop_oldest_once_{false};
 
   void forEach(absl::FunctionRef<bool(PendingStream&)> cb) override {
     for (auto it = items_.begin(); it != items_.end();) {
@@ -140,11 +148,14 @@ public:
   createQueuePolicy(const Protobuf::Message&, const std::string& stat_prefix,
                     ProtobufMessage::ValidationVisitor&) override {
     stat_prefix_ = stat_prefix;
-    return std::make_unique<TestPendingStreamQueue>();
+    auto queue = std::make_unique<TestPendingStreamQueue>();
+    queue_ = queue.get();
+    return queue;
   }
 
   std::string name() const override { return "envoy.queue_policy.fifo"; }
   std::string stat_prefix_;
+  TestPendingStreamQueue* queue_{};
 };
 
 // Creates a resolved queue policy bundle for the test factory, mirroring what
@@ -159,16 +170,11 @@ makeTestQueuePolicyBundle(TestPendingStreamQueueFactory& factory) {
   return policy;
 }
 
-std::unique_ptr<Upstream::ClusterInfo::PendingRqQueuePolicy> makeTestQueuePolicyBundle() {
-  static TestPendingStreamQueueFactory factory;
-  return makeTestQueuePolicyBundle(factory);
-}
-
-std::shared_ptr<Upstream::MockClusterInfo> makeClusterWithTestQueuePolicy() {
+std::shared_ptr<Upstream::MockClusterInfo>
+makeClusterWithTestQueuePolicy(TestPendingStreamQueueFactory& factory) {
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  cluster->pending_rq_queue_policy_ = makeTestQueuePolicyBundle();
+  cluster->pending_rq_queue_policy_ = makeTestQueuePolicyBundle(factory);
   cluster->resetResourceManager(1024, 1024, 1024, 1, 1);
-
   return cluster;
 }
 
@@ -237,7 +243,8 @@ public:
               overload_manager_) {}
 
   Upstream::ClusterConnectivityState state_;
-  std::shared_ptr<Upstream::MockClusterInfo> cluster_{makeClusterWithTestQueuePolicy()};
+  TestPendingStreamQueueFactory factory_;
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_{makeClusterWithTestQueuePolicy(factory_)};
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
@@ -309,6 +316,214 @@ TEST_F(ConnPoolImplBaseQueuePolicyTest, PurgeRespectsQueuePolicyOrder) {
                             ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
   EXPECT_EQ(0, state_.pending_streams_);
 }
+
+class ConnPoolImplCodelDropTest : public testing::Test {
+public:
+  ConnPoolImplCodelDropTest()
+      : api_(Api::createApiForTest(time_system_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")),
+        pool_(host_, Upstream::ResourcePriority::Default, *dispatcher_, nullptr, nullptr, state_,
+              overload_manager_) {
+    ON_CALL(pool_, instantiateActiveClient).WillByDefault([&]() -> ActiveClientPtr {
+      auto client = std::make_unique<NiceMock<TestActiveClient>>(pool_, 100, concurrent_streams_,
+                                                                 supports_early_data_);
+      client_ = client.get();
+      client_->real_host_description_ = descr_;
+      return client;
+    });
+  }
+
+  Event::SimulatedTimeSystemHelper time_system_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
+  Upstream::ClusterConnectivityState state_;
+  TestPendingStreamQueueFactory factory_;
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_{makeClusterWithTestQueuePolicy(factory_)};
+  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> descr_{
+      new NiceMock<Upstream::MockHostDescription>()};
+  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};
+  TestConnPoolImplBase pool_;
+  AttachContext context_;
+  TestActiveClient* client_{};
+  bool supports_early_data_{false};
+  uint32_t concurrent_streams_{1};
+};
+
+TEST_F(ConnPoolImplCodelDropTest, DropsPendingStreamAndUpdatesCounts) {
+  ASSERT_NE(factory_.queue_, nullptr);
+  factory_.queue_->drop_on_dequeue_ = true;
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  EXPECT_NE(pool_.newStreamImpl(context_, /*can_send_early_data=*/false), nullptr);
+  ASSERT_NE(client_, nullptr);
+  EXPECT_EQ(state_.pending_streams_, 1);
+  EXPECT_CALL(pool_, onPoolReady).Times(0);
+  EXPECT_CALL(pool_,
+              onPoolFailure(_, HasSubstr("dropped by CoDel"),
+                            ConnectionPool::PoolFailureReason::Overflow, testing::Ref(context_)));
+  client_->onEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_EQ(state_.pending_streams_, 0);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_active_.value(), 0);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_dropped_codel_.value(), 1);
+  pool_.drainConnectionsImpl(ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+TEST_F(ConnPoolImplCodelDropTest, DropsEarlyDataPendingStreamAndUpdatesCounts) {
+  supports_early_data_ = true;
+  ASSERT_NE(factory_.queue_, nullptr);
+  factory_.queue_->drop_on_dequeue_ = true;
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  EXPECT_NE(pool_.newStreamImpl(context_, /*can_send_early_data=*/true), nullptr);
+  ASSERT_NE(client_, nullptr);
+  EXPECT_CALL(pool_, onPoolReady).Times(0);
+  EXPECT_CALL(pool_,
+              onPoolFailure(_, HasSubstr("dropped by CoDel"),
+                            ConnectionPool::PoolFailureReason::Overflow, testing::Ref(context_)));
+  client_->onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+  pool_.onUpstreamReadyForEarlyData(*client_);
+
+  EXPECT_EQ(state_.pending_streams_, 0);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_active_.value(), 0);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_dropped_codel_.value(), 1);
+  pool_.drainConnectionsImpl(ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+TEST_F(ConnPoolImplCodelDropTest, DoesNotDropWithoutAnEarlyDataEligibleStream) {
+  supports_early_data_ = true;
+  factory_.queue_->drop_on_dequeue_ = true;
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  auto* pending = pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+  ASSERT_NE(pending, nullptr);
+  EXPECT_CALL(pool_, onPoolReady).Times(0);
+  EXPECT_CALL(pool_, onPoolFailure).Times(0);
+  client_->onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+  pool_.onUpstreamReadyForEarlyData(*client_);
+
+  EXPECT_EQ(state_.pending_streams_, 1);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_active_.value(), 1);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_dropped_codel_.value(), 0);
+  if (state_.pending_streams_ > 0) {
+    pending->cancel(ConnectionPool::CancelPolicy::Default);
+  }
+  pool_.drainConnectionsImpl(ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+TEST_F(ConnPoolImplCodelDropTest, RechecksDropsAfterEachEarlyDataDispatch) {
+  supports_early_data_ = true;
+  concurrent_streams_ = 3;
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  EXPECT_NE(pool_.newStreamImpl(context_, /*can_send_early_data=*/false), nullptr);
+  AttachContext second_context;
+  EXPECT_NE(pool_.newPendingStream(second_context, /*can_send_early_data=*/true), nullptr);
+  AttachContext third_context;
+  EXPECT_NE(pool_.newPendingStream(third_context, /*can_send_early_data=*/true), nullptr);
+
+  testing::InSequence sequence;
+  EXPECT_CALL(pool_, onPoolReady(_, testing::Ref(second_context)))
+      .WillOnce([&](ActiveClient& client, AttachContext&) {
+        TestActiveClient::incrementActiveStreams(client);
+        factory_.queue_->drop_oldest_once_ = true;
+      });
+  EXPECT_CALL(pool_,
+              onPoolFailure(_, HasSubstr("dropped by CoDel"),
+                            ConnectionPool::PoolFailureReason::Overflow, testing::Ref(context_)));
+  EXPECT_CALL(pool_, onPoolReady(_, testing::Ref(third_context)))
+      .WillOnce([](ActiveClient& client, AttachContext&) {
+        TestActiveClient::incrementActiveStreams(client);
+      });
+  client_->onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+  pool_.onUpstreamReadyForEarlyData(*client_);
+
+  EXPECT_EQ(state_.pending_streams_, 0);
+  EXPECT_EQ(state_.active_streams_, 2);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_active_.value(), 0);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_dropped_codel_.value(), 1);
+  while (client_->active_streams_ > 0) {
+    --client_->active_streams_;
+    pool_.onStreamClosed(*client_, false);
+  }
+  pool_.drainConnectionsImpl(ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+class ConnPoolImplCodelOldestDropTest : public ConnPoolImplCodelDropTest,
+                                        public testing::WithParamInterface<bool> {};
+
+TEST_P(ConnPoolImplCodelOldestDropTest, DropsOldestBeforeDispatchingNewest) {
+  supports_early_data_ = GetParam();
+  factory_.queue_->drop_oldest_once_ = true;
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  // The oldest request need not be eligible for early data to be shed.
+  EXPECT_NE(pool_.newStreamImpl(context_, /*can_send_early_data=*/false), nullptr);
+  AttachContext newest_context;
+  EXPECT_NE(pool_.newPendingStream(newest_context, /*can_send_early_data=*/true), nullptr);
+  EXPECT_EQ(state_.pending_streams_, 2);
+
+  testing::InSequence sequence;
+  EXPECT_CALL(pool_,
+              onPoolFailure(_, HasSubstr("dropped by CoDel"),
+                            ConnectionPool::PoolFailureReason::Overflow, testing::Ref(context_)));
+  EXPECT_CALL(pool_, onPoolReady(_, testing::Ref(newest_context)))
+      .WillOnce([](ActiveClient& client, AttachContext&) {
+        TestActiveClient::incrementActiveStreams(client);
+      });
+  if (supports_early_data_) {
+    client_->onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+    pool_.onUpstreamReadyForEarlyData(*client_);
+  } else {
+    client_->onEvent(Network::ConnectionEvent::Connected);
+  }
+
+  EXPECT_EQ(state_.pending_streams_, 0);
+  EXPECT_EQ(state_.active_streams_, 1);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_active_.value(), 0);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_dropped_codel_.value(), 1);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_overflow_.value(), 0);
+  --client_->active_streams_;
+  pool_.onStreamClosed(*client_, false);
+  pool_.drainConnectionsImpl(ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+TEST_P(ConnPoolImplCodelOldestDropTest, DropCallbackMayCancelAnotherPendingStream) {
+  supports_early_data_ = GetParam();
+  factory_.queue_->drop_oldest_once_ = true;
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  EXPECT_NE(pool_.newStreamImpl(context_, /*can_send_early_data=*/false), nullptr);
+  AttachContext cancelled_context;
+  auto* cancelled = pool_.newPendingStream(cancelled_context, /*can_send_early_data=*/true);
+  AttachContext newest_context;
+  EXPECT_NE(pool_.newPendingStream(newest_context, /*can_send_early_data=*/true), nullptr);
+
+  testing::InSequence sequence;
+  EXPECT_CALL(pool_,
+              onPoolFailure(_, HasSubstr("dropped by CoDel"),
+                            ConnectionPool::PoolFailureReason::Overflow, testing::Ref(context_)))
+      .WillOnce([&](const Upstream::HostDescriptionConstSharedPtr&, absl::string_view,
+                    ConnectionPool::PoolFailureReason, AttachContext&) {
+        cancelled->cancel(ConnectionPool::CancelPolicy::Default);
+        EXPECT_EQ(state_.pending_streams_, 1);
+      });
+  EXPECT_CALL(pool_, onPoolReady(_, testing::Ref(newest_context)))
+      .WillOnce([](ActiveClient& client, AttachContext&) {
+        TestActiveClient::incrementActiveStreams(client);
+      });
+  if (supports_early_data_) {
+    client_->onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+    pool_.onUpstreamReadyForEarlyData(*client_);
+  } else {
+    client_->onEvent(Network::ConnectionEvent::Connected);
+  }
+
+  EXPECT_EQ(state_.pending_streams_, 0);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_active_.value(), 0);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_dropped_codel_.value(), 1);
+  EXPECT_EQ(cluster_->trafficStats()->upstream_rq_pending_overflow_.value(), 0);
+  --client_->active_streams_;
+  pool_.onStreamClosed(*client_, false);
+  pool_.drainConnectionsImpl(ConnectionPool::DrainBehavior::DrainAndDelete);
+}
+
+INSTANTIATE_TEST_SUITE_P(NormalAndEarlyData, ConnPoolImplCodelOldestDropTest, testing::Bool());
 
 class ConnPoolImplDispatcherBaseTest : public testing::Test {
 public:
