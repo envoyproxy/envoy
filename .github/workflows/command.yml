@@ -45,13 +45,11 @@ jobs:
       with:
         key: ${{ secrets.ENVOY_CI_APP_KEY }}
         app_id: ${{ secrets.ENVOY_CI_APP_ID }}
-    - uses: envoyproxy/toolshed/actions/retest@e0d2ffaac17df9f2cb36ff437b87d0d00d265335  # actions-v0.4.36
+    - uses: envoyproxy/toolshed/actions/envoy/retest@e0d2ffaac17df9f2cb36ff437b87d0d00d265335  # actions-v0.4.36
       if: ${{ startsWith(steps.command.outputs.command, 'retest') }}
       name: Retest
       with:
         token: ${{ steps.appauth-retest.outputs.token }}
-        azp_org: cncf
-        azp_token: ${{ secrets.AZP_TOKEN }}
         comment-id: ${{ github.event.comment.id }}
         pr-url: ${{ github.event.issue.pull_request.url }}
         app-owner: ci-envoy
