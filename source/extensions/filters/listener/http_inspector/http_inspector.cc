@@ -124,8 +124,32 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
             "envoy.reloadable_features.http_inspector_fast_fail_invalid_method_bytes")) {
       const absl::string_view prefix = data.substr(0, kMaxHttpMethodLength);
       const size_t bad = prefix.find_first_not_of(kValidHttpMethodChars);
-      if (bad != absl::string_view::npos && !absl::ascii_isspace(prefix[bad])) {
-        return ParseState::Error;
+      if (bad != absl::string_view::npos) {
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.http_inspector_fast_fail_non_sp_whitespace")) {
+          // RFC 9112 §3: request-line = method SP request-target SP HTTP-version CRLF
+          // The method must not be empty (bad > 0) and must be separated from the
+          // request-target by a single SP (' ', 0x20). Other whitespace like \t, \f, \v
+          // is invalid.
+          if (bad == 0 || prefix[bad] != ' ') {
+            return ParseState::Error;
+          }
+
+          // Validate that bytes in the request target prior to CRLF do not contain
+          // invalid control characters (e.g. binary protocols where the length byte happens to be '
+          // ').
+          for (size_t i = bad + 1; i < prefix.size(); ++i) {
+            const char c = prefix[i];
+            if (c == '\r' || c == '\n') {
+              break;
+            }
+            if (static_cast<unsigned char>(c) < 0x20 || c == 0x7f) {
+              return ParseState::Error;
+            }
+          }
+        } else if (!absl::ascii_isspace(prefix[bad])) {
+          return ParseState::Error;
+        }
       }
     }
 
