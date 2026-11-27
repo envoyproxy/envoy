@@ -48,7 +48,7 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
   // data therefore default to off on filter chains that validate a client certificate. Operators
   // can still opt into resumption explicitly.
   const bool default_resumption =
-      !(server_config->certificateValidationContext() != nullptr &&
+      !(server_config->validationContextConfigured() &&
         Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.quic_mtls_resumption_disabled_by_default"));
   const bool enable_early_data =
