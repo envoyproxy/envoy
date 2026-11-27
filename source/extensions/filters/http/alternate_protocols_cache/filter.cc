@@ -37,8 +37,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   if (alt_svc.empty()) {
     return Http::FilterHeadersStatus::Continue;
   }
-  // As an upstream filter, read this attempt's own stream info. With hedged retries, the
-  // request's stream info may already point at a newer attempt's host.
+  // As an upstream filter, read this attempt's own stream info.
   auto upstream_callbacks = encoder_callbacks_->upstreamCallbacks();
   StreamInfo::StreamInfo& stream_info = upstream_callbacks.has_value()
                                             ? upstream_callbacks->upstreamStreamInfo()
