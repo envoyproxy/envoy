@@ -2913,6 +2913,10 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_respo
                envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
                envoy_dynamic_module_type_module_http_header*, size_t)
 
+WEAK_STUB_VOID(
+    envoy_dynamic_module_callback_upstream_http_tcp_bridge_enable_upstream_connection_reuse,
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr)
+
 // ---------------------- Tracer callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the tracer abi_impl.cc when the tracer extension is used.

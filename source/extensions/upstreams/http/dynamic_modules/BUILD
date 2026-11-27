@@ -18,6 +18,9 @@ envoy_cc_library(
         "upstream_request.h",
     ],
     deps = [
+        "//envoy/event:deferred_deletable",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
         "//envoy/upstream:upstream_interface",

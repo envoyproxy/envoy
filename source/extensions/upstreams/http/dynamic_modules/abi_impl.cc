@@ -174,4 +174,12 @@ void envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_traile
   bridge->sendResponseTrailers(trailers_vector, trailers_vector_size);
 }
 
+// ----------------------- Upstream Connection Reuse ---------------------------
+
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_enable_upstream_connection_reuse(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr) {
+  auto* bridge = getBridge(bridge_envoy_ptr);
+  bridge->enableUpstreamConnectionReuse();
+}
+
 } // extern "C"

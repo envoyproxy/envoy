@@ -1,8 +1,13 @@
 #include "source/extensions/upstreams/http/dynamic_modules/upstream_request.h"
 
+#include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 
+#include "envoy/event/deferred_deletable.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -126,6 +131,81 @@ bool TcpConnPool::resetUpstreamHandleIfSet() {
   return false;
 }
 
+namespace {
+
+// How long a drained upstream connection may go without writing any of what the module sent before
+// Envoy resets it. It matches the HTTP connection manager's default delayed close timeout, which
+// also restarts on write progress.
+constexpr std::chrono::milliseconds UpstreamConnectionDrainTimeout{1000};
+
+// Holds an upstream connection the bridge closes while some data the module sent is still queued,
+// since closing at once would cut the request short behind a FIN that makes it look whole. Holding
+// the connection data keeps the pool from handing the connection to another request. The pool
+// reports every close of the connection to the holder of its data, its own teardown included, so
+// the drainer always reaches the close event that deletes it.
+class UpstreamConnectionDrainer : public Envoy::Tcp::ConnectionPool::UpstreamCallbacks,
+                                  public Event::DeferredDeletable,
+                                  public Logger::Loggable<Logger::Id::dynamic_modules> {
+public:
+  explicit UpstreamConnectionDrainer(
+      Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& connection_data)
+      : connection_data_(std::move(connection_data)) {}
+
+  // Starts the drain. The drainer owns itself until its close event hands it to the dispatcher.
+  static void drain(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& connection_data) {
+    std::make_unique<UpstreamConnectionDrainer>(std::move(connection_data)).release()->start();
+  }
+
+  // Tcp::ConnectionPool::UpstreamCallbacks
+  // A connection closing with FlushWrite reads nothing more, so this only completes the interface.
+  void onUpstreamData(Buffer::Instance& data, bool) override { data.drain(data.length()); }
+  void onEvent(Network::ConnectionEvent event) override {
+    if (event != Network::ConnectionEvent::LocalClose &&
+        event != Network::ConnectionEvent::RemoteClose) {
+      return;
+    }
+    drain_timer_->disableTimer();
+    connection().dispatcher().deferredDelete(std::unique_ptr<Event::DeferredDeletable>(this));
+  }
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+
+private:
+  void start() {
+    connection_data_->addUpstreamCallbacks(*this);
+    // A reset rather than a FIN tells the upstream that the request it has is not whole.
+    drain_timer_ = connection().dispatcher().createTimer([this]() {
+      ENVOY_CONN_LOG(debug,
+                     "dynamic module bridge resets an upstream connection whose queued data "
+                     "was not written in time",
+                     connection());
+      connection().close(Network::ConnectionCloseType::AbortReset,
+                         "dynamic_module_bridge_drain_timeout");
+    });
+    drain_timer_->enableTimer(UpstreamConnectionDrainTimeout);
+    // Each write the socket takes restarts the bound. The callback outlives the drainer only on a
+    // closed connection, which writes nothing more, and then it unregisters.
+    connection().addBytesSentCallback(
+        [drain_timer = std::weak_ptr<Event::Timer>(drain_timer_)](uint64_t) {
+          const std::shared_ptr<Event::Timer> timer = drain_timer.lock();
+          if (timer == nullptr) {
+            return false;
+          }
+          timer->enableTimer(UpstreamConnectionDrainTimeout);
+          return true;
+        });
+    // The close may report itself before returning, so nothing touches the drainer after it.
+    connection().close(Network::ConnectionCloseType::FlushWrite, "dynamic_module_bridge_drained");
+  }
+
+  Network::ClientConnection& connection() { return connection_data_->connection(); }
+
+  Envoy::Tcp::ConnectionPool::ConnectionDataPtr connection_data_;
+  std::shared_ptr<Event::Timer> drain_timer_;
+};
+
+} // namespace
+
 // =============================================================================
 // HttpTcpBridge
 // =============================================================================
@@ -151,6 +231,50 @@ HttpTcpBridge::~HttpTcpBridge() {
   if (in_module_bridge_ != nullptr) {
     (*config_->on_bridge_destroy_)(in_module_bridge_);
     in_module_bridge_ = nullptr;
+  }
+  if (upstream_connection_closed_) {
+    return;
+  }
+  Network::ClientConnection& upstream_connection = upstream_conn_data_->connection();
+  const Network::Connection::State state = upstream_connection.state();
+  if (state == Network::Connection::State::Closed) {
+    return;
+  }
+  // Only the module knows where its protocol's exchange ends, so the connection serves another
+  // request only when the module enabled its reuse. The whole request must have reached this
+  // bridge, since the upstream may still be waiting for the rest of a partial one. A half-closed
+  // connection cannot carry another request, nor can one whose reads are disabled deliver the next
+  // reply. One above its write high watermark would give the next request a flow control resume it
+  // never paused for, and data the socket has not taken yet would count against the next request's
+  // own unsent data. When all of these hold, the member destructor returns the connection to the
+  // pool.
+  const bool open = state == Network::Connection::State::Open;
+  const bool reads_enabled = open && upstream_connection.readEnabled();
+  const bool above_high_watermark = upstream_connection.aboveHighWatermark();
+  const bool data_unsent = unsent_upstream_bytes_ != nullptr && *unsent_upstream_bytes_ > 0;
+  if (upstream_connection_reuse_enabled_ && downstream_complete_ && !upstream_half_closed_ &&
+      reads_enabled && !above_high_watermark && !data_unsent) {
+    ENVOY_CONN_LOG(debug, "dynamic module bridge returns the upstream connection to the pool",
+                   upstream_connection);
+    return;
+  }
+  ENVOY_CONN_LOG(debug,
+                 "dynamic module bridge closes the upstream connection, reuse enabled: {}, "
+                 "request complete: {}, half-closed: {}, open: {}, reads enabled: {}, "
+                 "above high watermark: {}, data unsent: {}",
+                 upstream_connection, upstream_connection_reuse_enabled_, downstream_complete_,
+                 upstream_half_closed_, open, reads_enabled, above_high_watermark, data_unsent);
+  if (open && data_unsent) {
+    UpstreamConnectionDrainer::drain(std::move(upstream_conn_data_));
+    return;
+  }
+  // Releasing the connection before the close keeps the close from reaching this bridge or
+  // counting as a connection destroyed with an active request. The pool defers deleting a client it
+  // closes, so the reference outlives the release, and a draining pool closes the client itself.
+  upstream_conn_data_.reset();
+  if (upstream_connection.state() != Network::Connection::State::Closed) {
+    upstream_connection.close(Network::ConnectionCloseType::NoFlush,
+                              "dynamic_module_bridge_destroyed");
   }
 }
 
@@ -215,11 +339,15 @@ void HttpTcpBridge::readDisable(bool disable) {
 
 void HttpTcpBridge::resetStream() {
   upstream_request_ = nullptr;
-  upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush,
+  // A reset rather than a FIN tells the upstream that the part of the request it has is not whole.
+  upstream_conn_data_->connection().close(Network::ConnectionCloseType::AbortReset,
                                           "dynamic_module_bridge_reset_stream");
 }
 
 void HttpTcpBridge::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+  if (end_stream) {
+    upstream_half_closed_ = true;
+  }
   if (in_module_bridge_ == nullptr || upstream_request_ == nullptr) {
     return;
   }
@@ -243,9 +371,13 @@ void HttpTcpBridge::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 }
 
 void HttpTcpBridge::onEvent(Network::ConnectionEvent event) {
-  if ((event == Network::ConnectionEvent::LocalClose ||
-       event == Network::ConnectionEvent::RemoteClose) &&
-      upstream_request_ != nullptr) {
+  if (event != Network::ConnectionEvent::LocalClose &&
+      event != Network::ConnectionEvent::RemoteClose) {
+    return;
+  }
+  upstream_connection_closed_ = true;
+  // The reset may destroy this bridge, so nothing touches a member after it.
+  if (upstream_request_ != nullptr) {
     upstream_request_->onResetStream(Envoy::Http::StreamResetReason::ConnectionTermination, "");
   }
 }
@@ -284,17 +416,50 @@ void HttpTcpBridge::sendUpstreamData(absl::string_view data, bool end_stream) {
   if (upstream_conn_data_ == nullptr) {
     return;
   }
+  // The connection takes no data after its write side ended, so Envoy drops what the module sends
+  // after it ended its upstream data.
+  if (module_ended_upstream_data_) {
+    ENVOY_LOG(debug, "dynamic module bridge drops upstream data sent after the module ended it");
+    return;
+  }
   Buffer::OwnedImpl buffer;
   if (!data.empty()) {
     buffer.add(data);
   }
   if (buffer.length() > 0 || end_stream) {
     if (end_stream) {
+      module_ended_upstream_data_ = true;
+      upstream_half_closed_ = true;
       upstream_conn_data_->connection().enableHalfClose(true);
     }
     bytes_meter_->addWireBytesSent(buffer.length());
+    addUnsentUpstreamBytes(buffer.length());
     upstream_conn_data_->connection().write(buffer, end_stream);
   }
+}
+
+// The count charges every byte the socket takes to this bridge, which holds while the bridge is the
+// connection's only writer, since reuse needs every byte sent first. A transport socket that writes
+// bytes of its own, such as a PROXY protocol header, or an upstream network filter that changes the
+// byte count makes it read up to that many bytes low, and the clamp keeps it from wrapping.
+void HttpTcpBridge::addUnsentUpstreamBytes(uint64_t length) {
+  if (length == 0) {
+    return;
+  }
+  if (unsent_upstream_bytes_ == nullptr) {
+    unsent_upstream_bytes_ = std::make_shared<uint64_t>(0);
+    upstream_conn_data_->connection().addBytesSentCallback(
+        [unsent_upstream_bytes =
+             std::weak_ptr<uint64_t>(unsent_upstream_bytes_)](uint64_t bytes_sent) {
+          const std::shared_ptr<uint64_t> unsent = unsent_upstream_bytes.lock();
+          if (unsent == nullptr) {
+            return false;
+          }
+          *unsent -= std::min(*unsent, bytes_sent);
+          return true;
+        });
+  }
+  *unsent_upstream_bytes_ += length;
 }
 
 void HttpTcpBridge::sendResponse(uint32_t status_code,

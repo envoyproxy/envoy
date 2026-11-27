@@ -43,6 +43,7 @@ envoy_extension_cc_dyn_module_test(
         "//source/extensions/upstreams/http/dynamic_modules:config",
         "//source/extensions/upstreams/http/dynamic_modules:upstream_request_lib",
         "//test/extensions/dynamic_modules:util",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/router:router_filter_interface",
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:factory_context_mocks",

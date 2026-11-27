@@ -16456,6 +16456,16 @@ unsafe extern "C" {
  instance is being destroyed. The module should release any resources associated with the
  bridge instance.
 
+ After this hook returns, Envoy closes the bridge's upstream connection if it is still open, so no
+ other request reuses it, unless the module enabled its reuse with
+ envoy_dynamic_module_callback_upstream_http_tcp_bridge_enable_upstream_connection_reuse and
+ Envoy can hand the connection on, as that callback describes. When data the module sent is still
+ queued as the request ends, Envoy first waits for the socket to take it, for as long as each
+ write makes progress within one second, and otherwise tries to reset the connection, so the
+ upstream does not mistake a cut request for a whole one. A reset of the request tries to reset
+ the connection at once, and a close Envoy makes for another reason, such as when it shuts down
+ or the host fails its health check, ends the wait with a plain close.
+
  @param bridge_module_ptr is a pointer to the in-module per-request bridge instance.*/
     pub fn envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy(
         bridge_module_ptr: envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
@@ -16575,7 +16585,8 @@ unsafe extern "C" {
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
     /** envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_upstream_data is called by the
- module to send transformed data to the TCP upstream connection.
+ module to send transformed data to the TCP upstream connection. Envoy drops data the module
+ sends after it ended its upstream data.
 
  @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
  @param data is the data to send, owned by the module. Envoy copies the data.
@@ -16650,6 +16661,28 @@ unsafe extern "C" {
         bridge_envoy_ptr: envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
         trailers_vector: *mut envoy_dynamic_module_type_module_http_header,
         trailers_vector_size: usize,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_upstream_http_tcp_bridge_enable_upstream_connection_reuse is called
+ by the module to let the bridge's upstream connection serve another request to the same host
+ after this request ends. Envoy otherwise closes the connection when the bridge is destroyed,
+ since only the module knows where its protocol's exchange ends. The module must call this only
+ once the upstream has sent its whole reply to this request and will send nothing more for it,
+ since any later bytes reach whichever request uses the connection next. Reuse is best effort, so
+ Envoy may still close the connection when it cannot hand it on intact. Examples are a request
+ that has not reached the module in full, a connection the module or the upstream half-closed,
+ paused reads, a write buffer that has not drained since it went over its high watermark, data
+ the module sent that the socket has not taken yet, and a reset of the request, which includes a
+ response that ends before the request does. The next request to use the connection can come
+ from any downstream client or another user of the same TCP connection pool, and it inherits
+ whatever state this exchange left at the upstream. Its bridge cannot tell that the connection
+ was used before. Calling this again has no further effect, and the module cannot revoke it.
+
+ @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.*/
+    pub fn envoy_dynamic_module_callback_upstream_http_tcp_bridge_enable_upstream_connection_reuse(
+        bridge_envoy_ptr: envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
     );
 }
 /** envoy_dynamic_module_type_tracer_config_envoy_ptr is a pointer to the

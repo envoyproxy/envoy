@@ -43,6 +43,16 @@ pub trait UpstreamHttpTcpBridgeConfig: Send + Sync {
 /// One instance is created per HTTP request. The module controls the data flow by calling
 /// explicit callbacks on `envoy_bridge` (send_upstream_data, send_response, etc.) rather
 /// than returning status codes.
+///
+/// After the instance is dropped, Envoy closes its upstream connection if it is still open, so no
+/// other request reuses it, unless the module called
+/// [`EnvoyUpstreamHttpTcpBridge::enable_upstream_connection_reuse`] and Envoy can hand the
+/// connection on, as that method describes. When data sent with `send_upstream_data` is still
+/// queued as the request ends, Envoy first waits for the socket to take it, for as long as each
+/// write makes progress within one second, and otherwise tries to reset the connection, so the
+/// upstream does not mistake a cut request for a whole one. A reset of the request tries to reset
+/// the connection at once, and a close Envoy makes for another reason, such as when it shuts down
+/// or the host fails its health check, ends the wait with a plain close.
 pub trait UpstreamHttpTcpBridge: Send {
   /// Called when HTTP request headers are being encoded for the upstream.
   ///
@@ -102,7 +112,8 @@ pub trait EnvoyUpstreamHttpTcpBridge: Send {
   /// Get the raw TCP response data from the upstream as a contiguous byte vector.
   fn get_response_buffer(&self) -> Vec<u8>;
 
-  /// Send transformed data to the TCP upstream connection.
+  /// Send transformed data to the TCP upstream connection. Envoy drops data sent after
+  /// `end_stream` was true.
   fn send_upstream_data(&self, data: &[u8], end_stream: bool);
 
   /// Send a complete local response to the downstream client, ending the stream.
@@ -121,6 +132,23 @@ pub trait EnvoyUpstreamHttpTcpBridge: Send {
 
   /// Send response trailers to the downstream client, ending the stream.
   fn send_response_trailers<'a>(&self, trailers: &'a [(&'a str, &'a [u8])]);
+
+  /// Let the upstream connection serve another request to the same host after this request ends.
+  ///
+  /// Envoy otherwise closes the connection when the bridge is dropped, since only the module knows
+  /// where its protocol's exchange ends. Call this only once the upstream has sent its whole reply
+  /// to this request and will send nothing more for it, since any later bytes reach whichever
+  /// request uses the connection next. Reuse is best effort, so Envoy may still close the
+  /// connection when it cannot hand it on intact. Examples are a request that has not reached the
+  /// module in full, a connection the module or the upstream half-closed, paused reads, a write
+  /// buffer that has not drained since it went over its high watermark, data sent with
+  /// `send_upstream_data` that the socket has not taken yet, and a reset of the request, which
+  /// includes a response that ends before the request does. The next request to use the
+  /// connection can come from any downstream client or another user of the same TCP connection
+  /// pool, and it inherits whatever state this exchange left at the upstream. Its bridge cannot
+  /// tell that the connection was used before. Calling this again has no further effect, and the
+  /// module cannot revoke it.
+  fn enable_upstream_connection_reuse(&self);
 }
 
 struct EnvoyUpstreamHttpTcpBridgeImpl {
@@ -323,6 +351,14 @@ impl EnvoyUpstreamHttpTcpBridge for EnvoyUpstreamHttpTcpBridgeImpl {
         self.raw,
         trailers_ptr,
         trailer_vec.len(),
+      );
+    }
+  }
+
+  fn enable_upstream_connection_reuse(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_enable_upstream_connection_reuse(
+        self.raw,
       );
     }
   }

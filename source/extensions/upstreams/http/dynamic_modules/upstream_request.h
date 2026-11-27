@@ -160,6 +160,9 @@ public:
   void sendResponseTrailers(envoy_dynamic_module_type_module_http_header* trailers_vector,
                             size_t trailers_vector_size);
 
+  // Called by ABI callbacks to let the upstream connection serve another request after this one.
+  void enableUpstreamConnectionReuse() { upstream_connection_reuse_enabled_ = true; }
+
 private:
   Envoy::Http::ResponseHeaderMapPtr
   buildResponseHeaders(uint32_t status_code,
@@ -170,6 +173,9 @@ private:
   // bridge, so callers must invoke it last and touch no member afterwards.
   void applyPendingResponse();
 
+  // Counts bytes written to the upstream connection until its socket takes them.
+  void addUnsentUpstreamBytes(uint64_t length);
+
   // A terminal downstream response captured during a module hook.
   enum class PendingResponse { None, Response, Headers, Data, Trailers };
 
@@ -179,6 +185,20 @@ private:
   envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr in_module_bridge_ = nullptr;
 
   bool downstream_complete_ = false;
+  bool upstream_connection_reuse_enabled_ = false;
+  // True once the module or the upstream half-closed the upstream connection by ending its data.
+  // An upstream end of data reaches the bridge only after the module ended its own, which turned
+  // half-close on, so onUpstreamData() sets this as a guard.
+  bool upstream_half_closed_ = false;
+  // True once the module ended its upstream data, after which Envoy drops what the module sends.
+  bool module_ended_upstream_data_ = false;
+  // True once the upstream connection reported its close. The pool may free a closed connection
+  // after the close returns, so the destructor reads the connection only while this is false.
+  bool upstream_connection_closed_ = false;
+  // Bytes this bridge wrote that the upstream socket has not taken yet. The connection's bytes sent
+  // callback holds it weakly, since that callback outlives the bridge on a connection the pool
+  // keeps.
+  std::shared_ptr<uint64_t> unsent_upstream_bytes_;
 
   // True only while a module event hook is on the stack. A terminal downstream response requested
   // during a hook is deferred while this is set and applied after the hook returns, so the router
