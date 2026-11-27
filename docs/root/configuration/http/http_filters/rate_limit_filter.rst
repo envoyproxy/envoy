@@ -14,7 +14,8 @@ or per virtual host or route with
 :ref:`RateLimitPerRoute.rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
 in the ``typed_per_filter_config``, which takes precedence over the filter level configurations.
 More than one configuration can apply to a request. Each configuration results in a descriptor
-being sent to the rate limit service.
+being sent to the rate limit service, unless an earlier configuration
+:ref:`stopped the search <config_http_filters_rate_limit_stop_on_match>`.
 
 The deprecated route level :ref:`rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>`
 and virtual host level :ref:`rate_limits <envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>`
@@ -136,6 +137,66 @@ the following descriptor is generated:
   ("generic_key", "some_value1")
   ("remote_address", "<trusted address from x-forwarded-for>")
   ("source_cluster", "from_cluster")
+
+.. _config_http_filters_rate_limit_stop_on_match:
+
+Stopping at the first match
+---------------------------
+
+By default, every rate limit configuration that produces a descriptor is sent to the rate limit
+service. A request that matches several configurations is counted against all of them, so the
+strictest limit effectively wins. That makes tiered limits, such as a higher limit for one client
+and a per-client default for everyone else, awkward to express: each later configuration has to
+negate all of the earlier ones.
+
+Setting :ref:`stop_on_match <envoy_v3_api_field_config.route.v3.RateLimit.stop_on_match>` on a
+configuration makes the filter skip all later configurations once that configuration has produced a
+descriptor. Earlier configurations still apply, so configurations that should always count must be
+placed before the first one with the flag. Configurations that
+:ref:`apply on stream done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` are
+evaluated separately, so a stop at request time does not affect them. For the deprecated route and
+virtual host ``rate_limits``, only later configurations of the same
+:ref:`stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>` are skipped.
+
+The search stops only within one ``rate_limits`` list. When
+:ref:`rate_limits_override_option <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits_override_option>`
+is ``ALL_LEVELS``, the lists at every level are evaluated, and a stop in one list does not skip
+the others. Put tiers that should exclude each other in the same list. A list at another level,
+such as a filter level cap, then always applies. The deprecated route and virtual host
+``rate_limits`` are the exception: a match on a route configuration with the flag also skips the
+virtual host configurations.
+
+A configuration matches when all of its actions populate and the resulting descriptor has at least
+one entry. If an action cannot populate, for example because a required header is missing, the
+configuration does not stop the search. The same holds when every action is skipped through
+``skip_if_absent``, because the resulting descriptor is empty. In the embedded ``rate_limits``, a
+configuration whose
+:ref:`hits_addend <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` fails to evaluate,
+for example because the header it reads is missing or not a number, does not match either, so the
+request falls through to later configurations. What a configuration counts does not matter: one
+whose ``hits_addend`` is zero or sets ``is_negative_hits`` still matches and stops the search, so
+the flag is usually left unset on such configurations.
+
+With the following configuration, a request with ``x-user-id: client-a`` only produces the
+``("tier", "client-a")`` descriptor, and a request with any other ``x-user-id`` value produces
+``("user", "<x-user-id>")``. A request without the ``x-user-id`` header produces no descriptor:
+
+.. code-block:: yaml
+
+  rate_limits:
+  - actions:
+    - header_value_match:
+        descriptor_key: tier
+        descriptor_value: client-a
+        headers:
+        - name: x-user-id
+          string_match:
+            exact: client-a
+    stop_on_match: true
+  - actions:
+    - request_headers:
+        header_name: x-user-id
+        descriptor_key: user
 
 .. _config_http_filters_rate_limit_rate_limit_override:
 

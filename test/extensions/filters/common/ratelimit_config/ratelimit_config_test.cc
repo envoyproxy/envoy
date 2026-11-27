@@ -661,6 +661,114 @@ filter_metadata:
   EXPECT_FALSE(descriptors[0].limit_.has_value());
 }
 
+// A matching policy with stop_on_match ends the search. A policy whose actions cannot populate
+// does not count as a match, and policies before the stopping one still apply.
+TEST_F(RateLimitConfigTest, StopOnMatch) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: always
+  - actions:
+    - request_headers:
+        header_name: x-missing
+        descriptor_key: missing
+    stop_on_match: true
+  - actions:
+    - generic_key:
+        descriptor_value: second
+    stop_on_match: true
+  - actions:
+    - generic_key:
+        descriptor_value: third
+  )EOF";
+
+  setupTest(yaml);
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
+  config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {Envoy::RateLimit::Descriptor{{{"generic_key", "always"}}},
+                   Envoy::RateLimit::Descriptor{{{"generic_key", "second"}}}}),
+              testing::ContainerEq(descriptors));
+}
+
+// A policy whose actions are all skipped through skip_if_absent produces an empty descriptor.
+// That is not a match, so it does not stop the search.
+TEST_F(RateLimitConfigTest, StopOnMatchIgnoresEmptyDescriptor) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - request_headers:
+        header_name: x-tier
+        descriptor_key: tier
+        skip_if_absent: true
+    stop_on_match: true
+  - actions:
+    - generic_key:
+        descriptor_value: catch_all
+  )EOF";
+
+  setupTest(yaml);
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
+  config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors);
+  ASSERT_EQ(2, descriptors.size());
+  EXPECT_TRUE(descriptors[0].entries_.empty());
+  EXPECT_THAT(descriptors[1].entries_,
+              testing::ElementsAre(Envoy::RateLimit::DescriptorEntry{"generic_key", "catch_all"}));
+
+  // With the header present the first policy matches and the catch-all is skipped.
+  headers_.addCopy("x-tier", "gold");
+  descriptors.clear();
+  config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors);
+  EXPECT_THAT(
+      std::vector<Envoy::RateLimit::Descriptor>({Envoy::RateLimit::Descriptor{{{"tier", "gold"}}}}),
+      testing::ContainerEq(descriptors));
+}
+
+// The request-time and stream-done entries are evaluated separately, so a stop in one phase
+// does not affect the other.
+TEST_F(RateLimitConfigTest, StopOnMatchPerPhase) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: request_first
+    stop_on_match: true
+  - actions:
+    - generic_key:
+        descriptor_value: stream_done_first
+    apply_on_stream_done: true
+    stop_on_match: true
+  - actions:
+    - generic_key:
+        descriptor_value: request_second
+  - actions:
+    - generic_key:
+        descriptor_value: stream_done_second
+    apply_on_stream_done: true
+  )EOF";
+
+  setupTest(yaml);
+
+  {
+    std::vector<Envoy::RateLimit::Descriptor> descriptors;
+    config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors, false);
+    EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                    {Envoy::RateLimit::Descriptor{{{"generic_key", "request_first"}}}}),
+                testing::ContainerEq(descriptors));
+  }
+
+  {
+    std::vector<Envoy::RateLimit::Descriptor> descriptors;
+    config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors, true);
+    EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                    {Envoy::RateLimit::Descriptor{{{"generic_key", "stream_done_first"}}}}),
+                testing::ContainerEq(descriptors));
+  }
+}
+
 class RateLimitPolicyTest : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {

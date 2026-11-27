@@ -279,6 +279,7 @@ public:
                const StreamInfo::StreamInfo& info),
               (const));
   MOCK_METHOD(bool, applyOnStreamDone, (), (const));
+  MOCK_METHOD(bool, stopOnMatch, (), (const));
 
   uint64_t stage_{};
   std::string disable_key_;

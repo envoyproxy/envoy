@@ -2194,7 +2194,7 @@ message VirtualCluster {
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
 // Also applies to Local rate limiting :ref:`using descriptors <config_http_filters_local_rate_limit_descriptors>`.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
@@ -2854,6 +2854,17 @@ message RateLimit {
 
   // Descriptor level X-RateLimit headers options which may override the filter level setting.
   XRateLimitOption x_ratelimit_option = 7;
+
+  // If set to true and this configuration produces a descriptor for a request, later
+  // configurations in the same ``rate_limits`` list are skipped. Earlier configurations and other
+  // lists, such as a filter level list, still apply; the deprecated route and virtual host
+  // ``rate_limits`` count as one list. This allows ordered, tiered limits: put the more specific
+  // configurations first, each with this field set, and a catch-all configuration last. See the
+  // :ref:`rate limit <config_http_filters_rate_limit_stop_on_match>` and :ref:`local rate limit
+  // <config_http_filters_local_rate_limit_stop_on_match>` filter docs for the details.
+  //
+  // Only supported by the HTTP rate limit and local rate limit filters.
+  bool stop_on_match = 8;
 }
 
 // .. attention::
