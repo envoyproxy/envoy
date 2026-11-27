@@ -815,7 +815,7 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
   // Exercise both stats modes without doubling the test matrix: the two IP versions run the
   // server in different modes. The mode is read during server initialization, before the runtime
   // loader exists, so it has to be set directly rather than with addRuntimeOverride().
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+  Runtime::maybeSetRuntimeGuard("envoy.restart_features.enable_stats_explicit_tags",
                                 useExplicitStatsTags());
   initialize();
 
@@ -881,7 +881,7 @@ void HttpIntegrationTest::testRouteStats() {
   // Exercise both stats modes without doubling the test matrix: the two IP versions run the
   // server in different modes. The mode is read during server initialization, before the runtime
   // loader exists, so it has to be set directly rather than with addRuntimeOverride().
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+  Runtime::maybeSetRuntimeGuard("envoy.restart_features.enable_stats_explicit_tags",
                                 useExplicitStatsTags());
   initialize();
 

@@ -197,9 +197,7 @@ public:
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
-  void setTagProducer(TagProducerPtr&& tag_producer) override {
-    tag_producer_ = std::move(tag_producer);
-  }
+  void setTagProducer(TagProducerPtr&& tag_producer) override;
   void setStatsMatcher(StatsMatcherPtr&& stats_matcher) override;
   void setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) override;
   // Enables/disables the explicit-tags logic store-wide. This should be called before
@@ -245,6 +243,8 @@ public:
   void extractAndAppendTags(absl::string_view name, StatNamePool& pool,
                             StatNameTagVector& tags) override;
   const TagVector& fixedTags() override { return tag_producer_->fixedTags(); };
+  // The fixed tags of the tag producer (e.g. from the --stats-tag CLI option) as StatNames.
+  StatNameTagSpan fixedStatNameTags() const { return fixed_stat_name_tags_; }
 
   void ensureOverflowStats(const ScopeStatsLimitSettings& limits);
 
@@ -648,6 +648,10 @@ private:
   // the root scope is always created explicit-tag-capable so this can be enabled without recreating
   // it.
   bool use_explicit_tags_ = false;
+  // fixedTags() interned once per setTagProducer(), so explicit-tags stats can carry them without
+  // going through the tag producer.
+  StatNamePool fixed_tags_pool_;
+  StatNameTagVec fixed_stat_name_tags_;
 
   mutable Thread::MutexBasicLockable hist_mutex_;
   StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);

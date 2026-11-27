@@ -77,8 +77,7 @@ TEST_P(GrpcStatsTagsIntegrationTest, StatsTagsAndNamesAreIdenticalInBothModes) {
   // server in different modes. The mode is read during server initialization, before the runtime
   // loader exists, so it has to be set directly rather than with addRuntimeOverride().
   const bool explicit_tags = GetParam() == Network::Address::IpVersion::v6;
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
-                                explicit_tags);
+  Runtime::maybeSetRuntimeGuard("envoy.restart_features.enable_stats_explicit_tags", explicit_tags);
   config_helper_.prependFilter(R"yaml(
             name: envoy.filters.http.grpc_stats
             typed_config:

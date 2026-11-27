@@ -633,6 +633,9 @@ protected:
   // server.
   Server::HotRestart* hot_restart_{};
 
+  // Tags the server gets from the --stats-tag CLI option.
+  Stats::TagVector cli_stats_tags_;
+
   // Steps that should be done before the envoy server starting.
   std::function<void(IntegrationTestServer&)> on_server_ready_function_;
 

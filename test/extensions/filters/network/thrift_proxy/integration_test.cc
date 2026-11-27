@@ -148,7 +148,7 @@ public:
     // the multiplexed and non-multiplexed variants run the server in different modes. The mode is
     // read during server initialization, before the runtime loader exists, so it has to be set
     // directly rather than with addRuntimeOverride().
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+    Runtime::maybeSetRuntimeGuard("envoy.restart_features.enable_stats_explicit_tags",
                                   explicitTags());
     BaseThriftIntegrationTest::initialize();
 

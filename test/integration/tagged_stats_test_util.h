@@ -33,7 +33,7 @@ namespace TestUtil {
  * that differs between the modes (flat stat names are identical in both).
  */
 inline void setExplicitStatsTags(bool enable) {
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", enable);
+  Runtime::maybeSetRuntimeGuard("envoy.restart_features.enable_stats_explicit_tags", enable);
 }
 
 /**

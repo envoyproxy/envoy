@@ -379,8 +379,7 @@ TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest,
   // The mode is read during server initialization, so it must be set directly rather than with
   // addRuntimeOverride().
   const bool explicit_tags = GetParam() == Network::Address::IpVersion::v6;
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
-                                explicit_tags);
+  Runtime::maybeSetRuntimeGuard("envoy.restart_features.enable_stats_explicit_tags", explicit_tags);
   initializeFilter(R"EOF(
 name: rbac
 typed_config:

@@ -12,6 +12,7 @@
 #include "envoy/server/process_context.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/tag.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/lock_guard.h"
@@ -474,7 +475,8 @@ public:
          Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false,
          bool use_bootstrap_node_metadata = false,
          std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto = nullptr,
-         bool use_admin_server = true, Server::HotRestart* hot_restart = nullptr);
+         bool use_admin_server = true, Server::HotRestart* hot_restart = nullptr,
+         const Stats::TagVector& cli_stats_tags = {});
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -689,6 +691,8 @@ private:
   bool use_admin_interface_to_quit_{};
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config_proto_;
   Server::HotRestart* hot_restart_{};
+  // Tags the server gets from the --stats-tag CLI option.
+  Stats::TagVector cli_stats_tags_;
 };
 
 // Default implementation of IntegrationTestServer

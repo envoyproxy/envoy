@@ -1,0 +1,3 @@
+stats_config:
+  use_all_default_tags: false
+static_resources:
