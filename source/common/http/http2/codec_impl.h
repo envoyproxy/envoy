@@ -792,7 +792,7 @@ protected:
   // Called when a stream encodes to the http2 connection which enables us to
   // keep the active_streams list in LRU if deferred processing.
   void updateActiveStreamsOnEncode(StreamImpl& stream) {
-    LinkedList::moveIntoList(stream.removeFromList(active_streams_), active_streams_);
+    stream.moveBetweenLists(active_streams_, active_streams_);
   }
 
   // dumpState helper method.
