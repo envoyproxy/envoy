@@ -70,9 +70,15 @@ jobs:
       trusted: ${{ inputs.trusted }}
       # Only what the pipeline uses: the images of both arches, and the signed release.
       uploads: |
-        oci.x64: {path: container/envoy/x64/build_images, compression-level: 0}
-        oci.arm64: {path: container/envoy/arm64/build_images, compression-level: 0}
+        oci.x64:
+          path: container/envoy/x64/build_images
+          compression-level: 0
+          retention-days: ${{ fromJSON(inputs.request).request.pr && 1 || 30 }}
+        oci.arm64:
+          path: container/envoy/arm64/build_images
+          compression-level: 0
+          retention-days: ${{ fromJSON(inputs.request).request.pr && 1 || 30 }}
         ${{ fromJSON(inputs.request).run.release
             && (vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy')
-            && 'release.signed: {path: container/envoy/release.signed.tar.zst, compression-level: 0}'
+            && 'release.signed: {path: container/envoy/release.signed.tar.zst, compression-level: 0, retention-days: 30}'
             || '' }}
