@@ -63,7 +63,7 @@ See `bazel/README.md` for full build documentation. Common commands:
 # Docker-based (recommended — matches CI environment)
 ./ci/run_envoy_docker.sh bash                                   # interactive shell
 ./ci/do_ci.sh debug //test/common/http/...                      # build + test
-./ci/do_ci.sh debug.server_only                                 # build binary only
+./ci/do_ci.sh debug.server                                      # build binary only
 
 # Local (requires local dependencies)
 bazel test -c dbg //test/common/http/...                         # run tests

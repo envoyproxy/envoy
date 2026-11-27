@@ -770,8 +770,8 @@ case $CI_TARGET in
               //test/server:cgroup_cpu_simple_integration_test
         ;;
 
-    debug|debug.test_only|debug.server_only)
-        if [[ "$CI_TARGET" != "debug.server_only" ]]; then
+    debug|debug.test|debug.server)
+        if [[ "$CI_TARGET" != "debug.server" ]]; then
             echo "Testing ${TEST_TARGETS[*]}"
             # Make sure that there are no regressions to building Envoy with autolink disabled.
             EXTRA_OPTIONS=(
@@ -781,7 +781,7 @@ case $CI_TARGET in
                   -c dbg \
                   "${TEST_TARGETS[@]}"
         fi
-        if [[ "$CI_TARGET" != "debug.test_only" ]]; then
+        if [[ "$CI_TARGET" != "debug.test" ]]; then
             echo "bazel debug build..."
             bazel_envoy_binary_build debug
         fi
@@ -829,30 +829,30 @@ case $CI_TARGET in
         deps_update "${DEPENDENCY_ARGS[@]}"
         ;;
 
-    dev|dev.test_only|dev.server_only)
+    dev|dev.test|dev.server)
         # This doesn't go into CI but is available for developer convenience.
         # TODO(wbpcode): run the tests before the binary build, as `debug` and `release` do, so
         # test failures are reported before the slower binary link.
-        if [[ "$CI_TARGET" != "dev.test_only" ]]; then
+        if [[ "$CI_TARGET" != "dev.test" ]]; then
             echo "bazel fastbuild build..."
             bazel_envoy_binary_build fastbuild
         fi
-        if [[ "$CI_TARGET" != "dev.server_only" ]]; then
+        if [[ "$CI_TARGET" != "dev.server" ]]; then
             echo "Testing ${TEST_TARGETS[*]}"
             bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
                   -c fastbuild "${TEST_TARGETS[@]}"
         fi
         ;;
 
-    dev.contrib|dev.contrib.test_only|dev.contrib.server_only)
+    dev.contrib|dev.contrib.test|dev.contrib.server)
         # This doesn't go into CI but is available for developer convenience.
         # TODO(wbpcode): run the tests before the binary build, as `debug` and `release` do, so
         # test failures are reported before the slower binary link.
-        if [[ "$CI_TARGET" != "dev.contrib.test_only" ]]; then
+        if [[ "$CI_TARGET" != "dev.contrib.test" ]]; then
             echo "bazel fastbuild build with contrib extensions..."
             bazel_contrib_binary_build fastbuild
         fi
-        if [[ "$CI_TARGET" != "dev.contrib.server_only" ]]; then
+        if [[ "$CI_TARGET" != "dev.contrib.server" ]]; then
             echo "Testing ${TEST_TARGETS[*]}"
             bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
                   -c fastbuild \
