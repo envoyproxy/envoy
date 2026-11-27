@@ -111,6 +111,59 @@ typed_config:
   EXPECT_EQ(6, entries.size());
 }
 
+TEST_P(AccessLogIntegrationTest, AccessLogInlineTokenBucket) {
+  const std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log_{}_{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+
+  config_helper_.addConfigModifier(
+      [access_log_path](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        const std::string access_log_yaml = fmt::format(R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter
+      token_bucket:
+        max_tokens: 1
+        tokens_per_fill: 1
+        fill_interval:
+          seconds: 1
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: "{}"
+)EOF",
+                                                        access_log_path);
+        auto* access_log = hcm.add_access_log();
+        *access_log = parseAccessLogFromV3Yaml(access_log_yaml);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // First log is written, second is rate limited.
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0, 0);
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0, 0);
+  cleanupUpstreamAndDownstream();
+
+  auto entries = waitForAccessLogEntries(access_log_path, nullptr);
+  EXPECT_EQ(1, entries.size());
+
+  // After refill.
+  timeSystem().advanceTimeWait(std::chrono::seconds(2));
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0, 0);
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0, 0);
+  cleanupUpstreamAndDownstream();
+  entries = waitForAccessLogEntries(access_log_path, nullptr);
+  EXPECT_EQ(2, entries.size());
+}
+
 class AccessLogAdsIntegrationTest : public AdsIntegrationTest {
 public:
   void SetUp() override {
