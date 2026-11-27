@@ -18,6 +18,24 @@ TEST(Random, DISABLED_benchmarkRandom) {
   }
 }
 
+TEST(Random, UuidBytes) {
+  std::set<RandomUtility::UuidBytes> results;
+  const size_t num_of_results = 100000;
+  for (size_t i = 0; i < num_of_results; ++i) {
+    const RandomUtility::UuidBytes uuid = RandomUtility::uuidBytes();
+    EXPECT_EQ(0x40, uuid[6] & 0xf0); // Version 4.
+    EXPECT_EQ(0x80, uuid[8] & 0xc0); // Variant 1.
+    results.insert(uuid);
+  }
+  EXPECT_EQ(num_of_results, results.size());
+}
+
+TEST(Random, UuidToString) {
+  const RandomUtility::UuidBytes uuid = {0xa1, 0x21, 0xe9, 0xe1, 0xfe, 0xae, 0x41, 0x36,
+                                         0x9e, 0x0e, 0x6f, 0xac, 0x34, 0x3d, 0x56, 0xc9};
+  EXPECT_EQ("a121e9e1-feae-4136-9e0e-6fac343d56c9", RandomUtility::uuidToString(uuid));
+}
+
 TEST(Random, SanityCheckOfUniquenessRandom) {
   Random::RandomGeneratorImpl random;
   std::set<uint64_t> results;

@@ -1,6 +1,8 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
+#include <string>
 
 #include "envoy/common/random_generator.h"
 
@@ -14,8 +16,22 @@ namespace Random {
  */
 class RandomUtility {
 public:
+  // Binary form of a UUID, as specified in RFC 4122.
+  using UuidBytes = std::array<uint8_t, 16>;
+
   static uint64_t random();
   static std::string uuid();
+
+  /**
+   * @return a version 4 (random) UUID in the binary form. 122 bits are drawn from the
+   * cryptographically secure random number generator of the SSL library.
+   */
+  static UuidBytes uuidBytes();
+
+  /**
+   * @return the canonical string form of the UUID, e.g. a121e9e1-feae-4136-9e0e-6fac343d56c9.
+   */
+  static std::string uuidToString(const UuidBytes& uuid);
 };
 
 /**
