@@ -1,6 +1,9 @@
+#include <cstdint>
+#include <limits>
 #include <vector>
 
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
+#include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf_parser.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 
 #include "test/test_common/status_utility.h"
@@ -70,6 +73,64 @@ TEST(SchemaTest, NumericRangeConstraints) {
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
   EXPECT_THAT(int_schema.validate(nlohmann::json(101)),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
+}
+
+// Values above INT64_MAX are stored unsigned. Reading them as int64_t wrapped
+// UINT64_MAX to -1, which passed any maximum (e.g. a max_tokens cap).
+TEST(SchemaTest, UnsignedIntegersAboveInt64MaxRespectMaximum) {
+  const uint64_t uint64_max = std::numeric_limits<uint64_t>::max();
+  const uint64_t int64_max_plus_one =
+      static_cast<uint64_t>(std::numeric_limits<int64_t>::max()) + 1u;
+
+  Schema capped = Schema::integer().max(4096);
+  EXPECT_THAT(capped.validate(nlohmann::json(uint64_max)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(capped.validate(nlohmann::json(int64_max_plus_one)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  // A huge maximum is still a maximum.
+  Schema capped_at_int64_max = Schema::integer().max(std::numeric_limits<int64_t>::max());
+  EXPECT_THAT(capped_at_int64_max.validate(nlohmann::json(uint64_max)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Minimums: UINT64_MAX is above any int64 minimum.
+  Schema floor_only = Schema::integer().min(0);
+  EXPECT_THAT(floor_only.validate(nlohmann::json(uint64_max)), IsOk());
+  Schema floor_above_wrap = Schema::integer().min(10);
+  EXPECT_THAT(floor_above_wrap.validate(nlohmann::json(uint64_max)), IsOk());
+
+  // No bounds: still a valid integer.
+  EXPECT_THAT(Schema::integer().validate(nlohmann::json(uint64_max)), IsOk());
+
+  // Unsigned values that fit int64 are unchanged.
+  Schema small = Schema::integer().min(0).max(100);
+  EXPECT_THAT(small.validate(nlohmann::json(static_cast<uint64_t>(50))), IsOk());
+  EXPECT_THAT(small.validate(nlohmann::json(static_cast<uint64_t>(101))),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(SchemaTest, UnsignedIntegersAboveInt64MaxRespectNumberRange) {
+  const uint64_t uint64_max = std::numeric_limits<uint64_t>::max();
+  Schema ranged = Schema::number().range(0.0, 2.0);
+  EXPECT_THAT(ranged.validate(nlohmann::json(uint64_max)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  Schema floor_only = Schema::number().range(0.0, 1e30);
+  EXPECT_THAT(floor_only.validate(nlohmann::json(uint64_max)), IsOk());
+}
+
+// End to end through the parser that produces the unsigned node.
+TEST(SchemaTest, OverWideIntegerFromParserIsRejectedByMaximum) {
+  JsonWithExtBufParser parser({});
+  ASSERT_THAT(parser.feed(R"({"max_tokens":18446744073709551615})", /*end_stream=*/true), IsOk());
+  const JsonWithExtBuf doc = parser.takeDocument();
+  ASSERT_TRUE(doc.json()["max_tokens"].is_number_unsigned());
+
+  // Max-only is the realistic shape (max_tokens) and the one the wrap defeated.
+  Schema request = Schema::object({{"max_tokens", Schema::integer().max(8192)}});
+  EXPECT_THAT(request.validate(doc.json()), StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  JsonWithExtBufParser ok_parser({});
+  ASSERT_THAT(ok_parser.feed(R"({"max_tokens":8192})", /*end_stream=*/true), IsOk());
+  EXPECT_THAT(request.validate(ok_parser.takeDocument().json()), IsOk());
 }
 
 TEST(SchemaTest, EnumStringValidation) {
