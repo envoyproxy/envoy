@@ -1,5 +1,6 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 
 #include "source/common/quic/quic_client_transport_socket_factory.h"
 #include "source/common/quic/quic_server_transport_socket_factory.h"
@@ -817,19 +818,23 @@ downstream_tls_context:
 )EOF");
   envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
+  // Build the validator config as a typed message rather than from an `@type` in YAML: nothing
+  // else in this test links in the SPIFFE config proto, so its type would not be registered on
+  // platforms whose linker drops unreferenced objects (e.g. Windows).
+  envoy::extensions::transport_sockets::tls::v3::SPIFFECertValidatorConfig spiffe_config;
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
-name: envoy.tls.cert_validator.spiffe
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_domains:
-  - name: lyft.com
-    trust_bundle:
-      filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+trust_domains:
+- name: lyft.com
+  trust_bundle:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 )EOF"),
-                            *proto_config.mutable_downstream_tls_context()
-                                 ->mutable_common_tls_context()
-                                 ->mutable_validation_context()
-                                 ->mutable_custom_validator_config());
+                            spiffe_config);
+  auto* custom_validator_config = proto_config.mutable_downstream_tls_context()
+                                      ->mutable_common_tls_context()
+                                      ->mutable_validation_context()
+                                      ->mutable_custom_validator_config();
+  custom_validator_config->set_name("envoy.tls.cert_validator.spiffe");
+  MessageUtil::packFrom(*custom_validator_config->mutable_typed_config(), spiffe_config);
   EXPECT_THAT(config_factory_.createTransportSocketFactory(proto_config, context_, {}).status(),
               IsOk());
 }
