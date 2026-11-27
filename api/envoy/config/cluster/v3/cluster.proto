@@ -209,6 +209,72 @@ message Cluster {
     // have the same restrictions as cluster name, i.e. it may be arbitrary
     // length. This may be a xdstp:// URL.
     string service_name = 2;
+
+    // If set to ``true``, when active health checking is configured, Envoy will retain healthy
+    // hosts removed by service discovery while newly added endpoints await their initial active
+    // health check and fewer than :ref:`healthy_panic_threshold
+    // <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.healthy_panic_threshold>`
+    // percent (defaulting to 50%, or runtime key ``upstream.healthy_panic_threshold``; at least one
+    // endpoint when set to 0%) of the priority's eligible advertised endpoints are healthy.
+    // Retained hosts are marked ``PENDING_DYNAMIC_REMOVAL`` and dropped once the priority reaches
+    // ``healthy_panic_threshold`` or all warming endpoints complete their initial active health
+    // check.
+    //
+    // Setting this option implies :ref:`ignore_health_on_host_removal
+    // <envoy_v3_api_field_config.cluster.v3.Cluster.ignore_health_on_host_removal>` and, when
+    // active health checking is configured, :ref:`ignore_new_hosts_until_first_hc
+    // <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.ignore_new_hosts_until_first_hc>`,
+    // so that newly added or recreated hosts (across all updates, not only replacements) are
+    // :ref:`excluded <arch_overview_load_balancing_excluded>` from load balancing weights,
+    // priority and locality availability, and load balancer :ref:`panic mode
+    // <arch_overview_load_balancing_panic_threshold>` calculations until their initial active
+    // health check completes. Warming hosts are, however, included in the eligible endpoint total
+    // when evaluating ``healthy_panic_threshold`` to retain or drop ``PENDING_DYNAMIC_REMOVAL``
+    // hosts (whereas endpoints marked ``DRAINING`` by EDS or excluded via immediate health check
+    // failure are not), so that the threshold is measured against the full set of incoming and
+    // existing endpoints rather than only those that have already completed their initial active
+    // health check.
+    //
+    // .. attention::
+    //
+    //   This option does not apply to endpoints whose :ref:`locality
+    //   <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.locality>`, :ref:`hostname
+    //   <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` or :ref:`health check
+    //   configuration <envoy_v3_api_field_config.endpoint.v3.Endpoint.health_check_config>`
+    //   changes, since Envoy replaces the host of such an
+    //   endpoint with a new host at the same address. As with
+    //   :ref:`ignore_health_on_host_removal
+    //   <envoy_v3_api_field_config.cluster.v3.Cluster.ignore_health_on_host_removal>`, the previous
+    //   host is removed immediately, even if it is healthy and the new host is awaiting its initial
+    //   active health check. The new host keeps the active health check status of the previous host
+    //   unless the health check address or ``disable_active_health_check`` changed, in which case
+    //   it awaits its initial active health check like a newly added host (so that other removed
+    //   hosts may be retained while it warms up).
+    //
+    // .. note::
+    //
+    //   * Retention and removal are evaluated per priority (rather than per locality or
+    //     :ref:`lb_subset_config <envoy_v3_api_field_config.cluster.v3.Cluster.lb_subset_config>`
+    //     subset): a priority retains removed hosts while it has warming endpoints and has not yet
+    //     reached ``healthy_panic_threshold``.
+    //   * Removed hosts are only retained if they are actively health checked and healthy (neither
+    //     unhealthy nor degraded—i.e., not failing or degraded by active health checking or
+    //     outlier detection, not marked unhealthy, degraded, or draining by EDS, and not excluded
+    //     via immediate health check failure). Any retained host that subsequently fails active
+    //     health checking, becomes degraded, or is ejected by outlier detection is removed without
+    //     waiting for warmup to complete.
+    //   * Only healthy (not degraded) advertised endpoints count toward reaching
+    //     ``healthy_panic_threshold``. Actively health checked advertised endpoints that are not
+    //     marked unhealthy or draining by EDS, ejected by outlier detection, or excluded via
+    //     immediate health check failure (including ``DEGRADED`` endpoints) are treated as warming
+    //     up while awaiting their initial active health check (``PENDING_ACTIVE_HC``). Once
+    //     warming completes (whether endpoints pass or fail their initial active health check),
+    //     retained hosts are removed even if healthy capacity remains below
+    //     ``healthy_panic_threshold``, so unreachable or degraded replacement endpoints do not keep
+    //     removed hosts retained indefinitely.
+    //   * This option should not be combined with :ref:`close_connections_on_host_set_change
+    //     <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.close_connections_on_host_set_change>`.
+    bool graceful_host_removal = 3;
   }
 
   // Optionally divide the endpoints in this cluster into subsets defined by

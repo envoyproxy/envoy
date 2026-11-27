@@ -157,6 +157,7 @@ public:
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(OptRef<const ClusterInfo::PendingRqQueuePolicy>, pendingRqQueuePolicy, (), (const));
   MOCK_METHOD(bool, drainConnectionsOnHostRemoval, (), (const));
+  MOCK_METHOD(bool, gracefulHostRemoval, (), (const));
   MOCK_METHOD(bool, connectionPoolPerDownstreamConnection, (), (const));
   MOCK_METHOD(bool, warmHosts, (), (const));
   MOCK_METHOD(bool, waitForWarmOnInit, (), (const));

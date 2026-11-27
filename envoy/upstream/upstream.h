@@ -1413,6 +1413,12 @@ public:
   virtual bool drainConnectionsOnHostRemoval() const PURE;
 
   /**
+   * @return whether to retain healthy removed hosts while newly added hosts await their initial
+   *         active health check, and remove them once warmup completes.
+   */
+  virtual bool gracefulHostRemoval() const PURE;
+
+  /**
    *  @return whether to create a new connection pool for each downstream connection routed to
    *          the cluster
    */
