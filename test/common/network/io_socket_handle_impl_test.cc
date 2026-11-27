@@ -251,6 +251,32 @@ TEST(IoSocketHandleImpl, DroppedUdpDatagramsMsg) {
   EXPECT_EQ(dropped_packets, 5);
 }
 
+TEST(IoSocketHandleImpl, TruncatedUdpDatagramCountsSeparately) {
+  NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
+  auto os_calls =
+      std::make_unique<Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl>>(
+          &os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
+      .WillOnce([](int /*fd*/, msghdr* msg_hdr, int /*flags*/) {
+        msg_hdr->msg_flags = MSG_TRUNC;
+        return Api::SysCallSizeResult{2048, 0};
+      });
+
+  uint32_t dropped_packets = 7;
+  uint32_t truncated_packets = 0;
+  char buffer[128] = {};
+  Buffer::RawSlice slice{buffer, sizeof(buffer)};
+  Network::IoHandle::RecvMsgOutput output(1, &dropped_packets, &truncated_packets);
+
+  IoSocketHandleImpl io_handle;
+  const auto result =
+      io_handle.recvmsg(&slice, 1, 1111, IoHandle::UdpSaveCmsgConfig(), output);
+  EXPECT_EQ(result.return_value_, 0);
+  EXPECT_EQ(dropped_packets, 7);
+  EXPECT_EQ(truncated_packets, 1);
+}
+
 TEST(IoSocketHandleImpl, DroppedUdpDatagramsMmsg) {
   NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
   auto os_calls =
