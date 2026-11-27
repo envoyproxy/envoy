@@ -130,6 +130,18 @@ TEST_P(SchemaValidationIntegrationTest, UnconfiguredRouteRejectsADetectedApiViol
   expectRejected(sendRequest("/v1/messages", R"({"model":"claude","messages":[]})"));
 }
 
+// The same route carries the provider's other endpoints, which are left alone.
+TEST_P(SchemaValidationIntegrationTest, UnconfiguredRouteForwardsAnotherEndpoint) {
+  initializeFilters(/*with_filter_state=*/false, /*fail_open=*/false, /*declare_route=*/false);
+  const std::string payload =
+      R"({"model":"claude","system":"be terse","messages":[{"role":"user","content":"hi"}]})";
+  expectForwarded(sendRequest("/v1/messages/count_tokens", payload), payload);
+  test_server_->waitForCounter("ai_protocol_manager.schema_validation.skipped", testing::Eq(1));
+  EXPECT_EQ(
+      test_server_->counter("ai_protocol_manager.schema_validation.llm_protocol_detected")->value(),
+      0);
+}
+
 // set_filter_state builds the core's filter state object from its enum-value name. The payload is
 // valid Chat Completions, as the path would have detected, so only Anthropic rejects it.
 TEST_P(SchemaValidationIntegrationTest, FilterStateNamesTheApi) {

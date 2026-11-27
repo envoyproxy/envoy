@@ -37,17 +37,60 @@ The payload is validated against the API the request declares: the
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.llm_protocol>`.
 A request that declares none falls back to :ref:`default_llm_protocol
 <envoy_v3_api_field_extensions.http.ai_filters.schema_validation.v3.SchemaValidation.default_llm_protocol>`,
-and by default the API is detected from the request: its path, matched as a
-suffix against each provider's REST path (``/chat/completions``,
-``/responses``, ``/v1/messages``, ``:generateContent``,
-``:streamGenerateContent``); then the ``anthropic-version`` header; then the
-payload's shape.
+and when that is unset too, the API is detected from the request.
 
-Chat Completions and Anthropic Messages share the ``messages[]`` request
-shape, so only keys exclusive to one of them tell the two apart. A payload
-carrying markers of both, or of neither -- including
-``{"model": ..., "messages": [{"role": "user", "content": ...}]}``, which is
-valid under either -- names no API, and is forwarded unvalidated.
+.. _config_http_ai_filters_schema_validation_detection:
+
+API detection
+-------------
+
+The path decides, and the payload only when the path names no API. The first
+row that matches wins:
+
+.. csv-table::
+  :header: The request, Detected API
+  :widths: 3, 1
+
+  "Path ends with ``/chat/completions``", ``OPENAI_CHAT_COMPLETIONS``
+  "Path ends with ``/responses``", ``OPENAI_RESPONSES``
+  "Path ends with ``/v1/messages``", ``ANTHROPIC_MESSAGES``
+  "Path ends with ``:generateContent`` or ``:streamGenerateContent``", ``GEMINI_GENERATE_CONTENT``
+  "Path goes on after one of the first three, as in ``/v1/messages/count_tokens``", None
+  "Payload has Gemini markers, but the path ends with another method, as in ``:countTokens``", None
+  "Payload has Gemini markers", ``GEMINI_GENERATE_CONTENT``
+  "Payload has ``messages`` and only Chat Completions markers", ``OPENAI_CHAT_COMPLETIONS``
+  "Payload has ``messages``, ``max_tokens`` and only Anthropic markers", ``ANTHROPIC_MESSAGES``
+  Anything else, None
+
+The path is matched without its query and as a suffix, so a gateway prefix such
+as ``/anthropic/v1/messages`` does not hide it.
+
+Markers are what only one API has:
+
+* Gemini: ``contents``, ``systemInstruction`` or ``generationConfig``, the last
+  two in either camel or snake case.
+* Chat Completions: ``max_completion_tokens``, ``response_format``,
+  ``frequency_penalty``, ``presence_penalty``, ``stream_options``,
+  ``logit_bias``, a tool with ``function``, or a message whose role is
+  ``system``, ``developer`` or ``tool``.
+* Anthropic: ``system``, ``stop_sequences``, ``top_k``, ``thinking``, a tool
+  with ``input_schema``, or an ``anthropic-version`` request header.
+
+A wrong guess rejects a valid request, so detection gives up when unsure:
+
+* Markers of both APIs, or of neither, detect nothing. That includes
+  ``{"model": ..., "messages": [{"role": "user", "content": ...}]}``, which is
+  valid under both.
+* Without ``messages`` in the payload, an ``anthropic-version`` header detects
+  nothing, because Anthropic clients send it to every endpoint.
+* Anthropic Messages needs ``max_tokens``, which that API requires and a
+  token-counting request does not carry.
+* The Responses API is detected by its path only, because
+  ``{"model": ..., "input": ...}`` is also an embeddings request.
+
+A request whose API is not detected is forwarded unvalidated and counted as
+``skipped``. Name its API on the route or with ``default_llm_protocol`` to
+validate it.
 
 Statistics
 ----------

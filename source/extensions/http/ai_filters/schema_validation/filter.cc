@@ -65,10 +65,7 @@ LLMProtocol SchemaValidationFilter::resolveLlmProtocol(const AiRequest& request)
   if (config_->defaultLlmProtocol() != LLMProtocol::Unspecified) {
     return config_->defaultLlmProtocol();
   }
-  LLMProtocol detected = detectFromHeaders(context_.request_headers);
-  if (detected == LLMProtocol::Unspecified) {
-    detected = detectFromPayload(request.json());
-  }
+  const LLMProtocol detected = detectLlmProtocol(context_.request_headers, request.json());
   if (detected != LLMProtocol::Unspecified) {
     config_->stats().llm_protocol_detected_.inc();
   }
