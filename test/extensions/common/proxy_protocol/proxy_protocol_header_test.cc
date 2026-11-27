@@ -110,6 +110,64 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2IPv6Header) {
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, util_buf));
 }
 
+Network::Address::InstanceConstSharedPtr scopedIpv6(const char* addr, uint16_t port,
+                                                    uint32_t scope_id) {
+  sockaddr_in6 sa{};
+  sa.sin6_family = AF_INET6;
+  EXPECT_EQ(1, inet_pton(AF_INET6, addr, &sa.sin6_addr));
+  sa.sin6_port = htons(port);
+  sa.sin6_scope_id = scope_id;
+  return std::make_shared<Network::Address::Ipv6Instance>(sa);
+}
+
+// Expected v2 header for a link-local source and destination: the fixed prefix, both addresses and
+// then both ports. The scope id is not part of the wire format.
+const uint8_t kV2ScopedIPv6Header[] = {
+    0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21,
+    0x21, 0x00, 0x24, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x1f, 0x90, 0x01, 0xbb};
+
+TEST(ProxyProtocolHeaderTest, GeneratesV2IPv6HeaderWithScopeId) {
+  const auto src_addr = scopedIpv6("fe80::1", 8080, 2);
+  const auto dst_addr = scopedIpv6("fe80::2", 443, 2);
+  ASSERT_EQ(2u, src_addr->ip()->ipv6()->scopeId());
+
+  const Buffer::OwnedImpl expectedBuff(kV2ScopedIPv6Header, sizeof(kV2ScopedIPv6Header));
+  Buffer::OwnedImpl buff;
+  generateV2Header(*src_addr->ip(), *dst_addr->ip(), buff);
+
+  EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
+}
+
+TEST(ProxyProtocolHeaderTest, GeneratesV2IPv6HeaderWithScopeIdFromProxyProtocolData) {
+  const auto src_addr = scopedIpv6("fe80::1", 8080, 2);
+  const auto dst_addr = scopedIpv6("fe80::2", 443, 3);
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {}};
+
+  const Buffer::OwnedImpl expectedBuff(kV2ScopedIPv6Header, sizeof(kV2ScopedIPv6Header));
+  Buffer::OwnedImpl buff;
+  EXPECT_TRUE(generateV2Header(proxy_proto_data, buff, true, {}, {}));
+
+  EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
+}
+
+TEST(ProxyProtocolHeaderTest, V2HeaderRejectsMixedIpVersions) {
+  const auto src_addr = Network::Address::InstanceConstSharedPtr(
+      new Network::Address::Ipv4Instance("1.2.3.4", 12345));
+  const auto dst_addr = scopedIpv6("fe80::2", 443, 2);
+
+  Buffer::OwnedImpl buff;
+  EXPECT_ENVOY_BUG(generateV2Header(*src_addr->ip(), *dst_addr->ip(), buff),
+                   "Source and destination IP versions differ");
+  EXPECT_EQ(0u, buff.length());
+
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {}};
+  EXPECT_ENVOY_BUG(EXPECT_FALSE(generateV2Header(proxy_proto_data, buff, true, {}, {})),
+                   "Source and destination IP versions differ");
+  EXPECT_EQ(0u, buff.length());
+}
+
 TEST(ProxyProtocolHeaderTest, GeneratesV2LocalHeader) {
   const uint8_t v2_protocol[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51,
                                  0x55, 0x49, 0x54, 0x0a, 0x20, 0x00, 0x00, 0x00};

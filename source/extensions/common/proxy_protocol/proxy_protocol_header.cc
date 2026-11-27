@@ -52,11 +52,13 @@ uint32_t v2AddrStructLen(Network::Address::IpVersion ip_version) {
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
-} // namespace
 
-void generateV2Header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
-                      uint32_t dst_port, Network::Address::IpVersion ip_version,
-                      uint16_t extension_length, Buffer::Instance& out) {
+// Writes a v2 header using the address bytes held by the Ip objects directly, so that addresses
+// which don't survive a string round trip (e.g. IPv6 with a scope id) are handled. The caller must
+// ensure that both addresses have the same IP version.
+void generateV2HeaderFromIp(const Network::Address::Ip& src, const Network::Address::Ip& dst,
+                            uint16_t extension_length, Buffer::Instance& out) {
+  const Network::Address::IpVersion ip_version = src.version();
   const uint32_t addr_struct_len = v2AddrStructLen(ip_version);
   const uint32_t addr_length = addr_struct_len + static_cast<uint32_t>(extension_length);
   if (Runtime::runtimeFeatureEnabled(
@@ -103,29 +105,46 @@ void generateV2Header(const std::string& src_addr, const std::string& dst_addr, 
 
   switch (ip_version) {
   case Network::Address::IpVersion::v4: {
-    const uint32_t net_src_addr =
-        Network::Address::Ipv4Instance(src_addr, src_port).ip()->ipv4()->address();
-    const uint32_t net_dst_addr =
-        Network::Address::Ipv4Instance(dst_addr, dst_port).ip()->ipv4()->address();
+    const uint32_t net_src_addr = src.ipv4()->address();
+    const uint32_t net_dst_addr = dst.ipv4()->address();
     out.add(&net_src_addr, 4);
     out.add(&net_dst_addr, 4);
     break;
   }
   case Network::Address::IpVersion::v6: {
-    const absl::uint128 net_src_addr =
-        Network::Address::Ipv6Instance(src_addr, src_port).ip()->ipv6()->address();
-    const absl::uint128 net_dst_addr =
-        Network::Address::Ipv6Instance(dst_addr, dst_port).ip()->ipv6()->address();
+    const absl::uint128 net_src_addr = src.ipv6()->address();
+    const absl::uint128 net_dst_addr = dst.ipv6()->address();
     out.add(&net_src_addr, 16);
     out.add(&net_dst_addr, 16);
     break;
   }
   }
 
-  const uint16_t net_src_port = htons(static_cast<uint16_t>(src_port));
-  const uint16_t net_dst_port = htons(static_cast<uint16_t>(dst_port));
+  const uint16_t net_src_port = htons(static_cast<uint16_t>(src.port()));
+  const uint16_t net_dst_port = htons(static_cast<uint16_t>(dst.port()));
   out.add(&net_src_port, 2);
   out.add(&net_dst_port, 2);
+}
+} // namespace
+
+void generateV2Header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
+                      uint32_t dst_port, Network::Address::IpVersion ip_version,
+                      uint16_t extension_length, Buffer::Instance& out) {
+  switch (ip_version) {
+  case Network::Address::IpVersion::v4: {
+    const Network::Address::Ipv4Instance src(src_addr, src_port);
+    const Network::Address::Ipv4Instance dst(dst_addr, dst_port);
+    generateV2HeaderFromIp(*src.ip(), *dst.ip(), extension_length, out);
+    return;
+  }
+  case Network::Address::IpVersion::v6: {
+    const Network::Address::Ipv6Instance src(src_addr, src_port);
+    const Network::Address::Ipv6Instance dst(dst_addr, dst_port);
+    generateV2HeaderFromIp(*src.ip(), *dst.ip(), extension_length, out);
+    return;
+  }
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void generateV2Header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
@@ -136,8 +155,11 @@ void generateV2Header(const std::string& src_addr, const std::string& dst_addr, 
 
 void generateV2Header(const Network::Address::Ip& source_address,
                       const Network::Address::Ip& dest_address, Buffer::Instance& out) {
-  generateV2Header(source_address.addressAsString(), dest_address.addressAsString(),
-                   source_address.port(), dest_address.port(), source_address.version(), 0, out);
+  if (source_address.version() != dest_address.version()) {
+    IS_ENVOY_BUG("Source and destination IP versions differ for the v2 PROXY protocol header");
+    return;
+  }
+  generateV2HeaderFromIp(source_address, dest_address, 0, out);
 }
 
 bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer::Instance& out,
@@ -154,6 +176,10 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
 
   const auto& src = *proxy_proto_data.src_addr_->ip();
   const auto& dst = *proxy_proto_data.dst_addr_->ip();
+  if (src.version() != dst.version()) {
+    IS_ENVOY_BUG("Source and destination IP versions differ in proxy_proto_data_");
+    return false;
+  }
 
   // The wire `len` field covers the address struct (addresses + ports) plus the TLVs,
   // and must fit in uint16_t. Reserve room for the address struct when capping TLVs.
@@ -199,8 +225,7 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
     final_tlvs.push_back(tlv);
   }
 
-  generateV2Header(src.addressAsString(), dst.addressAsString(), src.port(), dst.port(),
-                   src.version(), static_cast<uint16_t>(extension_length), out);
+  generateV2HeaderFromIp(src, dst, static_cast<uint16_t>(extension_length), out);
 
   const std::vector<Envoy::Network::ProxyProtocolTLV>& really_final_tlvs =
       remove_too_long_tlvs ? final_tlvs : combined_tlv_vector;
