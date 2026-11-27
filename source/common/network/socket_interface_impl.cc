@@ -114,7 +114,14 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
   const Api::SysCallSocketResult result =
       Api::OsSysCallsSingleton::get().socket(domain, flags, protocol);
   if (!SOCKET_VALID(result.return_value_)) {
-    IS_ENVOY_BUG(fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
+    // Running out of file descriptors is an expected runtime condition under load rather than an
+    // Envoy bug. Callers handle a null handle, e.g. by failing the connection or the listener.
+    if (result.errno_ == EMFILE || result.errno_ == ENFILE) {
+      ENVOY_LOG_EVERY_POW_2_MISC(warn, "socket(2) failed, got error: {}",
+                                 errorDetails(result.errno_));
+    } else {
+      IS_ENVOY_BUG(fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
+    }
     return nullptr;
   }
   IoHandlePtr io_handle =
