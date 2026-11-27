@@ -75,7 +75,8 @@ The following lists the filter state object keys used by the Envoy extensions to
 ``envoy.tcp_proxy.per_connection_idle_timeout_ms``
   :ref:`TCP proxy idle timeout duration
   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.idle_timeout>` override on a per-connection
-  basis. Accepts a count of milliseconds number string as a constructor.
+  basis. Accepts a count of milliseconds number string as a constructor. A value of ``0`` disables
+  the idle timeout for the connection.
 
 ``envoy.ratelimit.hits_addend``
   :ref:`Rate Limit Hits Addend
