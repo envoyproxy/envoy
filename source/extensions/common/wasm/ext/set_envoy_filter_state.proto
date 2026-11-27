@@ -5,10 +5,23 @@ package envoy.source.extensions.common.wasm;
 import "source/extensions/common/wasm/ext/declare_property.proto";
 
 message SetEnvoyFilterStateArguments {
+  enum SharedWithUpstream {
+    // Object is not shared with the upstream internal connections.
+    NONE = 0;
+    // Object is shared with the upstream internal connection.
+    ONCE = 1;
+    // Object is shared with the upstream internal connection and any internal connection
+    // upstream from it.
+    TRANSITIVE = 2;
+  }
+
   // path is the filter state key
   string path = 1;
   // value is the filter state object factory input
   string value = 2;
   // span is the life span of the filter state object
   LifeSpan span = 3;
+  // shared_with_upstream configures the object to be shared with the upstream internal
+  // connections
+  SharedWithUpstream shared_with_upstream = 4;
 };

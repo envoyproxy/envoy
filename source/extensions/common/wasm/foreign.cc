@@ -91,6 +91,19 @@ toFilterStateLifeSpan(envoy::source::extensions::common::wasm::LifeSpan span) {
   }
 }
 
+inline StreamInfo::StreamSharingMayImpactPooling toStreamSharing(
+    envoy::source::extensions::common::wasm::SetEnvoyFilterStateArguments::SharedWithUpstream
+        shared_with_upstream) {
+  switch (shared_with_upstream) {
+  case envoy::source::extensions::common::wasm::SetEnvoyFilterStateArguments::ONCE:
+    return StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce;
+  case envoy::source::extensions::common::wasm::SetEnvoyFilterStateArguments::TRANSITIVE:
+    return StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection;
+  default:
+    return StreamInfo::StreamSharingMayImpactPooling::None;
+  }
+}
+
 RegisterForeignFunction registerVerifySignatureForeignFunction(
     "verify_signature",
     [](WasmBase&, std::string_view arguments,
@@ -212,7 +225,8 @@ RegisterForeignFunction registerSetEnvoyFilterStateForeignFunction(
       if (args.ParseFromString(arguments)) {
         auto context = static_cast<Context*>(proxy_wasm::contextOrEffectiveContext());
         return context->setEnvoyFilterState(args.path(), args.value(),
-                                            toFilterStateLifeSpan(args.span()));
+                                            toFilterStateLifeSpan(args.span()),
+                                            toStreamSharing(args.shared_with_upstream()));
       }
       return WasmResult::BadArgument;
     });
