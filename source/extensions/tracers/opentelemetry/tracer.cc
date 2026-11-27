@@ -25,7 +25,6 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 constexpr absl::string_view kDefaultVersion = "00";
-static_assert(kDefaultVersion.size() == 2, "traceparent fast path assumes a 2 character version");
 // The sampled bit of the W3C trace flags carried in the low 8 bits of the OTLP span flags.
 // See https://www.w3.org/TR/trace-context/#sampled-flag.
 constexpr uint32_t TraceFlagsSampledMask = 0x1;
@@ -133,17 +132,6 @@ void Span::finishSpan() {
 void Span::setOperation(absl::string_view operation) { span_.set_name(operation); };
 
 namespace {
-constexpr char kHexDigits[] = "0123456789abcdef";
-
-// Writes the lowercase hex encoding of `bytes` to `out` and returns the next write position.
-char* writeHex(absl::string_view bytes, char* out) {
-  for (const unsigned char b : bytes) {
-    *out++ = kHexDigits[b >> 4];
-    *out++ = kHexDigits[b & 0xf];
-  }
-  return out;
-}
-
 // Stores `value` as big-endian bytes, the same byte order Hex::uint64ToHex encodes.
 void storeBigEndian(uint64_t value, char* out) {
   for (int i = 7; i >= 0; --i) {
@@ -167,52 +155,25 @@ void Span::setIdFromRandom(uint64_t id) {
 }
 
 void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
-  // The hex forms are only needed by the B3 formats and the non-standard-length fallback, so
-  // build them on demand.
-  std::string trace_id_hex, span_id_hex;
-  auto hexIds = [&]() {
-    if (trace_id_hex.empty()) {
-      trace_id_hex = absl::BytesToHexString(span_.trace_id());
-      span_id_hex = absl::BytesToHexString(span_.span_id());
-    }
-  };
+  std::string trace_id_hex = absl::BytesToHexString(span_.trace_id());
+  std::string span_id_hex = absl::BytesToHexString(span_.span_id());
   for (const TraceContextFormat format : parent_tracer_.outgoingTraceContext()) {
     switch (format) {
     case envoy::config::trace::v3::OpenTelemetryConfig::TRACE_CONTEXT: {
-      if (span_.trace_id().size() == 16 && span_.span_id().size() == 8) {
-        // "00-" + 32 hex + "-" + 16 hex + "-" + 2 hex, written into a stack buffer.
-        char buf[3 + 32 + 1 + 16 + 1 + 2];
-        char* p = buf;
-        absl::string_view version = kDefaultVersion;
-        for (const char ch : version) {
-          *p++ = ch;
-        }
-        *p++ = '-';
-        p = writeHex(span_.trace_id(), p);
-        *p++ = '-';
-        p = writeHex(span_.span_id(), p);
-        *p++ = '-';
-        *p++ = '0';
-        *p++ = sampled() ? '1' : '0';
-        traceParentHeader().setRefKey(trace_context, absl::string_view(buf, p - buf));
-      } else {
-        hexIds();
-        std::vector<uint8_t> trace_flags_vec{sampled()};
-        std::string trace_flags_hex = Hex::encode(trace_flags_vec);
-        std::string traceparent_header_value = absl::StrCat(kDefaultVersion, "-", trace_id_hex, "-",
-                                                            span_id_hex, "-", trace_flags_hex);
-        traceParentHeader().setRefKey(trace_context, traceparent_header_value);
-      }
+      std::vector<uint8_t> trace_flags_vec{sampled()};
+      std::string trace_flags_hex = Hex::encode(trace_flags_vec);
+      std::string traceparent_header_value =
+          absl::StrCat(kDefaultVersion, "-", trace_id_hex, "-", span_id_hex, "-", trace_flags_hex);
+      // Set the traceparent in the trace_context.
+      traceParentHeader().setRefKey(trace_context, traceparent_header_value);
       // Also set the tracestate.
       traceStateHeader().setRefKey(trace_context, span_.trace_state());
       break;
     }
     case envoy::config::trace::v3::OpenTelemetryConfig::B3:
-      hexIds();
       injectB3SingleHeader(trace_context, trace_id_hex, span_id_hex, sampled());
       break;
     case envoy::config::trace::v3::OpenTelemetryConfig::B3_MULTI:
-      hexIds();
       injectB3MultiHeaders(trace_context, trace_id_hex, span_id_hex, sampled());
       break;
     default:
