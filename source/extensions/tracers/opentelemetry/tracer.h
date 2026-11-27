@@ -50,6 +50,8 @@ public:
              envoy::config::trace::v3::OpenTelemetryConfig::TRACE_CONTEXT});
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
+  // Moves the span into the export buffer without copying it.
+  void sendSpan(::opentelemetry::proto::trace::v1::Span&& span);
 
   /**
    * @return the trace context formats injected into upstream requests.
@@ -82,6 +84,9 @@ private:
   Envoy::TimeSource& time_source_;
   Random::RandomGenerator& random_;
   std::vector<::opentelemetry::proto::trace::v1::Span> span_buffer_;
+  // Resource proto built once from resource_; empty (and unused) when there are no attributes.
+  ::opentelemetry::proto::resource::v1::Resource resource_proto_;
+  bool has_resource_attributes_{false};
   Runtime::Loader& runtime_;
   Event::TimerPtr flush_timer_;
   OpenTelemetryTracerStats tracing_stats_;
@@ -148,6 +153,18 @@ public:
   void setTraceId(absl::string_view trace_id_hex) {
     span_.set_trace_id(absl::HexStringToBytes(trace_id_hex));
   }
+
+  /**
+   * Sets a freshly generated 128-bit trace id from two random 64-bit halves. Produces the same
+   * bytes as setTraceId(hex(high) + hex(low)) without the intermediate hex round trip.
+   */
+  void setTraceIdFromRandom(uint64_t high, uint64_t low);
+
+  /**
+   * Sets a freshly generated 64-bit span id. Produces the same bytes as
+   * setId(Hex::uint64ToHex(id)) without the intermediate hex round trip.
+   */
+  void setIdFromRandom(uint64_t id);
 
   std::string getTraceId() const override { return absl::BytesToHexString(span_.trace_id()); };
 

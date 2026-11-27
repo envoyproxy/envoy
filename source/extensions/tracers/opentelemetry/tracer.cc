@@ -25,6 +25,7 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 constexpr absl::string_view kDefaultVersion = "00";
+static_assert(kDefaultVersion.size() == 2, "traceparent fast path assumes a 2 character version");
 // The sampled bit of the W3C trace flags carried in the low 8 bits of the OTLP span flags.
 // See https://www.w3.org/TR/trace-context/#sampled-flag.
 constexpr uint32_t TraceFlagsSampledMask = 0x1;
@@ -70,8 +71,6 @@ Span::Span(const std::string& name, const StreamInfo::StreamInfo& stream_info,
            OTelSpanKind span_kind, bool use_local_decision)
     : stream_info_(stream_info), parent_tracer_(parent_tracer), time_source_(time_source),
       use_local_decision_(use_local_decision) {
-  span_ = ::opentelemetry::proto::trace::v1::Span();
-
   span_.set_kind(span_kind);
 
   span_.set_name(name);
@@ -108,7 +107,23 @@ void Span::finishSpan() {
             span_.name(), getTraceId(), getSpanId(), sampled(),
             (span_.end_time_unix_nano() - span_.start_time_unix_nano()) / 1000);
   if (sampled()) {
-    parent_tracer_.sendSpan(span_);
+    // Hand the heavy repeated payload (attributes, events, links) over to the export buffer
+    // without copying it. Everything else (ids, trace state, flags, name, status, ...) is copied
+    // generically, so any field added to the proto in the future is still exported. The finished
+    // span keeps those light fields because they are read after the span is finished, e.g. by the
+    // %TRACE_ID% / %SPAN_ID% access log formatters, which run after the span is finalized.
+    auto attributes = std::move(*span_.mutable_attributes());
+    auto events = std::move(*span_.mutable_events());
+    auto links = std::move(*span_.mutable_links());
+    ::opentelemetry::proto::trace::v1::Span exported;
+    exported.CopyFrom(span_);
+    *exported.mutable_attributes() = std::move(attributes);
+    *exported.mutable_events() = std::move(events);
+    *exported.mutable_links() = std::move(links);
+    span_.clear_attributes();
+    span_.clear_events();
+    span_.clear_links();
+    parent_tracer_.sendSpan(std::move(exported));
   } else {
     ENVOY_LOG(debug, "Span not sampled, skipping export: trace_id={}, span_id={}", getTraceId(),
               getSpanId());
@@ -117,26 +132,87 @@ void Span::finishSpan() {
 
 void Span::setOperation(absl::string_view operation) { span_.set_name(operation); };
 
+namespace {
+constexpr char kHexDigits[] = "0123456789abcdef";
+
+// Writes the lowercase hex encoding of `bytes` to `out` and returns the next write position.
+char* writeHex(absl::string_view bytes, char* out) {
+  for (const unsigned char b : bytes) {
+    *out++ = kHexDigits[b >> 4];
+    *out++ = kHexDigits[b & 0xf];
+  }
+  return out;
+}
+
+// Stores `value` as big-endian bytes, the same byte order Hex::uint64ToHex encodes.
+void storeBigEndian(uint64_t value, char* out) {
+  for (int i = 7; i >= 0; --i) {
+    out[i] = static_cast<char>(value & 0xff);
+    value >>= 8;
+  }
+}
+} // namespace
+
+void Span::setTraceIdFromRandom(uint64_t high, uint64_t low) {
+  char bytes[16];
+  storeBigEndian(high, bytes);
+  storeBigEndian(low, bytes + 8);
+  span_.set_trace_id(bytes, sizeof(bytes));
+}
+
+void Span::setIdFromRandom(uint64_t id) {
+  char bytes[8];
+  storeBigEndian(id, bytes);
+  span_.set_span_id(bytes, sizeof(bytes));
+}
+
 void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
-  std::string trace_id_hex = absl::BytesToHexString(span_.trace_id());
-  std::string span_id_hex = absl::BytesToHexString(span_.span_id());
+  // The hex forms are only needed by the B3 formats and the non-standard-length fallback, so
+  // build them on demand.
+  std::string trace_id_hex, span_id_hex;
+  auto hexIds = [&]() {
+    if (trace_id_hex.empty()) {
+      trace_id_hex = absl::BytesToHexString(span_.trace_id());
+      span_id_hex = absl::BytesToHexString(span_.span_id());
+    }
+  };
   for (const TraceContextFormat format : parent_tracer_.outgoingTraceContext()) {
     switch (format) {
     case envoy::config::trace::v3::OpenTelemetryConfig::TRACE_CONTEXT: {
-      std::vector<uint8_t> trace_flags_vec{sampled()};
-      std::string trace_flags_hex = Hex::encode(trace_flags_vec);
-      std::string traceparent_header_value =
-          absl::StrCat(kDefaultVersion, "-", trace_id_hex, "-", span_id_hex, "-", trace_flags_hex);
-      // Set the traceparent in the trace_context.
-      traceParentHeader().setRefKey(trace_context, traceparent_header_value);
+      if (span_.trace_id().size() == 16 && span_.span_id().size() == 8) {
+        // "00-" + 32 hex + "-" + 16 hex + "-" + 2 hex, written into a stack buffer.
+        char buf[3 + 32 + 1 + 16 + 1 + 2];
+        char* p = buf;
+        absl::string_view version = kDefaultVersion;
+        for (const char ch : version) {
+          *p++ = ch;
+        }
+        *p++ = '-';
+        p = writeHex(span_.trace_id(), p);
+        *p++ = '-';
+        p = writeHex(span_.span_id(), p);
+        *p++ = '-';
+        *p++ = '0';
+        *p++ = sampled() ? '1' : '0';
+        traceParentHeader().setRefKey(trace_context, absl::string_view(buf, p - buf));
+      } else {
+        hexIds();
+        std::vector<uint8_t> trace_flags_vec{sampled()};
+        std::string trace_flags_hex = Hex::encode(trace_flags_vec);
+        std::string traceparent_header_value = absl::StrCat(kDefaultVersion, "-", trace_id_hex, "-",
+                                                            span_id_hex, "-", trace_flags_hex);
+        traceParentHeader().setRefKey(trace_context, traceparent_header_value);
+      }
       // Also set the tracestate.
       traceStateHeader().setRefKey(trace_context, span_.trace_state());
       break;
     }
     case envoy::config::trace::v3::OpenTelemetryConfig::B3:
+      hexIds();
       injectB3SingleHeader(trace_context, trace_id_hex, span_id_hex, sampled());
       break;
     case envoy::config::trace::v3::OpenTelemetryConfig::B3_MULTI:
+      hexIds();
       injectB3MultiHeaders(trace_context, trace_id_hex, span_id_hex, sampled());
       break;
     default:
@@ -158,15 +234,10 @@ void Span::setAttribute(absl::string_view name, const OTelAttribute& attribute_v
       return;
     }
   }
-  // If we haven't found an existing match already, we can add a new key/value.
-  opentelemetry::proto::common::v1::KeyValue key_value =
-      opentelemetry::proto::common::v1::KeyValue();
-  opentelemetry::proto::common::v1::AnyValue value_proto =
-      opentelemetry::proto::common::v1::AnyValue();
-  OtlpUtils::populateAnyValue(value_proto, attribute_value);
-  key_value.set_key(std::string{name});
-  *key_value.mutable_value() = value_proto;
-  *span_.add_attributes() = key_value;
+  // If we haven't found an existing match already, add the new key/value in place.
+  auto* key_value = span_.add_attributes();
+  key_value->set_key(name.data(), name.size());
+  OtlpUtils::populateAnyValue(*key_value->mutable_value(), attribute_value);
 }
 
 ::opentelemetry::proto::trace::v1::Status_StatusCode
@@ -292,6 +363,13 @@ Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_s
       tracing_stats_(tracing_stats), resource_(resource), sampler_(sampler),
       max_cache_size_(max_cache_size), set_instrumentation_scope_(set_instrumentation_scope),
       outgoing_trace_context_(std::move(outgoing_trace_context)) {
+  // Build the resource proto once; it is identical for every export.
+  for (auto const& att : resource_->attributes_) {
+    auto* key_value = resource_proto_.add_attributes();
+    key_value->set_key(std::string{att.first});
+    key_value->mutable_value()->set_string_value(std::string{att.second});
+  }
+  has_resource_attributes_ = !resource_->attributes_.empty();
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     tracing_stats_.timer_flushed_.inc();
     flushSpans();
@@ -326,16 +404,10 @@ void Tracer::flushSpans() {
   ::opentelemetry::proto::trace::v1::ResourceSpans* resource_span = request.add_resource_spans();
   resource_span->set_schema_url(resource_->schema_url_);
 
-  // add resource attributes
-  for (auto const& att : resource_->attributes_) {
-    opentelemetry::proto::common::v1::KeyValue key_value =
-        opentelemetry::proto::common::v1::KeyValue();
-    opentelemetry::proto::common::v1::AnyValue value_proto =
-        opentelemetry::proto::common::v1::AnyValue();
-    value_proto.set_string_value(std::string{att.second});
-    key_value.set_key(std::string{att.first});
-    *key_value.mutable_value() = value_proto;
-    (*resource_span->mutable_resource()->add_attributes()) = key_value;
+  // add resource attributes (only set the resource message when there are attributes, so that the
+  // serialized request is unchanged for an empty resource)
+  if (has_resource_attributes_) {
+    *resource_span->mutable_resource() = resource_proto_;
   }
 
   ::opentelemetry::proto::trace::v1::ScopeSpans* scope_span = resource_span->add_scope_spans();
@@ -346,8 +418,10 @@ void Tracer::flushSpans() {
     *scope_span->mutable_scope()->mutable_version() = Envoy::VersionInfo::version();
   }
 
-  for (const auto& pending_span : span_buffer_) {
-    (*scope_span->add_spans()) = pending_span;
+  scope_span->mutable_spans()->Reserve(span_buffer_.size());
+  for (auto& pending_span : span_buffer_) {
+    // The buffer is cleared right after the export, so move the spans in instead of copying.
+    scope_span->add_spans()->Swap(&pending_span);
   }
   tracing_stats_.spans_sent_.add(span_buffer_.size());
   ENVOY_LOG(debug, "Exporting {} span(s) to OpenTelemetry trace collector", span_buffer_.size());
@@ -361,6 +435,10 @@ void Tracer::flushSpans() {
 }
 
 void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
+  sendSpan(::opentelemetry::proto::trace::v1::Span(span));
+}
+
+void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span&& span) {
   if (span_buffer_.size() >= max_cache_size_) {
     ENVOY_LOG_EVERY_POW_2(
         warn,
@@ -370,11 +448,11 @@ void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
     flushSpans();
     return;
   }
-  span_buffer_.push_back(span);
+  span_buffer_.push_back(std::move(span));
   const uint64_t min_flush_spans =
       runtime_.snapshot().getInteger("tracing.opentelemetry.min_flush_spans", 5U);
   ENVOY_LOG(trace, "Span buffered for export: name={}, buffered={}, min_flush_spans={}",
-            span.name(), span_buffer_.size(), min_flush_spans);
+            span_buffer_.back().name(), span_buffer_.size(), min_flush_spans);
   if (span_buffer_.size() >= min_flush_spans) {
     flushSpans();
   }
@@ -395,9 +473,9 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
                                          *this, span_kind, use_local_decision);
   uint64_t trace_id_high = random_.random();
   uint64_t trace_id = random_.random();
-  new_span->setTraceId(absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id)));
+  new_span->setTraceIdFromRandom(trace_id_high, trace_id);
   uint64_t span_id = random_.random();
-  new_span->setId(Hex::uint64ToHex(span_id));
+  new_span->setIdFromRandom(span_id);
   if (sampler_) {
     callSampler(sampler_, stream_info, std::nullopt, *new_span, operation_name, trace_context);
   } else {
@@ -429,7 +507,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
   }
   // Generate a new identifier for the span id.
   uint64_t span_id = random_.random();
-  new_span->setId(Hex::uint64ToHex(span_id));
+  new_span->setIdFromRandom(span_id);
   if (sampler_) {
     // Sampler should make a sampling decision and set tracestate
     callSampler(sampler_, stream_info, parent_context, *new_span, operation_name, trace_context);

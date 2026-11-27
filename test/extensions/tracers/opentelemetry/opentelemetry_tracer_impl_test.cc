@@ -1199,6 +1199,27 @@ TEST_F(OpenTelemetryDriverTest, SpawnChildSpan) {
 // Verifies the OTLP span flags field is populated per the OTLP spec: bits 0-7 carry the W3C
 // trace flags (bit 0: sampled), bit 8 records that the parent-remoteness is known, and bit 9
 // records whether the parent span context was remote.
+// Access log formatters (%TRACE_ID%, %SPAN_ID%) read the ids from the active span after the span
+// has been finished, so finishing (and exporting) a span must not clear them.
+TEST_F(OpenTelemetryDriverTest, SpanIdentityIsReadableAfterFinish) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  const std::string trace_id = span->getTraceId();
+  const std::string span_id = span->getSpanId();
+  EXPECT_FALSE(trace_id.empty());
+  EXPECT_FALSE(span_id.empty());
+
+  span->setTag("test_tag", "test_value");
+  span->finishSpan();
+
+  EXPECT_EQ(trace_id, span->getTraceId());
+  EXPECT_EQ(span_id, span->getSpanId());
+}
+
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanFlags) {
   setupValidDriver();
 
