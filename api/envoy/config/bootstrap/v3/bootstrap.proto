@@ -764,6 +764,15 @@ message LayeredRuntime {
   // The :ref:`layers <config_runtime_layering>` of the runtime. This is ordered
   // such that later layers in the list overlay earlier entries.
   repeated RuntimeLayer layers = 1;
+
+  // Custom provider for evaluating runtime feature flags. When configured, extensible runtime
+  // checks delegate to this provider; when unset, they fall back to Envoy's built-in runtime
+  // feature evaluation. See :ref:`Extensible runtime <arch_overview_runtime_extensible_runtime>`.
+  //
+  // .. note::
+  //
+  //    The ``envoy.extensible_runtime`` extension category currently has no built-in extensions.
+  core.v3.TypedExtensionConfig extensible_runtime = 2;
 }
 
 // Used to specify the header that needs to be registered as an inline header.
