@@ -560,6 +560,7 @@ SUBCOMMAND
 SVG
 SVID
 SXG
+Sym
 Symbolizer
 TBD
 TCLAP
@@ -1571,6 +1572,7 @@ superroot
 superset
 supportability
 svc
+symbolizer
 symlink
 symlinked
 symlinks
