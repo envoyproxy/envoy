@@ -217,9 +217,26 @@ void TestEnvironment::initializeTestMain(char* program_name) {
   WSADATA wsa_data;
   const WORD version_requested = MAKEWORD(2, 2);
   RELEASE_ASSERT(WSAStartup(version_requested, &wsa_data) == 0, "");
-#endif
 
+  // SymInitialize(), called by absl::InitializeSymbolizer(), fails when the executable path is 256
+  // characters or longer, and absl treats that failure as fatal. Test binaries started from a
+  // runfiles tree (for example by envoy_benchmark_test) can have paths that long, so skip the
+  // symbolizer for them; stack traces then show addresses instead of symbol names.
+  constexpr DWORD kMaxSymbolizerPathLength = 255;
+  std::vector<wchar_t> module_path(32768);
+  const DWORD module_path_length =
+      GetModuleFileNameW(nullptr, module_path.data(), static_cast<DWORD>(module_path.size()));
+  if (module_path_length > kMaxSymbolizerPathLength) {
+    std::cerr << "Not initializing the symbolizer: the executable path is " << module_path_length
+              << " characters long, over the " << kMaxSymbolizerPathLength
+              << " characters SymInitialize() supports. Stack traces will not show symbol names."
+              << std::endl;
+  } else {
+    absl::InitializeSymbolizer(program_name);
+  }
+#else
   absl::InitializeSymbolizer(program_name);
+#endif
 
 #ifdef ENVOY_HANDLE_SIGNALS
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
