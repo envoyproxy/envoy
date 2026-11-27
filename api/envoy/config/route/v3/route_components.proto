@@ -991,8 +991,8 @@ message RouteAction {
     //
     //   A :ref:`cluster-level retry policy
     //   <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.retry_policy>` of the
-    //   mirror cluster overrides this policy entirely, as it does for route-level retry policies.
-    //   Without either, mirrored requests are not retried.
+    //   mirror cluster takes precedence over this policy, as it does for route-level retry
+    //   policies. Without either, mirrored requests are not retried.
     RetryPolicy retry_policy = 10;
 
     // Specifies the timeout of the mirrored requests, including all retries. If not set, the

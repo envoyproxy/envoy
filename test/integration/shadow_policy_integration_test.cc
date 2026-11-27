@@ -474,8 +474,8 @@ TEST_P(ShadowPolicyRetryAndTimeoutIntegrationTest, MirrorRetriesExhausted) {
   closeConnectionsAndCleanup();
 }
 
-// A cluster-level retry policy of the mirror cluster overrides the retry policy of the mirror
-// policy, as it overrides route-level retry policies.
+// A cluster-level retry policy of the mirror cluster takes precedence over the retry policy of the
+// mirror policy, as it does over route-level retry policies.
 TEST_P(ShadowPolicyRetryAndTimeoutIntegrationTest, ClusterRetryPolicyOverridesMirrorRetryPolicy) {
   configureMirrorRetryOn("5xx");
   // cluster_1 is added by configureMirrorRetryOn().
@@ -592,6 +592,36 @@ TEST_P(ShadowPolicyRetryAndTimeoutIntegrationTest, MirrorTimeout) { testMirrorTi
 // x-envoy-expected-rq-timeout-ms header set by the primary router before the headers are copied.
 TEST_P(ShadowPolicyRetryAndTimeoutIntegrationTest, MirrorTimeoutWithRespectExpectedRqTimeout) {
   testMirrorTimeout(true);
+}
+
+// A per try timeout of the mirror retry policy triggers a retry, and the mirror timeout ends the
+// attempts long before the retries are exhausted.
+TEST_P(ShadowPolicyRetryAndTimeoutIntegrationTest, MirrorPerTryTimeoutWithinMirrorTimeout) {
+  mirror_policy_modifier_ = [](envoy::config::route::v3::RouteAction::RequestMirrorPolicy& policy) {
+    policy.set_stat_prefix("test_mirror");
+    policy.mutable_retry_policy()->set_retry_on("5xx");
+    policy.mutable_retry_policy()->mutable_num_retries()->set_value(100);
+    policy.mutable_retry_policy()->mutable_per_try_timeout()->set_nanos(100 * 1000 * 1000);
+    policy.mutable_timeout()->set_seconds(2);
+  };
+  initialConfigSetup("cluster_1", "");
+  initialize();
+  sendRequest();
+  completePrimaryRequest();
+
+  // The mirror attempts are not answered, so each one ends on the per try timeout.
+  waitForMirrorAttempt();
+  EXPECT_EQ("100", mirror_attempts_.back()->headers().getEnvoyExpectedRequestTimeoutMsValue());
+  waitForMirrorAttempt();
+
+  test_server_->waitForCounter("mirror.test_mirror.rq_failure", Eq(1));
+  EXPECT_EQ(1, test_server_->counter("mirror.test_mirror.rq_started")->value());
+  EXPECT_GE(test_server_->counter("cluster.cluster_1.upstream_rq_per_try_timeout")->value(), 1);
+  EXPECT_GE(test_server_->counter("cluster.cluster_1.upstream_rq_retry")->value(), 1);
+  EXPECT_EQ(0,
+            test_server_->counter("cluster.cluster_1.upstream_rq_retry_limit_exceeded")->value());
+
+  closeConnectionsAndCleanup();
 }
 
 TEST_P(ShadowPolicyIntegrationTest, BasicWithLimits) {
