@@ -141,6 +141,15 @@ void Wasm::tickHandler(uint32_t root_context_id) {
 }
 
 Wasm::~Wasm() {
+  // Destroy root contexts now, before redis_call_state_ (a derived-class member) is destroyed:
+  // WasmBase::~WasmBase() clears these same containers, but only after derived-class members are
+  // already gone, and a root Context's destructor can call back into redisCallState() (via
+  // finishRedisCall()) to resolve an outstanding redisCall() as Failure. Also clear pending_done_
+  // and pending_delete_: a deferred-deletion onDone() can move a root context there instead of
+  // root_contexts_.
+  root_contexts_.clear();
+  pending_done_.clear();
+  pending_delete_.clear();
   lifecycle_stats_handler_.onMemorySizeChanged(memory_size_, 0);
   lifecycle_stats_handler_.onEvent(WasmEvent::VmShutDown);
   ENVOY_LOG(debug, "~Wasm {} remaining active", lifecycle_stats_handler_.getActiveVmCount());
