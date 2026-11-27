@@ -8,6 +8,7 @@
 #include "source/common/config/null_grpc_mux_impl.h"
 #include "source/common/config/resource_name.h"
 #include "source/common/config/xds_resource.h"
+#include "source/common/http/message_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/router/context_impl.h"
@@ -19,6 +20,7 @@
 #include "test/config/v2_link_hacks.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/conn_pool.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
@@ -655,7 +657,7 @@ TEST_F(ClusterManagerImplTest, EdsClustersRequireEdsConfig) {
                             "cannot create an EDS cluster without an EDS config");
 }
 
-// gRPC/OTLP and other TLS-backed access loggers are rejected for async client upstream logs.
+// gRPC/OTLP access loggers would recursively log their own async client exports.
 TEST_F(ClusterManagerImplTest, AsyncClientUpstreamLogRejectsUnsupportedLogger) {
   Bootstrap bootstrap;
   auto* log = bootstrap.mutable_cluster_manager()->add_async_client_upstream_log();
@@ -668,6 +670,57 @@ TEST_F(ClusterManagerImplTest, AsyncClientUpstreamLogRejectsUnsupportedLogger) {
       "async_client_upstream_log: unsupported access logger type "
       "'envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig'; only file and "
       "stdout/stderr access loggers are supported");
+}
+
+TEST_F(ClusterManagerImplTest, AsyncClientUpstreamLogTypedStructAndShutdown) {
+  auto bootstrap = parseBootstrapFromV3Json(fmt::sprintf(
+      "{\"static_resources\":{%s}}", clustersJson({defaultStaticClusterJson("cluster_1")})));
+  bootstrap.mutable_cluster_manager()->set_local_cluster_name("cluster_1");
+  TestUtility::loadFromYaml(R"EOF(
+name: envoy.access_loggers.file
+typed_config:
+  "@type": type.googleapis.com/xds.type.v3.TypedStruct
+  type_url: type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  value:
+    path: async_client.log
+    log_format:
+      text_format_source:
+        inline_string: "async client\n"
+)EOF",
+                            *bootstrap.mutable_cluster_manager()->add_async_client_upstream_log());
+
+  auto& log_manager = factory_.server_context_.access_log_manager_;
+  EXPECT_CALL(log_manager, createAccessLog(_)).WillOnce([&](const auto&) {
+    EXPECT_EQ(cluster_manager_->clusters().active_clusters_.size(), 1);
+    EXPECT_NE(cluster_manager_->getThreadLocalCluster("cluster_1"), nullptr);
+    return log_manager.file_;
+  });
+  create(bootstrap);
+
+  auto* pool = new NiceMock<Http::ConnectionPool::MockInstance>();
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(pool));
+  testing::StrictMock<ConnectionPool::MockCancellable> pending;
+  EXPECT_CALL(*pool, newStream(_, _, _)).Times(2).WillRepeatedly(Return(&pending));
+  EXPECT_CALL(pending, cancel(_)).Times(2);
+  NiceMock<Http::MockAsyncClientCallbacks> callbacks;
+  auto& client = cluster_manager_->getThreadLocalCluster("cluster_1")->httpAsyncClient();
+  const auto send_request = [&]() {
+    return client.send(std::make_unique<Http::RequestMessageImpl>(
+                           Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
+                               {":method", "GET"}, {":path", "/"}, {":authority", "host"}}}),
+                       callbacks, Http::AsyncClient::RequestOptions());
+  };
+
+  auto* request = send_request();
+  ASSERT_NE(request, nullptr);
+  EXPECT_CALL(*log_manager.file_, write("async client\n"));
+  request->cancel();
+  factory_.tls_.dispatcher_.clearDeferredDeleteList();
+  Mock::VerifyAndClearExpectations(log_manager.file_.get());
+
+  ASSERT_NE(send_request(), nullptr);
+  EXPECT_CALL(*log_manager.file_, write(_)).Times(0);
+  factory_.tls_.shutdownThread();
 }
 
 // Verify that specifying a cluster provided LB, but the cluster doesn't provide one is an error.

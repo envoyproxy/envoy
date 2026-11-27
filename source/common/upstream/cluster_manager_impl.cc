@@ -63,6 +63,24 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
+class AsyncClientAccessLog : public AccessLog::Instance {
+public:
+  AsyncClientAccessLog(AccessLog::InstanceSharedPtr access_log, ThreadLocal::Instance& tls)
+      : access_log_(std::move(access_log)), tls_(tls) {}
+
+  void log(const AccessLog::LogContext& context,
+           const StreamInfo::StreamInfo& stream_info) override {
+    // Async streams can outlive the TLS slots used by formatters and extension filters.
+    if (!tls_.isShutdown()) {
+      access_log_->log(context, stream_info);
+    }
+  }
+
+private:
+  const AccessLog::InstanceSharedPtr access_log_;
+  ThreadLocal::Instance& tls_;
+};
+
 // The factory a cluster's main-thread priority set creates host sets with, so its worker copies
 // create the same type. Null for clusters whose priority set is not a PrioritySetImpl.
 HostSetFactory hostSetFactoryOf(const Cluster& cluster) {
@@ -384,25 +402,6 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
   ASSERT(!initialized_);
   initialized_ = true;
 
-  // Only sinks that don't depend on the cluster manager or TLS are allowed: gRPC/OTLP sinks would
-  // log their own exports through this async client, and TLS-backed sinks are torn down before
-  // in-flight async client streams are cancelled on shutdown.
-  Server::GenericFactoryContextImpl generic_context(context_, context_.messageValidationVisitor());
-  for (const auto& log : bootstrap.cluster_manager().async_client_upstream_log()) {
-    const absl::string_view type =
-        TypeUtil::typeUrlToDescriptorFullName(log.typed_config().type_url());
-    if (type != "envoy.extensions.access_loggers.file.v3.FileAccessLog" &&
-        type != "envoy.extensions.access_loggers.stream.v3.StdoutAccessLog" &&
-        type != "envoy.extensions.access_loggers.stream.v3.StderrAccessLog") {
-      return absl::InvalidArgumentError(
-          fmt::format("async_client_upstream_log: unsupported access logger type '{}'; only file "
-                      "and stdout/stderr access loggers are supported",
-                      type));
-    }
-    async_client_router_config_->upstream_logs_.push_back(
-        AccessLog::AccessLogFactory::fromProto(log, generic_context));
-  }
-
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
   // the secondary clusters are loaded. As it currently stands all non-EDS clusters and EDS which
   // load endpoint definition from file are primary and
@@ -483,6 +482,23 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
   tls_.set([this, local_cluster_params](Event::Dispatcher& dispatcher) {
     return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher, local_cluster_params);
   });
+
+  // Formatters and extension filters may depend on static clusters and thread local state.
+  // gRPC/OTLP sinks are excluded because they would log their own async client exports.
+  Server::GenericFactoryContextImpl generic_context(context_, context_.messageValidationVisitor());
+  for (const auto& log : bootstrap.cluster_manager().async_client_upstream_log()) {
+    const std::string type = Config::Utility::getFactoryType(log.typed_config());
+    if (type != "envoy.extensions.access_loggers.file.v3.FileAccessLog" &&
+        type != "envoy.extensions.access_loggers.stream.v3.StdoutAccessLog" &&
+        type != "envoy.extensions.access_loggers.stream.v3.StderrAccessLog") {
+      return absl::InvalidArgumentError(
+          fmt::format("async_client_upstream_log: unsupported access logger type '{}'; only file "
+                      "and stdout/stderr access loggers are supported",
+                      type));
+    }
+    async_client_router_config_->upstream_logs_.push_back(std::make_shared<AsyncClientAccessLog>(
+        AccessLog::AccessLogFactory::fromProto(log, generic_context), context_.threadLocal()));
+  }
 
   const auto& dyn_resources = bootstrap.dynamic_resources();
   // We can now potentially create the CDS API once the backing cluster exists.
