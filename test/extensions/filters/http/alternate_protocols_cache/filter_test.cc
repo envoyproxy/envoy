@@ -128,8 +128,7 @@ TEST_F(FilterTest, ValidAltSvc) {
       .WillRepeatedly(ReturnRef(callbacks_.stream_info_));
   callbacks_.stream_info_.upstream_cluster_info_ = info;
   EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo()).Times(testing::AtLeast(1));
-  EXPECT_CALL(testing::Const(callbacks_.stream_info_), upstreamInfo())
-      .Times(testing::AtLeast(1));
+  EXPECT_CALL(testing::Const(callbacks_.stream_info_), upstreamInfo()).Times(testing::AtLeast(1));
   // Get the pointer to MockHostDescription.
   std::shared_ptr<const Upstream::MockHostDescription> hd =
       std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
@@ -215,8 +214,7 @@ TEST_F(FilterTest, ValidAltSvcNullAddress) {
       .WillRepeatedly(ReturnRef(callbacks_.stream_info_));
   callbacks_.stream_info_.upstream_cluster_info_ = info;
   EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo()).Times(testing::AtLeast(1));
-  EXPECT_CALL(testing::Const(callbacks_.stream_info_), upstreamInfo())
-      .Times(testing::AtLeast(1));
+  EXPECT_CALL(testing::Const(callbacks_.stream_info_), upstreamInfo()).Times(testing::AtLeast(1));
   // Get the pointer to MockHostDescription.
   std::shared_ptr<const Upstream::MockHostDescription> hd =
       std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
@@ -282,8 +280,7 @@ TEST_F(FilterTest, ValidAltSvcNullIp) {
       .WillRepeatedly(ReturnRef(callbacks_.stream_info_));
   callbacks_.stream_info_.upstream_cluster_info_ = info;
   EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo()).Times(testing::AtLeast(1));
-  EXPECT_CALL(testing::Const(callbacks_.stream_info_), upstreamInfo())
-      .Times(testing::AtLeast(1));
+  EXPECT_CALL(testing::Const(callbacks_.stream_info_), upstreamInfo()).Times(testing::AtLeast(1));
   // Get the pointer to MockHostDescription.
   std::shared_ptr<const Upstream::MockHostDescription> hd =
       std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
