@@ -109,6 +109,35 @@ private:
 constexpr absl::string_view kProxyProtoStatsPrefix = "proxy_proto.";
 constexpr absl::string_view kVersionStatsPrefix = "versions.";
 
+namespace {
+
+/**
+ * Encode a TLV value with the encoding configured for its rule.
+ * @return the encoded value, or std::nullopt if the value cannot be encoded.
+ */
+std::optional<std::string> encodeTlvValue(const KeyValuePair& key_value_pair,
+                                          absl::string_view tlv_value) {
+  switch (key_value_pair.value_string_encoding()) {
+  case KeyValuePair::BASE64:
+    return Base64::encode(tlv_value.data(), tlv_value.size());
+  case KeyValuePair::UNSIGNED_INTEGER_BIG_ENDIAN: {
+    if (tlv_value.empty() || tlv_value.size() > sizeof(uint64_t)) {
+      return std::nullopt;
+    }
+    uint64_t value = 0;
+    for (const char byte : tlv_value) {
+      value = (value << 8) | static_cast<uint8_t>(byte);
+    }
+    return absl::StrCat(value);
+  }
+  default:
+    // Default sanitization is to replace non-UTF-8 characters with `!` character.
+    return MessageUtil::sanitizeUtf8String(tlv_value);
+  }
+}
+
+} // namespace
+
 ProxyProtocolStats ProxyProtocolStats::create(Stats::Scope& scope, absl::string_view stat_prefix) {
   std::string filter_stat_prefix = std::string(kProxyProtoStatsPrefix);
   if (!stat_prefix.empty()) {
@@ -189,7 +218,14 @@ Config::Config(
                          : false),
       tlv_location_(proto_config.tlv_location()) {
   for (const auto& rule : proto_config.rules()) {
-    tlv_types_[0xFF & rule.tlv_type()] = rule.on_tlv_present();
+    const uint8_t tlv_type = 0xFF & rule.tlv_type();
+    // As with on_tlv_present, the last rule for a TLV type decides whether it is required.
+    tlv_types_[tlv_type] = rule.on_tlv_present();
+    if (rule.reject_if_absent()) {
+      required_tlv_types_.insert(tlv_type);
+    } else {
+      required_tlv_types_.erase(tlv_type);
+    }
   }
 
   if (proto_config.has_pass_through_tlvs() &&
@@ -236,6 +272,10 @@ bool Config::isPassThroughTlvTypeNeeded(uint8_t tlv_type) const {
 
 size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
 
+bool Config::isTlvTypeRequired(uint8_t type) const { return required_tlv_types_.contains(type); }
+
+size_t Config::numberOfRequiredTlvTypes() const { return required_tlv_types_.size(); }
+
 bool Config::allowRequestsWithoutProxyProtocol() const {
   return allow_requests_without_proxy_protocol_;
 }
@@ -278,6 +318,12 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   case ReadOrParseState::TryAgainLater:
     return Network::FilterStatus::StopIteration;
   case ReadOrParseState::Done:
+    if (present_required_tlvs_.size() < config_->numberOfRequiredTlvTypes()) {
+      ENVOY_LOG(debug, "proxy_protocol: connection does not carry every required TLV");
+      config_->stats_.general_.tlv_missing_.inc();
+      cb_->socket().ioHandle().close();
+      return Network::FilterStatus::StopIteration;
+    }
     return Network::FilterStatus::Continue;
   }
   return Network::FilterStatus::Continue;
@@ -626,18 +672,21 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
     // Only save to dynamic metadata if this type of TLV is needed.
     absl::string_view tlv_value(reinterpret_cast<char const*>(buf + idx), tlv_value_length);
     auto key_value_pair = config_->isTlvTypeNeeded(tlv_type);
+    // Encode the TLV value as configured.
+    std::optional<std::string> sanitised_value;
     if (nullptr != key_value_pair) {
-      // Encode the TLV value as configured.
-      std::string sanitised_value;
-      if (key_value_pair->value_string_encoding() ==
-          envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair::
-              BASE64) {
-        sanitised_value = Base64::encode(tlv_value.data(), tlv_value.size());
-      } else {
-        // Default sanitization is to replace non-UTF-8 characters with `!` character.
-        sanitised_value = MessageUtil::sanitizeUtf8String(tlv_value);
+      sanitised_value = encodeTlvValue(*key_value_pair, tlv_value);
+      if (!sanitised_value.has_value()) {
+        ENVOY_LOG(debug,
+                  "proxy_protocol: Skip TLV of type {} since its value of {} bytes cannot be "
+                  "encoded as configured",
+                  tlv_type, tlv_value_length);
+        config_->stats_.general_.tlv_invalid_.inc();
+      } else if (config_->isTlvTypeRequired(tlv_type)) {
+        present_required_tlvs_.insert(tlv_type);
       }
-
+    }
+    if (sanitised_value.has_value()) {
       if (config_->tlvLocation() ==
           envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::FILTER_STATE) {
         // Store TLV values in a single filter state object.
@@ -655,7 +704,7 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
                                      StreamInfo::FilterState::LifeSpan::Connection);
           ENVOY_LOG(trace, "proxy_protocol: Created TLV FilterState object");
         }
-        tlv_filter_state_obj->addTlvValue(key_value_pair->key(), sanitised_value);
+        tlv_filter_state_obj->addTlvValue(key_value_pair->key(), *sanitised_value);
         ENVOY_LOG(trace, "proxy_protocol: Stored TLV type {} value in FilterState with key {}",
                   tlv_type, key_value_pair->key());
       } else {
@@ -683,13 +732,13 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
         }
         // Always populate untyped metadata for backwards compatibility.
         Protobuf::Value metadata_value;
-        metadata_value.set_string_value(sanitised_value.data(), sanitised_value.size());
+        metadata_value.set_string_value(sanitised_value->data(), sanitised_value->size());
         Protobuf::Struct metadata(
             (*cb_->dynamicMetadata().mutable_filter_metadata())[metadata_key]);
         metadata.mutable_fields()->insert({key_value_pair->key(), metadata_value});
         cb_->setDynamicMetadata(metadata_key, metadata);
       }
-    } else {
+    } else if (nullptr == key_value_pair) {
       ENVOY_LOG(trace,
                 "proxy_protocol: Skip TLV of type {} since it's not needed for dynamic metadata",
                 tlv_type);
