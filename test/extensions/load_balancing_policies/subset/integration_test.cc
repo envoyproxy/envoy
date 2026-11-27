@@ -175,7 +175,7 @@ TEST_P(SubsetIntegrationTest, NormalLoadBalancing) {
   runNormalLoadBalancing();
 }
 
-TEST_P(SubsetIntegrationTest, NormalLoadBalancingWithLegacyAPI) {
+TEST_P(SubsetIntegrationTest, DEPRECATED_FEATURE_TEST(NormalLoadBalancingWithLegacyAPI)) {
   initializeConfig(true);
   runNormalLoadBalancing();
 }

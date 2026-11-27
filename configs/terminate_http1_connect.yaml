@@ -77,8 +77,10 @@ static_resources:
                 port_value: 443
   - name: local_original_dst
     connect_timeout: 0.25s
-    type: ORIGINAL_DST
+    cluster_type:
+      name: envoy.cluster.original_dst
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.original_dst.v3.OriginalDstCluster
+        use_http_header: true
+        http_header_name: ":authority"
     lb_policy: CLUSTER_PROVIDED
-    original_dst_lb_config:
-      use_http_header: true
-      http_header_name: ":authority"

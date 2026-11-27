@@ -8,6 +8,7 @@
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.h"
 #include "envoy/extensions/upstreams/tcp/v3/tcp_protocol_options.pb.h"
 
 #include "source/common/config/api_version.h"
@@ -1413,14 +1414,14 @@ void TcpProxyMetadataMatchIntegrationTest::initialize() {
     cluster_0->Clear();
     cluster_0->set_name("cluster_0");
     cluster_0->set_type(envoy::config::cluster::v3::Cluster::STATIC);
-    cluster_0->set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
-    auto* lb_subset_config = cluster_0->mutable_lb_subset_config();
-    lb_subset_config->set_fallback_policy(
-        envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK);
-    auto* subset_selector = lb_subset_config->add_subset_selectors();
+    envoy::extensions::load_balancing_policies::subset::v3::Subset subset_config;
+    subset_config.set_fallback_policy(
+        envoy::extensions::load_balancing_policies::subset::v3::Subset::NO_FALLBACK);
+    auto* subset_selector = subset_config.add_subset_selectors();
     subset_selector->add_keys("role");
     subset_selector->add_keys("version");
     subset_selector->add_keys("stage");
+    ConfigHelper::setSubsetLbPolicy(*cluster_0, subset_config);
     auto* load_assignment = cluster_0->mutable_load_assignment();
     load_assignment->set_cluster_name("cluster_0");
     auto* locality_lb_endpoints = load_assignment->add_endpoints();

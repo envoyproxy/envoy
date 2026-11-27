@@ -45,14 +45,24 @@ static_resources:
   clusters:
   - name: versioned-cluster
     type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    lb_subset_config:
-      fallback_policy: ANY_ENDPOINT
-      subset_selectors:
-      - keys:
-        - default
-      - keys:
-        - version
+    load_balancing_policy:
+      policies:
+      - typed_extension_config:
+          name: envoy.load_balancing_policies.subset
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.subset.v3.Subset
+            fallback_policy: ANY_ENDPOINT
+            subset_selectors:
+            - keys:
+              - default
+            - keys:
+              - version
+            subset_lb_policy:
+              policies:
+              - typed_extension_config:
+                  name: envoy.load_balancing_policies.round_robin
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin
     load_assignment:
       cluster_name: versioned-cluster
       endpoints:

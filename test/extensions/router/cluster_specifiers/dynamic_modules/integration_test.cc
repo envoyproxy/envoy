@@ -1,3 +1,4 @@
+#include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.h"
 #include "envoy/extensions/router/cluster_specifiers/dynamic_modules/v3/dynamic_modules.pb.h"
 
 #include "test/integration/http_integration.h"
@@ -102,13 +103,15 @@ route_action_overrides:
     setUpstreamCount(2);
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      envoy::extensions::load_balancing_policies::subset::v3::Subset subset_config;
       TestUtility::loadFromYaml(R"EOF(
 fallback_policy: NO_FALLBACK
 subset_selectors:
 - keys:
   - version
 )EOF",
-                                *cluster->mutable_lb_subset_config());
+                                subset_config);
+      ConfigHelper::setSubsetLbPolicy(*cluster, subset_config);
 
       auto* locality = cluster->mutable_load_assignment()->mutable_endpoints(0);
       auto* stable_endpoint = locality->mutable_lb_endpoints(0);

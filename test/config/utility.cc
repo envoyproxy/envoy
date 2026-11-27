@@ -9,6 +9,11 @@
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.h"
+#include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.h"
+#include "envoy/extensions/load_balancing_policies/random/v3/random.pb.h"
+#include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.h"
+#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
@@ -488,6 +493,52 @@ admin:
       port_value: 0
 )EOF",
                      api_type, Platform::null_device_path);
+}
+
+envoy::config::cluster::v3::LoadBalancingPolicy
+ConfigHelper::buildLbPolicy(envoy::config::cluster::v3::Cluster::LbPolicy lb_policy) {
+  envoy::config::cluster::v3::LoadBalancingPolicy lb_config;
+  auto* policy = lb_config.add_policies()->mutable_typed_extension_config();
+  switch (lb_policy) {
+  case envoy::config::cluster::v3::Cluster::LEAST_REQUEST:
+    policy->set_name("envoy.load_balancing_policies.least_request");
+    std::ignore = policy->mutable_typed_config()->PackFrom(
+        envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest());
+    break;
+  case envoy::config::cluster::v3::Cluster::RING_HASH:
+    policy->set_name("envoy.load_balancing_policies.ring_hash");
+    std::ignore = policy->mutable_typed_config()->PackFrom(
+        envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash());
+    break;
+  case envoy::config::cluster::v3::Cluster::RANDOM:
+    policy->set_name("envoy.load_balancing_policies.random");
+    std::ignore = policy->mutable_typed_config()->PackFrom(
+        envoy::extensions::load_balancing_policies::random::v3::Random());
+    break;
+  case envoy::config::cluster::v3::Cluster::MAGLEV:
+    policy->set_name("envoy.load_balancing_policies.maglev");
+    std::ignore = policy->mutable_typed_config()->PackFrom(
+        envoy::extensions::load_balancing_policies::maglev::v3::Maglev());
+    break;
+  default:
+    policy->set_name("envoy.load_balancing_policies.round_robin");
+    std::ignore = policy->mutable_typed_config()->PackFrom(
+        envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin());
+    break;
+  }
+  return lb_config;
+}
+
+void ConfigHelper::setSubsetLbPolicy(
+    envoy::config::cluster::v3::Cluster& cluster,
+    envoy::extensions::load_balancing_policies::subset::v3::Subset subset_config,
+    envoy::config::cluster::v3::Cluster::LbPolicy child_lb_policy) {
+  *subset_config.mutable_subset_lb_policy() = buildLbPolicy(child_lb_policy);
+  cluster.clear_load_balancing_policy();
+  auto* policy =
+      cluster.mutable_load_balancing_policy()->add_policies()->mutable_typed_extension_config();
+  policy->set_name("envoy.load_balancing_policies.subset");
+  std::ignore = policy->mutable_typed_config()->PackFrom(subset_config);
 }
 
 // TODO(samflattery): bundle this up with buildCluster
@@ -1120,7 +1171,8 @@ void ConfigHelper::setPorts(const std::vector<uint32_t>& ports, bool override_po
     auto* cluster = static_resources->mutable_clusters(i);
     if (cluster->type() == envoy::config::cluster::v3::Cluster::EDS) {
       eds_hosts = true;
-    } else if (cluster->type() == envoy::config::cluster::v3::Cluster::ORIGINAL_DST) {
+    } else if (cluster->type() == envoy::config::cluster::v3::Cluster::ORIGINAL_DST ||
+               cluster->cluster_type().name() == "envoy.cluster.original_dst") {
       original_dst_cluster = true;
     } else if (cluster->has_cluster_type() &&
                !absl::StartsWith(cluster->cluster_type().name(), "envoy.cluster.")) {

@@ -5,6 +5,7 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/config/endpoint/v3/load_report.pb.h"
+#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/type/v3/http.pb.h"
 
@@ -153,7 +154,13 @@ public:
         health_check->mutable_http_health_check()->set_codec_client_type(envoy::type::v3::HTTP1);
       }
       if (locality_weighted_lb_) {
-        cluster_0->mutable_common_lb_config()->mutable_locality_weighted_lb_config();
+        envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin round_robin;
+        round_robin.mutable_locality_lb_config()->mutable_locality_weighted_lb_config();
+        auto* policy = cluster_0->mutable_load_balancing_policy()
+                           ->add_policies()
+                           ->mutable_typed_extension_config();
+        policy->set_name("envoy.load_balancing_policies.round_robin");
+        std::ignore = policy->mutable_typed_config()->PackFrom(round_robin);
       }
     });
     HttpIntegrationTest::initialize();
