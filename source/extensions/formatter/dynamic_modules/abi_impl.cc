@@ -2,13 +2,15 @@
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
 #include "source/extensions/formatter/dynamic_modules/formatter.h"
 
-namespace Envoy {
-namespace Extensions {
-namespace Formatter {
-namespace DynamicModules {
+// NOLINT(namespace-envoy)
+
+namespace {
 
 using Envoy::Extensions::DynamicModules::ContextAccessor;
 using Envoy::Extensions::DynamicModules::HeadersMapOptConstRef;
+using Envoy::Extensions::Formatter::DynamicModules::FormatterContext;
+
+} // namespace
 
 extern "C" {
 
@@ -97,8 +99,3 @@ envoy_dynamic_module_callback_formatter_get_access_log_type(
 }
 
 } // extern "C"
-
-} // namespace DynamicModules
-} // namespace Formatter
-} // namespace Extensions
-} // namespace Envoy

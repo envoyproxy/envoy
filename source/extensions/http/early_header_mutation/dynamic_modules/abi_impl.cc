@@ -4,16 +4,14 @@
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
 #include "source/extensions/http/early_header_mutation/dynamic_modules/early_header_mutation.h"
 
-namespace Envoy {
-namespace Extensions {
-namespace Http {
-namespace EarlyHeaderMutation {
-namespace DynamicModules {
-
-using Envoy::Extensions::DynamicModules::ContextAccessor;
-using Envoy::Extensions::DynamicModules::HeadersMapOptConstRef;
+// NOLINT(namespace-envoy)
 
 namespace {
+
+using Envoy::makeOptRef;
+using Envoy::Extensions::DynamicModules::ContextAccessor;
+using Envoy::Extensions::DynamicModules::HeadersMapOptConstRef;
+using Envoy::Extensions::Http::EarlyHeaderMutation::DynamicModules::EarlyHeaderMutationContext;
 
 EarlyHeaderMutationContext*
 mutationContext(envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr) {
@@ -157,9 +155,3 @@ bool envoy_dynamic_module_callback_early_header_mutation_get_filter_state_bytes(
 }
 
 } // extern "C"
-
-} // namespace DynamicModules
-} // namespace EarlyHeaderMutation
-} // namespace Http
-} // namespace Extensions
-} // namespace Envoy

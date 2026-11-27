@@ -25,14 +25,31 @@
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 #include "source/extensions/filters/network/dynamic_modules/filter_config.h"
 
-namespace Envoy {
-namespace Extensions {
-namespace DynamicModules {
-namespace NetworkFilters {
-
-using Envoy::Extensions::DynamicModules::MetricRegistry;
+// NOLINT(namespace-envoy)
 
 namespace {
+
+namespace AccessLog = Envoy::AccessLog;
+
+using Envoy::MonotonicTime;
+using Envoy::StringUtil;
+using Envoy::Extensions::DynamicModules::ContextAccessor;
+using Envoy::Extensions::DynamicModules::isValidModuleBuffer;
+using Envoy::Extensions::DynamicModules::narrowToInt;
+using Envoy::Extensions::DynamicModules::NetworkFilters::DynamicModuleNetworkFilter;
+using Envoy::Extensions::DynamicModules::NetworkFilters::DynamicModuleNetworkFilterConfig;
+using Envoy::Extensions::DynamicModules::NetworkFilters::DynamicModuleNetworkFilterConfigScheduler;
+using Envoy::Extensions::DynamicModules::NetworkFilters::DynamicModuleNetworkFilterScheduler;
+namespace Buffer = Envoy::Buffer;
+namespace Http = Envoy::Http;
+namespace Network = Envoy::Network;
+namespace Protobuf = Envoy::Protobuf;
+namespace Router = Envoy::Router;
+namespace Stats = Envoy::Stats;
+namespace StreamInfo = Envoy::StreamInfo;
+namespace Upstream = Envoy::Upstream;
+
+using Envoy::Extensions::DynamicModules::MetricRegistry;
 
 Network::ConnectionCloseType
 toEnvoyCloseType(envoy_dynamic_module_type_network_connection_close_type close_type) {
@@ -1711,8 +1728,3 @@ bool envoy_dynamic_module_callback_network_filter_get_attribute_bool(
 }
 
 } // extern "C"
-
-} // namespace NetworkFilters
-} // namespace DynamicModules
-} // namespace Extensions
-} // namespace Envoy

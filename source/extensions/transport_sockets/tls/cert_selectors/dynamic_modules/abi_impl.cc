@@ -8,17 +8,24 @@
 #include "source/extensions/dynamic_modules/metric_registry.h"
 #include "source/extensions/transport_sockets/tls/cert_selectors/dynamic_modules/tls_certificate_selector.h"
 
-namespace Envoy {
-namespace Extensions {
-namespace TransportSockets {
-namespace Tls {
-namespace CertificateSelectors {
-namespace DynamicModules {
+// NOLINT(namespace-envoy)
+
+namespace {
+
+using Envoy::OptRef;
+using Envoy::Extensions::TransportSockets::Tls::ContextImpl;
+using Envoy::Extensions::TransportSockets::Tls::CertificateSelectors::DynamicModules::
+    DynamicModuleTlsCertificateSelectorConfig;
+using Envoy::Extensions::TransportSockets::Tls::CertificateSelectors::DynamicModules::
+    DynamicModuleTlsCertificateSelectorConfigScheduler;
+using Envoy::Extensions::TransportSockets::Tls::CertificateSelectors::DynamicModules::
+    TlsCertificateSelectionContext;
+namespace Network = Envoy::Network;
+namespace Stats = Envoy::Stats;
+namespace StreamInfo = Envoy::StreamInfo;
 
 using Envoy::Extensions::DynamicModules::ContextAccessor;
 using Envoy::Extensions::DynamicModules::MetricRegistry;
-
-namespace {
 
 DynamicModuleTlsCertificateSelectorConfig*
 toConfig(envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr config_envoy_ptr) {
@@ -298,10 +305,3 @@ void envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_del
 }
 
 } // extern "C"
-
-} // namespace DynamicModules
-} // namespace CertificateSelectors
-} // namespace Tls
-} // namespace TransportSockets
-} // namespace Extensions
-} // namespace Envoy
