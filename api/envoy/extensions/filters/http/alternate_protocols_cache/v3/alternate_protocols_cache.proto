@@ -20,9 +20,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // either in a cluster's :ref:`http_filters <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.http_filters>`
 // or in the router's :ref:`upstream_http_filters <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_http_filters>`.
 // Running it in a cluster learns alternate protocols only for that cluster, without changing any listener.
-// As an upstream filter it sees the response of every attempt, so it also caches ``alt-svc`` from
-// responses that are retried or lose a hedged race. In the HTTP connection manager's filter chain it
-// only sees the final response.
+// As an upstream filter it also caches ``alt-svc`` from responses the router discards and retries.
+// In the HTTP connection manager's filter chain it only sees the final response.
 // [#extension: envoy.filters.http.alternate_protocols_cache]
 message FilterConfig {
   // This field is ignored: the alternate protocols cache filter will use the
