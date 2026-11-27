@@ -265,7 +265,7 @@ message TokenCookieChunking {
 
 // OAuth config
 //
-// [#next-free-field: 35]
+// [#next-free-field: 36]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -506,6 +506,20 @@ message OAuth2Config {
   // be removed safely. In a rolling upgrade, set it only after every Envoy that may serve the same
   // client understands chunked cookies.
   TokenCookieChunking token_cookie_chunking = 34;
+
+  // If set to true, the refresh token request includes a ``scope`` parameter with the same value as
+  // the authorization request: the space-separated
+  // :ref:`auth_scopes <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_scopes>`
+  // (or the default ``user`` scope when none are configured). This is permitted by
+  // `RFC 6749 section 6 <https://datatracker.ietf.org/doc/html/rfc6749#section-6>`_ as long as the
+  // requested scopes do not exceed those originally granted.
+  //
+  // Some identity providers require this. Microsoft Entra ID, for example, rejects a refresh
+  // request without ``scope`` when the OAuth2 client is also the resource the access token is
+  // issued for. Only has effect when
+  // :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>`
+  // is enabled. Defaults to false.
+  bool send_scopes_on_refresh = 35;
 }
 
 // Per-route OAuth2 config.
