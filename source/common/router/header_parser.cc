@@ -195,6 +195,9 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers, const Formatter::Co
   // readability.
   std::string value_buffer;
   for (const auto& [key, entry] : headers_to_add_) {
+    if (entry->append_action_ == HeaderValueOption::ADD_IF_ABSENT && !headers.get(key).empty()) {
+      continue;
+    }
     absl::string_view value;
     if (stream_info != nullptr && entry->formatter_ != nullptr) {
       value_buffer.clear();
@@ -212,9 +215,7 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers, const Formatter::Co
         headers_to_add.emplace_back(key, value);
         break;
       case HeaderValueOption::ADD_IF_ABSENT:
-        if (auto header_entry = headers.get(key); header_entry.empty()) {
-          headers_to_add.emplace_back(key, value);
-        }
+        headers_to_add.emplace_back(key, value);
         break;
       case HeaderValueOption::OVERWRITE_IF_EXISTS:
         if (headers.get(key).empty()) {

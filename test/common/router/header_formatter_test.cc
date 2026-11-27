@@ -865,7 +865,7 @@ response_headers_to_add:
     append_action: OVERWRITE_IF_EXISTS_OR_ADD
   - header:
       key: "x-per-header"
-      value: "per"
+      value: "%PROTOCOL%"
     append_action: ADD_IF_ABSENT
 )EOF";
 
@@ -873,13 +873,14 @@ response_headers_to_add:
   HeaderParserPtr resp_header_parser =
       HeaderParser::configure(route.response_headers_to_add()).value();
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.protocol_ = Http::Protocol::Http11;
 
   {
     Http::TestResponseHeaderMapImpl header_map;
     resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
-    EXPECT_EQ("per", header_map.get_("x-per-header"));
+    EXPECT_EQ("HTTP/1.1", header_map.get_("x-per-header"));
   }
 
   {
@@ -887,7 +888,7 @@ response_headers_to_add:
     resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ(2, header_map.get(Http::LowerCaseString("x-foo-header")).size());
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
-    EXPECT_EQ("per", header_map.get_("x-per-header"));
+    EXPECT_EQ("HTTP/1.1", header_map.get_("x-per-header"));
   }
 
   {
@@ -896,11 +897,12 @@ response_headers_to_add:
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ(1, header_map.get(Http::LowerCaseString("x-bar-header")).size());
-    EXPECT_EQ("per", header_map.get_("x-per-header"));
+    EXPECT_EQ("HTTP/1.1", header_map.get_("x-per-header"));
   }
 
   {
     Http::TestResponseHeaderMapImpl header_map{{"x-per-header", "exist-per"}};
+    EXPECT_CALL(stream_info, protocol()).Times(0);
     resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
