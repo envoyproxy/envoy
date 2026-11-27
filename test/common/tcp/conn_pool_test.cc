@@ -282,6 +282,7 @@ public:
     EXPECT_CALL(*connection_, setBufferLimits(0));
     EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(false));
     EXPECT_CALL(*connection_, addConnectionCallbacks(_));
+    EXPECT_CALL(*connection_, state()).Times(AnyNumber());
     EXPECT_CALL(*connection_, addReadFilter(_));
     EXPECT_CALL(*connection_, connect());
     EXPECT_CALL(*connection_, setConnectionStats(_));
