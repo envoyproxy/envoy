@@ -24,6 +24,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/ascii.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
@@ -281,6 +282,17 @@ protected:
                               : listenerStatPrefix(absl::StrCat("on_demand_secret.", stat));
   }
 
+  // Sums the counters whose name starts with prefix.
+  uint64_t counterSum(absl::string_view prefix) {
+    uint64_t sum = 0;
+    for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
+      if (absl::StartsWith(counter->name(), prefix)) {
+        sum += counter->value();
+      }
+    }
+    return sum;
+  }
+
   std::vector<FakeStreamPtr> xds_streams_;
 };
 
@@ -310,6 +322,10 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
   test_server_->waitForCounter("sds.server.update_success", Eq(1));
   test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
   EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
+  // The handshake stats of the selected certificate stay on the listener or cluster scope.
+  EXPECT_EQ(2, counterSum(upstream_selector_ ? "cluster.cluster_0.ssl.local_sigalgs."
+                                             : listenerStatPrefix("ssl.local_sigalgs.")));
+  EXPECT_EQ(0, counterSum(onDemandStat("ssl.")));
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {

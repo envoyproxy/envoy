@@ -104,6 +104,9 @@ public:
 
   void setValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain) override;
 
+  void setLocalSignatureAlgorithm(uint16_t sigalg) override { local_signature_algorithm_ = sigalg; }
+  uint16_t localSignatureAlgorithm() const override { return local_signature_algorithm_; }
+
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
       Envoy::Ssl::ClientValidationStatus::NotValidated};
@@ -127,6 +130,7 @@ private:
   std::string cert_validation_error_;
   // Stores additional per-connection data needed by the certificate selector.
   Ssl::SelectionHandleConstSharedPtr cert_selection_handle_;
+  uint16_t local_signature_algorithm_{0};
 };
 
 class SslHandshakerImpl : public ConnectionInfoImplBase,

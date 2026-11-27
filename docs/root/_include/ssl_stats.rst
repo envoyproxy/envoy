@@ -17,5 +17,5 @@
    ciphers.<cipher>, Counter, Total successful TLS connections that used cipher <cipher>
    curves.<curve>, Counter, Total successful TLS connections that used ECDHE curve <curve>
    sigalgs.<sigalg>, Counter, Total successful TLS connections that used signature algorithm <sigalg>
-   local_sigalgs.<sigalg>, Counter, Total successful TLS handshakes in which Envoy signed with its own certificate using signature algorithm <sigalg>; resumed sessions are not counted
+   local_sigalgs.<sigalg>, Counter, Total successful TLS connections in which Envoy signed with its own certificate using signature algorithm <sigalg>; resumed sessions are not counted
    versions.<version>, Counter, Total successful TLS connections that used protocol version <version>

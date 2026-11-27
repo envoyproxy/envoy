@@ -401,16 +401,11 @@ void ContextImpl::infoCallback(const SSL* ssl, int type, int) {
   if (type != SSL_CB_HANDSHAKE_DONE || SSL_session_reused(ssl)) {
     return;
   }
-  const uint16_t sigalg_id = SSL_get_signature_algorithm_used(ssl);
-  if (sigalg_id == 0) {
-    return;
+  auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
+      SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
+  if (extended_socket_info != nullptr) {
+    extended_socket_info->setLocalSignatureAlgorithm(SSL_get_signature_algorithm_used(ssl));
   }
-  const auto* ctx = static_cast<const ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
-  ASSERT(ctx != nullptr);
-  ctx->incCounter(ctx->builtin_stat_names_->ssl_local_sigalgs_,
-                  ctx->builtin_stat_names_->ssl_sigalg_tag_name_,
-                  SSL_get_signature_algorithm_name(sigalg_id, 1 /* include curve */),
-                  ctx->builtin_stat_names_->unknown_ssl_algorithm_);
 }
 
 void ContextImpl::maybeWriteKeyLog(const char* line, const Network::Address::Instance* local_addr,
@@ -588,6 +583,17 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   if (sigalg_id) {
     const char* sigalg = SSL_get_signature_algorithm_name(sigalg_id, 1 /* include curve */);
     incCounter(builtin_stat_names_->ssl_sigalgs_, builtin_stat_names_->ssl_sigalg_tag_name_, sigalg,
+               builtin_stat_names_->unknown_ssl_algorithm_);
+  }
+
+  const auto* extended_socket_info = reinterpret_cast<const Envoy::Ssl::SslExtendedSocketInfo*>(
+      SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
+  const uint16_t local_sigalg_id =
+      extended_socket_info != nullptr ? extended_socket_info->localSignatureAlgorithm() : 0;
+  if (local_sigalg_id) {
+    incCounter(builtin_stat_names_->ssl_local_sigalgs_, builtin_stat_names_->ssl_sigalg_tag_name_,
+               absl::NullSafeStringView(
+                   SSL_get_signature_algorithm_name(local_sigalg_id, 1 /* include curve */)),
                builtin_stat_names_->unknown_ssl_algorithm_);
   }
 

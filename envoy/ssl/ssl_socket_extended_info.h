@@ -139,6 +139,17 @@ public:
    * @param chain the validated chain where chain[0] = leaf, chain[1] = direct issuer, etc.
    */
   virtual void setValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain) PURE;
+
+  /**
+   * Store the signature algorithm the local end signed the handshake with.
+   * @param sigalg the TLS SignatureScheme code point, or 0 if the local end did not sign.
+   */
+  virtual void setLocalSignatureAlgorithm(uint16_t sigalg) PURE;
+
+  /**
+   * @return the signature algorithm stored by setLocalSignatureAlgorithm(), or 0 if none.
+   */
+  virtual uint16_t localSignatureAlgorithm() const PURE;
 };
 
 } // namespace Ssl

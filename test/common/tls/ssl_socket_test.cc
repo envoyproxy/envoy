@@ -7979,9 +7979,13 @@ TEST_P(SslSocketTest, SignatureAlgorithms) {
         .setExpectedServerStats("ssl.sigalgs.rsa_pss_rsae_sha256")
         .setExpectedClientStats("ssl.sigalgs.ecdsa_secp256r1_sha256");
     testUtilV2(algorithm_test_options);
-    algorithm_test_options.setExpectedServerStats("ssl.local_sigalgs.ecdsa_secp256r1_sha256")
+
+    TestUtilOptionsV2 local_sigalgs_test_options(listener, client, true, version_);
+    local_sigalgs_test_options.setClientTlsVersion(tls_version)
+        .setExpectedClientCertUri("spiffe://lyft.com/test-team")
+        .setExpectedServerStats("ssl.local_sigalgs.ecdsa_secp256r1_sha256")
         .setExpectedClientStats("ssl.local_sigalgs.rsa_pss_rsae_sha256");
-    testUtilV2(algorithm_test_options);
+    testUtilV2(local_sigalgs_test_options);
 
     // Connection using defaults (client & server) succeeds, even with client renegotiation.
     client.set_allow_renegotiation(true);
