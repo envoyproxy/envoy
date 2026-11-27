@@ -9,6 +9,7 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Secret {
@@ -118,6 +119,14 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     return absl::InvalidArgumentError(msg);
   }
 
+  RETURN_IF_NOT_OK(updateSecret(secret, version_info));
+  init_target_.ready();
+  return absl::OkStatus();
+}
+
+absl::Status
+SdsApi::updateSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret,
+                     const std::string& version_info) {
   const uint64_t new_hash = MessageUtil::hash(secret);
 
   if (new_hash != secret_hash_) {
@@ -166,8 +175,12 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
     // Update last_updated only after successful file load and callbacks.
     secret_data_.last_updated_ = time_source_.systemTime();
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.sds_reuse_secret_across_providers")) {
+      last_secret_ =
+          std::make_unique<envoy::extensions::transport_sockets::tls::v3::Secret>(secret);
+    }
   }
-  init_target_.ready();
   return absl::OkStatus();
 }
 
@@ -233,9 +246,32 @@ void SdsApi::initialize(bool warm) {
     started_ = true;
     subscription_->start({sds_config_name_});
   }
-  if (!warm) {
+  if (!warm || seeded_) {
     init_target_.ready();
   }
+}
+
+bool SdsApi::seedFrom(const SdsApi& other) {
+  if (started_ || other.last_secret_ == nullptr) {
+    return false;
+  }
+  // Seeding runs while the owning listener or cluster is being created, so a failure here must not
+  // fail that update. The provider then waits for the server as it would without seeding.
+  TRY_ASSERT_MAIN_THREAD {
+    THROW_IF_NOT_OK(updateSecret(*other.last_secret_, other.secret_data_.version_info_));
+    seeded_ = true;
+  }
+  END_TRY
+  CATCH(const EnvoyException& e, {
+    ENVOY_LOG_MISC(warn, "sds: failed to reuse secret '{}' from an existing provider: {}",
+                   sds_config_name_, e.what());
+    // Make sure the same secret is applied again when the server delivers it.
+    secret_hash_ = 0;
+  });
+  if (seeded_) {
+    ENVOY_LOG_MISC(debug, "sds: secret '{}' reused from an existing provider", sds_config_name_);
+  }
+  return seeded_;
 }
 
 const SdsApi::SecretData& SdsApi::secretData() const { return secret_data_; }
