@@ -127,6 +127,31 @@ public:
       *slow_start_config.mutable_min_weight_percent() = legacy.min_weight_percent();
     }
   }
+
+  template <class SourceProto, class TargetProto>
+  static void convertConnectionAwareLbConfigTo(const SourceProto& source, TargetProto& target) {
+    if (!source.has_connection_aware_lb_config()) {
+      return;
+    }
+
+    auto& ca_config = *target.mutable_connection_aware_lb_config();
+    const auto& legacy = source.connection_aware_lb_config();
+
+    if (legacy.has_host_selection_retry_max_attempts()) {
+      *ca_config.mutable_host_selection_retry_max_attempts() =
+          legacy.host_selection_retry_max_attempts();
+    }
+  }
+
+  template <class Proto>
+  static std::optional<
+      envoy::extensions::load_balancing_policies::common::v3::ConnectionAwareLbConfig>
+  connectionAwareLbConfigFromProto(const Proto& proto_config) {
+    if (!proto_config.has_connection_aware_lb_config()) {
+      return {};
+    }
+    return proto_config.connection_aware_lb_config();
+  }
 };
 
 /**
@@ -262,15 +287,19 @@ private:
 class ZoneAwareLoadBalancerBase : public LoadBalancerBase {
 public:
   using LocalityLbConfig = envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig;
+  using ConnectionAwareLbConfig =
+      envoy::extensions::load_balancing_policies::common::v3::ConnectionAwareLbConfig;
 
   HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
 
 protected:
   // Both priority_set and local_priority_set if non-null must have at least one host set.
-  ZoneAwareLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                            ClusterLbStats& stats, Runtime::Loader& runtime,
-                            Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
-                            const std::optional<LocalityLbConfig> locality_config);
+  ZoneAwareLoadBalancerBase(
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
+      Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+      const std::optional<LocalityLbConfig> locality_config,
+      const std::optional<ConnectionAwareLbConfig> connection_aware_lb_config = std::nullopt,
+      ConnectionStateProvider* connection_state_provider = nullptr);
 
   // When deciding which hosts to use on an LB decision, we need to know how to index into the
   // priority_set. This priority_set cursor is used by ZoneAwareLoadBalancerBase subclasses, e.g.
@@ -491,6 +520,9 @@ private:
   // If locality weight aware routing is enabled.
   const bool locality_weighted_balancing_ : 1;
 
+  ConnectionStateProvider* const connection_state_provider_{};
+  const size_t connection_aware_attempts_;
+
   friend class TestZoneAwareLoadBalancer;
 };
 
@@ -520,7 +552,9 @@ public:
                       Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
                       const std::optional<LocalityLbConfig> locality_config,
                       const std::optional<SlowStartConfig> slow_start_config,
-                      TimeSource& time_source);
+                      const std::optional<ConnectionAwareLbConfig> connection_aware_lb_config,
+                      TimeSource& time_source,
+                      ConnectionStateProvider* connection_state_provider = nullptr);
 
   // Upstream::ZoneAwareLoadBalancerBase
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
