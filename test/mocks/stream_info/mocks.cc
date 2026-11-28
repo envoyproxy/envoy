@@ -268,6 +268,10 @@ MockStreamInfo::MockStreamInfo()
   });
   ON_CALL(*this, virtualHostSharedPtr())
       .WillByDefault([this]() -> Router::VirtualHostConstSharedPtr { return virtual_host_; });
+  ON_CALL(*this, workerId()).WillByDefault([this]() { return worker_id_; });
+  ON_CALL(*this, setWorkerId(_)).WillByDefault([this](std::optional<uint32_t> worker_id) {
+    worker_id_ = worker_id;
+  });
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

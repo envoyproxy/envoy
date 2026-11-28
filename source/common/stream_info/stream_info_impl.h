@@ -487,6 +487,7 @@ struct StreamInfoImpl : public StreamInfo {
     is_shadow_ = info.isShadow();
     codec_stream_id_ = info.codecStreamId();
     parent_stream_info_ = info.parentStreamInfo();
+    worker_id_ = info.workerId();
   }
 
   void setIsShadow(bool is_shadow) { is_shadow_ = is_shadow; }
@@ -539,6 +540,10 @@ struct StreamInfoImpl : public StreamInfo {
   std::optional<uint32_t> codecStreamId() const override { return codec_stream_id_; }
 
   void setCodecStreamId(std::optional<uint32_t> id) override { codec_stream_id_ = id; }
+
+  std::optional<uint32_t> workerId() const override { return worker_id_; }
+
+  void setWorkerId(std::optional<uint32_t> id) override { worker_id_ = id; }
 
   TimeSource& time_source_;
   SystemTime start_time_;
@@ -596,6 +601,7 @@ private:
   bool should_drain_connection_{false};
   bool is_shadow_{false};
   std::optional<uint32_t> codec_stream_id_;
+  std::optional<uint32_t> worker_id_;
 };
 
 } // namespace StreamInfo

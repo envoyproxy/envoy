@@ -151,6 +151,13 @@ TEST_P(AccessLogIntegrationTest, CommonDurationDownstreamConnectionActiveAtClose
   EXPECT_THAT(log, ContainsRegex("cx=[0-9]+"));
 }
 
+TEST_P(AccessLogIntegrationTest, WorkerId) {
+  useAccessLog("WORKER_ID=%WORKER_ID%");
+  testRouterDownstreamDisconnectBeforeRequestComplete();
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("WORKER_ID=0"));
+}
+
 // COMMON_DURATION DS_CX_BEG is populated for completed HTTP requests, while DS_CX_END renders as
 // "-" until the downstream connection closes.
 TEST_P(AccessLogIntegrationTest, CommonDurationDownstreamConnectionCompletedRequest) {

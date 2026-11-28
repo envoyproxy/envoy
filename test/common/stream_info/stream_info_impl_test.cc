@@ -46,13 +46,13 @@ protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
     ASSERT_TRUE(
         // with --config=docker-msan
-        sizeof(stream_info) == 752 ||
+        sizeof(stream_info) == 760 ||
         // with --config=docker-clang
-        sizeof(stream_info) == 776 ||
+        sizeof(stream_info) == 784 ||
         // with --config=docker-clang-libc++
-        sizeof(stream_info) == 728 ||
+        sizeof(stream_info) == 736 ||
         // with protobuf v35
-        sizeof(stream_info) == 736 || sizeof(stream_info) == 760)
+        sizeof(stream_info) == 744 || sizeof(stream_info) == 768)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -426,6 +426,16 @@ TEST_F(StreamInfoImplTest, CodecStreamId) {
   EXPECT_EQ(12345, stream_info.codecStreamId());
 }
 
+TEST_F(StreamInfoImplTest, WorkerId) {
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                             FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(std::nullopt, stream_info.workerId());
+  stream_info.setWorkerId(std::nullopt);
+  EXPECT_EQ(std::nullopt, stream_info.workerId());
+  stream_info.setWorkerId({5});
+  EXPECT_EQ(5, stream_info.workerId());
+}
+
 TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
   StreamInfoImpl s1(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
                     FilterState::LifeSpan::FilterChain);
@@ -495,6 +505,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.setIsShadow(true);
   s1.addCustomFlag("test_flag");
   s1.addCustomFlag("test_flag2");
+  s1.setWorkerId({5});
 
 #ifdef __clang__
 #if defined(__linux__)
@@ -553,6 +564,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.isShadow(), s2.isShadow());
   EXPECT_EQ(s1.customFlags(), s2.customFlags());
   EXPECT_EQ("test_flag,test_flag2", s1.customFlags());
+  EXPECT_EQ(s2.workerId(), 5);
 }
 
 TEST_F(StreamInfoImplTest, DynamicMetadataTest) {

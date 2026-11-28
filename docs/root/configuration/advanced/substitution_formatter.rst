@@ -955,6 +955,13 @@ Current supported substitution commands include:
   is unique with high likelihood within an execution, but can duplicate across
   multiple instances or between restarts.
 
+.. _config_access_log_format_worker_id:
+
+``%WORKER_ID%``
+  The zero-based index of the Envoy worker executing the request.
+
+  On threads that are not registered workers, will emit ``-``.
+
 .. _config_access_log_format_upstream_connection_id:
 
 ``%UPSTREAM_CONNECTION_ID%``

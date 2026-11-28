@@ -1580,7 +1580,16 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(formatValueForTest(downstream_format, {}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
-
+  {
+    StreamInfoFormatter format("WORKER_ID");
+    EXPECT_EQ("-", formatForTest(format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(format, {}, stream_info), ProtoEq(ValueUtil::stringValue("-")));
+    uint32_t id = 123;
+    stream_info.setWorkerId({id});
+    EXPECT_EQ("123", formatForTest(format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(format, {}, stream_info),
+                ProtoEq(ValueUtil::stringValue("123")));
+  }
   {
     StreamInfoFormatter upstream_format("CONNECTION_ID");
     uint64_t id = 123;
