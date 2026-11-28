@@ -56,6 +56,7 @@ impl SocketIo for TestIo {
       "io_read" => panic!("io_read panic"),
       "read_again" => SocketIoStatus::Again,
       "read_error" => SocketIoStatus::Error,
+      "read_over" => SocketIoStatus::Bytes(100),
       _ => {
         slices[0][0] = MaybeUninit::new(b'x');
         SocketIoStatus::Bytes(1)
@@ -550,6 +551,12 @@ fn test_io_hooks_map_to_the_abi() {
   assert_eq!((transferred, first), (1, b'x'));
   let (..) = read_one(io, true);
   assert!(recorded(&calls, "io_read_peek"));
+
+  // A count above the offered slices is clamped to them.
+  let over = io_state(new_io(&calls, "read_over"));
+  let (_, transferred, _) = read_one(over, false);
+  assert_eq!(transferred, 4);
+  close_state(over);
 
   // Empty buffers are passed through, and the byte count covers the others.
   let (status, transferred) = write_abc(io);

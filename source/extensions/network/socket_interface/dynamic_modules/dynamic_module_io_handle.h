@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include <memory>
 
 #include "envoy/event/dispatcher.h"
@@ -179,6 +180,8 @@ private:
   // Worker thread state of the current registration.
   uint32_t enabled_events_{0};
   bool registered_{false};
+  // Changes on every registration and reset, so a callback can tell it was replaced.
+  uint64_t registration_generation_{0};
   // A delegated client socket holds the module's readiness until the kernel reports its connect
   // done, since Envoy treats the first Write event as the connect completing.
   bool connecting_;
@@ -186,6 +189,13 @@ private:
   // example a read stopped by a limit or a capped accept loop, so the rest is delivered again.
   bool progress_{false};
 };
+
+// Converts an fd a module returned, mapping a value outside the fd range to INVALID_SOCKET so a
+// truncated value never names another socket.
+inline os_fd_t toOsFd(int64_t fd) {
+  return fd >= 0 && fd <= std::numeric_limits<os_fd_t>::max() ? static_cast<os_fd_t>(fd)
+                                                              : INVALID_SOCKET;
+}
 
 } // namespace DynamicModules
 } // namespace SocketInterface

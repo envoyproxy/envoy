@@ -176,7 +176,7 @@ Network::IoHandlePtr DynamicModuleSocketInterface::createModuleSocket(
 
   const bool already_connected =
       result == envoy_dynamic_module_type_socket_interface_creation_result_AlreadyConnected;
-  const os_fd_t socket_fd = static_cast<os_fd_t>(fd);
+  const os_fd_t socket_fd = toOsFd(fd);
   const std::string rejection = checkCreatedSocket(*config, socket_fd, socket_type, domain,
                                                    already_connected, flags, socket_module_ptr);
   if (!rejection.empty()) {

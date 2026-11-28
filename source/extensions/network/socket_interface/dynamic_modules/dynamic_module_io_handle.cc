@@ -68,6 +68,12 @@ toAddress(const envoy_dynamic_module_type_socket_interface_address& address, int
       (ip->ip()->version() == Network::Address::IpVersion::v6) != (domain == AF_INET6)) {
     return absl::InvalidArgumentError(absl::StrCat("invalid address ", value));
   }
+  // Match the kernel path, which turns a v4-mapped address on a dual-stack socket into IPv4.
+  if (domain == AF_INET6 && !socket_v6only) {
+    if (auto v4 = ip->ip()->ipv6()->v4CompatibleAddress(); v4 != nullptr) {
+      return v4;
+    }
+  }
   return ip;
 }
 
@@ -238,6 +244,8 @@ DynamicModuleIoHandle::DynamicModuleIoHandle(
       connecting_(connecting) {}
 
 DynamicModuleIoHandle::~DynamicModuleIoHandle() {
+  // close() closes the fd before the module's socket_close, as the ABI promises.
+  close();
   shared_state_->markClosed();
   releaseSocketModulePtr();
 }
@@ -401,6 +409,7 @@ Api::IoCallUint64Result DynamicModuleIoHandle::close() {
   }
   shared_state_->markClosed();
   registered_ = false;
+  ++registration_generation_;
   auto result = Network::IoSocketHandleImpl::close();
   releaseSocketModulePtr();
   return result;
@@ -441,6 +450,7 @@ DynamicModuleIoHandle::connect(Network::Address::InstanceConstSharedPtr address)
   if (already_connected_) {
     // Connecting an already connected socket fails with "already connected". Envoy still waits
     // for the socket to become writable, which completes a connect the module left in flight.
+    was_connected_ = true;
     return {0, 0};
   }
   return Network::IoSocketHandleImpl::connect(address);
@@ -486,7 +496,7 @@ Network::IoHandlePtr DynamicModuleIoHandle::accept(struct sockaddr* addr, sockle
   progress_ = true;
 
   const int domain = domain_.value_or(AF_INET);
-  const os_fd_t accepted_fd = static_cast<os_fd_t>(fd);
+  const os_fd_t accepted_fd = toOsFd(fd);
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
   if (flags & ~envoy_dynamic_module_type_socket_interface_socket_flag_DelegateIo) {
     rejectAccepted(accepted_fd, accepted_module_ptr, "a connection with an invalid flag");
@@ -568,13 +578,19 @@ Network::IoHandlePtr DynamicModuleIoHandle::duplicate() {
                                                     &fd, &duplicate_module_ptr);
   sockaddr_storage own_addr = {};
   socklen_t own_addr_len = sizeof(own_addr);
-  const os_fd_t duplicate_fd = static_cast<os_fd_t>(fd);
+  const os_fd_t duplicate_fd = toOsFd(fd);
+  int socket_type = 0;
+  socklen_t socket_type_len = sizeof(socket_type);
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+  // The copy must be a separate fd of the same kind, or two handles would close one fd.
   if (status == envoy_dynamic_module_type_socket_interface_io_status_Success &&
-      duplicate_module_ptr != nullptr && SOCKET_VALID(duplicate_fd) &&
-      Api::OsSysCallsSingleton::get()
-              .getsockname(duplicate_fd, reinterpret_cast<sockaddr*>(&own_addr), &own_addr_len)
+      duplicate_module_ptr != nullptr && SOCKET_VALID(duplicate_fd) && duplicate_fd != fd_ &&
+      os_sys_calls.getsockname(duplicate_fd, reinterpret_cast<sockaddr*>(&own_addr), &own_addr_len)
               .return_value_ == 0 &&
-      own_addr.ss_family == domain) {
+      own_addr.ss_family == domain &&
+      os_sys_calls.getsockopt(duplicate_fd, SOL_SOCKET, SO_TYPE, &socket_type, &socket_type_len)
+              .return_value_ == 0 &&
+      socket_type == SOCK_STREAM) {
     auto handle = std::make_unique<DynamicModuleIoHandle>(
         config_, duplicate_fd, socket_v6only_, domain,
         Network::SocketCreationOptions{false, max_addresses_cache_size_}, duplicate_module_ptr,
@@ -583,7 +599,7 @@ Network::IoHandlePtr DynamicModuleIoHandle::duplicate() {
     return handle;
   }
   if (status == envoy_dynamic_module_type_socket_interface_io_status_Success) {
-    if (SOCKET_VALID(duplicate_fd)) {
+    if (SOCKET_VALID(duplicate_fd) && duplicate_fd != fd_) {
       Api::OsSysCallsSingleton::get().close(duplicate_fd);
     }
     if (duplicate_module_ptr != nullptr) {
@@ -606,21 +622,29 @@ void DynamicModuleIoHandle::initializeFileEvent(Event::Dispatcher& dispatcher,
   Network::IoSocketHandleImpl::initializeFileEvent(
       dispatcher,
       [this, cb = std::move(cb)](uint32_t file_events) -> absl::Status {
+        // `cb` can close the socket or reset its events, which frees this closure, so only locals
+        // are used after it runs.
+        DynamicModuleIoHandle* self = this;
+        const uint64_t generation = self->registration_generation_;
         bool connected_now = false;
-        if (connecting_ && (file_events & Event::FileReadyType::Write)) {
+        if (self->connecting_ && (file_events & Event::FileReadyType::Write)) {
           // While connecting, Envoy injects nothing, so this Write is the kernel's.
-          connecting_ = false;
+          self->connecting_ = false;
           connected_now = true;
         }
-        progress_ = false;
+        self->progress_ = false;
         absl::Status status = cb(file_events);
-        if (connected_now || progress_) {
-          deliverPending();
+        if (self->registration_generation_ != generation) {
+          return status;
+        }
+        if (connected_now || self->progress_) {
+          self->deliverPending();
         }
         return status;
       },
       trigger, handsOverConnections() ? 0 : events);
   registered_ = true;
+  ++registration_generation_;
   enabled_events_ = events;
   shared_state_->setRegistration(*this, dispatcher);
   deliverPending();
@@ -640,6 +664,7 @@ void DynamicModuleIoHandle::enableFileEvents(uint32_t events) {
 void DynamicModuleIoHandle::resetFileEvents() {
   if (flags_ != 0) {
     registered_ = false;
+    ++registration_generation_;
     shared_state_->clearRegistration();
   }
   Network::IoSocketHandleImpl::resetFileEvents();

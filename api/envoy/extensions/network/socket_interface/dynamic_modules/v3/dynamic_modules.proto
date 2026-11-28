@@ -24,11 +24,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // The interface is selected only as the bootstrap's
 // :ref:`default_socket_interface <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.default_socket_interface>`,
 // so the module is asked for every socket of every listener and cluster except the admin
-// listener's, including health checks and Envoy gRPC xDS. For each socket the module creates the
-// socket itself or leaves it to the standard socket interface. Exactly one bootstrap extension of
-// this type can be configured, and the interface is supported on POSIX platforms only. A socket
-// whose I/O the module performs, or whose connections it hands over, requires hot restart to be
-// disabled.
+// listener's, including health checks, Envoy gRPC xDS and the statsd and X-Ray sockets. For each
+// socket the module creates the socket itself or leaves it to the standard socket interface, and
+// io_uring options do not apply to the sockets it creates. Exactly one bootstrap extension of this
+// type can be configured, and the interface is supported on POSIX platforms only. A socket whose
+// I/O the module performs, or whose connections it hands over, requires Envoy to run with
+// ``--disable-hot-restart``, even on a build without hot restart support. Module failures are
+// counted in ``dynamic_modules.socket_interface.<socket_interface_name>.socket_failed``,
+// ``accept_failed`` and ``duplicate_failed``.
 //
 // .. code-block:: yaml
 //

@@ -20,6 +20,7 @@ use std::ffi::c_void;
 use std::mem::MaybeUninit;
 use std::ops::BitOr;
 use std::ptr;
+use std::sync::{Mutex, MutexGuard};
 
 /// Stream sockets pass at most this many slices per read or write, so the slice lists stay on the
 /// stack.
@@ -188,9 +189,10 @@ pub trait SocketIo: Send {
     SocketShutdownStatus::NotImplemented
   }
 
-  /// Called when Envoy copies the socket. Returns the copy's file descriptor, for example from
-  /// `dup(2)`, and its per-socket object. The default implementation returns `None`, which makes
-  /// the copy a socket whose operations fail.
+  /// Called when Envoy copies the socket, for example when a reverse tunnel takes over a
+  /// connection. Returns the copy's file descriptor, for example from `dup(2)`, and its per-socket
+  /// object. The default implementation returns `None`, which makes the copy a socket whose
+  /// operations fail.
   fn duplicate(&mut self) -> Option<(i64, Box<dyn SocketIo>)> {
     None
   }
@@ -244,13 +246,12 @@ pub trait SocketAcceptor: Send {
   /// Called in place of `accept(2)` to hand Envoy the next pending connection.
   fn accept(&mut self) -> SocketAcceptResult;
 
-  /// Called when Envoy copies the listen socket, for example for each worker when the listener
-  /// does not use `reuse_port`. Returns the copy's file descriptor and per-socket object, each of
-  /// which hands over its own share of the connections. The default implementation returns
-  /// `None`, which makes the copy a socket whose operations fail.
-  fn duplicate(&mut self) -> Option<(i64, Box<dyn SocketAcceptor>)> {
-    None
-  }
+  /// Called when Envoy copies the listen socket: for each worker when the listener does not use
+  /// `reuse_port`, and on the main thread for every listener update that keeps the address, while
+  /// workers still accept on this socket. Returns the copy's file descriptor and per-socket object,
+  /// each of which hands over its own share of the connections. Returning `None` makes the copy a
+  /// socket whose operations fail, which fails the listener using it.
+  fn duplicate(&mut self) -> Option<(i64, Box<dyn SocketAcceptor>)>;
 }
 
 /// How Envoy handles a socket the module creates or a connection it hands over.
@@ -319,24 +320,34 @@ struct ModuleSocketInterface {
 
 /// The per-socket state of a socket the module created or handed over.
 enum ModuleSocket {
+  // Envoy calls an I/O socket's hooks on its worker thread, one at a time.
   Io(Box<dyn SocketIo>),
-  Acceptor {
-    acceptor: Box<dyn SocketAcceptor>,
-    // The addresses of the last connection handed over, which Envoy reads after `accept`
-    // returns.
-    local_address: String,
-    peer_address: String,
-  },
+  // Envoy copies a listen socket on the main thread while its worker may be accepting on it, so
+  // the hooks only take a shared reference and lock the state.
+  Acceptor(Mutex<AcceptorState>),
+}
+
+struct AcceptorState {
+  acceptor: Box<dyn SocketAcceptor>,
+  // The addresses of the last connection handed over, which Envoy reads after `accept` returns.
+  local_address: String,
+  peer_address: String,
 }
 
 impl ModuleSocket {
   fn acceptor(acceptor: Box<dyn SocketAcceptor>) -> Self {
-    ModuleSocket::Acceptor {
+    ModuleSocket::Acceptor(Mutex::new(AcceptorState {
       acceptor,
       local_address: String::new(),
       peer_address: String::new(),
-    }
+    }))
   }
+}
+
+/// Locks a listen socket's state. A panic in a hook already failed that call, so a poisoned lock
+/// still holds usable state.
+fn lock_acceptor(state: &Mutex<AcceptorState>) -> MutexGuard<'_, AcceptorState> {
+  state.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// Converts a handling into the flags and per-socket state Envoy receives.
@@ -543,12 +554,16 @@ ffi_export! {
     duplicate_socket_module_ptr_out:
       *mut abi::envoy_dynamic_module_type_socket_interface_socket_module_ptr,
   ) -> abi::envoy_dynamic_module_type_socket_interface_io_status {
-    let module = &mut *(socket_module_ptr as *mut ModuleSocket);
-    let copy = match module {
-      ModuleSocket::Io(io) => io.duplicate().map(|(fd, io)| (fd, ModuleSocket::Io(io))),
-      ModuleSocket::Acceptor { acceptor, .. } => acceptor
+    let socket = socket_module_ptr as *mut ModuleSocket;
+    let copy = if let ModuleSocket::Acceptor(state) = &*socket {
+      lock_acceptor(state)
+        .acceptor
         .duplicate()
-        .map(|(fd, acceptor)| (fd, ModuleSocket::acceptor(acceptor))),
+        .map(|(fd, acceptor)| (fd, ModuleSocket::acceptor(acceptor)))
+    } else if let ModuleSocket::Io(io) = &mut *socket {
+      io.duplicate().map(|(fd, io)| (fd, ModuleSocket::Io(io)))
+    } else {
+      None
     };
     match copy {
       Some((fd, state)) => {
@@ -573,13 +588,14 @@ ffi_export! {
     io_ready_handle_module_ptr:
       abi::envoy_dynamic_module_type_socket_interface_io_ready_handle_module_ptr,
   ) {
-    let module = &mut *(socket_module_ptr as *mut ModuleSocket);
     // SAFETY: Envoy passes the readiness handle it created for this socket, and the handle's
     // lifetime is module-managed from this point on.
     let handle = Box::new(unsafe { EnvoySocketIoReadyHandleImpl::new(io_ready_handle_module_ptr) });
-    match module {
-      ModuleSocket::Io(io) => io.set_ready_handle(handle),
-      ModuleSocket::Acceptor { acceptor, .. } => acceptor.set_ready_handle(handle),
+    let socket = socket_module_ptr as *mut ModuleSocket;
+    if let ModuleSocket::Acceptor(state) = &*socket {
+      lock_acceptor(state).acceptor.set_ready_handle(handle);
+    } else if let ModuleSocket::Io(io) = &mut *socket {
+      io.set_ready_handle(handle);
     }
   }
 }
@@ -615,7 +631,13 @@ ffi_export! {
         }
       })
       .collect();
-    to_io_status(io.io_read(&mut rust_slices, peek), bytes_transferred)
+    let offered: usize = rust_slices.iter().map(|slice| slice.len()).sum();
+    // A count above what Envoy offered would commit bytes the module never wrote.
+    let status = match io.io_read(&mut rust_slices, peek) {
+      SocketIoStatus::Bytes(bytes) => SocketIoStatus::Bytes(bytes.min(offered)),
+      other => other,
+    };
+    to_io_status(status, bytes_transferred)
   }
   on_panic = abi::envoy_dynamic_module_type_socket_interface_io_status::Error
 }
@@ -697,14 +719,15 @@ ffi_export! {
     local_address_out: *mut abi::envoy_dynamic_module_type_socket_interface_address,
     peer_address_out: *mut abi::envoy_dynamic_module_type_socket_interface_address,
   ) -> abi::envoy_dynamic_module_type_socket_interface_io_status {
-    let ModuleSocket::Acceptor {
+    let ModuleSocket::Acceptor(state) = &*(socket_module_ptr as *const ModuleSocket) else {
+      return abi::envoy_dynamic_module_type_socket_interface_io_status::Error;
+    };
+    let mut guard = lock_acceptor(state);
+    let AcceptorState {
       acceptor,
       local_address,
       peer_address,
-    } = &mut *(socket_module_ptr as *mut ModuleSocket)
-    else {
-      return abi::envoy_dynamic_module_type_socket_interface_io_status::Error;
-    };
+    } = &mut *guard;
     match acceptor.accept() {
       SocketAcceptResult::Accepted {
         fd,
@@ -716,8 +739,8 @@ ffi_export! {
         *fd_out = fd;
         *flags_out = flags;
         *accepted_socket_module_ptr_out = state;
-        // The addresses live in the listen socket's state until its next hook call, which is
-        // after Envoy copied them.
+        // The addresses live in the listen socket's state until its next accept, which is after
+        // Envoy copied them. A concurrent duplicate does not touch them.
         if let Some(local) = local {
           *local_address = local.address;
           *local_address_out = to_abi_address(local_address, local.port);

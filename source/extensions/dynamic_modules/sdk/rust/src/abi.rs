@@ -21562,9 +21562,15 @@ unsafe extern "C" {
  thread-safe.
 
  When the module creates the socket, it hands the file descriptor to Envoy, which owns and closes
- it from the point this returns. The file descriptor must be non-blocking and have the requested
- address family and socket type; Envoy rejects one that does not, as it does a flag the socket
- cannot use, closing the file descriptor and treating the creation as failed.
+ it from the point this returns. The file descriptor must have the requested address family and
+ socket type; Envoy rejects one that does not, as it does a flag the socket cannot use, closing
+ the file descriptor and treating the creation as failed. It must also be non-blocking, which
+ Envoy does not check: a blocking one stalls its thread. Envoy does not tell the hook whether the
+ socket becomes a listen or a client socket, so HandsOverConnections on a client socket leaves its
+ connect waiting until the connect timeout. With socket_v6only, the module sets IPV6_V6ONLY on an
+ IPv6 socket itself, before binding it. A module that declines a family in
+ envoy_dynamic_module_on_socket_interface_ip_family_supported is still asked for that family's
+ sockets and returns UseDefault for them.
 
  @param config_module_ptr is the pointer to the in-module socket interface configuration.
  @param socket_type is the type of the socket.
@@ -21603,7 +21609,9 @@ unsafe extern "C" {
  socket with a non-null per-socket state, after Envoy closed its file descriptor. The module
  releases its per-socket state here; bytes it took in
  envoy_dynamic_module_on_socket_interface_io_write and has not sent yet are its own to flush or
- drop. This hook must not block.
+ drop; since the file descriptor number may already belong to another socket, a module that
+ writes them later keeps its own dup(2) of it and closes that once done. This hook must not
+ block.
 
  @param config_module_ptr is the pointer to the in-module socket interface configuration.
  @param socket_module_ptr is the per-socket state of the socket.*/
@@ -21619,6 +21627,10 @@ unsafe extern "C" {
  reuse_port, or on a listener update. The module creates the copy's file descriptor, for example
  with dup(2), and its own per-socket state, and the copy keeps the original's flags. This hook is
  required when the module implements the I/O hooks or the accept hook.
+
+ Envoy copies a listen socket on the main thread during a listener update while the socket's
+ worker may be calling envoy_dynamic_module_on_socket_interface_accept on it, so the module
+ synchronizes the listen socket's state between the two hooks.
 
  @param config_module_ptr is the pointer to the in-module socket interface configuration.
  @param socket_module_ptr is the per-socket state of the socket being copied.
@@ -21666,7 +21678,9 @@ unsafe extern "C" {
  @param slices are the writable slices of the Envoy read buffer.
  @param num_slices is the number of slices.
  @param peek is whether Envoy only peeks at the data, as listener filters do with MSG_PEEK, in
- which case the module copies the bytes without consuming them.
+ which case the module copies the bytes without consuming them. A consuming read after a peek
+ returns the peeked bytes at once, since listener filters drain them in a loop that does not
+ expect Again or the end of the stream.
  @param bytes_transferred is where the module writes the number of bytes it wrote into the
  slices before it returns Success. Success with 0 bytes means the end of the stream.
  @return the outcome of the read.*/
@@ -21686,8 +21700,10 @@ unsafe extern "C" {
  order across the buffers, and stops at the first buffer it does not take completely. Envoy
  treats Success with 0 bytes as Again. After Again, the module reports Write readiness with
  envoy_dynamic_module_callback_socket_interface_io_ready once it can take more bytes, unless the
- kernel signals it. The buffers are owned by Envoy and valid only during this call. This hook is
- required when the module implements the I/O hooks.
+ kernel signals it. Bytes the module takes count as sent, so Envoy's write buffer limits no longer
+ bound them; the module bounds what it buffers and returns Again once full. The buffers are owned
+ by Envoy and valid only during this call. This hook is required when the module implements the
+ I/O hooks.
 
  @param config_module_ptr is the pointer to the in-module socket interface configuration.
  @param socket_module_ptr is the per-socket state of the socket.
@@ -21732,9 +21748,11 @@ unsafe extern "C" {
  calling this hook until it returns Again or the listener stops accepting.
 
  From the point this returns Success, Envoy owns the file descriptor and closes it. It must be a
- non-blocking, connected stream socket of the listen socket's address family; for AF_UNIX it must
- have a name, which Envoy reports as the peer address. Envoy rejects a file descriptor that does
- not, as it does a flag the connection cannot use, closing the file descriptor.
+ connected stream socket of the listen socket's address family; for AF_UNIX it must have a name,
+ which Envoy reports as the peer address. Envoy rejects a file descriptor that does not, as it
+ does a flag the connection cannot use, closing the file descriptor. It must also be
+ non-blocking, which Envoy does not check. After Error, Envoy calls this hook again only once the
+ module reports Read or the listener is re-enabled.
 
  This hook is optional, and independent of the I/O hooks.
 
@@ -21747,11 +21765,13 @@ unsafe extern "C" {
  @param accepted_socket_module_ptr_out is where the module writes the per-socket state of the
  accepted connection, which follows the same rules as the state of a created socket.
  @param local_address_out is where the module writes the local address of the connection, for
- example the destination of a connection it received over its own transport, which Envoy uses for
- filter chain matching. Envoy initializes it to empty.
- @param peer_address_out is where the module writes the peer address of the connection. Envoy
- initializes it to empty. The memory of both addresses must stay valid until the module's next
- hook call for the listen socket.
+ example the destination of a connection it received over its own transport. Envoy uses it for
+ filter chain matching only when the listener's address is a wildcard IP address; otherwise the
+ connection keeps the listener's address. Envoy initializes it to empty.
+ @param peer_address_out is where the module writes the peer address of the connection, which
+ filters such as RBAC and x-forwarded-for handling trust as the client's. Envoy initializes it to
+ empty. The memory of both addresses must stay valid until the module's next accept call for the
+ listen socket.
  @return Success when a connection is handed over, Again when no connection is pending, or Error
  when the accept failed.*/
     pub fn envoy_dynamic_module_on_socket_interface_accept(

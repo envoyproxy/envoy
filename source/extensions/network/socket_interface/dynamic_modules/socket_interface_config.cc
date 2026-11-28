@@ -1,6 +1,7 @@
 #include "source/extensions/network/socket_interface/dynamic_modules/socket_interface_config.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/stats/utility.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -15,7 +16,8 @@ namespace {
 DynamicModuleSocketInterfaceStats generateStats(absl::string_view socket_interface_name,
                                                 Stats::Scope& scope) {
   const std::string prefix =
-      absl::StrCat("dynamic_modules.socket_interface.", socket_interface_name, ".");
+      absl::StrCat("dynamic_modules.socket_interface.",
+                   Stats::Utility::sanitizeStatsName(socket_interface_name), ".");
   return {DYNAMIC_MODULE_SOCKET_INTERFACE_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
 }
 

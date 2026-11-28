@@ -50,7 +50,8 @@ static int byte_report = 0;
 // Hands back a client socket with 1 both flags, 2 HandsOverConnections or 3 no per-socket state.
 static int create_flags_mode = 0;
 // Hands over a connection with 1 no flags, 2 an invalid flag, 3 DelegateIo but no per-socket
-// state, 4 an unconnected socket, 5 an invalid port or 6 an IPv6 address.
+// state, 4 an unconnected socket, 5 an invalid port, 6 an IPv6 address or 7 v4-mapped IPv6
+// addresses.
 static int accept_mode = 0;
 static char greeting[64];
 static size_t greeting_length = 0;
@@ -88,28 +89,35 @@ static test_socket_state* new_state(int fd, int peer_fd) {
 }
 
 // Creates a connected IPv4 TCP pair: the client side goes to Envoy, the peer stays in the state.
-static test_socket_state* create_connected_pair(void) {
-  int listener = socket(AF_INET, SOCK_STREAM, 0);
+static test_socket_state* create_connected_pair(int domain) {
+  int listener = socket(domain, SOCK_STREAM, 0);
   if (listener < 0) {
     return NULL;
   }
-  struct sockaddr_in addr;
+  struct sockaddr_storage addr;
   memset(&addr, 0, sizeof(addr));
-  addr.sin_family = AF_INET;
-  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-  addr.sin_port = 0;
-  socklen_t addr_len = sizeof(addr);
-  if (bind(listener, (struct sockaddr*)&addr, sizeof(addr)) < 0 || listen(listener, 1) < 0 ||
+  socklen_t addr_len;
+  if (domain == AF_INET6) {
+    ((struct sockaddr_in6*)&addr)->sin6_family = AF_INET6;
+    ((struct sockaddr_in6*)&addr)->sin6_addr = in6addr_loopback;
+    addr_len = sizeof(struct sockaddr_in6);
+  } else {
+    ((struct sockaddr_in*)&addr)->sin_family = AF_INET;
+    ((struct sockaddr_in*)&addr)->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr_len = sizeof(struct sockaddr_in);
+  }
+  const socklen_t bind_len = addr_len;
+  if (bind(listener, (struct sockaddr*)&addr, bind_len) < 0 || listen(listener, 1) < 0 ||
       getsockname(listener, (struct sockaddr*)&addr, &addr_len) < 0) {
     close(listener);
     return NULL;
   }
-  int client_fd = socket(AF_INET, SOCK_STREAM, 0);
+  int client_fd = socket(domain, SOCK_STREAM, 0);
   if (client_fd < 0) {
     close(listener);
     return NULL;
   }
-  if (connect(client_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+  if (connect(client_fd, (struct sockaddr*)&addr, bind_len) < 0) {
     close(listener);
     close(client_fd);
     return NULL;
@@ -203,7 +211,7 @@ envoy_dynamic_module_on_socket_interface_socket(
     return envoy_dynamic_module_type_socket_interface_creation_result_Created;
   }
   const bool stream = socket_type == envoy_dynamic_module_type_socket_interface_socket_type_Stream;
-  if (listen_mode && stream && (domain == AF_INET || domain == AF_UNIX)) {
+  if (listen_mode && stream) {
     int fd = socket(domain, SOCK_STREAM, 0);
     test_socket_state* state = fd < 0 ? NULL : new_state(fd, -1);
     if (state == NULL) {
@@ -223,7 +231,7 @@ envoy_dynamic_module_on_socket_interface_socket(
   if (domain != AF_INET || !stream) {
     return envoy_dynamic_module_type_socket_interface_creation_result_UseDefault;
   }
-  test_socket_state* state = create_connected_pair();
+  test_socket_state* state = create_connected_pair(AF_INET);
   if (state == NULL) {
     return envoy_dynamic_module_type_socket_interface_creation_result_Error;
   }
@@ -282,8 +290,11 @@ envoy_dynamic_module_on_socket_interface_socket_duplicate(
     return envoy_dynamic_module_type_socket_interface_io_status_Error;
   }
   const test_socket_state* state = (const test_socket_state*)socket_module_ptr;
-  // With force_bad_fd, the copy is a socket of another family, which Envoy rejects.
-  int fd = force_bad_fd ? socket(AF_UNIX, SOCK_STREAM, 0) : dup(state->fd);
+  // With force_bad_fd 1, the copy is a socket of another family, and with 2 it is the original
+  // file descriptor, both of which Envoy rejects.
+  int fd = force_bad_fd == 1   ? socket(AF_UNIX, SOCK_STREAM, 0)
+           : force_bad_fd == 2 ? state->fd
+                               : dup(state->fd);
   test_socket_state* copy = fd < 0 ? NULL : new_state(fd, -1);
   if (copy == NULL) {
     if (fd >= 0) {
@@ -448,7 +459,8 @@ envoy_dynamic_module_on_socket_interface_accept(
   }
   const test_socket_state* listen_state = (const test_socket_state*)socket_module_ptr;
   const bool unix_domain = listen_state->domain == AF_UNIX;
-  test_socket_state* state = unix_domain ? create_unix_pair() : create_connected_pair();
+  test_socket_state* state =
+      unix_domain ? create_unix_pair() : create_connected_pair(listen_state->domain);
   if (state == NULL) {
     return envoy_dynamic_module_type_socket_interface_io_status_Error;
   }
@@ -467,9 +479,13 @@ envoy_dynamic_module_on_socket_interface_accept(
   } else if (accept_mode == 2) {
     *flags_out = envoy_dynamic_module_type_socket_interface_socket_flag_HandsOverConnections;
   }
-  if (report_accept_addresses || accept_mode == 5 || accept_mode == 6) {
+  if (report_accept_addresses || accept_mode >= 5) {
     const char* local = unix_domain ? accept_local_pipe : accept_local_address;
     const char* peer = unix_domain ? accept_peer_pipe : accept_peer_address;
+    if (accept_mode == 7) {
+      local = "::ffff:10.1.2.3";
+      peer = "::ffff:10.9.8.7";
+    }
     local_address_out->address.ptr = local;
     local_address_out->address.length = strlen(local);
     local_address_out->port = unix_domain ? 0 : (accept_mode == 5 ? 70000 : 443);

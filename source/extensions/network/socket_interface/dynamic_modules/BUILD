@@ -30,6 +30,7 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/network:utility_lib",
+        "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/dynamic_modules/abi",
         "@abseil-cpp//absl/base:core_headers",

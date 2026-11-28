@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -192,6 +193,8 @@ TEST_F(DynamicModuleSocketInterfaceTest, DelegatesDataPathAndSkipsConnect) {
       handle->connect(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1000));
   EXPECT_EQ(0, connect_result.return_value_);
   EXPECT_EQ(0, connect_result.errno_);
+  // UDP proxying reads this to send without a destination on a connected socket.
+  EXPECT_TRUE(handle->wasConnected());
   // Bind and listen stay with the kernel, which refuses them on a connected socket.
   EXPECT_EQ(
       -1,
@@ -693,6 +696,30 @@ TEST_F(DynamicModuleSocketInterfaceTest, AcceptReportsTheModuleAddresses) {
   EXPECT_TRUE(listen_handle->close().ok());
 }
 
+// On a dual-stack listener, a v4-mapped address becomes IPv4 as the kernel path makes it, so
+// IPv4 matchers such as RBAC see the connection.
+TEST_F(DynamicModuleSocketInterfaceTest, AcceptConvertsV4MappedAddresses) {
+  installInterface("socket_interface_test");
+  setSwitch("setSocketInterfaceTestListenMode", 1);
+  setSwitch("setSocketInterfaceTestAcceptMode", 7);
+  auto listen_handle = interface_.socket(
+      Network::Socket::Type::Stream,
+      std::make_shared<Network::Address::Ipv6Instance>("::1", 0, nullptr, /*v6only=*/false),
+      Network::SocketCreationOptions{});
+  ASSERT_NE(nullptr, listen_handle);
+  moduleFunction<void (*)(int)>("queueSocketInterfaceTestConnections")(1);
+
+  sockaddr_storage remote_addr = {};
+  socklen_t remote_len = sizeof(remote_addr);
+  auto accepted = listen_handle->accept(reinterpret_cast<sockaddr*>(&remote_addr), &remote_len);
+  ASSERT_NE(nullptr, accepted);
+  EXPECT_EQ("10.1.2.3:443", (*accepted->localAddress())->asString());
+  EXPECT_EQ("10.9.8.7:1234", (*accepted->peerAddress())->asString());
+  EXPECT_TRUE(accepted->close().ok());
+  EXPECT_TRUE(listen_handle->close().ok());
+  setSwitch("setSocketInterfaceTestAcceptMode", 0);
+}
+
 TEST_F(DynamicModuleSocketInterfaceTest, PausedListenerDefersTheAccept) {
   installInterface("socket_interface_test");
   setSwitch("setSocketInterfaceTestListenMode", 1);
@@ -866,8 +893,14 @@ TEST_F(DynamicModuleSocketInterfaceTest, DuplicateCopiesTheModuleState) {
   ASSERT_NE(nullptr, wrong_family_copy);
   expectFailedSocket(*wrong_family_copy);
   EXPECT_EQ(initial_close_count + 1, moduleCounter("getSocketInterfaceTestCloseCount"));
+  // A copy that hands back the original file descriptor is rejected without closing it.
+  setSwitch("setSocketInterfaceTestForceBadFd", 2);
+  auto same_fd_copy = listen_handle->duplicate();
+  ASSERT_NE(nullptr, same_fd_copy);
+  expectFailedSocket(*same_fd_copy);
+  EXPECT_NE(-1, ::fcntl(listen_handle->fdDoNotUse(), F_GETFD));
   setSwitch("setSocketInterfaceTestForceBadFd", 0);
-  EXPECT_EQ(2, counter("duplicate_failed"));
+  EXPECT_EQ(3, counter("duplicate_failed"));
   EXPECT_TRUE(copy->close().ok());
   EXPECT_TRUE(listen_handle->close().ok());
 }
