@@ -198,6 +198,51 @@ TEST_F(InternalClientConnectionImplTest, AbortResetEmitsEofToPeerGuardDisabled) 
   EXPECT_EQ(nullptr, read_res.err_);
 }
 
+TEST_F(InternalClientConnectionImplTest, AbortResetDeliversPendingDataBeforeRemoteReset) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+
+  client_ = std::make_unique<Network::ClientConnectionImpl>(
+      *dispatcher_,
+      std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_), local_addr_,
+                                                      remote_addr_),
+      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr, nullptr);
+  auto read_filter = std::make_shared<NiceMock<Network::MockReadFilter>>();
+  client_->addReadFilter(read_filter);
+  client_->addConnectionCallbacks(connection_callbacks);
+  client_->connect();
+  client_->noDelay(true);
+
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  const std::string early_response =
+      "HTTP/1.1 413 Payload Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+  Buffer::OwnedImpl buf_to_write(early_response);
+  ASSERT_TRUE(io_handle_peer_->write(buf_to_write).ok());
+  io_handle_peer_->setAbortiveClose();
+  io_handle_peer_->close();
+
+  std::string received;
+  {
+    testing::InSequence s;
+    EXPECT_CALL(*read_filter, onData(_, false))
+        .WillOnce([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
+          received.append(data.toString());
+          data.drain(data.length());
+          return Network::FilterStatus::Continue;
+        });
+    EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+        .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  }
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(early_response, received);
+  EXPECT_EQ(StreamInfo::DetectedCloseType::RemoteReset, client_->detectedCloseType());
+}
+
 // With half-close enabled and the feature on, a peer full close delivers all pending data with
 // end_stream=true first and then fires a normal RemoteClose. Without end_stream=true, consumers
 // like Http::Tcp::TcpUpstream reset the stream with INTERNAL_ERROR; without RemoteClose,
