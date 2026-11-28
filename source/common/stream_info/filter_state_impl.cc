@@ -1,5 +1,7 @@
 #include "source/common/stream_info/filter_state_impl.h"
 
+#include <utility>
+
 #include "envoy/common/exception.h"
 
 #include "source/common/common/compiled_string_map.h"
@@ -223,6 +225,14 @@ void FilterStateImpl::setIndexedData(FilterStateIndex index, std::shared_ptr<Obj
         fmt::format("FilterStateAccessViolation: FilterState::setIndexedData<T> called twice with "
                     "conflicting life_span on index: {}.",
                     idx));
+    return;
+  }
+
+  if (data == nullptr) {
+    if (indexed_data_storage_[idx] != nullptr) {
+      indexed_data_storage_[idx].reset();
+      --indexed_count_;
+    }
     return;
   }
 

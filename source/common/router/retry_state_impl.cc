@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
@@ -266,6 +267,12 @@ void RetryStateImpl::resetRetry() {
     next_loop_callback_ = nullptr;
   }
   do_retry_type_ = DoRetryType::Immediately;
+}
+
+void RetryStateImpl::onRetryComplete(StreamInfo::StreamInfo&) {
+  resetRetry();
+  retry_timer_.reset();
+  retry_on_ = 0;
 }
 
 RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallback callback) {

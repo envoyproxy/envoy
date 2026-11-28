@@ -14,6 +14,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
@@ -1518,6 +1519,20 @@ TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {
     EXPECT_FALSE(request_headers.has("x-envoy-hedge-on-per-try-timeout"));
     EXPECT_FALSE(request_headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
   }
+}
+
+TEST_F(RouterRetryStateImplTest, DefaultHooksAreNoOps) {
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+  setup(request_headers);
+  ASSERT_NE(nullptr, state_);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  state_->onRetryAttempt(request_headers, stream_info);
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  state_->onResponseHeaders(response_headers, stream_info);
+  EXPECT_TRUE(response_headers.getEnvoyAttemptCountValue().empty());
+  state_->onRetryComplete(stream_info);
 }
 
 } // namespace

@@ -220,6 +220,39 @@ public:
    * @return true if this retry state was automatically configured for HTTP/3.
    */
   virtual bool isAutomaticallyConfiguredForHttp3() const PURE;
+
+  /**
+   * Invoked at the start of each retry attempt prior to upstream cluster refresh and host
+   * selection (for example, to advance per-request candidate state or update request headers,
+   * DynamicMetadata, or FilterState on StreamInfo).
+   * @param request_headers the request headers for the upcoming retry attempt.
+   * @param downstream_stream_info the downstream stream info for the request.
+   */
+  virtual void onRetryAttempt(Http::RequestHeaderMap& /*request_headers*/,
+                              StreamInfo::StreamInfo& /*downstream_stream_info*/) {}
+
+  /**
+   * Invoked on response headers prior to forwarding downstream (including immediate and deferred
+   * local replies).
+   * @param response_headers the response headers.
+   * @param stream_info the stream info for the request.
+   */
+  virtual void onResponseHeaders(Http::ResponseHeaderMap& /*response_headers*/,
+                                 StreamInfo::StreamInfo& /*stream_info*/) {}
+
+  /**
+   * Called once when retries finish, are abandoned, or clean up, always prior to
+   * onResponseHeaders() (and response header finalization) so any StreamInfo updates made here are
+   * visible to response header formatters and onResponseHeaders(). The RetryState remains alive
+   * until stream destruction so onResponseHeaders() can still run on immediate or deferred local
+   * replies.
+   *
+   * Implementations MUST cancel and clean up all pending retry timers and callbacks in this
+   * method so that no retry callback can fire after onRetryComplete() returns, as firing a retry
+   * callback after completion would violate router state invariants.
+   * @param stream_info the stream info for the request.
+   */
+  virtual void onRetryComplete(StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 using RetryStatePtr = std::unique_ptr<RetryState>;
