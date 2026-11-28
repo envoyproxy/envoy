@@ -204,7 +204,7 @@ Api::IoCallBoolResult InstanceImplPosix::createPath(absl::string_view path) {
   while (!path.empty() && path.back() == '/') {
     path.remove_suffix(1);
   }
-  if (directoryExists(std::string{path})) {
+  if (directoryExists(path)) {
     return resultSuccess(false);
   }
   absl::string_view subpath = path;
@@ -214,7 +214,7 @@ Api::IoCallBoolResult InstanceImplPosix::createPath(absl::string_view path) {
       return resultFailure(false, ENOENT);
     }
     subpath = subpath.substr(0, slashpos);
-  } while (!directoryExists(std::string{subpath}));
+  } while (!directoryExists(subpath));
   // We're now at the most-nested directory that already exists.
   // Time to create paths recursively.
   while (subpath != path) {
@@ -271,13 +271,14 @@ FilePtr InstanceImplPosix::createFile(const FilePathAndType& file_info) {
   return nullptr; // for gcc
 }
 
-bool InstanceImplPosix::fileExists(const std::string& path) {
-  std::ifstream input_file(path);
+bool InstanceImplPosix::fileExists(absl::string_view path) {
+  std::ifstream input_file{std::string(path)};
   return input_file.is_open();
 }
 
-bool InstanceImplPosix::directoryExists(const std::string& path) {
-  DIR* const dir = ::opendir(path.c_str());
+bool InstanceImplPosix::directoryExists(absl::string_view path) {
+  const std::string path_str(path);
+  DIR* const dir = ::opendir(path_str.c_str());
   const bool dir_exists = nullptr != dir;
   if (dir_exists) {
     ::closedir(dir);
@@ -286,20 +287,21 @@ bool InstanceImplPosix::directoryExists(const std::string& path) {
   return dir_exists;
 }
 
-ssize_t InstanceImplPosix::fileSize(const std::string& path) {
+ssize_t InstanceImplPosix::fileSize(absl::string_view path) {
   struct stat info;
-  if (::stat(path.c_str(), &info) != 0) {
+  const std::string path_str(path);
+  if (::stat(path_str.c_str(), &info) != 0) {
     return -1;
   }
   return info.st_size;
 }
 
-absl::StatusOr<std::string> InstanceImplPosix::fileReadToEnd(const std::string& path) {
+absl::StatusOr<std::string> InstanceImplPosix::fileReadToEnd(absl::string_view path) {
   if (illegalPath(path)) {
     return absl::InvalidArgumentError(absl::StrCat("Invalid path: ", path));
   }
 
-  std::ifstream file(path);
+  std::ifstream file{std::string(path)};
   if (file.fail()) {
     return absl::InvalidArgumentError(absl::StrCat("unable to read file: ", path));
   }
@@ -323,7 +325,7 @@ absl::StatusOr<PathSplitResult> InstanceImplPosix::splitPathFromFilename(absl::s
   return PathSplitResult{path.substr(0, last_slash), name};
 }
 
-bool InstanceImplPosix::illegalPath(const std::string& path) {
+bool InstanceImplPosix::illegalPath(absl::string_view path) {
   // Special case, allow /dev/fd/* access here so that config can be passed in a
   // file descriptor from a bootstrap script via exec. The reason we do this
   // _before_ canonicalizing the path is that different unix flavors implement
@@ -348,7 +350,7 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
     return false;
   }
 
-  const Api::SysCallStringResult canonical_path = canonicalPath(path);
+  const Api::SysCallStringResult canonical_path = canonicalPath(std::string(path));
   if (canonical_path.return_value_.empty()) {
     ENVOY_LOG_MISC(debug, "Unable to determine canonical path for {}: {}", path,
                    errorDetails(canonical_path.errno_));

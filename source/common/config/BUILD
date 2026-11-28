@@ -76,6 +76,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
+        "@abseil-cpp//absl/strings:string_view",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

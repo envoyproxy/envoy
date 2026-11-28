@@ -20,7 +20,7 @@ namespace DataSource {
  * @return std::string with file contents. or an error status if the file does not exist or
  * cannot be read.
  */
-absl::StatusOr<std::string> readFile(const std::string& path, Api::Api& api, bool allow_empty,
+absl::StatusOr<std::string> readFile(absl::string_view path, Api::Api& api, bool allow_empty,
                                      uint64_t max_size) {
   auto& file_system = api.fileSystem();
 

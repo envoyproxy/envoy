@@ -9,6 +9,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -23,7 +24,7 @@ public:
     file_contents_[path] = contents;
   }
 
-  absl::StatusOr<std::string> fileReadToEnd(const std::string& path) override {
+  absl::StatusOr<std::string> fileReadToEnd(absl::string_view path) override {
     auto it = file_contents_.find(path);
     if (it != file_contents_.end()) {
       return it->second;
@@ -32,7 +33,7 @@ public:
   }
 
 private:
-  std::map<std::string, std::string> file_contents_;
+  absl::flat_hash_map<std::string, std::string> file_contents_;
 };
 
 // Helper function to escape paths like Linux's show_path

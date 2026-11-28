@@ -38,7 +38,7 @@ void ContainerCredentialsProvider::refresh() {
   if (authorization_token_.empty()) {
     // EKS Pod Identity token is sourced from AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE
     if (const auto token_file = std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE)) {
-      token_or_error = context_.api().fileSystem().fileReadToEnd(std::string(token_file));
+      token_or_error = context_.api().fileSystem().fileReadToEnd(token_file);
       if (token_or_error.ok()) {
         ENVOY_LOG(debug, "Container authorization token file contents loaded");
         authorization_header = token_or_error.value();

@@ -156,7 +156,7 @@ FilePtr MemfileInstanceImpl::createFile(const FilePathAndType& file_info) {
   return std::make_unique<MemfileImpl>(file_info, info);
 }
 
-ssize_t MemfileInstanceImpl::fileSize(const std::string& path) {
+ssize_t MemfileInstanceImpl::fileSize(absl::string_view path) {
   {
     absl::MutexLock m(lock_);
     auto it = files_.find(path);
@@ -169,7 +169,7 @@ ssize_t MemfileInstanceImpl::fileSize(const std::string& path) {
   return file_system_->fileSize(path);
 }
 
-absl::StatusOr<std::string> MemfileInstanceImpl::fileReadToEnd(const std::string& path) {
+absl::StatusOr<std::string> MemfileInstanceImpl::fileReadToEnd(absl::string_view path) {
   {
     absl::MutexLock m(lock_);
     auto it = files_.find(path);

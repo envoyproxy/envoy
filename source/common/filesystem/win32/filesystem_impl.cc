@@ -248,25 +248,28 @@ FilePtr InstanceImplWin32::createFile(const FilePathAndType& file_info) {
   return nullptr; // for gcc
 }
 
-bool InstanceImplWin32::fileExists(const std::string& path) {
-  const DWORD attributes = ::GetFileAttributes(path.c_str());
+bool InstanceImplWin32::fileExists(absl::string_view path) {
+  const std::string path_str(path);
+  const DWORD attributes = ::GetFileAttributes(path_str.c_str());
   return attributes != INVALID_FILE_ATTRIBUTES;
 }
 
-bool InstanceImplWin32::directoryExists(const std::string& path) {
-  const DWORD attributes = ::GetFileAttributes(path.c_str());
+bool InstanceImplWin32::directoryExists(absl::string_view path) {
+  const std::string path_str(path);
+  const DWORD attributes = ::GetFileAttributes(path_str.c_str());
   if (attributes == INVALID_FILE_ATTRIBUTES) {
     return false;
   }
   return attributes & FILE_ATTRIBUTE_DIRECTORY;
 }
 
-ssize_t InstanceImplWin32::fileSize(const std::string& path) {
+ssize_t InstanceImplWin32::fileSize(absl::string_view path) {
   // In ssl_integration_test::SslKeyLogTest cases, a temporary file is created, and then when
   // we check whether some logs are printed into the file, CreateFileA will fail and report the
   // error:"The process cannot access the file because it is being used by another process". Add
   // FILE_SHARE_WRITE flag to avoid such issue.
-  auto fd = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
+  const std::string path_str(path);
+  auto fd = CreateFileA(path_str.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
                         OPEN_EXISTING, 0, NULL);
   if (fd == INVALID_HANDLE) {
     return -1;
@@ -282,7 +285,7 @@ ssize_t InstanceImplWin32::fileSize(const std::string& path) {
   return result;
 }
 
-absl::StatusOr<std::string> InstanceImplWin32::fileReadToEnd(const std::string& path) {
+absl::StatusOr<std::string> InstanceImplWin32::fileReadToEnd(absl::string_view path) {
   if (illegalPath(path)) {
     return absl::InvalidArgumentError(absl::StrCat("Invalid path: ", path));
   }
@@ -290,7 +293,8 @@ absl::StatusOr<std::string> InstanceImplWin32::fileReadToEnd(const std::string& 
   // In integration tests (and potentially in production) we rename config files and this creates
   // sharing violation errors while reading the file from a different thread. This is why we need to
   // add `FILE_SHARE_DELETE` to the sharing mode.
-  auto fd = CreateFileA(path.c_str(), GENERIC_READ,
+  const std::string path_str(path);
+  auto fd = CreateFileA(path_str.c_str(), GENERIC_READ,
                         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0, OPEN_EXISTING, 0,
                         NULL);
   if (fd == INVALID_HANDLE) {
@@ -378,8 +382,8 @@ absl::node_hash_map<std::string, bool> pathelt_table = {
 
 // clang-format on
 
-bool InstanceImplWin32::illegalPath(const std::string& path) {
-  std::string pathbuffer = path;
+bool InstanceImplWin32::illegalPath(absl::string_view path) {
+  std::string pathbuffer(path);
   absl::string_view pathname = pathbuffer;
 
   // Examine and skip common leading path patterns of \\?\ and
