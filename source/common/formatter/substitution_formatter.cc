@@ -458,7 +458,8 @@ using JsonFormatValue =
 
 // A JSON object node in the format template tree used by OmitEmptyJsonFormatterImpl.
 struct JsonFormatMapNode {
-  // Fields are stored sorted by key to keep the output deterministic.
+  // Fields are stored sorted by key to keep the output deterministic. Each key is stored
+  // pre-serialized as a quoted, sanitized JSON string followed by the key-value delimiter.
   std::vector<std::pair<std::string, JsonFormatValue>> fields_;
 };
 
@@ -540,7 +541,11 @@ buildJsonFormatMapNode(const ProtoDict& fields, const std::vector<CommandParserP
     RETURN_IF_NOT_OK_REF(value_or.status());
     // Literal null fields are dropped so they are neither stored nor checked at format time.
     if (!absl::holds_alternative<absl::monostate>(value_or.value())) {
-      node.fields_.emplace_back(field->first, std::move(value_or).value());
+      std::string serialized_key;
+      JsonStringSerializer key_serializer(serialized_key);
+      key_serializer.addString(field->first);
+      key_serializer.addKeyValueDelimiter();
+      node.fields_.emplace_back(std::move(serialized_key), std::move(value_or).value());
     }
   }
   return node;
@@ -564,8 +569,7 @@ bool serializeJsonFormatMapNode(const JsonFormatMapNode& node, const Context& co
     if (!object_is_empty) {
       serializer.addElementsDelimiter();
     }
-    serializer.addString(field.first);
-    serializer.addKeyValueDelimiter();
+    serializer.addRawString(field.first);
     if (!serializeJsonFormatValue(field.second, context, info, serializer, scratch)) {
       // The value was omitted; roll back the element delimiter, key and any partial output.
       serializer.outputBuffer().resize(field_start);

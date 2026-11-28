@@ -6015,6 +6015,60 @@ TEST(SubstitutionFormatterTest, JsonFormatterWithOrderedPropertiesTest) {
   EXPECT_EQ(out_json, expected);
 }
 
+TEST(SubstitutionFormatterTest, JsonFormatterKeysNeedingEscapingTest) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{"key_1", "value_1"}};
+  Context formatter_context;
+  formatter_context.setRequestHeaders(request_header);
+
+  Protobuf::Struct present_fields;
+  auto& fields = *present_fields.mutable_fields();
+  fields[R"(quote"key)"].set_string_value("%REQ(key_1)%");
+  fields[R"(back\slash)"].set_string_value("%REQ(key_1)%");
+  fields["ctrl\x01\n\t"].set_string_value("%REQ(key_1)%");
+  fields["caf\xc3\xa9"].set_string_value("%REQ(key_1)%");
+  (*fields[R"(nested"map)"].mutable_struct_value()->mutable_fields())[R"(inner\key)"]
+      .set_string_value("%REQ(key_1)%");
+
+  const std::string expected = "{"
+                               R"("back\\slash":"value_1",)"
+                               "\"caf\xc3\xa9\":\"value_1\","
+                               R"("ctrl\u0001\n\t":"value_1",)"
+                               R"("nested\"map":{"inner\\key":"value_1"},)"
+                               R"("quote\"key":"value_1")"
+                               "}\n";
+
+  EXPECT_EQ(expected, JsonFormatterImpl::create(present_fields, false)
+                          .value()
+                          ->format(formatter_context, stream_info));
+  EXPECT_EQ(expected, OmitEmptyJsonFormatterImpl::create(present_fields)
+                          .value()
+                          ->format(formatter_context, stream_info));
+
+  // Omitted fields with escaped keys are rolled back without leaving any key bytes behind, at the
+  // start of the root object, inside a nested object and as a whole nested object.
+  Protobuf::Struct with_omitted_fields = present_fields;
+  auto& omitted = *with_omitted_fields.mutable_fields();
+  omitted[R"(absent"key)"].set_string_value("%REQ(missing)%");
+  (*omitted[R"(all\gone)"].mutable_struct_value()->mutable_fields())[R"(x"y)"].set_string_value(
+      "%REQ(missing)%");
+  (*omitted[R"(nested"map)"].mutable_struct_value()->mutable_fields())["\"first\x02"]
+      .set_string_value("%REQ(missing)%");
+  EXPECT_EQ(expected, OmitEmptyJsonFormatterImpl::create(with_omitted_fields)
+                          .value()
+                          ->format(formatter_context, stream_info));
+
+  // Keys that are not valid UTF-8 take the sanitizer's hex-escape path.
+  Protobuf::Struct invalid_utf8_key;
+  (*invalid_utf8_key.mutable_fields())["bad\xff"].set_string_value("%REQ(key_1)%");
+  EXPECT_EQ(JsonFormatterImpl::create(invalid_utf8_key, false)
+                .value()
+                ->format(formatter_context, stream_info),
+            OmitEmptyJsonFormatterImpl::create(invalid_utf8_key)
+                .value()
+                ->format(formatter_context, stream_info));
+}
+
 TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
