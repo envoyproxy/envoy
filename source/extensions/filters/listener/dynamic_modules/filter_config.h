@@ -10,6 +10,7 @@
 #include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/scheduler.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -101,6 +102,11 @@ public:
 
   // The main thread dispatcher for scheduling config-level events.
   Event::Dispatcher& main_thread_dispatcher_;
+
+  // Shared with the schedulers of this config. Initialized once the config is held by a shared
+  // pointer, before the module can create a scheduler, and cleared at the start of the destructor.
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleListenerFilterConfig> scheduler_target_{
+      std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleListenerFilterConfig>>()};
 
   // ----------------------------- Metrics Support -----------------------------
   // Handle classes for storing defined metrics.
@@ -214,28 +220,8 @@ private:
  * envoy_dynamic_module_callback_listener_filter_config_scheduler_new and deleted via
  * envoy_dynamic_module_callback_listener_filter_config_scheduler_delete.
  */
-class DynamicModuleListenerFilterConfigScheduler {
-public:
-  explicit DynamicModuleListenerFilterConfigScheduler(
-      std::weak_ptr<DynamicModuleListenerFilterConfig> config)
-      : config_(std::move(config)) {}
-
-  void commit(uint64_t event_id) {
-    // Lock the config so its dispatcher member stays valid across `post`.
-    auto config_shared = config_.lock();
-    if (!config_shared) {
-      return;
-    }
-    config_shared->main_thread_dispatcher_.post([config = config_, event_id]() {
-      if (std::shared_ptr<DynamicModuleListenerFilterConfig> cs = config.lock()) {
-        cs->onScheduled(event_id);
-      }
-    });
-  }
-
-private:
-  std::weak_ptr<DynamicModuleListenerFilterConfig> config_;
-};
+using DynamicModuleListenerFilterConfigScheduler =
+    DynamicModuleScheduler<DynamicModuleListenerFilterConfig>;
 
 /**
  * Creates a new DynamicModuleListenerFilterConfig for given configuration.

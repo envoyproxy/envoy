@@ -93,6 +93,7 @@ envoy_cc_test(
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 

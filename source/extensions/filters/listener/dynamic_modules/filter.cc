@@ -31,6 +31,9 @@ void DynamicModuleListenerFilter::initializeInModuleFilter() {
 }
 
 void DynamicModuleListenerFilter::destroy() {
+  // Stop the schedulers before the destroy hook, which may join a module thread that is committing
+  // an event.
+  scheduler_target_->clear();
   // Cancel all pending HTTP callouts before destroying the filter.
   for (auto& callout : http_callouts_) {
     if (callout.second->request_ != nullptr) {
@@ -48,6 +51,7 @@ void DynamicModuleListenerFilter::destroy() {
 
 Network::FilterStatus DynamicModuleListenerFilter::onAccept(Network::ListenerFilterCallbacks& cb) {
   callbacks_ = &cb;
+  scheduler_target_->initialize(cb.dispatcher(), weak_from_this());
 
   const std::string& worker_name = cb.dispatcher().name();
   auto pos = worker_name.find_first_of('_');

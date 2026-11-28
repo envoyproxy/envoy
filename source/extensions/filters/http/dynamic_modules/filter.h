@@ -2,6 +2,7 @@
 
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/scheduler.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
 
@@ -42,6 +43,7 @@ public:
   FilterMetadataStatus decodeMetadata(MetadataMap&) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
+    scheduler_target_->initialize(callbacks.dispatcher(), weak_from_this());
     // Registration is deferred until the in-module filter exists: the factory wires callbacks
     // before initializeInModuleFilter(), and addDownstreamWatermarkCallbacks() synchronously
     // replays any pending onAboveWriteBufferHighWatermark() into the newly registered callback.
@@ -61,6 +63,13 @@ public:
   void encodeComplete() override;
 
   bool isDestroyed() const { return destroyed_; }
+
+  /**
+   * Returns the target that the schedulers of this filter post through.
+   */
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleHttpFilter>& schedulerTarget() const {
+    return scheduler_target_;
+  }
 
   // ----------  Http::DownstreamWatermarkCallbacks  ----------
   void onAboveWriteBufferHighWatermark() override;
@@ -270,6 +279,11 @@ private:
   // asserts that the callback was previously added.
   bool downstream_watermark_callbacks_registered_ = false;
 
+  // Shared with the schedulers of this filter. Initialized when the decoder callbacks are set and
+  // cleared at the start of the teardown.
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleHttpFilter> scheduler_target_{
+      std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleHttpFilter>>()};
+
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
    * callout from the parent HTTP filter.
@@ -399,31 +413,7 @@ using DynamicModuleHttpFilterWeakPtr = std::weak_ptr<DynamicModuleHttpFilter>;
  * envoy_dynamic_module_callback_http_filter_scheduler_new and deleted via
  * envoy_dynamic_module_callback_http_filter_scheduler_delete.
  */
-class DynamicModuleHttpFilterScheduler {
-public:
-  explicit DynamicModuleHttpFilterScheduler(DynamicModuleHttpFilterWeakPtr filter)
-      : filter_(std::move(filter)) {}
-
-  void commit(uint64_t event_id) {
-    // Lock the filter so the dispatcher reference obtained via its callbacks stays valid across
-    // `post`.
-    auto filter_shared = filter_.lock();
-    if (!filter_shared || filter_shared->isDestroyed() ||
-        filter_shared->decoder_callbacks_ == nullptr) {
-      return;
-    }
-    filter_shared->decoder_callbacks_->dispatcher().post([filter = filter_, event_id]() {
-      if (DynamicModuleHttpFilterSharedPtr fs = filter.lock()) {
-        fs->onScheduled(event_id);
-      }
-    });
-  }
-
-private:
-  // The filter that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
-  // extending the lifetime of the filter.
-  DynamicModuleHttpFilterWeakPtr filter_;
-};
+using DynamicModuleHttpFilterScheduler = DynamicModuleScheduler<DynamicModuleHttpFilter>;
 
 } // namespace HttpFilters
 } // namespace DynamicModules
