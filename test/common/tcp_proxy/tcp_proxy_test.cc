@@ -2082,7 +2082,7 @@ TEST_P(TcpProxyTest, UpstreamFlushTimeoutExpired) {
   EXPECT_EQ(1U, config_->stats().idle_timeout_.value());
 }
 
-// Tests that upstream flush will close a connection if it reads data from the upstream
+// Tests that upstream flush will reset a connection if it reads data from the upstream
 // connection after the downstream connection is closed (nowhere to send it).
 TEST_P(TcpProxyTest, UpstreamFlushReceiveUpstreamData) {
   setup(1);
@@ -2099,8 +2099,71 @@ TEST_P(TcpProxyTest, UpstreamFlushReceiveUpstreamData) {
 
   // Send some bytes; no timeout configured so this should be a no-op (not a crash).
   Buffer::OwnedImpl buffer("a");
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::AbortReset));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+}
+
+// Tests that upstream flush will close a connection with NoFlush if it reads data from the
+// upstream connection after the downstream connection is closed when the runtime guard is disabled.
+TEST_P(TcpProxyTest, UpstreamFlushReceiveUpstreamDataWhenRstGuardDisabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.tcp_proxy_send_rst_on_drain_abort", "false"}});
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite, _))
+      .WillOnce(Return()); // Cancel default action of raising LocalClose
+  EXPECT_CALL(*upstream_connections_.at(0), state())
+      .WillOnce(Return(Network::Connection::State::Closing));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+
+  EXPECT_EQ(1U, config_->stats().upstream_flush_active_.value());
+
+  Buffer::OwnedImpl buffer("a");
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
   upstream_callbacks_->onUpstreamData(buffer, false);
+}
+
+// Tests that destroying UpstreamDrainManager with an active drain resets the upstream connection.
+TEST_P(TcpProxyTest, UpstreamFlushDrainManagerDestructionResetsConnection) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite, _))
+      .WillOnce(Return()); // Cancel default action of raising LocalClose
+  EXPECT_CALL(*upstream_connections_.at(0), state())
+      .WillOnce(Return(Network::Connection::State::Closing));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+
+  EXPECT_EQ(1U, config_->stats().upstream_flush_active_.value());
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::AbortReset));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, clearDeferredDeleteList());
+  factory_context_.server_factory_context_.thread_local_.shutdownThread();
+}
+
+// Tests that destroying UpstreamDrainManager with an active drain closes with NoFlush when the
+// runtime guard is disabled.
+TEST_P(TcpProxyTest, UpstreamFlushDrainManagerDestructionUsesNoFlushWhenRstGuardDisabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.tcp_proxy_send_rst_on_drain_abort", "false"}});
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite, _))
+      .WillOnce(Return()); // Cancel default action of raising LocalClose
+  EXPECT_CALL(*upstream_connections_.at(0), state())
+      .WillOnce(Return(Network::Connection::State::Closing));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+
+  EXPECT_EQ(1U, config_->stats().upstream_flush_active_.value());
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, clearDeferredDeleteList());
+  factory_context_.server_factory_context_.thread_local_.shutdownThread();
 }
 
 TEST_P(TcpProxyTest, UpstreamSocketOptionsReturnedEmpty) {

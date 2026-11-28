@@ -831,7 +831,7 @@ public:
   void onData(Buffer::Instance& data, bool end_stream);
   void onIdleTimeout();
   void onBytesSent();
-  void cancelDrain();
+  void cancelDrain(Network::ConnectionCloseType close_type);
   Event::Dispatcher& dispatcher();
 
 private:
