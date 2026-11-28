@@ -1964,6 +1964,11 @@ void FilterManager::maybeEndEncode(bool end_stream) {
   if (end_stream) {
     ASSERT(!state_.encoder_filter_chain_complete_);
     state_.encoder_filter_chain_complete_ = true;
+    if (state_.deferred_no_error_reset_) {
+      state_.deferred_no_error_reset_ = false;
+      filter_manager_callbacks_.resetStream(StreamResetReason::RemoteResetNoError, "");
+      return;
+    }
     if (filter_manager_callbacks_.isHalfCloseEnabled()) {
       // If independent half close is enabled the stream is closed when both decoder and encoder
       // filter chains has completed or were aborted.
@@ -2495,6 +2500,18 @@ void FilterManager::responseDataDrained() {
 
 void FilterManager::resetStream(StreamResetReason reason,
                                 absl::string_view transport_failure_reason) {
+  // A clean upstream reset follows the complete response, but encoder filters may still be
+  // holding its final data or trailers. Let them deliver end_stream to the codec before closing
+  // the downstream request half, so the reset cannot discard buffered response data.
+  if (reason == StreamResetReason::RemoteResetNoError && !state_.encoder_filter_chain_complete_ &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.filter_manager_defer_no_error_reset")) {
+    state_.deferred_no_error_reset_ = true;
+    state_.decoder_filter_chain_aborted_ = true;
+    return;
+  }
+  state_.deferred_no_error_reset_ = false;
+
   // Stop filter chain iteration if stream is reset while filter decoding or encoding callbacks
   // are running.
   if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {

@@ -181,10 +181,11 @@ public:
   // Builds the chain, sends request headers through the router filter, and sends 200 response
   // headers with every encoder filter returning Continue except last_filter, which returns
   // `last_headers_status`, and first_filter, which returns `first_headers_status`.
-  EncoderTrailerChain setupEncoderTrailerChain(
-      bool with_middle_filter,
-      FilterHeadersStatus last_headers_status = FilterHeadersStatus::Continue,
-      FilterHeadersStatus first_headers_status = FilterHeadersStatus::Continue);
+  EncoderTrailerChain
+  setupEncoderTrailerChain(bool with_middle_filter,
+                           FilterHeadersStatus last_headers_status = FilterHeadersStatus::Continue,
+                           FilterHeadersStatus first_headers_status = FilterHeadersStatus::Continue,
+                           bool request_end_stream = true);
   void runEncodeDataAddTrailersOnStopIterationNoBufferTest(bool forward_held_trailers);
 
   std::unique_ptr<DownstreamFilterManager> filter_manager_;
@@ -3676,6 +3677,11 @@ TEST_F(FilterManagerTrailersTest, ResponseTrailersAddedWithoutStopAreEncodedOnce
   filter_manager_->destroyFilters();
 }
 
+<<<<<<< HEAD
+FilterManagerTest::EncoderTrailerChain FilterManagerTest::setupEncoderTrailerChain(
+    bool with_middle_filter, FilterHeadersStatus last_headers_status,
+    FilterHeadersStatus first_headers_status, bool request_end_stream) {
+=======
 TEST_F(FilterManagerTrailersTest,
        RequestTrailersNotForwardedAfterTooLargeReplyEndsStreamWithoutGuard) {
   initializeChain(false);
@@ -3711,6 +3717,7 @@ FilterManagerTest::EncoderTrailerChain
 FilterManagerTest::setupEncoderTrailerChain(bool with_middle_filter,
                                             FilterHeadersStatus last_headers_status,
                                             FilterHeadersStatus first_headers_status) {
+>>>>>>> upstream/main
   EncoderTrailerChain chain;
   if (with_middle_filter) {
     chain.middle_filter = std::make_shared<NiceMock<MockStreamEncoderFilter>>();
@@ -3742,9 +3749,9 @@ FilterManagerTest::setupEncoderTrailerChain(bool with_middle_filter,
 
   filter_manager_->createDownstreamFilterChain();
   filter_manager_->requestHeadersInitialized();
-  EXPECT_CALL(*chain.router_filter, decodeHeaders(_, true))
+  EXPECT_CALL(*chain.router_filter, decodeHeaders(_, request_end_stream))
       .WillOnce(Return(FilterHeadersStatus::Continue));
-  filter_manager_->decodeHeaders(*chain.request_headers, true);
+  filter_manager_->decodeHeaders(*chain.request_headers, request_end_stream);
 
   EXPECT_CALL(*chain.first_filter, encodeHeaders(_, false)).WillOnce(Return(first_headers_status));
   if (first_headers_status == FilterHeadersStatus::Continue) {
@@ -3758,6 +3765,107 @@ FilterManagerTest::setupEncoderTrailerChain(bool with_middle_filter,
       std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
       false, "via_upstream");
   return chain;
+}
+
+class FilterManagerDeferredResetTest : public FilterManagerTest,
+                                       public testing::WithParamInterface<bool> {
+public:
+  void SetUp() override {
+    runtime_.mergeValues({{"envoy.reloadable_features.filter_manager_defer_no_error_reset",
+                           GetParam() ? "true" : "false"}});
+    initialize();
+  }
+
+  TestScopedRuntime runtime_;
+};
+
+INSTANTIATE_TEST_SUITE_P(RuntimeGuard, FilterManagerDeferredResetTest, testing::Bool());
+
+TEST_P(FilterManagerDeferredResetTest, CleanResetWaitsForInjectedResponseData) {
+  ON_CALL(filter_manager_callbacks_, isHalfCloseEnabled()).WillByDefault(Return(true));
+  EncoderTrailerChain chain = setupEncoderTrailerChain(
+      /*with_middle_filter=*/false, FilterHeadersStatus::Continue, FilterHeadersStatus::Continue,
+      /*request_end_stream=*/false);
+  Buffer::OwnedImpl held_data;
+  EXPECT_CALL(*chain.first_filter, encodeData(_, true)).WillOnce([&](Buffer::Instance& data, bool) {
+    held_data.move(data);
+    return FilterDataStatus::StopIterationNoBuffer;
+  });
+  Buffer::OwnedImpl payload("payload");
+  chain.router_filter->callbacks_->encodeData(payload, true);
+
+  EXPECT_CALL(filter_manager_callbacks_, resetStream(StreamResetReason::RemoteResetNoError, ""))
+      .Times(GetParam() ? 0 : 1);
+  chain.router_filter->callbacks_->resetStream(StreamResetReason::RemoteResetNoError, "");
+  testing::Mock::VerifyAndClearExpectations(&filter_manager_callbacks_);
+
+  if (GetParam()) {
+    // The upstream has closed, so further request data must not reach the router.
+    EXPECT_CALL(*chain.router_filter, decodeData(_, _)).Times(0);
+    Buffer::OwnedImpl late_request_data("late request data");
+    filter_manager_->decodeData(late_request_data, false);
+
+    InSequence sequence;
+    // A rate limiter can release multiple chunks before its final end_stream.
+    EXPECT_CALL(filter_manager_callbacks_, encodeData(_, false));
+    EXPECT_CALL(filter_manager_callbacks_, encodeData(_, true));
+    EXPECT_CALL(filter_manager_callbacks_, resetStream(StreamResetReason::RemoteResetNoError, ""));
+    EXPECT_CALL(filter_manager_callbacks_, endStream()).Times(0);
+    Buffer::OwnedImpl first_chunk;
+    first_chunk.move(held_data, 3);
+    chain.first_filter->callbacks_->injectEncodedDataToFilterChain(first_chunk, false);
+    chain.first_filter->callbacks_->injectEncodedDataToFilterChain(held_data, true);
+  }
+  filter_manager_->destroyFilters();
+}
+
+TEST_P(FilterManagerDeferredResetTest, CleanResetWaitsForResponseTrailers) {
+  EncoderTrailerChain chain = setupEncoderTrailerChain(/*with_middle_filter=*/false);
+  EXPECT_CALL(*chain.first_filter, encodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::StopIteration));
+  ResponseTrailerMapPtr trailers = std::make_unique<TestResponseTrailerMapImpl>();
+  trailers->addCopy(LowerCaseString("x-trailer"), "value");
+  chain.router_filter->callbacks_->encodeTrailers(std::move(trailers));
+
+  EXPECT_CALL(filter_manager_callbacks_, resetStream(StreamResetReason::RemoteResetNoError, ""))
+      .Times(GetParam() ? 0 : 1);
+  chain.router_filter->callbacks_->resetStream(StreamResetReason::RemoteResetNoError, "");
+  testing::Mock::VerifyAndClearExpectations(&filter_manager_callbacks_);
+
+  if (GetParam()) {
+    InSequence sequence;
+    EXPECT_CALL(filter_manager_callbacks_, encodeTrailers(ContainsHeader("x-trailer", "value")));
+    EXPECT_CALL(filter_manager_callbacks_, resetStream(StreamResetReason::RemoteResetNoError, ""));
+    EXPECT_CALL(filter_manager_callbacks_, endStream()).Times(0);
+    chain.first_filter->callbacks_->continueEncoding();
+  }
+  filter_manager_->destroyFilters();
+}
+
+TEST_P(FilterManagerDeferredResetTest, ErrorResetDoesNotWaitForResponse) {
+  EncoderTrailerChain chain = setupEncoderTrailerChain(/*with_middle_filter=*/false);
+  EXPECT_CALL(*chain.first_filter, encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  Buffer::OwnedImpl payload("payload");
+  chain.router_filter->callbacks_->encodeData(payload, true);
+
+  EXPECT_CALL(filter_manager_callbacks_, resetStream(StreamResetReason::RemoteResetNoError, ""))
+      .Times(GetParam() ? 0 : 1);
+  chain.router_filter->callbacks_->resetStream(StreamResetReason::RemoteResetNoError, "");
+  EXPECT_CALL(filter_manager_callbacks_, resetStream(StreamResetReason::LocalReset, "error"));
+  chain.router_filter->callbacks_->resetStream(StreamResetReason::LocalReset, "error");
+  filter_manager_->destroyFilters();
+}
+
+TEST_P(FilterManagerDeferredResetTest, CleanResetAfterResponseDoesNotWait) {
+  EncoderTrailerChain chain = setupEncoderTrailerChain(/*with_middle_filter=*/false);
+  EXPECT_CALL(filter_manager_callbacks_, encodeData(_, true));
+  EXPECT_CALL(filter_manager_callbacks_, endStream());
+  Buffer::OwnedImpl payload("payload");
+  chain.router_filter->callbacks_->encodeData(payload, true);
+  EXPECT_CALL(filter_manager_callbacks_, resetStream(StreamResetReason::RemoteResetNoError, ""));
+  chain.router_filter->callbacks_->resetStream(StreamResetReason::RemoteResetNoError, "");
+  filter_manager_->destroyFilters();
 }
 
 // Exercises encodeData(..., /*end_stream=*/true) when first_filter adds trailers and

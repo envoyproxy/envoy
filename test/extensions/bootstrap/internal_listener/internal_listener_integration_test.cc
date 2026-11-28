@@ -605,6 +605,20 @@ public:
           ->mutable_route()
           ->set_cluster("cluster_internal");
       ConfigHelper::setConnectConfig(outer_hcm, /*terminate_connect=*/true, /*allow_post=*/false);
+      if (bandwidth_limit_kbps_ != 0) {
+        auto* bandwidth_filter = outer_hcm.add_http_filters();
+        TestUtility::loadFromYaml(absl::StrCat(R"EOF(
+name: envoy.filters.http.bandwidth_share
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare
+  response_limit:
+    bucket_id: connect_response
+    kbps: {default_value: )EOF",
+                                               bandwidth_limit_kbps_, "}"),
+                                  *bandwidth_filter);
+        // Encoder iteration is reversed, so put the limiter before the router.
+        outer_hcm.mutable_http_filters()->SwapElements(0, outer_hcm.http_filters_size() - 1);
+      }
       std::ignore = outer_filter_blob->PackFrom(outer_hcm);
 
       auto* internal_listener = bootstrap.mutable_static_resources()->add_listeners();
@@ -631,7 +645,7 @@ public:
     HttpIntegrationTest::initialize();
   }
 
-  void runHttp1ConnectionCloseOverConnectTunnel() {
+  void runHttp1ConnectionCloseOverConnectTunnel(const std::string& payload = "world") {
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto encoder_decoder = codec_client_->startRequest(
         Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "foo.lyft.com:80"}});
@@ -651,21 +665,29 @@ public:
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
     upstream_request_->encodeHeaders(
-        Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-length", "5"}}, false);
-    upstream_request_->encodeData("world", true);
+        Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                        {"content-length", std::to_string(payload.size())}},
+        false);
+    upstream_request_->encodeData(payload, true);
 
     // Must deliver full HTTP/1.1 payload WITH end_stream=true (not truncated by INTERNAL_ERROR).
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_THAT(response->body(), testing::HasSubstr("\r\n\r\nworld"));
+    if (downstream_protocol_ == Http::CodecType::HTTP1) {
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
+    } else {
+      ASSERT_TRUE(response->waitForEndStream());
+    }
+    EXPECT_THAT(response->body(), testing::HasSubstr(absl::StrCat("\r\n\r\n", payload)));
 
     // Because the client request half is still open, RFC 9113 section 8.1 closes the stream via
     // RST_STREAM(NO_ERROR) (RemoteResetNoError), not INTERNAL_ERROR (RemoteReset).
-    Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
-    while (!response->reset() && bound.withinBound()) {
-      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    if (downstream_protocol_ != Http::CodecType::HTTP1) {
+      Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+      while (!response->reset() && bound.withinBound()) {
+        dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+      }
+      ASSERT_TRUE(response->reset());
+      EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());
     }
-    ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());
 
     EXPECT_THAT(waitForAccessLog(access_log_name_), Eq("200 - Normal"));
     test_server_->waitForGauge("listener.envoy_internal_internal_listener.downstream_cx_active",
@@ -674,6 +696,7 @@ public:
     cleanupUpstreamAndDownstream();
   }
 
+  uint64_t bandwidth_limit_kbps_{0};
   bool enable_internal_tls_{false};
   bool internal_uses_h2_tunnel_{false};
 };
@@ -686,6 +709,42 @@ TEST_P(InternalListenerConnectTerminationIntegrationTest,
        InternalHttp1ConnectionCloseDeliversEndStreamAndNoErrorReset) {
   initialize();
   runHttp1ConnectionCloseOverConnectTunnel();
+}
+
+TEST_P(InternalListenerConnectTerminationIntegrationTest,
+       InternalHttp1ConnectionCloseWithBandwidthFilter) {
+  bandwidth_limit_kbps_ = 1024;
+  initialize();
+  runHttp1ConnectionCloseOverConnectTunnel();
+}
+
+TEST_P(InternalListenerConnectTerminationIntegrationTest,
+       InternalHttp1ConnectionCloseWithThrottledResponse) {
+  bandwidth_limit_kbps_ = 1;
+  initialize();
+  runHttp1ConnectionCloseOverConnectTunnel(std::string(2048, 'a'));
+}
+
+TEST_P(InternalListenerConnectTerminationIntegrationTest,
+       Http1ConnectConnectionCloseWithBandwidthFilter) {
+  // HTTP/1 must preserve the response even without clean-reset deferral.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.filter_manager_defer_no_error_reset",
+                                    "false");
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  bandwidth_limit_kbps_ = 1024;
+  initialize();
+  runHttp1ConnectionCloseOverConnectTunnel();
+}
+
+TEST_P(InternalListenerConnectTerminationIntegrationTest,
+       Http1ConnectConnectionCloseWithThrottledResponse) {
+  // HTTP/1 must preserve the response even without clean-reset deferral.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.filter_manager_defer_no_error_reset",
+                                    "false");
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  bandwidth_limit_kbps_ = 1;
+  initialize();
+  runHttp1ConnectionCloseOverConnectTunnel(std::string(2048, 'a'));
 }
 
 TEST_P(InternalListenerConnectTerminationIntegrationTest,

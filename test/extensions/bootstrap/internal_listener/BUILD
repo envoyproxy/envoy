@@ -48,6 +48,7 @@ envoy_extension_cc_test(
     ],
     extension_names = [
         "envoy.bootstrap.internal_listener",
+        "envoy.filters.http.bandwidth_share",
         "envoy.transport_sockets.tls",
         "envoy.upstreams.http.tcp",
     ],
@@ -63,6 +64,7 @@ envoy_extension_cc_test(
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/bootstrap/internal_listener:config",
+        "//source/extensions/filters/http/bandwidth_share:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/io_socket/user_space:config",
         "//source/extensions/transport_sockets/tls:config",

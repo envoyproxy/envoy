@@ -1103,6 +1103,9 @@ protected:
     // enabled.
     bool encoder_filter_chain_complete_{};
 
+    // A clean upstream reset waiting for encoder filters to deliver the complete response.
+    bool deferred_no_error_reset_{};
+
     // Set `true` when the filter manager observes end stream on the decoder path (from downstream
     // client) before iteration of the decoder filter chain begins. This flag is used for setting
     // end_stream value when resuming decoder filter chain iteration.
