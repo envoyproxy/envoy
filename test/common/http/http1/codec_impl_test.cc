@@ -4853,6 +4853,143 @@ TEST_F(Http1ServerConnectionImplTest, Char22InHeaderValue) {
               HasStatusMessage("http/1.1 protocol error: header value contains invalid chars"));
 }
 
+namespace {
+
+struct ByteOutcome {
+  // Empty when the message decodes.
+  std::string error_message;
+  std::string details;
+  std::string value;
+};
+
+// The outcome of a header or trailer line `key: a<c>b`. LF ends the line early, leaving `b` as a
+// line with no colon. CR is stripped. Every other byte the HTTP/1.1 field-value grammar allows
+// (HTAB, SP, VCHAR and obs-text, RFC 9110 section 5.5) passes through, and the rest are invalid.
+ByteOutcome expectedByteOutcome(const unsigned char c, absl::string_view missing_colon_error) {
+  if (c == '\n') {
+    return {std::string(missing_colon_error), "http1.codec_error", ""};
+  }
+  if (c == '\r') {
+    return {"", "", "ab"};
+  }
+  if (c == '\t' || (c >= 0x20 && c != 0x7f)) {
+    return {"", "", absl::StrCat("a", std::string(1, c), "b")};
+  }
+  return {"header value contains invalid chars", "http1.invalid_characters", ""};
+}
+
+std::string keyValue(const HeaderMap& headers) {
+  const auto result = headers.get(LowerCaseString("key"));
+  return result.empty() ? "" : std::string(result[0]->value().getStringView());
+}
+
+} // namespace
+
+TEST_F(Http1ServerConnectionImplTest, HeaderValueEveryByte) {
+  for (int i = 0; i <= 0xff; ++i) {
+    const unsigned char c = i;
+    SCOPED_TRACE(absl::StrCat("byte 0x", absl::Hex(i, absl::kZeroPad2)));
+    const ByteOutcome expected = expectedByteOutcome(c, "HEADER_MISSING_COLON");
+    initialize();
+
+    NiceMock<MockRequestDecoder> decoder;
+    setupRequestDecoderMock(decoder);
+    Http::ResponseEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        });
+    std::string decoded_value;
+    ON_CALL(decoder, decodeHeaders_(_, _))
+        .WillByDefault(
+            [&](RequestHeaderMapSharedPtr& headers, bool) { decoded_value = keyValue(*headers); });
+    EXPECT_CALL(decoder,
+                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, expected.details))
+        .Times(expected.error_message.empty() ? 0 : 1);
+
+    Buffer::OwnedImpl buffer(
+        absl::StrCat("GET / HTTP/1.1\r\nkey: a", std::string(1, c), "b\r\n\r\n"));
+    const Status status = codec_->dispatch(buffer);
+    if (expected.error_message.empty()) {
+      EXPECT_OK(status);
+      EXPECT_EQ(expected.value, decoded_value);
+    } else {
+      EXPECT_THAT(status, HasStatusMessage(
+                              absl::StrCat("http/1.1 protocol error: ", expected.error_message)));
+      EXPECT_EQ(expected.details, response_encoder->getStream().responseDetails());
+    }
+  }
+}
+
+TEST_F(Http1ServerConnectionImplTest, TrailerValueEveryByte) {
+  codec_settings_.enable_trailers_ = true;
+  for (int i = 0; i <= 0xff; ++i) {
+    const unsigned char c = i;
+    SCOPED_TRACE(absl::StrCat("byte 0x", absl::Hex(i, absl::kZeroPad2)));
+    const ByteOutcome expected = expectedByteOutcome(c, "HPE_INVALID_HEADER_TOKEN");
+    initialize();
+
+    NiceMock<MockRequestDecoder> decoder;
+    setupRequestDecoderMock(decoder);
+    Http::ResponseEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        });
+    std::string decoded_value;
+    ON_CALL(decoder, decodeTrailers_(_)).WillByDefault([&](RequestTrailerMapPtr& trailers) {
+      decoded_value = keyValue(*trailers);
+    });
+    EXPECT_CALL(decoder,
+                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, expected.details))
+        .Times(expected.error_message.empty() ? 0 : 1);
+
+    Buffer::OwnedImpl buffer(absl::StrCat("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
+                                          "5\r\nHello\r\n0\r\nkey: a",
+                                          std::string(1, c), "b\r\n\r\n"));
+    const Status status = codec_->dispatch(buffer);
+    if (expected.error_message.empty()) {
+      EXPECT_OK(status);
+      EXPECT_EQ(expected.value, decoded_value);
+    } else {
+      EXPECT_THAT(status, HasStatusMessage(
+                              absl::StrCat("http/1.1 protocol error: ", expected.error_message)));
+      EXPECT_EQ(expected.details, response_encoder->getStream().responseDetails());
+    }
+  }
+}
+
+TEST_F(Http1ClientConnectionImplTest, HeaderValueEveryByte) {
+  for (int i = 0; i <= 0xff; ++i) {
+    const unsigned char c = i;
+    SCOPED_TRACE(absl::StrCat("byte 0x", absl::Hex(i, absl::kZeroPad2)));
+    const ByteOutcome expected = expectedByteOutcome(c, "HEADER_MISSING_COLON");
+    initialize();
+
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    EXPECT_OK(request_encoder.encodeHeaders(headers, true));
+    std::string decoded_value;
+    ON_CALL(response_decoder, decodeHeaders_(_, _))
+        .WillByDefault(
+            [&](ResponseHeaderMapPtr& headers, bool) { decoded_value = keyValue(*headers); });
+
+    Buffer::OwnedImpl response(absl::StrCat("HTTP/1.1 200 OK\r\nkey: a", std::string(1, c),
+                                            "b\r\ncontent-length: 0\r\n\r\n"));
+    const Status status = codec_->dispatch(response);
+    if (expected.error_message.empty()) {
+      EXPECT_OK(status);
+      EXPECT_EQ(expected.value, decoded_value);
+    } else {
+      EXPECT_THAT(status, HasStatusMessage(
+                              absl::StrCat("http/1.1 protocol error: ", expected.error_message)));
+    }
+  }
+}
+
 TEST_F(Http1ClientConnectionImplTest, MultipleContentLength) {
   initialize();
 
@@ -5049,6 +5186,15 @@ TEST_F(Http1ServerConnectionImplTest, ValueEndsWithNullCharacter) {
 
   testRequestWithValueExpectFailure(value, "http1.invalid_characters",
                                     "header value contains invalid chars");
+}
+
+TEST_F(Http1ServerConnectionImplTest, ObsFoldContinuationLineWithInvalidCharacter) {
+  for (const absl::string_view invalid : {absl::string_view("\x7f"), kNullCharacter}) {
+    SCOPED_TRACE(absl::StrCat("byte 0x", absl::Hex(invalid[0], absl::kZeroPad2)));
+    testRequestWithValueExpectFailure(absl::StrCat("foo\r\n b", invalid, "r"),
+                                      "http1.invalid_characters",
+                                      "header value contains invalid chars");
+  }
 }
 
 TEST_F(Http1ServerConnectionImplTest, ValueStartsWithCR) {

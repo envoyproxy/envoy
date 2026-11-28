@@ -799,14 +799,8 @@ Status ConnectionImpl::onHeaderValueImpl(const char* data, size_t length) {
     return okStatus();
   }
 
+  // The parser has already rejected invalid characters in the header block and stripped CR and LF.
   absl::string_view header_value{data, length};
-  if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
-    ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
-    error_code_ = Http::Code::BadRequest;
-    RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters));
-    return codecProtocolError("http/1.1 protocol error: header value contains invalid chars");
-  }
-
   header_parsing_state_ = HeaderParsingState::Value;
   if (current_header_value_.empty()) {
     // Strip leading whitespace if the current header value input contains the first bytes of the
