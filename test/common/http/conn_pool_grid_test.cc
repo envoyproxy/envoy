@@ -725,12 +725,20 @@ TEST_F(ConnectivityGridTest, ParallelH3NoTcp) {
 
   // Expect both pools to get a new stream attempt.
   EXPECT_CALL(*grid_->http3Pool(), newStream).WillOnce(Return(&cancel_));
-  EXPECT_CALL(*grid_->alternate(), newStream).WillOnce(Return(nullptr));
+  EXPECT_CALL(*grid_->alternate(), newStream)
+      .WillOnce(
+          [&](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(encoder_, host_, info_, std::nullopt);
+            return nullptr;
+          });
+  EXPECT_CALL(cancel_, cancel(_));
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
   EXPECT_CALL(*grid_->http2Pool(), newStream).Times(0);
 
-  grid_->newStream(decoder_, callbacks_,
-                   {/*can_send_early_data=*/false,
-                    /*can_use_http3_=*/true});
+  EXPECT_EQ(nullptr, grid_->newStream(decoder_, callbacks_,
+                                      {/*can_send_early_data=*/false,
+                                       /*can_use_http3_=*/true}));
 }
 
 // Test all three connections in parallel, H3 failing and TCP connecting.
@@ -1918,6 +1926,227 @@ TEST_F(ConnectivityGridTest, DestroyGridWithActiveH2Attempts) {
   // Without the fix, this failure attempt will call describePool() on the half-destroyed H2 pool
   // and crash. With the fix, it safely returns early because delete_started_ is true.
   EXPECT_CALL(callbacks_.pool_failure_, ready());
+  grid.reset();
+}
+
+TEST_F(ConnectivityGridTest, ImmediateH3FailureWithPendingHappyEyeballsCancelAvoidsUaf) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
+
+  initialize();
+  grid_->alternate_immediate_ = false;
+  addHttp3AlternateProtocol();
+  grid_->getOrCreateHttp3Pool();
+
+  EXPECT_CALL(*grid_->http3Pool(), newStream)
+      .WillOnce(
+          [&](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                    "h3 immediate failure", host_);
+            return nullptr;
+          });
+
+  auto caller_callbacks = std::make_unique<NiceMock<ConnPoolCallbacks>>();
+  EXPECT_CALL(caller_callbacks->pool_failure_, ready()).Times(0);
+  EXPECT_CALL(caller_callbacks->pool_ready_, ready()).Times(0);
+
+  ConnectionPool::Cancellable* cancel = grid_->newStream(decoder_, *caller_callbacks,
+                                                         {/*can_send_early_data_=*/false,
+                                                          /*can_use_http3_=*/true});
+  ASSERT_NE(cancel, nullptr);
+  EXPECT_NE(grid_->alternate(), nullptr);
+  EXPECT_EQ(grid_->http2Pool(), nullptr);
+
+  // Downstream resets/cancels while the Happy Eyeballs alternate H3 attempt is still pending,
+  // then destroys caller_callbacks.
+  EXPECT_CALL(cancel_, cancel(Envoy::ConnectionPool::CancelPolicy::Default));
+  cancel->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
+  caller_callbacks.reset();
+  grid_.reset();
+}
+
+TEST_F(ConnectivityGridTest, ImmediateH3FailureWithPendingHappyEyeballsSucceedsLater) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
+
+  initialize();
+  grid_->alternate_immediate_ = false;
+  addHttp3AlternateProtocol();
+  grid_->getOrCreateHttp3Pool();
+
+  EXPECT_CALL(*grid_->http3Pool(), newStream)
+      .WillOnce(
+          [&](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                    "h3 immediate failure", host_);
+            return nullptr;
+          });
+
+  ConnectionPool::Cancellable* cancel = grid_->newStream(decoder_, callbacks_,
+                                                         {/*can_send_early_data_=*/false,
+                                                          /*can_use_http3_=*/true});
+  ASSERT_NE(cancel, nullptr);
+  ASSERT_NE(grid_->alternate(), nullptr);
+  ASSERT_EQ(grid_->callbackSize(), 1);
+
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  grid_->callbacks(0)->onPoolReady(encoder_, host_, info_, std::nullopt);
+}
+
+TEST_F(ConnectivityGridTest, ImmediateH3FailureWithPendingTcpFallbackCancelAvoidsUaf) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "false"}});
+
+  initialize();
+  addHttp3AlternateProtocol();
+  grid_->getOrCreateHttp3Pool();
+
+  EXPECT_CALL(*grid_->http3Pool(), newStream)
+      .WillOnce(
+          [&](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                    "h3 immediate failure", host_);
+            return nullptr;
+          });
+
+  auto caller_callbacks = std::make_unique<NiceMock<ConnPoolCallbacks>>();
+  EXPECT_CALL(caller_callbacks->pool_failure_, ready()).Times(0);
+  EXPECT_CALL(caller_callbacks->pool_ready_, ready()).Times(0);
+
+  ConnectionPool::Cancellable* cancel = grid_->newStream(decoder_, *caller_callbacks,
+                                                         {/*can_send_early_data_=*/false,
+                                                          /*can_use_http3_=*/true});
+  ASSERT_NE(cancel, nullptr);
+  EXPECT_NE(grid_->http2Pool(), nullptr);
+
+  EXPECT_CALL(cancel_, cancel(Envoy::ConnectionPool::CancelPolicy::Default));
+  cancel->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
+  caller_callbacks.reset();
+  grid_.reset();
+}
+
+TEST_F(ConnectivityGridTest, ParallelH3AlternateImmediateFailureKeepsHandleAndStartsTcp) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
+
+  initialize();
+  grid_->alternate_immediate_ = false;
+  addHttp3AlternateProtocol();
+  grid_->onZeroRttHandshakeFailed();
+
+  grid_->getOrCreateHttp3Pool();
+  grid_->getOrCreateHttp2Pool();
+  grid_->createHttp3AlternatePool();
+
+  EXPECT_CALL(*grid_->http3Pool(), hasActiveConnections).WillOnce(Return(false));
+  EXPECT_CALL(*grid_->alternate(), hasActiveConnections).WillOnce(Return(true));
+
+  NiceMock<Envoy::ConnectionPool::MockCancellable> cancel_h2;
+  EXPECT_CALL(*grid_->http3Pool(), newStream).WillOnce(Return(&cancel_));
+  EXPECT_CALL(*grid_->alternate(), newStream)
+      .WillOnce(
+          [&](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                    "alternate immediate failure", host_);
+            return nullptr;
+          });
+  EXPECT_CALL(*grid_->http2Pool(), newStream).WillOnce(Return(&cancel_h2));
+
+  auto caller_callbacks = std::make_unique<NiceMock<ConnPoolCallbacks>>();
+  ConnectionPool::Cancellable* cancel = grid_->newStream(decoder_, *caller_callbacks,
+                                                         {/*can_send_early_data_=*/false,
+                                                          /*can_use_http3_=*/true});
+  ASSERT_NE(cancel, nullptr);
+
+  EXPECT_CALL(cancel_, cancel(Envoy::ConnectionPool::CancelPolicy::Default));
+  EXPECT_CALL(cancel_h2, cancel(Envoy::ConnectionPool::CancelPolicy::Default));
+  cancel->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
+  caller_callbacks.reset();
+  grid_.reset();
+}
+
+TEST_F(ConnectivityGridTest, PoolFailureWithNullHostLogsCleanly) {
+  initialize();
+  addHttp3AlternateProtocol();
+  EXPECT_NE(grid_->newStream(decoder_, callbacks_,
+                             {/*can_send_early_data_=*/false,
+                              /*can_use_http3_=*/true}),
+            nullptr);
+  ASSERT_NE(grid_->http3Pool(), nullptr);
+
+  EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
+  EXPECT_LOG_CONTAINS(
+      "trace", "http3 pool failed to create connection to host 'unknown'",
+      grid_->callbacks()->onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, "", nullptr));
+  ASSERT_NE(grid_->http2Pool(), nullptr);
+
+  EXPECT_CALL(callbacks_.pool_ready_, ready());
+  grid_->callbacks(1)->onPoolReady(encoder_, host_, info_, std::nullopt);
+  EXPECT_TRUE(grid_->isHttp3Broken());
+}
+
+TEST_F(ConnectivityGridTest, RealGridSdsEmptySecretsFailsOverToTcpAndRemainsCancellable) {
+  Envoy::LogLevelSetter save_levels(spdlog::level::trace);
+  initialize();
+  addHttp3AlternateProtocol();
+  EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
+  dispatcher_.allow_null_callback_ = true;
+
+  // Create a QUIC transport socket factory whose secrets aren't loaded yet (sslCtx() == nullptr),
+  // so Http3ConnPoolImpl::instantiateActiveClient() returns nullptr synchronously inside
+  // newStream() (ConnectionResult::FailedToCreateConnection).
+  Envoy::Ssl::ClientContextConfigPtr quic_config(new NiceMock<Ssl::MockClientContextConfig>());
+  EXPECT_CALL(factory_context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(nullptr));
+  auto quic_factory =
+      *Quic::QuicClientTransportSocketFactory::create(std::move(quic_config), factory_context_);
+  quic_factory->initialize();
+
+  NiceMock<Network::MockTransportSocketFactory> tcp_factory;
+  EXPECT_CALL(tcp_factory, createTransportSocket(_, _))
+      .WillRepeatedly([](Network::TransportSocketOptionsConstSharedPtr,
+                         std::shared_ptr<const Upstream::HostDescription>) {
+        return std::make_unique<NiceMock<Network::MockTransportSocket>>();
+      });
+
+  auto& matcher =
+      static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
+  EXPECT_CALL(matcher, resolve(_, _, _))
+      .WillOnce(Return(
+          Upstream::TransportSocketMatcher::MatchData(*quic_factory, matcher.stats_, "quic")))
+      .WillRepeatedly(
+          Return(Upstream::TransportSocketMatcher::MatchData(tcp_factory, matcher.stats_, "tcp")));
+
+  auto grid = std::make_unique<ConnectivityGrid>(
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000"),
+      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
+      simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
+      quic_connection_persistent_info_, OptRef<Quic::EnvoyQuicNetworkObserverRegistry>(),
+      overload_manager_);
+
+  auto* tcp_connection = new NiceMock<Network::MockClientConnection>();
+  ON_CALL(*tcp_connection, connecting()).WillByDefault(Return(true));
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(tcp_connection));
+
+  auto caller_callbacks = std::make_unique<NiceMock<ConnPoolCallbacks>>();
+  EXPECT_CALL(caller_callbacks->pool_failure_, ready()).Times(0);
+  EXPECT_CALL(caller_callbacks->pool_ready_, ready()).Times(0);
+
+  ConnectionPool::Cancellable* cancel = grid->newStream(decoder_, *caller_callbacks,
+                                                        {/*can_send_early_data_=*/false,
+                                                         /*can_use_http3_=*/true});
+  ASSERT_NE(cancel, nullptr);
+
+  // Downstream cancels with Default policy (matching UpstreamRequest::resetStream) and destroys
+  // caller_callbacks while TCP failover is still connecting, then TCP connection later raises
+  // LocalClose — must not touch freed caller_callbacks.
+  cancel->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
+  caller_callbacks.reset();
+  tcp_connection->raiseEvent(Network::ConnectionEvent::LocalClose);
   grid.reset();
 }
 
