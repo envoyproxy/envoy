@@ -573,5 +573,67 @@ TEST(IoSocketHandleImpl, GetOrCreateEnvoyAddressInstance) {
   wrapper.runGetAddressTests(/*cache_size=*/10);
 }
 
+TEST(IoSocketHandleImpl, RecvMsgDstAddressChecksCmsgLevel) {
+  NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
+  Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  auto run_recvmsg = [&](int cmsg_level, int cmsg_type, const void* payload, size_t payload_len) {
+    EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
+        .WillOnce([cmsg_level, cmsg_type, payload, payload_len](os_fd_t /*fd*/, msghdr* msg_hdr,
+                                                                int /*flags*/) {
+          msg_hdr->msg_iovlen = 1;
+          msg_hdr->msg_flags = 0;
+
+          sockaddr_in peer_address{};
+          peer_address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+          peer_address.sin_family = AF_INET;
+          peer_address.sin_port = htons(12345);
+          memcpy(msg_hdr->msg_name, &peer_address, sizeof(peer_address));
+          msg_hdr->msg_namelen = sizeof(peer_address);
+
+          auto* cmsg = reinterpret_cast<cmsghdr*>(msg_hdr->msg_control);
+          cmsg->cmsg_level = cmsg_level;
+          cmsg->cmsg_type = cmsg_type;
+          cmsg->cmsg_len = CMSG_LEN(payload_len);
+          memcpy(CMSG_DATA(cmsg), payload, payload_len);
+          msg_hdr->msg_controllen = cmsg->cmsg_len;
+
+          return Api::SysCallSizeResult{1, 0};
+        });
+
+    char buffer[128] = {};
+    Buffer::RawSlice slice{buffer, sizeof(buffer)};
+    Network::IoHandle::RecvMsgOutput output(1, nullptr);
+    IoSocketHandleImpl io_handle;
+    auto result = io_handle.recvmsg(&slice, 1, 1111, IoHandle::UdpSaveCmsgConfig(), output);
+    EXPECT_EQ(result.return_value_, 1);
+    return output.msg_[0].local_address_;
+  };
+
+#ifdef IP_RECVDSTADDR
+  constexpr int kIpv4PktInfoType = IP_RECVDSTADDR;
+  in_addr v4_payload{};
+  v4_payload.s_addr = htonl(INADDR_LOOPBACK);
+#else
+  constexpr int kIpv4PktInfoType = IP_PKTINFO;
+  in_pktinfo v4_payload{};
+  v4_payload.ipi_addr.s_addr = htonl(INADDR_LOOPBACK);
+#endif
+  auto v4_addr = run_recvmsg(IPPROTO_IP, kIpv4PktInfoType, &v4_payload, sizeof(v4_payload));
+  ASSERT_NE(v4_addr, nullptr);
+  EXPECT_EQ(v4_addr->asString(), "127.0.0.1:1111");
+
+  in6_pktinfo v6_payload{};
+  const sockaddr_storage v6_ss = Network::Test::getV6SockAddr("::1", 0);
+  v6_payload.ipi6_addr = reinterpret_cast<const sockaddr_in6*>(&v6_ss)->sin6_addr;
+  auto v6_addr = run_recvmsg(IPPROTO_IPV6, IPV6_PKTINFO, &v6_payload, sizeof(v6_payload));
+  ASSERT_NE(v6_addr, nullptr);
+  EXPECT_EQ(v6_addr->asString(), "[::1]:1111");
+
+  // Mismatched cmsg_level must be ignored (on Windows IP_PKTINFO and IPV6_PKTINFO share value 19).
+  EXPECT_EQ(run_recvmsg(SOL_SOCKET, IPV6_PKTINFO, &v6_payload, sizeof(v6_payload)), nullptr);
+  EXPECT_EQ(run_recvmsg(SOL_SOCKET, kIpv4PktInfoType, &v4_payload, sizeof(v4_payload)), nullptr);
+}
+
 } // namespace Network
 } // namespace Envoy

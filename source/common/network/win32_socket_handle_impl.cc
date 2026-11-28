@@ -1,7 +1,9 @@
 #include "source/common/network/win32_socket_handle_impl.h"
 
+#include <cerrno>
 #include <optional>
 
+#include "envoy/api/io_error.h"
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
@@ -16,6 +18,41 @@ using Envoy::Api::SysCallSizeResult;
 
 namespace Envoy {
 namespace Network {
+
+namespace {
+
+bool isTransientUdpRecvError(const Api::IoError& err) {
+  switch (err.getErrorCode()) {
+  case Api::IoError::IoErrorCode::Again:
+  case Api::IoError::IoErrorCode::ConnectionReset:
+  case Api::IoError::IoErrorCode::Interrupt:
+  case Api::IoError::IoErrorCode::MessageTooBig:
+  case Api::IoError::IoErrorCode::NetworkUnreachable:
+  case Api::IoError::IoErrorCode::NoBufferSpace:
+    return true;
+  case Api::IoError::IoErrorCode::UnknownError:
+    switch (err.getSystemErrorCode()) {
+#ifdef WIN32
+    case WSAENETRESET:
+    case WSAEHOSTUNREACH:
+    case WSAECONNREFUSED:
+    case WSAENOBUFS:
+      return true;
+#else
+    case ENETRESET:
+    case EHOSTUNREACH:
+    case ECONNREFUSED:
+      return true;
+#endif
+    default:
+      return false;
+    }
+  default:
+    return false;
+  }
+}
+
+} // namespace
 
 Api::IoCallUint64Result Win32SocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,
                                                      uint64_t num_slice) {
@@ -74,7 +111,12 @@ Api::IoCallUint64Result Win32SocketHandleImpl::recvmsg(
     const IoHandle::UdpSaveCmsgConfig& udp_save_cmsg_config, RecvMsgOutput& output) {
   Api::IoCallUint64Result result =
       IoSocketHandleImpl::recvmsg(slices, num_slice, self_port, udp_save_cmsg_config, output);
-  reEnableEventBasedOnIOResult(result, Event::FileReadyType::Read);
+  // Keep emulated edge-triggered UDP listeners armed across transient receive errors (such as
+  // WSAECONNRESET from an ICMP port-unreachable on an unconnected UDP socket) in addition to
+  // EAGAIN, since UdpListenerImpl stops reading on any error.
+  if (!result.ok() && isTransientUdpRecvError(*result.err_) && file_event_) {
+    file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
+  }
   return result;
 }
 
@@ -85,7 +127,9 @@ Win32SocketHandleImpl::recvmmsg(RawSliceArrays& slices, uint32_t self_port,
                                 RecvMsgOutput& output) {
   Api::IoCallUint64Result result =
       IoSocketHandleImpl::recvmmsg(slices, self_port, udp_save_cmsg_config, output);
-  reEnableEventBasedOnIOResult(result, Event::FileReadyType::Read);
+  if (!result.ok() && isTransientUdpRecvError(*result.err_) && file_event_) {
+    file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
+  }
   return result;
 }
 
