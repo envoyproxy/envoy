@@ -123,6 +123,15 @@ bool isDeathTestChild(int argc, char** argv) {
 
 int TestRunner::runTests(int argc, char** argv) {
   const bool is_death_test_child = isDeathTestChild(argc, argv);
+  // Take the runtime override flags out before gtest sees them, since it discards flags it
+  // does not recognize. This allows doing test overrides of Envoy runtime features without adding
+  // test flags to the Envoy production command line.
+  const std::regex ENABLE_PATTERN{"--runtime-feature-override-for-tests=(.*)",
+                                  std::regex::optimize};
+  std::string runtime_override_enable = findAndRemove(ENABLE_PATTERN, argc, argv);
+  const std::regex DISABLE_PATTERN{"--runtime-feature-disable-for-tests=(.*)",
+                                   std::regex::optimize};
+  std::string runtime_override_disable = findAndRemove(DISABLE_PATTERN, argc, argv);
   ::testing::InitGoogleMock(&argc, argv);
   // Record the thread initializing gtest (the first thread of the process) as the test thread,
   // for platforms that cannot identify it directly.
@@ -150,12 +159,6 @@ int TestRunner::runTests(int argc, char** argv) {
 
   TestEnvironment::setEnvVar("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory(), 1);
 
-  // Before letting TestEnvironment latch argv and argc, remove any runtime override flag.
-  // This allows doing test overrides of Envoy runtime features without adding
-  // test flags to the Envoy production command line.
-  const std::regex ENABLE_PATTERN{"--runtime-feature-override-for-tests=(.*)",
-                                  std::regex::optimize};
-  std::string runtime_override_enable = findAndRemove(ENABLE_PATTERN, argc, argv);
   if (!runtime_override_enable.empty()) {
     ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), info,
                         "Running with runtime feature override enable {}", runtime_override_enable);
@@ -164,9 +167,6 @@ int TestRunner::runTests(int argc, char** argv) {
     ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
     listeners.Append(new RuntimeManagingListener(runtime_override_enable));
   }
-  const std::regex DISABLE_PATTERN{"--runtime-feature-disable-for-tests=(.*)",
-                                   std::regex::optimize};
-  std::string runtime_override_disable = findAndRemove(DISABLE_PATTERN, argc, argv);
   if (!runtime_override_disable.empty()) {
     ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), info,
                         "Running with runtime feature override disable {}",

@@ -92,6 +92,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "runtime_flag_for_tests_test",
+    srcs = ["runtime_flag_for_tests_test.cc"],
+    args = [
+        "--runtime-feature-override-for-tests=envoy.reloadable_features.test_feature_false",
+        "--runtime-feature-disable-for-tests=envoy.reloadable_features.test_feature_true",
+    ],
+    coverage = False,
+    deps = [
+        "//source/common/runtime:runtime_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "runtime_flag_override_noop_test",
     srcs = ["runtime_flag_override_noop_test.cc"],
     args = [
