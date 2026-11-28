@@ -10,7 +10,11 @@ namespace Extensions {
 namespace DynamicModules {
 namespace HttpFilters {
 
-DynamicModuleHttpFilter::~DynamicModuleHttpFilter() { destroy(); }
+DynamicModuleHttpFilter::~DynamicModuleHttpFilter() {
+  // In a well-formed filter chain onDestroy() has already run and these are no-ops.
+  scheduler_target_->clear();
+  destroy();
+}
 
 void DynamicModuleHttpFilter::initializeInModuleFilter() {
   ASSERT(in_module_filter_ == nullptr);
@@ -32,6 +36,9 @@ void DynamicModuleHttpFilter::onStreamComplete() {
 }
 
 void DynamicModuleHttpFilter::onDestroy() {
+  // Stop the schedulers before the module hooks below, which may join a module thread that is
+  // committing an event.
+  scheduler_target_->clear();
   destroyed_ = true;
   // Pair with the register in maybeRegisterDownstreamWatermarkCallbacks(); the underlying
   // removeDownstreamWatermarkCallbacks() asserts the callback was previously added.

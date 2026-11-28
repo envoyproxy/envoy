@@ -1,3 +1,7 @@
+#include <atomic>
+#include <thread>
+#include <vector>
+
 #include "source/extensions/bootstrap/dynamic_modules/extension.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -17,6 +21,9 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
+#include "absl/synchronization/mutex.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -118,9 +125,9 @@ TEST_F(BootstrapAbiImplTest, OnScheduledCallback) {
   envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(scheduler_ptr);
 }
 
-// Test that onScheduled handles the case when config is already destroyed.
 TEST_F(BootstrapAbiImplTest, OnScheduledAfterConfigDestroyed) {
   Event::PostCb captured_cb;
+  std::weak_ptr<DynamicModuleBootstrapExtensionConfig> weak_config;
 
   {
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
@@ -131,29 +138,82 @@ TEST_F(BootstrapAbiImplTest, OnScheduledAfterConfigDestroyed) {
         "test", "config", DefaultMetricsNamespace, std::move(dynamic_module.value()), dispatcher_,
         context_, context_.store_);
     ASSERT_TRUE(config.ok()) << config.status();
-
+    weak_config = config.value();
     // Create a scheduler via the ABI callback.
     auto* scheduler_ptr = envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(
         config.value()->thisAsVoidPtr());
     EXPECT_NE(scheduler_ptr, nullptr);
 
-    // Capture the posted callback.
-    EXPECT_CALL(dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    EXPECT_CALL(dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
       captured_cb = std::move(cb);
-    }));
+    });
 
-    // Commit an event via the ABI callback.
     envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(scheduler_ptr, 456);
-
-    // Delete the scheduler before the callback is executed.
     envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(scheduler_ptr);
-
-    // Config goes out of scope here and is destroyed.
   }
 
-  // Execute the captured callback after config is destroyed.
-  // This should not crash - the weak_ptr should be expired.
+  // The pending event does not keep the config alive, and is dropped when it runs.
+  EXPECT_TRUE(weak_config.expired());
   captured_cb();
+}
+
+TEST_F(BootstrapAbiImplTest, SchedulerDoesNotExtendConfigLifetime) {
+  auto config = newOptionalHooksConfig();
+  std::weak_ptr<DynamicModuleBootstrapExtensionConfig> weak_config = config;
+  auto* scheduler_ptr = envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(
+      config->thisAsVoidPtr());
+
+  Event::PostCb captured_cb;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  });
+  std::thread module_thread([&]() {
+    envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(scheduler_ptr, 1);
+  });
+  module_thread.join();
+  ASSERT_TRUE(captured_cb);
+
+  // The config is destroyed on this thread as soon as its last reference is dropped.
+  config.reset();
+  EXPECT_TRUE(weak_config.expired());
+
+  EXPECT_CALL(dispatcher_, post(_)).Times(0);
+  envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(scheduler_ptr, 2);
+  captured_cb();
+  envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(scheduler_ptr);
+}
+
+TEST_F(BootstrapAbiImplTest, SchedulerCommitRacesConfigDestruction) {
+  auto config = newOptionalHooksConfig();
+  std::weak_ptr<DynamicModuleBootstrapExtensionConfig> weak_config = config;
+  auto* scheduler_ptr = envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(
+      config->thisAsVoidPtr());
+
+  absl::Mutex mutex;
+  std::vector<Event::PostCb> posted;
+  EXPECT_CALL(dispatcher_, post(_)).WillRepeatedly([&](Event::PostCb cb) {
+    absl::MutexLock lock(mutex);
+    posted.push_back(std::move(cb));
+  });
+  std::atomic<bool> started{false};
+  std::thread module_thread([&]() {
+    for (uint64_t i = 0; i < 1000; ++i) {
+      envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(scheduler_ptr, i);
+      started.store(true);
+    }
+  });
+  while (!started.load()) {
+  }
+  config.reset();
+  EXPECT_TRUE(weak_config.expired());
+  module_thread.join();
+  envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(scheduler_ptr);
+
+  // Every event posted before the config was destroyed is dropped when it runs.
+  absl::MutexLock lock(mutex);
+  for (Event::PostCb& cb : posted) {
+    cb();
+  }
 }
 
 // `commit` must not touch the dispatcher once the owning config has been destroyed. Exercises

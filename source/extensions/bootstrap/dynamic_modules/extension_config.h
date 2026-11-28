@@ -19,6 +19,7 @@
 #include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/scheduler.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -200,6 +201,12 @@ public:
 
   // The main thread dispatcher.
   Event::Dispatcher& main_thread_dispatcher_;
+
+  // Shared with the schedulers of this config. Initialized once the config is held by a shared
+  // pointer, before the module can create a scheduler, and cleared at the start of the destructor.
+  using SchedulerTarget = Extensions::DynamicModules::DynamicModuleSchedulerTarget<
+      DynamicModuleBootstrapExtensionConfig>;
+  const std::shared_ptr<SchedulerTarget> scheduler_target_{std::make_shared<SchedulerTarget>()};
 
   // File watchers created by
   // envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch. Envoy owns the
@@ -474,30 +481,8 @@ using DynamicModuleBootstrapExtensionConfigSharedPtr =
  * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new and deleted via
  * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete.
  */
-class DynamicModuleBootstrapExtensionConfigScheduler {
-public:
-  explicit DynamicModuleBootstrapExtensionConfigScheduler(
-      std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config)
-      : config_(std::move(config)) {}
-
-  void commit(uint64_t event_id) {
-    // Lock the config so its dispatcher member stays valid across `post`.
-    auto config_shared = config_.lock();
-    if (!config_shared) {
-      return;
-    }
-    config_shared->main_thread_dispatcher_.post([config = config_, event_id]() {
-      if (std::shared_ptr<DynamicModuleBootstrapExtensionConfig> cs = config.lock()) {
-        cs->onScheduled(event_id);
-      }
-    });
-  }
-
-private:
-  // The config that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
-  // extending the lifetime of the config.
-  std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config_;
-};
+using DynamicModuleBootstrapExtensionConfigScheduler =
+    Extensions::DynamicModules::DynamicModuleScheduler<DynamicModuleBootstrapExtensionConfig>;
 
 /**
  * This class wraps an Envoy timer for use by bootstrap extension dynamic modules. It is created via

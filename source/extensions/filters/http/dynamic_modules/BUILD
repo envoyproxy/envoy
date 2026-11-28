@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["filter_config.h"],
     deps = [
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:scheduler_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )
@@ -26,6 +27,7 @@ envoy_cc_library(
     deps = [
         ":filter_config_lib",
         "//source/common/tracing:null_span_lib",
+        "//source/extensions/dynamic_modules:scheduler_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )

@@ -23,6 +23,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "scheduler_lib",
+    hdrs = ["scheduler.h"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/synchronization",
+    ],
+)
+
+envoy_cc_library(
     name = "background_fetch_manager_lib",
     srcs = ["background_fetch_manager.cc"],
     hdrs = ["background_fetch_manager.h"],
