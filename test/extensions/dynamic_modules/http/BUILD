@@ -170,6 +170,8 @@ envoy_cc_test(
         "//test/mocks/upstream:host_set_mocks",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 

@@ -8,6 +8,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/scheduler.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter_config.h"
 
 namespace Envoy {
@@ -74,6 +75,14 @@ public:
   Event::Dispatcher* dispatcher() { return cached_dispatcher_.load(std::memory_order_acquire); }
 
   /**
+   * Returns the target that the schedulers of this filter post through.
+   */
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleListenerFilter>&
+  schedulerTarget() const {
+    return scheduler_target_;
+  }
+
+  /**
    * Returns the worker index assigned to this filter.
    */
   uint32_t workerIndex() const { return worker_index_; }
@@ -112,6 +121,11 @@ private:
 
   // Worker dispatcher published at callback-init, cleared on destroy. Read via `dispatcher()`.
   std::atomic<Event::Dispatcher*> cached_dispatcher_{nullptr};
+
+  // Shared with the schedulers of this filter. Initialized when the filter accepts the socket and
+  // cleared when the filter is destroyed.
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleListenerFilter> scheduler_target_{
+      std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleListenerFilter>>()};
 
   uint32_t worker_index_ = 0;
 
@@ -177,35 +191,7 @@ private:
  * envoy_dynamic_module_callback_listener_filter_scheduler_new and deleted via
  * envoy_dynamic_module_callback_listener_filter_scheduler_delete.
  */
-class DynamicModuleListenerFilterScheduler {
-public:
-  explicit DynamicModuleListenerFilterScheduler(DynamicModuleListenerFilterWeakPtr filter)
-      : filter_(std::move(filter)) {}
-
-  // Safe to call from any thread. Reads only the weak_ptr and the atomic dispatcher cache (see
-  // `DynamicModuleListenerFilter::dispatcher()`); it never dereferences `callbacks_` from a
-  // foreign thread.
-  void commit(uint64_t event_id) {
-    DynamicModuleListenerFilterSharedPtr filter_shared = filter_.lock();
-    if (!filter_shared) {
-      return;
-    }
-    Event::Dispatcher* dispatcher = filter_shared->dispatcher();
-    if (dispatcher == nullptr) {
-      return;
-    }
-    dispatcher->post([filter = filter_, event_id]() {
-      if (DynamicModuleListenerFilterSharedPtr fs = filter.lock()) {
-        fs->onScheduled(event_id);
-      }
-    });
-  }
-
-private:
-  // The filter that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
-  // extending the lifetime of the filter.
-  DynamicModuleListenerFilterWeakPtr filter_;
-};
+using DynamicModuleListenerFilterScheduler = DynamicModuleScheduler<DynamicModuleListenerFilter>;
 
 } // namespace ListenerFilters
 } // namespace DynamicModules

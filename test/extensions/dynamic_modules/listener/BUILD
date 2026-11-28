@@ -100,6 +100,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 

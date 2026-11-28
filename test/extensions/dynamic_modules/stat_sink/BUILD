@@ -75,6 +75,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
