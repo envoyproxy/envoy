@@ -30,6 +30,7 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http/http2:codec_lib",
+        "//source/common/network:address_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/http/header_validators/envoy_default:header_validator_factory",

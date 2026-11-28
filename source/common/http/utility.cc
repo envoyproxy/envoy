@@ -1193,6 +1193,12 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
   return "";
 }
 
+bool Utility::isConnectionResetReason(const Http::StreamResetReason reset_reason) {
+  return reset_reason == Http::StreamResetReason::LocalConnectionFailure ||
+         reset_reason == Http::StreamResetReason::RemoteConnectionFailure ||
+         reset_reason == Http::StreamResetReason::ConnectionTermination;
+}
+
 void Utility::transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers) {
   ASSERT(Utility::isUpgrade(headers));
 

@@ -42,6 +42,14 @@
 namespace Envoy {
 namespace Router {
 
+namespace {
+
+bool isInternalListenerAddress(const Network::Address::InstanceConstSharedPtr& address) {
+  return address != nullptr && address->type() == Network::Address::Type::EnvoyInternal;
+}
+
+} // namespace
+
 // The upstream HTTP filter manager class.
 class UpstreamFilterManager : public Http::FilterManager {
 public:
@@ -532,6 +540,15 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
     }
 
     stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
+  }
+  // For a reset caused by a connection to an internal listener, the codec supplies the
+  // connection's transport failure reason. Record it, as onPoolFailure() does for a connection
+  // that fails before the stream is attached to it.
+  if (Http::Utility::isConnectionResetReason(reason) && !transport_failure_reason.empty() &&
+      isInternalListenerAddress(stream_info_.upstreamInfo()->upstreamRemoteAddress()) &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.internal_listener_propagate_close_details")) {
+    stream_info_.upstreamInfo()->setUpstreamTransportFailureReason(transport_failure_reason);
   }
   clearRequestEncoder();
   awaiting_headers_ = false;

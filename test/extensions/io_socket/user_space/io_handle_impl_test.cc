@@ -1479,6 +1479,21 @@ TEST(IoHandleFactoryTest, UseExistingPassthroughState) {
   }
 }
 
+// Close details recorded through one handle are visible through its peer, even after the
+// recording handle is closed.
+TEST(PassthroughStateImplTest, CloseDetails) {
+  auto [io_handle, io_handle_peer] = IoHandleFactory::createIoHandlePair();
+  EXPECT_EQ("", io_handle->passthroughState()->closeDetails());
+
+  io_handle_peer->passthroughState()->setCloseDetails("close_details");
+  io_handle_peer->close();
+  EXPECT_EQ("close_details", io_handle->passthroughState()->closeDetails());
+
+  io_handle_peer->passthroughState()->setCloseDetails("");
+  EXPECT_EQ("", io_handle->passthroughState()->closeDetails());
+  io_handle->close();
+}
+
 TEST_F(IoHandleImplTest, ResetCloseEmitsConnectionResetErrorOnReadGuardEnabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(

@@ -438,6 +438,12 @@ void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata
   state_ = State::Done;
 }
 
+void PassthroughStateImpl::setCloseDetails(absl::string_view close_details) {
+  close_details_ = std::string(close_details);
+  ENVOY_LOG(trace, "passthrough state {} close details: {}", static_cast<void*>(this),
+            close_details_);
+}
+
 std::pair<IoHandleImplPtr, IoHandleImplPtr>
 IoHandleFactory::createIoHandlePair(PassthroughStatePtr state) {
   PassthroughStateSharedPtr shared_state;

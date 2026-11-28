@@ -791,6 +791,7 @@ envoy_cc_test(
         },
     },
     deps = [
+        "//source/common/network:address_lib",
         "//source/common/router:router_lib",
         "//test/common/http:common_lib",
         "//test/common/memory:memory_test_utility_lib",

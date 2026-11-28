@@ -6,6 +6,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/filter_state.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
@@ -29,6 +31,19 @@ public:
    */
   virtual void mergeInto(envoy::config::core::v3::Metadata& metadata,
                          StreamInfo::FilterState& filter_state) PURE;
+
+  /**
+   * Record why the peer closed the connection, so that the other side can report the reason after
+   * it observes the close. Called by the closing side while closing; the peer handles the close in
+   * a later event loop iteration on the same dispatcher, so the details are always recorded before
+   * the peer reads them.
+   */
+  virtual void setCloseDetails(absl::string_view close_details) PURE;
+
+  /**
+   * @return the details recorded by setCloseDetails(), or empty if none were recorded.
+   */
+  virtual absl::string_view closeDetails() const PURE;
 };
 
 using PassthroughStateSharedPtr = std::shared_ptr<PassthroughState>;

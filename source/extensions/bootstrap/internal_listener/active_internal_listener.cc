@@ -5,12 +5,78 @@
 
 #include "source/common/listener_manager/active_stream_listener_base.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace InternalListener {
+
+namespace {
+
+constexpr absl::string_view CloseDetailsLocalClosePrefix = "internal_listener_close:";
+constexpr absl::string_view CloseDetailsUpstreamFailurePrefix =
+    "internal_listener_upstream_failure:";
+
+// Formats the local close reason and upstream transport failure reason of an internal listener
+// connection, omitting empty fields.
+std::string formatCloseDetails(absl::string_view local_close_reason,
+                               absl::string_view upstream_transport_failure_reason) {
+  if (local_close_reason.empty() && upstream_transport_failure_reason.empty()) {
+    return {};
+  }
+  if (upstream_transport_failure_reason.empty()) {
+    return absl::StrCat(CloseDetailsLocalClosePrefix, local_close_reason);
+  }
+  if (local_close_reason.empty()) {
+    return absl::StrCat(CloseDetailsUpstreamFailurePrefix, upstream_transport_failure_reason);
+  }
+  return absl::StrCat(CloseDetailsLocalClosePrefix, local_close_reason, "|",
+                      CloseDetailsUpstreamFailurePrefix, upstream_transport_failure_reason);
+}
+
+// Returns the state shared with the client side of the connection if the connection's socket is a
+// user space socket. Otherwise returns nullptr.
+IoSocket::UserSpace::PassthroughStateSharedPtr
+closeDetailsPassthroughState(const Network::Connection& connection) {
+  auto* io_handle =
+      dynamic_cast<IoSocket::UserSpace::IoHandle*>(&connection.getSocket()->ioHandle());
+  return io_handle != nullptr ? io_handle->passthroughState() : nullptr;
+}
+
+} // namespace
+
+ActiveInternalConnection::ActiveInternalConnection(
+    Server::ActiveConnections& active_connections, Network::ConnectionPtr&& new_connection,
+    TimeSource& time_system, std::unique_ptr<StreamInfo::StreamInfo>&& stream_info,
+    IoSocket::UserSpace::PassthroughStateSharedPtr passthrough_state)
+    : Server::ActiveTcpConnection(active_connections, std::move(new_connection), time_system,
+                                  std::move(stream_info)),
+      passthrough_state_(std::move(passthrough_state)) {}
+
+void ActiveInternalConnection::onEvent(Network::ConnectionEvent event) {
+  // Record why this side closed the connection. A close initiated by the client side is not
+  // recorded, as the client side already knows why it closed.
+  if (event == Network::ConnectionEvent::LocalClose && passthrough_state_ != nullptr &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.internal_listener_propagate_close_details")) {
+    const StreamInfo::StreamInfo& stream_info = connection_->streamInfo();
+    absl::string_view upstream_transport_failure_reason;
+    if (stream_info.upstreamInfo().has_value()) {
+      upstream_transport_failure_reason =
+          stream_info.upstreamInfo()->upstreamTransportFailureReason();
+    }
+    const std::string details =
+        formatCloseDetails(connection_->localCloseReason(), upstream_transport_failure_reason);
+    if (!details.empty()) {
+      passthrough_state_->setCloseDetails(details);
+    }
+  }
+  Server::ActiveTcpConnection::onEvent(event);
+}
 
 ActiveInternalListener::ActiveInternalListener(Network::ConnectionHandler& conn_handler,
                                                Event::Dispatcher& dispatcher,
@@ -65,9 +131,13 @@ void ActiveInternalListener::newActiveConnection(
     const Network::FilterChain& filter_chain, Network::ServerConnectionPtr server_conn_ptr,
     std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
   auto& active_connections = getOrCreateActiveConnections(filter_chain);
-  auto active_connection = std::make_unique<Server::ActiveTcpConnection>(
+  IoSocket::UserSpace::PassthroughStateSharedPtr passthrough_state =
+      server_conn_ptr->state() != Network::Connection::State::Closed
+          ? closeDetailsPassthroughState(*server_conn_ptr)
+          : nullptr;
+  Server::ActiveConnectionPtr active_connection = std::make_unique<ActiveInternalConnection>(
       active_connections, std::move(server_conn_ptr), dispatcher().timeSource(),
-      std::move(stream_info));
+      std::move(stream_info), std::move(passthrough_state));
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
     ENVOY_CONN_LOG(
