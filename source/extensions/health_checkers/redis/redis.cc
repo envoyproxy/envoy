@@ -69,6 +69,11 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onDeferredDelete() {
   if (client_) {
     client_->close();
   }
+  // close() does not raise another event when the socket is already going away in this same
+  // callback. Drop the client here so it is not destroyed on that connection's stack.
+  if (client_ != nullptr) {
+    parent_.dispatcher_.deferredDelete(std::move(client_));
+  }
 }
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
@@ -76,6 +81,10 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(Network::Connect
       event == Network::ConnectionEvent::LocalClose) {
     // This should only happen after any active requests have been failed/cancelled.
     ASSERT(!current_request_);
+    // Teardown may already have released the client. Do not touch the parent health checker then.
+    if (client_ == nullptr) {
+      return;
+    }
     parent_.dispatcher_.deferredDelete(std::move(client_));
   }
 }

@@ -71,6 +71,10 @@ protected:
     void handleFailure(envoy::data::core::v3::HealthCheckFailureType type, bool retriable = false,
                        uint64_t http_status_code = 0);
 
+    // True once onDeferredDeleteBase() has started. The parent health checker may
+    // already be destroyed (HDS cluster removal); callers must not use it.
+    bool detached() const { return detached_; }
+
     HostSharedPtr host_;
 
   private:
@@ -91,6 +95,9 @@ protected:
     uint32_t num_unhealthy_{};
     uint32_t num_healthy_{};
     bool first_check_{true};
+    // Set for the whole teardown, including while the session waits on the
+    // dispatcher's deferred-delete list after its health checker is gone.
+    bool detached_{false};
     TimeSource& time_source_;
   };
 

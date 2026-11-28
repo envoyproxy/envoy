@@ -264,6 +264,12 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onDeferredDelete() {
     expect_reset_ = true;
     client_->close(Network::ConnectionCloseType::Abort);
   }
+  // close() does not raise another event when the socket is already going away in this same
+  // callback (the health-check connection failure that raced with cluster removal). The client
+  // would otherwise still be owned here and destroyed on the connection's stack.
+  if (client_ != nullptr) {
+    parent_.dispatcher_.deferredDelete(std::move(client_));
+  }
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::abortNegotiatingConnection() {
@@ -310,6 +316,11 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
     // timer. There is nothing to do here other than blow away the client.
     response_headers_.reset();
     response_body_->drain(response_body_->length());
+    // Teardown may already have released the client, and the parent health checker with it. Do not
+    // touch the parent when there is nothing left to delete.
+    if (client_ == nullptr) {
+      return;
+    }
     parent_.dispatcher_.deferredDelete(std::move(client_));
   }
 }
@@ -439,12 +450,20 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::sendRequest() {
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::StreamResetReason,
                                                                         absl::string_view) {
-  request_in_flight_ = false;
-  ENVOY_CONN_LOG(debug, "connection/stream error health_flags={}", *client_,
-                 HostUtility::healthFlagsToString(*host_));
-  if (expect_reset_) {
+  // Cluster teardown sets this before close, and a same-iteration socket error can reset the
+  // stream after client_ has already been released. Do not log through the connection or record
+  // another failure in that case.
+  if (expect_reset_ || detached()) {
+    request_in_flight_ = false;
     return;
   }
+
+  request_in_flight_ = false;
+  if (client_ == nullptr) {
+    return;
+  }
+  ENVOY_CONN_LOG(debug, "connection/stream error health_flags={}", *client_,
+                 HostUtility::healthFlagsToString(*host_));
 
   if (client_ && !reuse_connection_) {
     client_->close(Network::ConnectionCloseType::Abort);
