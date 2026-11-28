@@ -14,8 +14,10 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -73,7 +75,7 @@ const std::vector<std::string>& defaultContentEncoding() {
 
 // List of CompressorFilterConfig objects registered for a stream.
 struct CompressorRegistry : public StreamInfo::FilterState::Object {
-  std::list<CompressorFilterConfigSharedPtr> filter_configs_;
+  absl::InlinedVector<CompressorFilterConfigSharedPtr, 2> filter_configs_;
 };
 
 // Key to per stream CompressorRegistry objects.
@@ -296,7 +298,7 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
   if (accept_encoding != nullptr) {
     // Capture the value of the "Accept-Encoding" request header to use it later when making
     // decision on compressing the corresponding HTTP response.
-    accept_encoding_ = std::make_unique<std::string>(accept_encoding->value().getStringView());
+    accept_encoding_.emplace(accept_encoding->value().getStringView());
   }
 
   // Ensure per-route configuration is initialized only once for this stream.
@@ -602,11 +604,16 @@ bool CompressorFilter::hasCacheControlNoTransform(Http::ResponseHeaderMap& heade
 std::unique_ptr<CompressorFilter::EncodingDecision>
 CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   using EncPair = std::pair<absl::string_view, float>; // pair of {encoding, q_value}
-  std::vector<EncPair> pairs;
+  absl::InlinedVector<EncPair, 8> pairs;
 
-  // Find all compressors enabled for the filter chain.
-  std::map<std::string, CompressorInChain> allowed_compressors;
-  uint32_t registration_count{0};
+  // Find all compressors enabled for the filter chain, in registration order.
+  absl::InlinedVector<CompressorInChain, 4> allowed_compressors;
+  const auto find_allowed = [&allowed_compressors](absl::string_view encoding) {
+    return std::find_if(allowed_compressors.begin(), allowed_compressors.end(),
+                        [encoding](const CompressorInChain& compressor) {
+                          return compressor.content_encoding_ == encoding;
+                        });
+  };
 
   auto typed_state =
       streamInfo().filterState()->getDataReadOnly<CompressorRegistry>(compressorRegistryKey());
@@ -629,26 +636,17 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
     // There could be many compressors registered for the same content encoding, e.g. consider a
     // case when there are two gzip filters using different compression levels for different content
     // sizes. In such case we ignore duplicates (or different filters for the same encoding)
-    // registered last.
-    std::string content_encoding;
-    if (filter_config.get() == config_.get()) {
-      // For the current filter, use per-route content encoding if available.
-      content_encoding = getContentEncoding();
-    } else {
-      // For other filters in the chain, use their main config.
-      content_encoding = filter_config->contentEncoding();
-    }
-
-    auto enc = allowed_compressors.find(content_encoding);
-    if (enc == allowed_compressors.end()) {
-      allowed_compressors.insert(
-          {content_encoding, {registration_count, filter_config->chooseFirst()}});
-      ++registration_count;
+    // registered last. The current filter uses its per-route content encoding if available.
+    const std::string& content_encoding = filter_config.get() == config_.get()
+                                              ? getContentEncoding()
+                                              : filter_config->contentEncoding();
+    if (find_allowed(content_encoding) == allowed_compressors.end()) {
+      allowed_compressors.push_back({content_encoding, filter_config->chooseFirst()});
     }
   }
 
   // Find all encodings accepted by the user agent and adjust the list of allowed compressors.
-  for (const auto& token : StringUtil::splitToken(*accept_encoding_, ",", false /* keep_empty */)) {
+  for (const absl::string_view token : absl::StrSplit(*accept_encoding_, ',', absl::SkipEmpty())) {
     EncPair pair =
         std::make_pair(StringUtil::trim(StringUtil::cropRight(token, ";")), static_cast<float>(1));
     const auto params = StringUtil::cropLeft(token, ";");
@@ -673,7 +671,10 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
       // the cases of "Accept-Encoding: gzip;q=0, deflate, *" and "Accept-Encoding: deflate, *"
       // whereas the proxy has only "gzip" configured. If we just exclude the encodings with "q=0"
       // from "pairs" then upon noticing "*" we don't know if "gzip" is acceptable by the client.
-      allowed_compressors.erase(std::string(pair.first));
+      if (const auto disallowed = find_allowed(pair.first);
+          disallowed != allowed_compressors.end()) {
+        allowed_compressors.erase(disallowed);
+      }
     }
   }
 
@@ -689,13 +690,13 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   // by the allowed compressors and choose the one with the highest q-value.
   EncPair choice{Http::CustomHeaders::get().AcceptEncodingValues.Identity, static_cast<float>(0)};
   for (const auto& pair : pairs) {
-    if (allowed_compressors.count(std::string(pair.first)) ||
+    const auto registered = find_allowed(pair.first);
+    if (registered != allowed_compressors.end() ||
         pair.first == Http::CustomHeaders::get().AcceptEncodingValues.Identity ||
         pair.first == Http::CustomHeaders::get().AcceptEncodingValues.Wildcard) {
-      const auto registered = allowed_compressors.find(std::string(pair.first));
       if ((pair.second > choice.second) ||
           (pair.second == choice.second && registered != allowed_compressors.end() &&
-           registered->second.choose_first_)) {
+           registered->choose_first_)) {
         choice = pair;
       }
     }
@@ -717,18 +718,13 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
 
   // If wildcard is given then use which ever compressor is registered first.
   if (choice.first == Http::CustomHeaders::get().AcceptEncodingValues.Wildcard) {
-    auto first_registered =
-        std::min_element(allowed_compressors.begin(), allowed_compressors.end(),
-                         [](const std::pair<std::string, CompressorInChain>& a,
-                            const std::pair<std::string, CompressorInChain>& b) -> bool {
-                           return a.second.registration_count_ < b.second.registration_count_;
-                         });
     return std::make_unique<CompressorFilter::EncodingDecision>(
-        first_registered->first, CompressorFilter::EncodingDecision::HeaderStat::Wildcard);
+        allowed_compressors.front().content_encoding_,
+        CompressorFilter::EncodingDecision::HeaderStat::Wildcard);
   }
 
   return std::make_unique<CompressorFilter::EncodingDecision>(
-      std::string(choice.first), CompressorFilter::EncodingDecision::HeaderStat::ValidCompressor);
+      choice.first, CompressorFilter::EncodingDecision::HeaderStat::ValidCompressor);
 }
 
 // Check if this filter was chosen to compress. Also update the filter's stat counters related to
@@ -772,7 +768,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(bool maybe_compress,
 }
 
 bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& headers) const {
-  if (accept_encoding_ == nullptr) {
+  if (!accept_encoding_.has_value()) {
     config_->responseDirectionConfig().responseStats().no_accept_header_.inc();
     return false;
   }
@@ -978,9 +974,9 @@ Envoy::Compression::Compressor::CompressorFactory& CompressorFilter::getCompress
       config_->compressorFactory());
 }
 
-std::string CompressorFilter::getContentEncoding() const {
-  if (per_route_config_ && per_route_config_->contentEncoding().has_value()) {
-    return per_route_config_->contentEncoding().value();
+const std::string& CompressorFilter::getContentEncoding() const {
+  if (per_route_config_ && per_route_config_->compressorFactory()) {
+    return per_route_config_->compressorFactory()->contentEncoding();
   }
   return config_->contentEncoding();
 }

@@ -162,7 +162,7 @@ public:
 
   Envoy::Compression::Compressor::CompressorPtr makeCompressor();
 
-  const std::string contentEncoding() const { return content_encoding_; };
+  const std::string& contentEncoding() const { return content_encoding_; };
   bool chooseFirst() const { return choose_first_; };
   const RequestDirectionConfig& requestDirectionConfig() { return request_direction_config_; }
   const ResponseDirectionConfig& responseDirectionConfig() { return response_direction_config_; }
@@ -196,12 +196,6 @@ public:
   // Returns the per-route compressor factory if configured, nullptr otherwise.
   const Envoy::Compression::Compressor::CompressorFactory* compressorFactory() const {
     return compressor_factory_.get();
-  }
-
-  // Returns the content encoding for the per-route compressor if configured.
-  std::optional<std::string> contentEncoding() const {
-    return compressor_factory_ ? std::make_optional(compressor_factory_->contentEncoding())
-                               : std::nullopt;
   }
 
 private:
@@ -271,7 +265,7 @@ private:
   class EncodingDecision : public StreamInfo::FilterState::Object {
   public:
     enum class HeaderStat { NotValid, Identity, Wildcard, ValidCompressor };
-    EncodingDecision(const std::string& encoding, const HeaderStat stat)
+    EncodingDecision(absl::string_view encoding, const HeaderStat stat)
         : encoding_(encoding), stat_(stat) {}
     const std::string& encoding() const { return encoding_; }
     HeaderStat stat() const { return stat_; }
@@ -282,7 +276,7 @@ private:
   };
 
   struct CompressorInChain {
-    uint32_t registration_count_;
+    absl::string_view content_encoding_;
     bool choose_first_;
   };
 
@@ -294,7 +288,7 @@ private:
   Envoy::Compression::Compressor::CompressorFactory& getCompressorFactory() const;
 
   // Returns the appropriate content encoding for the current route.
-  std::string getContentEncoding() const;
+  const std::string& getContentEncoding() const;
 
   // Returns the request stream info (downstream or upstream depending on the filter type).
   StreamInfo::StreamInfo& streamInfo() const;
@@ -305,7 +299,7 @@ private:
   Http::RequestHeaderMap* pending_request_headers_{};
   Http::ResponseHeaderMap* pending_response_headers_{};
   const CompressorFilterConfigSharedPtr config_;
-  std::unique_ptr<std::string> accept_encoding_;
+  std::optional<std::string> accept_encoding_;
   // Cached per-route configuration pointer, initialized once per stream.
   const CompressorPerRouteFilterConfig* per_route_config_{};
 };

@@ -707,6 +707,45 @@ BENCHMARK(compressChunks1024WithBrotli)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
+// Request and response header handling of a brotli filter followed by a gzip filter on one stream,
+// with no body. Arg 0 is a compressible response without content-length, so the encoding is
+// chosen and the filter waits for the body. Arg 1 is a response whose content type is not
+// compressible.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void headersOnlyBrotliThenGzip(benchmark::State& state) {
+  Stats::IsolatedStoreImpl stats;
+  testing::NiceMock<Runtime::MockLoader> runtime;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(runtime.snapshot_, featureEnabled("test.filter_enabled", 100))
+      .WillByDefault(Return(true));
+  const CompressorFilterConfigSharedPtr brotli_config =
+      makeBrotliConfig(stats, runtime, context, brotli_compression_params[0]);
+  const CompressorFilterConfigSharedPtr gzip_config =
+      makeGzipConfig(stats, runtime, context, gzip_compression_params[0]);
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "get"},
+                                                 {"accept-encoding", "gzip, deflate, br, zstd"}};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"content-type", state.range(0) == 0 ? "text/html" : "image/png"}};
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    decoder_callbacks.stream_info_.filter_state_ = std::make_shared<StreamInfo::FilterStateImpl>(
+        StreamInfo::FilterState::LifeSpan::FilterChain);
+    CompressorFilter brotli(brotli_config);
+    CompressorFilter gzip(gzip_config);
+    brotli.setDecoderFilterCallbacks(decoder_callbacks);
+    gzip.setDecoderFilterCallbacks(decoder_callbacks);
+    brotli.decodeHeaders(request_headers, true);
+    gzip.decodeHeaders(request_headers, true);
+    gzip.encodeHeaders(response_headers, false);
+    brotli.encodeHeaders(response_headers, false);
+    response_headers.remove(Http::CustomHeaders::get().Vary);
+  }
+}
+BENCHMARK(headersOnlyBrotliThenGzip)->DenseRange(0, 1, 1);
+
 } // namespace Compressor
 } // namespace HttpFilters
 } // namespace Extensions
