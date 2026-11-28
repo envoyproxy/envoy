@@ -4,7 +4,9 @@
 
 #include "source/common/common/regex.h"
 #include "source/common/stats/custom_stat_namespaces_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
 #include "source/common/stats/thread_local_store.h"
+#include "source/server/admin/prometheus_stats.h"
 #include "source/server/admin/stats_handler.h"
 #include "source/server/admin/stats_request.h"
 
@@ -87,7 +89,7 @@ public:
    * @param url the admin endpoint to query.
    * @return the Http Code and the response body as a string.
    */
-  CodeResponse handlerStats(absl::string_view url) {
+  CodeResponse handlerStats(absl::string_view url, bool prometheus_endpoint = false) {
     NiceMock<MockInstance> instance;
     EXPECT_CALL(admin_stream_, getRequestHeaders()).WillRepeatedly(ReturnRef(request_headers_));
     EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
@@ -98,7 +100,8 @@ public:
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     StatsHandler handler(instance);
     request_headers_.setPath(url);
-    Admin::RequestPtr request = handler.makeRequest(admin_stream_);
+    Admin::RequestPtr request = prometheus_endpoint ? handler.makePrometheusRequest(admin_stream_)
+                                                    : handler.makeRequest(admin_stream_);
     Http::TestResponseHeaderMapImpl response_headers;
     Http::Code code = request->start(response_headers);
     Buffer::OwnedImpl data;
@@ -1697,6 +1700,100 @@ envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
   const CodeResponse code_response = handlerStats("/stats?format=prometheus&text_readouts");
   EXPECT_EQ(Http::Code::OK, code_response.first);
   EXPECT_EQ(expected_response, code_response.second);
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, PrometheusEndpoint) {
+  createTestStats();
+  const CodeResponse code_response = handlerStats("/stats/prometheus?text_readouts", true);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
+envoy_cluster_upstream_cx_total{cluster="c1"} 10
+envoy_cluster_upstream_cx_total{cluster="c2"} 20
+# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{cluster="c1"} 11
+envoy_cluster_upstream_cx_active{cluster="c2"} 12
+# TYPE envoy_control_plane_identifier gauge
+envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
+)EOF";
+  // The output is not sorted by default.
+  EXPECT_EQ(sortedLines(expected_response), sortedLines(code_response.second));
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, PrometheusEndpointInvalidRegex) {
+  const CodeResponse code_response = handlerStats("/stats/prometheus?filter=(+invalid)", true);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_THAT(code_response.second, HasSubstr("Invalid re2 regex"));
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, PrometheusEndpointUnsupportedBucketMode) {
+  const CodeResponse code_response =
+      handlerStats("/stats/prometheus?histogram_buckets=disjoint", true);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_EQ("unsupported prometheus histogram bucket mode", code_response.second);
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, FamiliesFromManyScopesAreNotSplitAcrossChunks) {
+  // Default tag extractors turn cluster.<name>.<stat> into cluster.<stat>.
+  store_->setTagProducer(Stats::TagProducerImpl::createTagProducer({}, {}).value());
+
+  // Interleave the scopes so that rendering scope by scope would split each family.
+  Stats::ScopeSharedPtr c2 = store_->createScope("cluster.c2");
+  c2->counterFromString("upstream_rq_total").add(21);
+  c2->counterFromString("upstream_cx_total").add(20);
+  c2->gaugeFromString("upstream_cx_active", Stats::Gauge::ImportMode::Accumulate).set(22);
+  Stats::ScopeSharedPtr empty = store_->createScope("");
+  empty->counterFromString("cluster.c3.upstream_cx_total").add(30);
+  empty->gaugeFromString("cluster.c3.upstream_cx_active", Stats::Gauge::ImportMode::Accumulate)
+      .set(32);
+  Stats::ScopeSharedPtr c1 = store_->createScope("cluster.c1");
+  c1->counterFromString("upstream_cx_total").add(10);
+  c1->counterFromString("upstream_rq_total").add(11);
+  Stats::ScopeSharedPtr c4 = store_->createScope("cluster")->createScope("c4");
+  c4->counterFromString("upstream_cx_total").add(40);
+  store_->rootScope()->counterFromString("cluster.c5.upstream_cx_total").add(50);
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  const StatsParams params;
+  std::unique_ptr<PrometheusStatsFormatter::OutputFormat> output_format =
+      PrometheusStatsFormatter::makeOutputFormat(params, request_headers, response_headers);
+  const std::vector<Stats::CounterSharedPtr> counters = store_->counters();
+  const std::vector<Stats::GaugeSharedPtr> gauges = store_->gauges();
+  const std::vector<Stats::ParentHistogramSharedPtr> histograms = store_->histograms();
+  const std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  PrometheusStatsFormatter::ChunkedRenderer renderer(counters, gauges, histograms, text_readouts,
+                                                     endpoints_helper_.cm_, params,
+                                                     custom_namespaces_, *output_format);
+
+  std::vector<std::string> chunks;
+  bool more_data;
+  do {
+    Buffer::OwnedImpl chunk;
+    more_data = renderer.nextChunk(chunk, 1);
+    chunks.push_back(chunk.toString());
+  } while (more_data);
+
+  // One chunk per family, each holding every scope's series.
+  ASSERT_EQ(3, chunks.size());
+  EXPECT_EQ(R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
+envoy_cluster_upstream_cx_total{envoy_cluster_name="c1"} 10
+envoy_cluster_upstream_cx_total{envoy_cluster_name="c2"} 20
+envoy_cluster_upstream_cx_total{envoy_cluster_name="c3"} 30
+envoy_cluster_upstream_cx_total{envoy_cluster_name="c4"} 40
+envoy_cluster_upstream_cx_total{envoy_cluster_name="c5"} 50
+)EOF",
+            chunks[0]);
+  EXPECT_EQ(R"EOF(# TYPE envoy_cluster_upstream_rq_total counter
+envoy_cluster_upstream_rq_total{envoy_cluster_name="c1"} 11
+envoy_cluster_upstream_rq_total{envoy_cluster_name="c2"} 21
+)EOF",
+            chunks[1]);
+  EXPECT_EQ(R"EOF(# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{envoy_cluster_name="c2"} 22
+envoy_cluster_upstream_cx_active{envoy_cluster_name="c3"} 32
+)EOF",
+            chunks[2]);
+  EXPECT_EQ(3, renderer.metricNameCount());
 }
 
 } // namespace Server

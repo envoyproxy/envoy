@@ -21,29 +21,60 @@ namespace Server {
 const uint64_t RecentLookupsCapacity = 100;
 
 namespace {
-// Implements a chunked request for Prometheus stats.
+// Implements a chunked request for Prometheus stats. The stats are snapshotted and grouped by
+// metric family in start(), and nextChunk() renders whole families up to the chunk size.
 class PrometheusRequest : public Admin::Request {
 public:
-  PrometheusRequest(StatsHandler& handler, const StatsParams& params, AdminStream& admin_stream)
-      : handler_(handler), params_(params), admin_stream_(admin_stream) {}
+  PrometheusRequest(Server::Instance& server, const StatsParams& params, AdminStream& admin_stream)
+      : server_(server), params_(params), admin_stream_(admin_stream) {}
 
   Http::Code start(Http::ResponseHeaderMap& response_headers) override {
-    code_ = handler_.prometheusFlushAndRender(params_, admin_stream_.getRequestHeaders(),
-                                              response_headers, response_);
-    return code_;
+    const Http::RequestHeaderMap& request_headers = admin_stream_.getRequestHeaders();
+    const absl::Status status = PrometheusStatsFormatter::validateParams(params_, request_headers);
+    if (!status.ok()) {
+      response_.add(status.message());
+      return Http::Code::BadRequest;
+    }
+    if (server_.statsConfig().flushOnAdmin()) {
+      server_.flushStats();
+    }
+
+    // The snapshots keep the stats alive until the request is done, even if their scopes are
+    // deleted between chunks.
+    Stats::Store& stats = server_.stats();
+    counters_ = stats.counters();
+    gauges_ = stats.gauges();
+    histograms_ = stats.histograms();
+    if (params_.prometheus_text_readouts_) {
+      text_readouts_ = stats.textReadouts();
+    }
+    output_format_ =
+        PrometheusStatsFormatter::makeOutputFormat(params_, request_headers, response_headers);
+    renderer_ = std::make_unique<PrometheusStatsFormatter::ChunkedRenderer>(
+        counters_, gauges_, histograms_, text_readouts_, server_.clusterManager(), params_,
+        server_.api().customStatNamespaces(), *output_format_);
+    return Http::Code::OK;
   }
 
   bool nextChunk(Buffer::Instance& response) override {
-    response.move(response_);
-    return false;
+    if (renderer_ == nullptr) {
+      response.move(response_);
+      return false;
+    }
+    return renderer_->nextChunk(response, StatsRequest::DefaultChunkSize);
   }
 
 private:
-  StatsHandler& handler_;
+  Server::Instance& server_;
   const StatsParams params_;
   AdminStream& admin_stream_;
   Buffer::OwnedImpl response_;
-  Http::Code code_{Http::Code::OK};
+  std::vector<Stats::CounterSharedPtr> counters_;
+  std::vector<Stats::GaugeSharedPtr> gauges_;
+  std::vector<Stats::ParentHistogramSharedPtr> histograms_;
+  std::vector<Stats::TextReadoutSharedPtr> text_readouts_;
+  std::unique_ptr<PrometheusStatsFormatter::OutputFormat> output_format_;
+  std::unique_ptr<PrometheusStatsFormatter::ChunkedRenderer> renderer_;
 };
 } // namespace
 
@@ -107,14 +138,9 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
   }
 
   if (params.format_ == StatsFormat::Prometheus) {
-    // TODO(#16139): modify streaming algorithm to cover Prometheus.
-    //
-    // This may be easiest to accomplish by populating the set
-    // with tagExtractedName(), and allowing for vectors of
-    // stats as multiples will have the same tag-extracted names.
-    // Ideally we'd find a way to do this without slowing down
-    // the non-Prometheus implementations.
-    return std::make_unique<PrometheusRequest>(*this, params, admin_stream);
+    // Prometheus needs all stats with the same tag-extracted name in one group, and those come
+    // from different scopes, so it cannot stream scope by scope like StatsRequest.
+    return std::make_unique<PrometheusRequest>(server_, params, admin_stream);
   }
 
   if (params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::PrometheusNative) {
@@ -143,54 +169,14 @@ Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsPara
   return std::make_unique<StatsRequest>(stats, params, cluster_manager, url_handler_fn);
 }
 
-Http::Code StatsHandler::handlerPrometheusStats(Http::ResponseHeaderMap& response_headers,
-                                                Buffer::Instance& response,
-                                                AdminStream& admin_stream) {
-  return prometheusStats(admin_stream.getRequestHeaders(), response_headers, response);
-}
-
-Http::Code StatsHandler::prometheusStats(const Http::RequestHeaderMap& request_headers,
-                                         Http::ResponseHeaderMap& response_headers,
-                                         Buffer::Instance& response) {
+Admin::RequestPtr StatsHandler::makePrometheusRequest(AdminStream& admin_stream) {
   StatsParams params;
-  Http::Code code = params.parse(request_headers.getPathValue(), response);
+  Buffer::OwnedImpl response;
+  const Http::Code code = params.parse(admin_stream.getRequestHeaders().getPathValue(), response);
   if (code != Http::Code::OK) {
-    return code;
+    return Admin::makeStaticTextRequest(response, code);
   }
-
-  return prometheusFlushAndRender(params, request_headers, response_headers, response);
-}
-
-Http::Code StatsHandler::prometheusFlushAndRender(const StatsParams& params,
-                                                  const Http::RequestHeaderMap& request_headers,
-                                                  Http::ResponseHeaderMap& response_headers,
-                                                  Buffer::Instance& response) {
-  absl::Status paramsStatus = PrometheusStatsFormatter::validateParams(params, request_headers);
-  if (!paramsStatus.ok()) {
-    response.add(paramsStatus.message());
-    return Http::Code::BadRequest;
-  }
-  if (server_.statsConfig().flushOnAdmin()) {
-    server_.flushStats();
-  }
-  prometheusRender(server_.stats(), server_.api().customStatNamespaces(), server_.clusterManager(),
-                   params, request_headers, response_headers, response);
-  return Http::Code::OK;
-}
-
-void StatsHandler::prometheusRender(Stats::Store& stats,
-                                    const Stats::CustomStatNamespaces& custom_namespaces,
-                                    const Upstream::ClusterManager& cluster_manager,
-                                    const StatsParams& params,
-                                    const Http::RequestHeaderMap& request_headers,
-                                    Http::ResponseHeaderMap& response_headers,
-                                    Buffer::Instance& response) {
-  const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
-      params.prometheus_text_readouts_ ? stats.textReadouts()
-                                       : std::vector<Stats::TextReadoutSharedPtr>();
-  PrometheusStatsFormatter::statsAsPrometheus(
-      stats.counters(), stats.gauges(), stats.histograms(), text_readouts_vec, cluster_manager,
-      request_headers, response_headers, response, params, custom_namespaces);
+  return std::make_unique<PrometheusRequest>(server_, params, admin_stream);
 }
 
 Http::Code StatsHandler::handlerContention(Http::ResponseHeaderMap& response_headers,
