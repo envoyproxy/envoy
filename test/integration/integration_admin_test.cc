@@ -16,6 +16,7 @@
 #include "source/common/stats/stats_matcher_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/integration/socket_interface_swap.h"
 #include "test/integration/utility.h"
 #include "test/test_common/stats_utility.h"
 #include "test/test_common/status_utility.h"
@@ -891,6 +892,118 @@ TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(IncludeExact)) {
   initialize();
   makeRequest();
   EXPECT_EQ(response_->body(), "listener_manager.listener_create_success: 1\n");
+}
+
+// Emits num_chunks chunks of chunk_size bytes and counts the chunks produced.
+class CountingChunksRequest : public Server::Admin::Request {
+public:
+  CountingChunksRequest(uint32_t num_chunks, uint32_t chunk_size, std::atomic<uint32_t>& produced)
+      : num_chunks_(num_chunks), chunk_size_(chunk_size), produced_(produced) {}
+
+  Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
+  bool nextChunk(Buffer::Instance& response) override {
+    response.add(std::string(chunk_size_, 'a'));
+    return ++produced_ < num_chunks_;
+  }
+
+private:
+  const uint32_t num_chunks_;
+  const uint32_t chunk_size_;
+  std::atomic<uint32_t>& produced_;
+};
+
+class AdminFlowControlIntegrationTest : public SocketInterfaceSwap,
+                                        public HttpProtocolIntegrationTest {
+public:
+  static constexpr uint32_t BufferLimit = 16 * 1024;
+  static constexpr uint32_t ChunkSize = 16 * 1024;
+  static constexpr uint32_t NumChunks = 64;
+
+  AdminFlowControlIntegrationTest() : SocketInterfaceSwap(Network::Socket::Type::Stream) {}
+
+  void initializeWithBufferLimit(uint32_t limit) {
+    // Flow control only applies when yielding between chunks.
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.admin_filter_yield_between_chunks",
+                                      "true");
+    config_helper_.addConfigModifier([limit](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      if (limit > 0) {
+        bootstrap.mutable_admin()->mutable_per_connection_buffer_limit_bytes()->set_value(limit);
+      }
+    });
+    initialize();
+    ASSERT_TRUE(test_server_->server().admin()->addStreamingHandler(
+        "/chunks", "chunks",
+        [this](Server::AdminStream&) -> Server::Admin::RequestPtr {
+          return std::make_unique<CountingChunksRequest>(NumChunks, ChunkSize, produced_);
+        },
+        true, false));
+  }
+
+  // Starts /chunks on the admin port with writes to the client stalled.
+  IntegrationStreamDecoderPtr startStalledRequest() {
+    write_matcher_->setSourcePort(lookupPort("admin"));
+    write_matcher_->setWriteReturnsEgain();
+    codec_client_ = makeHttpConnection(lookupPort("admin"));
+    return codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+        {":method", "GET"}, {":path", "/chunks"}, {":scheme", "http"}, {":authority", "admin"}});
+  }
+
+  // Blocks until the main thread has run a posted callback, i.e. finished an event loop iteration.
+  void waitForMainThreadIteration() {
+    absl::Notification done;
+    test_server_->server().dispatcher().post([&done]() { done.Notify(); });
+    done.WaitForNotification();
+  }
+
+  // An unpaused response produces a chunk per event loop iteration, so this many iterations are
+  // enough to produce all of it.
+  void waitForMainThreadIterations(uint32_t iterations) {
+    for (uint32_t i = 0; i < iterations; ++i) {
+      waitForMainThreadIteration();
+    }
+  }
+
+  std::atomic<uint32_t> produced_{0};
+};
+
+INSTANTIATE_TEST_SUITE_P(Protocols, AdminFlowControlIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+                             {Http::CodecType::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(AdminFlowControlIntegrationTest, StalledClientStopsAdminResponseProduction) {
+  initializeWithBufferLimit(BufferLimit);
+  IntegrationStreamDecoderPtr response = startStalledRequest();
+
+  test_server_->waitForGauge("http.admin.downstream_cx_tx_bytes_buffered",
+                             testing::Ge(BufferLimit));
+  // Without flow control these iterations would produce the whole response.
+  waitForMainThreadIterations(2 * NumChunks);
+  // A chunk is as large as the limit, so the first one already raises the high watermark.
+  EXPECT_LE(produced_.load(), 2u);
+  EXPECT_LE(test_server_->gauge("http.admin.downstream_cx_tx_bytes_buffered")->value(),
+            BufferLimit + ChunkSize);
+
+  write_matcher_->setResumeWrites();
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(NumChunks * ChunkSize, response->body().size());
+  EXPECT_EQ(NumChunks, produced_.load());
+}
+
+TEST_P(AdminFlowControlIntegrationTest, NoBufferLimitProducesWholeResponse) {
+  initializeWithBufferLimit(0);
+  IntegrationStreamDecoderPtr response = startStalledRequest();
+
+  test_server_->waitForGauge("http.admin.downstream_cx_tx_bytes_buffered", testing::Ge(ChunkSize));
+  // Without a limit the whole response is produced even though nothing is written.
+  waitForMainThreadIterations(2 * NumChunks);
+  EXPECT_EQ(NumChunks, produced_.load());
+
+  write_matcher_->setResumeWrites();
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(NumChunks * ChunkSize, response->body().size());
 }
 
 } // namespace Envoy

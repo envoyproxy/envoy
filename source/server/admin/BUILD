@@ -124,6 +124,7 @@ envoy_cc_library(
     deps = [
         ":utils_lib",
         "//envoy/event:schedulable_cb_interface",
+        "//envoy/http:codec_interface",
         "//envoy/http:filter_interface",
         "//envoy/server:admin_interface",
         "//source/common/buffer:buffer_lib",

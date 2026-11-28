@@ -4,6 +4,7 @@
 #include <list>
 
 #include "envoy/event/schedulable_cb.h"
+#include "envoy/http/codec.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/admin.h"
 
@@ -23,6 +24,7 @@ namespace Server {
  */
 class AdminFilter : public Http::PassThroughFilter,
                     public AdminStream,
+                    public Http::DownstreamWatermarkCallbacks,
                     Logger::Loggable<Logger::Id::admin> {
 public:
   using AdminServerCallbackFunction = std::function<Http::Code(
@@ -44,6 +46,7 @@ public:
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
@@ -59,6 +62,10 @@ public:
     return encoder_callbacks_->http1StreamEncoderOptions();
   }
   Http::Utility::QueryParamsMulti queryParams() const override;
+
+  // Http::DownstreamWatermarkCallbacks
+  void onAboveWriteBufferHighWatermark() override;
+  void onBelowWriteBufferLowWatermark() override;
 
 private:
   /**
@@ -78,6 +85,9 @@ private:
    */
   void scheduleNextChunk();
 
+  // True while the downstream connection or stream is above its write buffer high watermark.
+  bool paused() const { return above_high_watermark_count_ > 0; }
+
   const Admin& admin_;
   // Latched at construction so the runtime guard is not re-read for every request chunk.
   const bool yield_between_chunks_;
@@ -88,6 +98,12 @@ private:
   // The request whose response is still being streamed, if any.
   Admin::RequestPtr request_;
   Event::SchedulableCallbackPtr next_chunk_cb_;
+  // The stream and the connection may each be above their high watermark, see
+  // Http::DownstreamWatermarkCallbacks.
+  uint32_t above_high_watermark_count_{0};
+  // Set once this filter has registered for downstream watermark callbacks, which is done only when
+  // yielding between chunks and the admin connection has a buffer limit.
+  bool watermark_callbacks_registered_{false};
   bool destroyed_{false};
 };
 

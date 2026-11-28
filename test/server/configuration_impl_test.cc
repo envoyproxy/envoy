@@ -1236,6 +1236,39 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPath)) 
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);
 }
+
+TEST(InitialImplTest, AdminPerConnectionBufferLimitBytes) {
+  const std::string yaml = R"EOF(
+  admin:
+    per_connection_buffer_limit_bytes: 16384
+  )EOF";
+  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(yaml);
+  absl::Status status;
+  InitialImpl config(bootstrap, status);
+  ASSERT_OK(status);
+  EXPECT_EQ(16384, config.admin().perConnectionBufferLimitBytes());
+}
+
+TEST(InitialImplTest, AdminPerConnectionBufferLimitBytesUnsetMeansNoLimit) {
+  const std::string yaml = R"EOF(
+  admin: {}
+  )EOF";
+  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(yaml);
+  absl::Status status;
+  InitialImpl config(bootstrap, status);
+  ASSERT_OK(status);
+  EXPECT_EQ(0, config.admin().perConnectionBufferLimitBytes());
+}
+
+TEST(InitialImplTest, AdminPerConnectionBufferLimitBytesAbove32BitsRejected) {
+  const std::string yaml = R"EOF(
+  admin:
+    per_connection_buffer_limit_bytes: 4294967296
+  )EOF";
+  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(yaml);
+  EXPECT_THROW(TestUtility::validate(bootstrap), Envoy::ProtoValidationException);
+}
+
 } // namespace
 } // namespace Configuration
 } // namespace Server

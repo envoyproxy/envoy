@@ -219,12 +219,16 @@ private:
     Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
     AccessLog::InstanceSharedPtrVector accessLogs() const override { return access_logs_; }
     bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
+    uint64_t perConnectionBufferLimitBytes() const override {
+      return per_connection_buffer_limit_bytes_;
+    }
 
     std::string profile_path_;
     AccessLog::InstanceSharedPtrVector access_logs_;
     Network::Address::InstanceConstSharedPtr address_;
     Network::Socket::OptionsSharedPtr socket_options_;
     bool ignore_global_conn_limit_;
+    uint64_t per_connection_buffer_limit_bytes_{};
   };
 
   AdminImpl admin_;

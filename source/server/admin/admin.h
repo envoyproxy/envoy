@@ -71,7 +71,7 @@ class AdminImpl : public Admin,
                   Logger::Loggable<Logger::Id::admin> {
 public:
   AdminImpl(const std::string& profile_path, Server::Instance& server,
-            bool ignore_global_conn_limit);
+            bool ignore_global_conn_limit, uint64_t per_connection_buffer_limit_bytes = 0);
 
   Http::Code runCallback(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream& admin_stream);
@@ -398,7 +398,10 @@ private:
     }
     bool bindToPort() const override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
-    uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+    uint32_t perConnectionBufferLimitBytes() const override {
+      // The bootstrap validation keeps the limit within 32 bits.
+      return static_cast<uint32_t>(parent_.per_connection_buffer_limit_bytes_);
+    }
     std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const override {
       return std::chrono::milliseconds::zero();
     }
@@ -535,6 +538,7 @@ private:
   const std::optional<std::string> scheme_;
   const bool scheme_match_upstream_ = false;
   const bool ignore_global_conn_limit_;
+  const uint64_t per_connection_buffer_limit_bytes_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;
   const absl::flat_hash_set<uint32_t> https_destination_ports_;

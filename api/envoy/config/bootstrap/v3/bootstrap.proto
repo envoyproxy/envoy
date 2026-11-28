@@ -466,7 +466,7 @@ message Bootstrap {
 
 // Administration interface :ref:`operations documentation
 // <operations_admin_interface>`.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message Admin {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v2.Admin";
 
@@ -514,6 +514,22 @@ message Admin {
   //   - prefix: /healthcheck
   //
   repeated type.matcher.v3.StringMatcher allow_paths = 7;
+
+  // Soft limit on the size of the read and write buffers of each admin connection. If not specified
+  // or 0, there is no limit. It must fit in 32 bits for now.
+  //
+  // When set and the ``envoy.reloadable_features.admin_filter_yield_between_chunks`` runtime guard
+  // is enabled, admin responses produced in multiple chunks (for example ``/stats``) are flow
+  // controlled: the next chunk is produced only after the client has drained the response
+  // buffered so far below half of this limit, so a slow client does not make Envoy buffer the
+  // whole response. The buffered response can still exceed this limit, by up to about one chunk
+  // plus the limit. Responses produced in a single chunk, such as ``/config_dump``, are buffered
+  // whole as before.
+  //
+  // For HTTP/1 admin connections, request bodies larger than this limit are rejected. For HTTP/2,
+  // the per-stream buffers are bounded by the HTTP/2 stream window instead.
+  google.protobuf.UInt64Value per_connection_buffer_limit_bytes = 8
+      [(validate.rules).uint64 = {lte: 4294967295}];
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.

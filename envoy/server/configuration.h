@@ -168,6 +168,12 @@ public:
    * limit.
    */
   virtual bool ignoreGlobalConnLimit() const PURE;
+
+  /**
+   * @return uint64_t the soft limit on the size of each admin connection's read and write buffers,
+   * or 0 for no limit.
+   */
+  virtual uint64_t perConnectionBufferLimitBytes() const PURE;
 };
 
 /**

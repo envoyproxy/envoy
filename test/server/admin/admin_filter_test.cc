@@ -4,6 +4,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
@@ -198,6 +199,193 @@ TEST_P(AdminFilterChunkedTest, ResetWhileEncodingStopsChunksByDefault) {
   });
   filter_.decodeHeaders(request_headers_, true);
   EXPECT_TRUE(request_destroyed_);
+}
+
+class AdminFilterFlowControlTest : public AdminFilterChunkedTest {
+public:
+  void setBufferLimit(uint32_t limit) {
+    ON_CALL(connection_, bufferLimit()).WillByDefault(Return(limit));
+    ON_CALL(callbacks_, connection())
+        .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+  }
+
+  NiceMock<Network::MockConnection> connection_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminFilterFlowControlTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(AdminFilterFlowControlTest, PausesOnHighWatermarkAndResumesOnLowWatermark) {
+  setBufferLimit(1024);
+  AdminFilter& filter = createYieldingFilter();
+  expectCountingRequest(3);
+  auto* next_chunk_cb = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
+
+  // The first chunk fills the downstream write buffer.
+  EXPECT_CALL(callbacks_, encodeData(BufferString("0"), false))
+      .WillOnce([&filter](Buffer::Instance&, bool) { filter.onAboveWriteBufferHighWatermark(); });
+  filter.decodeHeaders(request_headers_, true);
+  EXPECT_FALSE(next_chunk_cb->enabled_);
+  EXPECT_FALSE(request_destroyed_);
+
+  filter.onBelowWriteBufferLowWatermark();
+  EXPECT_TRUE(next_chunk_cb->enabled_);
+  expectData("1", false);
+  next_chunk_cb->invokeCallback();
+  // Back to one chunk per event loop iteration.
+  EXPECT_TRUE(next_chunk_cb->enabled_);
+  expectData("2", true);
+  next_chunk_cb->invokeCallback();
+  EXPECT_TRUE(request_destroyed_);
+  filter.onDestroy();
+}
+
+TEST_P(AdminFilterFlowControlTest, NoFlowControlWithoutYielding) {
+  setBufferLimit(1024);
+  EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_)).Times(0);
+  AdminFilter filter(admin_);
+  filter.setDecoderFilterCallbacks(callbacks_);
+  expectCountingRequest(3);
+  EXPECT_CALL(callbacks_.dispatcher_, createSchedulableCallback_(_)).Times(0);
+
+  InSequence s;
+  expectData("0", false);
+  expectData("1", false);
+  expectData("2", true);
+  filter.decodeHeaders(request_headers_, true);
+  EXPECT_TRUE(request_destroyed_);
+  EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_)).Times(0);
+  filter.onDestroy();
+}
+
+TEST_P(AdminFilterFlowControlTest, HighWatermarkWhileScheduledStopsNextChunk) {
+  setBufferLimit(1024);
+  AdminFilter& filter = createYieldingFilter();
+  expectCountingRequest(3);
+  auto* next_chunk_cb = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
+
+  expectData("0", false);
+  filter.decodeHeaders(request_headers_, true);
+  EXPECT_TRUE(next_chunk_cb->enabled_);
+
+  // The downstream backs up before the scheduled chunk runs.
+  filter.onAboveWriteBufferHighWatermark();
+  EXPECT_CALL(callbacks_, encodeData(_, _)).Times(0);
+  next_chunk_cb->invokeCallback();
+  EXPECT_FALSE(next_chunk_cb->enabled_);
+  testing::Mock::VerifyAndClearExpectations(&callbacks_);
+
+  filter.onBelowWriteBufferLowWatermark();
+  expectData("1", false);
+  next_chunk_cb->invokeCallback();
+  filter.onDestroy();
+  EXPECT_TRUE(request_destroyed_);
+}
+
+TEST_P(AdminFilterFlowControlTest, WaitsForEveryLowWatermark) {
+  setBufferLimit(1024);
+  AdminFilter& filter = createYieldingFilter();
+  expectCountingRequest(2);
+  auto* next_chunk_cb = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
+
+  // Both the stream and the connection go above their high watermark.
+  EXPECT_CALL(callbacks_, encodeData(BufferString("0"), false))
+      .WillOnce([&filter](Buffer::Instance&, bool) {
+        filter.onAboveWriteBufferHighWatermark();
+        filter.onAboveWriteBufferHighWatermark();
+      });
+  filter.decodeHeaders(request_headers_, true);
+
+  filter.onBelowWriteBufferLowWatermark();
+  EXPECT_FALSE(next_chunk_cb->enabled_);
+  filter.onBelowWriteBufferLowWatermark();
+  EXPECT_TRUE(next_chunk_cb->enabled_);
+
+  expectData("1", true);
+  next_chunk_cb->invokeCallback();
+  EXPECT_TRUE(request_destroyed_);
+  filter.onDestroy();
+}
+
+TEST_P(AdminFilterFlowControlTest, StartsPausedWhenAlreadyAboveHighWatermark) {
+  setBufferLimit(1024);
+  // Registration replays a high watermark the downstream already raised.
+  EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_))
+      .WillOnce([](Http::DownstreamWatermarkCallbacks& callbacks) {
+        callbacks.onAboveWriteBufferHighWatermark();
+      });
+  AdminFilter& filter = createYieldingFilter();
+  expectCountingRequest(2);
+  auto* next_chunk_cb = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
+
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
+  EXPECT_CALL(callbacks_, encodeData(_, _)).Times(0);
+  filter.decodeHeaders(request_headers_, true);
+  testing::Mock::VerifyAndClearExpectations(&callbacks_);
+
+  filter.onBelowWriteBufferLowWatermark();
+  EXPECT_TRUE(next_chunk_cb->enabled_);
+  expectData("0", false);
+  next_chunk_cb->invokeCallback();
+  expectData("1", true);
+  next_chunk_cb->invokeCallback();
+  EXPECT_TRUE(request_destroyed_);
+  filter.onDestroy();
+}
+
+TEST_P(AdminFilterFlowControlTest, DestroyWhilePausedReleasesRequest) {
+  setBufferLimit(1024);
+  AdminFilter& filter = createYieldingFilter();
+  expectCountingRequest(3);
+  EXPECT_CALL(callbacks_, encodeData(BufferString("0"), false))
+      .WillOnce([&filter](Buffer::Instance&, bool) { filter.onAboveWriteBufferHighWatermark(); });
+  filter.decodeHeaders(request_headers_, true);
+  EXPECT_FALSE(request_destroyed_);
+
+  EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_));
+  filter.onDestroy();
+  EXPECT_TRUE(request_destroyed_);
+}
+
+TEST_P(AdminFilterFlowControlTest, NoBufferLimitSkipsFlowControl) {
+  setBufferLimit(0);
+  EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_)).Times(0);
+  AdminFilter& filter = createYieldingFilter();
+  expectCountingRequest(2);
+  auto* next_chunk_cb = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
+
+  expectData("0", false);
+  filter.decodeHeaders(request_headers_, true);
+  EXPECT_TRUE(next_chunk_cb->enabled_);
+  expectData("1", true);
+  next_chunk_cb->invokeCallback();
+  EXPECT_TRUE(request_destroyed_);
+  EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_)).Times(0);
+  filter.onDestroy();
+}
+
+TEST_P(AdminFilterFlowControlTest, LowWatermarkDuringLastChunkDoesNotEncodeAgain) {
+  setBufferLimit(1024);
+  AdminFilter& filter = createYieldingFilter();
+  // The stream stays open after the last chunk, as with tap or hystrix.
+  filter.setEndStreamOnComplete(false);
+  expectCountingRequest(1);
+  auto* next_chunk_cb = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
+
+  // The last chunk goes above and back below inline, which schedules a callback.
+  EXPECT_CALL(callbacks_, encodeData(BufferString("0"), false))
+      .WillOnce([&filter](Buffer::Instance&, bool) {
+        filter.onAboveWriteBufferHighWatermark();
+        filter.onBelowWriteBufferLowWatermark();
+      });
+  filter.decodeHeaders(request_headers_, true);
+  EXPECT_TRUE(request_destroyed_);
+  EXPECT_TRUE(next_chunk_cb->enabled_);
+
+  EXPECT_CALL(callbacks_, encodeData(_, _)).Times(0);
+  next_chunk_cb->invokeCallback();
+  filter.onDestroy();
 }
 
 } // namespace Server

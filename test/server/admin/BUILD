@@ -102,6 +102,7 @@ envoy_cc_test(
         "//source/server/admin:admin_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/server:admin_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:test_runtime_lib",
