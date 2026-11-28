@@ -4,12 +4,18 @@ module(
 )
 
 bazel_dep(name = "envoy", version = "1.41.0-dev")
+bazel_dep(name = "envoy_api", version = "1.41.0-dev")
 bazel_dep(name = "envoy_mobile", version = "1.41.0-dev")
 bazel_dep(name = "platforms", version = "1.1.0")
 
 local_path_override(
     module_name = "envoy",
     path = "../..",
+)
+
+local_path_override(
+    module_name = "envoy_api",
+    path = "../../api",
 )
 
 local_path_override(

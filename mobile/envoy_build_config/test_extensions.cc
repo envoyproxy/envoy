@@ -27,6 +27,8 @@
 #include "test/common/http/filters/test_kv_store/filter_descriptor.pb.h"
 #include "test/common/http/filters/test_logger/filter_descriptor.pb.h"
 #include "test/common/mocks/dns/mock_dns_resolver_descriptor.pb.h"
+
+#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin_descriptor.pb.h"
 #endif
 
 void register_test_extensions() {
@@ -56,6 +58,8 @@ void register_test_extensions() {
       protobuf::reflection::test_common_http_filters_test_kv_store_filter::kFileDescriptorInfo,
       protobuf::reflection::test_common_http_filters_test_logger_filter::kFileDescriptorInfo,
       protobuf::reflection::test_common_mocks_dns_mock_dns_resolver::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_load_balancing_policies_round_robin_v3_round_robin::
+          kFileDescriptorInfo,
   };
   for (const Envoy::FileDescriptorInfo& descriptor : file_descriptors) {
     Envoy::loadFileDescriptors(descriptor);
