@@ -43,7 +43,7 @@ ProfileAction::ProfileAction(
               absl::StrCat(context.guarddog_name_, ".profile_action.successfully_captured"),
               context.stats_.symbolTable())
               .statName())),
-      context_(context), timer_cb_(context_.dispatcher_.createTimer([this] {
+      api_(context.api_), timer_cb_(context.dispatcher_.createTimer([this] {
         if (Profiler::Cpu::profilerEnabled()) {
           Profiler::Cpu::stopProfiler();
           running_profile_ = false;
@@ -53,7 +53,7 @@ ProfileAction::ProfileAction(
           return;
         }
 
-        if (!context_.api_.fileSystem().fileExists(profile_filename_)) {
+        if (!api_.fileSystem().fileExists(profile_filename_)) {
           ENVOY_LOG_MISC(error, "Profile file {} wasn't created!", profile_filename_);
         } else {
           profiles_successfully_captured_.inc();
@@ -82,14 +82,14 @@ void ProfileAction::run(
     return;
   }
 
-  auto& fs = context_.api_.fileSystem();
+  auto& fs = api_.fileSystem();
   if (!fs.directoryExists(path_)) {
     ENVOY_LOG_MISC(error, "Profile Action: Directory path {} doesn't exist.", path_);
     return;
   }
 
   // Generate file path for output and try to profile
-  profile_filename_ = generateProfileFilePath(path_, context_.api_.timeSource());
+  profile_filename_ = generateProfileFilePath(path_, api_.timeSource());
 
   if (!Profiler::Cpu::profilerEnabled()) {
     if (Profiler::Cpu::startProfiler(profile_filename_)) {

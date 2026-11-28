@@ -1,4 +1,5 @@
 #include <memory>
+#include <optional>
 
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -15,6 +16,7 @@
 #include "source/extensions/watchdog/profile_action/profile_action.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
@@ -260,6 +262,32 @@ TEST_F(ProfileActionTest, ShouldNotProfileIfDirectoryDoesNotExist) {
 
   EXPECT_EQ(countNumberOfProfileInPath(test_path_), 0);
   EXPECT_FALSE(api_->fileSystem().directoryExists(nonexistant_path));
+}
+
+// GuardDogImpl builds its actions from a factory context that is destroyed when its constructor
+// returns, so the action must not keep a reference to the context.
+TEST_F(ProfileActionTest, DoesNotUseFactoryContextAfterConstruction) {
+  envoy::extensions::watchdog::profile_action::v3::ProfileActionConfig config;
+  const std::string nonexistent_path = test_path_ + "/nonexistent_dir/";
+  config.set_profile_path(nonexistent_path);
+
+  std::optional<Server::Configuration::GuardDogActionFactoryContext> context;
+  context.emplace(Server::Configuration::GuardDogActionFactoryContext{*api_, *dispatcher_,
+                                                                      *stats_.rootScope(), "test"});
+  action_ = std::make_unique<ProfileAction>(config, *context);
+
+  // Put a context with a different Api in the same storage, as a later stack frame would.
+  testing::StrictMock<Api::MockApi> other_api;
+  EXPECT_CALL(other_api, fileSystem()).Times(0);
+  context.reset();
+  context.emplace(Server::Configuration::GuardDogActionFactoryContext{other_api, *dispatcher_,
+                                                                      *stats_.rootScope(), "test"});
+
+  const auto now = api_->timeSource().monotonicTime();
+  action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MEGAMISS,
+               {{Thread::ThreadId(10), now}}, now);
+
+  EXPECT_EQ(TestUtility::findCounter(stats_, "test.profile_action.attempted")->value(), 1);
 }
 
 TEST_F(ProfileActionTest, ShouldNotProfileIfNoTids) {
