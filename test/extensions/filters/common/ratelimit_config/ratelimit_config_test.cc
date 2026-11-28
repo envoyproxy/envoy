@@ -186,6 +186,33 @@ rate_limits: []
   EXPECT_TRUE(config_->empty());
 }
 
+TEST_F(RateLimitConfigTest, HasStreamDone) {
+  const std::string yaml = R"EOF(
+rate_limits:
+- actions:
+  - generic_key:
+      descriptor_value: stream_done
+  apply_on_stream_done: true
+  )EOF";
+
+  setupTest(yaml);
+
+  EXPECT_TRUE(config_->hasStreamDone());
+}
+
+TEST_F(RateLimitConfigTest, DoesNotHaveStreamDone) {
+  const std::string yaml = R"EOF(
+rate_limits:
+- actions:
+  - generic_key:
+      descriptor_value: request
+  )EOF";
+
+  setupTest(yaml);
+
+  EXPECT_FALSE(config_->hasStreamDone());
+}
+
 TEST_F(RateLimitConfigTest, SinglePolicy) {
   const std::string yaml = R"EOF(
   rate_limits:

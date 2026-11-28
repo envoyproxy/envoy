@@ -54,6 +54,9 @@ public:
 
   size_t size() const { return rate_limit_policies_.size(); }
 
+  // Returns whether any configured rate limit applies on stream completion.
+  bool hasStreamDone() const { return has_stream_done_; }
+
   // `headers` (request headers) is always present. `response_headers` is optional: it is only set
   // on the apply_on_stream_done path and is nullptr on the request path; it lets a `hits_addend`
   // format resolve `%RESP()%` substitutions.
@@ -65,6 +68,7 @@ public:
 
 private:
   std::vector<RateLimitPolicy> rate_limit_policies_;
+  bool has_stream_done_ = false;
 };
 
 } // namespace RateLimit

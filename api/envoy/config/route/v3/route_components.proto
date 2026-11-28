@@ -2833,7 +2833,9 @@ message RateLimit {
 
   // If true, the rate limit request will be applied when the stream completes. The default value is false.
   // This is useful when the rate limit budget needs to reflect the response context that is not available
-  // on the request path.
+  // on the request path. Stream-done descriptors see the request headers as they were when the rate
+  // limit filter processed the request, plus headers added by the rate limit service. Later changes
+  // to the request headers by other filters are not reflected.
   //
   // For example, let's say the upstream service calculates the usage statistics and returns them in the response body
   // and we want to utilize these numbers to apply the rate limit action for the subsequent requests.
