@@ -108,6 +108,7 @@ envoy_extension_cc_test(
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/reverse_tunnel_reporting_service:reporter_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stats:stats_mocks",

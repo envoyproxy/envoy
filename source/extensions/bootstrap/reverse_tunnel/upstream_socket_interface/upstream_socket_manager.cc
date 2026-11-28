@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/common/platform.h"
+#include "envoy/event/file_event.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
@@ -240,7 +241,7 @@ void UpstreamSocketManager::addConnectionSocket(
         onPingResponse(socket_ref->ioHandle());
         return absl::OkStatus();
       },
-      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
   // Store ping_interval_ if not yet set.
   if (ping_interval_ == std::chrono::seconds::zero()) {
@@ -643,6 +644,11 @@ void UpstreamSocketManager::cleanStaleNodeEntry(const std::string& node_id) {
 
 void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
   const int fd = io_handle.fdDoNotUse();
+  auto rearm_read_event = [&]() {
+    if (auto event_it = fd_to_event_map_.find(fd); event_it != fd_to_event_map_.end()) {
+      event_it->second->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
+    }
+  };
 
   Buffer::OwnedImpl buffer;
   const auto ping_size =
@@ -668,6 +674,7 @@ void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
 
   if (result.return_value_ < ping_size) {
     ENVOY_LOG(debug, "reverse_tunnel: FD: {}: no complete ping data yet", fd);
+    rearm_read_event();
     return;
   }
 
@@ -678,6 +685,7 @@ void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
     ENVOY_LOG(debug, "reverse_tunnel: response is not RPING. fd: {}.", fd);
     // Treat as a miss; do not immediately kill unless threshold crossed.
     onPingTimeout(fd);
+    rearm_read_event();
     return;
   }
   ENVOY_LOG(trace, "reverse_tunnel: received ping response. fd: {}.", fd);
@@ -696,6 +704,7 @@ void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
 
   // Re-arm the per-connection send timer with jitter.
   rearmPingSendTimer(fd);
+  rearm_read_event();
 }
 
 void UpstreamSocketManager::sendPingForConnection(int fd) {
