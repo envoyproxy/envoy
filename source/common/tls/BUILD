@@ -58,6 +58,7 @@ envoy_cc_library(
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/network:io_handle_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/runtime:runtime_features_lib",
     ],
 )
@@ -88,6 +89,7 @@ envoy_cc_library(
         "//source/common/common:thread_annotations",
         "//source/common/http:headers_lib",
         "//source/common/network:transport_socket_options_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@abseil-cpp//absl/container:node_hash_set",
         "@abseil-cpp//absl/hash",
         "@abseil-cpp//absl/synchronization",
