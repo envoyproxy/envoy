@@ -47,6 +47,7 @@ public:
 
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
   MOCK_METHOD(bool, supportsAlpn, (), (const));
+  MOCK_METHOD(bool, tunnelsHttp11ProxyTraffic, (), (const));
   MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));
   MOCK_METHOD(Envoy::Ssl::ClientContextSharedPtr, sslCtx, ());
   MOCK_METHOD(OptRef<const Ssl::ClientContextConfig>, clientContextConfig, (), (const));

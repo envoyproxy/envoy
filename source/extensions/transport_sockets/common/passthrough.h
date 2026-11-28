@@ -22,6 +22,9 @@ public:
     return transport_socket_factory_->implementsSecureTransport();
   }
   bool supportsAlpn() const override { return transport_socket_factory_->supportsAlpn(); }
+  bool tunnelsHttp11ProxyTraffic() const override {
+    return transport_socket_factory_->tunnelsHttp11ProxyTraffic();
+  }
   absl::string_view defaultServerNameIndication() const override {
     return transport_socket_factory_->defaultServerNameIndication();
   }
