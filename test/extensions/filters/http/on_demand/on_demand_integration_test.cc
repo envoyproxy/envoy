@@ -1015,6 +1015,51 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsTwoOnDemandVirtualHostsRouteResponses) {
   }
 }
 
+TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateWithTrailersOnly) {
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"x-lyft-user-id", "123"}};
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  Http::RequestEncoder& encoder = encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  test_server_->waitForGauge("http.config_test.on_demand.route_discovery_pending", Eq(1));
+
+  // Send trailers without body data while route discovery is paused in StopIteration.
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer", "trailer-value"}};
+  codec_client_->sendTrailers(encoder, request_trailers);
+  test_server_->waitForWorkerThreads();
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost.first")}, {},
+                                           vhds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "2", vhds_stream_.get(),
+      {"my_route/vhost.first"});
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  waitForNextUpstreamRequest(1);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("", upstream_request_->body().toString());
+  ASSERT_NE(nullptr, upstream_request_->trailers());
+  EXPECT_EQ("trailer-value", upstream_request_->trailers()
+                                 ->get(Http::LowerCaseString("x-trailer"))[0]
+                                 ->value()
+                                 .getStringView());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+}
+
 // Test class for VHDS on-demand updates with request bodies
 class OnDemandVhdsWithBodyIntegrationTest
     : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, VhdsIntegrationTestParam>>,

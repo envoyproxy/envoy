@@ -133,6 +133,34 @@ TEST_F(OnDemandFilterTest, TestDecodeTrailers) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
 }
 
+TEST_F(OnDemandFilterTest, DecodeHeadersRefreshesStaleMissingRouteSnapshot) {
+  Http::TestRequestHeaderMapImpl headers;
+  bool refreshed = false;
+  ON_CALL(decoder_callbacks_, route()).WillByDefault([&]() -> OptRef<const Router::Route> {
+    return makeOptRefFromPtr<const Router::Route>(refreshed ? decoder_callbacks_.route_.get()
+                                                            : nullptr);
+  });
+  {
+    testing::InSequence s;
+    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot())
+        .WillOnce([&]() { refreshed = true; });
+    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  }
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+}
+
+TEST_F(OnDemandFilterTest, DecodeTrailersReturnsStopIterationWhilePaused) {
+  Http::TestRequestHeaderMapImpl headers;
+  Http::TestRequestTrailerMapImpl trailers;
+  Buffer::OwnedImpl buffer;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(trailers));
+}
+
 // tests onRouteConfigUpdateCompletion() when redirect contains a body with trailers (fully read)
 TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStreamWithTrailers) {
   TestScopedRuntime scoped_runtime;
