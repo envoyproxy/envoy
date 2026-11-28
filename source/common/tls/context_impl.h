@@ -158,6 +158,10 @@ protected:
   // A SSL_CTX_set_custom_verify callback for asynchronous cert validation.
   static enum ssl_verify_result_t customVerifyCallback(SSL* ssl, uint8_t* out_alert);
 
+  // A SSL_CTX_set_info_callback callback that saves the signature algorithm of the local
+  // handshake signature for logHandshake(), as BoringSSL discards it once the handshake is done.
+  static void infoCallback(const SSL* ssl, int type, int value);
+
   bool parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl, absl::Status& parse_status);
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols,
                                           absl::Status& parse_status);

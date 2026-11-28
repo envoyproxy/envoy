@@ -2275,6 +2275,62 @@ TEST_P(SslSocketTest, MultiCertPreferEcdsaWithoutSni) {
   testUtil(test_options);
 }
 
+// ssl.local_sigalgs tells which of an RSA and an ECDSA certificate was served, also with TLS 1.3
+// where the cipher suite does not.
+TEST_P(SslSocketTest, MultiCertLocalSigalgs) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_ecdsa_p256_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_ecdsa_p256_key.pem"
+)EOF";
+
+  struct TestCase {
+    std::string tls_params;
+    std::string cert_hash;
+    std::string expected_stat;
+  };
+  const std::vector<TestCase> test_cases = {
+      {R"EOF(
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-ECDSA-AES128-GCM-SHA256
+        - ECDHE-RSA-AES128-GCM-SHA256)EOF",
+       TEST_SELFSIGNED_ECDSA_P256_CERT_256_HASH, "ssl.local_sigalgs.ecdsa_secp256r1_sha256"},
+      {R"EOF(
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256)EOF",
+       TEST_SELFSIGNED_CERT_256_HASH, "ssl.local_sigalgs.rsa_pss_rsae_sha256"},
+      {R"EOF(
+        tls_minimum_protocol_version: TLSv1_3
+        tls_maximum_protocol_version: TLSv1_3)EOF",
+       TEST_SELFSIGNED_ECDSA_P256_CERT_256_HASH, "ssl.local_sigalgs.ecdsa_secp256r1_sha256"},
+      {R"EOF(
+        tls_minimum_protocol_version: TLSv1_3
+        tls_maximum_protocol_version: TLSv1_3
+        signature_algorithms:
+        - rsa_pss_rsae_sha256)EOF",
+       TEST_SELFSIGNED_CERT_256_HASH, "ssl.local_sigalgs.rsa_pss_rsae_sha256"},
+  };
+  for (const auto& test_case : test_cases) {
+    SCOPED_TRACE(test_case.tls_params);
+    const std::string client_ctx_yaml =
+        absl::StrCat("common_tls_context:\n  tls_params:", test_case.tls_params,
+                     "\n  validation_context:\n    verify_certificate_hash: ", test_case.cert_hash);
+    TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+    testUtil(test_options.setExpectedServerStats(test_case.expected_stat));
+  }
+}
+
 // When client supports SNI, exact match is preferred over wildcard match.
 TEST_P(SslSocketTest, MultiCertPreferExactSniMatch) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
@@ -5504,6 +5560,16 @@ void testTicketSessionResumptionWithTlsVersion(
 
   EXPECT_EQ(0UL, server_stats_store.counter("ssl.session_reused").value());
   EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
+  const auto local_sigalgs = [&server_stats_store]() {
+    uint64_t count = 0;
+    for (const Stats::CounterSharedPtr& counter : server_stats_store.counters()) {
+      if (absl::StartsWith(counter->name(), "ssl.local_sigalgs.")) {
+        count += counter->value();
+      }
+    }
+    return count;
+  };
+  EXPECT_EQ(1UL, local_sigalgs());
 
   client_connection = dispatcher->createClientConnection(
       socket2->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -5571,6 +5637,7 @@ void testTicketSessionResumptionWithTlsVersion(
 
   EXPECT_EQ(expect_reuse ? 1UL : 0UL, server_stats_store.counter("ssl.session_reused").value());
   EXPECT_EQ(expect_reuse ? 1UL : 0UL, client_stats_store.counter("ssl.session_reused").value());
+  EXPECT_EQ(expect_reuse ? 1UL : 2UL, local_sigalgs());
 }
 
 // Runs testTicketSessionResumptionWithTlsVersion() with TLS 1.2, and also with TLS 1.3 when both
@@ -7912,6 +7979,13 @@ TEST_P(SslSocketTest, SignatureAlgorithms) {
         .setExpectedServerStats("ssl.sigalgs.rsa_pss_rsae_sha256")
         .setExpectedClientStats("ssl.sigalgs.ecdsa_secp256r1_sha256");
     testUtilV2(algorithm_test_options);
+
+    TestUtilOptionsV2 local_sigalgs_test_options(listener, client, true, version_);
+    local_sigalgs_test_options.setClientTlsVersion(tls_version)
+        .setExpectedClientCertUri("spiffe://lyft.com/test-team")
+        .setExpectedServerStats("ssl.local_sigalgs.ecdsa_secp256r1_sha256")
+        .setExpectedClientStats("ssl.local_sigalgs.rsa_pss_rsae_sha256");
+    testUtilV2(local_sigalgs_test_options);
 
     // Connection using defaults (client & server) succeeds, even with client renegotiation.
     client.set_allow_renegotiation(true);

@@ -159,6 +159,10 @@ TEST_P(SslIntegrationTest, StatsTagExtraction) {
         absl::StrCat("cluster.", entry.second.first), entry.second.second};
   }
 
+  // Envoy signs with its certificate on the listener only: it has no client certificate.
+  expected_counters[listenerStatPrefix("ssl.local_sigalgs.rsa_pss_rsae_sha256")] = {
+      "listener.ssl.local_sigalgs", {{"envoy.ssl_sigalg", "rsa_pss_rsae_sha256"}}};
+
   // The cipher suite extractor is written as two rules for listener and cluster, and they don't
   // match unfortunately, but it's left this way for backwards compatibility.
   expected_counters["cluster.cluster_0.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256"].second = {

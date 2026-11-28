@@ -130,6 +130,10 @@ TagNameValues::TagNameValues() {
   addRe2(SSL_SIGALG, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.sigalgs(\.(<CIPHER>))$)",
          ".ssl.sigalgs.");
 
+  // listener.[<address>.]ssl.local_sigalgs.(<algorithm>)
+  addRe2(SSL_SIGALG, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.local_sigalgs(\.(<CIPHER>))$)",
+         ".ssl.local_sigalgs.");
+
   // listener.[<address>.]ssl.versions.(<version>)
   addRe2(SSL_VERSION, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.versions(\.(<TLS_VERSION>))$)",
          ".ssl.versions.");

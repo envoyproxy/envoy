@@ -54,6 +54,8 @@ public:
   absl::string_view certificateValidationError() const override { return cert_validation_error_; }
 
   void setValidatedCertChain(std::vector<bssl::UniquePtr<X509>>) override {}
+  void setLocalSignatureAlgorithm(uint16_t) override {}
+  uint16_t localSignatureAlgorithm() const override { return 0; }
 
 private:
   Envoy::Ssl::ClientValidationStatus status_;

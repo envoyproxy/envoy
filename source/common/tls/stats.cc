@@ -32,6 +32,7 @@ TlsBuiltinStatNames::TlsBuiltinStatNames(Stats::SymbolTable& symbol_table)
       ssl_versions_(stat_name_set_->add("ssl.versions")),
       ssl_curves_(stat_name_set_->add("ssl.curves")),
       ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")),
+      ssl_local_sigalgs_(stat_name_set_->add("ssl.local_sigalgs")),
       ssl_cipher_tag_name_(stat_name_set_->add(Envoy::Config::TagNames::get().SSL_CIPHER)),
       ssl_cipher_suite_tag_name_(
           stat_name_set_->add(Envoy::Config::TagNames::get().SSL_CIPHER_SUITE)),
