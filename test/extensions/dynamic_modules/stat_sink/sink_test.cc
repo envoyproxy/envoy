@@ -297,8 +297,11 @@ TEST_F(DynamicModuleStatsSinkTest, OnHistogramCompleteReentrantCallKeepsOuterNam
 class DynamicModuleStatsSinkGaugeTest : public testing::Test {
 public:
   DynamicModuleStatsSinkConfigSharedPtr makeConfig() {
-    return std::make_shared<DynamicModuleStatsSinkConfig>("test_sink", "test_config",
-                                                          /*dynamic_module=*/nullptr, context_);
+    auto config = std::make_shared<DynamicModuleStatsSinkConfig>(
+        "test_sink", "test_config", /*dynamic_module=*/nullptr, context_);
+    // newDynamicModuleStatsSinkConfig does this for a config the module creates.
+    config->scheduler_target_->initialize(context_.dispatcher_, config);
+    return config;
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
@@ -437,7 +440,7 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerCommitPostsAndRunsHook) {
   // Run the posted callback inline to model the main thread dispatching the event.
   EXPECT_CALL(context_.dispatcher_, post(_)).WillOnce([](Event::PostCb cb) { cb(); });
 
-  DynamicModuleStatsSinkConfigScheduler scheduler(config->ensureSchedulerTarget());
+  DynamicModuleStatsSinkConfigScheduler scheduler(config->scheduler_target_);
   scheduler.commit(42);
 
   auto gauge = TestUtility::findGauge(context_.store_, "g");
@@ -445,18 +448,9 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerCommitPostsAndRunsHook) {
   EXPECT_EQ(42u, gauge->value());
 }
 
-TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerTargetIsCreatedOnFirstScheduler) {
-  auto config = makeConfig();
-  EXPECT_EQ(nullptr, config->scheduler_target_);
-
-  const auto target = config->ensureSchedulerTarget();
-  ASSERT_NE(nullptr, target);
-  EXPECT_EQ(target, config->ensureSchedulerTarget());
-}
-
 TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerCommitAfterConfigDestroyedDoesNotPost) {
   auto config = makeConfig();
-  DynamicModuleStatsSinkConfigScheduler scheduler(config->ensureSchedulerTarget());
+  DynamicModuleStatsSinkConfigScheduler scheduler(config->scheduler_target_);
   config.reset();
 
   EXPECT_CALL(context_.dispatcher_, post(_)).Times(0);
@@ -478,7 +472,7 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerPostedEventDoesNotKeepConfigAli
                                     envoy_dynamic_module_type_stat_sink_config_module_ptr,
                                     uint64_t) { hook_ran = true; };
 
-  DynamicModuleStatsSinkConfigScheduler scheduler(config->ensureSchedulerTarget());
+  DynamicModuleStatsSinkConfigScheduler scheduler(config->scheduler_target_);
   scheduler.commit(99);
   ASSERT_TRUE(posted_cb);
 
@@ -500,7 +494,7 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerCommitRacesConfigDestruction) {
 
   auto config = makeConfig();
   std::weak_ptr<DynamicModuleStatsSinkConfig> weak_config = config;
-  DynamicModuleStatsSinkConfigScheduler scheduler(config->ensureSchedulerTarget());
+  DynamicModuleStatsSinkConfigScheduler scheduler(config->scheduler_target_);
   std::atomic<bool> started{false};
   std::thread module_thread([&]() {
     for (uint64_t i = 0; i < 1000; ++i) {

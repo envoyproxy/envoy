@@ -49,11 +49,8 @@ void DynamicModuleNetworkFilter::initializeInModuleFilter() {
 
 void DynamicModuleNetworkFilter::destroy() {
   // Stop the schedulers before the destroy hook, which may join a module thread that is committing
-  // an event. Setting destroyed_ first keeps a scheduler created by the hook inactive.
-  destroyed_ = true;
-  if (scheduler_target_ != nullptr) {
-    scheduler_target_->clear();
-  }
+  // an event.
+  scheduler_target_->clear();
   // Cancel all pending HTTP callouts before destroying the filter.
   for (auto& callout : http_callouts_) {
     if (callout.second->request_ != nullptr) {
@@ -68,29 +65,14 @@ void DynamicModuleNetworkFilter::destroy() {
   }
   // Clear the cached dispatcher so any concurrent foreign-thread `commit()` short-circuits.
   cached_dispatcher_.store(nullptr, std::memory_order_release);
-}
-
-const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleNetworkFilter>&
-DynamicModuleNetworkFilter::ensureSchedulerTarget() {
-  if (scheduler_target_ == nullptr) {
-    scheduler_target_ =
-        std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleNetworkFilter>>();
-    // Otherwise initializeReadFilterCallbacks() initializes it, or it stays inactive after the
-    // teardown.
-    if (read_callbacks_ != nullptr && !destroyed_ && !connection_closed_) {
-      scheduler_target_->initialize(read_callbacks_->connection().dispatcher(), weak_from_this());
-    }
-  }
-  return scheduler_target_;
+  destroyed_ = true;
 }
 
 void DynamicModuleNetworkFilter::initializeReadFilterCallbacks(
     Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
   cached_dispatcher_.store(&callbacks.connection().dispatcher(), std::memory_order_release);
-  if (scheduler_target_ != nullptr && !destroyed_ && !connection_closed_) {
-    scheduler_target_->initialize(callbacks.connection().dispatcher(), weak_from_this());
-  }
+  scheduler_target_->initialize(callbacks.connection().dispatcher(), weak_from_this());
 
   worker_index_ = callbacks.connection().dispatcher().workerId().value_or(0);
 
@@ -166,10 +148,8 @@ void DynamicModuleNetworkFilter::onEvent(Network::ConnectionEvent event) {
     // The filter can outlive the connection, so drop the events scheduled from now on: their hook
     // could call back into the connection after it is freed. This is done before the event hook,
     // which may join a module thread that is committing an event.
+    scheduler_target_->clear();
     connection_closed_ = true;
-    if (scheduler_target_ != nullptr) {
-      scheduler_target_->clear();
-    }
   }
   if (!config_->access_logs_.empty() && closed) {
     connection().streamInfo().downstreamTiming().onDownstreamConnectionEnd(

@@ -2561,21 +2561,6 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
   envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
 }
 
-TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
-       ListenerFilterSchedulerCreatedBeforeOnAcceptPostsAfterAccept) {
-  auto fresh_filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  EXPECT_EQ(nullptr, fresh_filter->schedulerTargetForTest());
-  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(
-      static_cast<void*>(fresh_filter.get()));
-  EXPECT_NE(nullptr, fresh_filter->schedulerTargetForTest());
-  fresh_filter->onAccept(callbacks_);
-
-  EXPECT_CALL(worker_thread_dispatcher_, post(_));
-  envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 123);
-
-  envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
-}
-
 // Verifies `commit()` from a foreign thread before destroy posts via the cached dispatcher.
 // Run under `--config=tsan` to confirm no data race on `callbacks_`.
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest,

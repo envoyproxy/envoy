@@ -50,9 +50,7 @@ public:
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
     cached_dispatcher_.store(&callbacks.dispatcher(), std::memory_order_release);
-    if (scheduler_target_ != nullptr && !destroyed_) {
-      scheduler_target_->initialize(callbacks.dispatcher(), weak_from_this());
-    }
+    scheduler_target_->initialize(callbacks.dispatcher(), weak_from_this());
     // Registration is deferred until the in-module filter exists: the factory wires callbacks
     // before initializeInModuleFilter(), and addDownstreamWatermarkCallbacks() synchronously
     // replays any pending onAboveWriteBufferHighWatermark() into the newly registered callback.
@@ -103,14 +101,9 @@ public:
   Event::Dispatcher* dispatcher() { return cached_dispatcher_.load(std::memory_order_acquire); }
 
   /**
-   * Returns the target that the schedulers of this filter post through, creating it on first use.
-   * Must be called on the worker thread of the filter.
+   * Returns the target that the schedulers of this filter post through.
    */
-  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleHttpFilter>& ensureSchedulerTarget();
-
-  // Test-only accessor for the scheduler target, which is null until a scheduler is created.
-  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleHttpFilter>&
-  schedulerTargetForTest() const {
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleHttpFilter>& schedulerTarget() const {
     return scheduler_target_;
   }
 
@@ -350,9 +343,10 @@ private:
   // Worker dispatcher published at callback-init, cleared on destroy. Read via `dispatcher()`.
   std::atomic<Event::Dispatcher*> cached_dispatcher_{nullptr};
 
-  // Shared with the schedulers of this filter. Created when the module creates the first scheduler,
-  // initialized once the decoder callbacks are set, and cleared at the start of the teardown.
-  DynamicModuleSchedulerTargetSharedPtr<DynamicModuleHttpFilter> scheduler_target_;
+  // Shared with the schedulers of this filter. Initialized when the decoder callbacks are set and
+  // cleared at the start of the teardown.
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleHttpFilter> scheduler_target_{
+      std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleHttpFilter>>()};
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP

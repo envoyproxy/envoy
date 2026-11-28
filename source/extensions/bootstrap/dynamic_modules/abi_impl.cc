@@ -52,7 +52,7 @@ envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr
 envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
-  return new DynamicModuleBootstrapExtensionConfigScheduler(config->ensureSchedulerTarget());
+  return new DynamicModuleBootstrapExtensionConfigScheduler(config->scheduler_target_);
 }
 
 void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(

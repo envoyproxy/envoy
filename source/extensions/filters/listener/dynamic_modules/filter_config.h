@@ -105,14 +105,10 @@ public:
   // The main thread dispatcher for scheduling config-level events.
   Event::Dispatcher& main_thread_dispatcher_;
 
-  // Shared with the schedulers of this config. Created when the module creates the first scheduler
-  // and cleared at the start of the destructor.
-  DynamicModuleSchedulerTargetSharedPtr<DynamicModuleListenerFilterConfig> scheduler_target_;
-  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleListenerFilterConfig>&
-  ensureSchedulerTarget() {
-    return ensureDynamicModuleSchedulerTarget(scheduler_target_, main_thread_dispatcher_,
-                                              weak_from_this());
-  }
+  // Shared with the schedulers of this config. Initialized once the config is held by a shared
+  // pointer, before the module can create a scheduler, and cleared at the start of the destructor.
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleListenerFilterConfig> scheduler_target_{
+      std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleListenerFilterConfig>>()};
 
   // The provider of the load shed points that the module can check. It is empty when the factory
   // context of the filter bypasses the overload manager.

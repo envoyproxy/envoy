@@ -513,7 +513,7 @@ envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr
 envoy_dynamic_module_callback_stat_sink_config_scheduler_new(
     envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr) {
   return new DynamicModuleStatsSinkConfigScheduler(
-      toStatsSinkConfig(config_envoy_ptr)->ensureSchedulerTarget());
+      toStatsSinkConfig(config_envoy_ptr)->scheduler_target_);
 }
 
 void envoy_dynamic_module_callback_stat_sink_config_scheduler_commit(

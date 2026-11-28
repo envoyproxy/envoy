@@ -62,16 +62,11 @@ public:
   // The main thread dispatcher used by the scheduler to post events back to the main thread.
   Event::Dispatcher& main_thread_dispatcher_;
 
-  // Shared with the schedulers of this config. Created when the module creates the first scheduler
-  // and cleared at the start of the destructor.
-  using SchedulerTargetSharedPtr =
-      Extensions::DynamicModules::DynamicModuleSchedulerTargetSharedPtr<
-          DynamicModuleStatsSinkConfig>;
-  SchedulerTargetSharedPtr scheduler_target_;
-  const SchedulerTargetSharedPtr& ensureSchedulerTarget() {
-    return Extensions::DynamicModules::ensureDynamicModuleSchedulerTarget(
-        scheduler_target_, main_thread_dispatcher_, weak_from_this());
-  }
+  // Shared with the schedulers of this config. Initialized once the config is held by a shared
+  // pointer, before the module can create a scheduler, and cleared at the start of the destructor.
+  using SchedulerTarget =
+      Extensions::DynamicModules::DynamicModuleSchedulerTarget<DynamicModuleStatsSinkConfig>;
+  const std::shared_ptr<SchedulerTarget> scheduler_target_{std::make_shared<SchedulerTarget>()};
 
   /**
    * Defines a gauge with the given name and returns its 1-based id via gauge_id_out. Valid only

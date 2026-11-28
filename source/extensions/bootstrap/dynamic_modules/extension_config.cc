@@ -50,9 +50,7 @@ DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
 DynamicModuleBootstrapExtensionConfig::~DynamicModuleBootstrapExtensionConfig() {
   // Stop the schedulers before the destroy hook, which may join a module thread that is committing
   // an event.
-  if (scheduler_target_ != nullptr) {
-    scheduler_target_->clear();
-  }
+  scheduler_target_->clear();
   xds_update_handle_.reset();
   extension_config_subscription_.reset();
   // Cancel any pending HTTP callouts before destroying the config.
@@ -841,6 +839,8 @@ newDynamicModuleBootstrapExtensionConfig(
   auto config = std::make_shared<DynamicModuleBootstrapExtensionConfig>(
       extension_name, extension_config, metrics_namespace, std::move(dynamic_module),
       main_thread_dispatcher, context, stats_store);
+  config->scheduler_target_->initialize(main_thread_dispatcher, config);
+
   // The module constructor can enable the writers, which capture their done hooks, so the optional
   // hooks are resolved first.
   auto on_xds_update =

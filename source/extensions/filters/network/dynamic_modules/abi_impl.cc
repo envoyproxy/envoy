@@ -1627,7 +1627,7 @@ envoy_dynamic_module_type_network_filter_scheduler_module_ptr
 envoy_dynamic_module_callback_network_filter_scheduler_new(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  return new DynamicModuleNetworkFilterScheduler(filter->ensureSchedulerTarget());
+  return new DynamicModuleNetworkFilterScheduler(filter->schedulerTarget());
 }
 
 void envoy_dynamic_module_callback_network_filter_scheduler_delete(
@@ -1646,7 +1646,7 @@ envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr
 envoy_dynamic_module_callback_network_filter_config_scheduler_new(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr) {
   auto* filter_config = static_cast<DynamicModuleNetworkFilterConfig*>(filter_config_envoy_ptr);
-  return new DynamicModuleNetworkFilterConfigScheduler(filter_config->ensureSchedulerTarget());
+  return new DynamicModuleNetworkFilterConfigScheduler(filter_config->scheduler_target_);
 }
 
 void envoy_dynamic_module_callback_network_filter_config_scheduler_delete(

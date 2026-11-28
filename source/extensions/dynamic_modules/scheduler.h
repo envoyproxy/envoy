@@ -18,11 +18,10 @@ namespace DynamicModules {
  * object is always destroyed by its own thread rather than by a module thread that commits an
  * event.
  *
- * The owner creates the target on its own thread when the module creates the first scheduler,
- * initializes it once the owner is held by a shared pointer and its dispatcher is known, and clears
- * it at the start of its teardown. Events committed before the target is initialized or after it
- * is cleared are dropped, and so are events that run after the owner is destroyed. Events that are
- * delivered call Owner::onScheduled(uint64_t) on the owner's thread.
+ * The owner initializes the target once it is held by a shared pointer and before the module can
+ * commit an event, and clears it at the start of its teardown. Events committed before the target
+ * is initialized or after it is cleared are dropped, and so are events that run after the owner is
+ * destroyed. Events that are delivered call Owner::onScheduled(uint64_t) on the owner's thread.
  */
 template <class Owner> class DynamicModuleSchedulerTarget {
 public:
@@ -77,27 +76,6 @@ private:
 
 template <class Owner>
 using DynamicModuleSchedulerTargetSharedPtr = std::shared_ptr<DynamicModuleSchedulerTarget<Owner>>;
-
-/**
- * Creates and initializes the scheduler target of an owner whose dispatcher is known from its
- * creation, unless it already exists. Owners create the target only when the module creates the
- * first scheduler, so an owner without schedulers neither allocates it nor locks its mutex. Must be
- * called on the owner's thread.
- * @param target the scheduler target member of the owner.
- * @param dispatcher the dispatcher of the thread the owner runs on.
- * @param owner the owner of the target.
- * @return the scheduler target.
- */
-template <class Owner>
-const DynamicModuleSchedulerTargetSharedPtr<Owner>&
-ensureDynamicModuleSchedulerTarget(DynamicModuleSchedulerTargetSharedPtr<Owner>& target,
-                                   Event::Dispatcher& dispatcher, std::weak_ptr<Owner> owner) {
-  if (target == nullptr) {
-    target = std::make_shared<DynamicModuleSchedulerTarget<Owner>>();
-    target->initialize(dispatcher, std::move(owner));
-  }
-  return target;
-}
 
 /**
  * A scheduler that a module creates to run an event hook of an object on the object's thread from
