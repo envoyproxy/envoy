@@ -267,6 +267,7 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 RUNTIME_GUARD(envoy_reloadable_features_zipkin_preserve_b3_single_header_format);
 RUNTIME_GUARD(envoy_reloadable_features_zstd_compressor_flush);
 RUNTIME_GUARD(envoy_restart_features_defer_worker_routing_init);
+RUNTIME_GUARD(envoy_restart_features_freeze_restart_features);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
 
@@ -275,6 +276,8 @@ RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reverse_tunnel_listener_drain);
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
+// Test flag.
+FALSE_RUNTIME_GUARD(envoy_restart_features_test_feature);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_srds_partial_acceptance);
 // When true (and the stats config carries no custom tags), the stats store uses the explicit-tags
 // scope logic that propagates scope-level tags onto every stat. Evaluated once at startup.
@@ -466,6 +469,10 @@ bool hasRuntimePrefix(absl::string_view feature) {
 
 bool isRuntimeFeature(absl::string_view feature) {
   return RuntimeFeaturesDefaults::get().getFlag(feature) != nullptr;
+}
+
+bool isRestartFeature(absl::string_view feature) {
+  return absl::StartsWith(feature, "envoy.restart_features.") && isRuntimeFeature(feature);
 }
 
 bool isLegacyRuntimeFeature(absl::string_view feature) {

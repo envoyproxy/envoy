@@ -30,6 +30,7 @@
 #include "source/common/init/target_impl.h"
 #include "source/common/singleton/threadsafe_singleton.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/status/statusor.h"
 #include "spdlog/spdlog.h"
@@ -48,6 +49,7 @@ using RuntimeSingleton = ThreadSafeSingleton<Loader>;
   COUNTER(load_success)                                                                            \
   COUNTER(override_dir_exists)                                                                     \
   COUNTER(override_dir_not_exists)                                                                 \
+  COUNTER(restart_feature_ignored)                                                                 \
   GAUGE(admin_overrides_active, NeverImport)                                                       \
   GAUGE(deprecated_feature_seen_since_process_start, NeverImport)                                  \
   GAUGE(num_keys, NeverImport)                                                                     \
@@ -232,6 +234,7 @@ public:
   void countDeprecatedFeatureUse() const override;
   absl::Status onWorkerThreadsRegistered() override;
   Common::CallbackHandlePtr addUpdateCallback(UpdateCallback callback) override;
+  void freezeRestartFeatures() { restart_features_frozen_ = true; }
 
 private:
   friend RtdsSubscription;
@@ -244,6 +247,7 @@ private:
                           ProtobufMessage::ValidationVisitor& validation_visitor);
   // Create a new Snapshot
   absl::StatusOr<SnapshotImplPtr> createNewSnapshot();
+  void maybeAddFrozenRestartFeaturesLayer(std::vector<Snapshot::OverrideLayerConstPtr>& layers);
   // Load a new Snapshot into TLS
   absl::Status loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
@@ -262,6 +266,8 @@ private:
   Init::ManagerImpl init_manager_{"RTDS"};
   std::vector<RtdsSubscriptionPtr> subscriptions_;
   absl::node_hash_map<std::string, bool> runtime_feature_defaults_;
+  bool restart_features_frozen_{false};
+  absl::flat_hash_set<std::string> ignored_restart_features_;
   Upstream::ClusterManager* cm_{};
   Stats::Store& store_;
 
