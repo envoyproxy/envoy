@@ -1,6 +1,7 @@
 #include "source/extensions/filters/listener/original_dst/original_dst.h"
 
 #include "envoy/network/listen_socket.h"
+#include "envoy/stream_info/uint32_accessor.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/config/metadata.h"
@@ -68,6 +69,17 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
 
       // Restore the local address to the original one.
       socket.connectionInfoProvider().restoreLocalAddress(original_local_address);
+    }
+    // The port can be translated outside of this network namespace, e.g. by a Kubernetes Service
+    // mapping port 443 to a container port 10443, where SO_ORIGINAL_DST cannot see it.
+    const auto* local_port = cb.filterState().getDataReadOnly<StreamInfo::UInt32Accessor>(
+        FilterNames::get().LocalPortFilterStateKey);
+    if (local_port != nullptr) {
+      const auto local_address = Network::Utility::getAddressWithPort(
+          *socket.connectionInfoProvider().localAddress(), local_port->value());
+      ENVOY_LOG(debug, "original_dst: set destination port from filter state to {}",
+                local_port->value());
+      socket.connectionInfoProvider().restoreLocalAddress(local_address);
     }
     break;
   }
