@@ -533,6 +533,58 @@ TEST_P(StrictDnsClusterImplParamTest, ZeroHostsHealthChecker) {
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
+// A replacement cluster shares its membership gauges with the cluster it replaces. If its first
+// DNS lookup fails, it goes active with no hosts and must report zero, not the old cluster's count.
+TEST_P(StrictDnsClusterImplParamTest, ReplacementClusterResetsMembershipStatsOnFailedLookup) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+
+  // The original cluster resolves one host.
+  ResolverData old_resolver(*dns_resolver_, server_context_.dispatcher_);
+  auto old_cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
+  MockInitializeCallback old_initialize_cb;
+  EXPECT_CALL(old_initialize_cb, Call).WillOnce(Return(absl::OkStatus()));
+  old_cluster->initialize(old_initialize_cb.AsStdFunction());
+  EXPECT_CALL(*old_resolver.timer_, enableTimer(_, _));
+  old_resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
+                             TestUtility::makeDnsResponse({"127.0.0.1"}));
+  EXPECT_EQ(1UL, old_cluster->info()->endpointStats().membership_total_.value());
+  EXPECT_EQ(1UL, old_cluster->info()->endpointStats().membership_healthy_.value());
+
+  // The replacement cluster sees the old cluster's values while it warms.
+  ResolverData new_resolver(*dns_resolver_, server_context_.dispatcher_);
+  auto new_cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
+  EXPECT_EQ(1UL, new_cluster->info()->endpointStats().membership_total_.value());
+  MockInitializeCallback new_initialize_cb;
+  new_cluster->initialize(new_initialize_cb.AsStdFunction());
+
+  // Its first lookup fails, so it goes active with no hosts and the gauges drop to zero.
+  EXPECT_CALL(new_initialize_cb, Call).WillOnce(Return(absl::OkStatus()));
+  EXPECT_CALL(*new_resolver.timer_, enableTimer(_, _));
+  new_resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, "", {});
+  EXPECT_EQ(0UL, new_cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, new_cluster->info()->endpointStats().membership_total_.value());
+  EXPECT_EQ(0UL, new_cluster->info()->endpointStats().membership_healthy_.value());
+}
+
 TEST_P(StrictDnsClusterImplParamTest, DontWaitForDNSOnInit) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});

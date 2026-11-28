@@ -1404,6 +1404,7 @@ private:
 
   void finishInitialization();
   void reloadHealthyHosts(const HostSharedPtr& host);
+  void updateMembershipStats();
 
   std::function<absl::Status()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
