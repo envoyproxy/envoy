@@ -86,6 +86,7 @@ bazel_dep(name = "rules_buf", version = "0.6.1")
 bazel_dep(name = "rules_cc", version = "0.2.28")
 bazel_dep(name = "rules_distroless", version = "0.9.4")
 bazel_dep(name = "rules_foreign_cc", version = "0.17.0")
+bazel_dep(name = "rules_fuzzing", version = "0.8.0")
 bazel_dep(name = "rules_go", version = "0.63.0")
 bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_license", version = "1.0.0")
@@ -122,11 +123,6 @@ bazel_dep(name = "zstd", version = "1.5.7.bcr.3")
 ####################################################################################
 
 bazel_dep(name = "google_benchmark", version = "1.10.0", dev_dependency = True, repo_name = "benchmark")
-
-bazel_dep(name = "rules_fuzzing", version = "0.6.0")
-
-fuzzing_ext = use_extension("@rules_fuzzing//fuzzing/private:extensions.bzl", "non_module_dependencies")
-use_repo(fuzzing_ext, "rules_fuzzing_oss_fuzz")
 
 bazel_dep(name = "rules_shellcheck", version = "0.7.0", dev_dependency = True, repo_name = "shellcheck")
 
@@ -616,6 +612,13 @@ proxy_wasm_cpp_host.deps(
 
 libsxg = use_extension("@libsxg//:extensions.bzl", "libsxg")
 libsxg.deps(crypto_lib = "@envoy//bazel:crypto")
+
+####################################################################################
+# repo: Extensions (external)
+####################################################################################
+
+fuzzing_ext = use_extension("@rules_fuzzing//fuzzing/private:extensions.bzl", "non_module_dependencies")
+use_repo(fuzzing_ext, "rules_fuzzing_oss_fuzz")
 
 ####################################################################################
 # repo: Extensions
