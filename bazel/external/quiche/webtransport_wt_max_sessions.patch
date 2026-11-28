@@ -1,0 +1,104 @@
+diff --git a/quiche/quic/core/http/http_constants.h b/quiche/quic/core/http/http_constants.h
+@@ -43,6 +43,8 @@
+   // draft-ietf-webtrans-http3
+   SETTINGS_WEBTRANS_DRAFT00 = 0x2b603742,
+   SETTINGS_WEBTRANS_MAX_SESSIONS_DRAFT07 = 0xc671706a,
++  // draft-ietf-webtrans-http3-13 SETTINGS_WT_MAX_SESSIONS.
++  SETTINGS_WT_MAX_SESSIONS = 0x14e9cd29,
+   // draft-ietf-httpbis-h3-websockets
+   SETTINGS_ENABLE_CONNECT_PROTOCOL = 0x08,
+   SETTINGS_ENABLE_METADATA = 0x4d44,
+
+diff --git a/quiche/quic/core/http/http_constants.cc b/quiche/quic/core/http/http_constants.cc
+@@ -23,6 +23,7 @@
+     RETURN_STRING_LITERAL(SETTINGS_H3_DATAGRAM);
+     RETURN_STRING_LITERAL(SETTINGS_WEBTRANS_DRAFT00);
+     RETURN_STRING_LITERAL(SETTINGS_WEBTRANS_MAX_SESSIONS_DRAFT07);
++    RETURN_STRING_LITERAL(SETTINGS_WT_MAX_SESSIONS);
+     RETURN_STRING_LITERAL(SETTINGS_ENABLE_CONNECT_PROTOCOL);
+     RETURN_STRING_LITERAL(SETTINGS_ENABLE_METADATA);
+   }
+
+diff --git a/quiche/quic/core/http/quic_spdy_session.cc b/quiche/quic/core/http/quic_spdy_session.cc
+@@ -70,6 +70,11 @@
+ 
+ constexpr QuicStreamCount kDefaultMaxWebTransportSessions = 16;
+ 
++// Advertised in local SETTINGS when WebTransport is enabled. Value 1 satisfies
++// draft-13 SETTINGS_WT_MAX_SESSIONS (Safari) without requiring
++// SETTINGS_WT_INITIAL_MAX_* when max sessions is greater than 1.
++constexpr QuicStreamCount kAdvertisedWebTransportMaxSessions = 1;
++
+ #define ENDPOINT \
+   (perspective() == Perspective::IS_SERVER ? "Server: " : "Client: ")
+ 
+@@ -651,7 +656,9 @@
+           perspective() == Perspective::IS_SERVER && !allow_extended_connect())
+           << "WebTransport enabled, but extended CONNECT is not";
+       settings_.values[SETTINGS_WEBTRANS_MAX_SESSIONS_DRAFT07] =
+-          kDefaultMaxWebTransportSessions;
++          kAdvertisedWebTransportMaxSessions;
++      settings_.values[SETTINGS_WT_MAX_SESSIONS] =
++          kAdvertisedWebTransportMaxSessions;
+     }
+   }
+   if (allow_extended_connect()) {
+@@ -1385,6 +1392,21 @@
+         if (value > 0) {
+           peer_web_transport_versions_.Set(WebTransportHttp3Version::kDraft07);
+           if (perspective() == Perspective::IS_CLIENT) {
++            max_webtransport_sessions_[WebTransportHttp3Version::kDraft07] =
++                value;
++          }
++        }
++        break;
++      case SETTINGS_WT_MAX_SESSIONS:
++        if (!WillNegotiateWebTransport()) {
++          break;
++        }
++        QUIC_DVLOG(1) << ENDPOINT
++                      << "SETTINGS_WT_MAX_SESSIONS received with value "
++                      << value;
++        if (value > 0) {
++          peer_web_transport_versions_.Set(WebTransportHttp3Version::kDraft07);
++          if (perspective() == Perspective::IS_CLIENT) {
+             max_webtransport_sessions_[WebTransportHttp3Version::kDraft07] =
+                 value;
+           }
+
+diff --git a/quiche/quic/core/http/quic_spdy_session_test.cc b/quiche/quic/core/http/quic_spdy_session_test.cc
+@@ -551,6 +551,7 @@
+     }
+     if (versions.IsSet(WebTransportHttp3Version::kDraft07)) {
+       settings.values[SETTINGS_WEBTRANS_MAX_SESSIONS_DRAFT07] = 16;
++      settings.values[SETTINGS_WT_MAX_SESSIONS] = 1;
+     }
+     settings.values[SETTINGS_ENABLE_CONNECT_PROTOCOL] = 1;
+     std::string data = std::string(1, kControlStream) +
+@@ -4275,6 +4276,25 @@
+   EXPECT_TRUE(session_->ShouldProcessIncomingRequests());
+ }
+ 
++TEST_P(QuicSpdySessionTestServer,
++       WebTransportLocalSettingsAdvertiseWtMaxSessions) {
++  Initialize();
++  if (!version().IsIetfQuic()) {
++    return;
++  }
++  session_->set_local_http_datagram_support(
++      HttpDatagramSupport::kRfcAndDraft04);
++  session_->set_locally_supported_web_transport_versions(
++      WebTransportHttp3VersionSet({WebTransportHttp3Version::kDraft07}));
++  session_->set_allow_extended_connect(true);
++  CompleteHandshake();
++
++  const SettingsFrame outgoing_settings = session_->settings();
++  EXPECT_EQ(1u, outgoing_settings.values.at(
++                    SETTINGS_WEBTRANS_MAX_SESSIONS_DRAFT07));
++  EXPECT_EQ(1u, outgoing_settings.values.at(SETTINGS_WT_MAX_SESSIONS));
++}
++
+ TEST_P(QuicSpdySessionTestServer, BufferingIncomingStreams) {
+   Initialize();
+   if (!version().IsIetfQuic()) {
+

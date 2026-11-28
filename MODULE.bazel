@@ -155,6 +155,13 @@ single_version_override(
     version = "3.5.9.bcr.1",
 )
 
+single_version_override(
+    module_name = "quiche",
+    version = "0.0.0-261117-00f72ed.envoy",
+    patch_strip = 1,
+    patches = ["@envoy//bazel/external/quiche:webtransport_wt_max_sessions.patch"],
+)
+
 # testing/debugging
 # local_path_override(
 #     module_name = "envoy_toolshed",
