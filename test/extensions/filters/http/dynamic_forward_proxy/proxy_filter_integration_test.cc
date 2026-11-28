@@ -791,7 +791,8 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithSuspectDomain) {
 
 // Do a sanity check using the getaddrinfo() resolver.
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainGetAddrInfoResolver) {
-  requestWithUnknownDomainTest("doesnotexist.example.com", "Name_or_service_not_known");
+  requestWithUnknownDomainTest("doesnotexist.example.com",
+                               StringUtil::replaceAllEmptySpace(gai_strerror(EAI_NONAME)));
 }
 
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainAndNoCaching) {

@@ -600,9 +600,18 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDownstreamHalfCloseBothWays)
   waitForFirstGrpcMessage(request);
   EXPECT_EQ(request.has_write_data(), true);
   EXPECT_EQ(request.write_data().data(), "server_data");
-  EXPECT_EQ(request.write_data().end_of_stream(), true);
-
-  sendWriteGrpcMessage("server_data_inspected", true, true);
+  if (request.write_data().end_of_stream()) {
+    sendWriteGrpcMessage("server_data_inspected", true, true);
+  } else {
+    // Handle potential TCP fragmentation where data and FIN arrive separately.
+    sendWriteGrpcMessage("server_data_inspected", false, true);
+    ProcessingRequest final_write_request;
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, final_write_request));
+    EXPECT_EQ(final_write_request.has_write_data(), true);
+    EXPECT_EQ(final_write_request.write_data().data(), "");
+    EXPECT_EQ(final_write_request.write_data().end_of_stream(), true);
+    sendWriteGrpcMessage("", true);
+  }
 
   tcp_client->waitForData("server_data_inspected");
 

@@ -627,13 +627,13 @@ TEST_P(HttpInspectorTest, Http1WithLargeRequestLine) {
     auto copy_len = std::make_shared<size_t>(1);
     EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
         .Times(num_loops)
-        .WillRepeatedly([&data, ctr, num_loops](os_fd_t, void* buffer, size_t length,
-                                                int) -> Api::SysCallSizeResult {
-          ASSERT(length >= 1);
-          memcpy(buffer, data.data() + *ctr, 1);
-          *ctr += 1;
-          return Api::SysCallSizeResult{ssize_t(1), 0};
-        });
+        .WillRepeatedly(
+            [&data, ctr](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+              ASSERT(length >= 1);
+              memcpy(buffer, data.data() + *ctr, 1);
+              *ctr += 1;
+              return Api::SysCallSizeResult{ssize_t(1), 0};
+            });
 #else
     auto ctr = std::make_shared<size_t>(1);
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
@@ -732,12 +732,25 @@ TEST_P(HttpInspectorTest, HttpExceedMaxBufferSize) {
   init();
   buffer_->resetCapacity(Config::MAX_INSPECT_SIZE);
 
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls_, readv(42, _, _))
+      .WillOnce([&data](os_fd_t, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
+        size_t total_copied = 0;
+        for (int i = 0; i < num_iov && total_copied < data.size(); ++i) {
+          const size_t amount_to_copy = std::min(iov[i].iov_len, data.size() - total_copied);
+          memcpy(iov[i].iov_base, data.data() + total_copied, amount_to_copy);
+          total_copied += amount_to_copy;
+        }
+        return Api::SysCallSizeResult{ssize_t(total_copied), 0};
+      });
+#else
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
         const size_t amount_to_copy = std::min(length, data.size());
         memcpy(buffer, data.data(), amount_to_copy);
         return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
       });
+#endif
 
   EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 
@@ -761,12 +774,27 @@ TEST_P(HttpInspectorTest, HttpExceedInitialBufferSize) {
 
   init();
 
+#ifdef WIN32
+  size_t offset = 0;
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, 0))
+      .WillRepeatedly(
+          [&data, &offset](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            if (offset >= data.size()) {
+              return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
+            }
+            const size_t amount_to_copy = std::min(length, data.size() - offset);
+            memcpy(buffer, data.data() + offset, amount_to_copy);
+            offset += amount_to_copy;
+            return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
+          });
+#else
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
         const size_t amount_to_copy = std::min(length, data.size());
         memcpy(buffer, data.data(), amount_to_copy);
         return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
       });
+#endif
   EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 
   auto accepted = filter_->onAccept(cb_);
@@ -777,12 +805,14 @@ TEST_P(HttpInspectorTest, HttpExceedInitialBufferSize) {
   buffer_size *= 2;
   buffer_->resetCapacity(buffer_size);
 
+#ifndef WIN32
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
         const size_t amount_to_copy = std::min(length, data.size());
         memcpy(buffer, data.data(), amount_to_copy);
         return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
       });
+#endif
   EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 
   status = filter_->onData(*buffer_);
@@ -791,12 +821,14 @@ TEST_P(HttpInspectorTest, HttpExceedInitialBufferSize) {
   buffer_size *= 2;
   buffer_->resetCapacity(buffer_size);
 
+#ifndef WIN32
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
         const size_t amount_to_copy = std::min(length, data.size());
         memcpy(buffer, data.data(), amount_to_copy);
         return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
       });
+#endif
   EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 
   const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http10};
