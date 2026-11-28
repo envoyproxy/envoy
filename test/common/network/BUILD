@@ -273,6 +273,7 @@ envoy_cc_test(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:listener_lib",
         "//source/common/network:utility_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stream_info:stream_info_lib",
         "//test/common/network:listener_impl_test_base_lib",

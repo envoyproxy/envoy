@@ -2,11 +2,13 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/exception.h"
+#include "envoy/server/proactive_resource_monitor.h"
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/common/network/listener_impl_test_base.h"
@@ -727,6 +729,220 @@ TEST(AcceptedSocketImplTest, SetOverloadStateRebindsDeallocationTarget) {
 
   socket->setOverloadState(Server::ThreadLocalOverloadStateOptRef(rebound_state));
   socket.reset(); // Should deallocate through rebound_state only.
+}
+
+// A resource monitor with the bounds of the downstream connections monitor: allocation fails past
+// the maximum and deallocation fails below zero.
+class BoundedResourceMonitor : public Server::ProactiveResourceMonitor {
+public:
+  explicit BoundedResourceMonitor(int64_t max) : max_(max) {}
+
+  bool tryAllocateResource(int64_t increment) override {
+    if (current_ + increment > max_) {
+      return false;
+    }
+    current_ += increment;
+    return true;
+  }
+  bool tryDeallocateResource(int64_t decrement) override {
+    if (current_ - decrement < 0) {
+      return false;
+    }
+    current_ -= decrement;
+    return true;
+  }
+  int64_t currentResourceUsage() const override { return current_; }
+  int64_t maxResourceUsage() const override { return max_; }
+
+private:
+  const int64_t max_;
+  int64_t current_{0};
+};
+
+class TcpListenerGlobalCxLimitTest : public ListenerImplTestBase {
+protected:
+  static constexpr Server::OverloadProactiveResourceName GlobalCx =
+      Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections;
+
+  struct TestListener {
+    std::shared_ptr<Network::Test::TcpListenSocketImmediateListen> socket;
+    NiceMock<MockTcpListenerCallbacks> callbacks;
+    std::unique_ptr<TestTcpListenerImpl> listener;
+    std::vector<ConnectionSocketPtr> accepted;
+    uint32_t rejected{0};
+  };
+
+  void initializeResource(int64_t max) {
+    resource_.emplace(Server::OverloadProactiveResources::get().GlobalDownstreamMaxConnections,
+                      std::make_unique<BoundedResourceMonitor>(max), *store_.rootScope());
+    ON_CALL(overload_state_, isResourceMonitorEnabled(GlobalCx)).WillByDefault(Return(true));
+    ON_CALL(overload_state_, tryAllocateResource(GlobalCx, _))
+        .WillByDefault([this](Server::OverloadProactiveResourceName, int64_t increment) {
+          return resource_->tryAllocateResource(increment);
+        });
+    ON_CALL(overload_state_, tryDeallocateResource(GlobalCx, _))
+        .WillByDefault([this](Server::OverloadProactiveResourceName, int64_t decrement) {
+          return resource_->tryDeallocateResource(decrement);
+        });
+  }
+
+  std::unique_ptr<TestListener> makeListener(bool ignore_global_conn_limit) {
+    auto test_listener = std::make_unique<TestListener>();
+    test_listener->socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(version_));
+    TestListener* raw = test_listener.get();
+    ON_CALL(raw->callbacks, onAccept_(_)).WillByDefault([this, raw](ConnectionSocketPtr& socket) {
+      raw->accepted.push_back(std::move(socket));
+      dispatcher_->exit();
+    });
+    ON_CALL(raw->callbacks, onReject(_))
+        .WillByDefault([this, raw](TcpListenerCallbacks::RejectCause) {
+          ++raw->rejected;
+          dispatcher_->exit();
+        });
+    raw->listener = std::make_unique<TestTcpListenerImpl>(
+        dispatcherImpl(), api_->randomGenerator(), runtime_, raw->socket, raw->callbacks, true,
+        ignore_global_conn_limit, false, Server::ThreadLocalOverloadStateOptRef(overload_state_));
+    return test_listener;
+  }
+
+  // Connects one client and runs the dispatcher until the listener accepts or rejects it.
+  void connect(TestListener& test_listener) {
+    clients_.push_back(dispatcher_->createClientConnection(
+        test_listener.socket->connectionInfoProvider().localAddress(),
+        Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr,
+        nullptr));
+    clients_.back()->connect();
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
+
+  int64_t usage() {
+    return resource_->getProactiveResourceMonitorForTest()->currentResourceUsage();
+  }
+
+  uint64_t failedUpdates() {
+    return TestUtility::findCounter(
+               store_, absl::StrCat(
+                           "overload.",
+                           Server::OverloadProactiveResources::get().GlobalDownstreamMaxConnections,
+                           ".failed_updates"))
+        ->value();
+  }
+
+  void TearDown() override {
+    for (auto& client : clients_) {
+      client->close(ConnectionCloseType::NoFlush);
+    }
+  }
+
+  Stats::IsolatedStoreImpl store_;
+  std::optional<Server::ProactiveResource> resource_;
+  NiceMock<Server::MockThreadLocalOverloadState> overload_state_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  std::vector<ClientConnectionPtr> clients_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpListenerGlobalCxLimitTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Connections to an opted-out listener hold a global connection resource while open and release
+// exactly that resource when closed, so they never release one held by another listener.
+TEST_P(TcpListenerGlobalCxLimitTest, OptOutListenerReleasesOnlyResourcesItAllocated) {
+  initializeResource(10);
+  auto limited = makeListener(false);
+  auto opted_out = makeListener(true);
+
+  connect(*limited);
+  connect(*limited);
+  ASSERT_EQ(2, limited->accepted.size());
+  EXPECT_EQ(2, usage());
+
+  for (int i = 0; i < 3; ++i) {
+    connect(*opted_out);
+    EXPECT_EQ(3, usage());
+    opted_out->accepted.clear();
+    EXPECT_EQ(2, usage());
+  }
+
+  for (int i = 0; i < 3; ++i) {
+    connect(*opted_out);
+  }
+  EXPECT_EQ(3, opted_out->accepted.size());
+  EXPECT_EQ(5, usage());
+  opted_out->accepted.clear();
+  EXPECT_EQ(2, usage());
+
+  EXPECT_EQ(0, opted_out->rejected);
+  EXPECT_EQ(0, failedUpdates());
+}
+
+TEST_P(TcpListenerGlobalCxLimitTest, OptOutListenerNotCountedWithRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.global_conn_limit_opt_out_counts_connections", "false"}});
+  initializeResource(10);
+  auto limited = makeListener(false);
+  auto opted_out = makeListener(true);
+
+  connect(*limited);
+  connect(*limited);
+  EXPECT_EQ(2, usage());
+
+  for (int i = 0; i < 3; ++i) {
+    connect(*opted_out);
+    EXPECT_EQ(2, usage());
+    opted_out->accepted.clear();
+    EXPECT_EQ(2, usage());
+  }
+
+  EXPECT_EQ(0, opted_out->rejected);
+  EXPECT_EQ(0, failedUpdates());
+}
+
+// At the limit, an opted-out listener still admits connections, and closing them leaves the limit
+// in force for other listeners.
+TEST_P(TcpListenerGlobalCxLimitTest, OptOutListenerAtLimitKeepsLimitEnforced) {
+  initializeResource(2);
+  auto limited = makeListener(false);
+  auto opted_out = makeListener(true);
+
+  connect(*limited);
+  connect(*limited);
+  EXPECT_EQ(2, usage());
+
+  connect(*opted_out);
+  connect(*opted_out);
+  EXPECT_EQ(2, opted_out->accepted.size());
+  EXPECT_EQ(0, opted_out->rejected);
+  opted_out->accepted.clear();
+  EXPECT_EQ(2, usage());
+
+  connect(*limited);
+  EXPECT_EQ(2, limited->accepted.size());
+  EXPECT_EQ(1, limited->rejected);
+  EXPECT_EQ(2, usage());
+}
+
+// A load-shed rejection on an opted-out listener at the limit releases nothing, because the
+// listener did not allocate a resource for the connection.
+TEST_P(TcpListenerGlobalCxLimitTest, LoadShedOnOptOutListenerAtLimitReleasesNothing) {
+  initializeResource(1);
+  auto limited = makeListener(false);
+  auto opted_out = makeListener(true);
+
+  connect(*limited);
+  EXPECT_EQ(1, usage());
+
+  Server::MockOverloadManager overload_manager;
+  Server::MockLoadShedPoint accept_connection_point;
+  EXPECT_CALL(overload_manager, getLoadShedPoint(_)).WillOnce(Return(&accept_connection_point));
+  opted_out->listener->configureLoadShedPoints(overload_manager);
+  EXPECT_CALL(accept_connection_point, shouldShedLoad()).WillOnce(Return(true));
+
+  connect(*opted_out);
+  EXPECT_EQ(1, opted_out->rejected);
+  EXPECT_EQ(1, usage());
 }
 
 TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {

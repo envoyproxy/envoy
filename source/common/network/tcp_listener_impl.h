@@ -45,14 +45,15 @@ private:
 
   // Returns true if global connection limit has been reached and the accepted socket should be
   // rejected/closed. If the accepted socket is to be admitted, false is returned.
-  // When returning false (socket admitted), this method allocates a connection resource that must
-  // be released by either creating an AcceptedSocketImpl or calling releaseGlobalCxLimitResource().
-  bool rejectCxOverGlobalLimit() const;
+  // Sets holds_global_cx_resource to whether this method allocated a connection resource in the
+  // overload manager. An allocated resource must be released by either creating an
+  // AcceptedSocketImpl that tracks it or calling releaseGlobalCxLimitResource().
+  bool rejectCxOverGlobalLimit(bool& holds_global_cx_resource) const;
 
-  // Releases the global connection limit resource that was allocated by rejectCxOverGlobalLimit().
+  // Releases the global connection limit resource if rejectCxOverGlobalLimit() allocated one.
   // Must be called when a connection was admitted (rejectCxOverGlobalLimit returned false) but
   // the AcceptedSocketImpl will not be created (e.g., due to address resolution failure).
-  void releaseGlobalCxLimitResource() const;
+  void releaseGlobalCxLimitResource(bool holds_global_cx_resource) const;
 
   Random::RandomGenerator& random_;
   Runtime::Loader& runtime_;
