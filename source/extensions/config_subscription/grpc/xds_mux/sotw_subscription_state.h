@@ -7,6 +7,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/hash.h"
+#include "source/common/config/decoded_resource_cache.h"
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/extensions/config_subscription/grpc/xds_mux/subscription_state.h"
 
@@ -49,10 +50,13 @@ private:
   getNextRequestInternal() override;
 
   void handleGoodResponse(envoy::service::discovery::v3::DiscoveryResponse& message) override;
-  void setResourceTtl(const DecodedResourceImpl& decoded_resource);
+  void setResourceTtl(const DecodedResource& decoded_resource);
   bool isHeartbeatResource(const DecodedResource& resource, const std::string& version);
 
   OpaqueResourceDecoderSharedPtr resource_decoder_;
+
+  // Reuses the decode of resources whose bytes did not change since the previous response.
+  DecodedResourceCache decode_cache_;
 
   // The version_info carried by the last accepted DiscoveryResponse.
   // Remains empty until one is accepted.

@@ -1,6 +1,8 @@
 #include "source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/config/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/config_subscription/grpc/xds_source_id.h"
 
 namespace Envoy {
@@ -47,6 +49,15 @@ void SotwSubscriptionState::handleGoodResponse(
     envoy::service::discovery::v3::DiscoveryResponse& message) {
   Protobuf::Arena batch_arena(resource_decoder_->arenaOptions());
   std::vector<DecodedResourcePtr> non_heartbeat_resources;
+  const bool skip_unchanged = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.xds_skip_unchanged_resource_decode");
+  // A rejected response must not become the cache's reference.
+  bool decoded_all = false;
+  Cleanup abort_cache_update([this, &decoded_all, skip_unchanged]() {
+    if (skip_unchanged && !decoded_all) {
+      decode_cache_.abortUpdate();
+    }
+  });
 
   {
     const auto scoped_update = ttl_.scopedTtlUpdate();
@@ -59,16 +70,27 @@ void SotwSubscriptionState::handleGoodResponse(
                         any.type_url(), message.type_url(), message.DebugString()));
       }
 
-      auto decoded_resource =
-          THROW_OR_RETURN_VALUE(DecodedResourceImpl::fromResource(
-                                    *resource_decoder_, any, message.version_info(), batch_arena),
-                                DecodedResourceImplPtr);
+      DecodedResourcePtr decoded_resource;
+      if (skip_unchanged) {
+        decoded_resource = THROW_OR_RETURN_VALUE(
+            decode_cache_.decode(*resource_decoder_, any, message.version_info(), batch_arena),
+            DecodedResourcePtr);
+      } else {
+        decoded_resource =
+            THROW_OR_RETURN_VALUE(DecodedResourceImpl::fromResource(
+                                      *resource_decoder_, any, message.version_info(), batch_arena),
+                                  DecodedResourceImplPtr);
+      }
       setResourceTtl(*decoded_resource);
       if (isHeartbeatResource(*decoded_resource, message.version_info())) {
         continue;
       }
       non_heartbeat_resources.push_back(std::move(decoded_resource));
     }
+  }
+  if (skip_unchanged) {
+    decode_cache_.endUpdate();
+    decoded_all = true;
   }
 
   // TODO (dmitri-d) to eliminate decoding of resources twice consider expanding the interface to
@@ -185,7 +207,7 @@ void SotwSubscriptionState::ttlExpiryCallback(const std::vector<std::string>& ex
   callbacks().onConfigUpdate({}, removed_resources, "");
 }
 
-void SotwSubscriptionState::setResourceTtl(const DecodedResourceImpl& decoded_resource) {
+void SotwSubscriptionState::setResourceTtl(const DecodedResource& decoded_resource) {
   if (decoded_resource.ttl()) {
     ttl_.add(std::chrono::milliseconds(*decoded_resource.ttl()), decoded_resource.name());
   } else {

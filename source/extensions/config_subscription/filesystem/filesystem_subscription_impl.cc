@@ -8,6 +8,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {
@@ -96,10 +97,27 @@ std::string FilesystemSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePt
       return message.version_info();
     }
   }
-  const auto decoded_resources =
-      THROW_OR_RETURN_VALUE(DecodedResourcesWrapper::create(*resource_decoder_, message.resources(),
-                                                            message.version_info()),
-                            std::unique_ptr<DecodedResourcesWrapper>);
+  std::unique_ptr<DecodedResourcesWrapper> decoded_resources;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.xds_skip_unchanged_resource_decode")) {
+    decoded_resources =
+        std::make_unique<DecodedResourcesWrapper>(resource_decoder_->arenaOptions());
+    for (const auto& resource : message.resources()) {
+      absl::StatusOr<DecodedResourcePtr> decoded = decode_cache_.decode(
+          *resource_decoder_, resource, message.version_info(), *decoded_resources->arena_);
+      if (!decoded.ok()) {
+        decode_cache_.abortUpdate();
+        THROW_IF_NOT_OK_REF(decoded.status());
+      }
+      decoded_resources->pushBack(std::move(decoded.value()));
+    }
+    decode_cache_.endUpdate();
+  } else {
+    decoded_resources =
+        THROW_OR_RETURN_VALUE(DecodedResourcesWrapper::create(
+                                  *resource_decoder_, message.resources(), message.version_info()),
+                              std::unique_ptr<DecodedResourcesWrapper>);
+  }
   THROW_IF_NOT_OK(callbacks_.onConfigUpdate(decoded_resources->refvec_, message.version_info()));
   config_hash_ = new_hash;
   return message.version_info();

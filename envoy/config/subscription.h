@@ -112,6 +112,12 @@ public:
    * Returns arena options optimized for this resource type.
    */
   virtual const Protobuf::ArenaOptions& arenaOptions() const PURE;
+
+  /**
+   * Whether decoding the same bytes always yields an equivalent message. A decoder that injects
+   * per-call state (for example a generated name) returns false so its decodes are never reused.
+   */
+  virtual bool isDeterministic() const { return true; }
 };
 
 using OpaqueResourceDecoderSharedPtr = std::shared_ptr<OpaqueResourceDecoder>;

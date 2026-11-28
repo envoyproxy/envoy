@@ -108,6 +108,7 @@ public:
               (const Protobuf::Any& resource, Protobuf::Arena& arena));
   MOCK_METHOD(std::string, resourceName, (const Protobuf::Message& resource));
   MOCK_METHOD(const Protobuf::ArenaOptions&, arenaOptions, (), (const));
+  MOCK_METHOD(bool, isDeterministic, (), (const));
 
   Protobuf::ArenaOptions arena_options_;
 };

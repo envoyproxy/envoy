@@ -33,6 +33,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "decoded_resource_cache_test",
+    srcs = ["decoded_resource_cache_test.cc"],
+    deps = [
+        "//source/common/config:decoded_resource_cache_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "dependent_type_pausing_subscription_test",
     srcs = ["dependent_type_pausing_subscription_test.cc"],
     deps = [

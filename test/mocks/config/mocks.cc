@@ -5,6 +5,7 @@
 #include "test/test_common/utility.h"
 
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -75,6 +76,7 @@ MockSubscriptionCallbacks::~MockSubscriptionCallbacks() = default;
 
 MockOpaqueResourceDecoder::MockOpaqueResourceDecoder() {
   ON_CALL(*this, arenaOptions()).WillByDefault(ReturnRef(arena_options_));
+  ON_CALL(*this, isDeterministic()).WillByDefault(Return(true));
 }
 MockOpaqueResourceDecoder::~MockOpaqueResourceDecoder() = default;
 

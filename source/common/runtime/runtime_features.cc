@@ -261,6 +261,7 @@ RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 // already subscribes to, replay the last delivered secret to the new watch instead of waiting for
 // the server to resend it.
 RUNTIME_GUARD(envoy_reloadable_features_xds_replay_cached_resources);
+RUNTIME_GUARD(envoy_reloadable_features_xds_skip_unchanged_resource_decode);
 // This is only needed if sharing c-ares query cache across dns clusters.
 // Disabled by default for now to prevent behavior changes.
 FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
