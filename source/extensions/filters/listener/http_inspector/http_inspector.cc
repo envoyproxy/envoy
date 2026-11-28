@@ -28,6 +28,35 @@ constexpr absl::string_view kValidHttpMethodChars =
 
 constexpr size_t kMaxHttpMethodLength = 32;
 
+// The HTTP-version word of a request line is exactly "HTTP/x.y" (RFC 9112
+// section 2.3), or absent for a HTTP/0.9-style simple request.
+constexpr absl::string_view kHttpVersionPrefix = "HTTP/";
+constexpr size_t kHttpVersionLength = 8;
+
+// The HTTP/1 parser treats every byte <= ' ' as a first-line separator.
+constexpr bool isFirstLineWhitespace(char c) { return static_cast<uint8_t>(c) <= ' '; }
+
+// Characters a CONNECT request-target (authority-form host) may start with,
+// mirroring the host characters the HTTP/1 request-target validation accepts.
+bool isValidConnectTargetChar(char c) {
+  return absl::ascii_isalnum(c) || c == '!' || c == '$' || c == '%' || c == '&' || c == '\'' ||
+         c == '(' || c == ')' || c == '*' || c == '+' || c == ',' || c == '-' || c == '.' ||
+         c == ':' || c == ';' || c == '=' || c == '@' || c == '[' || c == ']' || c == '_' ||
+         c == '~' || c == '?';
+}
+
+// Whether character `c` at offset `offset` of the version word can still be
+// part of a "HTTP/x.y" version.
+bool isValidVersionChar(size_t offset, char c) {
+  if (offset < kHttpVersionPrefix.size()) {
+    return c == kHttpVersionPrefix[offset];
+  }
+  if (offset == kHttpVersionPrefix.size() + 1) {
+    return c == '.';
+  }
+  return offset < kHttpVersionLength && absl::ascii_isdigit(c);
+}
+
 } // namespace
 
 Config::Config(Stats::Scope& scope)
@@ -118,14 +147,79 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
       return ParseState::Error;
     }
 
-    // Fast-fail when the request-line prefix contains a byte that is not a
-    // valid HTTP method token character and not a method/path separator.
+    // Fast-fail when the request-line prefix can no longer be completed into
+    // a valid request line of the form `method SP+ request-target (SP+
+    // HTTP-version)?` (RFC 9112 section 3). The parser treats every byte
+    // <= ' ' as a first-line separator and defers validation until a line
+    // terminator is seen, so a non-HTTP connection whose early bytes look
+    // like `token whitespace` — for example an `LDAP` bind request
+    // `30 0c 02 01 01 60 ...` — otherwise stalls here until the listener
+    // filter timeout. The scan is bounded to the first
+    // kMaxHttpMethodLength bytes of the line; a prefix that can still be
+    // completed into a valid request line is left to the parser.
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.http_inspector_fast_fail_invalid_method_bytes")) {
-      const absl::string_view prefix = data.substr(0, kMaxHttpMethodLength);
+      const size_t line_end = data.find('\n');
+      const absl::string_view prefix = data.substr(0, std::min(line_end, kMaxHttpMethodLength));
       const size_t bad = prefix.find_first_not_of(kValidHttpMethodChars);
-      if (bad != absl::string_view::npos && !absl::ascii_isspace(prefix[bad])) {
-        return ParseState::Error;
+      if (bad != absl::string_view::npos) {
+        // The method must be non-empty and terminated by ASCII whitespace.
+        if (bad == 0 || !absl::ascii_isspace(prefix[bad])) {
+          return ParseState::Error;
+        }
+        // Skip the separator run after the method token.
+        size_t pos = bad;
+        while (pos < prefix.size() && isFirstLineWhitespace(prefix[pos])) {
+          ++pos;
+        }
+        if (pos < prefix.size()) {
+          // The next word is the request-target: it begins with '/', '*',
+          // an alpha (scheme) character, or an authority host character for
+          // CONNECT.
+          const bool is_connect = prefix.substr(0, bad) == "CONNECT";
+          const char first = prefix[pos];
+          if (first != '/' && first != '*' &&
+              !(is_connect ? isValidConnectTargetChar(first) : absl::ascii_isalpha(first))) {
+            return ParseState::Error;
+          }
+          // The rest of the request-target may only contain printable
+          // characters.
+          while (pos < prefix.size() && !isFirstLineWhitespace(prefix[pos])) {
+            if (static_cast<uint8_t>(prefix[pos]) >= 0x7f) {
+              return ParseState::Error;
+            }
+            ++pos;
+          }
+          // Skip the separator run before the optional version word.
+          while (pos < prefix.size() && isFirstLineWhitespace(prefix[pos])) {
+            ++pos;
+          }
+          if (pos < prefix.size()) {
+            // A version word must match "HTTP/x.y".
+            size_t version_len = 0;
+            while (pos < prefix.size() && !isFirstLineWhitespace(prefix[pos])) {
+              if (!isValidVersionChar(version_len, prefix[pos])) {
+                return ParseState::Error;
+              }
+              ++version_len;
+              ++pos;
+            }
+            // The version word is complete once a separator follows it or
+            // the scan reaches the line terminator; a complete word must be
+            // exactly "HTTP/x.y" and the last word of the request line.
+            if (pos < prefix.size() || prefix.size() == line_end) {
+              if (version_len != kHttpVersionLength) {
+                return ParseState::Error;
+              }
+              while (pos < prefix.size() && isFirstLineWhitespace(prefix[pos])) {
+                ++pos;
+              }
+              if (pos < prefix.size()) {
+                return ParseState::Error;
+              }
+            }
+          }
+        }
       }
     }
 
