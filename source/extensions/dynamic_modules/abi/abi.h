@@ -3699,7 +3699,11 @@ bool envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
 
 /**
  * envoy_dynamic_module_callback_http_filter_continue_decoding is called by the module to continue
- * decoding the HTTP request.
+ * decoding the HTTP request after a request headers, body or trailers event hook stopped it. Call
+ * it from outside the hook that stopped the request, such as from a scheduled event or a callout
+ * completion. A call is ignored while the request is iterating, which includes a call from inside a
+ * hook that is about to return a stop. A call from inside a later hook, after an earlier hook
+ * stopped the request, is forwarded to the filter manager before that hook returns.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
@@ -3709,7 +3713,11 @@ void envoy_dynamic_module_callback_http_filter_continue_decoding(
 
 /**
  * envoy_dynamic_module_callback_http_filter_continue_encoding is called by the module to continue
- * encoding the HTTP response.
+ * encoding the HTTP response after a response headers, body or trailers event hook stopped it. Call
+ * it from outside the hook that stopped the response, such as from a scheduled event or a callout
+ * completion. A call is ignored while the response is iterating, which includes a call from inside
+ * a hook that is about to return a stop. A call from inside a later hook, after an earlier hook
+ * stopped the response, is forwarded to the filter manager before that hook returns.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.

@@ -124,7 +124,9 @@ FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bo
   const envoy_dynamic_module_type_on_http_filter_request_headers_status status =
       config_->on_http_filter_request_headers_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   decode_in_continue_ =
-      status == envoy_dynamic_module_type_on_http_filter_request_headers_status_Continue;
+      status == envoy_dynamic_module_type_on_http_filter_request_headers_status_Continue ||
+      status ==
+          envoy_dynamic_module_type_on_http_filter_request_headers_status_ContinueAndDontEndStream;
   return static_cast<FilterHeadersStatus>(status);
 };
 
@@ -154,15 +156,16 @@ FilterTrailersStatus DynamicModuleHttpFilter::decodeTrailers(RequestTrailerMap&)
   return static_cast<FilterTrailersStatus>(status);
 }
 
+// A metadata Continue does not resume a filter that stopped on headers, so the continue flag stays
+// as the last headers, body or trailers hook left it.
 FilterMetadataStatus DynamicModuleHttpFilter::decodeMetadata(MetadataMap&) {
-  decode_in_continue_ = true;
   return FilterMetadataStatus::Continue;
 }
 
 void DynamicModuleHttpFilter::decodeComplete() {}
 
+// A 1xx Continue never changes the filter's iteration state, so the continue flag needs no write.
 Filter1xxHeadersStatus DynamicModuleHttpFilter::encode1xxHeaders(ResponseHeaderMap&) {
-  encode_in_continue_ = true;
   return Filter1xxHeadersStatus::Continue;
 }
 
@@ -174,13 +177,17 @@ FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap&, b
   const envoy_dynamic_module_type_on_http_filter_response_headers_status status =
       config_->on_http_filter_response_headers_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   encode_in_continue_ =
-      status == envoy_dynamic_module_type_on_http_filter_response_headers_status_Continue;
+      status == envoy_dynamic_module_type_on_http_filter_response_headers_status_Continue ||
+      status ==
+          envoy_dynamic_module_type_on_http_filter_response_headers_status_ContinueAndDontEndStream;
   return static_cast<FilterHeadersStatus>(status);
 };
 
 FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bool end_of_stream) {
   HookScope hook_scope(*this);
   if (sent_local_reply_ || in_module_filter_ == nullptr) { // See the comment on the flag.
+    // A data Continue resumes a filter that stopped on headers, so the direction is continued.
+    encode_in_continue_ = true;
     return FilterDataStatus::Continue;
   }
   current_response_body_ = &chunk;
@@ -195,6 +202,8 @@ FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bo
 FilterTrailersStatus DynamicModuleHttpFilter::encodeTrailers(ResponseTrailerMap&) {
   HookScope hook_scope(*this);
   if (sent_local_reply_ || in_module_filter_ == nullptr) { // See the comment on the flag.
+    // As in encodeData(), a trailers Continue resumes the filter.
+    encode_in_continue_ = true;
     return FilterTrailersStatus::Continue;
   }
   const envoy_dynamic_module_type_on_http_filter_response_trailers_status status =
@@ -204,8 +213,8 @@ FilterTrailersStatus DynamicModuleHttpFilter::encodeTrailers(ResponseTrailerMap&
   return static_cast<FilterTrailersStatus>(status);
 };
 
+// Leaves the continue flag alone, as decodeMetadata() does.
 FilterMetadataStatus DynamicModuleHttpFilter::encodeMetadata(MetadataMap&) {
-  encode_in_continue_ = true;
   return FilterMetadataStatus::Continue;
 }
 
@@ -365,15 +374,30 @@ void DynamicModuleHttpFilter::onScheduled(uint64_t event_id) {
 
 void DynamicModuleHttpFilter::continueDecoding() {
   if (decoder_callbacks_ && !decode_in_continue_) {
-    decoder_callbacks_->continueDecoding();
+    // Set before the call, since the filter manager can replay the buffered body and trailers into
+    // this filter before it returns, and a hook that stops again has to keep its stop.
     decode_in_continue_ = true;
+    decoder_callbacks_->continueDecoding();
+  } else if (decoder_callbacks_ != nullptr && hasConfig()) {
+    // A module that continues from inside a hook that then stops lands here, and its stream
+    // stalls, so say why.
+    ENVOY_STREAM_LOG(debug,
+                     "dynamic module continue_decoding ignored, the request is iterating, "
+                     "filter_name={}",
+                     *decoder_callbacks_, getFilterConfig().filterName());
   }
 }
 
 void DynamicModuleHttpFilter::continueEncoding() {
   if (encoder_callbacks_ && !encode_in_continue_) {
-    encoder_callbacks_->continueEncoding();
+    // Set before the call for the same reason as in continueDecoding().
     encode_in_continue_ = true;
+    encoder_callbacks_->continueEncoding();
+  } else if (encoder_callbacks_ != nullptr && hasConfig()) {
+    ENVOY_STREAM_LOG(debug,
+                     "dynamic module continue_encoding ignored, the response is iterating, "
+                     "filter_name={}",
+                     *encoder_callbacks_, getFilterConfig().filterName());
   }
 }
 
