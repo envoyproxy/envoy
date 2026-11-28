@@ -548,6 +548,17 @@ void DefaultCertValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
 absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
                                                               bool require_client_cert) {
   if (config_ == nullptr || config_->caCert().empty()) {
+    if (require_client_cert &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.require_client_certificate_without_ca")) {
+      if (SSL_CTX_get_verify_mode(ctx) == SSL_VERIFY_NONE) {
+        // Without a validation policy, require presentation without authenticating the certificate.
+        SSL_CTX_set_custom_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
+                                  [](SSL*, uint8_t*) { return ssl_verify_ok; });
+      } else {
+        SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
+      }
+    }
     return absl::OkStatus();
   }
 
