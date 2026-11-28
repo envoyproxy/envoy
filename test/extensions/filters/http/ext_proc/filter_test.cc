@@ -130,6 +130,7 @@ protected:
     DEFAULT = 1,
     OnGrpcError = 2,
     OnGrpcClose = 3,
+    GrpcAbortiveClose = 4,
   };
   void initialize(std::string&& yaml, bool is_upstream_filter = false) {
     scoped_runtime_.mergeValues(
@@ -295,7 +296,12 @@ protected:
     EXPECT_CALL(*stream, streamInfo()).WillRepeatedly(ReturnRef(async_client_stream_info_));
 
     // close is idempotent and only called once per filter
-    EXPECT_CALL(*stream, close()).WillOnce(Invoke(this, &HttpFilterTest::doSendClose));
+    if (do_start_option_ == GrpcAbortiveClose) {
+      EXPECT_CALL(*stream, close()).WillOnce(Invoke(this, &HttpFilterTest::doSendClose));
+    } else {
+      EXPECT_CALL(*stream, halfCloseAndDeleteOnRemoteClose())
+          .WillOnce(Invoke(this, &HttpFilterTest::doSendClose));
+    }
 
     return stream;
   }
@@ -1815,6 +1821,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
 }
 
 TEST_F(HttpFilterTest, PostAndRespondImmediatelyWithDisabledConfig) {
+  do_start_option_ = GrpcAbortiveClose;
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -2570,6 +2577,7 @@ TEST_F(HttpFilterTest, StreamingBodyNotMutateLastChunk) {
 
 // gRPC call fails when streaming sends small chunk request data.
 TEST_F(HttpFilterTest, StreamingSendRequestDataGrpcFail) {
+  do_start_option_ = GrpcAbortiveClose;
   initializeTestSendAll();
 
   HttpTestUtility::addDefaultHeaders(request_headers_);
@@ -2621,6 +2629,7 @@ TEST_F(HttpFilterTest, StreamingSendRequestDataGrpcFail) {
 
 // gRPC call fails when streaming sends small chunk response data.
 TEST_F(HttpFilterTest, StreamingSendResponseDataGrpcFail) {
+  do_start_option_ = GrpcAbortiveClose;
   initializeTestSendAll();
 
   HttpTestUtility::addDefaultHeaders(request_headers_);
@@ -2673,6 +2682,7 @@ TEST_F(HttpFilterTest, StreamingSendResponseDataGrpcFail) {
 
 // Grpc fails when sending request trailer message.
 TEST_F(HttpFilterTest, GrpcFailOnRequestTrailer) {
+  do_start_option_ = GrpcAbortiveClose;
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -3365,6 +3375,7 @@ TEST_F(HttpFilterTest, RespondImmediatelyGrpcError) {
 // Using the default configuration, test the filter with a processor that
 // returns an error from from the gRPC stream.
 TEST_F(HttpFilterTest, PostAndFail) {
+  do_start_option_ = GrpcAbortiveClose;
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -3411,6 +3422,7 @@ TEST_F(HttpFilterTest, PostAndFail) {
 // Using the default configuration, test the filter with a processor that
 // returns an error from from the gRPC stream during response header processing.
 TEST_F(HttpFilterTest, PostAndFailOnResponse) {
+  do_start_option_ = GrpcAbortiveClose;
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -3462,6 +3474,7 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
 // returns an error from the gRPC stream that is ignored because the
 // failure_mode_allow parameter is set.
 TEST_F(HttpFilterTest, PostAndIgnoreFailure) {
+  do_start_option_ = GrpcAbortiveClose;
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -3500,6 +3513,7 @@ TEST_F(HttpFilterTest, PostAndIgnoreFailure) {
 // Using the default configuration, test the filter with a processor that
 // replies to the request_headers message by closing the gRPC stream.
 TEST_F(HttpFilterTest, PostAndClose) {
+  do_start_option_ = GrpcAbortiveClose;
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -4347,6 +4361,7 @@ TEST_F(HttpFilterTest, ReplaceCompleteResponseBuffered) {
 // request_body message, which should result in the stream being closed
 // and ignored.
 TEST_F(HttpFilterTest, OutOfOrderFailOpen) {
+  do_start_option_ = GrpcAbortiveClose;
   initialize(R"EOF(
   failure_mode_allow: true
   grpc_service:
@@ -4393,6 +4408,7 @@ TEST_F(HttpFilterTest, OutOfOrderFailOpen) {
 // a processor that replies to the request_headers message incorrectly by sending
 // a request_body message, which should result in local reply being sent.
 TEST_F(HttpFilterTest, OutOfOrderFailClose) {
+  do_start_option_ = GrpcAbortiveClose;
   initialize(R"EOF(
   failure_mode_allow: false
   grpc_service:
@@ -4474,6 +4490,7 @@ protected:
 };
 
 TEST_F(HttpFilterTest, OutOfOrderPerRouteOverrideFailOpen) {
+  do_start_option_ = GrpcAbortiveClose;
   // Filter is configured with fail-close.
   initialize(R"EOF(
   failure_mode_allow: false
@@ -4714,6 +4731,7 @@ TEST_F(OverrideTest, MaxStreamedBodyChunkSizeMerge) {
 // Verify that attempts to change headers that are not allowed to be changed
 // are ignored and a counter is incremented.
 TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {
+  do_start_option_ = GrpcAbortiveClose;
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -4752,6 +4770,7 @@ TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {
 // Verify that attempts to change headers that are not allowed to be changed
 // can be configured to cause a request failure.
 TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
+  do_start_option_ = GrpcAbortiveClose;
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -4789,6 +4808,7 @@ TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
 // Set the HCM max request headers size limit to be 2kb. Test the
 // header mutation end result size check works for the trailer response.
 TEST_F(HttpFilterTest, ResponseTrailerMutationExceedSizeLimit) {
+  do_start_option_ = GrpcAbortiveClose;
   TestResponseTrailerMapImpl resp_trailers_({}, 2, 100);
   initialize(R"EOF(
   grpc_service:
@@ -6626,6 +6646,7 @@ TEST_F(HttpFilterTest, DontSaveImmediateResponse) {
 }
 
 TEST_F(HttpFilterTest, DontSaveImmediateResponseOnError) {
+  do_start_option_ = GrpcAbortiveClose;
   SaveProcessingResponseFactory factory;
   Envoy::Registry::InjectFactory<OnProcessingResponseFactory> registration(factory);
   initialize(R"EOF(
@@ -7230,6 +7251,7 @@ TEST_F(HttpFilterTest, KeepContentLengthFullDuplex) {
 }
 
 TEST_F(HttpFilterTest, HttpEventTrafficStatsTest) {
+  do_start_option_ = GrpcAbortiveClose;
   initializeTestFullDuplex();
 
   // Request Body
@@ -7473,6 +7495,7 @@ TEST_F(HttpFilterTest, CloseGrpcStreamLastRespImmediate) {
 }
 
 TEST_F(HttpFilterTest, HandleStreamingImmediateResponseDefault) {
+  do_start_option_ = GrpcAbortiveClose;
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:

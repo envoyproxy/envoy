@@ -92,6 +92,7 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_send_rst_on_user_space_socket);
 // Ignore the automated "remove this flag" issue: never remove this before 2027/10. Confirm with
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
+RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
 // Ignore the automated "remove this flag" issue: do not remove this before
 // envoy.reloadable_features.filter_manager_per_filter_buffer is removed, since it is
 // still used when that flag is disabled.
@@ -359,8 +360,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
 // TODO(jwendell): Flip to true to make gRPC timeout responses return DEADLINE_EXCEEDED
 // instead of UNAVAILABLE.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_grpc_timeout_returns_deadline_exceeded);
-
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
 
