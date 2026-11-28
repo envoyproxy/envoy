@@ -193,6 +193,24 @@ may read or modify the document, or reject the request with a local reply.
 Requests the filter does not parse -- those passed through, those without a
 body, and best-effort payloads that fail to parse -- run no AI filters.
 
+A declared endpoint's request that has no body, or whose body is not JSON, has
+no document to run the AI filters over. Each AI filter may answer such a request
+with a local reply of its own; when none does, the request without a body is
+forwarded and the one that is not JSON is rejected with a 400. An AI filter may
+instead have a request that is not JSON forwarded as it arrived: no AI filter
+runs on it or on its response. The filter is given what the parser had read of
+such a body, and whether the body ended too soon or stopped being JSON.
+
+A body in which an object repeats a key is not JSON to the filter, and is
+rejected, unless an AI filter of the chain accepts repeated keys. The body is
+then parsed, the document holds the last value of the key, and every AI filter
+of the chain sees it. Of the AI filters here only the :ref:`MCP filter
+<config_http_ai_filters_mcp>` does.
+
+A route configures an AI filter with :ref:`typed_per_filter_config
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.typed_per_filter_config>`,
+keyed by the filter's name in ``filters``.
+
 Once the AI filters finish, the parsed document is re-serialized as the
 request body by default. With :ref:`reserialize_body
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.reserialize_body>`
@@ -485,7 +503,7 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   :widths: 1, 1, 2
 
   request_parsed, Counter, A held request payload was parsed into a document.
-  request_parse_error, Counter, A declared AI endpoint's payload was not well-formed JSON and was rejected with a 400.
+  request_parse_error, Counter, "A declared AI endpoint's payload was not well-formed JSON: rejected with a 400, or answered or forwarded by an AI filter."
   request_passthrough, Counter, "A payload on an unconfigured route failed to parse under :ref:`parse_unconfigured_routes <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>` and was forwarded unchanged; never a request failure."
   route_binding_unused, Counter, "A request on a route that declares a :ref:`binding <config_http_ai_filters_transcoder_instructions>` no AI filter of the chain applies, such as a ``response.binding`` with no transcoder running a request ``FROM_IR`` leg."
   request_external_buffer_error, Counter, The external buffer failed irrecoverably on the request path and the stream was answered with a 500.

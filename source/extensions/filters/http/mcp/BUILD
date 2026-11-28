@@ -20,6 +20,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/mcp:constants_lib",
         "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
+        "@nlohmann_json//:json",
     ],
 )
 
@@ -30,6 +31,7 @@ envoy_cc_library(
     deps = [
         ":mcp_json_parser_lib",
         "//envoy/buffer:buffer_interface",
+        "//envoy/common:pure_lib",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
@@ -37,6 +39,8 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
         "//envoy/stream_info:filter_state_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:base64_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:headers_lib",
@@ -49,6 +53,7 @@ envoy_cc_library(
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
+        "@nlohmann_json//:json",
     ],
 )
 

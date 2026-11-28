@@ -4,6 +4,7 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,6 +12,72 @@ namespace HttpFilters {
 namespace Mcp {
 
 using namespace Filters::Common::Mcp::McpConstants;
+
+namespace {
+
+// Replays `value` to `extractor` as a streaming parser would report it. Returns false if `value`
+// holds a node that is not JSON.
+//
+// `open_keys` is empty for a value the parser read to its end. Otherwise `value` is a container
+// that was never closed: open_keys[0] is its own entry and the rest lead to the innermost open
+// container. An open container is replayed after its siblings, since it is where parsing
+// stopped, and its end is not reported.
+bool renderJson(absl::string_view name, const nlohmann::json& value, McpFieldExtractor& extractor,
+                absl::Span<const std::string> open_keys = {}) {
+  const bool is_open = !open_keys.empty();
+  switch (value.type()) {
+  case nlohmann::json::value_t::object: {
+    const auto open_member = open_keys.size() > 1 ? value.find(open_keys[1]) : value.end();
+    bool complete = true;
+    extractor.StartObject(name);
+    for (auto it = value.begin(); it != value.end(); ++it) {
+      if (it != open_member) {
+        complete = renderJson(it.key(), *it, extractor) && complete;
+      }
+    }
+    if (open_member != value.end()) {
+      complete =
+          renderJson(open_member.key(), *open_member, extractor, open_keys.subspan(1)) && complete;
+    }
+    if (!is_open) {
+      extractor.EndObject();
+    }
+    return complete;
+  }
+  case nlohmann::json::value_t::array:
+    // The extractor reads nothing inside an array.
+    extractor.StartList(name);
+    if (!is_open) {
+      extractor.EndList();
+    }
+    break;
+  case nlohmann::json::value_t::string:
+    extractor.RenderString(name, value.get_ref<const std::string&>());
+    break;
+  case nlohmann::json::value_t::boolean:
+    extractor.RenderBool(name, value.get<bool>());
+    break;
+  case nlohmann::json::value_t::number_integer:
+    extractor.RenderInt64(name, value.get<int64_t>());
+    break;
+  case nlohmann::json::value_t::number_unsigned:
+    extractor.RenderUint64(name, value.get<uint64_t>());
+    break;
+  case nlohmann::json::value_t::number_float:
+    extractor.RenderDouble(name, value.get<double>());
+    break;
+  case nlohmann::json::value_t::null:
+    extractor.RenderNull(name);
+    break;
+  case nlohmann::json::value_t::binary:
+    return !extractor.renderOmittedString(name);
+  case nlohmann::json::value_t::discarded:
+    return false;
+  }
+  return true;
+}
+
+} // namespace
 
 void McpParserConfig::addMethodConfig(absl::string_view method,
                                       std::vector<AttributeExtractionRule> fields) {
@@ -648,6 +715,29 @@ McpFieldExtractor* McpFieldExtractor::RenderBytes(absl::string_view name, absl::
   return RenderString(name, value);
 }
 
+bool McpFieldExtractor::renderOmittedString(absl::string_view name) {
+  if (can_stop_parsing_ || array_depth_ > 0) {
+    return false;
+  }
+
+  // The member still tells a request from a response.
+  if (depth_ == 1) {
+    if (name == RESULT_FIELD) {
+      has_result_ = true;
+      if (has_jsonrpc_) {
+        is_valid_mcp_ = true;
+      }
+    } else if (name == METHOD_FIELD) {
+      has_method_ = true;
+      if (has_jsonrpc_) {
+        is_valid_mcp_ = true;
+      }
+    }
+  }
+
+  return context_stack_.top().struct_ptr != nullptr && isPathInteresting(buildFullPath(name));
+}
+
 void McpFieldExtractor::storeField(const std::string& path, absl::string_view name,
                                    const Protobuf::Value& value) {
   // Store in nested structure in temp storage
@@ -871,6 +961,36 @@ absl::Status McpJsonParser::finishParse() {
   auto status = stream_parser_->FinishParse();
   extractor_->finalizeExtraction();
   return status;
+}
+
+bool McpJsonParser::parseDocument(const nlohmann::json& document) {
+  reset();
+  extractor_ = std::make_unique<McpFieldExtractor>(metadata_, config_);
+  const bool complete = renderJson("", document, *extractor_);
+  if (!extractor_->shouldStopParsing()) {
+    extractor_->finalizeExtraction();
+  }
+  return complete;
+}
+
+void McpJsonParser::parsePartialDocument(const nlohmann::json& document,
+                                         absl::Span<const std::string> open_keys,
+                                         bool ended_early) {
+  reset();
+  extractor_ = std::make_unique<McpFieldExtractor>(metadata_, config_);
+  if (!document.is_discarded()) {
+    renderJson("", document, *extractor_, open_keys);
+  }
+  // finishParse() publishes what was read of a body that ends too soon; a parse error does not.
+  if (ended_early && !extractor_->shouldStopParsing()) {
+    extractor_->finalizeExtraction();
+  }
+}
+
+void McpJsonParser::noteDuplicateKeys() {
+  if (extractor_) {
+    extractor_->noteDuplicateKeys();
+  }
 }
 
 bool McpJsonParser::isValidMcpRequest() const { return extractor_ && extractor_->isValidMcp(); }

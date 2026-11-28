@@ -194,9 +194,9 @@ public:
           completed_ = true;
         },
         /*request_headers=*/nullptr,
-        [this](Http::Code code, std::string details) {
-          local_reply_code_ = code;
-          local_reply_details_ = std::move(details);
+        [this](HttpFilters::AiProtocolManager::LocalReply reply) {
+          local_reply_code_ = reply.code;
+          local_reply_details_ = std::move(reply.body);
         });
     for (int i = 0; i < 20; ++i) {
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);

@@ -44,11 +44,11 @@ private:
     ASSIGN_OR_CO_RETURN(HttpFilters::AiProtocolManager::AiRequestPtr request,
                         co_await std::move(receive_request)());
     bool replied_locally = false;
-    HttpFilters::AiProtocolManager::LocalReplier tracked_replier =
-        [&reply_locally, &replied_locally](Http::Code code, std::string details) {
+    HttpFilters::AiProtocolManager::LocalReplier tracked_replier(
+        [&reply_locally, &replied_locally](HttpFilters::AiProtocolManager::LocalReply reply) {
           replied_locally = true;
-          std::move(reply_locally)(code, std::move(details));
-        };
+          std::move(reply_locally)(std::move(reply));
+        });
     absl::Status status = decodeSync(*request, std::move(tracked_replier));
     if (replied_locally) {
       co_return absl::OkStatus();

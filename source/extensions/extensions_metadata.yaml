@@ -2447,6 +2447,14 @@ envoy.http.ext_proc.response_processors.save_processing_response:
   - envoy.http.ext_proc.response_processors
   security_posture: unknown
   status: wip
+envoy.http.ai_filters.mcp:
+  categories:
+  - envoy.http.ai_filters
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.mcp.v3.Mcp
+  - envoy.extensions.filters.http.mcp.v3.McpOverride
 envoy.http.ai_filters.model_router:
   categories:
   - envoy.http.ai_filters

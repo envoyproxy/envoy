@@ -11,6 +11,7 @@
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -2301,6 +2302,205 @@ TEST(McpJsonParserMemoryTest, HeavyObjectFieldsUnorderedMethod) {
 
     EXPECT_LT(heap_bytes, static_cast<int64_t>(body.size() * 2));
   }
+}
+
+// A parsed document yields what the streaming parser reads from the same bytes.
+TEST_F(McpJsonParserTest, ParseDocumentMatchesStreamingParse) {
+  McpParserConfig config = McpParserConfig::createDefault();
+  config.addMethodConfig("custom/method", {McpParserConfig::AttributeExtractionRule("params.flag"),
+                                           McpParserConfig::AttributeExtractionRule("params.big"),
+                                           McpParserConfig::AttributeExtractionRule("params.ratio"),
+                                           McpParserConfig::AttributeExtractionRule("params.none"),
+                                           McpParserConfig::AttributeExtractionRule("params.ref")});
+  for (const std::string json : {
+           R"({"jsonrpc":"2.0","id":-3,"method":"custom/method","params":{"flag":true,)"
+           R"("big":18446744073709551615,"ratio":0.5,"none":null,"ref":{"type":"x"},)"
+           R"("list":[{"name":"skipped"}],"_meta":{"traceparent":"t"}}})",
+           R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"tool"}})",
+           R"({"jsonrpc":"2.0","method":"notifications/initialized"})",
+           R"({"jsonrpc":"2.0","id":1,"result":{"content":[]}})",
+           R"({"jsonrpc":"1.0","id":1,"method":"tools/list"})",
+           R"({"":{"jsonrpc":"2.0"},"method":"tools/list"})",
+           R"([{"jsonrpc":"2.0","id":1,"method":"tools/list"}])",
+           R"("tools/list")",
+       }) {
+    SCOPED_TRACE(json);
+    McpJsonParser streaming(config);
+    EXPECT_OK(streaming.parse(json));
+    EXPECT_OK(streaming.finishParse());
+
+    McpJsonParser document(config);
+    EXPECT_TRUE(document.parseDocument(nlohmann::json::parse(json)));
+
+    EXPECT_EQ(document.isValidMcpRequest(), streaming.isValidMcpRequest());
+    EXPECT_EQ(document.isResponse(), streaming.isResponse());
+    EXPECT_EQ(document.getMethod(), streaming.getMethod());
+    EXPECT_EQ(document.hasAllRequiredFields(), streaming.hasAllRequiredFields());
+    EXPECT_FALSE(document.hasDuplicateKeys());
+    EXPECT_TRUE(TestUtility::protoEqual(document.metadata(), streaming.metadata()))
+        << document.metadata().DebugString() << streaming.metadata().DebugString();
+  }
+}
+
+// A node that is not JSON stands for a value the document's parser left out.
+TEST_F(McpJsonParserTest, ParseDocumentReportsValuesLeftOut) {
+  nlohmann::json document =
+      nlohmann::json::parse(R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{}})");
+  document["params"]["name"] = nlohmann::json::binary({0x01});
+
+  EXPECT_FALSE(parser_->parseDocument(document));
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), "tools/call");
+  EXPECT_EQ(parser_->getNestedValue("params.name"), nullptr);
+
+  document["params"]["name"] = "tool";
+  document["params"]["_meta"]["traceparent"] = nlohmann::json::binary({0x01});
+  EXPECT_FALSE(parser_->parseDocument(document));
+
+  document["params"].erase("_meta");
+  document["params"]["arguments"] = nlohmann::json(nlohmann::json::value_t::discarded);
+  EXPECT_FALSE(parser_->parseDocument(document));
+}
+
+// A value the extraction does not read is not missed.
+TEST_F(McpJsonParserTest, ParseDocumentIgnoresValuesLeftOutThatItDoesNotRead) {
+  nlohmann::json document = nlohmann::json::parse(
+      R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"tool"}})");
+  document["params"]["arguments"]["blob"] = nlohmann::json::binary({0x01});
+  document["params"]["list"] = nlohmann::json::array({nlohmann::json::binary({0x01})});
+  document["extra"] = nlohmann::json::binary({0x01});
+
+  EXPECT_TRUE(parser_->parseDocument(document));
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->hasAllRequiredFields());
+  EXPECT_EQ(parser_->getNestedValue("params.name")->string_value(), "tool");
+}
+
+// A member whose value was left out still tells a response from a request.
+TEST_F(McpJsonParserTest, ParseDocumentClassifiesByMembersLeftOut) {
+  nlohmann::json response = nlohmann::json::parse(R"({"jsonrpc":"2.0","id":1})");
+  response["result"] = nlohmann::json::binary({0x01});
+  EXPECT_TRUE(parser_->parseDocument(response));
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->isResponse());
+
+  nlohmann::json request = nlohmann::json::parse(R"({"jsonrpc":"2.0","id":1,"result":{}})");
+  request["method"] = nlohmann::json::binary({0x01});
+  EXPECT_FALSE(parser_->parseDocument(request));
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_FALSE(parser_->isResponse());
+
+  nlohmann::json no_version = nlohmann::json::parse(R"({"id":1})");
+  no_version["result"] = nlohmann::json::binary({0x01});
+  no_version["method"] = nlohmann::json::binary({0x01});
+  no_version["jsonrpc"] = nlohmann::json::binary({0x01});
+  EXPECT_FALSE(parser_->parseDocument(no_version));
+  EXPECT_FALSE(parser_->isValidMcpRequest());
+}
+
+// What another parser read of a body that ends too soon yields what the streaming parser reads
+// from the same bytes.
+TEST_F(McpJsonParserTest, ParsePartialDocumentMatchesAStreamingParseThatEndsEarly) {
+  struct Case {
+    std::string body;
+    std::string read;
+    std::vector<std::string> open_keys;
+  };
+  const std::vector<Case> cases = {
+      {R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"tool","arguments":{"a":)",
+       R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"tool","arguments":{}}})",
+       {"", "params", "arguments"}},
+      {R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"to)",
+       R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{}})",
+       {"", "params"}},
+      // The open member is not the last by key order.
+      {R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"tool"},"_meta":{"x":)",
+       R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"tool"},"_meta":{}})",
+       {"", "_meta"}},
+      {R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"list":[1,{"name":)",
+       R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"list":[1,{}]}})",
+       {"", "params", "list", ""}},
+      {R"({"jsonrpc":"2.0","id":1,"result":{"content":[)",
+       R"({"jsonrpc":"2.0","id":1,"result":{"content":[]}})",
+       {"", "result", "content"}},
+      {R"({"jsonrpc":"2.0","id":1,)", R"({"jsonrpc":"2.0","id":1})", {""}},
+      {R"([{"jsonrpc":"2.0",)", R"([{"jsonrpc":"2.0"}])", {"", ""}},
+  };
+  for (const Case& c : cases) {
+    SCOPED_TRACE(c.body);
+    McpJsonParser streaming(McpParserConfig::createDefault());
+    EXPECT_OK(streaming.parse(c.body));
+    EXPECT_FALSE(streaming.finishParse().ok());
+
+    McpJsonParser partial(McpParserConfig::createDefault());
+    partial.parsePartialDocument(nlohmann::json::parse(c.read), c.open_keys, /*ended_early=*/true);
+
+    EXPECT_EQ(partial.isValidMcpRequest(), streaming.isValidMcpRequest());
+    EXPECT_EQ(partial.isResponse(), streaming.isResponse());
+    EXPECT_EQ(partial.getMethod(), streaming.getMethod());
+    EXPECT_EQ(partial.hasAllRequiredFields(), streaming.hasAllRequiredFields());
+    EXPECT_TRUE(TestUtility::protoEqual(partial.metadata(), streaming.metadata()))
+        << partial.metadata().DebugString() << streaming.metadata().DebugString();
+  }
+}
+
+// A body that is not JSON classifies by what was read, but publishes none of it.
+TEST_F(McpJsonParserTest, ParsePartialDocumentMatchesAStreamingParseThatFails) {
+  const std::string body = R"({"jsonrpc":"2.0","id":1,"method":"tools/call" "params":{}})";
+  McpJsonParser streaming(McpParserConfig::createDefault());
+  EXPECT_FALSE(streaming.parse(body).ok());
+
+  McpJsonParser partial(McpParserConfig::createDefault());
+  partial.parsePartialDocument(
+      nlohmann::json::parse(R"({"jsonrpc":"2.0","id":1,"method":"tools/call"})"), {""},
+      /*ended_early=*/false);
+
+  EXPECT_TRUE(partial.isValidMcpRequest());
+  EXPECT_EQ(partial.isValidMcpRequest(), streaming.isValidMcpRequest());
+  EXPECT_EQ(partial.getMethod(), streaming.getMethod());
+  EXPECT_TRUE(TestUtility::protoEqual(partial.metadata(), streaming.metadata()))
+      << partial.metadata().DebugString() << streaming.metadata().DebugString();
+}
+
+// Bytes after the document: all of it was read, and it is published.
+TEST_F(McpJsonParserTest, ParsePartialDocumentPublishesADocumentThatWasClosed) {
+  parser_->parsePartialDocument(
+      nlohmann::json::parse(
+          R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"tool"}})"),
+      {}, /*ended_early=*/false);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  ASSERT_NE(parser_->getNestedValue("params.name"), nullptr);
+  EXPECT_EQ(parser_->getNestedValue("params.name")->string_value(), "tool");
+}
+
+TEST_F(McpJsonParserTest, ParsePartialDocumentOfABodyWithNoValue) {
+  parser_->parsePartialDocument(nlohmann::json(nlohmann::json::value_t::discarded), {},
+                                /*ended_early=*/true);
+
+  EXPECT_FALSE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->getMethod().empty());
+}
+
+TEST_F(McpJsonParserTest, NotesDuplicateKeysAnotherParserFound) {
+  // Nothing to note before a parse.
+  parser_->noteDuplicateKeys();
+  EXPECT_FALSE(parser_->hasDuplicateKeys());
+
+  EXPECT_TRUE(parser_->parseDocument(
+      nlohmann::json::parse(R"({"jsonrpc":"2.0","id":2,"method":"tools/list"})")));
+  EXPECT_FALSE(parser_->hasDuplicateKeys());
+  parser_->noteDuplicateKeys();
+  EXPECT_TRUE(parser_->hasDuplicateKeys());
+}
+
+TEST_F(McpJsonParserTest, ParseDocumentReplacesAnEarlierParse) {
+  parseJson(R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"first"}})");
+
+  EXPECT_TRUE(parser_->parseDocument(
+      nlohmann::json::parse(R"({"jsonrpc":"2.0","id":2,"method":"tools/list"})")));
+  EXPECT_EQ(parser_->getMethod(), "tools/list");
+  EXPECT_EQ(parser_->getNestedValue("params.name"), nullptr);
 }
 
 } // namespace

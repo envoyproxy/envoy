@@ -1,14 +1,20 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
 
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/pure.h"
 #include "envoy/extensions/filters/http/mcp/v3/mcp.pb.h"
+#include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
@@ -17,6 +23,10 @@
 #include "source/extensions/filters/common/mcp/filter_state.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/mcp/mcp_json_parser.h"
+
+#include "absl/strings/string_view.h"
+#include "absl/types/span.h"
+#include "nlohmann/json_fwd.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -95,6 +105,10 @@ public:
 
   McpFilterStats& stats() { return stats_; }
 
+  // The body size limit `proto_config` sets; 0 for no limit.
+  static uint32_t
+  maxRequestBodySize(const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config);
+
 private:
   const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
   const bool clear_route_cache_;
@@ -170,30 +184,73 @@ private:
 using McpFilterConfigSharedPtr = std::shared_ptr<McpFilterConfig>;
 
 /**
- * MCP proxy implementation.
+ * What an McpInspector needs from the filter that hosts it.
  */
-class McpFilter : public Http::PassThroughFilter, public Logger::Loggable<Logger::Id::mcp> {
+class McpInspectorCallbacks {
 public:
-  explicit McpFilter(McpFilterConfigSharedPtr config) : config_(config) {}
+  virtual ~McpInspectorCallbacks() = default;
 
-  // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
-                                          bool end_stream) override;
-  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
+  virtual Http::RequestHeaderMapOptRef requestHeaders() PURE;
+  // The route's override; null when the route has none.
+  virtual const McpOverrideConfig* routeOverride() const PURE;
+  virtual void clearRouteCache() PURE;
+  virtual void sendLocalReply(Http::Code code, absl::string_view body,
+                              std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                              absl::string_view details) PURE;
+};
 
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
-    decoder_callbacks_ = &callbacks;
-  }
+/**
+ * Inspects one request: classifies it as MCP traffic, holds it to the traffic mode, and publishes
+ * its attributes. Shared by the MCP HTTP filter and the MCP AI filter, which differ only in how
+ * the request body reaches it.
+ */
+class McpInspector : public Logger::Loggable<Logger::Id::mcp> {
+public:
+  enum class Result {
+    // The request goes on.
+    Continue,
+    // The body, or more of it, is needed.
+    NeedBody,
+    // The request was answered with a local reply.
+    Replied,
+  };
+
+  McpInspector(McpFilterConfigSharedPtr config, McpInspectorCallbacks& callbacks)
+      : config_(std::move(config)), callbacks_(callbacks) {}
+
+  Result onRequestHeaders(const Http::RequestHeaderMap& headers, bool end_stream);
+
+  // Parses the body as it arrives, up to maxRequestBodySize().
+  Result onRequestBody(const Buffer::Instance& data, bool end_stream);
+
+  // The two calls below are for a host that parses the body itself. Call one of them once
+  // onRequestHeaders() has asked for the body.
+  //
+  // Takes a body of `body_size` bytes the host parsed to its end. `has_duplicate_keys` is true
+  // if an object in it repeated a key. A body over the size limit, or one whose document lacks a
+  // value the inspector reads, is handled as a body parsed in part.
+  Result onRequestBody(const nlohmann::json& body, uint64_t body_size,
+                       bool has_duplicate_keys = false);
+
+  // Takes what the host had read of a body when it gave up. `open_keys` has one entry per
+  // container that was never closed, from the root inwards: the container's key in its parent
+  // object, or empty. `ended_early` is true if the body ended too soon and false if it is not
+  // JSON.
+  Result onPartialRequestBody(const nlohmann::json& body, absl::Span<const std::string> open_keys,
+                              bool ended_early, bool has_duplicate_keys);
+
+  uint32_t maxRequestBodySize() const;
 
 private:
   bool isValidMcpSseRequest(const Http::RequestHeaderMap& headers) const;
   bool isValidMcpPostRequest(const Http::RequestHeaderMap& headers) const;
   bool isValidMcpDeleteRequest(const Http::RequestHeaderMap& headers) const;
   bool shouldRejectRequest();
-  // Traffic mode after applying any per-route override. Latched on first access in decodeHeaders;
-  // we assume the route does not change during the request, so it is resolved only once.
+  // Traffic mode after applying any per-route override. Latched on first access in
+  // onRequestHeaders; we assume the route does not change during the request, so it is resolved
+  // only once.
   envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode trafficMode();
-  uint32_t getMaxRequestBodySize() const;
   bool clearRouteCache() const;
   const ParserConfig& parserConfig() const;
   bool shouldStoreToDynamicMetadata() const;
@@ -202,7 +259,12 @@ private:
   // Whether buffering may stop once routing attributes are collected (see .cc
   // for gating). Non-const because it resolves the latched traffic mode.
   bool canEarlyTerminate();
-  const McpOverrideConfig* routeOverride() const;
+  // Whether onRequestHeaders() asked for the body.
+  bool awaitsBody() const;
+  // Rejects a body that is not JSON, or goes on with what was read, by the traffic mode.
+  Result onInvalidRequestBody();
+  // Rejects a body parsed in part, or goes on with what was read, by the traffic mode.
+  Result onIncompleteBody(Filters::Common::Mcp::Status reason);
 
   void recordErrorState(absl::string_view error_msg, Filters::Common::Mcp::Status status);
   void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);
@@ -222,13 +284,13 @@ private:
     Mismatch,
   };
   ProtocolVersionValidationResult validateProtocolVersion() const;
-  Http::FilterDataStatus completeParsing();
+  Result completeParsing();
   void setDynamicMetadataStatus(Protobuf::Struct metadata);
   void populateMetadataFromHeaders();
   bool shouldUseNewSpecSemantics() const;
 
   McpFilterConfigSharedPtr config_;
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  McpInspectorCallbacks& callbacks_;
   std::optional<envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode> traffic_mode_;
   uint32_t bytes_parsed_{0};
   bool parsing_complete_{false};
@@ -243,6 +305,40 @@ private:
   std::optional<std::string> protocol_version_;
   Filters::Common::Mcp::Status status_{Filters::Common::Mcp::Status::Ok};
   std::optional<Filters::Common::Mcp::Status> passthrough_reason_;
+};
+
+/**
+ * MCP proxy implementation.
+ */
+class McpFilter : public Http::PassThroughFilter,
+                  public McpInspectorCallbacks,
+                  public Logger::Loggable<Logger::Id::mcp> {
+public:
+  explicit McpFilter(McpFilterConfigSharedPtr config) : inspector_(std::move(config), *this) {}
+
+  // Http::StreamDecoderFilter
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
+  }
+
+  // McpInspectorCallbacks
+  StreamInfo::StreamInfo& streamInfo() override { return decoder_callbacks_->streamInfo(); }
+  Http::RequestHeaderMapOptRef requestHeaders() override {
+    return decoder_callbacks_->requestHeaders();
+  }
+  const McpOverrideConfig* routeOverride() const override;
+  void clearRouteCache() override;
+  void sendLocalReply(Http::Code code, absl::string_view body,
+                      std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                      absl::string_view details) override;
+
+private:
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  McpInspector inspector_;
 };
 
 } // namespace Mcp

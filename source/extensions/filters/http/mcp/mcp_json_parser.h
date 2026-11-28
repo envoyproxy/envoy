@@ -14,6 +14,9 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 
+#include "absl/types/span.h"
+#include "nlohmann/json_fwd.hpp"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -136,11 +139,17 @@ public:
   McpFieldExtractor* RenderNull(absl::string_view name) override;
   McpFieldExtractor* RenderBytes(absl::string_view name, absl::string_view value) override;
 
+  // Notes a string member whose value another parser left out of the document. Returns true if
+  // the value is one the extractor reads.
+  bool renderOmittedString(absl::string_view name);
+
   // Check if parsing is complete (root object has closed)
   bool shouldStopParsing() const { return can_stop_parsing_; }
 
   // Check if duplicate keys were detected
   bool hasDuplicateKeys() const { return has_duplicate_keys_; }
+  // Records that the body repeated a key, when another parser is the one that saw it.
+  void noteDuplicateKeys() { has_duplicate_keys_ = true; }
 
   // Finalize extraction after parsing complete
   void finalizeExtraction();
@@ -260,6 +269,21 @@ public:
 
   // Finish parsing
   absl::Status finishParse();
+
+  // Extracts from a document another parser already read. Returns false if that parser left out
+  // of the document a value the extraction reads, marked by a node that is not JSON: the value
+  // reads as absent.
+  bool parseDocument(const nlohmann::json& document);
+
+  // Extracts from what another parser had read of a body when it gave up. `open_keys` has one
+  // entry per container that was never closed, from the root inwards: the container's key in its
+  // parent object, or empty. `ended_early` is true if the body ended too soon and false if it is
+  // not JSON, which matches finishParse() failing and parse() failing.
+  void parsePartialDocument(const nlohmann::json& document, absl::Span<const std::string> open_keys,
+                            bool ended_early);
+
+  // Records that the body repeated a key, when another parser is the one that saw it.
+  void noteDuplicateKeys();
 
   // Check if this is a valid MCP request
   bool isValidMcpRequest() const;

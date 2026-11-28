@@ -32,7 +32,7 @@ namespace AiProtocolManager {
 // instances across both directions.
 class FilterManager : public Logger::Loggable<Logger::Id::ai_protocol_manager> {
 public:
-  using LocalReplyFn = RequestFilterManager::LocalReplyFn;
+  using LocalReplyFn = AiProtocolManager::LocalReplyFn;
   using OnCompleteFn = absl::AnyInvocable<void(absl::Status)>;
 
   explicit FilterManager(std::vector<AiFilterSharedPtr> filters);

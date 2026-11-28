@@ -2,8 +2,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 #include "absl/status/statusor.h"
 #include "nlohmann/json.hpp"
@@ -79,6 +81,19 @@ public:
 
 private:
   nlohmann::json json_;
+};
+
+// What the parser had read of a body when it gave up on it.
+struct PartialJson {
+  // The values read so far; discarded if there were none. An open container holds the members
+  // read before parsing stopped.
+  nlohmann::json json = nlohmann::json(nlohmann::json::value_t::discarded);
+  // One entry per container that was never closed, from the root inwards. An entry is the key
+  // the container has in its parent object; it is empty for the root and for an array element,
+  // which is always the array's last.
+  std::vector<std::string> open_keys;
+  // True if the body simply ended too soon, false if it is not JSON.
+  bool ended_early{false};
 };
 
 } // namespace AiProtocolManager
