@@ -422,35 +422,44 @@ absl::string_view StringUtil::removeTrailingCharacters(absl::string_view source,
   return source;
 }
 
-bool StringUtil::findToken(absl::string_view source, absl::string_view delimiters,
-                           absl::string_view key_token, bool trim_whitespace) {
-  const auto tokens = splitToken(source, delimiters, trim_whitespace);
+namespace {
+
+// Returns whether `matches` holds for any token of `source`, splitting lazily. With
+// `trim_whitespace`, empty tokens are kept and every token is trimmed before matching; otherwise
+// empty tokens are skipped.
+template <class Matches>
+bool anyToken(absl::string_view source, absl::string_view delimiters, bool trim_whitespace,
+              Matches matches) {
   if (trim_whitespace) {
-    for (const auto& token : tokens) {
-      if (key_token == trim(token)) {
+    for (absl::string_view token : absl::StrSplit(source, absl::ByAnyChar(delimiters))) {
+      if (matches(StringUtil::trim(token))) {
         return true;
       }
     }
     return false;
   }
+  for (absl::string_view token :
+       absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipEmpty())) {
+    if (matches(token)) {
+      return true;
+    }
+  }
+  return false;
+}
 
-  return std::find(tokens.begin(), tokens.end(), key_token) != tokens.end();
+} // namespace
+
+bool StringUtil::findToken(absl::string_view source, absl::string_view delimiters,
+                           absl::string_view key_token, bool trim_whitespace) {
+  return anyToken(source, delimiters, trim_whitespace,
+                  [key_token](absl::string_view token) { return token == key_token; });
 }
 
 bool StringUtil::caseFindToken(absl::string_view source, absl::string_view delimiters,
                                absl::string_view key_token, bool trim_whitespace) {
-  const auto tokens = splitToken(source, delimiters, trim_whitespace);
-  std::function<bool(absl::string_view)> predicate;
-
-  if (trim_whitespace) {
-    predicate = [&](absl::string_view token) {
-      return absl::EqualsIgnoreCase(key_token, trim(token));
-    };
-  } else {
-    predicate = [&](absl::string_view token) { return absl::EqualsIgnoreCase(key_token, token); };
-  }
-
-  return std::find_if(tokens.begin(), tokens.end(), predicate) != tokens.end();
+  return anyToken(source, delimiters, trim_whitespace, [key_token](absl::string_view token) {
+    return absl::EqualsIgnoreCase(key_token, token);
+  });
 }
 
 absl::string_view StringUtil::cropRight(absl::string_view source, absl::string_view delimiter) {
