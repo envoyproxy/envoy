@@ -88,7 +88,7 @@ bool ActiveLookupRequest::requiresValidation(const Http::ResponseHeaderMap& resp
     freshness_lifetime = expires_value - date_value;
   }
 
-  if (response_age > freshness_lifetime) {
+  if (response_age >= freshness_lifetime) {
     // Response is stale, requires validation if
     // the response does not allow being served stale,
     // or the request max-stale directive does not allow it.
