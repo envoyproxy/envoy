@@ -106,7 +106,9 @@ envoy_extension_cc_test(
     },
     deps = [
         ":jwt_test_data_lib",
+        "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:cleanup_lib",
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
