@@ -14,6 +14,7 @@
 #include "source/common/version/version.h"
 #include "source/extensions/tracers/opentelemetry/b3_span_context.h"
 #include "source/extensions/tracers/opentelemetry/otlp_utils.h"
+#include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 
 #include "absl/strings/numbers.h"
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
@@ -67,9 +68,10 @@ void callSampler(SamplerSharedPtr sampler, const StreamInfo::StreamInfo& stream_
 
 Span::Span(const std::string& name, const StreamInfo::StreamInfo& stream_info,
            SystemTime start_time, Envoy::TimeSource& time_source, Tracer& parent_tracer,
-           OTelSpanKind span_kind, bool use_local_decision)
+           OTelSpanKind span_kind, bool use_local_decision, bool resample_on_update_parent)
     : stream_info_(stream_info), parent_tracer_(parent_tracer), time_source_(time_source),
-      use_local_decision_(use_local_decision) {
+      use_local_decision_(use_local_decision),
+      resample_on_update_parent_(resample_on_update_parent) {
   span_ = ::opentelemetry::proto::trace::v1::Span();
 
   span_.set_kind(span_kind);
@@ -84,7 +86,41 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
   SpanContext span_context(kDefaultVersion, getTraceId(), spanId(), sampled(),
                            std::string(tracestate()), /*is_remote=*/false);
   return parent_tracer_.startSpan(name, stream_info_, start_time, span_context, {},
-                                  ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+                                  ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT,
+                                  preserve_headers_);
+}
+
+void Span::updateParent(const Tracing::TraceContext& trace_context, bool preserve_headers) {
+  SpanContextExtractor extractor(trace_context);
+  absl::StatusOr<SpanContext> context = extractor.extractSpanContext();
+  if (!context.ok()) {
+    ENVOY_LOG(debug, "Unable to extract span context in updateParent: {}", context.status());
+    return;
+  }
+  preserve_headers_ = preserve_headers;
+
+  setParentContextIsRemote(context->isRemote());
+  setTraceId(context->traceId());
+  setParentId(context->spanId());
+
+  // Resample now that we have the correct trace context.
+  if (resample_on_update_parent_ && parent_tracer_.sampler() != nullptr) {
+    ENVOY_LOG(debug, "Resampling in updateParent");
+    callSampler(parent_tracer_.sampler(), stream_info_,
+                /*span_context=*/*context,
+                /*new_span=*/*this, std::string(name()), trace_context);
+    return;
+  }
+
+  ENVOY_LOG(debug, "Not resampling in updateParent");
+  setSampled(context->sampled());
+  // Don't let a route refresh reset the sampled flag. See
+  // `ConnectionManagerImpl::ActiveStream::refreshTracing()`.
+  disableLocalDecision();
+
+  if (!context->tracestate().empty()) {
+    setTracestate(context->tracestate());
+  }
 }
 
 void Span::finishSpan() {
@@ -117,7 +153,11 @@ void Span::finishSpan() {
 
 void Span::setOperation(absl::string_view operation) { span_.set_name(operation); };
 
-void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
+void Span::injectContext(Tracing::TraceContext& trace_context,
+                         const Tracing::UpstreamContext& upstream) {
+  if (preserve_headers_ && !upstream.async_client_span_) {
+    return;
+  }
   std::string trace_id_hex = absl::BytesToHexString(span_.trace_id());
   std::string span_id_hex = absl::BytesToHexString(span_.span_id());
   for (const TraceContextFormat format : parent_tracer_.outgoingTraceContext()) {
@@ -287,10 +327,11 @@ Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_s
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
                const ResourceConstSharedPtr resource, SamplerSharedPtr sampler,
                uint64_t max_cache_size, bool set_instrumentation_scope,
-               TraceContextFormats outgoing_trace_context)
+               bool resample_on_update_parent, TraceContextFormats outgoing_trace_context)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random), runtime_(runtime),
       tracing_stats_(tracing_stats), resource_(resource), sampler_(sampler),
       max_cache_size_(max_cache_size), set_instrumentation_scope_(set_instrumentation_scope),
+      resample_on_update_parent_(resample_on_update_parent),
       outgoing_trace_context_(std::move(outgoing_trace_context)) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     tracing_stats_.timer_flushed_.inc();
@@ -391,8 +432,9 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
   const bool use_local_decision = sampler_ == nullptr;
 
   // Create an Tracers::OpenTelemetry::Span class that will contain the OTel span.
-  auto new_span = std::make_unique<Span>(operation_name, stream_info, start_time, time_source_,
-                                         *this, span_kind, use_local_decision);
+  auto new_span =
+      std::make_unique<Span>(operation_name, stream_info, start_time, time_source_, *this,
+                             span_kind, use_local_decision, resample_on_update_parent_);
   uint64_t trace_id_high = random_.random();
   uint64_t trace_id = random_.random();
   new_span->setTraceId(absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id)));
@@ -415,13 +457,14 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
                                    const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
                                    const SpanContext& parent_context,
                                    OptRef<const Tracing::TraceContext> trace_context,
-                                   OTelSpanKind span_kind) {
+                                   OTelSpanKind span_kind, bool preserve_headers) {
   // If reached here, then this is main span for request with a parent context or this is
   // subsequent spans. Ignore the Envoy tracing decision anyway.
 
   // Create a new span and populate details from the span context.
   auto new_span = std::make_unique<Span>(operation_name, stream_info, start_time, time_source_,
-                                         *this, span_kind, false);
+                                         *this, span_kind, false, resample_on_update_parent_);
+  new_span->setPreserveHeaders(preserve_headers);
   new_span->setParentContextIsRemote(parent_context.isRemote());
   new_span->setTraceId(parent_context.traceId());
   if (!parent_context.spanId().empty()) {

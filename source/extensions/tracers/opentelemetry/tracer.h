@@ -46,6 +46,7 @@ public:
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          OpenTelemetryTracerStats tracing_stats, const ResourceConstSharedPtr resource,
          SamplerSharedPtr sampler, uint64_t max_cache_size, bool set_instrumentation_scope = true,
+         bool resample_on_update_parent = false,
          TraceContextFormats outgoing_trace_context = {
              envoy::config::trace::v3::OpenTelemetryConfig::TRACE_CONTEXT});
 
@@ -66,7 +67,9 @@ public:
                              const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
                              const SpanContext& previous_span_context,
                              OptRef<const Tracing::TraceContext> trace_context,
-                             OTelSpanKind span_kind);
+                             OTelSpanKind span_kind, bool preserve_headers = false);
+
+  SamplerSharedPtr sampler() const { return sampler_; }
 
 private:
   /**
@@ -89,6 +92,7 @@ private:
   SamplerSharedPtr sampler_;
   uint64_t max_cache_size_;
   const bool set_instrumentation_scope_{true};
+  const bool resample_on_update_parent_{false};
   const TraceContextFormats outgoing_trace_context_;
 };
 
@@ -100,7 +104,7 @@ class Span : Logger::Loggable<Logger::Id::tracing>, public Tracing::Span {
 public:
   Span(const std::string& name, const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
        Envoy::TimeSource& time_source, Tracer& parent_tracer, OTelSpanKind span_kind,
-       bool use_local_decision = false);
+       bool use_local_decision = false, bool resample_on_update_parent = false);
 
   // Tracing::Span functions
   void setOperation(absl::string_view /*operation*/) override;
@@ -114,6 +118,7 @@ public:
                      const Tracing::UpstreamContext&) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
+  void updateParent(const Tracing::TraceContext& trace_context, bool preserve_headers) override;
 
   /**
    * Set the span's sampled flag.
@@ -182,6 +187,11 @@ public:
    */
   void setParentContextIsRemote(bool is_remote) { parent_context_is_remote_ = is_remote; }
 
+  /**
+   * Sets whether injectContext() should preserve existing trace headers on upstream requests.
+   */
+  void setPreserveHeaders(bool preserve_headers) { preserve_headers_ = preserve_headers; }
+
   absl::string_view tracestate() const { return span_.trace_state(); }
 
   /**
@@ -190,6 +200,8 @@ public:
   void setTracestate(absl::string_view tracestate) {
     span_.set_trace_state(std::string{tracestate});
   }
+
+  std::string getTracestate() const override { return span_.trace_state(); }
 
   /**
    * Sets a span attribute.
@@ -208,7 +220,9 @@ private:
   Envoy::TimeSource& time_source_;
   bool sampled_;
   bool use_local_decision_{false};
+  bool resample_on_update_parent_{false};
   bool parent_context_is_remote_{false};
+  bool preserve_headers_{false};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;

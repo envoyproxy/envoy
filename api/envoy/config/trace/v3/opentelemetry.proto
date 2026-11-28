@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the OpenTelemetry tracer.
 //  [#extension: envoy.tracers.opentelemetry]
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message OpenTelemetryConfig {
   // Trace context formats that can be extracted from downstream requests and injected into
   // upstream requests.
@@ -141,4 +141,18 @@ message OpenTelemetryConfig {
   // Each format may be listed at most once. If not specified, the default is ``[TRACE_CONTEXT]``.
   repeated TraceContextFormat outgoing_trace_context = 12
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
+
+  // Specifies whether to re-evaluate sampling decisions when spans are reparented. (For example the
+  // MCP filter may reparent the active span after request headers have already been processed,
+  // depending on the value of
+  // :ref:`propagate_trace_context <envoy_v3_api_field_extensions.filters.http.mcp.v3.Mcp.propagate_trace_context>`.)
+  //
+  // When this field is ``true`` and
+  // :ref:`sampler <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.sampler>` is configured,
+  // reparenting a span invokes the sampler with the new parent's trace context. The sampler might
+  // take this opportunity to update the span's ``sampled`` flag and ``tracestate``.
+  //
+  // Otherwise, reparented spans adopt the ``sampled`` flag and ``tracestate`` directly from the new
+  // parent.
+  google.protobuf.BoolValue resample_on_update_parent = 13;
 }
