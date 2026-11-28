@@ -864,8 +864,8 @@ response_headers_to_add:
       value: "bar"
     append_action: OVERWRITE_IF_EXISTS_OR_ADD
   - header:
-      key: "x-per-header"
-      value: "per"
+      key: "x-protocol"
+      value: "%PROTOCOL%"
     append_action: ADD_IF_ABSENT
 )EOF";
 
@@ -873,13 +873,14 @@ response_headers_to_add:
   HeaderParserPtr resp_header_parser =
       HeaderParser::configure(route.response_headers_to_add()).value();
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.protocol_ = Http::Protocol::Http11;
 
   {
     Http::TestResponseHeaderMapImpl header_map;
     resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
-    EXPECT_EQ("per", header_map.get_("x-per-header"));
+    EXPECT_EQ("HTTP/1.1", header_map.get_("x-protocol"));
   }
 
   {
@@ -887,7 +888,7 @@ response_headers_to_add:
     resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ(2, header_map.get(Http::LowerCaseString("x-foo-header")).size());
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
-    EXPECT_EQ("per", header_map.get_("x-per-header"));
+    EXPECT_EQ("HTTP/1.1", header_map.get_("x-protocol"));
   }
 
   {
@@ -896,15 +897,16 @@ response_headers_to_add:
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ(1, header_map.get(Http::LowerCaseString("x-bar-header")).size());
-    EXPECT_EQ("per", header_map.get_("x-per-header"));
+    EXPECT_EQ("HTTP/1.1", header_map.get_("x-protocol"));
   }
 
   {
-    Http::TestResponseHeaderMapImpl header_map{{"x-per-header", "exist-per"}};
+    Http::TestResponseHeaderMapImpl header_map{{"x-protocol", "HTTP/2"}};
+    EXPECT_CALL(stream_info, protocol()).Times(0);
     resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
-    EXPECT_EQ("exist-per", header_map.get_("x-per-header"));
+    EXPECT_EQ("HTTP/2", header_map.get_("x-protocol"));
   }
 }
 
@@ -927,8 +929,8 @@ response_headers_to_add:
       value: "per"
     append_action: ADD_IF_ABSENT
   - header:
-      key: "x-overwrite"
-      value: "overwritten"
+      key: "x-protocol"
+      value: "%PROTOCOL%"
     append_action: OVERWRITE_IF_EXISTS
 )EOF";
 
@@ -936,27 +938,30 @@ response_headers_to_add:
   HeaderParserPtr resp_header_parser =
       HeaderParser::configure(route.response_headers_to_add()).value();
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.protocol_ = Http::Protocol::Http11;
 
   {
     Http::TestResponseHeaderMapImpl header_map;
+    EXPECT_CALL(stream_info, protocol()).Times(0);
     resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ("per", header_map.get_("x-per-header"));
-    // If the response headers do not contain "x-overwrite" header,
+    // If the response headers do not contain "x-protocol" header,
     // the final set should also not contain it.
-    EXPECT_FALSE(header_map.has("x-overwrite"));
+    EXPECT_FALSE(header_map.has("x-protocol"));
+    testing::Mock::VerifyAndClearExpectations(&stream_info);
   }
 
   {
-    Http::TestResponseHeaderMapImpl header_map{{"x-overwrite", "to overwrite"}};
+    Http::TestResponseHeaderMapImpl header_map{{"x-protocol", "HTTP/2"}};
     resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ("per", header_map.get_("x-per-header"));
-    // If the response headers contain "x-overwrite" header it should
+    // If the response headers contain "x-protocol" header it should
     // be overwritten with the new value.
-    EXPECT_EQ("overwritten", header_map.get_("x-overwrite"));
+    EXPECT_EQ("HTTP/1.1", header_map.get_("x-protocol"));
   }
 }
 

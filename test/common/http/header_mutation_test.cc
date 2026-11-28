@@ -92,10 +92,10 @@ TEST(HeaderMutationsTest, AllOperations) {
   append2->mutable_header()->set_value("flag-header-2-value");
   append2->set_append_action(ProtoHeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
-  // Step 4: Append 'flag-header-3' header if not exist.
+  // Step 4: Append 'x-protocol' header if not exist.
   auto append3 = proto_mutations.Add()->mutable_append();
-  append3->mutable_header()->set_key("flag-header-3");
-  append3->mutable_header()->set_value("flag-header-3-value");
+  append3->mutable_header()->set_key("x-protocol");
+  append3->mutable_header()->set_value("%PROTOCOL%");
   append3->set_append_action(ProtoHeaderValueOption::ADD_IF_ABSENT);
 
   // Step 4: Overwrite 'flag-header-4' header if exist.
@@ -104,8 +104,15 @@ TEST(HeaderMutationsTest, AllOperations) {
   append4->mutable_header()->set_value("flag-header-4-value");
   append4->set_append_action(ProtoHeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
 
+  auto append5 = proto_mutations.Add()->mutable_append();
+  append5->mutable_header()->set_key("x-virtual-cluster");
+  append5->mutable_header()->set_value("%VIRTUAL_CLUSTER_NAME%");
+  append5->set_append_action(ProtoHeaderValueOption::OVERWRITE_IF_EXISTS);
+
   auto mutations = HeaderMutations::create(proto_mutations, context).value();
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.protocol_ = Http::Protocol::Http11;
+  stream_info.virtual_cluster_name_ = "new-cluster";
 
   // Remove 'flag-header' and try to append 'flag-header' with value 'another-flag-header-value'.
   // But 'another-flag-header' is not found, so 'flag-header' is not appended.
@@ -115,7 +122,10 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
+    EXPECT_CALL(stream_info, virtualClusterName()).Times(0);
     mutations->evaluateHeaders(headers, {&headers}, stream_info);
+    EXPECT_TRUE(headers.get(Http::LowerCaseString("x-virtual-cluster")).empty());
+    testing::Mock::VerifyAndClearExpectations(&stream_info);
 
     // Original 'flag-header' is removed and no new value is appended because there is no
     // 'another-flag-header'.
@@ -158,7 +168,7 @@ TEST(HeaderMutationsTest, AllOperations) {
     EXPECT_EQ(1, headers.get(Http::LowerCaseString("flag-header-2")).size());
   }
 
-  // Add header 'flag-header-3' if it is not exist.
+  // Add header 'x-protocol' if it is not exist.
   {
     Envoy::Http::TestRequestHeaderMapImpl headers = {
         {":method", "GET"},
@@ -166,19 +176,21 @@ TEST(HeaderMutationsTest, AllOperations) {
 
     mutations->evaluateHeaders(headers, {&headers}, stream_info);
 
-    EXPECT_EQ(1, headers.get(Http::LowerCaseString("flag-header-3")).size());
+    EXPECT_EQ(1, headers.get(Http::LowerCaseString("x-protocol")).size());
   }
-  // Skip add header 'flag-header-3' if it is exist.
+  // Skip add header 'x-protocol' if it is exist.
   {
     Envoy::Http::TestRequestHeaderMapImpl headers = {
-        {"flag-header-3", "flag-header-3-value-old"},
+        {"x-protocol", "HTTP/2"},
         {":method", "GET"},
     };
 
+    EXPECT_CALL(stream_info, protocol()).Times(0);
     mutations->evaluateHeaders(headers, {&headers}, stream_info);
+    testing::Mock::VerifyAndClearExpectations(&stream_info);
 
-    EXPECT_EQ(1, headers.get(Http::LowerCaseString("flag-header-3")).size());
-    EXPECT_EQ("flag-header-3-value-old", headers.get_("flag-header-3"));
+    EXPECT_EQ(1, headers.get(Http::LowerCaseString("x-protocol")).size());
+    EXPECT_EQ("HTTP/2", headers.get_("x-protocol"));
   }
 
   // Overwrite header 'flag-header-4' if it is exist.
@@ -211,8 +223,9 @@ TEST(HeaderMutationsTest, AllOperations) {
         {"flag-header", "flag-header-value"},
         {"another-flag-header", "another-flag-header-value"},
         {"flag-header-2", "flag-header-2-value-old"},
-        {"flag-header-3", "flag-header-3-value-old"},
+        {"x-protocol", "HTTP/2"},
         {"flag-header-4", "flag-header-4-value-old"},
+        {"x-virtual-cluster", "old-cluster"},
         {":method", "GET"},
     };
 
@@ -222,12 +235,13 @@ TEST(HeaderMutationsTest, AllOperations) {
     EXPECT_EQ("another-flag-header-value", headers.get_("flag-header"));
     // 'flag-header-2' is appended.
     EXPECT_EQ(2, headers.get(Http::LowerCaseString("flag-header-2")).size());
-    // 'flag-header-3' is not appended and keep the old value.
-    EXPECT_EQ(1, headers.get(Http::LowerCaseString("flag-header-3")).size());
-    EXPECT_EQ("flag-header-3-value-old", headers.get_("flag-header-3"));
+    // 'x-protocol' is not appended and keep the old value.
+    EXPECT_EQ(1, headers.get(Http::LowerCaseString("x-protocol")).size());
+    EXPECT_EQ("HTTP/2", headers.get_("x-protocol"));
     // 'flag-header-4' is overwritten.
     EXPECT_EQ(1, headers.get(Http::LowerCaseString("flag-header-4")).size());
     EXPECT_EQ("flag-header-4-value", headers.get_("flag-header-4"));
+    EXPECT_EQ("new-cluster", headers.get_("x-virtual-cluster"));
   }
 }
 
