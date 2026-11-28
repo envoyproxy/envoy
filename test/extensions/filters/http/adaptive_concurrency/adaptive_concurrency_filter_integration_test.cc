@@ -21,6 +21,7 @@ void AdaptiveConcurrencyIntegrationTest::sendRequests(uint32_t request_count,
   // stream. We should change this integration test to allow for the ability to test this scenario.
 
   if (use_grpc_) {
+    default_request_headers_.setMethod(Http::Headers::get().MethodValues.Post);
     default_request_headers_.setContentType(Http::Headers::get().ContentTypeValues.Grpc);
   }
 

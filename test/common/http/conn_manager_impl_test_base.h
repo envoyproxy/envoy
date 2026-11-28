@@ -94,6 +94,10 @@ public:
   void doRemoteClose(bool deferred = true);
   void testPathNormalization(const RequestHeaderMap& request_headers,
                              const ResponseHeaderMap& expected_response);
+  // Sends a GET with a gRPC content type through decoder_filters_[0], which answers it with a 503
+  // local reply, and checks the status and presence of grpc-status on the encoded reply.
+  void sendGetWithGrpcContentTypeAndExpectLocalReply(const std::string& expected_status,
+                                                     bool expect_grpc_status);
 
   // Http::ConnectionManagerConfig
   const AccessLog::InstanceSharedPtrVector& accessLogs() override { return access_logs_; }
