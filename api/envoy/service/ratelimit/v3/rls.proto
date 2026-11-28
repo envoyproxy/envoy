@@ -22,9 +22,59 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Rate limit service (RLS)]
 
+// The Rate Limit Service (RLS) provides global rate limiting decisions over gRPC:
+//
+// * ``ShouldRateLimit`` performs a single-step admission check and consumes quota.
+// * ``PeekRateLimit`` checks whether a request would be rate limited without consuming quota.
+// * ``ConsumeQuota`` unconditionally records consumed quota without performing an admission check
+//   (for example, when actual request cost such as token usage is only known after upstream
+//   processing completes).
+//
+// Refer to the :ref:`rate limit service configuration overview <config_rate_limit_service>` for
+// further details.
+
 service RateLimitService {
   // Determine whether rate limiting should take place.
   rpc ShouldRateLimit(RateLimitRequest) returns (RateLimitResponse) {
+  }
+
+  // Check whether rate limiting would take place without consuming quota.
+  //
+  // Evaluates :ref:`domain <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.domain>` and
+  // :ref:`descriptors <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.descriptors>` using
+  // the effective ``hits_addend`` (:ref:`RateLimitRequest.hits_addend
+  // <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>`, defaulting to ``1`` if
+  // unset, or overridden per descriptor by :ref:`RateLimitDescriptor.hits_addend
+  // <envoy_v3_api_field_extensions.common.ratelimit.v3.RateLimitDescriptor.hits_addend>`) to
+  // determine whether admitting the request would exceed any matched limit.
+  //
+  // This call does not mutate server-side counters, reserve quota, or issue cacheable
+  // ``RateLimitResponse.Quota`` grants. It populates :ref:`overall_code
+  // <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.overall_code>` (``OK`` or
+  // ``OVER_LIMIT``) and per-descriptor :ref:`statuses
+  // <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.statuses>`, with
+  // :ref:`limit_remaining
+  // <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.limit_remaining>`
+  // reflecting the current unconsumed budget.
+  rpc PeekRateLimit(RateLimitRequest) returns (RateLimitResponse) {
+  }
+
+  // Consume rate limit quota without performing a limit check.
+  //
+  // Unconditionally applies the effective ``hits_addend`` (and :ref:`is_negative_hits
+  // <envoy_v3_api_field_extensions.common.ratelimit.v3.RateLimitDescriptor.is_negative_hits>` if
+  // set) to all matched :ref:`descriptors
+  // <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.descriptors>` in the request, even
+  // if one or more descriptors are already at or over limit or become over limit as a result of
+  // the deduction. Changes are applied to the active quota windows at the time of the
+  // ``ConsumeQuota`` call, regardless of any previous ``PeekRateLimit`` calls, and must not issue
+  // cacheable ``RateLimitResponse.Quota`` grants.
+  //
+  // Populates :ref:`overall_code
+  // <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.overall_code>` and per-descriptor
+  // :ref:`statuses <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.statuses>`
+  // reflecting the post-consumption state of each descriptor.
+  rpc ConsumeQuota(RateLimitRequest) returns (RateLimitResponse) {
   }
 }
 
@@ -55,7 +105,7 @@ message RateLimitRequest {
   uint32 hits_addend = 3;
 }
 
-// A response from a ShouldRateLimit call.
+// A response from a ``RateLimitService`` call.
 // [#next-free-field: 8]
 message RateLimitResponse {
   option (udpa.annotations.versioning).previous_message_type =
