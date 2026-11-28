@@ -1,0 +1,155 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.orca_reporter.v3;
+
+import "envoy/type/matcher/v3/regex.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.orca_reporter.v3";
+option java_outer_classname = "OrcaReporterProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/orca_reporter/v3;orca_reporterv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: ORCA Reporter]
+// ORCA Reporter :ref:`configuration overview <config_http_filters_orca_reporter>`.
+// [#extension: envoy.filters.http.orca_reporter]
+
+// The ORCA reporter filter periodically samples the CPU and memory usage of one or more cgroups
+// and adds the result as an ORCA
+// :ref:`load report <envoy_v3_api_msg_.xds.data.orca.v3.OrcaLoadReport>` to every response, in
+// the ``endpoint-load-metrics`` header. A client Envoy can consume the
+// report with a load aware policy such as
+// :ref:`client_side_weighted_round_robin
+// <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`.
+// The rate of requests through the filter is added as ``rps_fractional`` whenever a utilization
+// metric is reported, as weighted round robin needs it to use the report.
+//
+// Sampling happens on the main thread every :ref:`refresh_interval
+// <envoy_v3_api_field_extensions.filters.http.orca_reporter.v3.OrcaReporter.refresh_interval>`;
+// the request path only reads the latest values. Filters with the same configuration, apart from
+// :ref:`overwrite_existing_report
+// <envoy_v3_api_field_extensions.filters.http.orca_reporter.v3.OrcaReporter.overwrite_existing_report>`,
+// share one sampler. Only cgroup v2 is supported.
+message OrcaReporter {
+  // Encoding of the load report.
+  enum Format {
+    // ``endpoint-load-metrics: TEXT cpu_utilization=0.3, mem_utilization=0.5``.
+    TEXT = 0;
+
+    // ``endpoint-load-metrics: JSON {"cpuUtilization": 0.3, "memUtilization": 0.5}``.
+    JSON = 1;
+
+    // Base64 encoded serialized ``OrcaLoadReport`` in the ``endpoint-load-metrics-bin`` header.
+    BINARY = 2;
+  }
+
+  // The metrics to report.
+  repeated Metric metrics = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  // How often the cgroups are sampled. CPU utilization is computed over this interval. Defaults
+  // to 1s. Intervals shorter than a few CPU quota periods (the period in ``cpu.max``, 100ms by
+  // default) produce noisy CPU values for CPU limited cgroups. The first refresh happens 100ms
+  // after the sampler is created, so that CPU utilization is reported early.
+  google.protobuf.Duration refresh_interval = 2 [(validate.rules).duration = {
+    lte {seconds: 60}
+    gte {nanos: 100000000}
+  }];
+
+  // Encoding of the load report. Defaults to ``TEXT``.
+  Format format = 3 [(validate.rules).enum = {defined_only: true}];
+
+  // The report is written to the response headers, and to the trailers if the response has
+  // trailers. The headers and the trailers are handled separately: by default, a load report that
+  // is already in one of them (for example, one set by the upstream application) is left
+  // untouched there. If true, that report is removed and replaced.
+  bool overwrite_existing_report = 4;
+}
+
+// A single value in the load report.
+message Metric {
+  // The ORCA field to set, with the same syntax as
+  // :ref:`metric_names_for_computing_utilization
+  // <envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.metric_names_for_computing_utilization>`:
+  // ``cpu_utilization``, ``mem_utilization``, ``application_utilization``,
+  // ``named_metrics.<key>`` or ``utilization.<key>``. A ``<key>`` may only contain
+  // ``[A-Za-z0-9_.-]``. Each name may appear only once.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  oneof source {
+    option (validate.required) = true;
+
+    // CPU utilization of a set of cgroups.
+    CgroupCpu cgroup_cpu = 2;
+
+    // Memory utilization of a set of cgroups.
+    CgroupMemory cgroup_memory = 3;
+  }
+}
+
+// CPU utilization of the sum of the given cgroups, computed as the growth of ``usage_usec`` in
+// ``cpu.stat`` divided by elapsed wall time times the capacity. If a cgroup's usage goes down
+// (for example, because its container restarted) the previous value is reported for that
+// interval, and the next one is computed from the new usage.
+message CgroupCpu {
+  // The cgroups to sum.
+  repeated CgroupSource cgroups = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  // The CPU capacity, in cores. If not set, the sum of each cgroup's ``cpu.max`` quota divided by
+  // its period is used. If not set and any of the cgroups has no CPU limit, the metric is not
+  // reported.
+  google.protobuf.DoubleValue capacity_cores = 2 [(validate.rules).double = {gt: 0.0}];
+}
+
+// Memory utilization of the sum of the given cgroups. Usage is the working set, as computed by
+// the kubelet: ``memory.current`` minus ``inactive_file`` in ``memory.stat``.
+message CgroupMemory {
+  // The cgroups to sum.
+  repeated CgroupSource cgroups = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  // The memory capacity, in bytes. If not set, the sum of each cgroup's ``memory.max`` is used.
+  // If not set and any of the cgroups has no memory limit, the metric is not reported.
+  google.protobuf.UInt64Value capacity_bytes = 2 [(validate.rules).uint64 = {gt: 0}];
+}
+
+// A cgroup v2 directory to read.
+//
+// The cgroup of Envoy's own container:
+//
+// .. code-block:: yaml
+//
+//   path: /sys/fs/cgroup
+//
+// The cgroup of a Burstable Kubernetes pod on a node using the systemd cgroup driver, with the
+// host's ``/sys/fs/cgroup`` mounted read-only at ``/host/cg`` and the pod UID exposed through the
+// downward API (``env: [{name: POD_UID, valueFrom: {fieldRef: {fieldPath: metadata.uid}}}]``).
+// The systemd driver writes the UID with ``_`` instead of ``-``:
+//
+// .. code-block:: yaml
+//
+//   path: /host/cg/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod{POD_UID}.slice
+//   value_rewrites:
+//   - pattern: { regex: "-" }
+//     substitution: "_"
+message CgroupSource {
+  // The absolute path of the cgroup directory. Every ``{NAME}`` is replaced with the value of the
+  // environment variable ``NAME``, after applying :ref:`value_rewrites
+  // <envoy_v3_api_field_extensions.filters.http.orca_reporter.v3.CgroupSource.value_rewrites>`.
+  // ``NAME`` must match ``[A-Za-z_][A-Za-z0-9_]*``.
+  //
+  // The path is resolved once, when the configuration is loaded. The configuration is rejected
+  // if a referenced environment variable is not set or empty, or the resulting directory does not
+  // exist.
+  string path = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Rewrites applied, in order, to each environment variable value before it is substituted
+  // into :ref:`path
+  // <envoy_v3_api_field_extensions.filters.http.orca_reporter.v3.CgroupSource.path>`. The
+  // literal parts of the path are not rewritten.
+  repeated type.matcher.v3.RegexMatchAndSubstitute value_rewrites = 2;
+}

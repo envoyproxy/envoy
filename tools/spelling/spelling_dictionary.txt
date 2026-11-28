@@ -1785,6 +1785,12 @@ cgroupv1
 cgroupv2
 cgroupsv1
 cgroupsv2
+cgroups
+cgroupfs
+kubelet
+kubepods
+systemd
+burstable
 usage_usec
 usec
 nsec
