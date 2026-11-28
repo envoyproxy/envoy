@@ -178,6 +178,13 @@ responder = ca
 status = unknown
 next_update_days = 730
 
+# Has no nextUpdate, which Envoy treats as an expired response.
+[ocsp server_expired_ocsp_resp.der]
+cert = server
+issuer = ca
+responder = ca
+status = unknown
+
 [ocsp long_server_ocsp_resp.der]
 cert = long_server
 issuer = long_intermediate_ca

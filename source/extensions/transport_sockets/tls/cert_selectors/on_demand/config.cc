@@ -1,7 +1,10 @@
 #include "source/extensions/transport_sockets/tls/cert_selectors/on_demand/config.h"
 
+#include "envoy/network/transport_socket.h"
+
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/context_impl.h"
 #include "source/server/generic_factory_context.h"
 
@@ -40,21 +43,71 @@ absl::Status AsyncContextConfig::loadCert() {
   return absl::OkStatus();
 }
 
+namespace {
+
+// Returns the ID of the connection whose handshake uses the SSL object, if it runs on a connection.
+std::optional<uint64_t> connectionId(const SSL& ssl) {
+  auto* callbacks = static_cast<Network::TransportSocketCallbacks*>(
+      SSL_get_ex_data(&ssl, ContextImpl::sslSocketIndex()));
+  if (callbacks == nullptr) {
+    return std::nullopt;
+  }
+  return callbacks->connection().id();
+}
+
+// Serves the TLS context of an on-demand certificate, or fails the selection, counts it and logs it
+// when the OCSP staple policy rejects the certificate.
+Ssl::SelectionResult serveAsyncContext(const AsyncContext& cert_ctx, bool client_ocsp_capable,
+                                       SslStats& ssl_stats, absl::string_view name,
+                                       std::optional<uint64_t> connection_id,
+                                       Ssl::SelectionHandleConstSharedPtr handle = nullptr) {
+  const Ssl::TlsContext& tls_context = cert_ctx.tlsContext();
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.on_demand_secret_enforce_ocsp_staple_policy")) {
+    return {.status = Ssl::SelectionResult::SelectionStatus::Success,
+            .selected_ctx = &tls_context,
+            .staple =
+                ocspStapleAction(tls_context, client_ocsp_capable, cert_ctx.ocspStaplePolicy()) ==
+                Ssl::OcspStapleAction::Staple,
+            .handle = std::move(handle)};
+  }
+  Ssl::SelectionResult result = serveTlsContext(tls_context, client_ocsp_capable,
+                                                cert_ctx.ocspStaplePolicy(), std::move(handle));
+  if (result.status == Ssl::SelectionResult::SelectionStatus::Failed) {
+    ssl_stats.ocsp_staple_failed_.inc();
+    spdlog::logger& logger = Logger::Registry::getLog(Logger::Id::connection);
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(logger, debug)) {
+      // The asynchronous path decides on the main thread and holds only the connection's ID, so the
+      // line carries the ConnectionId tag that ENVOY_CONN_LOG writes rather than the connection.
+      std::map<std::string, std::string> log_tags;
+      if (connection_id.has_value()) {
+        log_tags.emplace("ConnectionId", std::to_string(*connection_id));
+      }
+      ENVOY_TAGGED_LOG_TO_LOGGER(logger, debug, log_tags,
+                                 "TLS certificate '{}' fails the OCSP policy", name);
+    }
+  }
+  return result;
+}
+
+} // namespace
+
 void Handle::notify(AsyncContextConstSharedPtr cert_ctx) {
+  // Only the asynchronous handle that fetchCertificate() builds is notified, and it holds stats.
   ASSERT(cb_);
-  bool staple = false;
+  ASSERT(ssl_stats_.has_value());
+  Ssl::SelectionResult result{.status = Ssl::SelectionResult::SelectionStatus::Failed};
   if (cert_ctx) {
     active_context_ = cert_ctx;
-    staple =
-        (ocspStapleAction(active_context_->tlsContext(), client_ocsp_capable_,
-                          active_context_->ocspStaplePolicy()) == Ssl::OcspStapleAction::Staple);
+    result = serveAsyncContext(*cert_ctx, client_ocsp_capable_, *ssl_stats_, name_, connection_id_);
   }
   Event::Dispatcher& dispatcher = cb_->dispatcher();
   // TODO: This could benefit from batching events by the dispatcher in the outer loop.
-  dispatcher.post([cb = std::move(cb_), cert_ctx, staple] {
-    cb->onCertificateSelectionResult(
-        makeOptRefFromPtr(cert_ctx ? &cert_ctx->tlsContext() : nullptr), staple);
-  });
+  // The context capture keeps the selected TLS context alive until the callback runs.
+  dispatcher.post(
+      [cb = std::move(cb_), cert_ctx, selected_ctx = result.selected_ctx, staple = result.staple] {
+        cb->onCertificateSelectionResult(makeOptRefFromPtr(selected_ctx), staple);
+      });
   cb_ = nullptr;
 }
 
@@ -70,6 +123,8 @@ SecretManager::SecretManager(const ConfigProto& config,
       stats_(generateCertSelectionStats(*stats_scope_)),
       factory_context_(factory_context.serverFactoryContext()),
       config_source_(config.config_source()), context_factory_(std::move(context_factory)),
+      ssl_stats_scope_(factory_context.statsScope().createScope("")),
+      ssl_stats_(generateSslStats(*ssl_stats_scope_)),
       cert_contexts_(factory_context_.threadLocal()) {
   cert_contexts_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
   for (const auto& name : config.prefetch_secret_names()) {
@@ -180,8 +235,10 @@ void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name) {
 
 HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
                                                 Ssl::CertificateSelectionCallbackPtr&& cb,
-                                                bool client_ocsp_capable) {
-  HandleSharedPtr handle = std::make_shared<Handle>(std::move(cb), client_ocsp_capable);
+                                                bool client_ocsp_capable,
+                                                std::optional<uint64_t> connection_id) {
+  HandleSharedPtr handle = std::make_shared<Handle>(std::move(cb), client_ocsp_capable, ssl_stats_,
+                                                    secret_name, connection_id);
   // The manager might need to be destroyed after posting from a worker because
   // the filter chain is being removed. Therefore, use a weak_ptr and ignore
   // the request to fetch a secret. Handle can also be destroyed because the
@@ -225,25 +282,20 @@ SecretManager::getContext(absl::string_view secret_name) const {
 
 Ssl::SelectionResult
 BaseAsyncSelector::doSelectTlsContext(const std::string& name, const bool client_ocsp_capable,
-                                      Ssl::CertificateSelectionCallbackPtr cb) {
+                                      const SSL& ssl, Ssl::CertificateSelectionCallbackPtr cb) {
   auto current_context = secret_manager_->getContext(name);
   if (current_context) {
     ENVOY_LOG(trace, "Using an existing certificate '{}'", name);
-    const Ssl::TlsContext* tls_context = &current_context.value()->tlsContext();
-    const auto staple_action = ocspStapleAction(*tls_context, client_ocsp_capable,
-                                                current_context.value()->ocspStaplePolicy());
-    auto handle = std::make_shared<Handle>(*std::move(current_context));
-    return Ssl::SelectionResult{
-        .status = Ssl::SelectionResult::SelectionStatus::Success,
-        .selected_ctx = tls_context,
-        .staple = (staple_action == Ssl::OcspStapleAction::Staple),
-        .handle = std::move(handle),
-    };
+    const AsyncContext& cert_ctx = *current_context.value();
+    return serveAsyncContext(cert_ctx, client_ocsp_capable, secret_manager_->sslStats(), name,
+                             connectionId(ssl),
+                             std::make_shared<Handle>(*std::move(current_context)));
   }
   ENVOY_LOG(trace, "Requesting a certificate '{}'", name);
   return Ssl::SelectionResult{
       .status = Ssl::SelectionResult::SelectionStatus::Pending,
-      .handle = secret_manager_->fetchCertificate(name, std::move(cb), client_ocsp_capable),
+      .handle = secret_manager_->fetchCertificate(name, std::move(cb), client_ocsp_capable,
+                                                  connectionId(ssl)),
   };
 }
 
@@ -251,14 +303,14 @@ Ssl::SelectionResult AsyncSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl
                                                      Ssl::CertificateSelectionCallbackPtr cb) {
   const std::string name = mapper_->deriveFromClientHello(ssl_client_hello);
   const bool client_ocsp_capable = isClientOcspCapable(ssl_client_hello);
-  return doSelectTlsContext(name, client_ocsp_capable, std::move(cb));
+  return doSelectTlsContext(name, client_ocsp_capable, *ssl_client_hello.ssl, std::move(cb));
 }
 
 Ssl::SelectionResult UpstreamAsyncSelector::selectTlsContext(
     const SSL& ssl, const Network::TransportSocketOptionsConstSharedPtr& options,
     Ssl::CertificateSelectionCallbackPtr cb) {
   const std::string name = mapper_->deriveFromServerHello(ssl, options);
-  return doSelectTlsContext(name, false, std::move(cb));
+  return doSelectTlsContext(name, false, ssl, std::move(cb));
 }
 
 Ssl::TlsCertificateSelectorPtr

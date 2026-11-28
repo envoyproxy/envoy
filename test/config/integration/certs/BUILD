@@ -50,6 +50,7 @@ CERTS = [
     "server_ecdsa_p521cert_hash.h",
     "server_ecdsacert.pem",
     "server_ecdsacert_hash.h",
+    "server_expired_ocsp_resp.der",
     "server_ocsp_resp.der",
     "servercert.pem",
     "servercert_hash.h",

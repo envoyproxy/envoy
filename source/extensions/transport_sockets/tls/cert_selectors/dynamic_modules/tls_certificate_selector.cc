@@ -24,20 +24,17 @@ namespace {
 
 // Serves the TLS context with its OCSP response when the stapling policy staples it, or fails the
 // handshake when the policy fails it.
-Ssl::SelectionResult serveTlsContext(const Ssl::TlsContext& tls_context, bool client_ocsp_capable,
-                                     Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy,
-                                     Ssl::SelectionHandleConstSharedPtr handle = nullptr) {
-  const Ssl::OcspStapleAction ocsp_staple_action =
-      ocspStapleAction(tls_context, client_ocsp_capable, ocsp_staple_policy);
-  if (ocsp_staple_action == Ssl::OcspStapleAction::Fail) {
+Ssl::SelectionResult
+serveModuleTlsContext(const Ssl::TlsContext& tls_context, bool client_ocsp_capable,
+                      Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy,
+                      Ssl::SelectionHandleConstSharedPtr handle = nullptr) {
+  Ssl::SelectionResult result =
+      serveTlsContext(tls_context, client_ocsp_capable, ocsp_staple_policy, std::move(handle));
+  if (result.status == Ssl::SelectionResult::SelectionStatus::Failed) {
     ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::dynamic_modules), debug,
                         "TLS certificate selected by the dynamic module fails the OCSP policy");
-    return {.status = Ssl::SelectionResult::SelectionStatus::Failed};
   }
-  return {.status = Ssl::SelectionResult::SelectionStatus::Success,
-          .selected_ctx = &tls_context,
-          .staple = ocsp_staple_action == Ssl::OcspStapleAction::Staple,
-          .handle = std::move(handle)};
+  return result;
 }
 
 // Until SDS delivers a configured validation context, a TLS context built from the configuration
@@ -80,8 +77,8 @@ private:
 void DynamicCertificateHandle::notify(AsyncContextConstSharedPtr context) {
   Ssl::SelectionResult result{.status = Ssl::SelectionResult::SelectionStatus::Failed};
   if (context != nullptr) {
-    result =
-        serveTlsContext(context->tlsContext(), client_ocsp_capable_, context->ocspStaplePolicy());
+    result = serveModuleTlsContext(context->tlsContext(), client_ocsp_capable_,
+                                   context->ocspStaplePolicy());
     context_ = context;
   }
   Event::Dispatcher& dispatcher = cb_->dispatcher();
@@ -332,9 +329,9 @@ Ssl::SelectionResult DynamicModuleTlsCertificateSelectorConfig::selectDynamicCer
   const auto& contexts = thread_local_certificates_->get()->contexts;
   if (const auto it = contexts.find(name); it != contexts.end()) {
     // The handle keeps the context alive for the connection, since its callbacks use the context.
-    return serveTlsContext(it->second->tlsContext(), client_ocsp_capable,
-                           it->second->ocspStaplePolicy(),
-                           std::make_shared<DynamicCertificateHandle>(it->second));
+    return serveModuleTlsContext(it->second->tlsContext(), client_ocsp_capable,
+                                 it->second->ocspStaplePolicy(),
+                                 std::make_shared<DynamicCertificateHandle>(it->second));
   }
   // Without the requested hook the module is never asked for the certificate.
   if (on_certificate_requested_ == nullptr) {
@@ -597,7 +594,7 @@ DynamicModuleTlsCertificateSelector::selectCertificate(TlsCertificateSelectionCo
       return default_selector_->selectTlsContext(*context.client_hello, std::move(cb));
     }
     // Without a custom selector, an upstream TLS context uses its first certificate.
-    return serveTlsContext(tls_contexts_.front(), client_ocsp_capable, ocsp_staple_policy_);
+    return serveModuleTlsContext(tls_contexts_.front(), client_ocsp_capable, ocsp_staple_policy_);
   case envoy_dynamic_module_type_tls_certificate_selector_status_Configured:
     if (certificate_index >= tls_contexts_.size()) {
       ENVOY_LOG(debug,
@@ -606,8 +603,8 @@ DynamicModuleTlsCertificateSelector::selectCertificate(TlsCertificateSelectionCo
                 certificate_index, tls_contexts_.size());
       return {.status = Ssl::SelectionResult::SelectionStatus::Failed};
     }
-    return serveTlsContext(tls_contexts_[certificate_index], client_ocsp_capable,
-                           ocsp_staple_policy_);
+    return serveModuleTlsContext(tls_contexts_[certificate_index], client_ocsp_capable,
+                                 ocsp_staple_policy_);
   case envoy_dynamic_module_type_tls_certificate_selector_status_Dynamic:
     return config_->selectDynamicCertificate({certificate_name.ptr, certificate_name.length},
                                              client_ocsp_capable, std::move(cb));

@@ -13,6 +13,8 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
 
+#include "source/common/tls/ssl_handshaker.h"
+
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/config/integration/certs/server2cert_hash.h"
 #include "test/config/integration/certs/servercert_hash.h"
@@ -26,6 +28,7 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
+#include "openssl/ssl.h"
 
 using testing::Eq;
 namespace Envoy {
@@ -35,6 +38,8 @@ namespace Tls {
 namespace CertificateSelectors {
 namespace OnDemand {
 namespace {
+
+using envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext;
 
 // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221.
 const envoy::service::secret::v3::SdsDummy _sds_dummy;
@@ -119,6 +124,7 @@ public:
         tls_context.set_disable_stateless_session_resumption(true);
         tls_context.set_disable_stateful_session_resumption(true);
         tls_context.mutable_require_client_certificate()->set_value(mtls_);
+        tls_context.set_ocsp_staple_policy(ocsp_staple_policy_);
         std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
       }
     });
@@ -209,6 +215,11 @@ protected:
   std::string filter_state_value_;
   // Certificate-level TLS parameters to attach to every certificate secret sent over SDS.
   std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters> cert_tls_params_;
+  // OCSP staple policy of the downstream TLS context.
+  DownstreamTlsContext::OcspStaplePolicy ocsp_staple_policy_{
+      DownstreamTlsContext::LENIENT_STAPLING};
+  // OCSP response under test/config/integration/certs to attach to every certificate secret.
+  std::string ocsp_staple_;
 
   envoy::extensions::transport_sockets::tls::v3::Secret makeSecret(absl::string_view name,
                                                                    absl::string_view cert) {
@@ -226,6 +237,10 @@ protected:
           absl::StrCat("test/config/integration/certs/", cert, "key.pem")));
       if (cert_tls_params_.has_value()) {
         *tls_certificate->mutable_tls_params() = *cert_tls_params_;
+      }
+      if (!ocsp_staple_.empty()) {
+        tls_certificate->mutable_ocsp_staple()->set_filename(TestEnvironment::runfilesPath(
+            absl::StrCat("test/config/integration/certs/", ocsp_staple_)));
       }
     }
     return secret;
@@ -279,6 +294,99 @@ protected:
   std::string onDemandStat(absl::string_view stat) {
     return upstream_selector_ ? absl::StrCat("cluster.cluster_0.on_demand_secret.", stat)
                               : listenerStatPrefix(absl::StrCat("on_demand_secret.", stat));
+  }
+
+  // Sets up a listener with the OCSP staple `policy`, whose "server" secret carries the OCSP
+  // response `ocsp_staple`. A prefetched secret is in the selector's cache before the first
+  // handshake, so the selection completes synchronously.
+  void setupOcsp(DownstreamTlsContext::OcspStaplePolicy policy, absl::string_view ocsp_staple,
+                 bool prefetch) {
+    ocsp_staple_policy_ = policy;
+    ocsp_staple_ = ocsp_staple;
+    if (!prefetch) {
+      setup();
+      return;
+    }
+    on_server_init_function_ = [this]() {
+      createXdsConnection();
+      waitSendSdsResponse("server");
+    };
+    setup(R"EOF(
+  certificate_mapper:
+    name: static-name
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+      name: server
+  prefetch_secret_names:
+  - server
+  )EOF");
+    test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
+  }
+
+  // Opens a client connection that requests an OCSP response unless `request_ocsp` is false. A
+  // pending connection waits for the selector to request the "server" secret, which it then sends,
+  // so the selection completes asynchronously.
+  std::unique_ptr<ClientSslConnection> createOcspClientConnection(bool pending,
+                                                                  bool request_ocsp = true) {
+    auto conn = std::make_unique<ClientSslConnection>(*this);
+    if (request_ocsp) {
+      SSL_enable_ocsp_stapling(clientSsl(*conn));
+    }
+    if (pending) {
+      waitCertsRequested(1);
+      createXdsConnection();
+      waitSendSdsResponse("server");
+    }
+    return conn;
+  }
+
+  SSL* clientSsl(ClientSslConnection& conn) {
+    const auto* handshaker = dynamic_cast<const SslHandshakerImpl*>(conn.ssl_client_->ssl().get());
+    RELEASE_ASSERT(handshaker != nullptr, "the client connection must use TLS");
+    return handshaker->ssl();
+  }
+
+  // Runs the client until its handshake completes or its connection closes, and returns whether the
+  // handshake completed. A handshake that neither completes nor closes in time fails the test.
+  bool waitForHandshake(ClientSslConnection& conn) {
+    const MonotonicTime deadline = timeSystem().monotonicTime() + TestUtility::DefaultTimeout;
+    while (!conn.connect_callbacks_.connected() && !conn.connect_callbacks_.closed()) {
+      if (timeSystem().monotonicTime() >= deadline) {
+        ADD_FAILURE() << "the handshake neither completed nor closed in time";
+        return false;
+      }
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+    return conn.connect_callbacks_.connected();
+  }
+
+  // Expects the server to fail the handshake for the OCSP staple policy.
+  void expectOcspHandshakeFailure(ClientSslConnection& conn) {
+    const bool completed = waitForHandshake(conn);
+    // The connection of a handshake that completed stays open until it is closed here.
+    conn.close();
+    ASSERT_FALSE(completed) << "the server completed the handshake";
+    test_server_->waitForCounter(listenerStatPrefix("ssl.ocsp_staple_failed"), Eq(1));
+  }
+
+  // Expects the server to complete the handshake with the OCSP response `ocsp_staple`, or with no
+  // OCSP response when it is empty, and to proxy data over the connection.
+  void expectOcspHandshakeServed(ClientSslConnection& conn, absl::string_view ocsp_staple) {
+    ASSERT_TRUE(waitForHandshake(conn)) << "the server failed the handshake";
+    const uint8_t* response = nullptr;
+    size_t response_length = 0;
+    SSL_get0_ocsp_response(clientSsl(conn), &response, &response_length);
+    const std::string stapled_response =
+        response == nullptr ? ""
+                            : std::string(reinterpret_cast<const char*>(response), response_length);
+    const std::string expected_response =
+        ocsp_staple.empty()
+            ? ""
+            : TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+                  absl::StrCat("test/config/integration/certs/", ocsp_staple)));
+    EXPECT_EQ(expected_response, stapled_response);
+    conn.waitForUpstreamConnection();
+    conn.sendAndReceiveTlsData("hello", "world");
   }
 
   std::vector<FakeStreamPtr> xds_streams_;
@@ -761,6 +869,130 @@ TEST_P(OnDemandIntegrationTest, PerCertTlsParamsAppliedAfterAsyncSelection) {
   conn2->sendAndReceiveTlsData("hello", "world");
   EXPECT_EQ("ECDHE-RSA-AES128-GCM-SHA256", conn2->ciphersuite().value_or(""));
   conn2.reset();
+}
+
+// The OCSP staple policy of the listener applies to on-demand certificates as it does to the
+// certificates the default selector serves. A handshake that waits for a certificate whose OCSP
+// response expired fails under MUST_STAPLE for a client that requests the response, instead of
+// completing without it.
+TEST_P(OnDemandIntegrationTest, MustStapleExpiredOcspResponseFailsPendingHandshake) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "OCSP stapling applies to the downstream server certificate";
+  }
+  setupOcsp(DownstreamTlsContext::MUST_STAPLE, "server_expired_ocsp_resp.der", false);
+  auto conn = createOcspClientConnection(true);
+  expectOcspHandshakeFailure(*conn);
+}
+
+// A handshake that finds the certificate with the expired OCSP response in the cache fails under
+// MUST_STAPLE as well.
+TEST_P(OnDemandIntegrationTest, MustStapleExpiredOcspResponseFailsCachedHandshake) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "OCSP stapling applies to the downstream server certificate";
+  }
+  setupOcsp(DownstreamTlsContext::MUST_STAPLE, "server_expired_ocsp_resp.der", true);
+  auto conn = createOcspClientConnection(false);
+  expectOcspHandshakeFailure(*conn);
+}
+
+// STRICT_STAPLING rejects a certificate whose OCSP response expired, for a handshake that waits for
+// the certificate.
+TEST_P(OnDemandIntegrationTest, StrictStaplingExpiredOcspResponseFailsPendingHandshake) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "OCSP stapling applies to the downstream server certificate";
+  }
+  setupOcsp(DownstreamTlsContext::STRICT_STAPLING, "server_expired_ocsp_resp.der", false);
+  auto conn = createOcspClientConnection(true);
+  expectOcspHandshakeFailure(*conn);
+}
+
+// STRICT_STAPLING rejects a cached certificate whose OCSP response expired.
+TEST_P(OnDemandIntegrationTest, StrictStaplingExpiredOcspResponseFailsCachedHandshake) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "OCSP stapling applies to the downstream server certificate";
+  }
+  setupOcsp(DownstreamTlsContext::STRICT_STAPLING, "server_expired_ocsp_resp.der", true);
+  auto conn = createOcspClientConnection(false);
+  expectOcspHandshakeFailure(*conn);
+}
+
+// LENIENT_STAPLING serves a certificate whose OCSP response expired without the response, on both
+// selection paths.
+TEST_P(OnDemandIntegrationTest, LenientStaplingServesExpiredOcspResponseUnstapled) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "OCSP stapling applies to the downstream server certificate";
+  }
+  setupOcsp(DownstreamTlsContext::LENIENT_STAPLING, "server_expired_ocsp_resp.der", false);
+  for (const bool pending : {true, false}) {
+    auto conn = createOcspClientConnection(pending);
+    expectOcspHandshakeServed(*conn, "");
+    test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
+  }
+  EXPECT_EQ(0, test_server_->counter(listenerStatPrefix("ssl.ocsp_staple_failed"))->value());
+}
+
+// MUST_STAPLE staples a valid OCSP response on both selection paths.
+TEST_P(OnDemandIntegrationTest, MustStapleStaplesValidOcspResponse) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "OCSP stapling applies to the downstream server certificate";
+  }
+  setupOcsp(DownstreamTlsContext::MUST_STAPLE, "server_ocsp_resp.der", false);
+  for (const bool pending : {true, false}) {
+    auto conn = createOcspClientConnection(pending);
+    expectOcspHandshakeServed(*conn, "server_ocsp_resp.der");
+    test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
+  }
+  EXPECT_EQ(0, test_server_->counter(listenerStatPrefix("ssl.ocsp_staple_failed"))->value());
+}
+
+// A client that requests no OCSP response is served under a policy that rejects the certificate,
+// as the default selector serves it, on both selection paths.
+TEST_P(OnDemandIntegrationTest, MustStapleExpiredOcspResponseServesClientWithoutOcspRequest) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "OCSP stapling applies to the downstream server certificate";
+  }
+  setupOcsp(DownstreamTlsContext::MUST_STAPLE, "server_expired_ocsp_resp.der", false);
+  for (const bool pending : {true, false}) {
+    auto conn = createOcspClientConnection(pending, false);
+    expectOcspHandshakeServed(*conn, "");
+    test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
+  }
+  EXPECT_EQ(0, test_server_->counter(listenerStatPrefix("ssl.ocsp_staple_failed"))->value());
+}
+
+// With the runtime guard off, the selector completes the handshake without the OCSP response that
+// the policy rejects, on both selection paths. The first connection waits for the certificate and
+// the second finds it in the cache.
+TEST_P(OnDemandIntegrationTest, ExpiredOcspResponseServedUnstapledWithRuntimeGuardOff) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "OCSP stapling applies to the downstream server certificate";
+  }
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.on_demand_secret_enforce_ocsp_staple_policy", "false");
+  setupOcsp(DownstreamTlsContext::MUST_STAPLE, "server_expired_ocsp_resp.der", false);
+  for (const bool pending : {true, false}) {
+    auto conn = createOcspClientConnection(pending);
+    expectOcspHandshakeServed(*conn, "");
+    test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
+  }
+  EXPECT_EQ(0, test_server_->counter(listenerStatPrefix("ssl.ocsp_staple_failed"))->value());
+}
+
+// With the runtime guard off, the selector still staples a valid OCSP response on both selection
+// paths.
+TEST_P(OnDemandIntegrationTest, ValidOcspResponseStapledWithRuntimeGuardOff) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "OCSP stapling applies to the downstream server certificate";
+  }
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.on_demand_secret_enforce_ocsp_staple_policy", "false");
+  setupOcsp(DownstreamTlsContext::MUST_STAPLE, "server_ocsp_resp.der", false);
+  for (const bool pending : {true, false}) {
+    auto conn = createOcspClientConnection(pending);
+    expectOcspHandshakeServed(*conn, "server_ocsp_resp.der");
+    test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
+  }
+  EXPECT_EQ(0, test_server_->counter(listenerStatPrefix("ssl.ocsp_staple_failed"))->value());
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, OnDemandIntegrationTest,
