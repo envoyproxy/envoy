@@ -98,7 +98,13 @@ Api::IoCallUint64Result IoHandleImpl::close() {
                 static_cast<void*>(peer_handle_));
       // Record peer destruction before waking Read/Closed events on the peer.
       peer_handle_->onPeerDestroy();
-      if (rst_requested_) {
+      const bool send_rst_on_unread_data =
+          pending_received_data_.length() > 0 &&
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.enable_send_rst_on_user_space_socket");
+      if (rst_requested_ || send_rst_on_unread_data) {
+        // Propagate RST if abortive close was requested, or if closing with unread data in the
+        // receive buffer (matching TCP behavior per RFC 1122 section 4.2.2.13).
         peer_handle_->setRst();
       } else {
         // Notify the peer that it will not receive more data. shutdown(WRITE).
