@@ -26,7 +26,8 @@ public:
       Upstream::HostDescriptionConstSharedPtr host);
 
   ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
-               OptRef<Upstream::Host::CreateConnectionData> data);
+               OptRef<Upstream::Host::CreateConnectionData> data,
+               Envoy::ConnectionPool::ActiveClient* handoff_client = nullptr);
 };
 
 ConnectionPool::InstancePtr

@@ -80,10 +80,11 @@ void ActiveClient::StreamWrapper::onResetStream(StreamResetReason, absl::string_
 }
 
 ActiveClient::ActiveClient(HttpConnPoolImplBase& parent,
-                           OptRef<Upstream::Host::CreateConnectionData> data)
+                           OptRef<Upstream::Host::CreateConnectionData> data,
+                           Envoy::ConnectionPool::ActiveClient* handoff_client)
     : Envoy::Http::ActiveClient(parent, parent.host()->cluster().maxRequestsPerConnection(),
                                 /* effective_concurrent_stream_limit */ 1,
-                                /* configured_concurrent_stream_limit */ 1, data) {
+                                /* configured_concurrent_stream_limit */ 1, data, handoff_client) {
   parent.host()->cluster().trafficStats()->upstream_cx_http1_total_.inc();
 }
 

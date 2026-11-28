@@ -78,11 +78,16 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
   data.connection_->removeReadFilter(tcp_client->read_filter_handle_);
   dispatcher_.deferredDelete(client.removeFromList(owningList(client.state())));
 
+  Envoy::ConnectionPool::ActiveClient* handoff_client = nullptr;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.mixed_conn_pool_handover_stats")) {
+    handoff_client = &client;
+  }
+
   std::unique_ptr<ActiveClient> new_client;
   if (protocol_ == Http::Protocol::Http11) {
-    new_client = std::make_unique<Http1::ActiveClient>(*this, data);
+    new_client = std::make_unique<Http1::ActiveClient>(*this, data, handoff_client);
   } else {
-    new_client = std::make_unique<Http2::ActiveClient>(*this, data);
+    new_client = std::make_unique<Http2::ActiveClient>(*this, data, handoff_client);
   }
   // When we switch from TCP to HTTP clients, the base class onConnectionEvent
   // will be called for both, so add to the connecting stream capacity to
