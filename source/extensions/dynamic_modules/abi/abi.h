@@ -5951,10 +5951,9 @@ envoy_dynamic_module_callback_network_filter_scheduler_new(
  *
  * This can be called multiple times to schedule multiple events to the same filter.
  *
- * This is safe to call from any thread and is a no-op once the connection is closed or the filter
- * has been destroyed. Events that are pending when the connection closes are dropped. The module
- * must join or quiesce any thread that may call this before worker shutdown so a scheduled event
- * cannot race the worker dispatcher teardown.
+ * This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+ * module must join or quiesce any thread that may call this before worker shutdown so a scheduled
+ * event cannot race the worker dispatcher teardown.
  *
  * @param scheduler_module_ptr is the pointer to the network filter scheduler created by
  * envoy_dynamic_module_callback_network_filter_scheduler_new.

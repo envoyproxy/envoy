@@ -3275,34 +3275,6 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
   envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
 }
 
-TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
-       NetworkFilterScheduledEventAfterConnectionCloseIsDropped) {
-  // The hook is a C function pointer, so it reaches the flag through a static.
-  static bool hook_ran = false;
-  hook_ran = false;
-  filter_config_->on_network_filter_scheduled_ =
-      [](envoy_dynamic_module_type_network_filter_envoy_ptr,
-         envoy_dynamic_module_type_network_filter_module_ptr, uint64_t) { hook_ran = true; };
-  auto* scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
-
-  Event::PostCb captured_cb;
-  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
-    captured_cb = std::move(cb);
-  });
-  envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 1);
-  ASSERT_TRUE(captured_cb);
-
-  // The filter outlives the connection, for example as an access log handler.
-  filter_->onEvent(Network::ConnectionEvent::RemoteClose);
-  captured_cb();
-  EXPECT_FALSE(hook_ran);
-
-  EXPECT_CALL(worker_thread_dispatcher_, post(_)).Times(0);
-  envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 2);
-
-  envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
-}
-
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterSchedulerCommitRacesFilterTeardown) {
   auto* scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
 
@@ -3321,7 +3293,6 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterSchedulerCommitRa
   });
   while (!started.load()) {
   }
-  filter_->onEvent(Network::ConnectionEvent::LocalClose);
   filter_.reset();
   module_thread.join();
   envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);

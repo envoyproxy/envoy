@@ -257,9 +257,6 @@ private:
 
   bool destroyed_ = false;
 
-  // Set when the connection closes, after which scheduled events are dropped.
-  bool connection_closed_ = false;
-
   // The reports and access log flushes of the module have no effect until the filter passes the new
   // connection to it. A TCP proxy later in the chain replaces the upstream info and sets its
   // downstream bytes meter when its callbacks are set, and the stream info asserts that no other
@@ -272,7 +269,7 @@ private:
   std::atomic<Event::Dispatcher*> cached_dispatcher_{nullptr};
 
   // Shared with the schedulers of this filter. Initialized when the read filter callbacks are set
-  // and cleared when the connection closes or the filter is destroyed, whichever comes first.
+  // and cleared when the filter is destroyed.
   const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleNetworkFilter> scheduler_target_{
       std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleNetworkFilter>>()};
 
