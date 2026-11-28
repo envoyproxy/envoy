@@ -86,9 +86,9 @@ private:
   // that should be used when with this policy.
   std::vector<std::pair<Upstream::RetryHostPredicateFactory&, ProtobufTypes::MessagePtr>>
       retry_host_predicate_configs_;
-  // Name and config proto to use to create the RetryPriority to use with this policy. Default
-  // initialized when no RetryPriority should be used.
-  std::pair<Upstream::RetryPriorityFactory*, ProtobufTypes::MessagePtr> retry_priority_config_;
+  // Factory callback used to create a per-request RetryPriority from an already-validated config.
+  // Empty when no RetryPriority is configured.
+  Upstream::RetryPriorityFactoryCb retry_priority_factory_;
   uint32_t host_selection_attempts_{1};
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
@@ -97,7 +97,6 @@ private:
   std::optional<std::chrono::milliseconds> max_interval_;
   std::vector<ResetHeaderParserSharedPtr> reset_headers_;
   std::chrono::milliseconds reset_max_interval_{300000};
-  ProtobufMessage::ValidationVisitor* validation_visitor_{};
   std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
   const bool refresh_cluster_on_retry_{false};
 };

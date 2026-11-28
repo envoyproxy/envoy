@@ -1,14 +1,19 @@
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/retry/priority/previous_priorities/v3/previous_priorities_config.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"
 
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/router/retry_policy_impl.h"
 #include "source/extensions/retry/priority/previous_priorities/config.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -22,6 +27,9 @@ namespace Retry {
 namespace Priority {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::StatusIs;
+
 class RetryPriorityTest : public testing::Test {
 public:
   void initialize(const Upstream::HealthyLoad& original_healthy_priority_load,
@@ -32,11 +40,13 @@ public:
     envoy::extensions::retry::priority::previous_priorities::v3::PreviousPrioritiesConfig config;
     config.set_update_frequency(update_frequency_);
     // Use createEmptyConfigProto to exercise that code path. This ensures the proto returned
-    // by that method is compatible with the downcast in createRetryPriority.
+    // by that method is compatible with the downcast in createRetryPriorityFactory.
     auto empty = factory->createEmptyConfigProto();
     empty->MergeFrom(config);
-    retry_priority_ =
-        factory->createRetryPriority(*empty, ProtobufMessage::getStrictValidationVisitor(), 3);
+    auto factory_cb_or_error =
+        factory->createRetryPriorityFactory(*empty, ProtobufMessage::getStrictValidationVisitor());
+    ASSERT_TRUE(factory_cb_or_error.ok()) << factory_cb_or_error.status();
+    retry_priority_ = (*factory_cb_or_error)(3);
     original_priority_load_ = Upstream::HealthyAndDegradedLoad{original_healthy_priority_load,
                                                                original_degraded_priority_load};
   }
@@ -342,16 +352,130 @@ TEST_F(RetryPriorityTest, OverriddenFrequency) {
   verifyPriorityLoads(expected_priority_load, expected_degraded_priority_load);
 }
 
-// Tests that an invalid frequency results into a config error.
+// Tests that an invalid frequency results in a config error at factory creation time.
 TEST_F(RetryPriorityTest, OverriddenFrequencyInvalidValue) {
-  update_frequency_ = 0;
+  auto* factory = Registry::FactoryRegistry<Upstream::RetryPriorityFactory>::getFactory(
+      "envoy.retry_priorities.previous_priorities");
+  ASSERT_NE(factory, nullptr);
+
+  envoy::extensions::retry::priority::previous_priorities::v3::PreviousPrioritiesConfig config;
+  config.set_update_frequency(0);
+  auto cb_or_error =
+      factory->createRetryPriorityFactory(config, ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_THAT(cb_or_error, StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(cb_or_error, HasStatusMessage(AllOf(HasSubstr("Proto constraint validation failed"),
+                                                  HasSubstr("value must be greater than"))));
+}
+
+// Tests that createRetryPriorityFactory validates the config once at config load time and returns
+// a callback that creates working instances without retaining or re-using the ValidationVisitor.
+TEST_F(RetryPriorityTest, CreateRetryPriorityFactoryValidatesOnceAndCreatesInstances) {
+  auto* factory = Registry::FactoryRegistry<Upstream::RetryPriorityFactory>::getFactory(
+      "envoy.retry_priorities.previous_priorities");
+  ASSERT_NE(factory, nullptr);
+
+  envoy::extensions::retry::priority::previous_priorities::v3::PreviousPrioritiesConfig config;
+  config.set_update_frequency(2);
+  Upstream::RetryPriorityFactoryCb factory_cb;
+  {
+    ProtobufMessage::StrictValidationVisitorImpl scoped_visitor;
+    auto cb_or_error = factory->createRetryPriorityFactory(config, scoped_visitor);
+    ASSERT_TRUE(cb_or_error.ok()) << cb_or_error.status();
+    factory_cb = std::move(*cb_or_error);
+  }
+
+  // Invoking the factory callback after scoped_visitor is destroyed must succeed cleanly.
+  retry_priority_ = factory_cb(3);
+  ASSERT_NE(retry_priority_, nullptr);
+  EXPECT_NE(retry_priority_, factory_cb(3));
 
   const Upstream::HealthyLoad original_priority_load({100, 0});
   const Upstream::DegradedLoad original_degraded_priority_load({0, 0});
+  original_priority_load_ =
+      Upstream::HealthyAndDegradedLoad{original_priority_load, original_degraded_priority_load};
+  addHosts(0, 2, 2);
+  addHosts(1, 2, 2);
 
-  EXPECT_THROW_WITH_REGEX(initialize(original_priority_load, original_degraded_priority_load),
-                          EnvoyException,
+  auto host1 = std::make_shared<NiceMock<Upstream::MockHost>>();
+  ON_CALL(*host1, priority()).WillByDefault(Return(0));
+  retry_priority_->onHostAttempted(host1);
+  verifyPriorityLoads(original_priority_load, original_degraded_priority_load);
+  retry_priority_->onHostAttempted(host1);
+  verifyPriorityLoads(Upstream::HealthyLoad({0, 100}), original_degraded_priority_load);
+}
+
+TEST_F(RetryPriorityTest, CreateRetryPriorityFactoryRejectsWrongConfigType) {
+  auto* factory = Registry::FactoryRegistry<Upstream::RetryPriorityFactory>::getFactory(
+      "envoy.retry_priorities.previous_priorities");
+  ASSERT_NE(factory, nullptr);
+
+  Protobuf::Struct wrong_config;
+  auto cb_or_error = factory->createRetryPriorityFactory(
+      wrong_config, ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_THAT(cb_or_error, StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(cb_or_error, HasStatusMessage(HasSubstr("Invalid config type")));
+}
+
+// Tests that disabling the runtime guard defers validation to the returned callback without
+// holding a reference to the config-load ValidationVisitor.
+TEST_F(RetryPriorityTest, CreateRetryPriorityFactoryLegacyDeferredValidationWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.validate_retry_priority_config_at_load", "false"}});
+
+  auto* factory = Registry::FactoryRegistry<Upstream::RetryPriorityFactory>::getFactory(
+      "envoy.retry_priorities.previous_priorities");
+  ASSERT_NE(factory, nullptr);
+
+  // Valid config creates working instances even after the config-load visitor is destroyed.
+  envoy::extensions::retry::priority::previous_priorities::v3::PreviousPrioritiesConfig valid;
+  valid.set_update_frequency(2);
+  Upstream::RetryPriorityFactoryCb valid_cb;
+  {
+    ProtobufMessage::StrictValidationVisitorImpl scoped_visitor;
+    auto cb_or_error = factory->createRetryPriorityFactory(valid, scoped_visitor);
+    ASSERT_TRUE(cb_or_error.ok()) << cb_or_error.status();
+    valid_cb = std::move(*cb_or_error);
+  }
+  retry_priority_ = valid_cb(3);
+  ASSERT_NE(retry_priority_, nullptr);
+
+  // Invalid config is accepted at factory creation time and throws when invoked.
+  envoy::extensions::retry::priority::previous_priorities::v3::PreviousPrioritiesConfig invalid;
+  invalid.set_update_frequency(0);
+  auto invalid_cb_or_error =
+      factory->createRetryPriorityFactory(invalid, ProtobufMessage::getStrictValidationVisitor());
+  ASSERT_TRUE(invalid_cb_or_error.ok()) << invalid_cb_or_error.status();
+  EXPECT_THROW_WITH_REGEX((*invalid_cb_or_error)(3), ProtoValidationException,
                           "Proto constraint validation failed.*value must be greater than.*");
+}
+
+// Regression test: RetryPolicyImpl rejects invalid PreviousPrioritiesConfig at config load time
+// when the runtime guard is enabled and restores deferred validation when disabled.
+TEST_F(RetryPriorityTest, RetryPolicyImplRejectsInvalidConfigAtLoad) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::route::v3::RetryPolicy retry_policy_proto;
+  retry_policy_proto.set_retry_on("5xx");
+  auto* retry_priority = retry_policy_proto.mutable_retry_priority();
+  retry_priority->set_name("envoy.retry_priorities.previous_priorities");
+  envoy::extensions::retry::priority::previous_priorities::v3::PreviousPrioritiesConfig
+      priority_config;
+  priority_config.set_update_frequency(0);
+  ASSERT_TRUE(retry_priority->mutable_typed_config()->PackFrom(priority_config));
+
+  auto policy_or_error = Router::RetryPolicyImpl::create(
+      retry_policy_proto, ProtobufMessage::getStrictValidationVisitor(), factory_context);
+  EXPECT_THAT(policy_or_error, StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(policy_or_error, HasStatusMessage(HasSubstr("Proto constraint validation failed")));
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.validate_retry_priority_config_at_load", "false"}});
+  auto legacy_policy_or_error = Router::RetryPolicyImpl::create(
+      retry_policy_proto, ProtobufMessage::getStrictValidationVisitor(), factory_context);
+  ASSERT_TRUE(legacy_policy_or_error.ok()) << legacy_policy_or_error.status();
+  EXPECT_THROW_WITH_REGEX((*legacy_policy_or_error)->retryPriority(), ProtoValidationException,
+                          "Proto constraint validation failed");
 }
 
 } // namespace
