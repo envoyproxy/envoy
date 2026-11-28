@@ -22,6 +22,12 @@ namespace {
 
 using ProtoConfig = envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig;
 
+// Some build environments define DEBUG as a macro (see quiche_logging_impl.h for precedent),
+// which would otherwise rewrite the ProtoConfig::DEBUG enumerator reference below.
+#ifdef DEBUG
+#undef DEBUG
+#endif
+
 spdlog::level::level_enum logLevelFromProto(ProtoConfig::LogLevel level) {
   switch (level) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;

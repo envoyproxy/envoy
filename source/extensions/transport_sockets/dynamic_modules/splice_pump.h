@@ -95,21 +95,30 @@ private:
   // upstream error.
   bool sendUpstreamCloseNotify();
 
+  // splice and kTLS are Linux only. On other platforms prepare() always fails and every other
+  // method is a no-op, so the state below (only ever touched by the Linux implementation) would
+  // otherwise sit unused and trip -Wunused-private-field.
+#if defined(__linux__)
   const os_fd_t down_fd_;
   const os_fd_t up_fd_;
   Event::Dispatcher& dispatcher_;
+#endif
   CompletionCb on_complete_;
+#if defined(__linux__)
   const uint64_t max_bytes_per_wakeup_;
   // Whether prepare found kTLS on the upstream socket.
   bool up_is_ktls_{false};
+#endif
 
   Pipe u2d_; // Upstream to downstream, the plaintext download. Unused for a kTLS download.
   Pipe d2u_; // Downstream to upstream, the upload.
   // The kTLS download read with recvmsg, how many bytes it holds, and how many have reached the
   // downstream socket. A short write keeps the rest for the next pass.
   std::vector<uint8_t> download_buf_;
+#if defined(__linux__)
   size_t download_len_{0};
   size_t download_offset_{0};
+#endif
   Event::FileEventPtr up_file_event_;
   Event::FileEventPtr down_file_event_;
   // Resumes a pass that stopped at its byte budget, on the next loop iteration.
@@ -117,6 +126,7 @@ private:
   uint64_t bytes_uploaded_{0};
   uint64_t bytes_downloaded_{0};
 
+#if defined(__linux__)
   // Read readiness latches set by the file events and cleared on EAGAIN.
   bool up_readable_{false};
   bool down_readable_{false};
@@ -125,6 +135,7 @@ private:
   bool down_write_shutdown_{false};
   bool up_write_shutdown_{false};
   bool completed_{false};
+#endif
 };
 
 using SplicePumpPtr = std::unique_ptr<SplicePump>;
