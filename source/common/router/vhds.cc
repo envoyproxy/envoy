@@ -13,6 +13,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_resource.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
@@ -88,26 +89,44 @@ VhdsSubscription::VhdsSubscription(const envoy::config::route::v3::RouteConfigur
     : receiver_(receiver), route_config_name_(route_config.name()),
       scope_(createStatsScope(factory_context.scope(), stat_prefix, from_rds, route_config_name_)),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
-      init_target_(fmt::format("VhdsConfigSubscription {}", route_config_name_),
-                   [this]() {
-                     // Start with no concrete subscription; virtual hosts are fetched on demand.
-                     // Accept every resource under this route configuration's namespace, so that
-                     // on-demand virtual hosts -- whose resource names are
-                     // "<route_config_name>/<vhost>" -- are routed back to this subscription's
-                     // watch without being subscribed on the wire.
-                     subscription_->accept({route_config_name_ + "/*"});
-                     subscription_->start({});
-                   }),
+      init_target_(
+          fmt::format("VhdsConfigSubscription {}", route_config_name_),
+          [this, use_collection = !route_config.vhds().default_resource_locator().empty()]() {
+            if (!use_collection) {
+              // Accept on-demand virtual hosts without subscribing to them on the wire.
+              subscription_->accept({route_config_name_ + "/*"});
+            }
+            subscription_->start({});
+          }),
       resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
                             "name") {
-  const auto resource_name = resource_type_helper_.getResourceName();
-  Envoy::Config::SubscriptionOptions options;
-  absl::StatusOr<Envoy::Config::SubscriptionPtr> status_or =
-      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          route_config.vhds().config_source(), Grpc::Common::typeUrl(resource_name), *scope_, *this,
-          resource_type_helper_.resourceDecoder(), options);
-  SET_AND_RETURN_IF_NOT_OK(status_or.status(), status);
-  subscription_ = std::move(status_or.value());
+  const auto& vhds = route_config.vhds();
+  const auto& default_resource_name = vhds.default_resource_locator();
+
+  if (default_resource_name.empty()) {
+    // On-demand mode: accept virtual hosts under the route configuration namespace.
+    const auto resource_name = resource_type_helper_.getResourceName();
+    Envoy::Config::SubscriptionOptions options;
+    absl::StatusOr<Envoy::Config::SubscriptionPtr> status_or =
+        factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+            route_config.vhds().config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
+            *this, resource_type_helper_.resourceDecoder(), options);
+    SET_AND_RETURN_IF_NOT_OK(status_or.status(), status);
+    subscription_ = std::move(status_or.value());
+  } else {
+    // xdstp mode: use collection subscription.
+    auto resource_locator_or =
+        Envoy::Config::XdsResourceIdentifier::decodeUrl(default_resource_name);
+    SET_AND_RETURN_IF_NOT_OK(resource_locator_or.status(), status);
+    const auto& resource_locator = resource_locator_or.value();
+    const auto resource_name = resource_type_helper_.getResourceName();
+    absl::StatusOr<Envoy::Config::SubscriptionPtr> status_or =
+        factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
+            resource_locator, vhds.config_source(), resource_name, *scope_, *this,
+            resource_type_helper_.resourceDecoder());
+    SET_AND_RETURN_IF_NOT_OK(status_or.status(), status);
+    subscription_ = std::move(status_or.value());
+  }
   // Registered last, so that the target's callback never runs before subscription_ is set. That
   // can't happen with the per-update init manager, which is always Uninitialized here, but this
   // keeps it true regardless of which init manager is handed in.
