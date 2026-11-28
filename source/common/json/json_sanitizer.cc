@@ -1,107 +1,125 @@
 #include "source/common/json/json_sanitizer.h"
 
-#include "source/common/common/assert.h"
-#include "source/common/common/thread.h"
-#include "source/common/json/json_internal.h"
+#include <cstdint>
 
-#include "absl/strings/str_format.h"
+#include "source/common/common/assert.h"
+
+#include "absl/strings/str_cat.h"
 #include "third_party/utf8_range/utf8_validity.h"
 
 namespace Envoy {
 namespace Json {
 
-// clang-format off
-// SPELLCHECKER(off)
-//
-// Performance benchmarks show this is slightly faster as an array of uint32_t
-// rather than an array of bool.
-static constexpr uint32_t needs_slow_sanitizer[256] = {
-  // Control-characters 0-31 all require escapes.
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+namespace {
 
-  // Pass through printable characters starting with space. Double-quote and
-  // backslash require an escape.
-  0, 0, 1 /* " */, 0, 0, 0, 0, 0,         //  !"#$%&'
-  0, 0, 0, 0, 0, 0, 0, 0,                 // ()*+,-.7
-  0, 0, 0, 0, 0, 0, 0, 0,                 // 01234567
-  0, 0, 0, 0, 0, 0, 0, 0,                 // 89:;<=>?
-  0, 0, 0, 0, 0, 0, 0, 0,                 // @ABCDEFG
-  0, 0, 0, 0, 0, 0, 0, 0,                 // HIJKLMNO
-  0, 0, 0, 0, 0, 0, 0, 0,                 // PQRSTUVW
-  0, 0, 0, 0, 1 /* backslash */, 0, 0, 0, // XYZ[\]^_
-  0, 0, 0, 0, 0, 0, 0, 0,                 // `abcdefg
-  0, 0, 0, 0, 0, 0, 0, 0,                 // hijklmno
-  0, 0, 0, 0, 0, 0, 0, 0,                 // pqrstuvw
-  0, 0, 0, 0, 0, 0, 0, 1,                 // xyz{|}~\177
+constexpr char kHexDigits[] = "0123456789abcdef";
 
-  // 0x80-0xff, all of which require calling the slow sanitizer.
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-};
-// SPELLCHECKER(on)
-// clang-format on
+inline void appendHexEscape(std::string& buffer, uint8_t c) {
+  const char escaped[6] = {'\\', 'u', '0', '0', kHexDigits[c >> 4], kHexDigits[c & 0x0f]};
+  buffer.append(escaped, sizeof(escaped));
+}
+
+// Escapes a structurally valid UTF-8 (or pure 7-bit ASCII) string per RFC 8259 without throwing
+// exceptions or allocating intermediate buffers. Valid multi-byte UTF-8 sequences (>= 0x80) pass
+// through unchanged.
+void escapeValidUtf8(std::string& buffer, absl::string_view str) {
+  buffer.clear();
+  buffer.reserve(str.size() + 16);
+  const char* const data = str.data();
+  const size_t size = str.size();
+  size_t span_start = 0;
+
+  for (size_t i = 0; i < size; ++i) {
+    const uint8_t c = static_cast<uint8_t>(data[i]);
+    if (c >= 0x20 && c != '"' && c != '\\') {
+      continue;
+    }
+    if (i > span_start) {
+      buffer.append(data + span_start, i - span_start);
+    }
+    switch (c) {
+    case '"':
+      buffer.append("\\\"", 2);
+      break;
+    case '\\':
+      buffer.append("\\\\", 2);
+      break;
+    case '\b':
+      buffer.append("\\b", 2);
+      break;
+    case '\f':
+      buffer.append("\\f", 2);
+      break;
+    case '\n':
+      buffer.append("\\n", 2);
+      break;
+    case '\r':
+      buffer.append("\\r", 2);
+      break;
+    case '\t':
+      buffer.append("\\t", 2);
+      break;
+    default:
+      appendHexEscape(buffer, c);
+      break;
+    }
+    span_start = i + 1;
+  }
+
+  if (span_start < size) {
+    buffer.append(data + span_start, size - span_start);
+  }
+}
+
+// Fallback for strings containing invalid UTF-8 sequences: emits 4-digit lowercase hex escapes
+// (\u00XX) for control characters, quotes, backslashes, DEL (0x7f), and bytes >= 0x80.
+void escapeInvalidUtf8(std::string& buffer, absl::string_view str) {
+  buffer.clear();
+  buffer.reserve(str.size() + 16);
+  const char* const data = str.data();
+  const size_t size = str.size();
+  size_t span_start = 0;
+
+  for (size_t i = 0; i < size; ++i) {
+    const uint8_t c = static_cast<uint8_t>(data[i]);
+    if (c >= 0x20 && c < 0x7f && c != '"' && c != '\\') {
+      continue;
+    }
+    if (i > span_start) {
+      buffer.append(data + span_start, i - span_start);
+    }
+    appendHexEscape(buffer, c);
+    span_start = i + 1;
+  }
+
+  if (span_start < size) {
+    buffer.append(data + span_start, size - span_start);
+  }
+}
+
+} // namespace
 
 absl::string_view sanitize(std::string& buffer, absl::string_view str) {
-  // Fast-path to see whether any escapes or utf-encoding are needed. If str has
-  // only unescaped ascii characters, we can simply return it.
-  //
-  // Benchmarks show it's faster to just rip through the string with no
-  // conditionals, so we only check the arithmetically ORed condition after the
-  // loop. This avoids branches and allows simpler loop unrolling by the
-  // compiler.
-  static_assert(ARRAY_SIZE(needs_slow_sanitizer) == 256);
-  uint32_t need_slow = 0;
-  for (char c : str) {
-    // We need to escape control characters, characters >= 127, and double-quote
-    // and backslash.
-    need_slow |= needs_slow_sanitizer[static_cast<uint8_t>(c)];
-  }
-  if (need_slow == 0) {
-    return str; // Fast path, should be executed most of the time.
-  }
-  if (utf8_range::IsStructurallyValid(str)) {
-    // The Nlohmann JSON library supports serialization and is not too slow. A
-    // hand-rolled sanitizer can be a little over 2x faster at the cost of added
-    // production complexity. The main drawback is that this code cannot be used
-    // in the data plane as it throws exceptions. Should this become an issue,
-    // #20428 can be revived which is faster and doesn't throw exceptions, but
-    // adds complexity to the production code base.
-    buffer = Nlohmann::Factory::serialize(str);
-    return stripDoubleQuotes(buffer);
-  } else {
-    // If Nlohmann throws an error, emit a hex escape for any character
-    // requiring it. This can occur for invalid utf-8 sequences, and we don't
-    // want to crash the server if such a sequence makes its way into a string
-    // we need to serialize. For example, if admin endpoint /stats?format=json
-    // is called, and a stat name was synthesized from dynamic content such as a
-    // gRPC method.
-    //
-    // Note that JSON string escapes are always 4 digit hex. 3 digit octal would
-    // be more compact, and is legal JavaScript, but not legal JSON. See
-    // https://www.json.org/json-en.html for details.
-    //
-    // TODO(jmarantz): It would better to use the compact JSON escapes for
-    // quotes, slashes, backspace, form-feed, linefeed, CR, and tab, in which
-    // case we'd also need to modify jsonEquivalentStrings in
-    // test/common/json/json_sanitizer_test_util.h. We don't expect to hit this
-    // often, so it isn't a priority to use these more compact encodings.
-    buffer.clear();
-    for (char c : str) {
-      if (needs_slow_sanitizer[static_cast<uint8_t>(c)]) {
-        buffer.append(absl::StrFormat("\\u%04x", c));
-      } else {
-        buffer.append(1, c);
-      }
-    }
+  // Fast scan to check whether any byte needs JSON escaping
+  // (< 0x20, '"', '\\') or is non-ASCII (>= 0x80).
+  uint8_t need_escape = 0;
+  uint8_t or_all = 0;
+  for (const char c : str) {
+    const uint8_t uc = static_cast<uint8_t>(c);
+    or_all |= uc;
+    need_escape |= static_cast<uint8_t>((uc < 0x20) | (uc == '"') | (uc == '\\'));
   }
 
+  const bool has_non_ascii = (or_all & 0x80) != 0;
+  if (!has_non_ascii || utf8_range::IsStructurallyValid(str)) {
+    if (!need_escape) {
+      return str;
+    }
+    escapeValidUtf8(buffer, str);
+    return buffer;
+  }
+
+  escapeInvalidUtf8(buffer, str);
   return buffer;
 }
 
