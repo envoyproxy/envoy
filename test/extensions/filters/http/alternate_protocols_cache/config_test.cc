@@ -27,6 +27,24 @@ TEST(AlternateProtocolsCacheFilterConfigTest, AlternateProtocolsCacheFilter) {
   cb(filter_callback);
 }
 
+TEST(AlternateProtocolsCacheFilterConfigTest, UpstreamFilter) {
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::UpstreamHttpFilterConfigFactory>::getFactory(
+          "envoy.filters.http.alternate_protocols_cache");
+  ASSERT_NE(factory, nullptr);
+
+  NiceMock<Server::Configuration::MockUpstreamFactoryContext> context;
+  envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
+  Http::FilterFactoryCb cb =
+      Server::Configuration::createHttpFilterFactory(*factory, proto_config, "stats", context)
+          .value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(filter_callback, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+  EXPECT_CALL(filter_callback, addStreamEncoderFilter(_));
+  cb(filter_callback);
+}
+
 TEST(AlternateProtocolsCacheFilterConfigTest, AlternateProtocolsCacheFilterWithServerContext) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AlternateProtocolsCacheFilterFactory factory;

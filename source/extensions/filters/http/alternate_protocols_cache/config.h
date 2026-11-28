@@ -29,7 +29,11 @@ private:
       Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
+// REGISTER_FACTORY names its symbols after the class, so the upstream registration needs an alias.
+using UpstreamAlternateProtocolsCacheFilterFactory = AlternateProtocolsCacheFilterFactory;
+
 DECLARE_FACTORY(AlternateProtocolsCacheFilterFactory);
+DECLARE_FACTORY(UpstreamAlternateProtocolsCacheFilterFactory);
 
 } // namespace AlternateProtocolsCache
 } // namespace HttpFilters

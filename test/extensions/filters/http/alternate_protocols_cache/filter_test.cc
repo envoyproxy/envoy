@@ -128,7 +128,7 @@ TEST_F(FilterTest, ValidAltSvc) {
       .WillRepeatedly(ReturnRef(callbacks_.stream_info_));
   callbacks_.stream_info_.upstream_cluster_info_ = info;
   EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo()).Times(testing::AtLeast(1));
-  EXPECT_CALL(callbacks_.stream_info_, upstreamInfo()).Times(testing::AtLeast(1));
+  EXPECT_CALL(testing::Const(callbacks_.stream_info_), upstreamInfo()).Times(testing::AtLeast(1));
   // Get the pointer to MockHostDescription.
   std::shared_ptr<const Upstream::MockHostDescription> hd =
       std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
@@ -147,6 +147,47 @@ TEST_F(FilterTest, ValidAltSvc) {
                                      << dumpAlternative(actual_protocols[0]);
                                  ;
                                })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  filter_->onDestroy();
+}
+
+// As an upstream filter, the origin comes from the attempt's own stream info, not the request's,
+// which may already point at another attempt's host when retries are hedged.
+TEST_F(FilterTest, ValidAltSvcUsesAttemptStreamInfo) {
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"alt-svc", "h3=\":443\"; ma=60"}};
+  Http::HttpServerPropertiesCache::Origin expected_origin("https", "attempt-host", 443);
+
+  envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
+  auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  callbacks_.stream_info_.upstream_cluster_info_ = info;
+  info->alternate_protocols_cache_options_.emplace(
+      proto_config.alternate_protocols_cache_options());
+
+  // The request's stream info points at another attempt's host, which must not be used.
+  std::string other_hostname = "other-attempt-host";
+  std::shared_ptr<const Upstream::MockHostDescription> other_hd =
+      std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
+          callbacks_.stream_info_.upstreamInfo()->upstreamHost());
+  ON_CALL(*other_hd, hostname()).WillByDefault(ReturnRef(other_hostname));
+  NiceMock<Http::MockUpstreamStreamFilterCallbacks> upstream_callbacks;
+  StreamInfo::MockStreamInfo& attempt_stream_info = upstream_callbacks.upstream_stream_info_;
+  attempt_stream_info.upstream_cluster_info_ = info;
+  ON_CALL(callbacks_, upstreamCallbacks())
+      .WillByDefault(Return(OptRef<Http::UpstreamStreamFilterCallbacks>(upstream_callbacks)));
+
+  std::shared_ptr<Network::MockResolvedAddress> address =
+      std::make_shared<Network::MockResolvedAddress>("1.2.3.4:443", "1.2.3.4:443");
+  Network::MockIp ip;
+  std::string hostname = "attempt-host";
+  std::shared_ptr<const Upstream::MockHostDescription> hd =
+      std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
+          attempt_stream_info.upstreamInfo()->upstreamHost());
+  EXPECT_CALL(*hd, hostname()).WillOnce(ReturnRef(hostname));
+  EXPECT_CALL(*hd, address()).WillOnce(Return(address));
+  EXPECT_CALL(*address, ip()).WillOnce(Return(&ip));
+  EXPECT_CALL(ip, port()).WillOnce(Return(443));
+  EXPECT_CALL(*alternate_protocols_cache_, setAlternatives(expected_origin, _));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   filter_->onDestroy();
@@ -173,7 +214,7 @@ TEST_F(FilterTest, ValidAltSvcNullAddress) {
       .WillRepeatedly(ReturnRef(callbacks_.stream_info_));
   callbacks_.stream_info_.upstream_cluster_info_ = info;
   EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo()).Times(testing::AtLeast(1));
-  EXPECT_CALL(callbacks_.stream_info_, upstreamInfo()).Times(testing::AtLeast(1));
+  EXPECT_CALL(testing::Const(callbacks_.stream_info_), upstreamInfo()).Times(testing::AtLeast(1));
   // Get the pointer to MockHostDescription.
   std::shared_ptr<const Upstream::MockHostDescription> hd =
       std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
@@ -239,7 +280,7 @@ TEST_F(FilterTest, ValidAltSvcNullIp) {
       .WillRepeatedly(ReturnRef(callbacks_.stream_info_));
   callbacks_.stream_info_.upstream_cluster_info_ = info;
   EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo()).Times(testing::AtLeast(1));
-  EXPECT_CALL(callbacks_.stream_info_, upstreamInfo()).Times(testing::AtLeast(1));
+  EXPECT_CALL(testing::Const(callbacks_.stream_info_), upstreamInfo()).Times(testing::AtLeast(1));
   // Get the pointer to MockHostDescription.
   std::shared_ptr<const Upstream::MockHostDescription> hd =
       std::dynamic_pointer_cast<const Upstream::MockHostDescription>(

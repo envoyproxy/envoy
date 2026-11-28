@@ -37,8 +37,14 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   if (alt_svc.empty()) {
     return Http::FilterHeadersStatus::Continue;
   }
+  // Upstream callbacks are only set when the filter runs in an upstream filter chain. Then read
+  // this attempt's own stream info. Otherwise it is a downstream filter, so read the request's.
+  auto upstream_callbacks = encoder_callbacks_->upstreamCallbacks();
+  const StreamInfo::StreamInfo& stream_info = upstream_callbacks.has_value()
+                                                  ? upstream_callbacks->upstreamStreamInfo()
+                                                  : encoder_callbacks_->streamInfo();
   Http::HttpServerPropertiesCacheSharedPtr cache;
-  const auto info = encoder_callbacks_->streamInfo().upstreamClusterInfo();
+  const auto info = stream_info.upstreamClusterInfo();
   if (info) {
     const auto& alternate_options = info->httpProtocolOptions().alternateProtocolsCacheOptions();
     if (alternate_options) {
@@ -67,9 +73,9 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   // Envoy routes request to upstream hosts not to origin servers directly. This choice would
   // allow HTTP/3 to be used on a per-upstream host basis, even for origins which are load
   // balanced across them.
-  const auto upstream_info = encoder_callbacks_->streamInfo().upstreamInfo();
+  const auto upstream_info = stream_info.upstreamInfo();
   Upstream::HostDescriptionConstSharedPtr host =
-      upstream_info != nullptr ? upstream_info->upstreamHost() : nullptr;
+      upstream_info.has_value() ? upstream_info->upstreamHost() : nullptr;
   if (host == nullptr) {
     // There is no upstream host, for example when a local reply carrying an alt-svc header is sent
     // before an upstream request was created. Without a host there is no origin to associate the
