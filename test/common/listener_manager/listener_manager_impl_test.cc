@@ -11126,6 +11126,26 @@ TEST_P(ListenerManagerImplFcdsInPlaceUpdateTest, LocalFilterChainsServeListener)
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
+// FCDS inherits LDS initial_fetch_timeout.
+TEST_P(ListenerManagerImplFcdsInPlaceUpdateTest, InheritsLdsInitialFetchTimeout) {
+  server_.bootstrap_.mutable_dynamic_resources()
+      ->mutable_lds_config()
+      ->mutable_initial_fetch_timeout()
+      ->set_seconds(3);
+  startWorkers();
+  EXPECT_CALL(server_.server_factory_context_->cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(
+                  Property(&envoy::config::core::v3::ConfigSource::initial_fetch_timeout,
+                           Property(&Protobuf::Duration::seconds, 3)),
+                  _, _, _, _, _))
+      .Times(2);
+  expectListenSocket("127.0.0.1:1234");
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_TRUE(addOrUpdateListener(fcdsListenerProto("dynamic_1", "dynamic_2")));
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
 // A name that FCDS discovers cannot be written locally, and nothing is removed without a local
 // filter chain.
 TEST_P(ListenerManagerImplFcdsInPlaceUpdateTest, LocalFilterChainRejectsDiscoveredName) {

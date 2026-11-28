@@ -1022,12 +1022,17 @@ absl::Status ListenerImpl::buildFilterChains(const envoy::config::listener::v3::
                        !udpListenerConfig()->listenerFactory().isTransportConnectionless();
   ListenerFilterChainFactoryBuilder builder(is_quic, validation_visitor_, *parent_.factory_,
                                             *transport_factory_context_);
+  // Inherit LDS initial_fetch_timeout instead of silently falling back to the 15s default.
+  envoy::config::core::v3::ConfigSource fcds_config_source = config.fcds_config().config_source();
+  const auto& lds_config = parent_.server_.bootstrap().dynamic_resources().lds_config();
+  if (!fcds_config_source.has_initial_fetch_timeout() && lds_config.has_initial_fetch_timeout()) {
+    *fcds_config_source.mutable_initial_fetch_timeout() = lds_config.initial_fetch_timeout();
+  }
   return filter_chain_manager_->addFilterChains(
       config.has_filter_chain_matcher() ? &config.filter_chain_matcher() : nullptr,
       config.filter_chains(),
       config.has_default_filter_chain() ? &config.default_filter_chain() : nullptr, builder,
-      *filter_chain_manager_, maybeCreateFilterChainManager(config),
-      config.fcds_config().config_source(), *this);
+      *filter_chain_manager_, maybeCreateFilterChainManager(config), fcds_config_source, *this);
 }
 
 bool ListenerImpl::reusePortBpfCpuSteeringEnabled(
