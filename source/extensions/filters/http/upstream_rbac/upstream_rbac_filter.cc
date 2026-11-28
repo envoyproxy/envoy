@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/upstream_rbac/upstream_rbac_filter.h"
 
+#include <vector>
+
 #include "source/common/http/header_map_impl.h"
 #include "source/common/stream_info/upstream_address.h"
 
@@ -63,14 +65,36 @@ void UpstreamRoleBasedAccessControlFilter::onHostSelected(
     request_headers = Http::StaticEmptyHeaders::get().request_headers.get();
   }
 
-  ENVOY_LOG(debug, "checking upstream host {} for request", address->asString());
-
-  // Reuse the downstream RBAC filter's shadow + enforced evaluation. evaluateEngines() sends the
-  // 403 local reply on denial (aborting the upstream connection) and returns StopIteration.
-  const Http::FilterHeadersStatus status = evaluateEngines(*request_headers, DynamicMetadataKey);
-  if (status != Http::FilterHeadersStatus::StopIteration) {
-    ENVOY_LOG(debug, "allowed by default or by policy");
+  // Collect every address the connection may be established to: the primary address plus any
+  // additional addresses of the host (e.g. from a DNS answer with several addresses). Checking
+  // only the primary address would let a request reach a denied additional address whenever the
+  // connection falls back to it (e.g. Happy Eyeballs) after the primary proves unreachable.
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses_to_check{address};
+  if (const auto address_list = host->addressListOrNull(); address_list != nullptr) {
+    for (const auto& additional_address : *address_list) {
+      if (additional_address != nullptr && additional_address->asString() != address->asString()) {
+        addresses_to_check.push_back(additional_address);
+      }
+    }
   }
+
+  for (const auto& address_to_check : addresses_to_check) {
+    setUpstreamAddress(address_to_check);
+
+    ENVOY_LOG(debug, "checking upstream host {} for request", address_to_check->asString());
+
+    // Reuse the downstream RBAC filter's shadow + enforced evaluation. evaluateEngines() sends
+    // the 403 local reply on denial (aborting the upstream connection) and returns StopIteration.
+    const Http::FilterHeadersStatus status = evaluateEngines(*request_headers, DynamicMetadataKey);
+    if (status == Http::FilterHeadersStatus::StopIteration) {
+      return;
+    }
+  }
+
+  // Every address was allowed. Restore the primary address so the filter state observed by the
+  // rest of the request matches the behavior before additional addresses were checked.
+  setUpstreamAddress(address);
+  ENVOY_LOG(debug, "allowed by default or by policy");
 }
 
 } // namespace UpstreamRBACFilter
