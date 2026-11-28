@@ -35,6 +35,8 @@ _GPERFTOOLS_TCMALLOC = Label("//bazel:gperftools_tcmalloc")
 _JEMALLOC = Label("//bazel/deps:jemalloc")
 _JEMALLOC_ENABLED = Label("//bazel:jemalloc_enabled")
 _LINUX = Label("//bazel:linux")
+_LINUX_AARCH64 = Label("//bazel:linux_aarch64")
+_LINUX_X86_64 = Label("//bazel:linux_x86_64")
 _NO_DEBUG_INFO = Label("//bazel:no_debug_info")
 _OPT_BUILD = Label("//bazel:opt_build")
 _STATIC_STDLIB = Label("//bazel:static_stdlib")
@@ -128,6 +130,10 @@ def envoy_copts(test = False):
            }) + select({
                # TODO: Remove once https://reviews.llvm.org/D73007 is in the lowest supported Xcode version
                _APPLE: ["-Wno-range-loop-analysis"],
+               "//conditions:default": [],
+           }) + selects.with_or({
+               # Probe large stack allocations on supported Linux target architectures.
+               (_LINUX_AARCH64, _LINUX_X86_64): ["-fstack-clash-protection"],
                "//conditions:default": [],
            }) + select({
                _NO_DEBUG_INFO: ["-g0"],
