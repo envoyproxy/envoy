@@ -5385,6 +5385,130 @@ TEST_P(Http2CodecImplTest, BadResponseHeader) {
   EXPECT_OK(server_wrapper_->status_);
 }
 
+// A request with a pseudo-header after a regular header is malformed (RFC 9113 section 8.3).
+TEST_P(Http2CodecImplTest, PseudoHeaderAfterRegularHeaderInRequest) {
+  initialize();
+  driveToCompletion();
+
+  const Http2Frame request = Http2Frame::makeHeadersFrameWithHeaders(
+      Http2Frame::makeClientStreamId(0), {{":method", "GET"},
+                                          {":scheme", "http"},
+                                          {":authority", "example.com"},
+                                          {"x-a", "b"},
+                                          {":path", "/"}});
+
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(0);
+  Buffer::OwnedImpl data;
+  data.add(request.data(), request.size());
+  // dispatch() is private in ServerConnectionImpl but public in base ConnectionImpl
+  const Status status = static_cast<ConnectionImpl*>(server_.get())->dispatch(data);
+  EXPECT_THAT(status, Not(IsOk()));
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(1, server_stats_store_.counter("http2.rx_messaging_error").value());
+}
+
+// With stream_error_on_invalid_http_message, only the malformed request's stream is reset.
+TEST_P(Http2CodecImplTest, PseudoHeaderAfterRegularHeaderInRequestStreamError) {
+  expect_buffered_data_on_teardown_ = true;
+  stream_error_on_invalid_http_messaging_ = true;
+  initialize();
+  driveToCompletion();
+
+  const Http2Frame request = Http2Frame::makeHeadersFrameWithHeaders(
+      Http2Frame::makeClientStreamId(0), {{":method", "GET"},
+                                          {":scheme", "http"},
+                                          {"x-a", "b"},
+                                          {":authority", "example.com"},
+                                          {":path", "/"}});
+
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  Buffer::OwnedImpl data;
+  data.add(request.data(), request.size());
+  // dispatch() is private in ServerConnectionImpl but public in base ConnectionImpl
+  EXPECT_OK(static_cast<ConnectionImpl*>(server_.get())->dispatch(data));
+  EXPECT_EQ(1, server_stats_store_.counter("http2.rx_messaging_error").value());
+}
+
+// A response with a pseudo-header after a regular header is malformed (RFC 9113 section 8.3).
+TEST_P(Http2CodecImplTest, PseudoHeaderAfterRegularHeaderInResponse) {
+  expect_buffered_data_on_teardown_ = true;
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, true));
+  driveToCompletion();
+
+  const Http2Frame response = Http2Frame::makeHeadersFrameWithHeaders(
+      Http2Frame::makeClientStreamId(0), {{"x-r", "1"}, {":status", "200"}});
+
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(0);
+  client_wrapper_->buffer_.add(response.data(), response.size());
+  driveToCompletion();
+  EXPECT_THAT(client_wrapper_->status_, Not(IsOk()));
+  EXPECT_TRUE(isCodecProtocolError(client_wrapper_->status_));
+  EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
+}
+
+// The ordering check applies to each header block separately: the final response headers start
+// with :status even though the 1xx headers ended with a regular header.
+TEST_P(Http2CodecImplTest, PseudoHeaderOrderCheckedPerHeaderBlock) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, true));
+  driveToCompletion();
+
+  TestResponseHeaderMapImpl continue_headers{{":status", "100"}, {"x-c", "1"}};
+  EXPECT_CALL(response_decoder_, decode1xxHeaders_(_));
+  response_encoder_->encode1xxHeaders(continue_headers);
+  driveToCompletion();
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"x-r", "1"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+  driveToCompletion();
+
+  TestResponseTrailerMapImpl response_trailers{{"x-t", "1"}};
+  EXPECT_CALL(response_decoder_, decodeTrailers_(_));
+  response_encoder_->encodeTrailers(response_trailers);
+  driveToCompletion();
+  EXPECT_OK(client_wrapper_->status_);
+  EXPECT_EQ(0, client_stats_store_.counter("http2.rx_messaging_error").value());
+}
+
+// With the runtime guard disabled, oghttp2 accepts the out-of-order request as before. nghttp2
+// always rejects it.
+TEST_P(Http2CodecImplTest, PseudoHeaderAfterRegularHeaderAllowedWithRuntimeGuardDisabled) {
+  if (http2_implementation_ != Http2Impl::Oghttp2) {
+    GTEST_SKIP();
+  }
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http2_reject_pseudo_header_after_regular_header", "false"}});
+  initialize();
+  driveToCompletion();
+
+  const Http2Frame request = Http2Frame::makeHeadersFrameWithHeaders(
+      Http2Frame::makeClientStreamId(0), {{":method", "GET"},
+                                          {":scheme", "http"},
+                                          {":authority", "example.com"},
+                                          {"x-a", "b"},
+                                          {":path", "/"}});
+
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  Buffer::OwnedImpl data;
+  data.add(request.data(), request.size());
+  // dispatch() is private in ServerConnectionImpl but public in base ConnectionImpl
+  EXPECT_OK(static_cast<ConnectionImpl*>(server_.get())->dispatch(data));
+  EXPECT_EQ(0, server_stats_store_.counter("http2.rx_messaging_error").value());
+}
+
 // Test client for H/2 METADATA frame edge cases.
 class MetadataTestClientConnectionImpl : public TestClientConnectionImpl {
 public:

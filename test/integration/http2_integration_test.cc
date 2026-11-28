@@ -614,6 +614,60 @@ TEST_P(Http2FrameIntegrationTest, DownstreamHeadersAfterEndStreamGuardDisabled) 
   tcp_client_->waitForDisconnect();
 }
 
+// A request with a pseudo-header after a regular header is malformed (RFC 9113 section 8.3).
+TEST_P(Http2FrameIntegrationTest, DownstreamPseudoHeaderAfterRegularHeader) {
+  useAccessLog("%RESPONSE_CODE% %RESPONSE_CODE_DETAILS%");
+  beginSession();
+
+  sendFrame(Http2Frame::makeHeadersFrameWithHeaders(1, {{":method", "GET"},
+                                                        {":scheme", "http"},
+                                                        {":authority", "host"},
+                                                        {"x-a", "b"},
+                                                        {":path", "/"}}));
+
+  // Both codecs treat this as a connection error by default: the stream is not reset on its own and
+  // the request is not forwarded upstream.
+  for (Http2Frame frame = readNextStreamOrGoAwayFrame(); !frame.empty();
+       frame = readNextStreamOrGoAwayFrame()) {
+    EXPECT_EQ(Http2Frame::Type::GoAway, frame.type());
+  }
+  tcp_client_->waitForDisconnect();
+  EXPECT_EQ("0 http2.invalid.header.field", waitForAccessLog(access_log_name_));
+  test_server_->waitForCounter("http.config_test.downstream_cx_protocol_error", Eq(1));
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+}
+
+// A response with a pseudo-header after a regular header is malformed (RFC 9113 section 8.3).
+TEST_P(Http2FrameIntegrationTest, UpstreamPseudoHeaderAfterRegularHeader) {
+  useAccessLog("%RESPONSE_CODE% %RESPONSE_CODE_DETAILS%");
+  beginSession();
+
+  sendFrame(Http2Frame::makeRequest(1, "host", "/"));
+  FakeRawConnectionPtr upstream;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
+  // Wait for Envoy's preface, SETTINGS and request HEADERS.
+  ASSERT_TRUE(upstream->waitForData(FakeRawConnection::waitForAtLeastBytes(40)));
+
+  std::string buf;
+  absl::StrAppend(&buf, std::string(Http2Frame::makeEmptySettingsFrame()));
+  absl::StrAppend(&buf,
+                  std::string(Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack)));
+  absl::StrAppend(&buf, std::string(Http2Frame::makeHeadersFrameWithHeaders(
+                            1, {{"x-r", "1"}, {":status", "200"}})));
+  ASSERT_TRUE(upstream->write(buf));
+
+  // The response is rejected and the downstream client gets a local 502.
+  const Http2Frame response = readNextStreamOrGoAwayFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+  EXPECT_EQ("502 upstream_reset_before_response_started{protocol_error}",
+            waitForAccessLog(access_log_name_));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_protocol_error", Eq(1));
+  tcp_client_->close();
+  if (upstream->connected()) {
+    ASSERT_TRUE(upstream->close());
+  }
+}
+
 TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
   // Configure max concurrent streams to 2.
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
