@@ -333,6 +333,52 @@ TEST_F(PayloadReaderTest, ExternalReadFailureMarksReaderFailedAndFailsSubsequent
   EXPECT_EQ(state->total_reads, 1);
 }
 
+// Cancelling an in-flight read and dropping the last external PayloadReaderSharedPtr must not leak
+// via a PayloadReader <-> ExternalBuffer cycle; ExternalBuffer must destruct immediately.
+TEST_F(PayloadReaderTest, CancelMidReadAndDropLastRefDestroysExternalBufferImmediately) {
+  class PendingCallbackExternalBuffer : public ExternalBuffer {
+  public:
+    void write(Buffer::InstancePtr, bool, WriteCallback done) override {
+      done(ExternalBufferStatus::Ok);
+    }
+    void read(uint64_t, uint64_t, ReadCallback done) override { pending_read_ = std::move(done); }
+    uint64_t length() const override { return 10; }
+
+    ReadCallback pending_read_;
+  };
+
+  auto ext = std::make_shared<PendingCallbackExternalBuffer>();
+  std::weak_ptr<ExternalBuffer> weak_ext = ext;
+  PayloadReaderSharedPtr reader = PayloadReader::fromExternalBuffer(std::move(ext), 10);
+  std::weak_ptr<PayloadReader> weak_reader = reader;
+
+  absl::StatusOr<Buffer::InstancePtr> res = absl::UnknownError("pending");
+  auto handle = Coroutine::launch(
+      reader->readChunk(0, 5), executor_,
+      [&res](absl::StatusOr<Buffer::InstancePtr> r) { res = std::move(r); },
+      Coroutine::StartMode::Inline);
+  drain();
+
+  handle.cancel();
+  EXPECT_THAT(res.status(), HasStatusCode(absl::StatusCode::kCancelled));
+
+  reader.reset();
+  EXPECT_TRUE(weak_reader.expired());
+  EXPECT_TRUE(weak_ext.expired());
+}
+
+TEST_F(PayloadReaderTest, OverflowReadRangeReturnsInvalidArgument) {
+  Buffer::OwnedImpl mem("hello");
+  PayloadReaderSharedPtr reader = PayloadReader::fromInMemory(mem);
+
+  absl::StatusOr<Buffer::InstancePtr> chunk_or = absl::UnknownError("pending");
+  auto handle = Coroutine::launch(
+      reader->readChunk(UINT64_MAX, 1), executor_,
+      [&chunk_or](absl::StatusOr<Buffer::InstancePtr> res) { chunk_or = std::move(res); },
+      Coroutine::StartMode::Inline);
+  EXPECT_THAT(chunk_or.status(), HasStatusCode(absl::StatusCode::kInvalidArgument));
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

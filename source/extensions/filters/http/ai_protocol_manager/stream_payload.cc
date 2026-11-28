@@ -20,6 +20,9 @@ namespace AiProtocolManager {
 Coroutine::Task<absl::Status> streamPayload(PayloadReader& source, uint64_t offset, uint64_t length,
                                             ChainWriter& writer) {
   PayloadReaderSharedPtr reader = source.shared_from_this();
+  if (reader->hasFailed()) {
+    co_return absl::DataLossError("external buffer failed");
+  }
   if (offset > reader->length() || length > reader->length() - offset) {
     co_return absl::InvalidArgumentError("payload stream range out of bounds");
   }
@@ -29,8 +32,8 @@ Coroutine::Task<absl::Status> streamPayload(PayloadReader& source, uint64_t offs
   while (current < end) {
     const uint64_t chunk_len = std::min(ChainWriter::WriteChunkSize, end - current);
     ASSIGN_OR_CO_RETURN(Buffer::InstancePtr chunk, co_await reader->readChunk(current, chunk_len));
-    if (chunk == nullptr || chunk->length() == 0) {
-      co_return absl::DataLossError("external buffer returned empty chunk");
+    if (chunk == nullptr || chunk->length() == 0 || chunk->length() > chunk_len) {
+      co_return absl::DataLossError("external buffer returned invalid chunk");
     }
     current += chunk->length();
     CO_RETURN_IF_ERROR(co_await writer.inject(*chunk));

@@ -27,11 +27,14 @@ namespace AiProtocolManager {
 // like file or remote I/O are not easily cancelled, and keeping cancellation out of the
 // ExternalBuffer interface simplifies implementations). Because an in-flight read continues past
 // coroutine cancellation, onStart() moves the single-flight semaphore `permit` and a
-// `PayloadReaderSharedPtr` into the read callback:
+// `std::weak_ptr<PayloadReader>` into the read callback:
 //   - `permit` stays held until the underlying read callback fires so a subsequent reader (e.g. on
 //     upstream retry) cannot overlap an orphaned read, and is released before `complete()` so an
 //     uncontended caller can re-acquire immediately without suspending.
-//   - `reader` keeps the ExternalBuffer and `failed_` alive until the callback completes.
+//   - A weak reader reference avoids a strong `PayloadReader <-> ExternalBuffer` cycle while the
+//     read is in flight: `ReadExternalBuffer::reader_` keeps the reader alive while uncancelled,
+//     any external holder (e.g. retry state) keeps it alive across mid-read cancellation, and
+//     dropping the last external holder destroys `ExternalBuffer` immediately to cancel I/O.
 class PayloadReader::ReadExternalBuffer
     : public Coroutine::LeafAwaitable<absl::StatusOr<Buffer::InstancePtr>> {
 public:
@@ -42,12 +45,15 @@ public:
 
 protected:
   void onStart() override {
-    auto on_read = [this, alive = std::weak_ptr<bool>(alive_), reader = reader_,
+    auto on_read = [this, alive = std::weak_ptr<bool>(alive_),
+                    weak_reader = std::weak_ptr<PayloadReader>(reader_),
                     permit = std::move(permit_)](ExternalBufferStatus status,
                                                  Buffer::InstancePtr data) mutable {
       absl::StatusOr<Buffer::InstancePtr> result;
       if (status != ExternalBufferStatus::Ok) {
-        reader->failed_ = true;
+        if (PayloadReaderSharedPtr reader = weak_reader.lock(); reader != nullptr) {
+          reader->failed_ = true;
+        }
         result = absl::DataLossError("external buffer read failed");
       } else {
         result = std::move(data);

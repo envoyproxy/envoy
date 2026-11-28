@@ -126,6 +126,35 @@ TEST_F(ChainWriterTest, EmptyExternalChunkReturnsDataLoss) {
   EXPECT_EQ(injected(), "");
 }
 
+TEST_F(ChainWriterTest, OversizedExternalChunkReturnsDataLoss) {
+  class OversizedChunkExternalBuffer : public ExternalBuffer {
+  public:
+    void write(Buffer::InstancePtr, bool, WriteCallback done) override {
+      done(ExternalBufferStatus::Ok);
+    }
+    void read(uint64_t, uint64_t, ReadCallback done) override {
+      done(ExternalBufferStatus::Ok, std::make_unique<Buffer::OwnedImpl>("01234567"));
+    }
+    uint64_t length() const override { return 4; }
+  };
+
+  PayloadReaderSharedPtr reader =
+      PayloadReader::fromExternalBuffer(std::make_shared<OversizedChunkExternalBuffer>(), 4);
+  Coroutine::DetachedHandle handle = launch(stream(*reader, 0, 4));
+  drain();
+
+  EXPECT_THAT(result_, HasStatusCode(absl::StatusCode::kDataLoss));
+  EXPECT_EQ(injected(), "");
+}
+
+TEST_F(ChainWriterTest, FailedZeroLengthReaderReturnsDataLoss) {
+  PayloadReaderSharedPtr reader = PayloadReader::createFailed(0);
+  Coroutine::DetachedHandle handle = launch(stream(*reader, 0, 0));
+
+  EXPECT_THAT(result_, HasStatusCode(absl::StatusCode::kDataLoss));
+  EXPECT_EQ(injected(), "");
+}
+
 TEST_F(ChainWriterTest, CancelStopsAPendingRangeStream) {
   PayloadReaderSharedPtr reader = store("0123456789");
   Coroutine::DetachedHandle handle = launch(stream(*reader, 0, 10));
