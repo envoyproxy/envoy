@@ -69,6 +69,7 @@ public:
                     std::set<std::string>&& added_resource_ids,
                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                     const std::string& version_info) override;
+  void onVhdsFailure() override;
   void onRdsFailure() override { base_.onRdsFailure(); }
   void setObserver(OptRef<Rds::RouteConfigUpdateObserver> observer) override {
     base_.warmer_.setObserver(observer);

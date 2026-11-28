@@ -16,10 +16,16 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Router {
 
 namespace {
+
+// Tracks the in-flight initial wildcard VHDS subscription inside requested_vhds_resource_ids_;
+// per-host on-demand aliases always have the form "<route_config_name>/<domain>".
+constexpr absl::string_view WildcardResourceId = "*";
 
 // Resets 'route_config::virtual_hosts' by merging VirtualHost contained in
 // 'rds_vhosts' and 'vhds_vhosts'.
@@ -70,8 +76,15 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
   }
   auto new_route_config = std::make_unique<envoy::config::route::v3::RouteConfiguration>();
   new_route_config->CheckTypeAndMergeFrom(rc);
-  const uint64_t new_vhds_config_hash =
-      new_route_config->has_vhds() ? MessageUtil::hash(new_route_config->vhds()) : 0ul;
+  uint64_t new_vhds_config_hash = 0ul;
+  if (new_route_config->has_vhds()) {
+    // Exclude skip_initial_warming from the subscription hash: vhds_configuration_changed only
+    // gates post-initialization subscription replacement, where initial warming has already
+    // completed.
+    auto* skip_initial_warming = new_route_config->mutable_vhds()->release_skip_initial_warming();
+    new_vhds_config_hash = MessageUtil::hash(new_route_config->vhds());
+    new_route_config->mutable_vhds()->set_allocated_skip_initial_warming(skip_initial_warming);
+  }
   std::unique_ptr<VirtualHostMap> rds_virtual_hosts;
   if (new_route_config->has_vhds()) {
     // When using VHDS, stash away RDS vhosts, so that they can be merged with VHDS vhosts in
@@ -152,10 +165,15 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
     // The new subscription holds none of the aliases the old one requested, so nothing
     // guarantees pushes for them any more.
     requested_vhds_resource_ids_.clear();
+    resource_ids_in_last_update_.clear();
+    if (new_route_config->vhds().has_skip_initial_warming()) {
+      requested_vhds_resource_ids_.emplace(WildcardResourceId, false);
+    }
   } else if (!has_vhds) {
     // This route configuration doesn't use VHDS, so the subscription of a previous one goes away.
     vhds_subscription_.reset();
     requested_vhds_resource_ids_.clear();
+    resource_ids_in_last_update_.clear();
   }
   last_vhds_config_hash_ = new_vhds_config_hash;
   rds_virtual_hosts_ = std::move(rds_virtual_hosts);
@@ -192,6 +210,13 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
     // ids, so record that, otherwise the ids of the previous update would be resolved against a
     // later publish.
     resource_ids_in_last_update_ = std::move(added_resource_ids);
+    if (auto it = requested_vhds_resource_ids_.find(WildcardResourceId);
+        it != requested_vhds_resource_ids_.end() && !it->second) {
+      it->second = true;
+      if (!configWarming()) {
+        onVhdsConfigPublished();
+      }
+    }
     return false;
   }
 
@@ -217,6 +242,10 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   // answering them locally later would serve permanently stale data without ever subscribing.
   // TODO(wbpcode): also take the removed_resources into account for marking requested VHDS resource
   // IDs as answered.
+  if (auto it = requested_vhds_resource_ids_.find(WildcardResourceId);
+      it != requested_vhds_resource_ids_.end() && !it->second) {
+    added_resource_ids.emplace(std::string(WildcardResourceId));
+  }
   for (absl::string_view resource_id : added_resource_ids) {
     if (auto it = requested_vhds_resource_ids_.find(resource_id);
         it != requested_vhds_resource_ids_.end()) {
@@ -272,6 +301,31 @@ void RouteConfigUpdateReceiverImpl::notifyCallback(
   });
 }
 
+void RouteConfigUpdateReceiverImpl::onVhdsFailure() {
+  auto wildcard_it = requested_vhds_resource_ids_.find(WildcardResourceId);
+  if (wildcard_it == requested_vhds_resource_ids_.end() || wildcard_it->second) {
+    return;
+  }
+  requested_vhds_resource_ids_.erase(wildcard_it);
+  const auto* config = dynamic_cast<const ConfigImpl*>(parsedConfiguration().get());
+  for (auto it = config_update_callbacks_.begin(); it != config_update_callbacks_.end();) {
+    if (!requested_vhds_resource_ids_.contains(it->alias_)) {
+      if (config != nullptr) {
+        notifyCallback(*config, it->alias_, it->thread_local_dispatcher_, it->cb_);
+      } else {
+        it->thread_local_dispatcher_.post([cb = it->cb_] {
+          if (auto callback = cb.lock()) {
+            (*callback)(false);
+          }
+        });
+      }
+      it = config_update_callbacks_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
 void RouteConfigUpdateReceiverImpl::requestVirtualHostsUpdate(
     const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
@@ -290,6 +344,19 @@ void RouteConfigUpdateReceiverImpl::requestVirtualHostsUpdate(
                                                    : base_.route_config_name_;
         const std::string alias =
             VhdsSubscription::domainNameToAlias(route_config_name, for_domain);
+        if (const auto wildcard_it = requested_vhds_resource_ids_.find(WildcardResourceId);
+            wildcard_it != requested_vhds_resource_ids_.end()) {
+          if (!wildcard_it->second || configWarming()) {
+            config_update_callbacks_.push_back(
+                {alias, thread_local_dispatcher, route_config_updated_cb});
+            return;
+          }
+          if (const auto* config = dynamic_cast<const ConfigImpl*>(parsedConfiguration().get());
+              config != nullptr && config->virtualHostExists(for_domain)) {
+            notifyCallback(*config, alias, thread_local_dispatcher, route_config_updated_cb);
+            return;
+          }
+        }
         if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache") &&
             vhdsResourceIdAnswered(alias)) {
           // The server has already answered for this alias and the published route configuration
@@ -311,30 +378,40 @@ void RouteConfigUpdateReceiverImpl::onVhdsConfigPublished() {
     return;
   }
 
+  const auto* config = dynamic_cast<const ConfigImpl*>(parsedConfiguration().get());
+  if (config == nullptr) {
+    return;
+  }
+  const bool wildcard_answered = vhdsResourceIdAnswered(std::string(WildcardResourceId));
   const bool check_answered_ids =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache");
   const auto& aliases = resourceIdsInLastVhdsUpdate();
   // Regular (non-VHDS) updates don't populate aliases fields in resources, but any publish can
   // resolve a queued callback whose alias an earlier update already answered.
-  if (aliases.empty() && !check_answered_ids) {
+  if (aliases.empty() && !check_answered_ids && !wildcard_answered) {
     return;
   }
 
-  const auto config = std::static_pointer_cast<const ConfigImpl>(parsedConfiguration());
   // Notifies connections that RouteConfiguration update has been propagated.
   // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
   // the VHDS update request do not match the aliases in the update response
   for (auto it = config_update_callbacks_.begin(); it != config_update_callbacks_.end();) {
-    // A callback is answered by this update if the update carries its alias, or by any earlier
-    // published update that did: the callback was then queued while that update was still
-    // warming, or the update that carried the alias was superseded before it was published and
-    // this update is the one delivering its merged result.
+    // A callback is answered by this update if the update carries its alias, by any earlier
+    // published update that did, or by the initial wildcard response matching its domain.
+    const bool latched_on_wildcard =
+        wildcard_answered && !requested_vhds_resource_ids_.contains(it->alias_);
     const bool answered =
-        aliases.contains(it->alias_) || (check_answered_ids && vhdsResourceIdAnswered(it->alias_));
+        aliases.contains(it->alias_) ||
+        (check_answered_ids && vhdsResourceIdAnswered(it->alias_)) ||
+        (latched_on_wildcard &&
+         config->virtualHostExists(VhdsSubscription::aliasToDomainName(it->alias_)));
     if (answered) {
       notifyCallback(*config, it->alias_, it->thread_local_dispatcher_, it->cb_);
       it = config_update_callbacks_.erase(it);
     } else {
+      if (latched_on_wildcard) {
+        updateOnDemand(it->alias_);
+      }
       it++;
     }
   }

@@ -214,6 +214,59 @@ TEST_P(VhdsIntegrationTest, InitialVhdsBlocksListenerWarmingWithRdsRouteConfig) 
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
+class VhdsSkipInitialWarmingIntegrationTest : public VhdsIntegrationTest {
+public:
+  VhdsSkipInitialWarmingIntegrationTest() { useRdsWithVhosts(); }
+
+  const envoy::config::route::v3::RouteConfiguration rdsConfig() const override {
+    envoy::config::route::v3::RouteConfiguration config = VhdsIntegrationTest::rdsConfig();
+    config.mutable_vhds()->mutable_skip_initial_warming();
+    return config;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsSkipInitialWarmingIntegrationTest,
+                         VHDS_INTEGRATION_PARAMS, vhdsTestParamsToString);
+
+TEST_P(VhdsSkipInitialWarmingIntegrationTest, SkipInitialWarmingAllowsTrafficBeforeVhdsResponse) {
+  initializeUpToInitialVhdsRequest();
+
+  // With skip_initial_warming set, listener warming completes before vhds_stream_ sends any
+  // DeltaDiscoveryResponse.
+  waitForListenerToServe();
+
+  // Static virtual host serves 200 immediately while the initial VHDS request is still pending.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Domains that only VHDS knows about return 404 while initial VHDS is still pending.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Deliver the initial VHDS response for sni.lyft.com and wait for reload.
+  sendInitialVhdsResponse();
+  if (routeConfigType() == RouteConfigType::Rds) {
+    test_server_->waitForCounter("http.config_test.rds.vhds.my_route.config_reload",
+                                 testing::Eq(1));
+    test_server_->waitForCounter("http.config_test.rds.my_route.config_reload", testing::Eq(2));
+  } else {
+    test_server_->waitForCounter("vhds.my_route.config_reload", testing::Eq(1));
+  }
+  test_server_->waitForWorkerThreads();
+
+  // The VHDS virtual host is now reachable.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "sni.lyft.com");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
 // An inline route configuration that uses VHDS, in a listener that arrives over LDS after the
 // server is already live. This is deliberately a separate fixture from VhdsIntegrationTest, whose
 // listener comes from the bootstrap and is therefore built while the server is still initializing.

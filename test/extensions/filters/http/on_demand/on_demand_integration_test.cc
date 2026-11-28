@@ -20,6 +20,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/resources.h"
 
+#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -1248,6 +1249,212 @@ TEST_P(OnDemandVhdsWithBodyIntegrationTest, VhdsOnDemandUpdateWithBody) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
+}
+
+class OnDemandVhdsSkipInitialWarmingIntegrationTest : public VhdsIntegrationTest {
+public:
+  const envoy::config::route::v3::RouteConfiguration rdsConfig() const override {
+    envoy::config::route::v3::RouteConfiguration config = VhdsIntegrationTest::rdsConfig();
+    config.mutable_vhds()->mutable_skip_initial_warming();
+    return config;
+  }
+
+  void prependOnDemandFilter(const std::string& filter_yaml) {
+    config_helper_.prependFilter(filter_yaml);
+  }
+
+  void initialize() override {
+    prependOnDemandFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    )EOF");
+    initializeUpToInitialVhdsRequest();
+    waitForListenerToServe();
+  }
+
+  void waitForMainThreadDispatcher() {
+    absl::Notification done;
+    test_server_->server().dispatcher().post([&done]() { done.Notify(); });
+    done.WaitForNotification();
+  }
+
+  std::string vhdsUpdateAttemptStatName() const {
+    return routeConfigType() == RouteConfigType::Rds
+               ? "http.config_test.rds.vhds.my_route.update_attempt"
+               : "vhds.my_route.update_attempt";
+  }
+
+  void expectVhdsSubscribeAndAck(const std::string& expected_resource_name) {
+    envoy::service::discovery::v3::DeltaDiscoveryRequest first;
+    ASSERT_TRUE(vhds_stream_->waitForGrpcMessage(*dispatcher_, first));
+    EXPECT_EQ(Config::TestTypeUrl::get().VirtualHost, first.type_url());
+    EXPECT_TRUE(first.resource_names_unsubscribe().empty());
+
+    const std::set<std::string> subscribed(first.resource_names_subscribe().begin(),
+                                           first.resource_names_subscribe().end());
+    if (subscribed.empty()) {
+      EXPECT_FALSE(first.response_nonce().empty());
+      EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                               {expected_resource_name}, {}, vhds_stream_.get()));
+    } else {
+      EXPECT_THAT(subscribed, testing::ElementsAre(expected_resource_name));
+      if (first.response_nonce().empty()) {
+        EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                                 vhds_stream_.get()));
+      }
+    }
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OnDemandVhdsSkipInitialWarmingIntegrationTest,
+                         VHDS_INTEGRATION_PARAMS, vhdsTestParamsToString);
+
+TEST_P(OnDemandVhdsSkipInitialWarmingIntegrationTest,
+       LatchedRequestFallsThroughToOnDemandAfterUnmatchedInitialWildcard) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"x-lyft-user-id", "123"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  test_server_->waitForGauge("http.config_test.on_demand.route_discovery_pending", Eq(1));
+  waitForMainThreadDispatcher();
+  EXPECT_EQ(1, test_server_->counter(vhdsUpdateAttemptStatName())->value());
+
+  // Initial wildcard response delivers an unrelated vhost, so vhost.first falls through to
+  // per-domain on-demand VHDS discovery.
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_.get());
+  expectVhdsSubscribeAndAck(vhdsRequestResourceName("vhost.first"));
+
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "2", vhds_stream_.get(),
+      {"my_route/vhost.first"});
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  waitForNextUpstreamRequest(1);
+  EXPECT_TRUE(upstream_request_->complete());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(0, test_server_->gauge("http.config_test.on_demand.route_discovery_pending")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.on_demand.route_discovery_found")->value());
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+class OnDemandVhdsSkipInitialWarmingOdCdsIntegrationTest
+    : public OnDemandVhdsSkipInitialWarmingIntegrationTest {
+public:
+  void initialize() override {
+    prependOnDemandFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+      odcds:
+        source:
+          api_config_source:
+            api_type: DELTA_GRPC
+            grpc_services:
+              envoy_grpc:
+                cluster_name: xds_cluster
+        timeout: "2.5s"
+    )EOF");
+    initializeUpToInitialVhdsRequest();
+    dynamic_cluster_upstream_idx_ = fake_upstreams_.size();
+    addFakeUpstream(Http::CodecType::HTTP2);
+    dynamic_cluster_ = ConfigHelper::buildStaticCluster(
+        "dynamic_cluster",
+        fake_upstreams_[dynamic_cluster_upstream_idx_]->localAddress()->ip()->port(),
+        Network::Test::getLoopbackAddressString(ipVersion()));
+    waitForListenerToServe();
+  }
+
+  FakeStreamPtr odcds_stream_;
+  std::size_t dynamic_cluster_upstream_idx_{0};
+  envoy::config::cluster::v3::Cluster dynamic_cluster_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OnDemandVhdsSkipInitialWarmingOdCdsIntegrationTest,
+                         VHDS_INTEGRATION_PARAMS, vhdsTestParamsToString);
+
+TEST_P(OnDemandVhdsSkipInitialWarmingOdCdsIntegrationTest,
+       LatchedRequestResolvedByInitialWildcardWithFallbackAndOdCds) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "odcds.example.com"},
+                                                 {"x-lyft-user-id", "123"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  test_server_->waitForGauge("http.config_test.on_demand.route_discovery_pending", Eq(1));
+  waitForMainThreadDispatcher();
+  EXPECT_EQ(1, test_server_->counter(vhdsUpdateAttemptStatName())->value());
+
+  // Initial wildcard response delivers both a vhost targeting an undiscovered cluster and a
+  // catch-all '*' fallback vhost without triggering per-domain VHDS requests.
+  const auto vhost = TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
+name: my_route/odcds_vhost
+domains: ["odcds.example.com"]
+routes:
+- match: { prefix: "/" }
+  route: { cluster: "dynamic_cluster" }
+)EOF");
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost,
+      {vhost, TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+                  virtualHostYaml("my_route/fallback_vhost", "\"*\""))},
+      {}, "1", vhds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  test_server_->waitForCounter("http.config_test.on_demand.route_discovery_found", Eq(1));
+  test_server_->waitForGauge("http.config_test.on_demand.cluster_discovery_pending", Eq(1));
+  EXPECT_EQ(1,
+            test_server_->counter("http.config_test.on_demand.route_discovery_requested")->value());
+  EXPECT_EQ(2, test_server_->counter(vhdsUpdateAttemptStatName())->value());
+
+  AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  odcds_stream_->startGrpcStream();
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"dynamic_cluster"},
+                                           {}, odcds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {dynamic_cluster_}, {}, "1", odcds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {}, {},
+                                           odcds_stream_.get()));
+
+  waitForNextUpstreamRequest(dynamic_cluster_upstream_idx_);
+  EXPECT_TRUE(upstream_request_->complete());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(
+      1, test_server_->counter("http.config_test.on_demand.cluster_discovery_available")->value());
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Subsequent requests for arbitrary unmatched domains match the catch-all '*' vhost immediately
+  // without issuing any on-demand discovery or VHDS requests.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "arbitrary.unmatched.example.com");
+  EXPECT_EQ(1,
+            test_server_->counter("http.config_test.on_demand.route_discovery_requested")->value());
+  EXPECT_EQ(2, test_server_->counter(vhdsUpdateAttemptStatName())->value());
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 } // namespace

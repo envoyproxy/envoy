@@ -10,6 +10,8 @@ import "envoy/config/route/v3/route_components.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -199,6 +201,26 @@ message RouteConfiguration {
 message Vhds {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Vhds";
 
+  // Options for allowing listener and route configuration initialization to complete without
+  // waiting for the initial VHDS update.
+  message SkipInitialWarming {
+    option (xds.annotations.v3.message_status).work_in_progress = true;
+  }
+
   // Configuration source specifier for VHDS.
   core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // If set, initial VHDS warming does not block listener or route configuration initialization;
+  // the client marks initialization ready immediately upon starting the VHDS subscription while
+  // the initial VHDS request remains in flight. Requests arriving before the initial VHDS update
+  // completes are routed against the route configuration's existing virtual hosts. When the
+  // :ref:`on-demand HTTP filter <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>`
+  // is configured, requests that miss route lookup while the initial VHDS request is in flight
+  // wait for the initial VHDS update to complete (resuming immediately if the initial update
+  // resolves a matching virtual host, falling through to per-domain on-demand VHDS discovery if
+  // still unmatched, or completing without route discovery if the initial VHDS fetch fails). When
+  // unset, initial VHDS warming blocks listener and route configuration initialization until the
+  // initial VHDS update completes or fails.
+  SkipInitialWarming skip_initial_warming = 2
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 }

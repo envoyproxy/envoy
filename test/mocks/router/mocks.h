@@ -721,7 +721,9 @@ public:
   MOCK_METHOD(bool, onVhdsUpdate,
               (const VirtualHostRefVector& added_vhosts, std::set<std::string>&& added_resource_ids,
                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-               const std::string& version_info));
+               const std::string& version_info),
+              (override));
+  MOCK_METHOD(void, onVhdsFailure, (), (override));
 };
 
 class MockScopedConfig : public ScopedConfig {
