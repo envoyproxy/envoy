@@ -1875,6 +1875,9 @@ WEAK_STUB(UpstreamBridgeSendResponseData,
 WEAK_STUB(UpstreamBridgeSendResponseTrailers,
           envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_trailers(nullptr,
                                                                                         nullptr, 0))
+WEAK_STUB(UpstreamBridgeEnableUpstreamConnectionReuse,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_enable_upstream_connection_reuse(
+              nullptr))
 
 WEAK_STUB(NetworkSetDynamicMetadataBool,
           envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(nullptr, {nullptr, 0},

@@ -5,6 +5,7 @@
 #include "source/extensions/upstreams/http/dynamic_modules/config.h"
 #include "source/extensions/upstreams/http/dynamic_modules/upstream_request.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/router/router_filter_interface.h"
 #include "test/mocks/server/factory_context.h"
@@ -145,6 +146,9 @@ TEST_F(TcpConnPoolTest, Cancel) {
 class HttpTcpBridgeTest : public ::testing::Test {
 public:
   void createBridge(const std::string& module_name) {
+    // Destroying an earlier bridge closes the shared mock connection, so reopen it for the next.
+    bridge_.reset();
+    mock_connection_.state_ = Network::Connection::State::Open;
     setTestModulesSearchPath();
     bridge_config_ = createBridgeConfig(module_name);
 
@@ -256,13 +260,14 @@ TEST_F(HttpTcpBridgeTest, OnUpstreamConnectionClose) {
 }
 
 TEST_F(HttpTcpBridgeTest, ResetStream) {
-  EXPECT_CALL(mock_connection_,
-              close(Network::ConnectionCloseType::NoFlush, "dynamic_module_bridge_reset_stream"));
+  EXPECT_CALL(mock_connection_, close(Network::ConnectionCloseType::AbortReset,
+                                      "dynamic_module_bridge_reset_stream"));
   bridge_->resetStream();
+  // The reset closed the connection, so destroying the bridge closes it no second time.
+  bridge_.reset();
 }
 
 TEST_F(HttpTcpBridgeTest, ReadDisable) {
-  EXPECT_CALL(mock_connection_, state()).WillOnce(Return(Network::Connection::State::Open));
   EXPECT_CALL(mock_connection_, readDisable(true));
   bridge_->readDisable(true);
 }
@@ -506,7 +511,7 @@ TEST_F(HttpTcpBridgeTest, SendResponseOutsideHookWithoutBodyIsInline) {
 // =============================================================================
 
 TEST_F(HttpTcpBridgeTest, ReadDisableConnectionNotOpen) {
-  EXPECT_CALL(mock_connection_, state()).WillOnce(Return(Network::Connection::State::Closed));
+  ON_CALL(mock_connection_, state()).WillByDefault(Return(Network::Connection::State::Closed));
   EXPECT_CALL(mock_connection_, readDisable(_)).Times(0);
   bridge_->readDisable(true);
 }
@@ -522,17 +527,327 @@ TEST_F(HttpTcpBridgeTest, OnEventLocalClose) {
 }
 
 TEST_F(HttpTcpBridgeTest, OnEventAfterResetStream) {
-  EXPECT_CALL(mock_connection_,
-              close(Network::ConnectionCloseType::NoFlush, "dynamic_module_bridge_reset_stream"));
+  EXPECT_CALL(mock_connection_, close(Network::ConnectionCloseType::AbortReset,
+                                      "dynamic_module_bridge_reset_stream"));
   bridge_->resetStream();
 
   EXPECT_CALL(mock_upstream_to_downstream_, onResetStream(_, _)).Times(0);
   bridge_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_F(HttpTcpBridgeTest, WatermarksAfterResetStream) {
+// Only the module knows where its protocol's exchange ends, so destroying the bridge closes a
+// connection that is still open instead of returning it to the pool, and releases the connection
+// before the close so the pool reports the close to no one.
+TEST_F(HttpTcpBridgeTest, DestroyReleasesThenClosesTheUpstreamConnection) {
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
+  EXPECT_OK(bridge_->encodeHeaders(headers, true));
+  bool released = false;
+  mock_conn_data_->release_callback_ = [&released]() { released = true; };
   EXPECT_CALL(mock_connection_,
-              close(Network::ConnectionCloseType::NoFlush, "dynamic_module_bridge_reset_stream"));
+              close(Network::ConnectionCloseType::NoFlush, "dynamic_module_bridge_destroyed"))
+      .WillOnce(Invoke(
+          [&released](Network::ConnectionCloseType, absl::string_view) { EXPECT_TRUE(released); }));
+  bridge_.reset();
+}
+
+void enableReuse(HttpTcpBridge& bridge) {
+  envoy_dynamic_module_callback_upstream_http_tcp_bridge_enable_upstream_connection_reuse(
+      static_cast<envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr>(&bridge));
+}
+
+enum class RequestEnd { Headers, Data, Trailers };
+
+class HttpTcpBridgeReuseTest : public HttpTcpBridgeTest,
+                               public testing::WithParamInterface<RequestEnd> {};
+
+INSTANTIATE_TEST_SUITE_P(RequestEnds, HttpTcpBridgeReuseTest,
+                         testing::Values(RequestEnd::Headers, RequestEnd::Data,
+                                         RequestEnd::Trailers),
+                         [](const testing::TestParamInfo<RequestEnd>& info) -> std::string {
+                           switch (info.param) {
+                           case RequestEnd::Headers:
+                             return "Headers";
+                           case RequestEnd::Data:
+                             return "Data";
+                           case RequestEnd::Trailers:
+                             return "Trailers";
+                           }
+                           return "";
+                         });
+
+// A module that enabled reuse gets its open connection back in the pool, released and not closed,
+// once the whole request reached the bridge, whichever encode call ended it.
+TEST_P(HttpTcpBridgeReuseTest, EnabledReuseReturnsAnOpenConnectionToThePool) {
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
+  EXPECT_OK(bridge_->encodeHeaders(headers, GetParam() == RequestEnd::Headers));
+  if (GetParam() == RequestEnd::Data) {
+    Buffer::OwnedImpl body("body");
+    bridge_->encodeData(body, true);
+  }
+  if (GetParam() == RequestEnd::Trailers) {
+    Envoy::Http::TestRequestTrailerMapImpl trailers{{"trailer", "value"}};
+    bridge_->encodeTrailers(trailers);
+  }
+  enableReuse(*bridge_);
+  bool released = false;
+  mock_conn_data_->release_callback_ = [&released]() { released = true; };
+  EXPECT_CALL(mock_connection_, close(_, _)).Times(0);
+  bridge_.reset();
+  EXPECT_TRUE(released);
+}
+
+// Every field passes the reuse gate by default, so each row names only the one that refuses.
+struct ReuseRefusal {
+  std::string name;
+  Network::Connection::State state = Network::Connection::State::Open;
+  bool reuse_enabled = true;
+  bool request_complete = true;
+  bool module_ended_data = false;
+  bool upstream_ended_data = false;
+  bool read_enabled = true;
+  bool above_high_watermark = false;
+};
+
+class HttpTcpBridgeReuseRefusalTest : public HttpTcpBridgeTest,
+                                      public testing::WithParamInterface<ReuseRefusal> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    Refusals, HttpTcpBridgeReuseRefusalTest,
+    testing::Values(ReuseRefusal{.name = "ReuseNotEnabled", .reuse_enabled = false},
+                    ReuseRefusal{.name = "RequestIncomplete", .request_complete = false},
+                    ReuseRefusal{.name = "ModuleEndedData", .module_ended_data = true},
+                    ReuseRefusal{.name = "UpstreamEndedData", .upstream_ended_data = true},
+                    ReuseRefusal{.name = "ReadDisabled", .read_enabled = false},
+                    ReuseRefusal{.name = "AboveHighWatermark", .above_high_watermark = true},
+                    ReuseRefusal{.name = "Closing", .state = Network::Connection::State::Closing}),
+    [](const testing::TestParamInfo<ReuseRefusal>& info) { return info.param.name; });
+
+// Envoy closes a connection whose module did not enable reuse, and with reuse enabled it still
+// closes one whose request did not reach the bridge in full, one whose data the module or the
+// upstream ended, a read-disabled one, one above its write high watermark and a closing one, and it
+// never reads readEnabled() on the closing one.
+TEST_P(HttpTcpBridgeReuseRefusalTest, RefusedReuseClosesTheConnection) {
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
+  EXPECT_OK(bridge_->encodeHeaders(headers, GetParam().request_complete));
+  if (GetParam().reuse_enabled) {
+    enableReuse(*bridge_);
+  }
+  if (GetParam().module_ended_data) {
+    bridge_->sendUpstreamData("", true);
+  }
+  if (GetParam().upstream_ended_data) {
+    Buffer::OwnedImpl data;
+    bridge_->onUpstreamData(data, true);
+  }
+  ON_CALL(mock_connection_, state()).WillByDefault(Return(GetParam().state));
+  ON_CALL(mock_connection_, aboveHighWatermark())
+      .WillByDefault(Return(GetParam().above_high_watermark));
+  ON_CALL(mock_connection_, readEnabled()).WillByDefault(Return(GetParam().read_enabled));
+  if (GetParam().state != Network::Connection::State::Open) {
+    EXPECT_CALL(mock_connection_, readEnabled()).Times(0);
+  }
+  EXPECT_CALL(mock_connection_,
+              close(Network::ConnectionCloseType::NoFlush, "dynamic_module_bridge_destroyed"));
+  bridge_.reset();
+}
+
+class HttpTcpBridgeCloseEventTest : public HttpTcpBridgeTest,
+                                    public testing::WithParamInterface<Network::ConnectionEvent> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    CloseEvents, HttpTcpBridgeCloseEventTest,
+    testing::Values(Network::ConnectionEvent::LocalClose, Network::ConnectionEvent::RemoteClose),
+    [](const testing::TestParamInfo<Network::ConnectionEvent>& info) -> std::string {
+      return info.param == Network::ConnectionEvent::LocalClose ? "LocalClose" : "RemoteClose";
+    });
+
+// The router destroys the bridge inside the callback that reports a close, as
+// UpstreamRequest::onResetStream does, so the destructor finds the connection closed and makes no
+// second close.
+TEST_P(HttpTcpBridgeCloseEventTest, ResetThatDestroysTheBridgeMakesNoSecondClose) {
+  EXPECT_CALL(mock_connection_, close(_, _)).Times(0);
+  EXPECT_CALL(mock_upstream_to_downstream_, onResetStream(_, _))
+      .WillOnce(
+          Invoke([this](Envoy::Http::StreamResetReason, absl::string_view) { bridge_.reset(); }));
+  mock_connection_.raiseEvent(GetParam());
+  bridge_->onEvent(GetParam());
+  EXPECT_EQ(nullptr, bridge_);
+}
+
+// The pool may free a connection once its close returns, so a bridge destroyed after the pool
+// reported the close never reads the connection.
+TEST_F(HttpTcpBridgeTest, DestroyAfterACloseEventLeavesTheConnectionAlone) {
+  bridge_->onEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*mock_conn_data_, connection()).Times(0);
+  bridge_.reset();
+}
+
+// A draining pool closes a client the release returns to it, so the bridge closes no connection
+// the release already closed.
+TEST_F(HttpTcpBridgeTest, ReleaseThatClosesTheConnectionMakesNoSecondClose) {
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
+  EXPECT_OK(bridge_->encodeHeaders(headers, true));
+  mock_conn_data_->release_callback_ = [this]() {
+    mock_connection_.state_ = Network::Connection::State::Closed;
+  };
+  EXPECT_CALL(mock_connection_, close(_, _)).Times(0);
+  bridge_.reset();
+}
+
+// The count sums every write under one bytes sent callback, so data the socket took in full leaves
+// nothing to drain, the bridge releases and closes at once, and the callback unregisters once the
+// bridge is gone.
+TEST_F(HttpTcpBridgeTest, SentUpstreamDataClosesWithoutDraining) {
+  bridge_->sendUpstreamData("req", false);
+  bridge_->sendUpstreamData("uest", false);
+  ASSERT_EQ(1U, mock_connection_.bytes_sent_callbacks_.size());
+  // The mock keeps a callback whatever it returns, so each return value is checked here.
+  EXPECT_TRUE(mock_connection_.bytes_sent_callbacks_.front()(3));
+  EXPECT_TRUE(mock_connection_.bytes_sent_callbacks_.front()(4));
+  EXPECT_CALL(*mock_conn_data_, addUpstreamCallbacks(_)).Times(0);
+  EXPECT_CALL(mock_connection_,
+              close(Network::ConnectionCloseType::NoFlush, "dynamic_module_bridge_destroyed"));
+  bridge_.reset();
+  EXPECT_FALSE(mock_connection_.bytes_sent_callbacks_.front()(1));
+}
+
+// The connection takes no data after the module ended its upstream data, so Envoy drops what the
+// module sends after that instead of writing it.
+TEST_F(HttpTcpBridgeTest, DataSentAfterTheModuleEndedItsDataIsDropped) {
+  EXPECT_CALL(mock_connection_, write(_, true));
+  bridge_->sendUpstreamData("", true);
+  EXPECT_CALL(mock_connection_, write(_, _)).Times(0);
+  bridge_->sendUpstreamData("late", false);
+  EXPECT_TRUE(mock_connection_.bytes_sent_callbacks_.empty());
+}
+
+class HttpTcpBridgeDrainTest : public HttpTcpBridgeTest {
+public:
+  // Expects the bridge's destructor to hand the connection to a drainer, which it records. With
+  // close_at_once, the drain's close reports itself before it returns.
+  void expectDrain(bool close_at_once = false) {
+    EXPECT_CALL(*mock_conn_data_, addUpstreamCallbacks(_))
+        .WillOnce(Invoke([this](Envoy::Tcp::ConnectionPool::UpstreamCallbacks& callbacks) {
+          drainer_ = &callbacks;
+        }));
+    drain_timer_ = new NiceMock<Event::MockTimer>(&mock_connection_.dispatcher_);
+    EXPECT_CALL(*drain_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+    if (close_at_once) {
+      EXPECT_CALL(*drain_timer_, disableTimer());
+    }
+    EXPECT_CALL(mock_connection_,
+                close(Network::ConnectionCloseType::FlushWrite, "dynamic_module_bridge_drained"))
+        .WillOnce(Invoke([this, close_at_once](Network::ConnectionCloseType, absl::string_view) {
+          if (close_at_once) {
+            drainer_->onEvent(Network::ConnectionEvent::LocalClose);
+          }
+        }));
+    mock_conn_data_->release_callback_ = [this]() { released_ = true; };
+  }
+
+  // Reports the drained connection's close and runs the deletion it schedules.
+  void closeDrainedConnection(Network::ConnectionEvent event) {
+    EXPECT_CALL(*drain_timer_, disableTimer());
+    drainer_->onEvent(event);
+    mock_connection_.dispatcher_.clearDeferredDeleteList();
+    EXPECT_TRUE(released_);
+  }
+
+  Envoy::Tcp::ConnectionPool::UpstreamCallbacks* drainer_ = nullptr;
+  Event::MockTimer* drain_timer_ = nullptr;
+  bool released_ = false;
+};
+
+// Unsent data keeps the connection out of the pool until it is written, since closing at once
+// would cut the request short behind a FIN that makes it look whole. The drainer releases the
+// connection only once its close is reported.
+TEST_F(HttpTcpBridgeDrainTest, DestroyDrainsUnsentUpstreamDataBeforeTheClose) {
+  bridge_->sendUpstreamData("request", false);
+  expectDrain();
+  bridge_.reset();
+  ASSERT_NE(nullptr, drainer_);
+  EXPECT_FALSE(released_);
+
+  // A closing connection reads nothing more, but the pool's interface still needs these.
+  Buffer::OwnedImpl reply("reply");
+  drainer_->onUpstreamData(reply, false);
+  EXPECT_EQ(0U, reply.length());
+  drainer_->onAboveWriteBufferHighWatermark();
+  drainer_->onBelowWriteBufferLowWatermark();
+  drainer_->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_FALSE(released_);
+
+  closeDrainedConnection(Network::ConnectionEvent::RemoteClose);
+}
+
+// Only the part of the data the socket took counts as sent, so data written in two parts and taken
+// in part still drains.
+TEST_F(HttpTcpBridgeDrainTest, PartlySentUpstreamDataDrains) {
+  bridge_->sendUpstreamData("req", false);
+  bridge_->sendUpstreamData("uest", false);
+  mock_connection_.raiseBytesSentCallbacks(3);
+  expectDrain();
+  bridge_.reset();
+  ASSERT_NE(nullptr, drainer_);
+  closeDrainedConnection(Network::ConnectionEvent::LocalClose);
+}
+
+// Data the socket has not taken would count against the next request's own unsent data, so even a
+// connection whose module enabled reuse drains and closes.
+TEST_F(HttpTcpBridgeDrainTest, EnabledReuseStillDrainsUnsentUpstreamData) {
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
+  EXPECT_OK(bridge_->encodeHeaders(headers, true));
+  enableReuse(*bridge_);
+  bridge_->sendUpstreamData("request", false);
+  expectDrain();
+  bridge_.reset();
+  ASSERT_NE(nullptr, drainer_);
+  closeDrainedConnection(Network::ConnectionEvent::LocalClose);
+}
+
+// Each write the socket takes during the drain restarts its bound, and the drainer's bytes sent
+// callback stays registered while the drainer lives and unregisters once it is gone.
+TEST_F(HttpTcpBridgeDrainTest, DrainProgressRestartsTheBound) {
+  bridge_->sendUpstreamData("request", false);
+  expectDrain();
+  bridge_.reset();
+  ASSERT_NE(nullptr, drainer_);
+  ASSERT_EQ(2U, mock_connection_.bytes_sent_callbacks_.size());
+  Network::Connection::BytesSentCb& drain_progress = mock_connection_.bytes_sent_callbacks_.back();
+  EXPECT_CALL(*drain_timer_, enableTimer(std::chrono::milliseconds(1000), _)).Times(2);
+  EXPECT_TRUE(drain_progress(3));
+  EXPECT_TRUE(drain_progress(4));
+  closeDrainedConnection(Network::ConnectionEvent::LocalClose);
+  EXPECT_FALSE(drain_progress(1));
+}
+
+// An upstream that takes none of the unsent data in time gets a reset, so it never reads the part
+// it has as a whole request.
+TEST_F(HttpTcpBridgeDrainTest, DrainTimeoutResetsTheConnection) {
+  bridge_->sendUpstreamData("request", false);
+  expectDrain();
+  bridge_.reset();
+  ASSERT_NE(nullptr, drainer_);
+  EXPECT_CALL(mock_connection_, close(Network::ConnectionCloseType::AbortReset,
+                                      "dynamic_module_bridge_drain_timeout"))
+      .WillOnce(Return());
+  drain_timer_->invokeCallback();
+  closeDrainedConnection(Network::ConnectionEvent::LocalClose);
+}
+
+// A drain whose close completes before it returns still deletes the drainer once.
+TEST_F(HttpTcpBridgeDrainTest, DrainThatClosesAtOnceDeletesTheDrainer) {
+  bridge_->sendUpstreamData("request", false);
+  expectDrain(true);
+  bridge_.reset();
+  ASSERT_NE(nullptr, drainer_);
+  mock_connection_.dispatcher_.clearDeferredDeleteList();
+  EXPECT_TRUE(released_);
+}
+
+TEST_F(HttpTcpBridgeTest, WatermarksAfterResetStream) {
+  EXPECT_CALL(mock_connection_, close(Network::ConnectionCloseType::AbortReset,
+                                      "dynamic_module_bridge_reset_stream"));
   bridge_->resetStream();
 
   EXPECT_CALL(mock_upstream_to_downstream_, onAboveWriteBufferHighWatermark()).Times(0);
@@ -543,8 +858,8 @@ TEST_F(HttpTcpBridgeTest, WatermarksAfterResetStream) {
 }
 
 TEST_F(HttpTcpBridgeTest, OnUpstreamDataAfterResetStream) {
-  EXPECT_CALL(mock_connection_,
-              close(Network::ConnectionCloseType::NoFlush, "dynamic_module_bridge_reset_stream"));
+  EXPECT_CALL(mock_connection_, close(Network::ConnectionCloseType::AbortReset,
+                                      "dynamic_module_bridge_reset_stream"));
   bridge_->resetStream();
 
   Buffer::OwnedImpl data("response");
@@ -553,8 +868,8 @@ TEST_F(HttpTcpBridgeTest, OnUpstreamDataAfterResetStream) {
 }
 
 TEST_F(HttpTcpBridgeTest, SendCallbacksAfterResetStreamAreNoOps) {
-  EXPECT_CALL(mock_connection_,
-              close(Network::ConnectionCloseType::NoFlush, "dynamic_module_bridge_reset_stream"));
+  EXPECT_CALL(mock_connection_, close(Network::ConnectionCloseType::AbortReset,
+                                      "dynamic_module_bridge_reset_stream"));
   bridge_->resetStream();
 
   EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, _)).Times(0);
