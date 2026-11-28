@@ -200,8 +200,24 @@ void UdpListenerWorkerRouterImpl::unregisterWorkerForListener(UdpListenerCallbac
 void UdpListenerWorkerRouterImpl::deliver(uint32_t dest_worker_index, UdpRecvData&& data) {
   absl::ReaderMutexLock lock(mutex_);
 
-  ASSERT(dest_worker_index < workers_.size(),
-         "UdpListenerCallbacks::destination returned out-of-range value");
+  if (dest_worker_index >= workers_.size()) {
+    // Only a hot restart parent hands us an index we do not have: it forwards the datagrams it
+    // cannot dispatch tagged with ITS worker index, and it had more workers than we do (the
+    // in-process caller, ActiveUdpListenerBase::onData(), asserts its destination is in range).
+    // Map it onto our workers the way the QUIC worker selector does, modulo the worker count. For
+    // a parent whose worker count is a multiple of ours this is the worker our own connection ID
+    // routing picks for the packet, so a connection accepted from a forwarded handshake stays on
+    // the worker its later packets reach once the parent is gone.
+    if (workers_.empty()) {
+      return;
+    }
+    ENVOY_LOG_EVERY_POW_2_MISC(info,
+                               "udp worker index {} is not one of this instance's {} workers "
+                               "(hot restart parent with more workers); delivering to worker {}",
+                               dest_worker_index, workers_.size(),
+                               dest_worker_index % workers_.size());
+    dest_worker_index %= workers_.size();
+  }
   auto* worker = workers_[dest_worker_index];
 
   // When a listener is being removed, packets could be processed on some workers after the

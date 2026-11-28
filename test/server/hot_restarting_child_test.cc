@@ -681,6 +681,44 @@ TEST_F(HotRestartingChildTest, ForwardsPacketToListenerInNamedNetworkNamespace) 
   EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
 }
 
+// A parent with more workers than this child (concurrency lowered across the hot restart) forwards
+// packets tagged with a worker index the child does not have. The child's own worker router must
+// deliver them to one of its workers (index modulo its worker count) instead of indexing past the
+// end of its worker table.
+TEST_F(HotRestartingChildTest, ForwardsPacketFromAParentWorkerTheChildDoesNotHave) {
+  envoy::HotRestartMessage msg;
+  auto* packet = msg.mutable_request()->mutable_forwarded_udp_packet();
+  // Two workers, with the real worker router.
+  auto listener_config = std::make_shared<testing::NiceMock<Network::MockUdpListenerConfig>>(2);
+  auto test_listener_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  auto test_remote_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:4321");
+  HotRestartUdpForwardingTestHelper(*hot_restarting_child_)
+      .registerUdpForwardingListener(
+          test_listener_addr,
+          std::dynamic_pointer_cast<Network::UdpListenerConfig>(listener_config));
+  testing::NiceMock<Network::MockUdpListenerCallbacks> worker0;
+  testing::NiceMock<Network::MockUdpListenerCallbacks> worker1;
+  ON_CALL(worker0, workerIndex()).WillByDefault(Return(0));
+  ON_CALL(worker1, workerIndex()).WillByDefault(Return(1));
+  Network::UdpListenerWorkerRouter& router =
+      listener_config->listenerWorkerRouter(*test_listener_addr);
+  router.registerWorkerForListener(worker0);
+  router.registerWorkerForListener(worker1);
+
+  packet->set_local_addr(Network::Utility::urlFromDatagramAddress(*test_listener_addr));
+  packet->set_peer_addr(Network::Utility::urlFromDatagramAddress(*test_remote_addr));
+  packet->set_payload("from parent worker 3");
+  // Worker 3 of a four-worker parent.
+  packet->set_worker_index(3);
+  EXPECT_CALL(worker0, post(_)).Times(0);
+  EXPECT_CALL(worker1, post(IsUdpWith(test_listener_addr, test_remote_addr, "from parent worker 3",
+                                      uint64_t(0))));
+  EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
+
+  router.unregisterWorkerForListener(worker0);
+  router.unregisterWorkerForListener(worker1);
+}
+
 // A listener is not matched across network namespaces, nor by a namespace-less lookup.
 TEST_F(HotRestartingChildTest, DoesNotForwardAcrossNetworkNamespaces) {
   envoy::HotRestartMessage msg;

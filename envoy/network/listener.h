@@ -608,7 +608,10 @@ public:
 
   /**
    * Deliver ``data`` to the correct worker by calling ``onDataWorker()``
-   * or ``post()`` on one of the registered workers.
+   * or ``post()`` on one of the registered workers. A ``dest_worker_index`` that is
+   * not one of this instance's workers (a hot restart parent's worker index, when the
+   * parent ran more workers) is delivered to ``dest_worker_index`` modulo the number
+   * of workers.
    */
   virtual void deliver(uint32_t dest_worker_index, UdpRecvData&& data) PURE;
 };
