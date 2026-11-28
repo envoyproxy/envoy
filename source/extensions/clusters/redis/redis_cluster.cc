@@ -214,7 +214,8 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots,
   }
 
   const bool slot_updated =
-      lb_factory_ ? lb_factory_->onClusterSlotUpdate(std::move(slots), updated_hosts) : false;
+      lb_factory_ ? lb_factory_->onClusterSlotUpdate(std::move(slots), updated_hosts, host_updated)
+                  : false;
 
   // If slot is updated, call updateAllHosts regardless of if there's new hosts to force
   // update of the thread local load balancers.

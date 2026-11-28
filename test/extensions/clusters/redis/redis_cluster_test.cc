@@ -28,6 +28,7 @@
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/health_check_event_logger.h"
 #include "test/mocks/upstream/health_checker.h"
+#include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/status_utility.h"
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
@@ -151,7 +152,8 @@ protected:
     return addresses;
   }
 
-  void setupFromV3Yaml(const std::string& yaml) {
+  void setupFromV3Yaml(const std::string& yaml,
+                       ClusterSlotUpdateCallBackSharedPtr factory = nullptr) {
     expectRedisSessionCreated();
     envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
@@ -169,7 +171,7 @@ protected:
         cluster_config,
         TestUtility::downcastAndValidate<
             const envoy::extensions::clusters::redis::v3::RedisClusterConfig&>(config),
-        cluster_factory_context, *this, dns_resolver_, cluster_callback_));
+        cluster_factory_context, *this, dns_resolver_, factory ? factory : cluster_callback_));
     // This allows us to create expectation on cluster slot response without waiting for
     // makeRequest.
     pool_callbacks_ = cluster_->redis_discovery_session_.get();
@@ -246,8 +248,9 @@ protected:
   // Initializes the cluster, creates mock clients, sets up INFO expectations, and delivers
   // CLUSTER SLOTS. Returns the zone_client for the replica node so the caller can deliver
   // INFO responses via client_->client_callbacks_ and zone_client->client_callbacks_.
-  Extensions::NetworkFilters::Common::Redis::Client::MockClient* setupZoneDiscoveryWithTwoNodes() {
-    setupFromV3Yaml(ZoneDiscoveryConfig);
+  Extensions::NetworkFilters::Common::Redis::Client::MockClient*
+  setupZoneDiscoveryWithTwoNodes(ClusterSlotUpdateCallBackSharedPtr factory = nullptr) {
+    setupFromV3Yaml(ZoneDiscoveryConfig, factory);
     const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
     expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
     expectRedisResolve(true);
@@ -269,7 +272,9 @@ protected:
     EXPECT_CALL(*zone_client, makeRequest_(Ref(RedisCluster::InfoRequest::instance_), _))
         .WillOnce(Return(&pool_request_));
 
-    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+    if (!factory) {
+      EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, true));
+    }
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
 
     pool_callbacks_->onResponse(singleSlotPrimaryReplica("127.0.0.1", "127.0.0.2", 22120));
@@ -672,7 +677,7 @@ protected:
       return absl::OkStatus();
     });
 
-    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, true));
     expectClusterSlotResponse(singleSlotPrimaryReplica("127.0.0.1", "127.0.0.2", 22120));
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
 
@@ -680,14 +685,14 @@ protected:
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
     resolve_timer_->invokeCallback();
-    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, false));
     expectClusterSlotResponse(twoSlotsPrimaries());
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
 
     // No change.
     expectRedisResolve();
     resolve_timer_->invokeCallback();
-    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).WillOnce(Return(false));
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, false)).WillOnce(Return(false));
     expectClusterSlotResponse(twoSlotsPrimaries());
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
 
@@ -695,7 +700,7 @@ protected:
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
     resolve_timer_->invokeCallback();
-    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, true));
     expectClusterSlotResponse(twoSlotsPrimariesWithReplica());
     expectHealthyHosts(std::list<std::string>(
         {"127.0.0.1:22120", "127.0.0.3:22120", "127.0.0.2:22120", "127.0.0.4:22120"}));
@@ -703,7 +708,7 @@ protected:
     // No change.
     expectRedisResolve();
     resolve_timer_->invokeCallback();
-    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).WillOnce(Return(false));
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, false)).WillOnce(Return(false));
     expectClusterSlotResponse(twoSlotsPrimariesWithReplica());
     expectHealthyHosts(std::list<std::string>(
         {"127.0.0.1:22120", "127.0.0.3:22120", "127.0.0.2:22120", "127.0.0.4:22120"}));
@@ -712,7 +717,7 @@ protected:
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
     resolve_timer_->invokeCallback();
-    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, true));
     expectClusterSlotResponse(singleSlotPrimaryReplica("127.0.0.1", "127.0.0.2", 22120));
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
   }
@@ -853,7 +858,7 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
         std::list<std::string> address_pair = std::get<2>(GetParam());
         cb(Network::DnsResolver::ResolutionStatus::Completed, "",
            TestUtility::makeDnsResponse(address_pair));
-        EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+        EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
         expectClusterSlotResponse(
             singleSlotPrimaryReplica(address_pair.front(), address_pair.back(), 22120));
         return nullptr;
@@ -889,7 +894,7 @@ TEST_F(RedisClusterTest, AddressAsHostname) {
   });
 
   // 1. Single slot with primary and replica
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
   EXPECT_EQ(0U, cluster_->info()->configUpdateStats().update_failure_.value());
@@ -900,7 +905,7 @@ TEST_F(RedisClusterTest, AddressAsHostname) {
   resolve_timer_->invokeCallback();
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com",
                          primary_resolved_addresses);
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   expectClusterSlotResponse(singleSlotPrimary("primary.com", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120"}));
   EXPECT_EQ(0U, cluster_->info()->configUpdateStats().update_failure_.value());
@@ -911,7 +916,7 @@ TEST_F(RedisClusterTest, AddressAsHostname) {
   resolve_timer_->invokeCallback();
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica.org",
                          replica_resolved_addresses);
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   expectClusterSlotResponse(singleSlotPrimaryReplica("127.0.1.1", "replica.org", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
   EXPECT_EQ(0U, cluster_->info()->configUpdateStats().update_failure_.value());
@@ -935,7 +940,7 @@ TEST_F(RedisClusterTest, AddressAsHostnameParallelResolution) {
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   cluster_->initialize([&]() {
     initialized_.ready();
     return absl::OkStatus();
@@ -977,7 +982,7 @@ TEST_F(RedisClusterTest, AddressAsHostnameFailure) {
     return absl::OkStatus();
   });
 
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -1025,7 +1030,7 @@ TEST_F(RedisClusterTest, AddressAsHostnamePrimaryEmptyDnsResponse) {
     return absl::OkStatus();
   });
 
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
   // Primary and replica hosts are healthy.
   expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
@@ -1059,7 +1064,7 @@ TEST_F(RedisClusterTest, AddressAsHostnameReplicaEmptyDnsResponse) {
     return absl::OkStatus();
   });
 
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
   // Only the primary host is healthy.
   expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120"}));
@@ -1089,7 +1094,7 @@ TEST_F(RedisClusterTest, AddressAsHostnamePartialReplicaEmptyDnsResponse) {
     return absl::OkStatus();
   });
 
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   expectClusterSlotResponse(
       singleSlotPrimaryWithTwoReplicas("primary.com", "replica1.org", "replica2.org", 22120));
   // Only the primary host and one replica are healthy.
@@ -1144,7 +1149,7 @@ TEST_F(RedisClusterTest, AddressAsHostnamePartialReplicaFailure) {
     return absl::OkStatus();
   });
 
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   expectClusterSlotResponse(singleSlotPrimaryWithTwoReplicas("primary.com", "failed-replica.org",
                                                              "success-replica.org", 22120));
   EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -1259,7 +1264,7 @@ TEST_F(RedisClusterTest, RedisResolveFailure) {
   resolve_timer_->invokeCallback();
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   expectClusterSlotResponse(singleSlotPrimaryReplica("127.0.0.1", "127.0.0.2", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
 
@@ -1325,7 +1330,7 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
   hello_world_response->type(NetworkFilters::Common::Redis::RespType::Array);
   hello_world_response->asArray().swap(hello_world);
 
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(0);
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _)).Times(0);
   expectClusterSlotResponse(std::move(hello_world_response));
   EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_attempt_.value());
   EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_failure_.value());
@@ -1334,7 +1339,7 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
   resolve_timer_->invokeCallback();
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   std::bitset<ResponseFlagSize> single_slot_primary(0xfff);
   std::bitset<ResponseReplicaFlagSize> no_replica(0);
   expectClusterSlotResponse(createResponse(single_slot_primary, no_replica));
@@ -1349,7 +1354,7 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
     expectRedisResolve();
     resolve_timer_->invokeCallback();
     if (flags.all()) {
-      EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).WillOnce(Return(false));
+      EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _)).WillOnce(Return(false));
     }
     expectClusterSlotResponse(createResponse(flags, no_replica));
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
@@ -1373,7 +1378,7 @@ TEST_F(RedisClusterTest, RedisReplicaErrorResponse) {
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   std::bitset<ResponseFlagSize> single_slot_primary(0xfff);
   std::bitset<ResponseReplicaFlagSize> no_replica(0);
   expectClusterSlotResponse(createResponse(single_slot_primary, no_replica));
@@ -1389,7 +1394,7 @@ TEST_F(RedisClusterTest, RedisReplicaErrorResponse) {
     resolve_timer_->invokeCallback();
     if (replica_flags.all()) {
       EXPECT_CALL(membership_updated_, ready());
-      EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).WillOnce(Return(false));
+      EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _)).WillOnce(Return(false));
     }
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
     expectClusterSlotResponse(createResponse(single_slot_primary, replica_flags));
@@ -1415,7 +1420,7 @@ TEST_F(RedisClusterTest, RedisErrorResponsePortOverflow) {
   });
 
   // First, a valid response to initialize.
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   std::bitset<ResponseFlagSize> single_slot_primary(0xfff);
   std::bitset<ResponseReplicaFlagSize> no_replica(0);
   expectClusterSlotResponse(createResponse(single_slot_primary, no_replica));
@@ -1424,7 +1429,7 @@ TEST_F(RedisClusterTest, RedisErrorResponsePortOverflow) {
   // Now send a response with port > 0xffff (65535). This should fail validation.
   expectRedisResolve();
   resolve_timer_->invokeCallback();
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(0);
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _)).Times(0);
   expectClusterSlotResponse(singleSlotPrimary("127.0.0.1", 70000));
   EXPECT_EQ(2U, cluster_->info()->configUpdateStats().update_attempt_.value());
   EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_failure_.value());
@@ -1513,7 +1518,7 @@ TEST_F(RedisClusterTest, HostRemovalAfterHcFail) {
     return absl::OkStatus();
   });
 
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   expectClusterSlotResponse(twoSlotsPrimariesWithReplica());
 
   // Verify that all hosts are initially marked with FAILED_ACTIVE_HC, then
@@ -1553,7 +1558,7 @@ TEST_F(RedisClusterTest, HostRemovalAfterHcFail) {
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
     resolve_timer_->invokeCallback();
-    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
     expectClusterSlotResponse(singleSlotPrimaryReplica("127.0.0.1", "127.0.0.3", 22120));
 
     const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -1607,7 +1612,7 @@ TEST_F(RedisClusterTest, NoSegfaultOnClusterDestructionWithPendingCallback) {
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   std::bitset<ResponseFlagSize> single_slot_primary(0xfff);
   std::bitset<ResponseReplicaFlagSize> no_replica(0);
   expectClusterSlotResponse(createResponse(single_slot_primary, no_replica));
@@ -1641,7 +1646,7 @@ TEST_F(RedisClusterTest, DestructionWithHeldSessionClosesClientsAndDisarmsTimer)
     return absl::OkStatus();
   });
 
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   expectClusterSlotResponse(singleSlotPrimary("127.0.0.1", 22120));
 
   // Destroying the cluster closes the discovery connection (the close() expectation set by
@@ -1786,6 +1791,166 @@ TEST_F(RedisClusterTest, ZoneDiscoveryBasicFlow) {
   }
 }
 
+TEST_F(RedisClusterTest, ZoneDiscoveryRefreshesLoadBalancerHosts) {
+  auto factory = std::make_shared<RedisClusterLoadBalancerFactory>(random_);
+  auto* zone_client = setupZoneDiscoveryWithTwoNodes(factory);
+  auto respond_with_zone = [](auto& client, const std::string& zone) {
+    auto response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
+    response->type(NetworkFilters::Common::Redis::RespType::BulkString);
+    response->asString() = "availability_zone:" + zone + "\n";
+    client.client_callbacks_.back()->onResponse(std::move(response));
+  };
+  respond_with_zone(*client_, "");
+  respond_with_zone(*zone_client, "");
+
+  NiceMock<Upstream::MockPrioritySet> worker_priority_set;
+  auto lb = factory->create({worker_priority_set, {}});
+  NetworkFilters::Common::Redis::RespValue request;
+  request.type(NetworkFilters::Common::Redis::RespType::Array);
+  request.asArray().resize(2);
+  request.asArray()[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  request.asArray()[0].asString() = "get";
+  request.asArray()[1].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  request.asArray()[1].asString() = "key";
+  using ReadPolicy = NetworkFilters::Common::Redis::Client::ReadPolicy;
+  RedisSpecifyShardContextImpl primary_context(0, request, ReadPolicy::Primary);
+  RedisSpecifyShardContextImpl replica_context(0, request, ReadPolicy::Replica);
+  RedisSpecifyShardContextImpl affinity_context(
+      0, request, ReadPolicy::LocalZoneAffinityReplicasAndPrimary, "zone-a");
+  auto primary = cluster_->prioritySet().crossPriorityHostMap()->findHost("127.0.0.1:22120");
+  auto replica = cluster_->prioritySet().crossPriorityHostMap()->findHost("127.0.0.2:22120");
+  Upstream::HostConstSharedPtr previous_choice = replica;
+  EXPECT_EQ(previous_choice, lb->chooseHost(&affinity_context).host);
+
+  // Recover missing zones, swap the local role, then lose zone metadata again, without
+  // changing the slots or addresses. Keep the same worker LB throughout.
+  for (const auto& zones : std::vector<std::pair<std::string, std::string>>{
+           {"zone-a", "zone-b"}, {"zone-b", "zone-a"}, {"", ""}}) {
+    expectRedisResolve();
+    resolve_timer_->invokeCallback();
+    EXPECT_CALL(*client_, makeRequest_(Ref(RedisCluster::InfoRequest::instance_), _))
+        .WillOnce(Return(&pool_request_));
+    EXPECT_CALL(*zone_client, makeRequest_(Ref(RedisCluster::InfoRequest::instance_), _))
+        .WillOnce(Return(&pool_request_));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
+    EXPECT_CALL(membership_updated_, ready());
+    pool_callbacks_->onResponse(singleSlotPrimaryReplica("127.0.0.1", "127.0.0.2", 22120));
+    respond_with_zone(*client_, zones.first);
+    respond_with_zone(*zone_client, zones.second);
+
+    auto updated_primary =
+        cluster_->prioritySet().crossPriorityHostMap()->findHost("127.0.0.1:22120");
+    auto updated_replica =
+        cluster_->prioritySet().crossPriorityHostMap()->findHost("127.0.0.2:22120");
+    ASSERT_NE(nullptr, updated_primary);
+    ASSERT_NE(nullptr, updated_replica);
+    EXPECT_NE(primary, updated_primary);
+    EXPECT_NE(replica, updated_replica);
+    EXPECT_EQ(zones.first, updated_primary->locality().zone());
+    EXPECT_EQ(zones.second, updated_replica->locality().zone());
+    EXPECT_EQ(previous_choice, lb->chooseHost(&affinity_context).host);
+
+    worker_priority_set.runUpdateCallbacks(0, {updated_primary, updated_replica},
+                                           {primary, replica});
+    EXPECT_EQ(updated_primary, lb->chooseHost(&primary_context).host);
+    EXPECT_EQ(updated_replica, lb->chooseHost(&replica_context).host);
+    previous_choice = zones.first == "zone-a" ? updated_primary : updated_replica;
+    EXPECT_EQ(previous_choice, lb->chooseHost(&affinity_context).host);
+    primary = updated_primary;
+    replica = updated_replica;
+  }
+
+  // A genuinely unchanged refresh must preserve Host identity and the no-rebuild path.
+  const auto no_rebuild = cluster_->info()->configUpdateStats().update_no_rebuild_.value();
+  expectRedisResolve();
+  resolve_timer_->invokeCallback();
+  EXPECT_CALL(*client_, makeRequest_(Ref(RedisCluster::InfoRequest::instance_), _))
+      .WillOnce(Return(&pool_request_));
+  EXPECT_CALL(*zone_client, makeRequest_(Ref(RedisCluster::InfoRequest::instance_), _))
+      .WillOnce(Return(&pool_request_));
+  EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
+  EXPECT_CALL(membership_updated_, ready()).Times(0);
+  pool_callbacks_->onResponse(singleSlotPrimaryReplica("127.0.0.1", "127.0.0.2", 22120));
+  respond_with_zone(*client_, "");
+  respond_with_zone(*zone_client, "");
+  EXPECT_EQ(no_rebuild + 1, cluster_->info()->configUpdateStats().update_no_rebuild_.value());
+  EXPECT_EQ(primary, cluster_->prioritySet().crossPriorityHostMap()->findHost("127.0.0.1:22120"));
+  EXPECT_EQ(replica, cluster_->prioritySet().crossPriorityHostMap()->findHost("127.0.0.2:22120"));
+}
+
+TEST_F(RedisClusterTest, ZoneDiscoveryPreservesActiveHealthOnHostReplacement) {
+  auto factory = std::make_shared<RedisClusterLoadBalancerFactory>(random_);
+  auto* zone_client = setupZoneDiscoveryWithTwoNodes(factory);
+  auto health_checker = std::make_shared<testing::StrictMock<Upstream::MockHealthChecker>>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+  auto respond_with_zone = [](auto& client, const std::string& zone) {
+    auto response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
+    response->type(NetworkFilters::Common::Redis::RespType::BulkString);
+    response->asString() = "availability_zone:" + zone + "\n";
+    client.client_callbacks_.back()->onResponse(std::move(response));
+  };
+  respond_with_zone(*client_, "zone-a");
+  respond_with_zone(*zone_client, "zone-b");
+  auto primary = cluster_->prioritySet().crossPriorityHostMap()->findHost("127.0.0.1:22120");
+  auto replica = cluster_->prioritySet().crossPriorityHostMap()->findHost("127.0.0.2:22120");
+  primary->healthFlagClear(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+  primary->healthFlagClear(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC);
+  replica->healthFlagClear(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC);
+  EXPECT_CALL(membership_updated_, ready());
+  health_checker->runCallbacks(primary, Upstream::HealthTransition::Changed,
+                               Upstream::HealthState::Healthy);
+  health_checker->runCallbacks(replica, Upstream::HealthTransition::Unchanged,
+                               Upstream::HealthState::Unhealthy);
+
+  NiceMock<Upstream::MockPrioritySet> worker_priority_set;
+  auto lb = factory->create({worker_priority_set, {}});
+  NetworkFilters::Common::Redis::RespValue request;
+  request.type(NetworkFilters::Common::Redis::RespType::Array);
+  request.asArray().resize(1);
+  request.asArray()[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  request.asArray()[0].asString() = "get";
+  RedisSpecifyShardContextImpl context(0, request,
+                                       NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
+  EXPECT_EQ(primary, lb->chooseHost(&context).host);
+
+  expectRedisResolve();
+  resolve_timer_->invokeCallback();
+  EXPECT_CALL(*client_, makeRequest_(Ref(RedisCluster::InfoRequest::instance_), _))
+      .WillOnce(Return(&pool_request_));
+  EXPECT_CALL(*zone_client, makeRequest_(Ref(RedisCluster::InfoRequest::instance_), _))
+      .WillOnce(Return(&pool_request_));
+  EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
+  EXPECT_CALL(membership_updated_, ready());
+  pool_callbacks_->onResponse(singleSlotPrimaryReplica("127.0.0.1", "127.0.0.2", 22120));
+  respond_with_zone(*client_, "zone-b");
+  respond_with_zone(*zone_client, "zone-a");
+  auto updated_primary =
+      cluster_->prioritySet().crossPriorityHostMap()->findHost("127.0.0.1:22120");
+  auto updated_replica =
+      cluster_->prioritySet().crossPriorityHostMap()->findHost("127.0.0.2:22120");
+  ASSERT_NE(nullptr, updated_primary);
+  ASSERT_NE(nullptr, updated_replica);
+  EXPECT_NE(primary, updated_primary);
+  EXPECT_NE(replica, updated_replica);
+  EXPECT_FALSE(updated_primary->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_TRUE(updated_replica->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
+  worker_priority_set.runUpdateCallbacks(0, {updated_primary, updated_replica}, {primary, replica});
+  EXPECT_EQ(updated_primary, lb->chooseHost(&context).host);
+
+  // Subsequent health callbacks must affect the current Hosts used by this worker LB.
+  updated_primary->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+  updated_replica->healthFlagClear(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_CALL(membership_updated_, ready()).Times(2);
+  health_checker->runCallbacks(updated_primary, Upstream::HealthTransition::Changed,
+                               Upstream::HealthState::Unhealthy);
+  health_checker->runCallbacks(updated_replica, Upstream::HealthTransition::Changed,
+                               Upstream::HealthState::Healthy);
+  worker_priority_set.runUpdateCallbacks(0, {}, {});
+  EXPECT_EQ(updated_replica, lb->chooseHost(&context).host);
+}
+
 TEST_F(RedisClusterTest, ZoneDiscoveryPartialZones) {
   auto* zone_client = setupZoneDiscoveryWithTwoNodes();
 
@@ -1897,7 +2062,7 @@ TEST_F(RedisClusterTest, ZoneDiscoveryMakeRequestReturnsNull) {
   // makeRequest returns null for the single node's INFO command.
   EXPECT_CALL(*client_, makeRequest_(Ref(RedisCluster::InfoRequest::instance_), _))
       .WillOnce(Return(nullptr));
-  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _, _));
   EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
 
   // Deliver single-primary CLUSTER SLOTS response.
