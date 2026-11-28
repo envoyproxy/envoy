@@ -190,6 +190,13 @@ public:
    * @return Http::RequestHeaderMapOptRef the request headers for this stream, if present.
    */
   virtual Http::RequestHeaderMapOptRef requestHeaders() PURE;
+
+  /**
+   * Fail the stream with a local reply, or reset it if the response has already started.
+   * @param code supplies the response code.
+   * @param details supplies the response code details.
+   */
+  virtual void sendLocalReply(Http::Code code, absl::string_view details) PURE;
 };
 
 class Filter;
@@ -553,6 +560,7 @@ public:
     return nullptr;
   }
   bool clearRouteCache() const { return clear_route_cache_; }
+  bool failClosed() const { return fail_closed_; }
   const Protobuf::Struct& filterContext() const { return filter_context_; }
 
   const LuaFilterStats& stats() const { return stats_; }
@@ -568,6 +576,7 @@ private:
   }
 
   const bool clear_route_cache_{};
+  const bool fail_closed_{};
   const Protobuf::Struct filter_context_;
   // Non-null only when `shared_vm_id` is set. Holding it keeps the registry alive for at least
   // as long as the setups it handed to this configuration.
@@ -615,7 +624,12 @@ public:
       : config_(config), time_source_(time_source), stats_(config->stats()) {}
 
   Upstream::ClusterManager& clusterManager() { return config_->cluster_manager_; }
-  void scriptError(const absl::Status& status);
+  /**
+   * Report an error raised by the script running against callbacks.
+   * @return whether the stream was failed, in which case the caller must stop iteration and not
+   * touch the stream handle again: the local reply may already have run a script.
+   */
+  bool scriptError(FilterCallbacks& callbacks, const absl::Status& status);
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -629,10 +643,10 @@ public:
                      setup, headers, end_stream);
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
-    return doData(request_stream_wrapper_, data, end_stream);
+    return doData(request_stream_wrapper_, decoder_callbacks_, data, end_stream);
   }
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override {
-    return doTrailers(request_stream_wrapper_, trailers);
+    return doTrailers(request_stream_wrapper_, decoder_callbacks_, trailers);
   }
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_.callbacks_ = &callbacks;
@@ -650,10 +664,10 @@ public:
                      function_ref, setup, headers, end_stream);
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
-    return doData(response_stream_wrapper_, data, end_stream);
+    return doData(response_stream_wrapper_, encoder_callbacks_, data, end_stream);
   };
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
-    return doTrailers(response_stream_wrapper_, trailers);
+    return doTrailers(response_stream_wrapper_, encoder_callbacks_, trailers);
   };
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
     return Http::FilterMetadataStatus::Continue;
@@ -704,6 +718,9 @@ private:
     }
     Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
     Http::RequestHeaderMapOptRef requestHeaders() override { return callbacks_->requestHeaders(); }
+    void sendLocalReply(Http::Code code, absl::string_view details) override {
+      callbacks_->sendLocalReply(code, "", nullptr, std::nullopt, details);
+    }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -739,6 +756,9 @@ private:
     }
     Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
     Http::RequestHeaderMapOptRef requestHeaders() override { return callbacks_->requestHeaders(); }
+    void sendLocalReply(Http::Code code, absl::string_view details) override {
+      callbacks_->sendLocalReply(code, "", nullptr, std::nullopt, details);
+    }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};
@@ -782,8 +802,10 @@ private:
                                       FilterCallbacks& callbacks, int function_ref,
                                       PerLuaCodeSetup* setup,
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream);
-  Http::FilterDataStatus doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream);
-  Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
+  Http::FilterDataStatus doData(StreamHandleRef& handle, FilterCallbacks& callbacks,
+                                Buffer::Instance& data, bool end_stream);
+  Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, FilterCallbacks& callbacks,
+                                        Http::HeaderMap& trailers);
 
   FilterConfigConstSharedPtr config_;
   const FilterConfigPerRoute* per_route_config_{};
@@ -811,6 +833,7 @@ private:
   StreamHandleRef request_stream_wrapper_;
   StreamHandleRef response_stream_wrapper_;
   bool destroyed_{};
+  bool stream_failed_{};
 };
 
 } // namespace Lua

@@ -887,6 +887,102 @@ typed_config:
       response->headers().get(Http::LowerCaseString("fake_header"))[0]->value().getStringView());
 }
 
+// A script error on the request path fails the stream before it reaches the upstream.
+TEST_P(LuaIntegrationTest, FailClosedOnRequestError) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  failure_policy: FAIL_CLOSED
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        error("boom")
+      end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  cleanup();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+// A script error on the response path replaces the upstream's response.
+TEST_P(LuaIntegrationTest, FailClosedOnResponseError) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  failure_policy: FAIL_CLOSED
+  default_source_code:
+    inline_string: |
+      function envoy_on_response(response_handle)
+        error("boom")
+      end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  cleanup();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+// A script error after the response headers have gone downstream resets the stream, since a
+// local reply can no longer replace the response.
+TEST_P(LuaIntegrationTest, FailClosedOnResponseErrorAfterHeadersSent) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  failure_policy: FAIL_CLOSED
+  default_source_code:
+    inline_string: |
+      function envoy_on_response(response_handle)
+        for chunk in response_handle:bodyChunks() do
+          error("boom")
+        end
+      end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  response->waitForHeaders();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  upstream_request_->encodeData(10, true);
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(response->waitForReset());
+  }
+  cleanup();
+
+  EXPECT_FALSE(response->complete());
+  EXPECT_EQ(0, response->body().size());
+}
+
 // Upstream call followed by immediate response.
 TEST_P(LuaIntegrationTest, UpstreamCallAndRespond) {
   const std::string FILTER_AND_CODE =
