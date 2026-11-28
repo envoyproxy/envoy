@@ -141,12 +141,14 @@ binding's edits apply in order: to the body, and to the request headers. A reque
 the binding it arrived in gets those fields and headers back as the client sent them.
 
 A binding that does not parse, or one that needs a path variable the client's path did not hold,
-is a misconfiguration of the proxy, not of the client: the request fails with a ``500``, counted by
-``unresolved``. A request binding that does not match the path reads nothing and is
-logged at debug.
+is a misconfiguration of the proxy, not of the client: the request fails with a ``500``
+(rejected by the AI Protocol Manager for ``envoy.ai.binding.request``, or counted by
+``unresolved`` for ``envoy.ai.binding.response`` and unresolved variables). A request binding
+that does not match the path reads nothing and is logged at debug.
 
-The instructions are read once, when the transcoder's request leg runs, so the filter that
-writes them must run before that instance of the transcoder; the :ref:`route selector
+``envoy.ai.binding.request`` is resolved by the AI Protocol Manager before the AI filter chain
+runs, so it must be set by an HTTP filter ahead of it. The remaining instructions are read once
+when the transcoder's request leg runs, so the :ref:`route selector
 <config_http_ai_filters_route_selector>`, placed ahead of both instances, writes them in time.
 Writes during the response have no effect.
 

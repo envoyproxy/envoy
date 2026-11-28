@@ -125,8 +125,8 @@ The following lists the filter state object keys used by the Envoy extensions to
 ``envoy.ai.model.request``
   The model the request names, as the :ref:`request info AI filter
   <envoy_v3_api_msg_extensions.http.ai_filters.request_info.v3.RequestInfo>` read it from the
-  payload or, for Gemini, the request path. Accepts a non-empty model name as a constructor, e.g.
-  "gpt-4o".
+  payload or, when the request's binding carries it there, the request path. Accepts a non-empty
+  model name as a constructor, e.g. "gpt-4o".
 
 ``envoy.ai.llm_protocol.response``
   Names the backend's wire API to the :ref:`transcoder AI filter
@@ -137,9 +137,11 @@ The following lists the filter state object keys used by the Envoy extensions to
 
 ``envoy.ai.binding.request``
   The :ref:`binding <config_http_ai_filters_transcoder_instructions>` the
-  client's request arrived in, under which the transcoder's ``TO_IR`` leg reads its path and
-  body. Accepts a URI pattern (``/...``) or an :ref:`LLMBinding
-  <envoy_v3_api_msg_type.ai.v3.LLMBinding>` in JSON (``{...}``) as a constructor.
+  client's request arrived in, resolved once by the :ref:`AI Protocol Manager
+  <config_http_filters_ai_protocol_manager>` and shared with every AI filter (including
+  ``schema_validation``, ``request_info``, and the transcoder's ``TO_IR`` leg). Accepts a URI
+  pattern (``/...``) or an :ref:`LLMBinding <envoy_v3_api_msg_type.ai.v3.LLMBinding>` in JSON
+  (``{...}``) as a constructor.
 
 ``envoy.ai.binding.response``
   The :ref:`binding <config_http_ai_filters_transcoder_instructions>` the

@@ -57,6 +57,12 @@ public:
   RequestInfoFilter(RequestInfoFilterConfigSharedPtr config,
                     const HttpFilters::AiProtocolManager::AiFilterContext& context);
 
+  // HttpFilters::AiProtocolManager::AiFilter
+  // Reads the client's path under the route's request binding, so the route's is not unused.
+  HttpFilters::AiProtocolManager::BindingUse bindingUse() const override {
+    return {.request = true};
+  }
+
   // Common::SyncAiFilter
   absl::Status decodeSync(HttpFilters::AiProtocolManager::AiRequest& request,
                           HttpFilters::AiProtocolManager::LocalReplier reply_locally) override;

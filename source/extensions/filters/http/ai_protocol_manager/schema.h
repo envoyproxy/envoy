@@ -13,6 +13,7 @@
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "nlohmann/json.hpp"
 
 namespace Envoy {
@@ -124,7 +125,9 @@ public:
   }
 
   // Validation:
-  absl::Status validate(const nlohmann::json& json, absl::string_view path = "") const;
+  // `supplied` names fields provided outside the body so they are not flagged as missing.
+  absl::Status validate(const nlohmann::json& json, absl::string_view path = "",
+                        absl::Span<const absl::string_view> supplied = {}) const;
   absl::Status validate(const JsonWithExtBuf& payload) const {
     return validate(payload.json(), "");
   }
@@ -147,7 +150,8 @@ private:
   absl::Status validateInteger(const nlohmann::json& json, absl::string_view path) const;
   absl::Status validateBoolean(const nlohmann::json& json, absl::string_view path) const;
   absl::Status validateNull(const nlohmann::json& json, absl::string_view path) const;
-  absl::Status validateObject(const nlohmann::json& json, absl::string_view path) const;
+  absl::Status validateObject(const nlohmann::json& json, absl::string_view path,
+                              absl::Span<const absl::string_view> supplied = {}) const;
   absl::Status validateArray(const nlohmann::json& json, absl::string_view path) const;
   absl::Status validateOneOf(const nlohmann::json& json, absl::string_view path) const;
 
@@ -203,8 +207,10 @@ public:
   absl::Status validate(const JsonWithExtBuf& payload) const {
     return root_schema_.validate(payload);
   }
-  absl::Status validate(const nlohmann::json& json) const {
-    return root_schema_.validate(json, "");
+  // `supplied`: root fields provided outside the body, so not flagged as missing.
+  absl::Status validate(const nlohmann::json& json,
+                        absl::Span<const absl::string_view> supplied = {}) const {
+    return root_schema_.validate(json, "", supplied);
   }
 
 private:
@@ -264,8 +270,10 @@ public:
   absl::Status validateRequest(const JsonWithExtBuf& payload) const {
     return request_schema_.validate(payload);
   }
-  absl::Status validateRequest(const nlohmann::json& json) const {
-    return request_schema_.validate(json);
+  // `supplied`: root fields provided outside the body, so not flagged as missing.
+  absl::Status validateRequest(const nlohmann::json& json,
+                               absl::Span<const absl::string_view> supplied = {}) const {
+    return request_schema_.validate(json, supplied);
   }
 
 private:

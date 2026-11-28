@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/algorithm/container.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 
@@ -221,13 +222,14 @@ absl::Status Schema::validateNull(const nlohmann::json& json, absl::string_view 
   return absl::OkStatus();
 }
 
-absl::Status Schema::validateObject(const nlohmann::json& json, absl::string_view path) const {
+absl::Status Schema::validateObject(const nlohmann::json& json, absl::string_view path,
+                                    absl::Span<const absl::string_view> supplied) const {
   if (!json.is_object()) {
     return absl::InvalidArgumentError(absl::StrCat(
         "field '", path, "' has invalid type: expected object, got ", jsonTypeName(json)));
   }
   for (const Property& prop : properties_) {
-    bool found = false;
+    bool found = absl::c_linear_search(supplied, prop.name);
     auto validate_key = [&](const std::string& key) -> absl::Status {
       auto it = json.find(key);
       if (it == json.end()) {
@@ -345,7 +347,8 @@ absl::Status Schema::validateOneOf(const nlohmann::json& json, absl::string_view
                                                  absl::StrJoin(failure_reasons, "; "), "]"));
 }
 
-absl::Status Schema::validate(const nlohmann::json& json, absl::string_view path) const {
+absl::Status Schema::validate(const nlohmann::json& json, absl::string_view path,
+                              absl::Span<const absl::string_view> supplied) const {
   if (is_nullable_ && json.is_null()) {
     return absl::OkStatus();
   }
@@ -370,7 +373,7 @@ absl::Status Schema::validate(const nlohmann::json& json, absl::string_view path
   case Type::Any:
     break;
   case Type::Object:
-    status = validateObject(json, path);
+    status = validateObject(json, path, supplied);
     break;
   case Type::Array:
     status = validateArray(json, path);

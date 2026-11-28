@@ -16,8 +16,10 @@ envoy_extension_cc_test(
     srcs = ["extractor_test.cc"],
     extension_names = ["envoy.http.ai_filters.request_info"],
     deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:api_bindings_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_readers_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:llm_binding_lib",
         "//source/extensions/filters/http/ai_protocol_manager:token_usage_lib",
         "//source/extensions/http/ai_filters/request_info:extractor_lib",
         "@abseil-cpp//absl/strings",
@@ -39,6 +41,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_manager_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:llm_binding_lib",
         "//source/extensions/http/ai_filters/request_info:filter_lib",
         "//test/extensions/filters/http/ai_protocol_manager:fake_bridge_lib",
         "//test/mocks/stats:stats_mocks",

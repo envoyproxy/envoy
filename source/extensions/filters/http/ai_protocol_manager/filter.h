@@ -258,6 +258,7 @@ private:
   LLMProtocol request_protocol_{LLMProtocol::Unspecified};
   LLMProtocol route_response_protocol_{LLMProtocol::Unspecified};
   LlmBindingConstSharedPtr route_request_binding_;
+  LlmBindingConstSharedPtr request_binding_;
   LlmBindingConstSharedPtr route_response_binding_;
 
   JsonWithExtBuf request_json_;

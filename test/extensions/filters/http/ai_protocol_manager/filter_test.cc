@@ -1592,6 +1592,106 @@ TEST_F(AiProtocolManagerFilterStateTest, RouteRequestBindingLapsesForAnotherApi)
   EXPECT_NE(seen[0].response_binding, nullptr);
 }
 
+TEST_F(AiProtocolManagerFilterStateTest, FilterStateRequestBindingReplacesTheRoutes) {
+  callbacks_.stream_info_.filterState()->setData(
+      FilterStateKeys::BindingRequest, std::make_shared<LlmBindingObject>("/override/{model}"),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  const auto seen = runWithFilterState(LLMProtocol::Unspecified, routeWithBindings());
+  ASSERT_EQ(seen.size(), 1);
+  ASSERT_NE(seen[0].request_binding, nullptr);
+  EXPECT_EQ(seen[0].request_binding->pattern()->source(), "/override/{model}");
+}
+
+// Even when filter state overrides the route's API (lapsing the route's binding), a request
+// binding in filter state still applies.
+TEST_F(AiProtocolManagerFilterStateTest, FilterStateRequestBindingSurvivesApiOverride) {
+  callbacks_.stream_info_.filterState()->setData(
+      FilterStateKeys::BindingRequest,
+      std::make_shared<LlmBindingObject>("/vertex-override/{model}"),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  const auto seen = runWithFilterState(LLMProtocol::AnthropicMessages, routeWithBindings());
+  ASSERT_EQ(seen.size(), 1);
+  ASSERT_NE(seen[0].request_binding, nullptr);
+  EXPECT_EQ(seen[0].request_binding->pattern()->source(), "/vertex-override/{model}");
+}
+
+TEST_F(AiProtocolManagerFilterStateTest, FilterStateRequestBindingWorksWithoutARouteEntry) {
+  std::vector<ContextRecordingAiFilter::Seen> seen;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+    return std::make_unique<ContextRecordingAiFilter>(context, seen);
+  }});
+  callbacks_.stream_info_.filterState()->setData(
+      FilterStateKeys::LlmProtocolRequest,
+      std::make_shared<RequestLlmProtocol>(LLMProtocol::AnthropicMessages),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  callbacks_.stream_info_.filterState()->setData(FilterStateKeys::BindingRequest,
+                                                 std::make_shared<LlmBindingObject>("/gw/{model}"),
+                                                 StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"max_tokens":10,"messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  ASSERT_EQ(seen.size(), 1);
+  ASSERT_NE(seen[0].request_binding, nullptr);
+  EXPECT_EQ(seen[0].request_binding->pattern()->source(), "/gw/{model}");
+}
+
+// Unparseable filter-state binding is a proxy config error: reject with 500 before any AI filter
+// runs so downstream filters cannot misreport it as a client 400 or silently ignore it.
+TEST_F(AiProtocolManagerFilterStateTest, UnparseableRequestBindingFilterStateFailsWith500) {
+  std::vector<ContextRecordingAiFilter::Seen> seen;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+    return std::make_unique<ContextRecordingAiFilter>(context, seen);
+  }});
+  setRouteConfig(routeWithBindings());
+  callbacks_.stream_info_.filterState()->setData(
+      FilterStateKeys::BindingRequest, std::make_shared<LlmBindingObject>("/v1/{model/messages"),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(local_reply_calls_, 1);
+  EXPECT_EQ(local_reply_code_, Http::Code::InternalServerError);
+  EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_request_binding");
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  EXPECT_TRUE(seen.empty());
+}
+
+TEST_F(AiProtocolManagerFilterStateTest, ConnectionScopedRequestBindingReachesAiFilters) {
+  callbacks_.stream_info_.filterState()->setData(
+      FilterStateKeys::BindingRequest,
+      std::make_shared<LlmBindingObject>("/tenants/{tenant}/{model}"),
+      StreamInfo::FilterState::LifeSpan::Connection);
+  const auto seen = runWithFilterState(LLMProtocol::Unspecified);
+  ASSERT_EQ(seen.size(), 1);
+  ASSERT_NE(seen[0].request_binding, nullptr);
+  EXPECT_EQ(seen[0].request_binding->pattern()->source(), "/tenants/{tenant}/{model}");
+}
+
+TEST_F(AiProtocolManagerFilterStateTest, FilterStateRequestBindingWorksOnUnconfiguredRoute) {
+  std::vector<ContextRecordingAiFilter::Seen> seen;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+    return std::make_unique<ContextRecordingAiFilter>(context, seen);
+  }});
+  callbacks_.stream_info_.filterState()->setData(FilterStateKeys::BindingRequest,
+                                                 std::make_shared<LlmBindingObject>("/gw/{model}"),
+                                                 StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  ASSERT_EQ(seen.size(), 1);
+  ASSERT_NE(seen[0].request_binding, nullptr);
+  EXPECT_EQ(seen[0].request_binding->pattern()->source(), "/gw/{model}");
+}
+
 // Route and chain are configured apart, so a binding the route declares that no AI filter applies
 // is counted where a request shows it.
 TEST_F(AiProtocolManagerFilterStateTest, CountsARouteBindingNoAiFilterApplies) {

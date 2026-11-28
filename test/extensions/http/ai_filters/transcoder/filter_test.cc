@@ -173,7 +173,7 @@ public:
                            .request_headers = request_headers_,
                            .request_protocol = source_protocol,
                            .response_protocol = target_protocol_,
-                           .request_binding = route_request_binding_,
+                           .request_binding = request_binding_,
                            .response_binding = route_response_binding_};
   }
 
@@ -289,8 +289,8 @@ public:
   Http::TestRequestHeaderMapImpl request_headers_;
   // The backend's dialect, as the route declares it for the filters `makeContext()` builds.
   LLMProtocol target_protocol_{LLMProtocol::Unspecified};
-  // The bindings the route declares for those filters.
-  LlmBindingConstSharedPtr route_request_binding_;
+  // The resolved client binding and the route's backend binding for `makeContext()`.
+  LlmBindingConstSharedPtr request_binding_;
   LlmBindingConstSharedPtr route_response_binding_;
 
   absl::Status status_;
@@ -686,7 +686,7 @@ TEST_F(TranscoderFilterTest, InstructionsSendTheRequestToTheBackendTheRouterChos
 // A request binding tells the `TO_IR` leg where the client's path names the model and streaming
 // mode, for a dialect whose own bindings say nothing about the path.
 TEST_F(TranscoderFilterTest, RequestBindingLiftsTheModelFromTheClientsPath) {
-  setBinding(FilterStateKeys::BindingRequest, "/anthropic/{model}/{messages|stream}");
+  request_binding_ = *LlmBinding::parse("/anthropic/{model}/{messages|stream}");
 
   runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::AnthropicMessages,
                   R"({"max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]})",
@@ -718,20 +718,6 @@ TEST_F(TranscoderFilterTest, AppliesTheBindingsOfItsRequestLeg) {
   // Without a request leg, the instance still reads the client's path for its response's model.
   EXPECT_TRUE(use(TranscoderProto::DIRECTION_UNSPECIFIED).request);
   EXPECT_FALSE(use(TranscoderProto::DIRECTION_UNSPECIFIED).response);
-}
-
-// The route's request binding reads the client's path when filter state names none.
-TEST_F(TranscoderFilterTest, RouteRequestBindingLiftsTheModelFromTheClientsPath) {
-  route_request_binding_ = *LlmBinding::parse("/anthropic/{model}/{messages|stream}");
-
-  runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::AnthropicMessages,
-                  R"({"max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]})",
-                  "/anthropic/claude-sonnet-4-5/stream");
-
-  ASSERT_TRUE(status_.ok()) << status_;
-  const nlohmann::json out = forwarded();
-  EXPECT_EQ(out["model"], "claude-sonnet-4-5");
-  EXPECT_EQ(out["stream"], true);
 }
 
 constexpr absl::string_view ChatToClaude =
@@ -776,12 +762,9 @@ TEST_F(TranscoderFilterTest, RouteResponseBindingLapsesForAnotherBackendApi) {
   EXPECT_EQ(request_headers_.getPathValue(), "/v1beta/models/claude-sonnet-4-5:generateContent");
 }
 
-// A binding set once per connection is shared by every stream on it, so what one stream's path
-// held is kept on that stream alone.
+// A binding shared across streams records what one stream's path held on that stream alone.
 TEST_F(TranscoderFilterTest, ReadOfABindingSharedByStreamsStaysWithTheStream) {
-  connection_filter_state_->setData(FilterStateKeys::BindingRequest,
-                                    std::make_shared<LlmBindingObject>("/tenants/{tenant}/{model}"),
-                                    StreamInfo::FilterState::LifeSpan::Connection);
+  request_binding_ = *LlmBinding::parse("/tenants/{tenant}/{model}");
 
   runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::OpenAiChatCompletions,
                   R"({"messages": [{"role": "user", "content": "Hi"}]})", "/tenants/t-1/gpt-4o");
@@ -797,7 +780,7 @@ TEST_F(TranscoderFilterTest, ReadOfABindingSharedByStreamsStaysWithTheStream) {
 // A request binding that does not match the path reads nothing from it; the request still goes
 // through on what the body says.
 TEST_F(TranscoderFilterTest, RequestBindingThatMissesThePathReadsNothing) {
-  setBinding(FilterStateKeys::BindingRequest, "/anthropic/{model}/{messages|stream}");
+  request_binding_ = *LlmBinding::parse("/anthropic/{model}/{messages|stream}");
 
   runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::AnthropicMessages,
                   R"({"max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]})",
@@ -817,7 +800,7 @@ TEST_F(TranscoderFilterTest, ResponseOnlyInstanceFollowsTheInstructionsToo) {
   request_headers_ = Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                     {":path", "/gateway/gemini-2.5-pro/chat"}};
   setResponseProtocolInstruction(LLMProtocol::GeminiGenerateContent);
-  setBinding(FilterStateKeys::BindingRequest, "/gateway/{model}/{chat|chat-stream}");
+  request_binding_ = *LlmBinding::parse("/gateway/{model}/{chat|chat-stream}");
 
   FilterManager manager({std::make_shared<TranscoderFilter>(
       makeConfig(TranscoderProto::DIRECTION_UNSPECIFIED, TranscoderProto::TO_IR),
@@ -844,7 +827,7 @@ TEST_F(TranscoderFilterTest, ResponseOnlyInstanceTakesTheModelARequestLegRead) {
   request_headers_ =
       Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/gateway/rewritten/chat"}};
   setResponseProtocolInstruction(LLMProtocol::GeminiGenerateContent);
-  setBinding(FilterStateKeys::BindingRequest, "/gateway/{model}/{chat|chat-stream}");
+  request_binding_ = *LlmBinding::parse("/gateway/{model}/{chat|chat-stream}");
   stream_info_.filterState()->setData(
       FilterStateKeys::BindingRead,
       std::make_shared<LlmBindingReadObject>(LlmBindingRead{nullptr, "gemini-2.5-pro", {}, {}}),
