@@ -1,5 +1,6 @@
 #include "source/extensions/filters/common/fault/fault_config.h"
 
+#include "envoy/common/exception.h"
 #include "envoy/extensions/filters/common/fault/v3/fault.pb.h"
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 
@@ -45,6 +46,13 @@ FaultAbortConfig::FaultAbortConfig(
                                              std::nullopt, abort_config.percentage());
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kGrpcStatus:
+    for (const auto& header : abort_config.response_headers_to_add()) {
+      if (Http::LowerCaseString(header.header().key()) == Http::Headers::get().GrpcStatus) {
+        throwEnvoyExceptionOrPanic(
+            "grpc-status cannot be set in response_headers_to_add when abort.grpc_status is "
+            "configured");
+      }
+    }
     provider_ = std::make_unique<FixedAbortProvider>(
         std::nullopt, static_cast<Grpc::Status::GrpcStatus>(abort_config.grpc_status()),
         abort_config.percentage());
@@ -55,6 +63,9 @@ FaultAbortConfig::FaultAbortConfig(
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::ERROR_TYPE_NOT_SET:
     PANIC("not set");
   }
+  response_headers_parser_ =
+      THROW_OR_RETURN_VALUE(Router::HeaderParser::configure(abort_config.response_headers_to_add()),
+                            Router::HeaderParserPtr);
 }
 
 std::optional<Http::Code> FaultAbortConfig::HeaderAbortProvider::httpStatusCode(

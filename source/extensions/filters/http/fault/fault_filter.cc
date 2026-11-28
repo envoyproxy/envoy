@@ -16,6 +16,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
@@ -514,8 +515,17 @@ void FaultFilter::abortWithStatus(Http::Code http_status_code,
       !fault_settings_->requestAbort()->responseBody().empty()) {
     body = fault_settings_->requestAbort()->responseBody();
   }
-  decoder_callbacks_->sendLocalReply(http_status_code, body, nullptr, grpc_status,
-                                     RcDetails::get().FaultAbort);
+  decoder_callbacks_->sendLocalReply(
+      http_status_code, body,
+      [this](Http::ResponseHeaderMap& headers) {
+        const Formatter::Context formatter_context(decoder_callbacks_->requestHeaders().ptr(),
+                                                   &headers);
+        if (fault_settings_->requestAbort() != nullptr) {
+          fault_settings_->requestAbort()->responseHeadersParser().evaluateHeaders(
+              headers, formatter_context, decoder_callbacks_->streamInfo());
+        }
+      },
+      grpc_status, RcDetails::get().FaultAbort);
 }
 
 void FaultFilter::onAbortDryRun(Http::Code http_status_code,
