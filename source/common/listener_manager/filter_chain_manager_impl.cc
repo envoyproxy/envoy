@@ -266,7 +266,20 @@ absl::Status FilterChainManagerImpl::verifyNoDuplicateMatchers(
         absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()), filter_chain.name()));
   }
   if (!filter_chain_matcher) {
-    const auto& matching_iter = filter_chains.find(filter_chain_match);
+    // A source range with prefix_len 0 matches every address in its family, so it
+    // constrains the source no more than an absent range. Compare and store a copy
+    // of the match with catch-all ranges removed, so that a chain whose only source
+    // range is 0.0.0.0/0 is detected as a duplicate of a chain with no source range.
+    envoy::config::listener::v3::FilterChainMatch normalized_match = filter_chain_match;
+    auto* source_ranges = normalized_match.mutable_source_prefix_ranges();
+    source_ranges->erase(std::remove_if(source_ranges->begin(), source_ranges->end(),
+                                        [](const envoy::config::core::v3::CidrRange& range) {
+                                          return range.has_prefix_len() &&
+                                                 range.prefix_len().value() == 0;
+                                        }),
+                         source_ranges->end());
+
+    const auto& matching_iter = filter_chains.find(normalized_match);
     if (matching_iter != filter_chains.end()) {
       std::string error_msg =
           fmt::format("error adding listener '{}': filter chain '{}' has "
@@ -281,7 +294,7 @@ absl::Status FilterChainManagerImpl::verifyNoDuplicateMatchers(
       return absl::InvalidArgumentError(error_msg);
     }
 
-    filter_chains.insert({filter_chain_match, filter_chain.name()});
+    filter_chains.insert({normalized_match, filter_chain.name()});
   }
 
   return absl::OkStatus();
