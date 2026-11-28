@@ -226,6 +226,12 @@ SecretManager::getContext(absl::string_view secret_name) const {
 Ssl::SelectionResult
 BaseAsyncSelector::doSelectTlsContext(const std::string& name, const bool client_ocsp_capable,
                                       Ssl::CertificateSelectionCallbackPtr cb) {
+  if (name.empty()) {
+    ENVOY_LOG(debug, "Rejecting empty on-demand certificate name");
+    return Ssl::SelectionResult{
+        .status = Ssl::SelectionResult::SelectionStatus::Failed,
+    };
+  }
   auto current_context = secret_manager_->getContext(name);
   if (current_context) {
     ENVOY_LOG(trace, "Using an existing certificate '{}'", name);

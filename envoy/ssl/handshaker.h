@@ -356,12 +356,20 @@ public:
 class TlsCertificateMapper {
 public:
   virtual ~TlsCertificateMapper() = default;
+  /**
+   * Derive a certificate name from the client hello. Return an empty string to reject the input
+   * and fail certificate selection.
+   */
   virtual std::string deriveFromClientHello(const SSL_CLIENT_HELLO&) PURE;
 };
 
 class UpstreamTlsCertificateMapper {
 public:
   virtual ~UpstreamTlsCertificateMapper() = default;
+  /**
+   * Derive a certificate name from the server hello. Return an empty string to reject the input
+   * and fail certificate selection.
+   */
   virtual std::string
   deriveFromServerHello(const SSL&, const Network::TransportSocketOptionsConstSharedPtr&) PURE;
 };

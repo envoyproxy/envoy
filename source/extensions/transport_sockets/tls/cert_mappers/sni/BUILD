@@ -17,6 +17,8 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:factory_context_interface",
         "//envoy/ssl:handshaker_interface",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/tls:utility_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3:pkg_cc_proto",
     ],
 )

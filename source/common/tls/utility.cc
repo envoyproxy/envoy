@@ -15,6 +15,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/ssl/ssl.h"
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
@@ -113,6 +114,68 @@ bool Utility::dnsNameMatch(absl::string_view dns_name, absl::string_view pattern
   }
 
   return false;
+}
+
+namespace {
+
+constexpr size_t MAX_DNS_HOSTNAME_LENGTH = 253;
+constexpr size_t MAX_DNS_LABEL_LENGTH = 63;
+
+absl::string_view stripOptionalTrailingDot(absl::string_view hostname) {
+  if (!hostname.empty() && hostname.back() == '.') {
+    hostname.remove_suffix(1);
+  }
+  return hostname;
+}
+
+} // namespace
+
+bool Utility::isValidDnsHostname(absl::string_view hostname) {
+  hostname = stripOptionalTrailingDot(hostname);
+  if (hostname.empty() || hostname.size() > MAX_DNS_HOSTNAME_LENGTH) {
+    return false;
+  }
+
+  size_t label_start = 0;
+  bool label_all_digits = true;
+  for (size_t i = 0; i <= hostname.size(); ++i) {
+    const bool at_end = (i == hostname.size());
+    if (at_end || hostname[i] == '.') {
+      const size_t label_len = i - label_start;
+      if (label_len == 0 || label_len > MAX_DNS_LABEL_LENGTH) {
+        return false;
+      }
+      const absl::string_view label = hostname.substr(label_start, label_len);
+      if (!absl::ascii_isalnum(static_cast<unsigned char>(label.front())) ||
+          !absl::ascii_isalnum(static_cast<unsigned char>(label.back()))) {
+        return false;
+      }
+      if (!at_end) {
+        label_all_digits = true;
+      }
+      label_start = i + 1;
+    } else {
+      const auto c = static_cast<unsigned char>(hostname[i]);
+      if (!absl::ascii_isalnum(c) && c != '-') {
+        return false;
+      }
+      if (label_all_digits && !absl::ascii_isdigit(c)) {
+        label_all_digits = false;
+      }
+    }
+  }
+
+  // Per RFC 3696 section 2 and RFC 6066 section 3, reject IP literals: IPv6 addresses are already
+  // rejected by the character set check above; dotted-quad IPv4 and numeric literals always end
+  // with an all-digit label.
+  return !label_all_digits;
+}
+
+std::optional<std::string> Utility::normalizeDnsHostname(absl::string_view hostname) {
+  if (!isValidDnsHostname(hostname)) {
+    return std::nullopt;
+  }
+  return absl::AsciiStrToLower(stripOptionalTrailingDot(hostname));
 }
 
 namespace {
