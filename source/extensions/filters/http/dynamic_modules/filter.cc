@@ -15,9 +15,26 @@ namespace DynamicModules {
 namespace HttpFilters {
 
 DynamicModuleHttpFilter::~DynamicModuleHttpFilter() {
-  // In a well-formed filter chain onDestroy() has already run and these are no-ops.
-  scheduler_target_->clear();
+  // In a well-formed filter chain onDestroy() has already run and these are no-ops. Setting
+  // destroyed_ keeps a scheduler created by the destroy hook inactive.
+  destroyed_ = true;
+  if (scheduler_target_ != nullptr) {
+    scheduler_target_->clear();
+  }
   destroy();
+}
+
+const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleHttpFilter>&
+DynamicModuleHttpFilter::ensureSchedulerTarget() {
+  if (scheduler_target_ == nullptr) {
+    scheduler_target_ = std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleHttpFilter>>();
+    // Otherwise setDecoderFilterCallbacks() initializes it, or it stays inactive after onDestroy().
+    if (Event::Dispatcher* worker_dispatcher = dispatcher();
+        worker_dispatcher != nullptr && !destroyed_) {
+      scheduler_target_->initialize(*worker_dispatcher, weak_from_this());
+    }
+  }
+  return scheduler_target_;
 }
 
 void DynamicModuleHttpFilter::initializeInModuleFilter() {
@@ -46,7 +63,9 @@ void DynamicModuleHttpFilter::onStreamComplete() {
 void DynamicModuleHttpFilter::onDestroy() {
   // Stop the schedulers before the module hooks below, which may join a module thread that is
   // committing an event.
-  scheduler_target_->clear();
+  if (scheduler_target_ != nullptr) {
+    scheduler_target_->clear();
+  }
   destroyed_ = true;
   // Read before the cache is cleared below, because destroy() defers the module hook onto it.
   OptRef<Event::Dispatcher> worker_dispatcher = makeOptRefFromPtr(dispatcher());

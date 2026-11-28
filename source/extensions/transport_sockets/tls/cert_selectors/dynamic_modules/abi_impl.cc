@@ -280,7 +280,7 @@ envoy_dynamic_module_type_tls_certificate_selector_config_scheduler_module_ptr
 envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_new(
     envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr config_envoy_ptr) {
   return new DynamicModuleTlsCertificateSelectorConfigScheduler(
-      toConfig(config_envoy_ptr)->scheduler_target_);
+      toConfig(config_envoy_ptr)->ensureSchedulerTarget());
 }
 
 void envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_commit(

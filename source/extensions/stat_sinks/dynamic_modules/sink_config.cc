@@ -25,7 +25,9 @@ DynamicModuleStatsSinkConfig::DynamicModuleStatsSinkConfig(
 DynamicModuleStatsSinkConfig::~DynamicModuleStatsSinkConfig() {
   // Stop the schedulers before the destroy hook, which may join a module thread that is committing
   // an event.
-  scheduler_target_->clear();
+  if (scheduler_target_ != nullptr) {
+    scheduler_target_->clear();
+  }
   if (in_module_config_ != nullptr && on_config_destroy_ != nullptr) {
     on_config_destroy_(in_module_config_);
   }
@@ -102,7 +104,6 @@ newDynamicModuleStatsSinkConfig(absl::string_view sink_name, absl::string_view s
 
   auto config = std::make_shared<DynamicModuleStatsSinkConfig>(sink_name, sink_config,
                                                                std::move(dynamic_module), server);
-  config->scheduler_target_->initialize(config->main_thread_dispatcher_, config);
 
   config->on_config_destroy_ = on_config_destroy.value();
   config->on_flush_ = on_flush.value();

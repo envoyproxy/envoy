@@ -1303,7 +1303,7 @@ envoy_dynamic_module_type_listener_filter_scheduler_module_ptr
 envoy_dynamic_module_callback_listener_filter_scheduler_new(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
-  return new DynamicModuleListenerFilterScheduler(filter->schedulerTarget());
+  return new DynamicModuleListenerFilterScheduler(filter->ensureSchedulerTarget());
 }
 
 void envoy_dynamic_module_callback_listener_filter_scheduler_delete(
@@ -1322,7 +1322,7 @@ envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr
 envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
     envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr) {
   auto* filter_config = static_cast<DynamicModuleListenerFilterConfig*>(filter_config_envoy_ptr);
-  return new DynamicModuleListenerFilterConfigScheduler(filter_config->scheduler_target_);
+  return new DynamicModuleListenerFilterConfigScheduler(filter_config->ensureSchedulerTarget());
 }
 
 void envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(

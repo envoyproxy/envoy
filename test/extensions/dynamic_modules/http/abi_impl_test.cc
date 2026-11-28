@@ -5924,6 +5924,49 @@ TEST_F(DynamicModuleHttpFilterSchedulerTest,
   envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
 }
 
+TEST_F(DynamicModuleHttpFilterSchedulerTest,
+       HttpFilterSchedulerCreatedBeforeDecoderCallbacksPostsOnceCallbacksAreSet) {
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(_));
+  envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 123);
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterSchedulerCreatedAfterOnDestroyIsNoOp) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->onDestroy();
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).Times(0);
+  envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 123);
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterSchedulerTargetIsCreatedOnFirstScheduler) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  EXPECT_EQ(nullptr, filter_->schedulerTargetForTest());
+
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  const auto target = filter_->schedulerTargetForTest();
+  ASSERT_NE(nullptr, target);
+  auto* other_scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  EXPECT_EQ(target, filter_->schedulerTargetForTest());
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(other_scheduler);
+}
+
+TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterWithoutSchedulerHasNoTarget) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->onDestroy();
+  EXPECT_EQ(nullptr, filter_->schedulerTargetForTest());
+}
+
 // Verifies that the config scheduler `commit` posts to the main thread dispatcher.
 TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterConfigSchedulerCommitPostsToMainDispatcher) {
   auto* scheduler = envoy_dynamic_module_callback_http_filter_config_scheduler_new(configPtr());

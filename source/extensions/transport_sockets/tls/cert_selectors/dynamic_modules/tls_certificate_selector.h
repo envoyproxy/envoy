@@ -190,11 +190,16 @@ public:
   // The main thread dispatcher used to post work back to the main thread.
   Event::Dispatcher& main_thread_dispatcher_;
 
-  // Shared with the schedulers of this config. Initialized once the config is held by a shared
-  // pointer, before the module can create a scheduler, and cleared at the start of the destructor.
-  using SchedulerTarget = Envoy::Extensions::DynamicModules::DynamicModuleSchedulerTarget<
-      DynamicModuleTlsCertificateSelectorConfig>;
-  const std::shared_ptr<SchedulerTarget> scheduler_target_{std::make_shared<SchedulerTarget>()};
+  // Shared with the schedulers of this config. Created when the module creates the first scheduler
+  // and cleared at the start of the destructor.
+  using SchedulerTargetSharedPtr =
+      Envoy::Extensions::DynamicModules::DynamicModuleSchedulerTargetSharedPtr<
+          DynamicModuleTlsCertificateSelectorConfig>;
+  SchedulerTargetSharedPtr scheduler_target_;
+  const SchedulerTargetSharedPtr& ensureSchedulerTarget() {
+    return Envoy::Extensions::DynamicModules::ensureDynamicModuleSchedulerTarget(
+        scheduler_target_, main_thread_dispatcher_, weak_from_this());
+  }
 
   // Metrics can only be defined during config_new, so the registry needs no lock. The flag is
   // stored with release ordering once the configuration is created and loaded with acquire ordering

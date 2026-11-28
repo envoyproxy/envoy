@@ -3116,8 +3116,38 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, StartUpstreamSecureTransportNu
 // =============================================================================
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterSchedulerNewDelete) {
+  EXPECT_EQ(nullptr, filter_->schedulerTargetForTest());
   auto scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
   EXPECT_NE(nullptr, scheduler);
+  EXPECT_NE(nullptr, filter_->schedulerTargetForTest());
+
+  envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
+       NetworkFilterSchedulerCreatedBeforeReadCallbacksPostsOnceCallbacksAreSet) {
+  auto fresh_filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  auto* scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(
+      static_cast<void*>(fresh_filter.get()));
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).Times(0);
+  envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 1);
+  testing::Mock::VerifyAndClearExpectations(&worker_thread_dispatcher_);
+
+  fresh_filter->initializeReadFilterCallbacks(read_callbacks_);
+  EXPECT_CALL(worker_thread_dispatcher_, post(_));
+  envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 2);
+
+  envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
+  fresh_filter->onEvent(Network::ConnectionEvent::LocalClose);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
+       NetworkFilterSchedulerCreatedAfterConnectionCloseIsNoOp) {
+  filter_->onEvent(Network::ConnectionEvent::RemoteClose);
+  auto* scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).Times(0);
+  envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 1);
 
   envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
 }

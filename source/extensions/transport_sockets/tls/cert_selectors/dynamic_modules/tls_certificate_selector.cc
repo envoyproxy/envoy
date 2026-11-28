@@ -127,7 +127,9 @@ DynamicModuleTlsCertificateSelectorConfig::DynamicModuleTlsCertificateSelectorCo
 DynamicModuleTlsCertificateSelectorConfig::~DynamicModuleTlsCertificateSelectorConfig() {
   // Stop the schedulers before the destroy hook, which may join a module thread that is committing
   // an event.
-  scheduler_target_->clear();
+  if (scheduler_target_ != nullptr) {
+    scheduler_target_->clear();
+  }
   if (in_module_config_ != nullptr) {
     on_config_destroy_(in_module_config_);
   }
@@ -502,7 +504,6 @@ newDynamicModuleTlsCertificateSelectorConfig(
   auto config = std::make_shared<DynamicModuleTlsCertificateSelectorConfig>(
       std::move(dynamic_module), factory_context, tls_config, metrics_namespace,
       certificate_request_timeout, std::move(dynamic_context_factory));
-  config->scheduler_target_->initialize(config->main_thread_dispatcher_, config);
   config->on_config_destroy_ = on_config_destroy.value();
   config->on_new_ = on_new.value();
   config->on_destroy_ = on_destroy.value();

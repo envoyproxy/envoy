@@ -202,9 +202,14 @@ public:
   Event::Dispatcher* dispatcher() { return cached_dispatcher_.load(std::memory_order_acquire); }
 
   /**
-   * Returns the target that the schedulers of this filter post through.
+   * Returns the target that the schedulers of this filter post through, creating it on first use.
+   * Must be called on the worker thread of the filter.
    */
-  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleNetworkFilter>& schedulerTarget() const {
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleNetworkFilter>& ensureSchedulerTarget();
+
+  // Test-only accessor for the scheduler target, which is null until a scheduler is created.
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleNetworkFilter>&
+  schedulerTargetForTest() const {
     return scheduler_target_;
   }
 
@@ -271,10 +276,10 @@ private:
   // Worker dispatcher published at callback-init, cleared on destroy. Read via `dispatcher()`.
   std::atomic<Event::Dispatcher*> cached_dispatcher_{nullptr};
 
-  // Shared with the schedulers of this filter. Initialized when the read filter callbacks are set
-  // and cleared when the connection closes or the filter is destroyed, whichever comes first.
-  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleNetworkFilter> scheduler_target_{
-      std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleNetworkFilter>>()};
+  // Shared with the schedulers of this filter. Created when the module creates the first scheduler,
+  // initialized once the read filter callbacks are set, and cleared when the connection closes or
+  // the filter is destroyed, whichever comes first.
+  DynamicModuleSchedulerTargetSharedPtr<DynamicModuleNetworkFilter> scheduler_target_;
 
   uint32_t worker_index_ = 0;
 

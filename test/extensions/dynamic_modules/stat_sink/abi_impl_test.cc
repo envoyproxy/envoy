@@ -1208,8 +1208,6 @@ TEST_F(DynamicModuleStatsSinkConfigAbiTest, SchedulerNewCommitDelete) {
         envoy_dynamic_module_callback_stat_sink_config_set_gauge(config_envoy_ptr, 1, event_id);
       };
 
-  // newDynamicModuleStatsSinkConfig does this for a config the module creates.
-  config_->scheduler_target_->initialize(context_.dispatcher_, config_);
   auto* scheduler = envoy_dynamic_module_callback_stat_sink_config_scheduler_new(configHandle());
   ASSERT_NE(nullptr, scheduler);
   EXPECT_CALL(context_.dispatcher_, post(_)).WillOnce([](Event::PostCb cb) { cb(); });

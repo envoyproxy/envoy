@@ -384,11 +384,16 @@ public:
   // The main thread dispatcher.
   Event::Dispatcher& main_thread_dispatcher_;
 
-  // Shared with the schedulers of this config. Initialized once the config is held by a shared
-  // pointer, before the module can create a scheduler, and cleared at the start of the destructor.
-  using SchedulerTarget = Extensions::DynamicModules::DynamicModuleSchedulerTarget<
-      DynamicModuleBootstrapExtensionConfig>;
-  const std::shared_ptr<SchedulerTarget> scheduler_target_{std::make_shared<SchedulerTarget>()};
+  // Shared with the schedulers of this config. Created when the module creates the first scheduler
+  // and cleared at the start of the destructor.
+  using SchedulerTargetSharedPtr =
+      Extensions::DynamicModules::DynamicModuleSchedulerTargetSharedPtr<
+          DynamicModuleBootstrapExtensionConfig>;
+  SchedulerTargetSharedPtr scheduler_target_;
+  const SchedulerTargetSharedPtr& ensureSchedulerTarget() {
+    return Extensions::DynamicModules::ensureDynamicModuleSchedulerTarget(
+        scheduler_target_, main_thread_dispatcher_, weak_from_this());
+  }
 
   // File watchers created by
   // envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch. Envoy owns the

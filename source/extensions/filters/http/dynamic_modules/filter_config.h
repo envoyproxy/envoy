@@ -144,10 +144,14 @@ public:
 
   Envoy::Upstream::ClusterManager& cluster_manager_;
   Event::Dispatcher& main_thread_dispatcher_;
-  // Shared with the schedulers of this config. Initialized once the config is held by a shared
-  // pointer, before the module can create a scheduler, and cleared at the start of the destructor.
-  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleHttpFilterConfig> scheduler_target_{
-      std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleHttpFilterConfig>>()};
+  // Shared with the schedulers of this config. Created when the module creates the first scheduler
+  // and cleared at the start of the destructor.
+  DynamicModuleSchedulerTargetSharedPtr<DynamicModuleHttpFilterConfig> scheduler_target_;
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleHttpFilterConfig>&
+  ensureSchedulerTarget() {
+    return ensureDynamicModuleSchedulerTarget(scheduler_target_, main_thread_dispatcher_,
+                                              weak_from_this());
+  }
   const Stats::ScopeSharedPtr stats_scope_;
   // Shared metrics registry composed from stats_scope_.
   Extensions::DynamicModules::MetricRegistry metrics_;
