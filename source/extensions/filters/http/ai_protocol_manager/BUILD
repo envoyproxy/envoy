@@ -114,6 +114,38 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "payload_reader_lib",
+    srcs = ["payload_reader.cc"],
+    hdrs = ["payload_reader.h"],
+    deps = [
+        ":external_buffer_interface",
+        "//envoy/buffer:buffer_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/coroutine:leaf_awaitable_lib",
+        "//source/common/coroutine:semaphore_lib",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/coroutine:task_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
+    name = "stream_payload_lib",
+    srcs = ["stream_payload.cc"],
+    hdrs = ["stream_payload.h"],
+    deps = [
+        ":chain_writer_lib",
+        ":payload_reader_lib",
+        "//envoy/buffer:buffer_interface",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/coroutine:task_lib",
+        "@abseil-cpp//absl/status",
+    ],
+)
+
+envoy_cc_library(
     name = "buffer_manager_lib",
     srcs = ["buffer_manager.cc"],
     hdrs = ["buffer_manager.h"],
