@@ -48,7 +48,9 @@ GradientControllerConfig::GradientControllerConfig(
       fixed_value_(std::chrono::milliseconds(
           DurationUtil::durationToMilliseconds(proto_config.min_rtt_calc_params().fixed_value()))),
       min_rtt_buffer_pct_(
-          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config.min_rtt_calc_params(), buffer, 25)) {
+          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config.min_rtt_calc_params(), buffer, 25)),
+      min_latency_delta_(Protobuf::util::TimeUtil::DurationToMicroseconds(
+          proto_config.min_rtt_calc_params().min_latency_delta())) {
 
   if (min_rtt_calc_interval_ < std::chrono::milliseconds(1) &&
       fixed_value_ <= std::chrono::milliseconds::zero()) {
@@ -195,7 +197,10 @@ uint32_t GradientController::calculateNewLimit() {
   // This prevents extreme changes in the concurrency limit between each sample
   // window.
   const auto buffered_min_rtt = min_rtt_.count() + min_rtt_.count() * config_.minRTTBufferPercent();
-  const double raw_gradient = static_cast<double>(buffered_min_rtt) / sample_rtt_.count();
+  const double min_rtt_with_delta =
+      min_rtt_.count() +
+      std::chrono::duration<double, std::nano>(config_.minLatencyDelta()).count();
+  const double raw_gradient = std::max(buffered_min_rtt, min_rtt_with_delta) / sample_rtt_.count();
   const double gradient = std::max<double>(0.5, std::min<double>(2.0, raw_gradient));
 
   // Scale the value by 1000 when reporting it to maintain the granularity of its details

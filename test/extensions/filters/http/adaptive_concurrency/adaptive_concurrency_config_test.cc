@@ -43,6 +43,21 @@ enabled:
   cb(filter_callback);
 }
 
+TEST(AdaptiveConcurrencyConfigTest, EwmaController) {
+  AdaptiveConcurrencyFilterFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto proto = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml("ewma_controller_config: {}", *proto);
+  auto cb = factory.createFilterFactoryFromProto(*proto, "stats.", context);
+  ASSERT_TRUE(cb.ok()) << cb.status();
+  Http::MockFilterChainFactoryCallbacks callbacks;
+  EXPECT_CALL(callbacks, addStreamFilter(_));
+  cb.value()(callbacks);
+
+  TestUtility::loadFromYaml("ewma_controller_config: {initial_concurrency: 1001}", *proto);
+  EXPECT_FALSE(factory.createFilterFactoryFromProto(*proto, "stats.", context).ok());
+}
+
 TEST(AdaptiveConcurrencyConfigTest, AdaptiveConcurrencyFilterSeverContext) {
   const std::string yaml = R"EOF(
 gradient_controller_config:
