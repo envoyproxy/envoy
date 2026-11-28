@@ -45,6 +45,7 @@ envoy_cc_library(
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/dynamic_modules:metric_registry",
+        "//source/extensions/dynamic_modules:scheduler_lib",
         "@envoy_api//envoy/extensions/stat_sinks/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

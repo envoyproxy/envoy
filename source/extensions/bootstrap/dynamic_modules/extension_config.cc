@@ -29,6 +29,9 @@ DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
 }
 
 DynamicModuleBootstrapExtensionConfig::~DynamicModuleBootstrapExtensionConfig() {
+  // Stop the schedulers before the destroy hook, which may join a module thread that is committing
+  // an event.
+  scheduler_target_->clear();
   // Cancel any pending HTTP callouts before destroying the config.
   for (auto& callout : http_callouts_) {
     if (callout.second->request_ != nullptr) {
@@ -443,6 +446,7 @@ newDynamicModuleBootstrapExtensionConfig(
   auto config = std::make_shared<DynamicModuleBootstrapExtensionConfig>(
       extension_name, extension_config, metrics_namespace, std::move(dynamic_module),
       main_thread_dispatcher, context, stats_store);
+  config->scheduler_target_->initialize(main_thread_dispatcher, config);
 
   // Always register an init target so that Envoy blocks traffic until the module signals readiness.
   // This must happen before calling the module constructor so the module can call

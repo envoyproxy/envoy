@@ -27,6 +27,7 @@ envoy_cc_library(
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/dynamic_modules:metric_registry",
+        "//source/extensions/dynamic_modules:scheduler_lib",
     ],
 )
 

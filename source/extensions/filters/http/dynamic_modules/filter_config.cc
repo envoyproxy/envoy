@@ -111,6 +111,9 @@ size_t DynamicModuleHttpFilterConfig::subscribeGenericSecret(absl::string_view n
 }
 
 DynamicModuleHttpFilterConfig::~DynamicModuleHttpFilterConfig() {
+  // Stop the schedulers before the destroy hook, which may join a module thread that is committing
+  // an event.
+  scheduler_target_->clear();
   // When the initialization of the dynamic module fails, the in_module_config_ is nullptr,
   // and there's nothing to destroy from the module's point of view.
   if (on_http_filter_config_destroy_) {
@@ -312,6 +315,7 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
   auto config = std::make_shared<DynamicModuleHttpFilterConfig>(
       filter_name, filter_config, metrics_namespace, std::move(dynamic_module), stats_scope,
       context, init_manager);
+  config->scheduler_target_->initialize(config->main_thread_dispatcher_, config);
 
   const void* filter_config_envoy_ptr = (*constructor.value())(
       static_cast<void*>(config.get()), {filter_name.data(), filter_name.size()},

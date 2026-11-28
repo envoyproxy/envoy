@@ -1,3 +1,4 @@
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <limits>
@@ -25,6 +26,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/status_utility.h"
 
+#include "absl/synchronization/mutex.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -2293,39 +2295,103 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
 
   envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 123);
 
-  // Destroy the filter before invoking the callback.
+  // The pending event does not keep the filter alive, and is dropped when it runs.
+  std::weak_ptr<DynamicModuleListenerFilter> weak_filter = filter_;
   filter_.reset();
-
-  // Invoke the captured callback - should not crash because the scheduler holds a weak_ptr.
+  EXPECT_TRUE(weak_filter.expired());
   captured_cb();
 
   envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
 }
 
-// new_scheduler captures weak_from_this. On a make_unique-owned filter that is empty, so commit
-// never posts and onScheduled never runs. Shared ownership delivers the event. This guards the
-// scheduler half of the fix the same way the callout test guards the callout half.
+// The posted event locks a weak_from_this of the filter. On a make_unique-owned filter that is
+// empty, so onScheduled never runs. Shared ownership delivers the event. This guards the scheduler
+// half of the fix the same way the callout test guards the callout half.
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SchedulerRequiresSharedOwnership) {
+  // The hook is a C function pointer, so it reaches the counter through a static.
+  static int hook_runs = 0;
+  hook_runs = 0;
+  filter_config_->on_listener_filter_scheduled_ =
+      [](envoy_dynamic_module_type_listener_filter_envoy_ptr,
+         envoy_dynamic_module_type_listener_filter_module_ptr, uint64_t) { ++hook_runs; };
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillRepeatedly([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  });
+
   auto unique_filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
   unique_filter->onAccept(callbacks_);
   auto* unique_scheduler =
       envoy_dynamic_module_callback_listener_filter_scheduler_new(unique_filter.get());
-  EXPECT_CALL(worker_thread_dispatcher_, post(_)).Times(0);
   envoy_dynamic_module_callback_listener_filter_scheduler_commit(unique_scheduler, 1);
+  ASSERT_TRUE(captured_cb);
+  captured_cb();
+  EXPECT_EQ(0, hook_runs);
   envoy_dynamic_module_callback_listener_filter_scheduler_delete(unique_scheduler);
-  testing::Mock::VerifyAndClearExpectations(&worker_thread_dispatcher_);
 
   auto shared_filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
   shared_filter->onAccept(callbacks_);
   auto* shared_scheduler =
       envoy_dynamic_module_callback_listener_filter_scheduler_new(shared_filter.get());
+  envoy_dynamic_module_callback_listener_filter_scheduler_commit(shared_scheduler, 1);
+  captured_cb();
+  EXPECT_EQ(1, hook_runs);
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(shared_scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       ListenerFilterSchedulerDoesNotExtendFilterLifetime) {
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
+  std::weak_ptr<DynamicModuleListenerFilter> weak_filter = filter_;
+
   Event::PostCb captured_cb;
   EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
   }));
-  envoy_dynamic_module_callback_listener_filter_scheduler_commit(shared_scheduler, 1);
+  std::thread module_thread(
+      [&]() { envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 7); });
+  module_thread.join();
+  ASSERT_TRUE(captured_cb);
+
+  // The filter is destroyed on this thread as soon as its last reference is dropped.
+  filter_.reset();
+  EXPECT_TRUE(weak_filter.expired());
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).Times(0);
+  envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 8);
   captured_cb();
-  envoy_dynamic_module_callback_listener_filter_scheduler_delete(shared_scheduler);
+
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       ListenerFilterSchedulerCommitRacesFilterDestruction) {
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
+
+  absl::Mutex mutex;
+  std::vector<Event::PostCb> posted;
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillRepeatedly([&](Event::PostCb cb) {
+    absl::MutexLock lock(mutex);
+    posted.push_back(std::move(cb));
+  });
+  std::atomic<bool> started{false};
+  std::thread module_thread([&]() {
+    for (uint64_t i = 0; i < 1000; ++i) {
+      envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, i);
+      started.store(true);
+    }
+  });
+  while (!started.load()) {
+  }
+  filter_.reset();
+  module_thread.join();
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
+
+  // Every event posted before the filter was destroyed is dropped when it runs.
+  absl::MutexLock lock(mutex);
+  for (Event::PostCb& cb : posted) {
+    cb();
+  }
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
@@ -2342,11 +2408,13 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
 
   envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(scheduler, 456);
 
-  // Destroy the filter and config before invoking the callback.
+  // The pending event does not keep the config alive, and is dropped when it runs.
+  std::weak_ptr<DynamicModuleListenerFilterConfig> weak_config = filter_config_;
   filter_.reset();
   filter_config_.reset();
-
-  // Invoke the captured callback - should not crash because the scheduler holds a weak_ptr.
+  EXPECT_TRUE(weak_config.expired());
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).Times(0);
+  envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(scheduler, 457);
   captured_cb();
 
   // Clean up.

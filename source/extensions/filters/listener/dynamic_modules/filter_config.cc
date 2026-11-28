@@ -22,6 +22,9 @@ DynamicModuleListenerFilterConfig::DynamicModuleListenerFilterConfig(
       dynamic_module_(std::move(dynamic_module)) {}
 
 DynamicModuleListenerFilterConfig::~DynamicModuleListenerFilterConfig() {
+  // Stop the schedulers before the destroy hook, which may join a module thread that is committing
+  // an event.
+  scheduler_target_->clear();
   if (in_module_config_ != nullptr) {
     on_listener_filter_config_destroy_(in_module_config_);
   }
@@ -92,6 +95,7 @@ absl::StatusOr<DynamicModuleListenerFilterConfigSharedPtr> newDynamicModuleListe
   auto config = std::make_shared<DynamicModuleListenerFilterConfig>(
       filter_name, filter_config, metrics_namespace, std::move(dynamic_module), cluster_manager,
       stats_scope, main_thread_dispatcher);
+  config->scheduler_target_->initialize(main_thread_dispatcher, config);
 
   // Store the resolved function pointers.
   config->on_listener_filter_config_destroy_ = on_config_destroy.value();

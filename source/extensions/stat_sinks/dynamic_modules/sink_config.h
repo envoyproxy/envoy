@@ -11,6 +11,7 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/dynamic_modules/metric_registry.h"
+#include "source/extensions/dynamic_modules/scheduler.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -61,6 +62,12 @@ public:
   // The main thread dispatcher used by the scheduler to post events back to the main thread.
   Event::Dispatcher& main_thread_dispatcher_;
 
+  // Shared with the schedulers of this config. Initialized once the config is held by a shared
+  // pointer, before the module can create a scheduler, and cleared at the start of the destructor.
+  using SchedulerTarget =
+      Extensions::DynamicModules::DynamicModuleSchedulerTarget<DynamicModuleStatsSinkConfig>;
+  const std::shared_ptr<SchedulerTarget> scheduler_target_{std::make_shared<SchedulerTarget>()};
+
   /**
    * Defines a gauge with the given name and returns its 1-based id via gauge_id_out. Valid only
    * before stat creation is frozen, which happens once the configuration is created.
@@ -106,27 +113,8 @@ using DynamicModuleStatsSinkConfigSharedPtr = std::shared_ptr<DynamicModuleStats
  * Scheduler that dispatches events to a stats sink configuration on the main thread. The module can
  * hold it on any thread and call commit() to run the scheduled hook on the main thread.
  */
-class DynamicModuleStatsSinkConfigScheduler {
-public:
-  explicit DynamicModuleStatsSinkConfigScheduler(std::weak_ptr<DynamicModuleStatsSinkConfig> config)
-      : config_(std::move(config)) {}
-
-  void commit(uint64_t event_id) {
-    // Lock the config so its dispatcher member stays valid across post().
-    auto config_shared = config_.lock();
-    if (!config_shared) {
-      return;
-    }
-    config_shared->main_thread_dispatcher_.post([config = config_, event_id]() {
-      if (std::shared_ptr<DynamicModuleStatsSinkConfig> cs = config.lock()) {
-        cs->onScheduled(event_id);
-      }
-    });
-  }
-
-private:
-  std::weak_ptr<DynamicModuleStatsSinkConfig> config_;
-};
+using DynamicModuleStatsSinkConfigScheduler =
+    Extensions::DynamicModules::DynamicModuleScheduler<DynamicModuleStatsSinkConfig>;
 
 /**
  * Creates a new DynamicModuleStatsSinkConfig.
