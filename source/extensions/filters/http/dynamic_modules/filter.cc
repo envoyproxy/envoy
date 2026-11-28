@@ -10,7 +10,11 @@ namespace Extensions {
 namespace DynamicModules {
 namespace HttpFilters {
 
-DynamicModuleHttpFilter::~DynamicModuleHttpFilter() { destroy(); }
+DynamicModuleHttpFilter::~DynamicModuleHttpFilter() {
+  // In a well-formed filter chain onDestroy() has already run and these are no-ops.
+  scheduler_target_->clear();
+  destroy();
+}
 
 void DynamicModuleHttpFilter::initializeInModuleFilter() {
   in_module_filter_ = config_->on_http_filter_new_(config_->in_module_config_, thisAsVoidPtr());
@@ -21,6 +25,9 @@ void DynamicModuleHttpFilter::onStreamComplete() {
 }
 
 void DynamicModuleHttpFilter::onDestroy() {
+  // Stop the schedulers before the module hooks below, which may join a module thread that is
+  // committing an event.
+  scheduler_target_->clear();
   destroyed_ = true;
   destroy();
 };

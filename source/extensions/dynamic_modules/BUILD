@@ -22,6 +22,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "scheduler_lib",
+    hdrs = ["scheduler.h"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/synchronization",
+    ],
+)
+
+envoy_cc_library(
     name = "abi_impl",
     srcs = ["abi_impl.cc"],
     deps = [

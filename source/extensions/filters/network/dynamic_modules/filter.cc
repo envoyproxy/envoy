@@ -46,6 +46,9 @@ void DynamicModuleNetworkFilter::initializeInModuleFilter() {
 }
 
 void DynamicModuleNetworkFilter::destroy() {
+  // Stop the schedulers before the destroy hook, which may join a module thread that is committing
+  // an event.
+  scheduler_target_->clear();
   // Cancel all pending HTTP callouts before destroying the filter.
   for (auto& callout : http_callouts_) {
     if (callout.second->request_ != nullptr) {
@@ -64,6 +67,7 @@ void DynamicModuleNetworkFilter::destroy() {
 void DynamicModuleNetworkFilter::initializeReadFilterCallbacks(
     Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
+  scheduler_target_->initialize(callbacks.connection().dispatcher(), weak_from_this());
   // Register for connection events.
   read_callbacks_->connection().addConnectionCallbacks(*this);
 }

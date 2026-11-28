@@ -9,6 +9,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/scheduler.h"
 #include "source/extensions/filters/network/dynamic_modules/filter_config.h"
 
 namespace Envoy {
@@ -148,6 +149,13 @@ public:
     return read_callbacks_ != nullptr ? &read_callbacks_->connection().dispatcher() : nullptr;
   }
 
+  /**
+   * Returns the target that the schedulers of this filter post through.
+   */
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleNetworkFilter>& schedulerTarget() const {
+    return scheduler_target_;
+  }
+
 private:
   /**
    * Helper to get the `this` pointer as a void pointer.
@@ -171,6 +179,11 @@ private:
   Buffer::Instance* current_write_buffer_ = nullptr;
 
   bool destroyed_ = false;
+
+  // Shared with the schedulers of this filter. Initialized when the read filter callbacks are set
+  // and cleared when the filter is destroyed.
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleNetworkFilter> scheduler_target_{
+      std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleNetworkFilter>>()};
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
@@ -222,27 +235,7 @@ private:
  * envoy_dynamic_module_callback_network_filter_scheduler_new and deleted via
  * envoy_dynamic_module_callback_network_filter_scheduler_delete.
  */
-class DynamicModuleNetworkFilterScheduler {
-public:
-  DynamicModuleNetworkFilterScheduler(DynamicModuleNetworkFilterWeakPtr filter,
-                                      Event::Dispatcher& dispatcher)
-      : filter_(std::move(filter)), dispatcher_(dispatcher) {}
-
-  void commit(uint64_t event_id) {
-    dispatcher_.post([filter = filter_, event_id]() {
-      if (DynamicModuleNetworkFilterSharedPtr filter_shared = filter.lock()) {
-        filter_shared->onScheduled(event_id);
-      }
-    });
-  }
-
-private:
-  // The filter that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
-  // extending the lifetime of the filter.
-  DynamicModuleNetworkFilterWeakPtr filter_;
-  // The dispatcher is used to post the event to the worker thread that filter_ is assigned to.
-  Event::Dispatcher& dispatcher_;
-};
+using DynamicModuleNetworkFilterScheduler = DynamicModuleScheduler<DynamicModuleNetworkFilter>;
 
 } // namespace NetworkFilters
 } // namespace DynamicModules
