@@ -5439,6 +5439,698 @@ TEST_F(FilterManagerPerFilterBufferTest, ModifyBufferWithoutBufferedDataIsEnvoyB
   filter_manager_->destroyFilters();
 }
 
+class TestBaseFilterManager : public FilterManager {
+public:
+  TestBaseFilterManager(FilterManagerCallbacks& filter_manager_callbacks,
+                        Event::Dispatcher& dispatcher, OptRef<const Network::Connection> connection,
+                        uint64_t stream_id, Buffer::BufferMemoryAccountSharedPtr account,
+                        bool proxy_100_continue, uint32_t buffer_limit,
+                        StreamInfo::StreamInfo& stream_info)
+      : FilterManager(filter_manager_callbacks, dispatcher, connection, stream_id,
+                      std::move(account), proxy_100_continue, buffer_limit),
+        stream_info_(stream_info) {}
+
+  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
+  const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
+
+private:
+  StreamInfo::StreamInfo& stream_info_;
+};
+
+class CustomHooksFilterManager : public TestBaseFilterManager {
+public:
+  CustomHooksFilterManager(FilterManagerCallbacks& filter_manager_callbacks,
+                           Event::Dispatcher& dispatcher,
+                           OptRef<const Network::Connection> connection, uint64_t stream_id,
+                           Buffer::BufferMemoryAccountSharedPtr account, bool proxy_100_continue,
+                           uint32_t buffer_limit, StreamInfo::StreamInfo& stream_info,
+                           StreamInfo::StreamInfo& local_reply_stream_info)
+      : TestBaseFilterManager(filter_manager_callbacks, dispatcher, connection, stream_id,
+                              std::move(account), proxy_100_continue, buffer_limit, stream_info),
+        local_reply_stream_info_(local_reply_stream_info) {}
+
+  void sendLocalReply(Code code, absl::string_view body,
+                      const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                      const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details) override {
+    if (destroyed()) {
+      return;
+    }
+    TestBaseFilterManager::sendLocalReply(code, body, modify_headers, grpc_status, details);
+  }
+
+  std::function<void()> on_before_local_reply_;
+  std::function<void(ResponseHeaderMap&)> finalize_headers_;
+
+protected:
+  void onBeforeLocalReply() override {
+    if (on_before_local_reply_) {
+      on_before_local_reply_();
+    }
+  }
+  StreamInfo::StreamInfo& localReplyStreamInfo() override { return local_reply_stream_info_; }
+  void finalizeLocalReplyHeaders(ResponseHeaderMap& headers) override {
+    if (finalize_headers_) {
+      finalize_headers_(headers);
+    }
+  }
+
+private:
+  StreamInfo::StreamInfo& local_reply_stream_info_;
+};
+
+// Tests for the local reply pipeline on the base FilterManager, which the upstream filter manager
+// uses. The filter chain is filter_1_ (a stream filter) followed by filter_2_ (a decoder filter).
+class BaseFilterManagerTest : public FilterManagerTest {
+public:
+  enum class EncodePhase { Headers, Data, Trailers };
+
+  void setupFilterChainAndRequest(absl::string_view method, bool grpc) {
+    EXPECT_CALL(*filter_1_, setDecoderFilterCallbacks(_));
+    EXPECT_CALL(*filter_1_, setEncoderFilterCallbacks(_));
+    EXPECT_CALL(*filter_2_, setDecoderFilterCallbacks(_));
+    EXPECT_CALL(filter_factory_, createFilterChain(_))
+        .WillOnce([this](FilterChainFactoryCallbacks& callbacks) -> bool {
+          callbacks.setFilterConfigName("filter_1");
+          createStreamFilterFactoryCb(filter_1_)(callbacks);
+          callbacks.setFilterConfigName("filter_2");
+          createDecoderFilterFactoryCb(filter_2_)(callbacks);
+          return true;
+        });
+    base_fm_->createFilterChain(filter_factory_);
+
+    request_headers_ = std::make_unique<TestRequestHeaderMapImpl>(TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/"}, {":method", std::string(method)}});
+    if (grpc) {
+      request_headers_->setContentType(Headers::get().ContentTypeValues.Grpc);
+    }
+    ON_CALL(filter_manager_callbacks_, requestHeaders())
+        .WillByDefault(Return(makeOptRef(*request_headers_)));
+    base_fm_->requestHeadersInitialized();
+  }
+
+  void initializeBaseFilterManager(absl::string_view method = "GET", bool grpc = false) {
+    base_fm_ = std::make_unique<TestBaseFilterManager>(
+        filter_manager_callbacks_, dispatcher_, connection_, 0, nullptr, true, 10000, stream_info_);
+    setupFilterChainAndRequest(method, grpc);
+  }
+
+  CustomHooksFilterManager& initializeCustomHooksFilterManager(absl::string_view method = "GET",
+                                                               bool grpc = false) {
+    auto custom_fm = std::make_unique<CustomHooksFilterManager>(
+        filter_manager_callbacks_, dispatcher_, connection_, 0, nullptr, true, 10000, stream_info_,
+        local_reply_stream_info_);
+    auto& ref = *custom_fm;
+    base_fm_ = std::move(custom_fm);
+    setupFilterChainAndRequest(method, grpc);
+    return ref;
+  }
+
+  void expectDecodeComplete() {
+    EXPECT_CALL(*filter_1_, decodeComplete());
+    EXPECT_CALL(*filter_2_, decodeComplete());
+  }
+
+  void decodeHeaderOnlyRequest() {
+    EXPECT_CALL(*filter_1_, decodeHeaders(_, true)).WillOnce(Return(FilterHeadersStatus::Continue));
+    EXPECT_CALL(*filter_2_, decodeHeaders(_, true)).WillOnce(Return(FilterHeadersStatus::Continue));
+    expectDecodeComplete();
+    base_fm_->decodeHeaders(*request_headers_, true);
+  }
+
+  void expectOnLocalReply(int times = 1) {
+    EXPECT_CALL(*filter_1_, onLocalReply(_))
+        .Times(times)
+        .WillRepeatedly(Return(LocalErrorStatus::Continue));
+    EXPECT_CALL(*filter_2_, onLocalReply(_))
+        .Times(times)
+        .WillRepeatedly(Return(LocalErrorStatus::Continue));
+  }
+
+  void expectDestroyFilters() {
+    EXPECT_CALL(*filter_1_, onDestroy()).WillOnce([this]() { filters_destroyed_ = true; });
+    EXPECT_CALL(*filter_2_, onDestroy()).WillOnce([this]() { filters_destroyed_ = true; });
+  }
+
+  void destroyFiltersNow() {
+    expectDestroyFilters();
+    base_fm_->destroyFilters();
+  }
+
+  // Makes the end of the encoded response destroy the filters synchronously, the way the upstream
+  // request is cleaned up when an upstream filter local reply completes or is retried.
+  void destroyFiltersOnEndStream() {
+    expectDestroyFilters();
+    EXPECT_CALL(filter_manager_callbacks_, endStream()).WillOnce([this]() {
+      base_fm_->destroyFilters();
+    });
+  }
+
+  void destroyFiltersOnReset() {
+    expectDestroyFilters();
+    EXPECT_CALL(filter_manager_callbacks_, resetStream(_, _))
+        .WillOnce([this](StreamResetReason, absl::string_view) { base_fm_->destroyFilters(); });
+  }
+
+  void startUpstreamResponseHeaders() {
+    EXPECT_CALL(*filter_1_, encodeHeaders(_, false))
+        .WillOnce(Return(FilterHeadersStatus::Continue));
+    // Simulate UpstreamRequestFilterManagerCallbacks::encodeHeaders moving response_headers_ out,
+    // verifying subsequent local replies still detect started responses via
+    // non_100_response_headers_encoded_.
+    EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, false))
+        .WillOnce([this](ResponseHeaderMap&, bool) {
+          filter_manager_callbacks_.response_headers_.reset();
+        });
+    filter_2_->callbacks_->encodeHeaders(
+        std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+        false, "via_upstream");
+  }
+
+  void runAbortedLocalReplySkipsBodyTest(
+      bool send_outside_decode, int expected_on_local_reply_calls,
+      std::function<FilterHeadersStatus(ResponseHeaderMap&)> on_encode_headers) {
+    initializeBaseFilterManager();
+    expectOnLocalReply(expected_on_local_reply_calls);
+    ON_CALL(*filter_1_, encodeData(_, _))
+        .WillByDefault(Return(FilterDataStatus::StopIterationNoBuffer));
+    EXPECT_CALL(*filter_1_, encodeData(_, _)).Times(0);
+
+    EXPECT_CALL(*filter_1_, encodeHeaders(_, false))
+        .WillOnce([on_encode_headers](ResponseHeaderMap& headers, bool) {
+          EXPECT_EQ("400", headers.getStatusValue());
+          return on_encode_headers(headers);
+        });
+
+    if (send_outside_decode) {
+      decodeHeaderOnlyRequest();
+      filter_2_->callbacks_->sendLocalReply(Code::BadRequest, "decoder_body", nullptr, std::nullopt,
+                                            "decoder_local_reply");
+    } else {
+      EXPECT_CALL(*filter_1_, decodeHeaders(_, true))
+          .WillOnce(Return(FilterHeadersStatus::Continue));
+      EXPECT_CALL(*filter_2_, decodeHeaders(_, true))
+          .WillOnce([this](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+            filter_2_->callbacks_->sendLocalReply(Code::BadRequest, "decoder_body", nullptr,
+                                                  std::nullopt, "decoder_local_reply");
+            return FilterHeadersStatus::StopIteration;
+          });
+      expectDecodeComplete();
+      base_fm_->decodeHeaders(*request_headers_, true);
+    }
+    destroyFiltersNow();
+  }
+
+  void runLocalReplyInEncodeDestroyingFiltersTest(EncodePhase phase) {
+    initializeBaseFilterManager();
+    decodeHeaderOnlyRequest();
+    expectOnLocalReply();
+    EXPECT_CALL(*filter_1_, encodeComplete()).Times(0);
+
+    switch (phase) {
+    case EncodePhase::Headers: {
+      destroyFiltersOnEndStream();
+      EXPECT_CALL(*filter_1_, encodeHeaders(_, true))
+          .WillOnce([this](ResponseHeaderMap&, bool) -> FilterHeadersStatus {
+            filter_1_->encoder_callbacks_->sendLocalReply(Code::ServiceUnavailable, "", nullptr,
+                                                          std::nullopt, "encode_headers_error");
+            return FilterHeadersStatus::StopIteration;
+          });
+      EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, true));
+      filter_2_->callbacks_->encodeHeaders(std::make_unique<TestResponseHeaderMapImpl>(
+                                               TestResponseHeaderMapImpl{{":status", "200"}}),
+                                           true, "via_upstream");
+      break;
+    }
+    case EncodePhase::Data: {
+      startUpstreamResponseHeaders();
+      destroyFiltersOnReset();
+      EXPECT_CALL(*filter_1_, encodeData(_, true))
+          .WillOnce([this](Buffer::Instance&, bool) -> FilterDataStatus {
+            filter_1_->encoder_callbacks_->sendLocalReply(Code::InternalServerError, "body_error",
+                                                          nullptr, std::nullopt,
+                                                          "encode_data_error");
+            return FilterDataStatus::StopIterationNoBuffer;
+          });
+      EXPECT_CALL(filter_manager_callbacks_, encodeData(_, _)).Times(0);
+      Buffer::OwnedImpl response_body("ok_body");
+      filter_2_->callbacks_->encodeData(response_body, true);
+      break;
+    }
+    case EncodePhase::Trailers: {
+      startUpstreamResponseHeaders();
+      destroyFiltersOnReset();
+      EXPECT_CALL(*filter_1_, encodeTrailers(_))
+          .WillOnce([this](ResponseTrailerMap&) -> FilterTrailersStatus {
+            filter_1_->encoder_callbacks_->sendLocalReply(Code::InternalServerError,
+                                                          "trailer_error", nullptr, std::nullopt,
+                                                          "encode_trailers_error");
+            return FilterTrailersStatus::Continue;
+          });
+      EXPECT_CALL(filter_manager_callbacks_, encodeTrailers(_)).Times(0);
+      EXPECT_CALL(filter_manager_callbacks_, endStream()).Times(0);
+      filter_2_->callbacks_->encodeTrailers(std::make_unique<TestResponseTrailerMapImpl>(
+          TestResponseTrailerMapImpl{{"x-trailer", "1"}}));
+      break;
+    }
+    }
+    EXPECT_TRUE(filters_destroyed_);
+  }
+
+  void runHeaderOnlyLocalReplyTest(absl::string_view method, bool grpc,
+                                   absl::string_view expected_status,
+                                   absl::string_view expected_grpc_status = "") {
+    initializeBaseFilterManager(method, grpc);
+
+    EXPECT_CALL(*filter_1_, decodeHeaders(_, true)).WillOnce(Return(FilterHeadersStatus::Continue));
+    EXPECT_CALL(*filter_2_, decodeHeaders(_, true))
+        .WillOnce([this](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+          filter_2_->callbacks_->sendLocalReply(Code::ServiceUnavailable, "local_reply_body",
+                                                nullptr, std::nullopt, "base_fm_local_reply");
+          return FilterHeadersStatus::StopIteration;
+        });
+    expectDecodeComplete();
+    expectOnLocalReply();
+    EXPECT_CALL(*filter_1_, encodeHeaders(_, true))
+        .WillOnce([&](ResponseHeaderMap& headers, bool) -> FilterHeadersStatus {
+          EXPECT_EQ(expected_status, headers.getStatusValue());
+          if (!expected_grpc_status.empty()) {
+            EXPECT_EQ(expected_grpc_status, headers.getGrpcStatusValue());
+            EXPECT_EQ("local_reply_body", headers.getGrpcMessageValue());
+          }
+          return FilterHeadersStatus::Continue;
+        });
+    EXPECT_CALL(*filter_1_, encodeComplete());
+    EXPECT_CALL(*filter_1_, encodeData(_, _)).Times(0);
+    EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, true));
+    EXPECT_CALL(filter_manager_callbacks_, encodeData(_, _)).Times(0);
+    EXPECT_CALL(filter_manager_callbacks_, endStream());
+
+    base_fm_->decodeHeaders(*request_headers_, true);
+    destroyFiltersNow();
+  }
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<StreamInfo::MockStreamInfo> local_reply_stream_info_;
+  std::shared_ptr<StrictMock<MockStreamFilter>> filter_1_{
+      std::make_shared<StrictMock<MockStreamFilter>>()};
+  std::shared_ptr<StrictMock<MockStreamDecoderFilter>> filter_2_{
+      std::make_shared<StrictMock<MockStreamDecoderFilter>>()};
+  RequestHeaderMapPtr request_headers_;
+  bool filters_destroyed_{false};
+  std::unique_ptr<TestBaseFilterManager> base_fm_;
+};
+
+TEST_F(BaseFilterManagerTest, SendLocalReplyViaFilterChain) {
+  initializeBaseFilterManager();
+
+  EXPECT_CALL(*filter_1_, decodeHeaders(_, true)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter_2_, decodeHeaders(_, true))
+      .WillOnce([this](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        filter_2_->callbacks_->sendLocalReply(
+            Code::ServiceUnavailable, "local_reply_body",
+            [](ResponseHeaderMap& headers) {
+              headers.addCopy(LowerCaseString("x-local-reply"), "true");
+            },
+            std::nullopt, "base_fm_local_reply");
+        return FilterHeadersStatus::StopIteration;
+      });
+  expectDecodeComplete();
+  expectOnLocalReply();
+
+  EXPECT_CALL(*filter_1_, encodeHeaders(_, false))
+      .WillOnce([](ResponseHeaderMap& headers, bool) -> FilterHeadersStatus {
+        EXPECT_EQ("503", headers.getStatusValue());
+        EXPECT_EQ("true",
+                  headers.get(LowerCaseString("x-local-reply"))[0]->value().getStringView());
+        headers.addCopy(LowerCaseString("x-encoder-modified"), "1");
+        return FilterHeadersStatus::Continue;
+      });
+  EXPECT_CALL(*filter_1_, encodeData(_, true))
+      .WillOnce([](Buffer::Instance& data, bool) -> FilterDataStatus {
+        EXPECT_EQ("local_reply_body", data.toString());
+        return FilterDataStatus::Continue;
+      });
+  EXPECT_CALL(*filter_1_, encodeComplete());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, false))
+      .WillOnce([](ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("1",
+                  headers.get(LowerCaseString("x-encoder-modified"))[0]->value().getStringView());
+      });
+  EXPECT_CALL(filter_manager_callbacks_, encodeData(_, true));
+  EXPECT_CALL(filter_manager_callbacks_, endStream());
+  // The default localReplyStreamInfo() records the details on streamInfo(), and the callbacks are
+  // told about the local reply.
+  EXPECT_CALL(stream_info_, setResponseCodeDetails(absl::string_view("base_fm_local_reply")));
+  EXPECT_CALL(filter_manager_callbacks_, onLocalReply(Code::ServiceUnavailable));
+
+  base_fm_->decodeHeaders(*request_headers_, true);
+  destroyFiltersNow();
+}
+
+TEST_F(BaseFilterManagerTest, LocalReplyCustomizationHooksOrder) {
+  CustomHooksFilterManager& custom_fm = initializeCustomHooksFilterManager();
+  std::vector<std::string> call_order;
+
+  custom_fm.on_before_local_reply_ = [&call_order]() {
+    call_order.emplace_back("onBeforeLocalReply");
+  };
+  custom_fm.finalize_headers_ = [&call_order](ResponseHeaderMap& headers) {
+    call_order.emplace_back("finalizeLocalReplyHeaders");
+    headers.setCopy(LowerCaseString("x-hook-order"), "finalized");
+    headers.setCopy(LowerCaseString("x-finalized-only"), "1");
+  };
+
+  EXPECT_CALL(stream_info_, setResponseCodeDetails(_)).Times(0);
+  EXPECT_CALL(local_reply_stream_info_,
+              setResponseCodeDetails(absl::string_view("custom_hooks_details")));
+  EXPECT_CALL(*filter_1_, onLocalReply(_)).WillOnce([&call_order](const auto&) {
+    call_order.emplace_back("onLocalReply:filter_1");
+    return LocalErrorStatus::Continue;
+  });
+  EXPECT_CALL(*filter_2_, onLocalReply(_)).WillOnce([&call_order](const auto&) {
+    call_order.emplace_back("onLocalReply:filter_2");
+    return LocalErrorStatus::Continue;
+  });
+
+  EXPECT_CALL(*filter_1_, decodeHeaders(_, true)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter_2_, decodeHeaders(_, true))
+      .WillOnce([this, &call_order](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        filter_2_->callbacks_->sendLocalReply(
+            Code::ServiceUnavailable, "",
+            [&call_order](ResponseHeaderMap& headers) {
+              call_order.emplace_back("modify_headers");
+              EXPECT_EQ("finalized",
+                        headers.get(LowerCaseString("x-hook-order"))[0]->value().getStringView());
+              headers.setCopy(LowerCaseString("x-hook-order"), "modified");
+            },
+            std::nullopt, "custom_hooks_details");
+        return FilterHeadersStatus::StopIteration;
+      });
+  expectDecodeComplete();
+
+  EXPECT_CALL(*filter_1_, encodeHeaders(_, true))
+      .WillOnce([](ResponseHeaderMap& headers, bool) -> FilterHeadersStatus {
+        EXPECT_EQ("503", headers.getStatusValue());
+        EXPECT_EQ("modified",
+                  headers.get(LowerCaseString("x-hook-order"))[0]->value().getStringView());
+        EXPECT_EQ("1",
+                  headers.get(LowerCaseString("x-finalized-only"))[0]->value().getStringView());
+        return FilterHeadersStatus::Continue;
+      });
+  EXPECT_CALL(*filter_1_, encodeComplete());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, true));
+  EXPECT_CALL(filter_manager_callbacks_, endStream());
+
+  base_fm_->decodeHeaders(*request_headers_, true);
+  EXPECT_EQ((std::vector<std::string>{"onBeforeLocalReply", "onLocalReply:filter_1",
+                                      "onLocalReply:filter_2", "finalizeLocalReplyHeaders",
+                                      "modify_headers"}),
+            call_order);
+  destroyFiltersNow();
+}
+
+TEST_F(BaseFilterManagerTest, SendLocalReplyToGrpcRequest) {
+  // 503 maps to grpc-status UNAVAILABLE (14) on a headers-only :status 200 response.
+  runHeaderOnlyLocalReplyTest("POST", /*grpc=*/true, /*expected_status=*/"200",
+                              /*expected_grpc_status=*/"14");
+}
+
+TEST_F(BaseFilterManagerTest, SendLocalReplyToHeadRequest) {
+  runHeaderOnlyLocalReplyTest("HEAD", /*grpc=*/false, /*expected_status=*/"503");
+}
+
+TEST_F(BaseFilterManagerTest, LocalReplyModifyHeadersCopyingStatusKeepsValidStatus) {
+  initializeBaseFilterManager();
+  decodeHeaderOnlyRequest();
+
+  // Mirrors the upstream codec filter forwarding a failed websocket handshake as a local reply.
+  const TestResponseHeaderMapImpl upstream_headers{{":status", "200"}, {"upgrade", "websocket"}};
+  expectOnLocalReply();
+  EXPECT_CALL(*filter_1_, encodeHeaders(_, true))
+      .WillOnce([](ResponseHeaderMap& headers, bool) -> FilterHeadersStatus {
+        EXPECT_EQ("403", headers.getStatusValue());
+        EXPECT_EQ("websocket", headers.getUpgradeValue());
+        return FilterHeadersStatus::Continue;
+      });
+  EXPECT_CALL(*filter_1_, encodeComplete());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, true))
+      .WillOnce(
+          [](ResponseHeaderMap& headers, bool) { EXPECT_EQ("403", headers.getStatusValue()); });
+
+  filter_2_->callbacks_->sendLocalReply(
+      Code::Forbidden, "",
+      [&upstream_headers](ResponseHeaderMap& local_headers) {
+        upstream_headers.iterate([&local_headers](const HeaderEntry& header) {
+          local_headers.addCopy(LowerCaseString(header.key().getStringView()),
+                                header.value().getStringView());
+          return HeaderMap::Iterate::Continue;
+        });
+      },
+      std::nullopt, "copied_status_local_reply");
+  destroyFiltersNow();
+}
+
+TEST_F(BaseFilterManagerTest, ChainedLocalReplyInEncodeHeadersDoesNotEncodeOriginalBody) {
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "503"), false));
+  EXPECT_CALL(filter_manager_callbacks_, encodeData(_, true))
+      .WillOnce([](Buffer::Instance& data, bool) { EXPECT_EQ("encoder_body", data.toString()); });
+  EXPECT_CALL(filter_manager_callbacks_, endStream());
+
+  runAbortedLocalReplySkipsBodyTest(
+      /*send_outside_decode=*/false, /*expected_on_local_reply_calls=*/2,
+      [this](ResponseHeaderMap&) {
+        filter_1_->encoder_callbacks_->sendLocalReply(Code::ServiceUnavailable, "encoder_body",
+                                                      nullptr, std::nullopt, "encoder_local_reply");
+        return FilterHeadersStatus::StopIteration;
+      });
+}
+
+TEST_F(BaseFilterManagerTest, ResetStreamInEncodeHeadersDoesNotEncodeLocalReplyBody) {
+  EXPECT_CALL(filter_manager_callbacks_, resetStream(_, _));
+  EXPECT_CALL(filter_manager_callbacks_, encodeData(_, _)).Times(0);
+  EXPECT_CALL(filter_manager_callbacks_, endStream()).Times(0);
+
+  runAbortedLocalReplySkipsBodyTest(
+      /*send_outside_decode=*/false, /*expected_on_local_reply_calls=*/1,
+      [this](ResponseHeaderMap&) {
+        filter_1_->encoder_callbacks_->resetStream();
+        return FilterHeadersStatus::StopIteration;
+      });
+}
+
+TEST_F(BaseFilterManagerTest, RemovedStatusInEncodeHeadersDoesNotEncodeOriginalBody) {
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "502"), false));
+  EXPECT_CALL(filter_manager_callbacks_, encodeData(_, true));
+  EXPECT_CALL(filter_manager_callbacks_, endStream());
+
+  runAbortedLocalReplySkipsBodyTest(
+      /*send_outside_decode=*/true, /*expected_on_local_reply_calls=*/2,
+      [](ResponseHeaderMap& headers) {
+        headers.removeStatus();
+        return FilterHeadersStatus::Continue;
+      });
+}
+
+TEST_F(BaseFilterManagerTest, LocalReplyInEncodeHeadersDestroyingFiltersSkipsEncodeComplete) {
+  runLocalReplyInEncodeDestroyingFiltersTest(EncodePhase::Headers);
+}
+
+TEST_F(BaseFilterManagerTest, LocalReplyInEncodeDataDestroyingFiltersSkipsEncodeComplete) {
+  runLocalReplyInEncodeDestroyingFiltersTest(EncodePhase::Data);
+}
+
+TEST_F(BaseFilterManagerTest, LocalReplyInEncodeTrailersDestroyingFiltersSkipsPostDestroyCalls) {
+  runLocalReplyInEncodeDestroyingFiltersTest(EncodePhase::Trailers);
+}
+
+TEST_F(BaseFilterManagerTest, DestroyDuringEncodeHeadersCallbackSkipsBodyContinuation) {
+  initializeBaseFilterManager();
+  decodeHeaderOnlyRequest();
+  expectDestroyFilters();
+
+  EXPECT_CALL(*filter_1_, encodeHeaders(_, true))
+      .WillOnce([this](ResponseHeaderMap& headers, bool) -> FilterHeadersStatus {
+        Buffer::OwnedImpl injected("injected_body");
+        filter_1_->encoder_callbacks_->addEncodedData(injected, false);
+        headers.setContentLength(injected.length());
+        return FilterHeadersStatus::Continue;
+      });
+  EXPECT_CALL(*filter_1_, encodeComplete());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, false))
+      .WillOnce([this](ResponseHeaderMap&, bool) { base_fm_->destroyFilters(); });
+  EXPECT_CALL(filter_manager_callbacks_, encodeData(_, _)).Times(0);
+
+  filter_2_->callbacks_->encodeHeaders(
+      std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "503"}}),
+      true, "via_upstream");
+  EXPECT_TRUE(filters_destroyed_);
+}
+
+TEST_F(BaseFilterManagerTest, LocalReplyStreamInfoHookRecordsOwnerAndDetails) {
+  initializeCustomHooksFilterManager();
+  decodeHeaderOnlyRequest();
+  expectOnLocalReply();
+
+  EXPECT_CALL(stream_info_, setResponseCodeDetails(_)).Times(0);
+  EXPECT_CALL(local_reply_stream_info_,
+              setResponseCodeDetails(absl::string_view("hook_stream_info_details")));
+  EXPECT_CALL(*filter_1_, encodeHeaders(_, true)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter_1_, encodeComplete());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, true));
+  EXPECT_CALL(filter_manager_callbacks_, endStream());
+
+  filter_2_->callbacks_->sendLocalReply(Code::ServiceUnavailable, "", nullptr, std::nullopt,
+                                        "hook_stream_info_details");
+  destroyFiltersNow();
+  EXPECT_FALSE(
+      stream_info_.filterState()->hasData<LocalReplyOwnerObject>(LocalReplyFilterStateKey));
+  ASSERT_TRUE(local_reply_stream_info_.filterState()->hasData<LocalReplyOwnerObject>(
+      LocalReplyFilterStateKey));
+  EXPECT_EQ("filter_2", local_reply_stream_info_.filterState()
+                            ->getDataReadOnly<LocalReplyOwnerObject>(LocalReplyFilterStateKey)
+                            ->serializeAsString());
+}
+
+TEST_F(BaseFilterManagerTest, PostDestroySendLocalReplySkipsOwnerRecording) {
+  initializeCustomHooksFilterManager();
+  destroyFiltersNow();
+
+  EXPECT_CALL(stream_info_, setResponseCodeDetails(_)).Times(0);
+  EXPECT_CALL(local_reply_stream_info_, setResponseCodeDetails(_)).Times(0);
+
+  filter_2_->callbacks_->sendLocalReply(Code::BadGateway, "", nullptr, std::nullopt,
+                                        "after_destroy");
+  EXPECT_FALSE(
+      stream_info_.filterState()->hasData<LocalReplyOwnerObject>(LocalReplyFilterStateKey));
+  EXPECT_FALSE(local_reply_stream_info_.filterState()->hasData<LocalReplyOwnerObject>(
+      LocalReplyFilterStateKey));
+}
+
+TEST_F(BaseFilterManagerTest, PreparedLocalReplyClearedOnResetAndDuplicateLocalReplyIgnored) {
+  initializeBaseFilterManager();
+
+  EXPECT_CALL(*filter_1_, decodeHeaders(_, true)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter_2_, decodeHeaders(_, true))
+      .WillOnce([this](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        base_fm_->sendLocalReply(Code::ServiceUnavailable, "first", nullptr, std::nullopt,
+                                 "first_details");
+        filter_2_->callbacks_->sendLocalReply(Code::BadGateway, "second", nullptr, std::nullopt,
+                                              "second_details");
+        filter_2_->callbacks_->resetStream(StreamResetReason::LocalReset, "");
+        return FilterHeadersStatus::StopIteration;
+      });
+  expectDecodeComplete();
+  expectOnLocalReply(1);
+  EXPECT_CALL(stream_info_, setResponseCodeDetails(absl::string_view("first_details")));
+  EXPECT_CALL(stream_info_, setResponseCodeDetails(absl::string_view("second_details"))).Times(0);
+  EXPECT_CALL(filter_manager_callbacks_, resetStream(StreamResetReason::LocalReset, ""));
+  EXPECT_CALL(*filter_1_, encodeHeaders(_, _)).Times(0);
+
+  base_fm_->decodeHeaders(*request_headers_, true);
+  EXPECT_FALSE(
+      stream_info_.filterState()->hasData<LocalReplyOwnerObject>(LocalReplyFilterStateKey));
+  destroyFiltersNow();
+}
+
+TEST_F(BaseFilterManagerTest, PreparedLocalReplySkippedAndClearedOnDownstreamReset) {
+  initializeBaseFilterManager();
+
+  EXPECT_CALL(*filter_1_, decodeHeaders(_, true)).WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter_2_, decodeHeaders(_, true))
+      .WillOnce([this](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        filter_2_->callbacks_->sendLocalReply(Code::ServiceUnavailable, "body", nullptr,
+                                              std::nullopt, "downstream_reset_details");
+        base_fm_->onDownstreamReset();
+        return FilterHeadersStatus::StopIteration;
+      });
+  expectDecodeComplete();
+  expectOnLocalReply();
+  EXPECT_CALL(*filter_1_, encodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _)).Times(0);
+
+  base_fm_->decodeHeaders(*request_headers_, true);
+  destroyFiltersNow();
+}
+
+TEST_F(BaseFilterManagerTest, DirectLocalReplyOnDownstreamResetInEncodeHeadersSkipsBody) {
+  initializeBaseFilterManager();
+  decodeHeaderOnlyRequest();
+  expectOnLocalReply();
+
+  EXPECT_CALL(*filter_1_, encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  filter_2_->callbacks_->encodeHeaders(
+      std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+      false, "via_upstream");
+
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "500"), false))
+      .WillOnce([this](ResponseHeaderMap&, bool) { base_fm_->onDownstreamReset(); });
+  EXPECT_CALL(filter_manager_callbacks_, encodeData(_, _)).Times(0);
+  EXPECT_CALL(filter_manager_callbacks_, endStream()).Times(0);
+
+  filter_1_->encoder_callbacks_->sendLocalReply(Code::InternalServerError, "direct_body", nullptr,
+                                                std::nullopt, "direct_error");
+  destroyFiltersNow();
+}
+
+TEST_F(BaseFilterManagerTest, DirectLocalReplyDestroyingFiltersInEncodeHeadersSkipsEndStream) {
+  initializeBaseFilterManager();
+  decodeHeaderOnlyRequest();
+  expectDestroyFilters();
+  expectOnLocalReply();
+
+  EXPECT_CALL(*filter_1_, encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  filter_2_->callbacks_->encodeHeaders(
+      std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+      false, "via_upstream");
+
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "500"), true))
+      .WillOnce([this](ResponseHeaderMap&, bool) { base_fm_->destroyFilters(); });
+  EXPECT_CALL(filter_manager_callbacks_, endStream()).Times(0);
+
+  filter_1_->encoder_callbacks_->sendLocalReply(Code::InternalServerError, "", nullptr,
+                                                std::nullopt, "direct_empty_error");
+  EXPECT_TRUE(filters_destroyed_);
+}
+
+TEST_F(BaseFilterManagerTest, Encode1xxHeadersSkipsCodecCallbackWhenDestroyed) {
+  initializeBaseFilterManager();
+  decodeHeaderOnlyRequest();
+  expectDestroyFilters();
+
+  EXPECT_CALL(*filter_1_, encode1xxHeaders(_))
+      .WillOnce([this](ResponseHeaderMap&) -> Filter1xxHeadersStatus {
+        base_fm_->destroyFilters();
+        return Filter1xxHeadersStatus::Continue;
+      });
+  EXPECT_CALL(filter_manager_callbacks_, encode1xxHeaders(_)).Times(0);
+
+  filter_2_->callbacks_->encode1xxHeaders(
+      std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "100"}}));
+  EXPECT_TRUE(filters_destroyed_);
+}
+
+TEST_F(BaseFilterManagerTest, ContinueEncodingNoOpAfterDownstreamResetOrDestroy) {
+  initializeBaseFilterManager();
+  decodeHeaderOnlyRequest();
+
+  EXPECT_CALL(*filter_1_, encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*filter_1_, encodeComplete());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _)).Times(0);
+
+  filter_2_->callbacks_->encodeHeaders(
+      std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+      true, "via_upstream");
+
+  base_fm_->onDownstreamReset();
+  filter_1_->encoder_callbacks_->continueEncoding();
+  destroyFiltersNow();
+  filter_1_->encoder_callbacks_->continueEncoding();
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy

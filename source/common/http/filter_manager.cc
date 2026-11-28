@@ -525,8 +525,10 @@ void ActiveStreamFilterBase::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  if (!streamInfo().filterState()->hasIndexedData(StreamInfo::FilterStateIndex::LocalReplyOwner)) {
-    streamInfo().filterState()->setIndexedData(
+  if (!parent_.state_.destroyed_ && parent_.prepared_local_reply_ == nullptr &&
+      !parent_.localReplyStreamInfo().filterState()->hasIndexedData(
+          StreamInfo::FilterStateIndex::LocalReplyOwner)) {
+    parent_.localReplyStreamInfo().filterState()->setIndexedData(
         StreamInfo::FilterStateIndex::LocalReplyOwner,
         std::make_shared<LocalReplyOwnerObject>(filter_context_.config_name),
         StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -548,7 +550,8 @@ bool ActiveStreamEncoderFilter::canContinue() {
   // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
   // continue if a local reply has been sent or ActiveStreamDecoderFilter::recreateStream() is
   // called, etc.
-  return !parent_.state_.encoder_filter_chain_complete_ && !parent_.stopEncoderFilterChain();
+  return !parent_.state_.destroyed_ && !parent_.state_.saw_downstream_reset_ &&
+         !parent_.state_.encoder_filter_chain_complete_ && !parent_.stopEncoderFilterChain();
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
@@ -1287,7 +1290,12 @@ FilterManager::commonDecodePrefix(ActiveStreamDecoderFilter* filter,
   return std::next(filter->entry());
 }
 
-void DownstreamFilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
+void FilterManager::rewriteLocalReply(ResponseHeaderMap& response_headers, Code& code,
+                                      std::string& /*body*/, absl::string_view& /*content_type*/) {
+  response_headers.setStatus(enumToInt(code));
+}
+
+void FilterManager::onLocalReply(StreamFilterBase::LocalReplyData& data) {
   state_.under_on_local_reply_ = true;
   filter_manager_callbacks_.onLocalReply(data.code_);
 
@@ -1299,7 +1307,7 @@ void DownstreamFilterManager::onLocalReply(StreamFilterBase::LocalReplyData& dat
   state_.under_on_local_reply_ = false;
 }
 
-void DownstreamFilterManager::sendLocalReply(
+void FilterManager::sendLocalReply(
     Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
     const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
@@ -1318,22 +1326,28 @@ void DownstreamFilterManager::sendLocalReply(
   if (filter_manager_callbacks_.isHalfCloseEnabled()) {
     state_.decoder_filter_chain_aborted_ = true;
   }
-  // For early error handling, do a best-effort attempt to create a filter chain
-  // to ensure access logging. If the filter chain already exists this will be
-  // a no-op.
-  createDownstreamFilterChain();
 
-  streamInfo().setResponseCodeDetails(details);
+  // If a local reply has already been prepared during the current decoder filter callback, ignore
+  // subsequent sendLocalReply() calls so the first local reply's details and callbacks are kept.
+  if (prepared_local_reply_ != nullptr) {
+    return;
+  }
+
+  onBeforeLocalReply();
+
+  localReplyStreamInfo().setResponseCodeDetails(details);
   StreamFilterBase::LocalReplyData data{code, grpc_status, details, false, body};
   onLocalReply(data);
   if (data.reset_imminent_) {
     ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. onLocalReply requested reset.", *this,
                      details);
+    prepared_local_reply_.reset();
     filter_manager_callbacks_.resetStream(Http::StreamResetReason::LocalReset, "");
     return;
   }
 
-  if (!filter_manager_callbacks_.responseHeaders().has_value() &&
+  if (!state_.non_100_response_headers_encoded_ &&
+      !filter_manager_callbacks_.responseHeaders().has_value() &&
       (!filter_manager_callbacks_.informationalHeaders().has_value() ||
        !(state_.filter_call_state_ & FilterCallState::IsEncodingMask))) {
     // If the response has not started at all, or if the only response so far is an informational
@@ -1370,7 +1384,7 @@ void DownstreamFilterManager::sendLocalReply(
     // state machine screwed up, bypass the filter chain and send the local
     // reply directly to the codec.
     //
-    sendDirectLocalReply(code, body, modify_headers, state_.is_head_request_, grpc_status);
+    sendDirectLocalReply(code, body, modify_headers, is_head_request, grpc_status);
   } else {
     // If we land in this branch, response headers have already been sent to the client.
     // All we can do at this point is reset the stream.
@@ -1382,33 +1396,34 @@ void DownstreamFilterManager::sendLocalReply(
   }
 }
 
-void DownstreamFilterManager::prepareLocalReplyViaFilterChain(
+void FilterManager::prepareLocalReplyViaFilterChain(
     bool is_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
     const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ENVOY_STREAM_LOG(debug, "Preparing local reply with details {}", *this, details);
   ASSERT(!filter_manager_callbacks_.responseHeaders().has_value());
-
-  if (prepared_local_reply_) {
-    return;
-  }
+  ASSERT(prepared_local_reply_ == nullptr);
 
   prepared_local_reply_ = Utility::prepareLocalReply(
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            finalizeHeaders(filter_manager_callbacks_, streamInfo(), headers);
+            finalizeLocalReplyHeaders(headers);
             if (modify_headers) {
               modify_headers(headers);
             }
           },
           [this](ResponseHeaderMap& response_headers, Code& code, std::string& body,
                  absl::string_view& content_type) -> void {
-            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
-                                 streamInfo(), code, body, content_type);
+            rewriteLocalReply(response_headers, code, body, content_type);
           },
           [this](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             filter_manager_callbacks_.setResponseHeaders(std::move(headers));
             encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders().ref(), end_stream);
+            if (!end_stream) {
+              state_.local_reply_aborted_ = state_.destroyed_ || state_.saw_downstream_reset_ ||
+                                            state_.encoder_filter_chain_aborted_ ||
+                                            state_.encoder_filter_chain_complete_;
+            }
           },
           [this](Buffer::Instance& data, bool end_stream) -> void {
             encodeData(nullptr, data, end_stream,
@@ -1417,43 +1432,61 @@ void DownstreamFilterManager::prepareLocalReplyViaFilterChain(
       Utility::LocalReplyData{is_grpc_request, code, body, grpc_status, is_head_request});
 }
 
-void DownstreamFilterManager::executeLocalReplyIfPrepared() {
-  if (!prepared_local_reply_) {
+void FilterManager::executeLocalReplyIfPrepared() {
+  if (!prepared_local_reply_ || state_.destroyed_ || state_.saw_downstream_reset_) {
+    prepared_local_reply_.reset();
     return;
   }
 
   ENVOY_STREAM_LOG(debug, "Executing sending local reply.", *this);
-  Utility::encodeLocalReply(state_.destroyed_, std::move(prepared_local_reply_));
+  state_.local_reply_aborted_ = false;
+  Utility::encodeLocalReply(state_.local_reply_aborted_, std::move(prepared_local_reply_));
 }
 
 FilterManager::CreateChainResult DownstreamFilterManager::createDownstreamFilterChain() {
   return createFilterChain(filter_chain_factory_);
 }
 
-void DownstreamFilterManager::sendLocalReplyViaFilterChain(
+void DownstreamFilterManager::finalizeLocalReplyHeaders(ResponseHeaderMap& headers) {
+  finalizeHeaders(filter_manager_callbacks_, streamInfo(), headers);
+}
+
+void DownstreamFilterManager::rewriteLocalReply(ResponseHeaderMap& response_headers, Code& code,
+                                                std::string& body,
+                                                absl::string_view& content_type) {
+  local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
+                       streamInfo(), code, body, content_type);
+}
+
+void FilterManager::sendLocalReplyViaFilterChain(
     bool is_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
     const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ENVOY_STREAM_LOG(debug, "Sending local reply with details {}", *this, details);
   ASSERT(!filter_manager_callbacks_.responseHeaders().has_value());
 
+  bool local_reply_aborted = false;
   Utility::sendLocalReply(
-      state_.destroyed_,
+      local_reply_aborted,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            finalizeHeaders(filter_manager_callbacks_, streamInfo(), headers);
+            finalizeLocalReplyHeaders(headers);
             if (modify_headers) {
               modify_headers(headers);
             }
           },
           [this](ResponseHeaderMap& response_headers, Code& code, std::string& body,
                  absl::string_view& content_type) -> void {
-            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
-                                 streamInfo(), code, body, content_type);
+            rewriteLocalReply(response_headers, code, body, content_type);
           },
-          [this](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+          [this, &local_reply_aborted](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             filter_manager_callbacks_.setResponseHeaders(std::move(headers));
             encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders().ref(), end_stream);
+            if (!end_stream) {
+              local_reply_aborted = state_.destroyed_ || state_.saw_downstream_reset_ ||
+                                    state_.encoder_filter_chain_aborted_ ||
+                                    state_.encoder_filter_chain_complete_;
+            }
           },
           [this](Buffer::Instance& data, bool end_stream) -> void {
             encodeData(nullptr, data, end_stream,
@@ -1462,39 +1495,40 @@ void DownstreamFilterManager::sendLocalReplyViaFilterChain(
       Utility::LocalReplyData{is_grpc_request, code, body, grpc_status, is_head_request});
 }
 
-void DownstreamFilterManager::sendDirectLocalReply(
+void FilterManager::sendDirectLocalReply(
     Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap&)>& modify_headers, bool is_head_request,
     const std::optional<Grpc::Status::GrpcStatus> grpc_status) {
   // Make sure we won't end up with nested watermark calls from the body buffer.
   state_.encoder_filters_streaming_ = true;
+  state_.encoder_filter_chain_aborted_ = true;
   const bool flush_saved_response_metadata = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.direct_local_reply_flush_saved_response_metadata");
   const auto encode_saved_metadata_and_end_stream = [this]() -> void {
     encodeSavedResponseMetadataToCodec();
-    if (state_.saw_downstream_reset_) {
+    if (state_.saw_downstream_reset_ || state_.destroyed_) {
       return;
     }
     Buffer::OwnedImpl empty_data;
     filter_manager_callbacks_.encodeData(empty_data, true);
-    if (state_.saw_downstream_reset_) {
+    if (state_.saw_downstream_reset_ || state_.destroyed_) {
       return;
     }
     maybeEndEncode(true);
   };
+  bool direct_local_reply_aborted = state_.destroyed_ || state_.saw_downstream_reset_;
   Http::Utility::sendLocalReply(
-      state_.destroyed_,
+      direct_local_reply_aborted,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            finalizeHeaders(filter_manager_callbacks_, streamInfo(), headers);
+            finalizeLocalReplyHeaders(headers);
             if (modify_headers) {
               modify_headers(headers);
             }
           },
           [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
               absl::string_view& content_type) -> void {
-            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
-                                 streamInfo(), code, body, content_type);
+            rewriteLocalReply(response_headers, code, body, content_type);
           },
           [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
             // Move the response headers into the FilterManager to make sure they're visible to
@@ -1506,7 +1540,8 @@ void DownstreamFilterManager::sendDirectLocalReply(
             state_.non_100_response_headers_encoded_ = true;
             filter_manager_callbacks_.encodeHeaders(*filter_manager_callbacks_.responseHeaders(),
                                                     end_stream && !end_stream_after_metadata);
-            if (state_.saw_downstream_reset_) {
+            if (state_.saw_downstream_reset_ || state_.destroyed_) {
+              direct_local_reply_aborted = true;
               return;
             }
             if (end_stream_after_metadata) {
@@ -1519,7 +1554,7 @@ void DownstreamFilterManager::sendDirectLocalReply(
             const bool end_stream_after_metadata =
                 flush_saved_response_metadata && end_stream && hasSavedResponseMetadata();
             filter_manager_callbacks_.encodeData(data, end_stream && !end_stream_after_metadata);
-            if (state_.saw_downstream_reset_) {
+            if (state_.saw_downstream_reset_ || state_.destroyed_) {
               return;
             }
             if (end_stream_after_metadata) {
@@ -1568,7 +1603,9 @@ void FilterManager::encode1xxHeaders(ActiveStreamEncoderFilter* filter,
     }
   }
 
-  filter_manager_callbacks_.encode1xxHeaders(headers);
+  if (!state_.saw_downstream_reset_ && !state_.destroyed_) {
+    filter_manager_callbacks_.encode1xxHeaders(headers);
+  }
 }
 
 void FilterManager::maybeContinueEncoding(StreamEncoderFilters::Iterator continue_data_entry) {
@@ -1638,12 +1675,12 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     }
 
     // If this filter ended the stream, encodeComplete() should be called for it.
-    if ((*entry)->end_stream_) {
+    if ((*entry)->end_stream_ && !state_.destroyed_) {
       (*entry)->handle_->encodeComplete();
     }
 
     if (!continue_iteration) {
-      if (!(*entry)->end_stream_) {
+      if (!(*entry)->end_stream_ && !state_.destroyed_) {
         maybeContinueEncoding(continue_data_entry);
       }
       return;
@@ -1674,12 +1711,12 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   const bool modified_end_stream = (end_stream && continue_data_entry == encoder_filters_.end());
   state_.non_100_response_headers_encoded_ = true;
   filter_manager_callbacks_.encodeHeaders(headers, modified_end_stream);
-  if (state_.saw_downstream_reset_) {
+  if (state_.saw_downstream_reset_ || state_.destroyed_) {
     return;
   }
   maybeEndEncode(modified_end_stream);
 
-  if (!modified_end_stream) {
+  if (!modified_end_stream && !state_.destroyed_) {
     maybeContinueEncoding(continue_data_entry);
   }
 }
@@ -1760,7 +1797,7 @@ void FilterManager::encodeSavedResponseMetadataToCodec() {
     for (auto& metadata_map : *entry->saved_response_metadata_) {
       if (metadata_map != nullptr && !metadata_map->empty()) {
         filter_manager_callbacks_.encodeMetadata(std::move(metadata_map));
-        if (state_.saw_downstream_reset_) {
+        if (state_.saw_downstream_reset_ || state_.destroyed_) {
           return;
         }
       }
@@ -1855,7 +1892,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
                        *this, (*entry)->filter_context_.config_name);
       status = FilterDataStatus::StopIterationNoBuffer;
     }
-    if ((*entry)->end_stream_) {
+    if ((*entry)->end_stream_ && !state_.destroyed_) {
       (*entry)->handle_->encodeComplete();
     }
     state_.filter_call_state_ &= ~FilterCallState::EncodeData;
@@ -1882,7 +1919,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
 
   const bool modified_end_stream = end_stream && trailers_added_entry == encoder_filters_.end();
   filter_manager_callbacks_.encodeData(data, modified_end_stream);
-  if (state_.saw_downstream_reset_) {
+  if (state_.saw_downstream_reset_ || state_.destroyed_) {
     return;
   }
   maybeEndEncode(modified_end_stream);
@@ -1890,7 +1927,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
   if (forward_held_trailers_) {
     // Trailers added in this pass follow the data from the filter holding them, if it iterates.
     forwardResponseTrailers();
-  } else if (trailers_added_entry != encoder_filters_.end()) {
+  } else if (trailers_added_entry != encoder_filters_.end() && !state_.destroyed_) {
     // If trailers were adding during encodeData we need to trigger decodeTrailers in order
     // to allow filters to process the trailers.
     encodeTrailers(trailers_added_entry->get(), *filter_manager_callbacks_.responseTrailers());
@@ -1920,7 +1957,15 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTr
     state_.filter_call_state_ |= FilterCallState::EncodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->encodeTrailers(trailers);
     response_trailers_state_.processed_ = true;
-    (*entry)->handle_->encodeComplete();
+    if (state_.encoder_filter_chain_aborted_) {
+      ENVOY_STREAM_LOG(trace,
+                       "encodeTrailers filter iteration aborted due to local reply: filter={}",
+                       *this, (*entry)->filter_context_.config_name);
+      status = FilterTrailersStatus::StopIteration;
+    }
+    if (!state_.destroyed_) {
+      (*entry)->handle_->encodeComplete();
+    }
     (*entry)->end_stream_ = true;
     state_.filter_call_state_ &= ~FilterCallState::EncodeTrailers;
     ENVOY_STREAM_LOG(trace, "encode trailers called: filter={} status={}", *this,
@@ -1933,7 +1978,7 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTr
   // The trailers have left the chain.
   response_trailers_state_ = {};
   filter_manager_callbacks_.encodeTrailers(trailers);
-  if (state_.saw_downstream_reset_) {
+  if (state_.saw_downstream_reset_ || state_.destroyed_) {
     return;
   }
   maybeEndEncode(true);
@@ -2502,6 +2547,7 @@ void FilterManager::resetStream(StreamResetReason reason,
   } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
     state_.encoder_filter_chain_aborted_ = true;
   }
+  prepared_local_reply_.reset();
 
   filter_manager_callbacks_.resetStream(reason, transport_failure_reason);
 }

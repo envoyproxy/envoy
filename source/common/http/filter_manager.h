@@ -816,6 +816,8 @@ public:
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);
+    ASSERT(prepared_local_reply_ == nullptr,
+           "Filter Manager destroyed without executing prepared local reply");
   }
 
   // Returns the WebTransport session of the codec stream this filter manager is bound to, if any.
@@ -926,15 +928,9 @@ public:
   virtual void sendLocalReply(Code code, absl::string_view body,
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                               const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                              absl::string_view details) PURE;
+                              absl::string_view details);
 
   void resetStream(StreamResetReason reason, absl::string_view transport_failure_reason);
-
-  /**
-   * Executes a prepared, but not yet propagated, local reply.
-   * Prepared local replies can occur in the decoder filter chain iteration.
-   */
-  virtual void executeLocalReplyIfPrepared() PURE;
 
   // Possibly increases buffer_limit_ to the value of limit.
   void setBufferLimit(uint64_t limit);
@@ -1138,12 +1134,15 @@ protected:
     bool request_buffer_backpressure_applied_{};
     bool response_buffer_backpressure_applied_{};
 
-    // The following 3 members are booleans rather than part of the space-saving bitfield as they
-    // are passed as arguments to functions expecting bools. Extend State using the bitfield
-    // where possible.
+    // The following 4 members are booleans rather than part of the space-saving bitfield as they
+    // are passed as arguments to functions expecting bool references. Extend State using the
+    // bitfield where possible.
     bool encoder_filters_streaming_{true};
     bool decoder_filters_streaming_{true};
     bool destroyed_{false};
+    // Set when encoding the headers of a prepared local reply aborts, resets, completes, or
+    // destroys the stream, so Utility::encodeLocalReply skips encoding the local reply body.
+    bool local_reply_aborted_{false};
 
     // Set true when a filter calls addDecodedData()/addEncodedData() during its own
     // decodeData()/encodeData() callback. Reset immediately before each data callback. Combined
@@ -1161,7 +1160,60 @@ protected:
     ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
   };
 
+  /**
+   * Flags that keep track of which filter calls are currently in progress.
+   */
+  // clang-format off
+  struct FilterCallState {
+    static constexpr uint32_t DecodeHeaders   = 0x01;
+    static constexpr uint32_t DecodeData      = 0x02;
+    static constexpr uint32_t DecodeMetadata  = 0x04;
+    static constexpr uint32_t DecodeTrailers  = 0x08;
+    static constexpr uint32_t EncodeHeaders   = 0x10;
+    static constexpr uint32_t EncodeData      = 0x20;
+    static constexpr uint32_t EncodeMetadata  = 0x40;
+    static constexpr uint32_t EncodeTrailers  = 0x80;
+    // Encode1xxHeaders is a bit of a special state as 1xx
+    // headers may be sent during request processing. This state is only used
+    // to verify we do not encode1xx headers more than once per
+    // filter.
+    static constexpr uint32_t Encode1xxHeaders  = 0x100;
+    // Used to indicate that one of the following conditions is true:
+    // 1. The filter manager is processing the final [En|De]codeData frame.
+    // 2. The filter manager is in [En|De]codeHeaders and is processing a
+    //    header-only request or response.
+    static constexpr uint32_t EndOfStream = 0x200;
+
+    // Masks for filter call state.
+    static constexpr uint32_t IsDecodingMask = DecodeHeaders | DecodeData | DecodeMetadata | DecodeTrailers;
+    static constexpr uint32_t IsEncodingMask = EncodeHeaders | Encode1xxHeaders | EncodeData | EncodeMetadata | EncodeTrailers;
+  };
+  // clang-format on
+
   State& state() { return state_; }
+
+  // Called by sendLocalReply() before the local reply is built, for example to create the filter
+  // chain so that the local reply is access logged. The default implementation does nothing.
+  virtual void onBeforeLocalReply() {}
+  // Returns the StreamInfo where local reply metadata (response code details and the
+  // LocalReplyOwner filter state) is recorded. The default implementation returns streamInfo().
+  virtual StreamInfo::StreamInfo& localReplyStreamInfo() { return streamInfo(); }
+  // Finalizes the headers of a local reply before they are encoded. Called before the
+  // `modify_headers` callback passed to sendLocalReply(), if any, is applied. The default
+  // implementation does nothing.
+  virtual void finalizeLocalReplyHeaders(ResponseHeaderMap& /*headers*/) {}
+  // Rewrites the local reply before it is encoded. The default implementation re-applies `:status`
+  // from `code`, as the downstream rewriter also does, so that a `modify_headers` callback copying
+  // a `:status` header cannot leave an invalid (for example, comma-joined) status behind. It does
+  // not run mappers or body formatters, and does not touch stream info.
+  virtual void rewriteLocalReply(ResponseHeaderMap& response_headers, Code& code, std::string& body,
+                                 absl::string_view& content_type);
+
+  /**
+   * Executes a prepared, but not yet propagated, local reply.
+   * Prepared local replies can occur in the decoder filter chain iteration.
+   */
+  void executeLocalReplyIfPrepared();
 
 private:
   friend class DownstreamFilterManager;
@@ -1317,6 +1369,40 @@ private:
 
   bool isTerminalDecoderFilter(const ActiveStreamDecoderFilter& filter) const;
 
+  /**
+   * Called before local reply is made by the filter manager.
+   * @param data the data associated with the local reply.
+   */
+  void onLocalReply(StreamFilterBase::LocalReplyData& data);
+
+  /**
+   * Sends a local reply by constructing a response and passing it through all the encoder
+   * filters. The resulting response will be passed out via the FilterManagerCallbacks.
+   * This will be deprecated in favor of prepareLocalReplyViaFilterChain.
+   */
+  void sendLocalReplyViaFilterChain(
+      bool is_grpc_request, Code code, absl::string_view body,
+      const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+      const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+
+  /**
+   * Prepares a local reply that will be sent along the encoder filters in
+   * executeLocalReplyIfPrepared.
+   */
+  void prepareLocalReplyViaFilterChain(
+      bool is_grpc_request, Code code, absl::string_view body,
+      const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+      const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+
+  /**
+   * Sends a local reply by constructing a response and skipping the encoder filters. The
+   * resulting response will be passed out via the FilterManagerCallbacks.
+   */
+  void sendDirectLocalReply(Code code, absl::string_view body,
+                            const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                            bool is_head_request,
+                            const std::optional<Grpc::Status::GrpcStatus> grpc_status);
+
   FilterManagerCallbacks& filter_manager_callbacks_;
   Event::Dispatcher& dispatcher_;
   // This is unset if there is no downstream connection, e.g. for health check or
@@ -1382,42 +1468,14 @@ private:
   friend ActiveStreamDecoderFilter;
   friend ActiveStreamEncoderFilter;
 
-  /**
-   * Flags that keep track of which filter calls are currently in progress.
-   */
-  // clang-format off
-    struct FilterCallState {
-      static constexpr uint32_t DecodeHeaders   = 0x01;
-      static constexpr uint32_t DecodeData      = 0x02;
-      static constexpr uint32_t DecodeMetadata  = 0x04;
-      static constexpr uint32_t DecodeTrailers  = 0x08;
-      static constexpr uint32_t EncodeHeaders   = 0x10;
-      static constexpr uint32_t EncodeData      = 0x20;
-      static constexpr uint32_t EncodeMetadata  = 0x40;
-      static constexpr uint32_t EncodeTrailers  = 0x80;
-      // Encode1xxHeaders is a bit of a special state as 1xx
-      // headers may be sent during request processing. This state is only used
-      // to verify we do not encode1xx headers more than once per
-      // filter.
-      static constexpr uint32_t Encode1xxHeaders  = 0x100;
-      // Used to indicate that one of the following conditions is true:
-      // 1. The filter manager is processing the final [En|De]codeData frame.
-      // 2. The filter manager is in [En|De]codeHeaders and is processing a
-      //    header-only request or response.
-      static constexpr uint32_t EndOfStream = 0x200;
-
-      // Masks for filter call state.
-      static constexpr uint32_t IsDecodingMask = DecodeHeaders | DecodeData | DecodeMetadata | DecodeTrailers;
-      static constexpr uint32_t IsEncodingMask = EncodeHeaders | Encode1xxHeaders | EncodeData | EncodeMetadata | EncodeTrailers;
-    };
-  // clang-format on
-
   State state_;
+  Utility::PreparedLocalReplyPtr prepared_local_reply_{nullptr};
 };
 
-// The DownstreamFilterManager has explicit handling to send local replies.
-// The UpstreamFilterManager will not, and will instead defer local reply
-// management to the DownstreamFilterManager.
+// The DownstreamFilterManager customizes the FilterManager local reply hooks for the downstream
+// stream: it rewrites local replies with the configured LocalReply::LocalReply, creates the filter
+// chain before a local reply so that it is access logged, and supports downstream filter load
+// shedding.
 class DownstreamFilterManager : public FilterManager {
 public:
   DownstreamFilterManager(FilterManagerCallbacks& filter_manager_callbacks,
@@ -1442,10 +1500,6 @@ public:
         "LoadShedPoint envoy.load_shed_points.http_downstream_filter_check is not found. "
         "Is it configured?");
   }
-  ~DownstreamFilterManager() override {
-    ASSERT(prepared_local_reply_ == nullptr,
-           "Filter Manager destroyed without executing prepared local reply");
-  }
 
   // TODO(snowp): This should probably return a StreamInfo instead of the impl.
   StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
@@ -1457,22 +1511,6 @@ public:
   }
 
   CreateChainResult createDownstreamFilterChain();
-
-  /**
-   * Called before local reply is made by the filter manager.
-   * @param data the data associated with the local reply.
-   */
-  void onLocalReply(StreamFilterBase::LocalReplyData& data);
-
-  void sendLocalReply(Code code, absl::string_view body,
-                      const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                      const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                      absl::string_view details) override;
-
-  /**
-   * Whether downstream has observed end_stream.
-   */
-  bool decoderObservedEndStream() const override { return state_.observed_decode_end_stream_; }
 
   /**
    * Return true if the timestamp of the downstream end_stream was recorded.
@@ -1489,45 +1527,21 @@ public:
            downstream_filter_load_shed_point_->shouldShedLoad();
   }
 
-private:
-  /**
-   * Sends a local reply by constructing a response and passing it through all the encoder
-   * filters. The resulting response will be passed out via the FilterManagerCallbacks.
-   * This will be deprecated in favor of prepareLocalReplyViaFilterChain.
-   */
-  void sendLocalReplyViaFilterChain(
-      bool is_grpc_request, Code code, absl::string_view body,
-      const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
-      const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
-
-  /**
-   * Prepares a local reply that will be sent along the encoder filters in
-   * executeLocalReplyViaFilterChain.
-   */
-  void prepareLocalReplyViaFilterChain(
-      bool is_grpc_request, Code code, absl::string_view body,
-      const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
-      const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
-
-  /**
-   * Executes a prepared local reply along the encoder filters.
-   */
-  void executeLocalReplyIfPrepared() override;
-
-  /**
-   * Sends a local reply by constructing a response and skipping the encoder filters. The
-   * resulting response will be passed out via the FilterManagerCallbacks.
-   */
-  void sendDirectLocalReply(Code code, absl::string_view body,
-                            const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                            bool is_head_request,
-                            const std::optional<Grpc::Status::GrpcStatus> grpc_status);
+protected:
+  void onBeforeLocalReply() override {
+    // For early error handling, do a best-effort attempt to create a filter chain
+    // to ensure access logging. If the filter chain already exists this will be
+    // a no-op.
+    createDownstreamFilterChain();
+  }
+  void finalizeLocalReplyHeaders(ResponseHeaderMap& headers) override;
+  void rewriteLocalReply(ResponseHeaderMap& response_headers, Code& code, std::string& body,
+                         absl::string_view& content_type) override;
 
 private:
   OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   const LocalReply::LocalReply& local_reply_;
   const FilterChainFactory& filter_chain_factory_;
-  Utility::PreparedLocalReplyPtr prepared_local_reply_{nullptr};
   Server::LoadShedPoint* downstream_filter_load_shed_point_{nullptr};
 };
 
