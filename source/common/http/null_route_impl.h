@@ -2,6 +2,7 @@
 
 #include "envoy/router/router.h"
 
+#include "source/common/common/macros.h"
 #include "source/common/http/hash_policy.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/router/config_impl.h"
@@ -50,6 +51,9 @@ struct NullCommonConfig : public Router::CommonConfig {
     return Router::DefaultRouteMetadataPack::get().typed_metadata_;
   }
   bool ignorePathParametersInPathMatching() const override { return false; }
+  const LowerCaseString& vhostHeader() const override {
+    CONSTRUCT_ON_FIRST_USE(LowerCaseString, "");
+  }
 
   static const std::vector<LowerCaseString> internal_only_headers_;
 };

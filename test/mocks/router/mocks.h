@@ -660,12 +660,14 @@ public:
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(bool, ignorePathParametersInPathMatching, (), (const));
+  MOCK_METHOD(const Http::LowerCaseString&, vhostHeader, (), (const));
 
   std::shared_ptr<MockRoute> route_;
   std::vector<Http::LowerCaseString> internal_only_headers_;
   std::string name_{"fake_config"};
   envoy::config::core::v3::Metadata metadata_;
   MockRouteMetadata typed_metadata_;
+  Http::LowerCaseString vhost_header_{""};
 };
 
 class MockRouteSpecifier : public RouteSpecifier {

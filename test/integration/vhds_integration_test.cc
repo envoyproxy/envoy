@@ -612,5 +612,75 @@ TEST_P(OnDemandVhdsRecreateStreamRegressionTest,
   cleanupUpstreamAndDownstream();
 }
 
+// On-demand VHDS honors RouteConfiguration.vhost_header instead of always subscribing to
+// :authority.
+TEST_P(VhdsIntegrationTest, OnDemandVhdsWithAlternateVhostHeader) {
+  config_helper_.prependFilter(R"EOF(
+  name: envoy.filters.http.on_demand
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+  )EOF");
+  setVhostHeader("x-vhost");
+  initializeUpToInitialVhdsRequest();
+
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "1", vhds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+  waitForListenerToServe();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  // Missing x-vhost returns 404 without sending an on-demand DeltaDiscoveryRequest even when
+  // :authority matches an existing virtual host.
+  {
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "vhost.first"}};
+    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("404", response->headers().getStatusValue());
+  }
+
+  // Empty x-vhost likewise returns 404 without triggering an on-demand DeltaDiscoveryRequest.
+  {
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "vhost.first"},
+                                                   {"x-vhost", ""}};
+    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("404", response->headers().getStatusValue());
+  }
+
+  // Non-empty x-vhost triggers an on-demand DeltaDiscoveryRequest for the lowercase x-vhost
+  // value and routes to the resolved virtual host.
+  {
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "ignored.example.com"},
+                                                   {"x-vhost", "SNI.LYFT.COM"}};
+    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                             {vhdsRequestResourceName("sni.lyft.com")}, {},
+                                             vhds_stream_.get()));
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "2", vhds_stream_.get(),
+        {"my_route/sni.lyft.com"});
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+
+    waitForNextUpstreamRequest(1);
+    EXPECT_TRUE(upstream_request_->complete());
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace
 } // namespace Envoy

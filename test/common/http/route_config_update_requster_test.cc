@@ -14,6 +14,7 @@ namespace {
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 class TestRouteCache : public RouteCache {
 public:
@@ -64,6 +65,30 @@ TEST_F(RdsRouteConfigUpdateRequesterTest, VhdsUpdateWithoutHostContinuesFilterCh
   updated = true;
   TestRequestHeaderMapImpl empty_host{{":method", "GET"}, {":path", "/"}, {":authority", ""}};
   requestUpdate(empty_host, updated);
+  EXPECT_FALSE(updated);
+}
+
+TEST_F(RdsRouteConfigUpdateRequesterTest, VhdsUpdateWithAlternateVhostHeader) {
+  const Http::LowerCaseString vhost_header("x-vhost");
+  ON_CALL(*route_config_, vhostHeader()).WillByDefault(ReturnRef(vhost_header));
+
+  EXPECT_CALL(provider_, requestVirtualHostsUpdate("some.host", _, _));
+  bool updated = false;
+  TestRequestHeaderMapImpl alternate_host{
+      {":method", "GET"}, {":path", "/"}, {":authority", "ignored.host"}, {"X-Vhost", "Some.Host"}};
+  requestUpdate(alternate_host, updated);
+
+  EXPECT_CALL(provider_, requestVirtualHostsUpdate(_, _, _)).Times(0);
+  updated = true;
+  TestRequestHeaderMapImpl missing_alternate_host{
+      {":method", "GET"}, {":path", "/"}, {":authority", "Some.Host"}};
+  requestUpdate(missing_alternate_host, updated);
+  EXPECT_FALSE(updated);
+
+  updated = true;
+  TestRequestHeaderMapImpl empty_alternate_host{
+      {":method", "GET"}, {":path", "/"}, {":authority", "Some.Host"}, {"x-vhost", ""}};
+  requestUpdate(empty_alternate_host, updated);
   EXPECT_FALSE(updated);
 }
 

@@ -58,6 +58,7 @@ envoy_cc_library(
     deps = [
         ":hash_policy_lib",
         "//envoy/router:router_interface",
+        "//source/common/common:macros",
         "//source/common/router:router_lib",
     ],
 )
