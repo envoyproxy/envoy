@@ -38,6 +38,7 @@ using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideH
 using ::Envoy::Http::HeaderMap;
 using ::Envoy::Server::Configuration::ServerFactoryContext;
 using ::Envoy::Upstream::HostConstSharedPtr;
+using ::Envoy::Upstream::HostLookupMap;
 using ::Envoy::Upstream::HostLookupMapConstSharedPtr;
 using ::Envoy::Upstream::HostSharedPtr;
 using ::Envoy::Upstream::LoadBalancerConfig;
@@ -48,12 +49,14 @@ using ::Envoy::Upstream::TypedLoadBalancerFactory;
 
 OverrideHostLbConfig::OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
                                            std::optional<Config::MetadataKey>&& selected_host_key,
+                                           std::vector<std::string>&& internal_listener_names,
                                            TypedLoadBalancerFactory* fallback_load_balancer_factory,
                                            LoadBalancerConfigPtr&& fallback_load_balancer_config)
     : fallback_picker_lb_config_{fallback_load_balancer_factory,
                                  std::move(fallback_load_balancer_config)},
       override_host_sources_(std::move(override_host_sources)),
-      selected_host_key_(std::move(selected_host_key)) {}
+      selected_host_key_(std::move(selected_host_key)),
+      internal_listener_names_(std::move(internal_listener_names)) {}
 
 OverrideHostLbConfig::OverrideSource
 OverrideHostLbConfig::OverrideSource::make(const OverrideHost::OverrideHostSource& config) {
@@ -109,8 +112,10 @@ OverrideHostLbConfig::make(const OverrideHost& config, ServerFactoryContext& con
       auto fallback_load_balancer_config = factory->loadConfig(context, *proto_message);
       RETURN_IF_NOT_OK_REF(fallback_load_balancer_config.status());
       return std::unique_ptr<OverrideHostLbConfig>(new OverrideHostLbConfig(
-          std::move(override_host_sources).value(), std::move(selected_host_key), factory,
-          std::move(fallback_load_balancer_config.value())));
+          std::move(override_host_sources).value(), std::move(selected_host_key),
+          std::vector<std::string>(config.internal_listener_names().begin(),
+                                   config.internal_listener_names().end()),
+          factory, std::move(fallback_load_balancer_config.value())));
     }
     missing_policies.push_back(policy.typed_extension_config().name());
   }
@@ -210,7 +215,15 @@ void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedHostKey(
     return;
   }
 
-  const std::string selected_endpoint = response.host->address()->asString();
+  std::string selected_endpoint = response.host->address()->asString();
+  // Report the endpoint the way the picker named it when it was matched as an internal address.
+  if (const Network::Address::EnvoyInternalAddress* internal =
+          response.host->address()->envoyInternalAddress();
+      internal != nullptr && !internal->endpointId().empty() &&
+      std::find(config_.internalListenerNames().begin(), config_.internalListenerNames().end(),
+                internal->addressId()) != config_.internalListenerNames().end()) {
+    selected_endpoint = internal->endpointId();
+  }
   const Config::MetadataKey& metadata_key = config_.selectedHostKey().value();
   if (metadata_key.path_.empty()) {
     // Should not be possible based on proto validation, catching anyways.
@@ -313,7 +326,24 @@ OverrideHostLoadBalancer::LoadBalancerImpl::findHost(absl::string_view endpoint)
   }
 
   // TODO(yanavlasov): Validate that host health status did not change.
-  return hosts->findHost(endpoint);
+  if (const HostSharedPtr& host = hosts->findHost(endpoint); host != nullptr) {
+    return host;
+  }
+  return findInternalHost(*hosts, endpoint);
+}
+
+HostConstSharedPtr
+OverrideHostLoadBalancer::LoadBalancerImpl::findInternalHost(const HostLookupMap& hosts,
+                                                             absl::string_view endpoint) {
+  for (const std::string& listener_name : config_.internalListenerNames()) {
+    // Same format as Network::Address::EnvoyInternalInstance::asString().
+    const std::string internal_address = absl::StrCat("envoy://", listener_name, "/", endpoint);
+    if (const HostSharedPtr& host = hosts.findHost(internal_address); host != nullptr) {
+      ENVOY_LOG(trace, "Matched {} as internal address {}", endpoint, internal_address);
+      return host;
+    }
+  }
+  return nullptr;
 }
 
 HostConstSharedPtr OverrideHostLoadBalancer::LoadBalancerImpl::getEndpoint(
