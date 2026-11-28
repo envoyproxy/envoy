@@ -159,7 +159,7 @@ public:
                     filters,
                 Server::Configuration::ListenerFactoryContext& context) {
               return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
-                  filters, context);
+                  filters, context, *udp_listener_config_provider_manager_);
             });
 
     try {
@@ -196,6 +196,9 @@ public:
   std::shared_ptr<Filter::NetworkFilterConfigProviderManagerImpl> network_config_provider_manager_;
   std::shared_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
       tcp_listener_config_provider_manager_;
+  std::shared_ptr<Filter::UdpListenerFilterConfigProviderManagerImpl>
+      udp_listener_config_provider_manager_{
+          std::make_shared<Filter::UdpListenerFilterConfigProviderManagerImpl>()};
 };
 
 void testMerge() {

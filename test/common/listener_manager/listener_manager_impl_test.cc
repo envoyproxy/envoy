@@ -7347,8 +7347,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, ReusePortListenerDisabled) {
   EXPECT_EQ(0, manager_->listeners().size());
 }
 
-// Envoy throws exceptions for UDP listener with dynamic filter config.
-TEST_P(ListenerManagerImplWithRealFiltersTest, UdpListenerWithDynamicFilterConfig) {
+// Dynamic UDP listener filters must resolve every required type to a UDP factory.
+TEST_P(ListenerManagerImplWithRealFiltersTest, UdpListenerRejectsUnknownDynamicFilterType) {
   auto listener = createIPv4Listener("UdpListener");
   listener.mutable_address()->mutable_socket_address()->set_protocol(
       envoy::config::core::v3::SocketAddress::UDP);
@@ -7356,12 +7356,36 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, UdpListenerWithDynamicFilterConfi
   listener_filter->set_name("bar");
   // Adding basic dynamic listener filter config.
   auto* discovery = listener_filter->mutable_config_discovery();
-  discovery->add_type_urls(
-      "type.googleapis.com/test.integration.filters.TestUdpListenerFilterConfig");
+  discovery->add_type_urls("type.googleapis.com/test.missing.UdpFilter");
   discovery->set_apply_default_config_without_warming(false);
   EXPECT_THROW_WITH_MESSAGE(
       addOrUpdateListener(listener), EnvoyException,
-      "UDP listener filter: bar is configured with unsupported dynamic configuration");
+      "Error: no UDP listener factory found for a required type URL test.missing.UdpFilter.");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, UdpListenerRejectsPredicateOnDynamicFilter) {
+  auto listener = createIPv4Listener("UdpListener");
+  listener.mutable_address()->mutable_socket_address()->set_protocol(
+      envoy::config::core::v3::SocketAddress::UDP);
+  auto* filter = listener.add_listener_filters();
+  filter->set_name("dns_table");
+  filter->mutable_filter_disabled()->set_any_match(true);
+  filter->mutable_config_discovery()->add_type_urls(
+      "type.googleapis.com/test.integration.filters.TestUdpListenerFilterConfig");
+  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(listener), EnvoyException,
+                            "filter_disabled is not supported for raw UDP listener ECDS");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, UdpListenerRequiresDefaultWithoutWarming) {
+  auto listener = createIPv4Listener("UdpListener");
+  listener.mutable_address()->mutable_socket_address()->set_protocol(
+      envoy::config::core::v3::SocketAddress::UDP);
+  auto* listener_filter = listener.add_listener_filters();
+  listener_filter->set_name("bar");
+  listener_filter->mutable_config_discovery()->set_apply_default_config_without_warming(true);
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(listener), EnvoyException,
+      "Error: UDP listener filter config bar applied without warming but has no default config.");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {

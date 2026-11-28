@@ -51,9 +51,8 @@ the name until its subscription ends; later conflicting subscriptions are refuse
 Listener filters
 ^^^^^^^^^^^^^^^^
 
-For Listener filters, the discovery service configuration is: :ref:`dynamic listener filter
+For TCP listener filters, the discovery service configuration is: :ref:`dynamic listener filter
 re-configuration<envoy_v3_api_field_config.listener.v3.ListenerFilter.config_discovery>`.
-The dynamic listener filter config is only supported in TCP listeners.
 If the dynamic configuration is missing, the connection will be rejected until a valid config is updated.
 
 Network filters
@@ -71,6 +70,17 @@ HTTP filters
 For HTTP filters, HTTP connection manager supports :ref:`dynamic filter
 re-configuration<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.config_discovery>`.
 If the configuration is missing a local HTTP response with '500' status code will be returned.
+
+UDP listener filters
+^^^^^^^^^^^^^^^^^^^^
+
+With :ref:`config_discovery <envoy_v3_api_field_config.listener.v3.ListenerFilter.config_discovery>`,
+each worker replaces only the configured filter between datagrams. The socket stays open, but the
+replaced filter can lose pending work or sessions. If required configuration is missing, the
+listener drops datagrams before any filter runs. A worker that cannot construct an accepted
+filter drops datagrams until it receives a usable configuration change.
+
+These filters cannot use ``filter_disabled`` or register new listener initialization targets.
 
 UDP Session filters
 ^^^^^^^^^^^^^^^^^^^
@@ -90,6 +100,7 @@ are supported for listener filters, downstream network filters, and HTTP filters
 - For upstream network filters, the value of *<stat_prefix>* is *upstream_network_filter*.
 - For downstream HTTP filters, the value of *<stat_prefix>* is *http_filter*.
 - For upstream HTTP filters, the value of *<stat_prefix>* is *upstream_http_filter*.
+- For UDP listener filters, the value of *<stat_prefix>* is *udp_listener_filter*.
 - For UDP session filters the value of *<stat_prefix>* is *udp_session_filter*.
 
 .. csv-table::

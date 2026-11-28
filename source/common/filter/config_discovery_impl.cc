@@ -18,6 +18,64 @@ namespace Envoy {
 namespace Filter {
 
 namespace {
+
+// ECDS can replace a filter after the listener is warm. Nested extensions may retain their
+// factory context, so keep this context and the resulting factory together until worker teardown.
+class DynamicUdpListenerFilterFactory : public Server::Configuration::ListenerFactoryContext,
+                                        private Init::ManagerImpl {
+public:
+  explicit DynamicUdpListenerFilterFactory(Server::Configuration::ListenerFactoryContext& parent)
+      : Init::ManagerImpl("UDP listener filter ECDS"), parent_(parent) {}
+
+  absl::Status createCallback(Server::Configuration::NamedUdpListenerFilterConfigFactory& factory,
+                              const Protobuf::Message& message) {
+    callback_ = factory.createDynamicFilterFactoryFromProto(message, *this);
+    if (!callback_) {
+      status_.Update(absl::InvalidArgumentError(
+          absl::StrCat("UDP listener filter ", factory.name(), " returned an empty factory")));
+    }
+    return status_;
+  }
+
+  void createFilter(Network::UdpListenerFilterManager& manager,
+                    Network::UdpReadFilterCallbacks& callbacks) const {
+    callback_(manager, callbacks);
+  }
+
+private:
+  // Record the dependency and let construction finish. Factories may register callbacks before
+  // adding their init target and need a fully constructed object to release them on rejection.
+  void add(const Init::Target& target) override {
+    status_.Update(absl::FailedPreconditionError(absl::StrCat(
+        "UDP listener filter ECDS cannot register a listener init target: ", target.name())));
+  }
+  Init::Manager& initManager() override { return *this; }
+  Server::Configuration::ServerFactoryContext& serverFactoryContext() override {
+    return parent_.serverFactoryContext();
+  }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return parent_.messageValidationVisitor();
+  }
+  Stats::Scope& scope() override { return parent_.scope(); }
+  Stats::Scope& statsScope() override { return parent_.statsScope(); }
+  Stats::Scope& prefixedScope() override { return parent_.prefixedScope(); }
+  Stats::Scope& listenerScope() override { return parent_.listenerScope(); }
+  const Network::ListenerInfo& listenerInfo() const override { return parent_.listenerInfo(); }
+  const Network::DrainDecision& drainDecision() override { return parent_.drainDecision(); }
+  envoy::config::core::v3::TrafficDirection direction() const override {
+    return parent_.direction();
+  }
+  bool isQuic() const override { return parent_.isQuic(); }
+  bool shouldBypassOverloadManager() const override {
+    return parent_.shouldBypassOverloadManager();
+  }
+
+  Server::Configuration::ListenerFactoryContext& parent_;
+  absl::Status status_;
+  // Destroy the factory and any nested extensions before the context they were given.
+  Network::UdpListenerFilterFactoryCb callback_;
+};
+
 absl::Status validateTypeUrlHelper(const std::string& type_url,
                                    const absl::flat_hash_set<std::string> require_type_urls) {
   if (!require_type_urls.contains(type_url)) {
@@ -29,6 +87,20 @@ absl::Status validateTypeUrlHelper(const std::string& type_url,
 }
 
 } // namespace
+
+absl::StatusOr<Network::UdpListenerFilterFactoryCb>
+UdpListenerDynamicFilterConfigProviderImpl::instantiateFilterFactory(
+    const Protobuf::Message& message) const {
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::NamedUdpListenerFilterConfigFactory>::
+          getFactoryByType(message.GetTypeName());
+  auto context = std::make_shared<DynamicUdpListenerFilterFactory>(factory_context_);
+  RETURN_IF_NOT_OK(context->createCallback(*factory, message));
+  return [context = std::move(context)](Network::UdpListenerFilterManager& manager,
+                                        Network::UdpReadFilterCallbacks& callbacks) {
+    context->createFilter(manager, callbacks);
+  };
+}
 
 DynamicFilterConfigProviderImplBase::DynamicFilterConfigProviderImplBase(
     FilterConfigSubscriptionSharedPtr& subscription,

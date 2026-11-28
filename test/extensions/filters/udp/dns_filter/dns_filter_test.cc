@@ -1,6 +1,7 @@
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.validate.h"
 
+#include "source/extensions/filters/udp/dns_filter/config.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_constants.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
@@ -127,7 +128,7 @@ public:
   NiceMock<Server::Configuration::MockListenerFactoryContext> listener_factory_;
   Stats::IsolatedStoreImpl stats_store_;
   std::shared_ptr<Network::MockDnsResolver> resolver_;
-  std::unique_ptr<DnsFilter> filter_;
+  Network::UdpListenerReadFilterPtr filter_;
   std::unique_ptr<DnsMessageParser> query_parser_;
 
   const std::string forward_query_off_config = R"EOF(
@@ -467,6 +468,47 @@ virtual_domains:
 )EOF";
 };
 
+TEST_F(DnsFilterTest, DynamicForwardingRejectsBlockingResolverByType) {
+  auto config =
+      TestUtility::parseYaml<envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig>(
+          forward_query_on_config);
+  auto* resolver = config.mutable_client_config()->mutable_typed_dns_resolver_config();
+  // The configuration name still says c-ares. The type selects the getaddrinfo factory.
+  const envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+      getaddrinfo;
+  ASSERT_TRUE(resolver->mutable_typed_config()->PackFrom(getaddrinfo));
+  DnsFilterEnvoyConfig static_config(listener_factory_, config);
+  ASSERT_NE(nullptr, static_config.dnsResolverFactory());
+  EXPECT_EQ("envoy.network.dns_resolver.getaddrinfo", static_config.dnsResolverFactory()->name());
+
+  DnsFilterConfigFactory factory;
+  EXPECT_TRUE(factory.createFilterFactoryFromProto(config, listener_factory_));
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createDynamicFilterFactoryFromProto(config, listener_factory_), EnvoyException,
+      "DNS resolver envoy.network.dns_resolver.getaddrinfo does not support live replacement");
+}
+
+TEST_F(DnsFilterTest, DynamicTableRejectsAddingAddressesToClusterDomain) {
+  const std::string yaml = R"EOF(
+stat_prefix: dynamic
+server_config:
+  inline_dns_table:
+    virtual_domains:
+    - name: duplicate.example
+      endpoint: {cluster_name: cluster_0}
+    - name: duplicate.example
+      endpoint: {address_list: {address: ["192.0.2.1"]}}
+)EOF";
+  const auto config =
+      TestUtility::parseYaml<envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig>(
+          yaml);
+  DnsFilterConfigFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(factory.createDynamicFilterFactoryFromProto(config, listener_factory_),
+                            EnvoyException,
+                            "Cannot add addresses to DNS virtual domain "
+                            "duplicate.example with a different endpoint type");
+}
+
 TEST_F(DnsFilterTest, InvalidQuery) {
   InSequence s;
 
@@ -772,6 +814,50 @@ TEST_F(DnsFilterTest, LocalTypeAAAAQuerySuccess) {
   EXPECT_EQ(1, config_->stats().aaaa_record_queries_.value());
 }
 
+TEST_F(DnsFilterTest, DestructionCancelsPendingExternalResolution) {
+  setup(forward_query_on_config);
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  EXPECT_CALL(*timeout_timer, enableTimer(_, _));
+
+  testing::StrictMock<Network::MockActiveDnsQuery> active_query;
+  const std::string domain("www.foobaz.com");
+  EXPECT_CALL(*resolver_, resolve(domain, _, _)).WillOnce(Return(&active_query));
+  EXPECT_CALL(active_query, cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(callbacks_.udp_listener_, send(_)).Times(0);
+
+  sendQueryFromClient("10.0.0.1:1000",
+                      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN));
+  // The fixture retains the shared resolver, so cancellation cannot rely on resolver destruction.
+  filter_.reset();
+  EXPECT_EQ(0, config_->stats().downstream_tx_responses_.value());
+}
+
+TEST_F(DnsFilterTest, ExternalResolutionCompletesSynchronously) {
+  setup(forward_query_on_config);
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  EXPECT_CALL(*timeout_timer, enableTimer(_, _));
+  EXPECT_CALL(*timeout_timer, disableTimer());
+  EXPECT_CALL(resolver_->active_query_, cancel(_)).Times(0);
+
+  const std::string domain("www.foobaz.com");
+  EXPECT_CALL(*resolver_, resolve(domain, _, _))
+      .WillOnce(Invoke([](const std::string&, Network::DnsLookupFamily,
+                          Network::DnsResolver::ResolveCb callback) -> Network::ActiveDnsQuery* {
+        callback(Network::DnsResolver::ResolutionStatus::Completed, "",
+                 TestUtility::makeDnsResponse({"130.207.244.251"}));
+        return nullptr;
+      }));
+
+  sendQueryFromClient("10.0.0.1:1000",
+                      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN));
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  ASSERT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_EQ(1, response_ctx_->answers_.size());
+  filter_.reset();
+  EXPECT_EQ(1, config_->stats().downstream_tx_responses_.value());
+}
+
 TEST_F(DnsFilterTest, ExternalResolutionReturnSingleAddress) {
   InSequence s;
 
@@ -781,6 +867,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnSingleAddress) {
   const std::string expected_address("130.207.244.251");
   const std::string domain("www.foobaz.com");
   setup(forward_query_on_config);
+  EXPECT_CALL(resolver_->active_query_, cancel(_)).Times(0);
 
   const std::string query =
       Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
@@ -821,6 +908,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnSingleAddress) {
   EXPECT_EQ(0, config_->stats().aaaa_record_queries_.value());
   EXPECT_EQ(0, config_->stats().unanswered_queries_.value());
 
+  filter_.reset();
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(resolver_.get()));
 }
 
@@ -994,6 +1082,8 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout) {
   sendQueryFromClient("10.0.0.1:1000", query);
   simTime().advanceTimeWait(std::chrono::milliseconds(1500));
 
+  EXPECT_CALL(resolver_->active_query_, cancel(Network::ActiveDnsQuery::CancelReason::Timeout));
+
   // Execute timeout timer callback
   timeout_timer->invokeCallback();
 
@@ -1012,6 +1102,51 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout) {
   EXPECT_EQ(1, config_->stats().unanswered_queries_.value());
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(resolver_.get()));
+}
+
+TEST_F(DnsFilterTest, ExternalResolutionTimeoutCancelsOnlyItsOwnQuery) {
+  setup(R"EOF(
+stat_prefix: timeout
+client_config:
+  resolver_timeout: 1s
+  max_pending_lookups: 2
+  typed_dns_resolver_config:
+    name: envoy.network.dns_resolver.cares
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+)EOF");
+  Network::MockActiveDnsQuery first, second;
+  Network::DnsResolver::ResolveCb complete_second;
+  EXPECT_CALL(*resolver_, resolve("first.example", _, _)).WillOnce(Return(&first));
+  EXPECT_CALL(*resolver_, resolve("second.example", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&complete_second), Return(&second)));
+  EXPECT_CALL(first, cancel(Network::ActiveDnsQuery::CancelReason::Timeout));
+  EXPECT_CALL(second, cancel(_)).Times(0);
+
+  auto* first_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  simTime().setSystemTime(std::chrono::seconds(15));
+  sendQueryFromClient(
+      "10.0.0.1:1000",
+      Utils::buildQueryForDomain("first.example", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN, 1));
+  simTime().advanceTimeWait(std::chrono::milliseconds(500));
+  // Wall time steps backwards between the queries. Their one-second timers use monotonic time.
+  simTime().setSystemTime(std::chrono::milliseconds(900));
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  sendQueryFromClient(
+      "10.0.0.1:1000",
+      Utils::buildQueryForDomain("second.example", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN, 2));
+  simTime().advanceTimeWait(std::chrono::milliseconds(500));
+  first_timer->invokeCallback();
+  complete_second(Network::DnsResolver::ResolutionStatus::Completed, "",
+                  TestUtility::makeDnsResponse({"192.0.2.1"}));
+  filter_.reset();
+
+  EXPECT_EQ(2, config_->stats().downstream_tx_responses_.value());
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  ASSERT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(2, response_ctx_->id_);
+  ASSERT_EQ(1, response_ctx_->answers_.size());
+  Utils::verifyAddress({"192.0.2.1"}, response_ctx_->answers_.begin()->second);
 }
 
 TEST_F(DnsFilterTest, ExternalResolutionTimeout2) {
@@ -1035,6 +1170,8 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout2) {
   // Send a query to for a name not in our configuration
   sendQueryFromClient("10.0.0.1:1000", query);
   simTime().advanceTimeWait(std::chrono::milliseconds(1500));
+
+  EXPECT_CALL(resolver_->active_query_, cancel(Network::ActiveDnsQuery::CancelReason::Timeout));
 
   // Execute timeout timer callback
   timeout_timer->invokeCallback();
@@ -2845,14 +2982,32 @@ server_config:
 )EOF";
   envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
-  DnsFilterEnvoyConfig envoy_config(listener_factory_, filter_config);
+  class BootstrapResolverFactory : public Network::GetAddrInfoDnsResolverFactory {
+  public:
+    MOCK_METHOD(void, initialize, (), (override));
+  };
+  BootstrapResolverFactory resolver;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_resolver(resolver);
+  DnsFilterConfigFactory factory;
+  EXPECT_CALL(resolver, initialize());
+  EXPECT_TRUE(factory.createFilterFactoryFromProto(filter_config, listener_factory_));
+  Mock::VerifyAndClearExpectations(&resolver);
 
-  // Verify the filter is configured with bootstrap DNS resolver configuration.
-  const auto& resolver_config = envoy_config.typedDnsResolverConfig();
-  EXPECT_EQ(resolver_config.name(), "envoy.network.dns_resolver.getaddrinfo");
-  EXPECT_EQ(resolver_config.typed_config().type_url(),
-            "type.googleapis.com/"
-            "envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig");
+  // The authoritative-only ECDS filter answers locally without initializing the bootstrap resolver.
+  EXPECT_CALL(resolver, initialize()).Times(0);
+  auto create_filter =
+      factory.createDynamicFilterFactoryFromProto(filter_config, listener_factory_);
+  Network::MockUdpListenerFilterManager manager;
+  EXPECT_CALL(manager, addReadFilter_(_)).WillOnce([&](Network::UdpListenerReadFilterPtr& filter) {
+    filter_ = std::move(filter);
+  });
+  create_filter(manager, callbacks_);
+  sendQueryFromClient("10.0.0.1:1000", Utils::buildQueryForDomain("www.foo.com", DNS_RECORD_TYPE_A,
+                                                                  DNS_RECORD_CLASS_IN));
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  ASSERT_TRUE(response_ctx_->parse_status_);
+  ASSERT_EQ(1, response_ctx_->answers_.size());
+  Utils::verifyAddress({"10.0.0.1"}, response_ctx_->answers_.begin()->second);
 }
 
 // The stats carry the stat prefix as an explicit tag.

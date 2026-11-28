@@ -105,6 +105,7 @@ envoy_extension_cc_dyn_module_test(
         "tsan": {"link": "linux_x64_small"},
     },
     deps = [
+        "//source/extensions/config_subscription/filesystem:filesystem_subscription_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/udp/dynamic_modules:config",
@@ -112,10 +113,13 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules:util",
         "//test/integration:base_overload_integration_test_lib",
         "//test/integration:integration_lib",
+        "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/udp/dynamic_modules/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

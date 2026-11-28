@@ -33,6 +33,28 @@ static constexpr std::chrono::seconds DEFAULT_RESOLVER_TTL{300};
 DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     Server::Configuration::ListenerFactoryContext& context,
     const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig& config)
+    : DnsFilterEnvoyConfig(context, config,
+                           context.serverFactoryContext().bootstrap().typed_dns_resolver_config()) {
+  initializeAccessLogs(context, config);
+}
+
+std::shared_ptr<const DnsFilterEnvoyConfig> DnsFilterEnvoyConfig::createForLiveReplacement(
+    Server::Configuration::ListenerFactoryContext& context,
+    const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig& config) {
+  auto result = std::shared_ptr<DnsFilterEnvoyConfig>(
+      new DnsFilterEnvoyConfig(context, config, /*fallback_resolver=*/std::nullopt));
+  if (result->dns_resolver_factory_ != nullptr) {
+    result->dns_resolver_factory_->validateConfigForLiveReplacement(
+        result->typed_dns_resolver_config_, context.messageValidationVisitor());
+  }
+  result->initializeAccessLogs(context, config);
+  return result;
+}
+
+DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
+    Server::Configuration::ListenerFactoryContext& context,
+    const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig& config,
+    OptRef<const envoy::config::core::v3::TypedExtensionConfig> fallback_resolver)
     : root_scope_(context.scope()),
       cluster_manager_(context.serverFactoryContext().clusterManager()),
       api_(context.serverFactoryContext().api()),
@@ -88,9 +110,13 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
 
         auto existing_endpoint_config = virtual_domains->find(virtual_domain_name);
         if (existing_endpoint_config != virtual_domains->end()) {
-          // Update the existing endpoint config with the new addresses
-
-          auto& addr_vec = existing_endpoint_config->second.address_list.value();
+          auto& existing_addresses = existing_endpoint_config->second.address_list;
+          if (!existing_addresses.has_value()) {
+            throw EnvoyException(absl::StrCat("Cannot add addresses to DNS virtual domain ",
+                                              virtual_domain_name,
+                                              " with a different endpoint type"));
+          }
+          auto& addr_vec = *existing_addresses;
           addr_vec.reserve(addr_vec.size() + addrs.size());
           std::move(addrs.begin(), addrs.end(), std::inserter(addr_vec, addr_vec.end()));
         } else {
@@ -195,33 +221,25 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     resolver_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
         client_config, resolver_timeout, DEFAULT_RESOLVER_TIMEOUT.count()));
     max_pending_lookups_ = client_config.max_pending_lookups();
-  } else {
-    // In case client_config doesn't exist, use the bootstrap DNS resolver if it is configured.
-    if (context.serverFactoryContext().bootstrap().has_typed_dns_resolver_config() &&
-        !context.serverFactoryContext()
-             .bootstrap()
-             .typed_dns_resolver_config()
-             .typed_config()
-             .type_url()
-             .empty()) {
-      typed_dns_resolver_config_.MergeFrom(
-          context.serverFactoryContext().bootstrap().typed_dns_resolver_config());
+  } else if (fallback_resolver.has_value()) {
+    if (!fallback_resolver->typed_config().type_url().empty()) {
+      typed_dns_resolver_config_ = *fallback_resolver;
       dns_resolver_factory_ =
           &Network::createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config_);
     } else {
-      // Otherwise create default DNS resolver factory and save it.
       dns_resolver_factory_ = &Network::createDefaultDnsResolverFactory(typed_dns_resolver_config_);
     }
-    max_pending_lookups_ = 0;
   }
+}
 
-  // Initialize access logs with DNS-specific command parser
+void DnsFilterEnvoyConfig::initializeAccessLogs(
+    Server::Configuration::ListenerFactoryContext& context,
+    const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig& config) {
   for (const auto& log_config : config.access_log()) {
     std::vector<Formatter::CommandParserPtr> command_parsers;
     command_parsers.push_back(createDnsFilterCommandParser());
-    AccessLog::InstanceSharedPtr current_access_log =
-        AccessLog::AccessLogFactory::fromProto(log_config, context, std::move(command_parsers));
-    access_logs_.push_back(current_access_log);
+    access_logs_.push_back(
+        AccessLog::AccessLogFactory::fromProto(log_config, context, std::move(command_parsers)));
   }
 }
 
@@ -273,8 +291,8 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
   // This callback is executed when the dns resolution completes. At that time of a response by
   // the resolver, we build an answer record from each IP returned then send a response to the
   // client
-  resolver_callback_ = [this](DnsQueryContextPtr context, const DnsQueryRecord* query,
-                              AddressConstPtrVec& iplist) -> void {
+  auto resolver_callback = [this](DnsQueryContextPtr context, const DnsQueryRecord* query,
+                                  AddressConstPtrVec& iplist) {
     // We cannot retry the resolution if ares returns without a response. The ares context
     // is still dirty and will result in a segfault when it is freed during a subsequent resolve
     // call from here. We will retry resolutions for pending lookups only
@@ -301,10 +319,11 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
     sendDnsResponse(std::move(context));
   };
 
-  resolver_ = std::make_unique<DnsFilterResolver>(
-      resolver_callback_, config->resolverTimeout(), listener_.dispatcher(),
-      config->maxPendingLookups(), config->typedDnsResolverConfig(), config->dnsResolverFactory(),
-      config->api());
+  if (const auto* factory = config->dnsResolverFactory(); factory != nullptr) {
+    resolver_ = std::make_unique<DnsFilterResolver>(
+        std::move(resolver_callback), config->resolverTimeout(), listener_.dispatcher(),
+        config->maxPendingLookups(), config->typedDnsResolverConfig(), *factory, config->api());
+  }
 }
 
 Network::FilterStatus DnsFilter::onData(Network::UdpRecvData& client_request) {

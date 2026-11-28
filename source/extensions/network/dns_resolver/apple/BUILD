@@ -30,6 +30,8 @@ envoy_cc_extension(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/network/dns_resolver:dns_factory_util_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/singleton:threadsafe_singleton",
+        "@envoy_api//envoy/extensions/network/dns_resolver/apple/v3:pkg_cc_proto",
     ],
 )

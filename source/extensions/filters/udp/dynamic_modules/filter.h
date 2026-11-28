@@ -20,6 +20,8 @@ public:
                                  uint32_t worker_index);
   ~DynamicModuleUdpListenerFilter() override;
 
+  bool hasModuleFilter() const { return in_module_filter_ != nullptr; }
+
   // Network::UdpListenerReadFilter
   Network::FilterStatus onData(Network::UdpRecvData& data) override;
   Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode error_code) override;

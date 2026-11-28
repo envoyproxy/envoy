@@ -1,7 +1,9 @@
 #pragma once
 
+#include <functional>
 #include <string>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 
@@ -30,6 +32,13 @@ public:
    * generally apply only to new requests and connections.
    */
   virtual OptRef<FactoryCallback> config() PURE;
+
+  /**
+   * Observe changes to config() on the calling thread. The callback runs after the new
+   * configuration becomes available on that thread and must not throw. Destroy the handle on
+   * the same thread to unsubscribe. Static providers return nullptr.
+   */
+  virtual Common::CallbackHandlePtr addUpdateCallback(std::function<void()>) { return nullptr; }
 };
 
 } // namespace Config

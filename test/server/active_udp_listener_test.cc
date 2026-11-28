@@ -1,8 +1,11 @@
 #include <memory>
 
+#include "envoy/common/exception.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
 
+#include "source/common/common/callback_impl.h"
+#include "source/common/filter/udp_listener_filter.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
@@ -47,6 +50,60 @@ public:
   uint32_t destination(const Network::UdpRecvData&) const override { return destination_; }
 
   uint32_t destination_;
+};
+
+class WorkerConfigProvider
+    : public Config::ExtensionConfigProvider<Network::UdpListenerFilterFactoryCb> {
+public:
+  using Factory = Network::UdpListenerFilterFactoryCb;
+
+  const std::string& name() override { return name_; }
+  OptRef<Factory> config() override { return factory_ ? OptRef<Factory>(*factory_) : std::nullopt; }
+  Common::CallbackHandlePtr addUpdateCallback(std::function<void()> callback) override {
+    return updates_.add(std::move(callback));
+  }
+  void update(std::optional<Factory> factory) {
+    factory_ = std::move(factory);
+    updates_.runCallbacks();
+  }
+
+  Common::CallbackManager<void> updates_;
+
+private:
+  const std::string name_{"test_filter"};
+  std::optional<Factory> factory_;
+};
+
+struct FilterActivity {
+  uint32_t datagrams_{};
+  uint32_t errors_{};
+  uint32_t destructions_{};
+};
+
+class RecordingFilter : public Network::UdpListenerReadFilter {
+public:
+  RecordingFilter(Network::UdpReadFilterCallbacks& callbacks, FilterActivity& activity)
+      : UdpListenerReadFilter(callbacks), activity_(activity) {}
+  ~RecordingFilter() override { ++activity_.destructions_; }
+
+  Network::FilterStatus onData(Network::UdpRecvData&) override {
+    ++activity_.datagrams_;
+    return Network::FilterStatus::Continue;
+  }
+  Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode) override {
+    ++activity_.errors_;
+    return Network::FilterStatus::Continue;
+  }
+
+  static WorkerConfigProvider::Factory factory(FilterActivity& activity) {
+    return [&activity](Network::UdpListenerFilterManager& manager,
+                       Network::UdpReadFilterCallbacks& callbacks) {
+      manager.addReadFilter(std::make_unique<RecordingFilter>(callbacks, activity));
+    };
+  }
+
+private:
+  FilterActivity& activity_;
 };
 
 class ActiveUdpListenerTest : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -125,6 +182,133 @@ public:
 INSTANTIATE_TEST_SUITE_P(ActiveUdpListenerTests, ActiveUdpListenerTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+TEST_P(ActiveUdpListenerTest, DynamicFiltersGateTheChainUntilAllConfigsAreReady) {
+  WorkerConfigProvider first;
+  WorkerConfigProvider second;
+  FilterActivity before, first_v1, first_v2, second_activity;
+  setup();
+  auto listener = std::move(active_listener_);
+  auto& failures = scope_.counterFromString("udp.extension_config_update_failed");
+  listener->addReadFilter(std::make_unique<RecordingFilter>(*listener, before));
+  listener->addReadFilter(std::make_unique<Filter::UdpListenerFilter>(first, *listener, failures));
+  listener->addReadFilter(std::make_unique<Filter::UdpListenerFilter>(second, *listener, failures));
+  auto dispatch = [&]() {
+    listener->onDataWorker(makeRecvData(1000));
+    listener->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
+  };
+
+  dispatch();
+  first.update(RecordingFilter::factory(first_v1));
+  dispatch();
+  EXPECT_EQ(0, before.datagrams_);
+  EXPECT_EQ(0, before.errors_);
+  EXPECT_EQ(0, first_v1.datagrams_);
+
+  second.update(RecordingFilter::factory(second_activity));
+  dispatch();
+  EXPECT_EQ(1, first_v1.datagrams_);
+  EXPECT_EQ(1, first_v1.errors_);
+  first.update(RecordingFilter::factory(first_v2));
+  dispatch();
+  EXPECT_EQ(1, first_v1.destructions_);
+  EXPECT_EQ(1, first_v2.datagrams_);
+  EXPECT_EQ(2, second_activity.datagrams_);
+  EXPECT_EQ(0, before.destructions_);
+  EXPECT_EQ(0, second_activity.destructions_);
+
+  second.update(std::nullopt);
+  second.update(std::nullopt);
+  dispatch();
+  EXPECT_EQ(2, before.datagrams_);
+  EXPECT_EQ(2, before.errors_);
+  EXPECT_EQ(1, first_v2.errors_);
+  EXPECT_EQ(1, second_activity.destructions_);
+
+  second.update(RecordingFilter::factory(second_activity));
+  dispatch();
+  EXPECT_EQ(3, before.datagrams_);
+  EXPECT_EQ(2, first_v2.datagrams_);
+  EXPECT_EQ(3, second_activity.datagrams_);
+  EXPECT_EQ(3, scope_.counterFromString("udp.extension_config_missing").value());
+  EXPECT_EQ(0, failures.value());
+
+  listener->shutdownListener({});
+  EXPECT_EQ(0, first.updates_.size());
+  EXPECT_EQ(0, second.updates_.size());
+  EXPECT_EQ(1, first_v2.destructions_);
+  EXPECT_EQ(2, second_activity.destructions_);
+}
+
+TEST_P(ActiveUdpListenerTest, FailedWorkerUpdateDiscardsPartialFiltersAndRecovers) {
+  WorkerConfigProvider provider;
+  FilterActivity before, original, partial, recovered;
+  provider.update(RecordingFilter::factory(original));
+  setup();
+  auto listener = std::move(active_listener_);
+  auto& failures = scope_.counterFromString("udp.extension_config_update_failed");
+  listener->addReadFilter(std::make_unique<RecordingFilter>(*listener, before));
+  listener->addReadFilter(
+      std::make_unique<Filter::UdpListenerFilter>(provider, *listener, failures));
+  listener->onDataWorker(makeRecvData(1000));
+  EXPECT_EQ(1, original.datagrams_);
+
+  provider.update([&partial](Network::UdpListenerFilterManager& manager,
+                             Network::UdpReadFilterCallbacks& callbacks) {
+    manager.addReadFilter(std::make_unique<RecordingFilter>(callbacks, partial));
+    throw EnvoyException("worker construction failed");
+  });
+  EXPECT_EQ(1, original.destructions_);
+  EXPECT_EQ(1, partial.destructions_);
+  EXPECT_EQ(1, failures.value());
+  listener->onDataWorker(makeRecvData(1000));
+  EXPECT_EQ(1, before.datagrams_);
+  EXPECT_EQ(1, original.datagrams_);
+  EXPECT_EQ(0, partial.datagrams_);
+  EXPECT_EQ(1, scope_.counterFromString("udp.extension_config_missing").value());
+
+  provider.update(RecordingFilter::factory(recovered));
+  listener->onDataWorker(makeRecvData(1000));
+  EXPECT_EQ(2, before.datagrams_);
+  EXPECT_EQ(1, recovered.datagrams_);
+  EXPECT_EQ(1, failures.value());
+}
+
+TEST_P(ActiveUdpListenerTest, EmptyAndNullWorkerFiltersBlockDatagramsUntilRecovery) {
+  WorkerConfigProvider provider;
+  FilterActivity before, partial, recovered;
+  setup();
+  auto listener = std::move(active_listener_);
+  auto& failures = scope_.counterFromString("udp.extension_config_update_failed");
+  auto& missing = scope_.counterFromString("udp.extension_config_missing");
+  listener->addReadFilter(std::make_unique<RecordingFilter>(*listener, before));
+
+  provider.update([](Network::UdpListenerFilterManager&, Network::UdpReadFilterCallbacks&) {});
+  listener->addReadFilter(
+      std::make_unique<Filter::UdpListenerFilter>(provider, *listener, failures));
+  listener->onDataWorker(makeRecvData(1000));
+  EXPECT_EQ(1, failures.value());
+  EXPECT_EQ(1, missing.value());
+  EXPECT_EQ(0, before.datagrams_);
+
+  provider.update([&partial](Network::UdpListenerFilterManager& manager,
+                             Network::UdpReadFilterCallbacks& callbacks) {
+    manager.addReadFilter(std::make_unique<RecordingFilter>(callbacks, partial));
+    manager.addReadFilter(nullptr);
+  });
+  listener->onDataWorker(makeRecvData(1000));
+  EXPECT_EQ(2, failures.value());
+  EXPECT_EQ(2, missing.value());
+  EXPECT_EQ(0, before.datagrams_);
+  EXPECT_EQ(0, partial.datagrams_);
+  EXPECT_EQ(1, partial.destructions_);
+
+  provider.update(RecordingFilter::factory(recovered));
+  listener->onDataWorker(makeRecvData(1000));
+  EXPECT_EQ(1, before.datagrams_);
+  EXPECT_EQ(1, recovered.datagrams_);
+  EXPECT_EQ(2, missing.value());
+}
 
 TEST_P(ActiveUdpListenerTest, MultipleFiltersOnData) {
   setup();

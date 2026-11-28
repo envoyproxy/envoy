@@ -143,6 +143,27 @@ filter_name: test_filter
                             "Failed to initialize dynamic module UDP listener filter");
 }
 
+TEST_F(DynamicModuleUdpListenerFilterFactoryTest, NullWorkerFilter) {
+  NiceMock<Server::Configuration::MockListenerFactoryContext> context;
+  envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
+  proto_config.mutable_dynamic_module_config()->set_name("udp_null_config");
+  proto_config.set_filter_name("null_worker");
+
+  NiceMock<Network::MockUdpListenerFilterManager> manager;
+  NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
+  auto static_factory = factory_.createFilterFactoryFromProto(proto_config, context);
+  EXPECT_CALL(manager, addReadFilter_(testing::_))
+      .WillOnce([](Network::UdpListenerReadFilterPtr& filter) {
+        Network::UdpRecvData data{};
+        EXPECT_EQ(Network::FilterStatus::Continue, filter->onData(data));
+      });
+  static_factory(manager, callbacks);
+
+  auto discovered_factory = factory_.createDynamicFilterFactoryFromProto(proto_config, context);
+  EXPECT_THROW_WITH_MESSAGE(discovered_factory(manager, callbacks), EnvoyException,
+                            "Dynamic module failed to create the discovered UDP listener filter");
+}
+
 TEST_F(DynamicModuleUdpListenerFilterFactoryTest, MultipleFactoryCallsSameModule) {
   NiceMock<Server::Configuration::MockListenerFactoryContext> context;
 

@@ -340,9 +340,9 @@ message ListenerFilter {
     // [#extension-category: envoy.filters.listener,envoy.filters.udp_listener]
     google.protobuf.Any typed_config = 3;
 
-    // Configuration source specifier for an extension configuration discovery
-    // service. In case of a failure and without the default configuration, the
-    // listener closes the connections.
+    // Source for this listener filter's dynamic configuration. See
+    // :ref:`extension configuration discovery <config_overview_extension_discovery>` for how
+    // listeners apply updates and handle missing configuration.
     core.v3.ExtensionConfigSource config_discovery = 5;
   }
 

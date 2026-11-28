@@ -112,7 +112,9 @@ envoy_cc_library(
     deps = [
         ":dns_interface",
         "//envoy/api:api_interface",
+        "//envoy/common:exception_lib",
         "//source/common/config:utility_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
