@@ -244,6 +244,28 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
   }
 }
 
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, AsyncClientUpstreamLog) {
+  const std::string log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    envoy::extensions::access_loggers::file::v3::FileAccessLog file_log;
+    file_log.set_path(log_path);
+    file_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%UPSTREAM_CLUSTER% %RESPONSE_CODE% %ACCESS_LOG_TYPE%\n");
+    auto* log = bootstrap.mutable_cluster_manager()->add_async_client_upstream_log();
+    log->set_name("file");
+    std::ignore = log->mutable_typed_config()->PackFrom(file_log);
+  });
+  config_helper_.prependFilter(R"(
+  name: "envoy.test.async_upstream"
+  typed_config:
+      "@type": "type.googleapis.com/test.integration.filters.AsyncUpstreamFilterConfig"
+  )");
+  initialize();
+
+  sendRequestAndGetHeaders();
+  EXPECT_EQ(waitForAccessLog(log_path), "cluster_0 200 UpstreamEnd");
+}
+
 TEST_P(StaticRouterOrClusterFiltersIntegrationTest, TwoFilters) {
   addStaticFilter("foo", default_header_key_, "value1");
   addStaticFilter("bar", default_header_key_, "value2");

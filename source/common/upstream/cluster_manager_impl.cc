@@ -21,6 +21,7 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
@@ -48,6 +49,7 @@
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/load_stats_reporter_impl.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "absl/hash/hash.h"
 #include "absl/status/status.h"
@@ -465,6 +467,36 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
   tls_.set([this, local_cluster_params](Event::Dispatcher& dispatcher) {
     return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher, local_cluster_params);
   });
+
+  struct AsyncClientAccessLog : public AccessLog::Instance {
+    AsyncClientAccessLog(AccessLog::InstanceSharedPtr log, ThreadLocal::Instance& tls)
+        : log_(std::move(log)), tls_(tls) {}
+    void log(const AccessLog::LogContext& context, const StreamInfo::StreamInfo& info) override {
+      // Async streams can outlive the TLS slots used by formatters and extension filters.
+      if (!tls_.isShutdown()) {
+        log_->log(context, info);
+      }
+    }
+    const AccessLog::InstanceSharedPtr log_;
+    ThreadLocal::Instance& tls_;
+  };
+
+  // Formatters and extension filters may depend on static clusters and thread local state.
+  // gRPC/OTLP sinks are excluded because they would log their own async client exports.
+  Server::GenericFactoryContextImpl generic_context(context_, context_.messageValidationVisitor());
+  for (const auto& log : bootstrap.cluster_manager().async_client_upstream_log()) {
+    const std::string type = Config::Utility::getFactoryType(log.typed_config());
+    if (type != "envoy.extensions.access_loggers.file.v3.FileAccessLog" &&
+        type != "envoy.extensions.access_loggers.stream.v3.StdoutAccessLog" &&
+        type != "envoy.extensions.access_loggers.stream.v3.StderrAccessLog") {
+      return absl::InvalidArgumentError(
+          fmt::format("async_client_upstream_log: unsupported access logger type '{}'; only file "
+                      "and stdout/stderr access loggers are supported",
+                      type));
+    }
+    async_client_router_config_->upstream_logs_.push_back(std::make_shared<AsyncClientAccessLog>(
+        AccessLog::AccessLogFactory::fromProto(log, generic_context), context_.threadLocal()));
+  }
 
   const auto& dyn_resources = bootstrap.dynamic_resources();
   // We can now potentially create the CDS API once the backing cluster exists.
