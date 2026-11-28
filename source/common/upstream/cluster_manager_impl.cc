@@ -63,24 +63,6 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-class AsyncClientAccessLog : public AccessLog::Instance {
-public:
-  AsyncClientAccessLog(AccessLog::InstanceSharedPtr access_log, ThreadLocal::Instance& tls)
-      : access_log_(std::move(access_log)), tls_(tls) {}
-
-  void log(const AccessLog::LogContext& context,
-           const StreamInfo::StreamInfo& stream_info) override {
-    // Async streams can outlive the TLS slots used by formatters and extension filters.
-    if (!tls_.isShutdown()) {
-      access_log_->log(context, stream_info);
-    }
-  }
-
-private:
-  const AccessLog::InstanceSharedPtr access_log_;
-  ThreadLocal::Instance& tls_;
-};
-
 // The factory a cluster's main-thread priority set creates host sets with, so its worker copies
 // create the same type. Null for clusters whose priority set is not a PrioritySetImpl.
 HostSetFactory hostSetFactoryOf(const Cluster& cluster) {
@@ -482,6 +464,19 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
   tls_.set([this, local_cluster_params](Event::Dispatcher& dispatcher) {
     return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher, local_cluster_params);
   });
+
+  struct AsyncClientAccessLog : public AccessLog::Instance {
+    AsyncClientAccessLog(AccessLog::InstanceSharedPtr log, ThreadLocal::Instance& tls)
+        : log_(std::move(log)), tls_(tls) {}
+    void log(const AccessLog::LogContext& context, const StreamInfo::StreamInfo& info) override {
+      // Async streams can outlive the TLS slots used by formatters and extension filters.
+      if (!tls_.isShutdown()) {
+        log_->log(context, info);
+      }
+    }
+    const AccessLog::InstanceSharedPtr log_;
+    ThreadLocal::Instance& tls_;
+  };
 
   // Formatters and extension filters may depend on static clusters and thread local state.
   // gRPC/OTLP sinks are excluded because they would log their own async client exports.
