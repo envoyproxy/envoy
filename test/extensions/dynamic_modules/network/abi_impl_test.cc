@@ -1,3 +1,6 @@
+#include <atomic>
+#include <cstdint>
+#include <limits>
 #include <thread>
 #include <vector>
 
@@ -20,6 +23,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
 
+#include "absl/synchronization/mutex.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -2469,7 +2473,6 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
   auto scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
   EXPECT_NE(nullptr, scheduler);
 
-  // Capture the posted callback.
   Event::PostCb captured_cb;
   EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
@@ -2477,13 +2480,67 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
 
   envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 123);
 
-  // Destroy the filter before invoking the callback.
+  // The pending event does not keep the filter alive, and is dropped when it runs.
+  std::weak_ptr<DynamicModuleNetworkFilter> weak_filter = filter_;
   filter_.reset();
-
-  // The callback should not crash even though the filter is destroyed.
+  EXPECT_TRUE(weak_filter.expired());
   captured_cb();
 
   envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
+       NetworkFilterSchedulerDoesNotExtendFilterLifetime) {
+  auto* scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
+  std::weak_ptr<DynamicModuleNetworkFilter> weak_filter = filter_;
+
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  });
+  std::thread module_thread(
+      [&]() { envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 7); });
+  module_thread.join();
+  ASSERT_TRUE(captured_cb);
+
+  // The filter is destroyed on this thread as soon as its last reference is dropped.
+  filter_.reset();
+  EXPECT_TRUE(weak_filter.expired());
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).Times(0);
+  envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 8);
+  captured_cb();
+
+  envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterSchedulerCommitRacesFilterTeardown) {
+  auto* scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
+
+  absl::Mutex mutex;
+  std::vector<Event::PostCb> posted;
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillRepeatedly([&](Event::PostCb cb) {
+    absl::MutexLock lock(mutex);
+    posted.push_back(std::move(cb));
+  });
+  std::atomic<bool> started{false};
+  std::thread module_thread([&]() {
+    for (uint64_t i = 0; i < 1000; ++i) {
+      envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, i);
+      started.store(true);
+    }
+  });
+  while (!started.load()) {
+  }
+  filter_.reset();
+  module_thread.join();
+  envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
+
+  // Every event posted before the teardown is dropped when it runs.
+  absl::MutexLock lock(mutex);
+  for (Event::PostCb& cb : posted) {
+    cb();
+  }
 }
 
 // Verifies `commit()` from a foreign thread before destroy posts via the cached dispatcher.
@@ -2539,14 +2596,27 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
 
   envoy_dynamic_module_callback_network_filter_config_scheduler_commit(scheduler, 456);
 
-  // Destroy the filter and config before invoking the callback.
+  // The pending event does not keep the config alive, and is dropped when it runs.
+  std::weak_ptr<DynamicModuleNetworkFilterConfig> weak_config = filter_config_;
   filter_.reset();
   filter_config_.reset();
-
-  // The callback should not crash even though the config is destroyed.
+  EXPECT_TRUE(weak_config.expired());
   captured_cb();
 
   // Clean up.
+  envoy_dynamic_module_callback_network_filter_config_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
+       NetworkFilterConfigSchedulerCommitAfterConfigDestroyedDoesNotPost) {
+  auto* scheduler = envoy_dynamic_module_callback_network_filter_config_scheduler_new(
+      static_cast<void*>(filter_config_.get()));
+  filter_.reset();
+  filter_config_.reset();
+
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).Times(0);
+  envoy_dynamic_module_callback_network_filter_config_scheduler_commit(scheduler, 1);
+
   envoy_dynamic_module_callback_network_filter_config_scheduler_delete(scheduler);
 }
 

@@ -7,6 +7,7 @@
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/scheduler.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -131,6 +132,10 @@ public:
 
   Envoy::Upstream::ClusterManager& cluster_manager_;
   Event::Dispatcher& main_thread_dispatcher_;
+  // Shared with the schedulers of this config. Initialized once the config is held by a shared
+  // pointer, before the module can create a scheduler, and cleared at the start of the destructor.
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleHttpFilterConfig> scheduler_target_{
+      std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleHttpFilterConfig>>()};
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
   // We only allow the module to create stats during envoy_dynamic_module_on_http_filter_config_new,
@@ -447,28 +452,8 @@ private:
       http_stream_callouts_;
 };
 
-class DynamicModuleHttpFilterConfigScheduler {
-public:
-  explicit DynamicModuleHttpFilterConfigScheduler(
-      std::weak_ptr<DynamicModuleHttpFilterConfig> config)
-      : config_(std::move(config)) {}
-
-  void commit(uint64_t event_id) {
-    // Lock the config so its dispatcher member stays valid across `post`.
-    auto config_shared = config_.lock();
-    if (!config_shared) {
-      return;
-    }
-    config_shared->main_thread_dispatcher_.post([config = config_, event_id]() {
-      if (std::shared_ptr<DynamicModuleHttpFilterConfig> cs = config.lock()) {
-        cs->onScheduled(event_id);
-      }
-    });
-  }
-
-private:
-  std::weak_ptr<DynamicModuleHttpFilterConfig> config_;
-};
+using DynamicModuleHttpFilterConfigScheduler =
+    DynamicModuleScheduler<DynamicModuleHttpFilterConfig>;
 
 class DynamicModuleHttpPerRouteFilterConfig : public Router::RouteSpecificFilterConfig {
 public:

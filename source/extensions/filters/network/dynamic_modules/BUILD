@@ -19,6 +19,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:scheduler_lib",
     ],
 )
 
@@ -46,6 +47,7 @@ envoy_cc_library(
         "//source/common/router:string_accessor_lib",
         "//source/extensions/dynamic_modules:abi_context_accessors_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:scheduler_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
