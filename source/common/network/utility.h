@@ -396,7 +396,8 @@ public:
     // Open the fd for the network namespace we want the socket in.
     auto netns_fd_result = posix.open(netns, O_RDONLY);
     const int netns_fd = netns_fd_result.return_value_;
-    if (netns_fd <= 0) {
+    // 0 is a valid file descriptor, e.g. when stdin is closed.
+    if (netns_fd < 0) {
       return absl::InternalError(fmt::format("failed to open netns file {}: {}", netns,
                                              errorDetails(netns_fd_result.errno_)));
     }
