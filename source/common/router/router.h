@@ -638,6 +638,7 @@ private:
                                                 uint64_t status_code);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
                               std::optional<uint64_t> code);
+  void completeRetry();
   void doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry);
   void continueDoRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry,
                        GenericConnPoolPtr generic_conn_pool);
@@ -665,7 +666,6 @@ private:
                                                    absl::string_view selection_details,
                                                    std::optional<Http::Code> failure_status);
 
-  RetryStatePtr retry_state_;
   const FilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_;
@@ -674,6 +674,7 @@ private:
   // is complete.
   absl::InlinedVector<Upstream::ClusterInfoConstSharedPtr, 4> expired_clusters_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
+  RetryStatePtr retry_state_;
   std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_{};
   RouteStatsContextOptRef route_stats_context_;
@@ -738,6 +739,7 @@ private:
   // dropped. See dropKeptBody().
   bool drop_kept_body_ : 1 = false;
   bool saw_local_reply_ : 1 = false;
+  bool retry_complete_ : 1 = false;
 };
 
 class ProdFilter : public Filter {
