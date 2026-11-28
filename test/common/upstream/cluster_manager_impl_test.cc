@@ -10,7 +10,9 @@
 #include "source/common/config/xds_resource.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/resolver_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/common/quic/test_utils.h"
@@ -1825,6 +1827,105 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
   // Reusing the same options should lead to the same connection pools.
   EXPECT_EQ(cp1, should_be_cp1);
   EXPECT_EQ(cp2, should_be_cp2);
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/49040. Requests that resolve to
+// different filter state transport socket matches must not share a pool, even when the filter
+// state object driving the match is not Hashable.
+TEST_F(ClusterManagerImplTest, FilterStateTransportSocketMatchSplitsHttpConnPools) {
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.250s
+    lb_policy: ROUND_ROBIN
+    type: STATIC
+    load_assignment:
+      cluster_name: cluster_1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+    transport_socket_matches:
+    - name: socket_a
+      match:
+        unused: "a"
+      transport_socket:
+        name: envoy.transport_sockets.raw_buffer
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+    - name: socket_b
+      match:
+        unused: "b"
+      transport_socket:
+        name: envoy.transport_sockets.raw_buffer
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+    transport_socket_matcher:
+      matcher_tree:
+        input:
+          name: envoy.matching.inputs.transport_socket_filter_state
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.FilterStateInput
+            key: "test.key"
+        exact_match_map:
+          map:
+            "a":
+              action:
+                name: envoy.matching.action.transport_socket.name
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
+                  name: socket_a
+            "b":
+              action:
+                name: envoy.matching.action.transport_socket.name
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
+                  name: socket_b
+)EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  // Router::StringAccessorImpl is intentionally not Hashable.
+  auto make_options = [](absl::string_view value) {
+    auto objects = std::make_unique<StreamInfo::FilterState::Objects>();
+    objects->push_back({std::make_shared<Router::StringAccessorImpl>(value),
+                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce,
+                        "test.key"});
+    return std::make_shared<Network::TransportSocketOptionsImpl>(
+        "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+        std::nullopt, std::move(objects));
+  };
+  auto options_a = make_options("a");
+  auto options_b = make_options("b");
+
+  NiceMock<MockLoadBalancerContext> context_a;
+  NiceMock<MockLoadBalancerContext> context_b;
+  ON_CALL(context_a, upstreamTransportSocketOptions()).WillByDefault(Return(options_a));
+  ON_CALL(context_b, upstreamTransportSocketOptions()).WillByDefault(Return(options_b));
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
+      .WillOnce(Return(new NiceMock<Http::ConnectionPool::MockInstance>()))
+      .WillOnce(Return(new NiceMock<Http::ConnectionPool::MockInstance>()));
+
+  auto* cluster = cluster_manager_->getThreadLocalCluster("cluster_1");
+  auto get_pool = [&](MockLoadBalancerContext& context) {
+    return HttpPoolDataPeer::getPool(cluster->httpConnPool(cluster->chooseHost(nullptr).host,
+                                                           ResourcePriority::Default,
+                                                           Http::Protocol::Http11, &context));
+  };
+
+  auto* pool_a = get_pool(context_a);
+  auto* pool_b = get_pool(context_b);
+  ASSERT_NE(nullptr, pool_a);
+  ASSERT_NE(nullptr, pool_b);
+  EXPECT_NE(pool_a, pool_b);
+
+  // The same match keeps reusing its pool.
+  EXPECT_EQ(pool_a, get_pool(context_a));
+  EXPECT_EQ(pool_b, get_pool(context_b));
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsNullIsOkay) {
