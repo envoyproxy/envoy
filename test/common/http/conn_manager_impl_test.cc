@@ -5843,5 +5843,167 @@ TEST_F(HttpConnectionManagerImplTest, RouteResolutionStatsDisabledByDefault) {
   EXPECT_FALSE(fake_stats_.findHistogramByString("downstream_rq_route_resolutions").has_value());
 }
 
+TEST_F(HttpConnectionManagerImplTest,
+       TimeoutWhileDeferredToNextIoIterationWithPausedEncoderFilterCancelsDecode) {
+  stream_idle_timeout_ = std::chrono::milliseconds(10);
+  EXPECT_CALL(runtime_.snapshot_, getInteger(_, _)).WillRepeatedly(testing::ReturnArg<1>());
+  auto* deferred_request_callback = enableStreamsPerIoLimit(1);
+  setup();
+  setupFilterChain(1, 1, /*num_requests=*/2);
+  ON_CALL(*codec_, protocol()).WillByDefault(Return(Protocol::Http2));
+
+  std::vector<NiceMock<MockResponseEncoder>> response_encoders(2);
+  for (auto& encoder : response_encoders) {
+    EXPECT_CALL(encoder, getStream()).WillRepeatedly(ReturnRef(encoder.stream_));
+  }
+
+  std::vector<Event::MockTimer*> idle_timers;
+  RequestDecoder* deferred_decoder = nullptr;
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_)).Times(0);
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce([&](Buffer::Instance& data) -> Http::Status {
+    for (int i = 0; i < 2; ++i) {
+      auto* timer = setUpTimer();
+      EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(10), _)).Times(2);
+      idle_timers.push_back(timer);
+      RequestDecoder* decoder = &conn_manager_->newStream(response_encoders[i]);
+      if (i == 1) {
+        deferred_decoder = decoder;
+      }
+      RequestHeaderMapPtr headers{
+          new TestRequestHeaderMapImpl{{":authority", "host"}, {":method", "GET"}, {":path", "/"}}};
+      decoder->decodeHeaders(std::move(headers), i == 0);
+    }
+    data.drain(4);
+    return Http::okStatus();
+  });
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  ASSERT_NE(deferred_decoder, nullptr);
+  EXPECT_TRUE(deferred_request_callback->enabled_);
+
+  // Stream 1 hits idle timeout while deferred and an encoder filter pauses its 408 local reply.
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*idle_timers[1], enableTimer(_, _)).Times(2);
+  idle_timers[1]->invokeCallback();
+
+  // Running the deferred request callback and receiving trailing frames on stream 1 before
+  // continueEncoding() must not decode stream 1 or reschedule another deferred pass.
+  deferred_request_callback->invokeCallback();
+  EXPECT_FALSE(deferred_request_callback->enabled_);
+
+  EXPECT_CALL(*idle_timers[1], enableTimer(_, _)).Times(2);
+  Buffer::OwnedImpl trailing_data("hello");
+  deferred_decoder->decodeData(trailing_data, false);
+  RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"x-trailer", "value"}}};
+  deferred_decoder->decodeTrailers(std::move(trailers));
+
+  // Complete stream 1's paused 408 response and stream 0 cleanly.
+  EXPECT_CALL(*idle_timers[1], enableTimer(_, _)).Times(2);
+  EXPECT_CALL(*idle_timers[1], disableTimer());
+  EXPECT_CALL(*decoder_filters_[1], onStreamComplete());
+  EXPECT_CALL(*encoder_filters_[1], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[1], onDestroy());
+  EXPECT_CALL(*encoder_filters_[1], onDestroy());
+  EXPECT_CALL(response_encoders[1], encodeHeaders(_, false))
+      .WillOnce([](const ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("408", headers.getStatusValue());
+      });
+  EXPECT_CALL(response_encoders[1], encodeData(_, true));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(2);
+  encoder_filters_[1]->callbacks_->continueEncoding();
+  response_encoders[1].stream_.codec_callbacks_->onCodecEncodeComplete();
+
+  EXPECT_CALL(*idle_timers[0], enableTimer(_, _));
+  EXPECT_CALL(*idle_timers[0], disableTimer());
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*encoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  EXPECT_CALL(*encoder_filters_[0], onDestroy());
+  EXPECT_CALL(response_encoders[0], encodeHeaders(_, true))
+      .WillOnce([](const ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("200", headers.getStatusValue());
+      });
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+  response_encoders[0].stream_.codec_callbacks_->onCodecEncodeComplete();
+}
+
+TEST_F(HttpConnectionManagerImplTest,
+       UpgradeRejectedWithNonEmptyLocalReplyAndPausedEncoderFilterAbortsDecoderChain) {
+  envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig
+      local_reply_config;
+  local_reply_config.mutable_body_format()->mutable_text_format_source()->set_inline_string(
+      "upgrade rejected");
+  auto local_reply_or_error = LocalReply::Factory::create(local_reply_config, factory_context_);
+  ASSERT_TRUE(local_reply_or_error.ok());
+  local_reply_ = std::move(local_reply_or_error.value());
+
+  setup();
+  ON_CALL(*codec_, protocol()).WillByDefault(Return(Protocol::Http2));
+
+  auto* decoder_filter = new NiceMock<MockStreamDecoderFilter>();
+  auto* encoder_filter = new NiceMock<MockStreamEncoderFilter>();
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("websocket", _, _)).WillOnce(Return(false));
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter});
+        callbacks.addStreamEncoderFilter(StreamEncoderFilterSharedPtr{encoder_filter});
+        return true;
+      });
+  EXPECT_CALL(*decoder_filter, decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeData(_, _)).Times(0);
+  EXPECT_CALL(*decoder_filter, decodeTrailers(_)).Times(0);
+  EXPECT_CALL(*encoder_filter, encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filter, encodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
+                                                             {":method", "GET"},
+                                                             {":path", "/"},
+                                                             {"connection", "Upgrade"},
+                                                             {"upgrade", "websocket"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    data.drain(4);
+    return Http::okStatus();
+  });
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_ws_on_non_ws_route_.value());
+
+  // Trailing body frames and trailers arriving while the non-empty 403 local reply is paused must
+  // not enter the uninitialized decoder filter chain.
+  Buffer::OwnedImpl body("hello");
+  decoder_->decodeData(body, false);
+  RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"x-trailer", "value"}}};
+  decoder_->decodeTrailers(std::move(trailers));
+
+  EXPECT_CALL(*decoder_filter, onStreamComplete());
+  EXPECT_CALL(*encoder_filter, onStreamComplete());
+  EXPECT_CALL(*decoder_filter, onDestroy());
+  EXPECT_CALL(*encoder_filter, onDestroy());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce([](const ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("403", headers.getStatusValue());
+      });
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  encoder_filter->callbacks_->continueEncoding();
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+}
+
 } // namespace Http
 } // namespace Envoy
