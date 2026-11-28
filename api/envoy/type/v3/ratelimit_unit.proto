@@ -29,6 +29,9 @@ enum RateLimitUnit {
   // The time unit representing a day.
   DAY = 4;
 
+  // The time unit representing a week.
+  WEEK = 7;
+
   // The time unit representing a month.
   MONTH = 5;
 
