@@ -66,7 +66,7 @@ public:
                              const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
                              const SpanContext& previous_span_context,
                              OptRef<const Tracing::TraceContext> trace_context,
-                             OTelSpanKind span_kind);
+                             OTelSpanKind span_kind, bool preserve_headers = false);
 
 private:
   /**
@@ -114,6 +114,7 @@ public:
                      const Tracing::UpstreamContext&) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
+  void updateParent(const Tracing::TraceContext& trace_context, bool preserve_headers) override;
 
   /**
    * Set the span's sampled flag.
@@ -182,6 +183,11 @@ public:
    */
   void setParentContextIsRemote(bool is_remote) { parent_context_is_remote_ = is_remote; }
 
+  /**
+   * Sets whether injectContext() should preserve existing trace headers on upstream requests.
+   */
+  void setPreserveHeaders(bool preserve_headers) { preserve_headers_ = preserve_headers; }
+
   absl::string_view tracestate() const { return span_.trace_state(); }
 
   /**
@@ -190,6 +196,8 @@ public:
   void setTracestate(absl::string_view tracestate) {
     span_.set_trace_state(std::string{tracestate});
   }
+
+  std::string getTracestate() const override { return span_.trace_state(); }
 
   /**
    * Sets a span attribute.
@@ -209,6 +217,7 @@ private:
   bool sampled_;
   bool use_local_decision_{false};
   bool parent_context_is_remote_{false};
+  bool preserve_headers_{false};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;
