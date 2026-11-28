@@ -704,6 +704,7 @@ EXTENSIONS = {
     "envoy.tls.upstream_certificate_mappers.filter_state_override": "//source/extensions/transport_sockets/tls/cert_mappers/filter_state_override:config",
 
     # Local address selectors
+    "envoy.upstream.local_address_selector.dynamic_modules":       "//source/extensions/local_address_selectors/dynamic_modules:config",
     "envoy.upstream.local_address_selector.filter_state_override": "//source/extensions/local_address_selectors/filter_state_override:config",
 
     #

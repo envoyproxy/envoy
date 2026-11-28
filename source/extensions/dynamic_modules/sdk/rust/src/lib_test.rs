@@ -16345,3 +16345,296 @@ mod xds_tests {
     );
   }
 }
+
+// =============================================================================
+// Local address selector
+// =============================================================================
+
+// The name, config and cluster name a local address selector factory received.
+type LocalAddressSelectorFactoryInputs = std::cell::RefCell<Option<(String, Vec<u8>, String)>>;
+
+thread_local! {
+  // The last address the module recorded with set_address on this thread.
+  static LOCAL_ADDRESS_SELECTOR_SET_ADDRESS: std::cell::RefCell<Option<(String, u32)>> =
+    const { std::cell::RefCell::new(None) };
+  // What the set_address stub returns on this thread.
+  static LOCAL_ADDRESS_SELECTOR_SET_ADDRESS_ACCEPTS: std::cell::Cell<bool> =
+    const { std::cell::Cell::new(true) };
+  // What the last factory call on this thread received.
+  static LOCAL_ADDRESS_SELECTOR_FACTORY_INPUTS: LocalAddressSelectorFactoryInputs =
+    const { std::cell::RefCell::new(None) };
+  // The endpoint the last select call on this thread received.
+  static LOCAL_ADDRESS_SELECTOR_ENDPOINT: std::cell::Cell<Option<std::net::SocketAddr>> =
+    const { std::cell::Cell::new(None) };
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_local_address_selector_set_address(
+  _selector_envoy_ptr: abi::envoy_dynamic_module_type_local_address_selector_envoy_ptr,
+  address: abi::envoy_dynamic_module_type_module_buffer,
+  port: u32,
+) -> bool {
+  let address = unsafe {
+    std::str::from_utf8(std::slice::from_raw_parts(
+      address.ptr as *const u8,
+      address.length,
+    ))
+    .unwrap()
+    .to_string()
+  };
+  LOCAL_ADDRESS_SELECTOR_SET_ADDRESS
+    .with(|recorded| *recorded.borrow_mut() = Some((address, port)));
+  LOCAL_ADDRESS_SELECTOR_SET_ADDRESS_ACCEPTS.with(|accepts| accepts.get())
+}
+
+struct TestLocalAddressSelectorConfig {
+  selection: local_address_selector::LocalAddressSelection,
+}
+
+impl local_address_selector::LocalAddressSelectorConfig for TestLocalAddressSelectorConfig {
+  fn select(
+    &self,
+    endpoint: std::net::SocketAddr,
+  ) -> local_address_selector::LocalAddressSelection {
+    LOCAL_ADDRESS_SELECTOR_ENDPOINT.with(|seen| seen.set(Some(endpoint)));
+    self.selection
+  }
+}
+
+fn local_address_selector_envoy_buffer(value: &str) -> abi::envoy_dynamic_module_type_envoy_buffer {
+  abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: value.as_ptr() as *const _,
+    length: value.len(),
+  }
+}
+
+fn local_address_selector_config_ptr(
+  config: Box<dyn local_address_selector::LocalAddressSelectorConfig>,
+) -> *const std::ffi::c_void {
+  Box::into_raw(Box::new(config)) as *const std::ffi::c_void
+}
+
+// Runs the select hook against `selection` for an endpoint and reports the hook's result and the
+// address the module recorded, if any.
+fn run_local_address_selector_select(
+  selection: local_address_selector::LocalAddressSelection,
+  endpoint_ip: &str,
+  endpoint_port: u32,
+) -> (bool, Option<(String, u32)>) {
+  LOCAL_ADDRESS_SELECTOR_SET_ADDRESS.with(|recorded| *recorded.borrow_mut() = None);
+  let config_ptr =
+    local_address_selector_config_ptr(Box::new(TestLocalAddressSelectorConfig { selection }));
+  let result = unsafe {
+    local_address_selector::envoy_dynamic_module_on_local_address_selector_select(
+      config_ptr,
+      std::ptr::null_mut(),
+      local_address_selector_envoy_buffer(endpoint_ip),
+      endpoint_port,
+    )
+  };
+  unsafe {
+    local_address_selector::envoy_dynamic_module_on_local_address_selector_config_destroy(
+      config_ptr,
+    );
+  }
+  (
+    result,
+    LOCAL_ADDRESS_SELECTOR_SET_ADDRESS.with(|recorded| recorded.borrow().clone()),
+  )
+}
+
+#[test]
+fn test_local_address_selector_config_new_impl_passes_inputs() {
+  let new_fn: NewLocalAddressSelectorConfigFunction = |name, config, cluster_name| {
+    LOCAL_ADDRESS_SELECTOR_FACTORY_INPUTS.with(|inputs| {
+      *inputs.borrow_mut() = Some((name.to_string(), config.to_vec(), cluster_name.to_string()))
+    });
+    Some(Box::new(TestLocalAddressSelectorConfig {
+      selection: local_address_selector::LocalAddressSelection::Default,
+    }))
+  };
+  let config_ptr =
+    local_address_selector::envoy_dynamic_module_on_local_address_selector_config_new_impl(
+      "test_selector",
+      b"config",
+      "cluster_0",
+      &new_fn,
+    );
+  assert!(!config_ptr.is_null());
+  assert_eq!(
+    Some((
+      "test_selector".to_string(),
+      b"config".to_vec(),
+      "cluster_0".to_string()
+    )),
+    LOCAL_ADDRESS_SELECTOR_FACTORY_INPUTS.with(|inputs| inputs.borrow().clone())
+  );
+  unsafe {
+    local_address_selector::envoy_dynamic_module_on_local_address_selector_config_destroy(
+      config_ptr,
+    );
+  }
+
+  // A factory that declines the configuration makes Envoy reject the cluster.
+  let new_fn: NewLocalAddressSelectorConfigFunction = |_, _, _| None;
+  let config_ptr =
+    local_address_selector::envoy_dynamic_module_on_local_address_selector_config_new_impl(
+      "unknown", b"", "", &new_fn,
+    );
+  assert!(config_ptr.is_null());
+}
+
+#[test]
+fn test_local_address_selector_select_passes_the_endpoint() {
+  let (result, recorded) = run_local_address_selector_select(
+    local_address_selector::LocalAddressSelection::Default,
+    "2001:db8::1",
+    8443,
+  );
+  assert!(result);
+  assert!(recorded.is_none());
+  assert_eq!(
+    Some("[2001:db8::1]:8443".parse().unwrap()),
+    LOCAL_ADDRESS_SELECTOR_ENDPOINT.with(|seen| seen.get())
+  );
+}
+
+#[test]
+fn test_local_address_selector_select_results() {
+  use local_address_selector::LocalAddressSelection;
+
+  // Default continues without recording an address.
+  assert_eq!(
+    (true, None),
+    run_local_address_selector_select(LocalAddressSelection::Default, "10.0.0.1", 443)
+  );
+
+  // Fail fails the connection without recording an address.
+  assert_eq!(
+    (false, None),
+    run_local_address_selector_select(LocalAddressSelection::Fail, "10.0.0.1", 443)
+  );
+
+  // An address is recorded with Envoy, IPv6 without brackets.
+  assert_eq!(
+    (true, Some(("127.0.0.2".to_string(), 0))),
+    run_local_address_selector_select(
+      LocalAddressSelection::Address("127.0.0.2".parse().unwrap(), 0),
+      "10.0.0.1",
+      443
+    )
+  );
+  assert_eq!(
+    (true, Some(("2001:db8::2".to_string(), 1234))),
+    run_local_address_selector_select(
+      LocalAddressSelection::Address("2001:db8::2".parse().unwrap(), 1234),
+      "2001:db8::1",
+      443
+    )
+  );
+
+  // An address that Envoy rejects fails the connection.
+  LOCAL_ADDRESS_SELECTOR_SET_ADDRESS_ACCEPTS.with(|accepts| accepts.set(false));
+  let (result, recorded) = run_local_address_selector_select(
+    LocalAddressSelection::Address("127.0.0.2".parse().unwrap(), 0),
+    "10.0.0.1",
+    443,
+  );
+  LOCAL_ADDRESS_SELECTOR_SET_ADDRESS_ACCEPTS.with(|accepts| accepts.set(true));
+  assert!(!result);
+  assert!(recorded.is_some());
+}
+
+#[test]
+fn test_local_address_selector_select_rejects_an_invalid_endpoint() {
+  use local_address_selector::LocalAddressSelection;
+
+  LOCAL_ADDRESS_SELECTOR_ENDPOINT.with(|seen| seen.set(None));
+  assert_eq!(
+    (false, None),
+    run_local_address_selector_select(LocalAddressSelection::Default, "not-an-ip", 443)
+  );
+  assert_eq!(
+    (false, None),
+    run_local_address_selector_select(LocalAddressSelection::Default, "10.0.0.1", 65536)
+  );
+  // The module is not asked about an endpoint it cannot represent.
+  assert!(LOCAL_ADDRESS_SELECTOR_ENDPOINT
+    .with(|seen| seen.get())
+    .is_none());
+}
+
+#[test]
+fn test_local_address_selector_select_recovers_from_panic() {
+  // Selection runs on worker threads, so a panic must be caught at the FFI boundary and fail the
+  // connection rather than unwinding across the ABI.
+  struct PanicConfig;
+  impl local_address_selector::LocalAddressSelectorConfig for PanicConfig {
+    fn select(
+      &self,
+      _endpoint: std::net::SocketAddr,
+    ) -> local_address_selector::LocalAddressSelection {
+      panic!("intentional panic in select");
+    }
+  }
+
+  let config_ptr = local_address_selector_config_ptr(Box::new(PanicConfig));
+  let result = unsafe {
+    local_address_selector::envoy_dynamic_module_on_local_address_selector_select(
+      config_ptr,
+      std::ptr::null_mut(),
+      local_address_selector_envoy_buffer("10.0.0.1"),
+      443,
+    )
+  };
+  assert!(!result);
+  unsafe {
+    local_address_selector::envoy_dynamic_module_on_local_address_selector_config_destroy(
+      config_ptr,
+    );
+  }
+}
+
+#[test]
+fn test_local_address_selector_config_destroy_recovers_from_panic() {
+  struct PanicOnDrop;
+  impl local_address_selector::LocalAddressSelectorConfig for PanicOnDrop {
+    fn select(
+      &self,
+      _endpoint: std::net::SocketAddr,
+    ) -> local_address_selector::LocalAddressSelection {
+      local_address_selector::LocalAddressSelection::Default
+    }
+  }
+  impl Drop for PanicOnDrop {
+    fn drop(&mut self) {
+      panic!("intentional panic in drop");
+    }
+  }
+
+  let config_ptr = local_address_selector_config_ptr(Box::new(PanicOnDrop));
+  // Returning normally shows the panic did not unwind across the ABI.
+  unsafe {
+    local_address_selector::envoy_dynamic_module_on_local_address_selector_config_destroy(
+      config_ptr,
+    );
+  }
+}
+
+#[test]
+fn test_local_address_selector_config_new_recovers_from_panic() {
+  // This is the only test that registers the global factory.
+  let new_fn: NewLocalAddressSelectorConfigFunction = |_, _, _| panic!("intentional panic");
+  NEW_LOCAL_ADDRESS_SELECTOR_CONFIG_FUNCTION
+    .set(new_fn)
+    .unwrap();
+  let config_ptr = unsafe {
+    local_address_selector::envoy_dynamic_module_on_local_address_selector_config_new(
+      std::ptr::null_mut(),
+      local_address_selector_envoy_buffer("selector"),
+      local_address_selector_envoy_buffer(""),
+      local_address_selector_envoy_buffer("cluster_0"),
+    )
+  };
+  assert!(config_ptr.is_null());
+}

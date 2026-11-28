@@ -52,6 +52,7 @@ Currently, dynamic modules are supported at the following extension points:
 * As a :ref:`DNS resolver <envoy_v3_api_msg_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig>`
   (:ref:`architecture <arch_overview_dns_resolution>`). The Hickory resolver is implemented as a
   builtin dynamic module; the ABI and SDKs also support custom DNS resolvers.
+* As a :ref:`local address selector <envoy_v3_api_msg_extensions.local_address_selectors.dynamic_modules.v3.DynamicModuleLocalAddressSelector>`.
 
 There are a few design goals for the dynamic modules:
 

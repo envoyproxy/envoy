@@ -18,6 +18,7 @@ package(default_visibility = [
     "//test/extensions/health_checkers/dynamic_modules:__pkg__",
     "//test/extensions/http/early_header_mutation/dynamic_modules:__pkg__",
     "//test/extensions/http/header_formatters/dynamic_modules:__pkg__",
+    "//test/extensions/local_address_selectors/dynamic_modules:__pkg__",
     "//test/extensions/resource_monitors/dynamic_modules:__pkg__",
     "//test/extensions/router/cluster_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/router/route_specifiers/dynamic_modules:__pkg__",
@@ -33,6 +34,8 @@ test_program(name = "no_op")
 test_program(name = "network_no_op")
 
 test_program(name = "listener_no_op")
+
+test_program(name = "local_address_selector_integration_test")
 
 test_program(name = "no_program_init")
 

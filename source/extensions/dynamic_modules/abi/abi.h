@@ -21384,6 +21384,143 @@ void envoy_dynamic_module_callback_resource_monitor_config_scheduler_report_fail
 void envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete(
     envoy_dynamic_module_type_resource_monitor_config_scheduler_module_ptr scheduler_module_ptr);
 
+// =============================================================================
+// ========================= Local Address Selector ============================
+// =============================================================================
+
+// =============================================================================
+// Local Address Selector Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_local_address_selector_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleLocalAddressSelectorConfig class in Envoy. It is passed to the module when creating
+ * a new in-module selector configuration and stays valid until
+ * envoy_dynamic_module_on_local_address_selector_config_destroy returns for that configuration.
+ *
+ * This has 1:1 correspondence with
+ * envoy_dynamic_module_type_local_address_selector_config_module_ptr in the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_local_address_selector_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_local_address_selector_config_module_ptr is a pointer to an in-module
+ * local address selector configuration created by
+ * envoy_dynamic_module_on_local_address_selector_config_new. Envoy creates one configuration per
+ * cluster, and every connection of that cluster shares it.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_local_address_selector_config_destroy is called for the
+ * same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_local_address_selector_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_local_address_selector_envoy_ptr is a raw pointer to the Envoy context
+ * of a single address selection. It is the target of
+ * envoy_dynamic_module_callback_local_address_selector_set_address.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ *
+ * THREADING: This pointer is only valid for the duration of a single
+ * envoy_dynamic_module_on_local_address_selector_select call. The module must not store it, share
+ * it across threads, or use it after the hook returns.
+ */
+typedef void* envoy_dynamic_module_type_local_address_selector_envoy_ptr;
+
+// =============================================================================
+// Local Address Selector Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_local_address_selector_config_new is called when Envoy creates the local
+ * address selector of a cluster. This is called on the main thread.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleLocalAddressSelectorConfig object.
+ * @param name is the selector_name from the configuration.
+ * @param config is the selector_config from the configuration.
+ * @param cluster_name is the name of the cluster whose upstream_bind_config sets the selector.
+ *        It is empty when the selector comes from the bootstrap bind config.
+ * @return a pointer to the in-module selector configuration. Returning nullptr rejects the
+ *         configuration, and with it the cluster.
+ */
+envoy_dynamic_module_type_local_address_selector_config_module_ptr
+envoy_dynamic_module_on_local_address_selector_config_new(
+    envoy_dynamic_module_type_local_address_selector_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config,
+    envoy_dynamic_module_type_envoy_buffer cluster_name);
+
+/**
+ * envoy_dynamic_module_on_local_address_selector_config_destroy is called when the selector
+ * configuration is destroyed. Envoy releases it with the last reference to the cluster, which can
+ * happen on any thread.
+ *
+ * @param config_module_ptr is the pointer to the in-module selector configuration.
+ */
+void envoy_dynamic_module_on_local_address_selector_config_destroy(
+    envoy_dynamic_module_type_local_address_selector_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_local_address_selector_select is called before Envoy creates each
+ * upstream connection of the cluster, to pick its source address. Envoy calls it once per attempt,
+ * including each happy eyeballs attempt. It is called on worker threads and on the main thread, for
+ * example for health checks, so it can run concurrently for the same configuration.
+ *
+ * Envoy only calls this hook for IP endpoints. A non-IP endpoint uses the default selection.
+ *
+ * To use its own address, the module calls
+ * envoy_dynamic_module_callback_local_address_selector_set_address and returns true. Returning true
+ * without setting an address keeps the address that the default local address selector picks from
+ * the bind config.
+ *
+ * Returning false fails the connection. Envoy closes it before it connects, and the connection pool
+ * handles it as a local origin connect failure of the host. The pool counts
+ * upstream_cx_connect_fail and fails the requests waiting for a connection to the host, unless
+ * another connection that is being established can serve them. Outlier detection counts the
+ * failure against the host. Unless the cluster's outlier detection sets
+ * split_external_local_origin_errors, it counts as a 503 response, so failing connections for an
+ * endpoint can eject a healthy host.
+ *
+ * @param config_module_ptr is the pointer to the in-module selector configuration.
+ * @param selector_envoy_ptr is the pointer to the Envoy selection context. It is only valid during
+ *        this call.
+ * @param endpoint_address is the IP address of the upstream endpoint, without brackets for IPv6.
+ *        The buffer is owned by Envoy and is only valid during this call.
+ * @param endpoint_port is the port of the upstream endpoint.
+ * @return true to create the connection, false to fail it.
+ */
+bool envoy_dynamic_module_on_local_address_selector_select(
+    envoy_dynamic_module_type_local_address_selector_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_local_address_selector_envoy_ptr selector_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer endpoint_address, uint32_t endpoint_port);
+
+// =============================================================================
+// Local Address Selector Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_local_address_selector_set_address records the source address of
+ * the connection being selected. It takes effect when the select hook returns true. A later call
+ * replaces an earlier one.
+ *
+ * The address must have the same IP family as the endpoint. Otherwise binding the socket fails and
+ * Envoy fails the connection. When the port is 0, the kernel picks the port at connect time, as for
+ * a ``source_address`` with port 0. Envoy keeps the socket options of the bind config, so options
+ * such as freebind and keepalive still apply.
+ *
+ * @param selector_envoy_ptr is the pointer to the Envoy selection context.
+ * @param address is the source IP address, without brackets for IPv6. The buffer is owned by the
+ *        module.
+ * @param port is the source port.
+ * @return true if the address was recorded, false if the address is not a valid IP address or the
+ *         port is above 65535.
+ */
+bool envoy_dynamic_module_callback_local_address_selector_set_address(
+    envoy_dynamic_module_type_local_address_selector_envoy_ptr selector_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address, uint32_t port);
+
 #ifdef __cplusplus
 }
 #endif

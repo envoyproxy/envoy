@@ -1171,6 +1171,14 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_matcher_get_header_value, false,
 WEAK_STUB_VOID(envoy_dynamic_module_callback_matcher_set_error,
                envoy_dynamic_module_type_matcher_input_envoy_ptr)
 
+// ---------------------- Local address selector callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementations
+// are provided in the local address selector extension abi_impl.cc when it is used.
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_local_address_selector_set_address, false,
+          envoy_dynamic_module_type_local_address_selector_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, uint32_t)
+
 // ---------------------- Matcher data input callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the matcher data input extension abi_impl.cc when the extension is used.

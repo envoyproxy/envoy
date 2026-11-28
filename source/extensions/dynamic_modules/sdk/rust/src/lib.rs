@@ -30,6 +30,7 @@ pub mod health_checker;
 pub mod http;
 pub mod listener;
 pub mod load_balancer;
+pub mod local_address_selector;
 pub mod matcher;
 pub mod matcher_data_input;
 pub mod memory;
@@ -943,6 +944,8 @@ macro_rules! declare_network_filter_init_functions {
 /// - `header_formatter:` — [`NewHeaderFormatterConfigFunction`] for HTTP/1 header formatters
 /// - `tls_certificate_selector:` — [`NewTlsCertificateSelectorConfigFunction`] for TLS certificate
 ///   selectors
+/// - `local_address_selector:` — [`NewLocalAddressSelectorConfigFunction`] for upstream local
+///   address selectors
 /// - `resource_monitor:` — [`NewResourceMonitorConfigFunction`] for resource monitors
 /// - `synchronous_feedback_resource_monitor:` —
 ///   [`NewSynchronousFeedbackResourceMonitorConfigFunction`] for resource monitors with synchronous
@@ -1207,6 +1210,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION,
       $fn,
       "NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION"
+    );
+  };
+  (@register local_address_selector : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_LOCAL_ADDRESS_SELECTOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_LOCAL_ADDRESS_SELECTOR_CONFIG_FUNCTION"
     );
   };
   (@register resource_monitor : $fn:expr) => {
@@ -2159,6 +2169,30 @@ pub type NewTlsCertificateSelectorConfigFunction =
 /// Global function for creating TLS certificate selector configurations.
 pub static NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION: OnceLock<
   NewTlsCertificateSelectorConfigFunction,
+> = OnceLock::new();
+
+// =================================================================================================
+// Local Address Selector Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new local address selector configuration.
+///
+/// The `name` is the value of `selector_name` from the `dynamic_modules` local address selector
+/// configuration, allowing a single module to dispatch to different implementations. The `config`
+/// is the raw bytes from the `selector_config` field. `cluster_name` is the name of the cluster
+/// whose `upstream_bind_config` sets the selector, and is empty when the selector comes from the
+/// bootstrap bind config. Envoy calls this once per cluster on the main thread. Returning `None`
+/// causes Envoy to reject the cluster.
+pub type NewLocalAddressSelectorConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+    cluster_name: &str,
+  ) -> Option<Box<dyn local_address_selector::LocalAddressSelectorConfig>>;
+
+/// Global function for creating local address selector configurations.
+pub static NEW_LOCAL_ADDRESS_SELECTOR_CONFIG_FUNCTION: OnceLock<
+  NewLocalAddressSelectorConfigFunction,
 > = OnceLock::new();
 
 // =================================================================================================
