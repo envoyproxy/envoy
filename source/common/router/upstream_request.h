@@ -131,11 +131,13 @@ public:
   void clearRequestEncoder();
   void onStreamMaxDurationReached();
 
-  // Either disable upstream reading immediately or defer it and keep tracking
-  // of how many read disabling has happened.
+  // Propagate a downstream high/low watermark through the upstream filter manager (so
+  // UpstreamCodecFilter pauses/resumes upstream reads and other subscribed upstream filters can
+  // pause/resume injecting response data), or defer high watermarks until the downstream response
+  // has started.
   void readDisableOrDefer(bool disable);
-  // Called upon receiving the first response headers from the upstream. And
-  // applies read disabling to it if there is any pending read disabling.
+  // Flush any deferred downstream high watermarks through the upstream filter manager once the
+  // downstream response has started (after retry/redirect/hedge selection).
   void maybeHandleDeferredReadDisable();
 
   struct DownstreamWatermarkManager : public Http::DownstreamWatermarkCallbacks {
@@ -158,6 +160,7 @@ public:
     outlier_detection_timeout_recorded_ = recorded;
   }
   bool outlierDetectionTimeoutRecorded() { return outlier_detection_timeout_recorded_; }
+  bool cleanedUp() const { return cleaned_up_; }
   void retried(bool value) { retried_ = value; }
   bool retried() { return retried_; }
   bool grpcRqSuccessDeferred() { return grpc_rq_success_deferred_; }
@@ -199,6 +202,7 @@ private:
   void onPerTryIdleTimeout();
   void upstreamLog(AccessLog::AccessLogType access_log_type);
   void resetUpstreamLogFlushTimer();
+  void syncUpstreamWatermarkDepth();
 
   RouterFilterInterface& parent_;
   std::unique_ptr<GenericConnPool> conn_pool_;
@@ -231,15 +235,16 @@ private:
   std::unique_ptr<UpstreamRequestFilterManagerCallbacks> filter_manager_callbacks_;
   std::unique_ptr<Http::FilterManager> filter_manager_;
 
-  // The number of outstanding readDisable to be called with parameter value true.
-  // When downstream send buffers get above high watermark before response headers arrive, we
-  // increment this counter instead of immediately calling readDisable on upstream stream. This is
-  // to avoid the upstream request from being spuriously retried or reset because of upstream
-  // timeouts while upstream stream is readDisabled by downstream but the response has actually
-  // arrived from upstream. See https://github.com/envoyproxy/envoy/issues/25901. During the
-  // deferring period, if the downstream buffer gets below low watermark, this counter gets
-  // decremented. Once the response headers arrive, call readDisable the number of times as the
-  // remaining value of this counter.
+  // The number of deferred downstream high watermarks waiting to be forwarded through the upstream
+  // filter manager. When downstream send buffers go above high watermark before the downstream
+  // response starts, we increment this counter instead of immediately calling
+  // filter_manager_->callHighWatermarkCallbacks() (which causes UpstreamCodecFilter to readDisable
+  // the upstream stream). This avoids spuriously retrying or resetting the upstream request due to
+  // upstream timeouts while upstream reads are paused by downstream even though the response has
+  // already arrived. See https://github.com/envoyproxy/envoy/issues/25901. While deferred,
+  // downstream low watermarks decrement this counter. Once the downstream response starts,
+  // maybeHandleDeferredReadDisable() calls filter_manager_->callHighWatermarkCallbacks() for each
+  // remaining count.
   size_t deferred_read_disabling_count_{0};
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.

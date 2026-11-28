@@ -257,9 +257,9 @@ void UpstreamRequest::cleanUp() {
   upstreamLog(AccessLog::AccessLogType::UpstreamEnd);
 
   while (downstream_data_disabled_ != 0) {
+    --downstream_data_disabled_;
     parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
     parent_.cluster()->trafficStats()->upstream_flow_control_drained_total_.inc();
-    --downstream_data_disabled_;
   }
   // The upstream HTTP filter chain callbacks own headers/trailers while they are traversing the
   // filter chain. Make sure to not delete them immediately when the stream ends, as the stream
@@ -289,7 +289,6 @@ void UpstreamRequest::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
 
   ASSERT(Http::HeaderUtility::isSpecial1xx(*headers));
   addResponseHeadersStat(headers->byteSize(), headers->size());
-  maybeHandleDeferredReadDisable();
   parent_.onUpstream1xxHeaders(std::move(headers), *this);
 }
 
@@ -331,21 +330,20 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   }
   stream_info_.setResponseCode(static_cast<uint32_t>(response_code));
 
-  maybeHandleDeferredReadDisable();
   ASSERT(headers.get());
 
   parent_.onUpstreamHeaders(response_code, std::move(headers), *this, end_stream);
 }
 
 void UpstreamRequest::maybeHandleDeferredReadDisable() {
-  for (; deferred_read_disabling_count_ > 0; --deferred_read_disabling_count_) {
-    // If the deferred read disabling count hasn't been cancelled out by read
-    // enabling count so far, stop the upstream from reading the rest response.
-    // Because readDisable keeps track of how many time it is called with
-    // "true" or "false", here it has to be called with "true" the same number
-    // of times as it would be called with "false" in the future.
-    parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
-    upstream_->readDisable(true);
+  while (deferred_read_disabling_count_ > 0 && !cleaned_up_) {
+    // Forward each uncancelled deferred downstream high watermark through the upstream filter
+    // manager so UpstreamCodecFilter pauses upstream reads (and updates its flow-control stats)
+    // and any other subscribed upstream filters can pause injecting response data. Each deferred
+    // high watermark must be forwarded individually so high/low watermark counts stay balanced with
+    // future callLowWatermarkCallbacks() calls.
+    --deferred_read_disabling_count_;
+    filter_manager_->callHighWatermarkCallbacks();
   }
 }
 
@@ -789,6 +787,7 @@ void UpstreamRequest::clearRequestEncoder() {
   if (upstream_) {
     parent_.callbacks()->removeDownstreamWatermarkCallbacks(downstream_watermark_manager_);
   }
+  deferred_read_disabling_count_ = 0;
   upstream_.reset();
 }
 
@@ -796,29 +795,28 @@ void UpstreamRequest::readDisableOrDefer(bool disable) {
   if (disable) {
     // See comments on deferred_read_disabling_count_ for when we do and don't defer.
     if (parent_.downstreamResponseStarted()) {
-      // The downstream connection is overrun. Pause reads from upstream.
-      // If there are multiple calls to readDisable either the codec (H2) or the
-      // underlying Network::Connection (H1) will handle reference counting.
-      parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
-      upstream_->readDisable(disable);
+      // The downstream connection is overrun. Forward the high watermark through the upstream
+      // filter manager so UpstreamCodecFilter pauses reads from upstream and any other subscribed
+      // upstream filters can pause injecting response data.
+      filter_manager_->callHighWatermarkCallbacks();
     } else {
       ++deferred_read_disabling_count_;
     }
     return;
   }
 
-  // One source of connection blockage has buffer available.
+  // One source of downstream blockage has buffer available.
   if (deferred_read_disabling_count_ > 0) {
-    ASSERT(!parent_.downstreamResponseStarted());
-    // Cancel out an existing deferred read disabling.
+    // Cancel out an existing deferred high watermark (either before the response starts or
+    // reentrantly while maybeHandleDeferredReadDisable() is draining remaining deferred counts).
     --deferred_read_disabling_count_;
     return;
   }
   ASSERT(parent_.downstreamResponseStarted());
-  // Pass this on to the stream, which
-  // will resume reads if this was the last remaining high watermark.
-  parent_.cluster()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
-  upstream_->readDisable(disable);
+  // Forward the low watermark through the upstream filter manager so UpstreamCodecFilter balances
+  // its upstream readDisable() count and any other subscribed upstream filters can resume injecting
+  // response data.
+  filter_manager_->callLowWatermarkCallbacks();
 }
 
 void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
@@ -831,19 +829,32 @@ void UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark
   parent_.readDisableOrDefer(false);
 }
 
+void UpstreamRequest::syncUpstreamWatermarkDepth() {
+  while (!cleaned_up_ &&
+         filter_manager_->upstreamHighWatermarkCount() < downstream_data_disabled_) {
+    filter_manager_->callUpstreamHighWatermarkCallbacks();
+  }
+  while (!cleaned_up_ &&
+         filter_manager_->upstreamHighWatermarkCount() > downstream_data_disabled_) {
+    filter_manager_->callUpstreamLowWatermarkCallbacks();
+  }
+}
+
 void UpstreamRequest::disableDataFromDownstreamForFlowControl() {
   parent_.cluster()->trafficStats()->upstream_flow_control_backed_up_total_.inc();
-  parent_.callbacks()->onDecoderFilterAboveWriteBufferHighWatermark();
   ++downstream_data_disabled_;
+  parent_.callbacks()->onDecoderFilterAboveWriteBufferHighWatermark();
+  syncUpstreamWatermarkDepth();
 }
 
 void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
   parent_.cluster()->trafficStats()->upstream_flow_control_drained_total_.inc();
-  parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
   ASSERT(downstream_data_disabled_ != 0);
   if (downstream_data_disabled_ > 0) {
     --downstream_data_disabled_;
   }
+  parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
+  syncUpstreamWatermarkDepth();
 }
 
 Http::RequestHeaderMapOptRef UpstreamRequestFilterManagerCallbacks::requestHeaders() {

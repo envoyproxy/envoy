@@ -39,13 +39,36 @@ UpstreamCodecFilter::ScopedEncodingTracker::~ScopedEncodingTracker() {
 }
 
 void UpstreamCodecFilter::onBelowWriteBufferLowWatermark() {
-  callbacks_->clusterInfo()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
-  callbacks_->upstreamCallbacks()->upstream()->readDisable(false);
+  if (unapplied_high_watermarks_ > 0) {
+    --unapplied_high_watermarks_;
+    return;
+  }
+  auto upstream = callbacks_->upstreamCallbacks()->upstream();
+  if (!upstream.has_value() || upstream_read_disable_count_ == 0) {
+    return;
+  }
+  --upstream_read_disable_count_;
+  if (const auto cluster_info = callbacks_->clusterInfo()) {
+    cluster_info->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
+  }
+  // Balance a prior readDisable(true); the codec (H2/H3) or underlying Network::Connection (H1)
+  // resumes upstream reads once all active readDisable(true) calls have been balanced.
+  upstream->readDisable(false);
 }
 
 void UpstreamCodecFilter::onAboveWriteBufferHighWatermark() {
-  callbacks_->clusterInfo()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
-  callbacks_->upstreamCallbacks()->upstream()->readDisable(true);
+  auto upstream = callbacks_->upstreamCallbacks()->upstream();
+  if (!upstream.has_value()) {
+    ++unapplied_high_watermarks_;
+    return;
+  }
+  if (const auto cluster_info = callbacks_->clusterInfo()) {
+    cluster_info->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
+  }
+  ++upstream_read_disable_count_;
+  // Pause reads from upstream. If called multiple times, either the codec (H2/H3) or the
+  // underlying Network::Connection (H1) handles reference counting.
+  upstream->readDisable(true);
 }
 
 void UpstreamCodecFilter::onDestroy() {

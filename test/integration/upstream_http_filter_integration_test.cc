@@ -1,19 +1,44 @@
+#include <atomic>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <optional>
 #include <ostream>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/http/codec.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/filter_factory.h"
+#include "envoy/http/header_map.h"
+#include "envoy/http/metadata_interface.h"
+#include "envoy/server/factory_context.h"
+#include "envoy/server/filter_config.h"
+
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/config/utility.h"
+#include "test/integration/fake_upstream.h"
 #include "test/integration/filters/add_header_filter.pb.h"
 #include "test/integration/filters/repick_cluster_filter.h"
 #include "test/integration/filters/test_filters.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/registry.h"
 
+#include "absl/base/thread_annotations.h"
+#include "absl/status/statusor.h"
+#include "absl/synchronization/mutex.h"
+#include "absl/time/time.h"
+#include "gtest/gtest.h"
 #include "http_integration.h"
 
 namespace Envoy {
@@ -318,6 +343,915 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest, OnHostSelectedLocalReplyNoRe
   auto upstream_headers =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
   EXPECT_TRUE(upstream_headers == nullptr);
+
+  cleanupUpstreamAndDownstream();
+}
+
+namespace {
+
+struct BidirectionalWatermarkCounts {
+  absl::Mutex mutex;
+  int upstream_high ABSL_GUARDED_BY(mutex){0};
+  int upstream_low ABSL_GUARDED_BY(mutex){0};
+  int downstream_high ABSL_GUARDED_BY(mutex){0};
+  int downstream_low ABSL_GUARDED_BY(mutex){0};
+  int encoder_continued ABSL_GUARDED_BY(mutex){0};
+
+  enum class Mode {
+    ObserveOnly,
+    PrePoolEncoderHighThenTriggerLow,
+    SelfUnsubscribeInDownstreamHighCallback,
+    RaiseDecoderHighAndLocalReplyInDecodeHeaders,
+    StopAllAndWatermarkOnEncodeHeaders,
+    ResetStreamOnDemand,
+  };
+  Mode mode{Mode::ObserveOnly};
+  std::string target_path;
+
+  Event::Dispatcher* active_dispatcher ABSL_GUARDED_BY(mutex){nullptr};
+  std::weak_ptr<std::atomic<bool>> active_alive ABSL_GUARDED_BY(mutex);
+  std::function<void()> action_fn ABSL_GUARDED_BY(mutex);
+  bool action_completed ABSL_GUARDED_BY(mutex){false};
+
+  bool waitForCount(int BidirectionalWatermarkCounts::* field, int min_count) {
+    absl::MutexLock lock(mutex);
+    auto cond = [&]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) { return this->*field >= min_count; };
+    return mutex.AwaitWithTimeout(absl::Condition(&cond), absl::Seconds(10));
+  }
+
+  void runActiveAction() {
+    Event::Dispatcher* disp = nullptr;
+    std::weak_ptr<std::atomic<bool>> alive;
+    std::function<void()> fn;
+    {
+      absl::MutexLock lock(mutex);
+      disp = active_dispatcher;
+      alive = active_alive;
+      fn = action_fn;
+      action_completed = false;
+    }
+    ASSERT_NE(disp, nullptr);
+    disp->post([this, alive = std::move(alive), fn = std::move(fn)]() {
+      if (auto guard = alive.lock(); guard != nullptr && guard->load()) {
+        fn();
+      }
+      absl::MutexLock lock(mutex);
+      action_completed = true;
+    });
+    absl::MutexLock lock(mutex);
+    auto cond = [&]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) { return action_completed; };
+    ASSERT_TRUE(mutex.AwaitWithTimeout(absl::Condition(&cond), absl::Seconds(10)));
+  }
+};
+
+// Upstream HTTP filter that subscribes to both upstream (request-direction) and downstream
+// (response-direction) watermark callbacks and optionally triggers edge-case watermark behaviors.
+class BidirectionalWatermarkObserverFilter : public Http::StreamFilter {
+public:
+  explicit BidirectionalWatermarkObserverFilter(std::shared_ptr<BidirectionalWatermarkCounts> state)
+      : state_(std::move(state)), alive_(std::make_shared<std::atomic<bool>>(true)),
+        upstream_cb_(*this), downstream_cb_(*this) {}
+
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
+    if (!state_->target_path.empty() && headers.getPathValue() != state_->target_path) {
+      is_target_stream_ = false;
+      return Http::FilterHeadersStatus::Continue;
+    }
+    is_target_stream_ = true;
+    if (state_->mode == BidirectionalWatermarkCounts::Mode::PrePoolEncoderHighThenTriggerLow) {
+      encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
+      absl::MutexLock lock(state_->mutex);
+      state_->active_dispatcher = &callbacks_->dispatcher();
+      state_->active_alive = alive_;
+      state_->action_fn = [this]() {
+        encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark();
+      };
+    } else if (state_->mode ==
+               BidirectionalWatermarkCounts::Mode::RaiseDecoderHighAndLocalReplyInDecodeHeaders) {
+      callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+      callbacks_->sendLocalReply(Http::Code::Forbidden, "blocked", nullptr, std::nullopt,
+                                 "watermark_test_local_reply");
+      return Http::FilterHeadersStatus::StopIteration;
+    } else if (state_->mode == BidirectionalWatermarkCounts::Mode::ResetStreamOnDemand) {
+      absl::MutexLock lock(state_->mutex);
+      state_->active_dispatcher = &callbacks_->dispatcher();
+      state_->active_alive = alive_;
+      state_->action_fn = [this]() { callbacks_->resetStream(); };
+    }
+    return Http::FilterHeadersStatus::Continue;
+  }
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
+    return Http::FilterDataStatus::Continue;
+  }
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
+    return Http::FilterTrailersStatus::Continue;
+  }
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    callbacks_ = &callbacks;
+    callbacks_->addUpstreamWatermarkCallbacks(upstream_cb_);
+    upstream_subscribed_ = true;
+    callbacks_->addDownstreamWatermarkCallbacks(downstream_cb_);
+    downstream_subscribed_ = true;
+  }
+
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
+    return Http::Filter1xxHeadersStatus::Continue;
+  }
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
+    if (is_target_stream_ &&
+        state_->mode == BidirectionalWatermarkCounts::Mode::StopAllAndWatermarkOnEncodeHeaders &&
+        !stopped_encode_headers_) {
+      stopped_encode_headers_ = true;
+      continue_cb_ = encoder_callbacks_->dispatcher().createSchedulableCallback([this]() {
+        if (!alive_->load()) {
+          return;
+        }
+        {
+          absl::MutexLock lock(state_->mutex);
+          ++state_->encoder_continued;
+        }
+        encoder_callbacks_->continueEncoding();
+      });
+      return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+    }
+    return Http::FilterHeadersStatus::Continue;
+  }
+  Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
+    return Http::FilterDataStatus::Continue;
+  }
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override {
+    return Http::FilterTrailersStatus::Continue;
+  }
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
+    encoder_callbacks_ = &callbacks;
+  }
+
+  void onDestroy() override {
+    alive_->store(false);
+    if (continue_cb_ != nullptr) {
+      continue_cb_->cancel();
+    }
+    if (callbacks_ != nullptr) {
+      if (upstream_subscribed_) {
+        callbacks_->removeUpstreamWatermarkCallbacks(upstream_cb_);
+        upstream_subscribed_ = false;
+      }
+      if (downstream_subscribed_) {
+        callbacks_->removeDownstreamWatermarkCallbacks(downstream_cb_);
+        downstream_subscribed_ = false;
+      }
+    }
+  }
+
+private:
+  class UpstreamSubscriber : public Http::UpstreamWatermarkCallbacks {
+  public:
+    explicit UpstreamSubscriber(BidirectionalWatermarkObserverFilter& parent) : parent_(parent) {}
+    void onAboveWriteBufferHighWatermark() override {
+      absl::MutexLock lock(parent_.state_->mutex);
+      ++parent_.state_->upstream_high;
+    }
+    void onBelowWriteBufferLowWatermark() override {
+      absl::MutexLock lock(parent_.state_->mutex);
+      ++parent_.state_->upstream_low;
+    }
+    BidirectionalWatermarkObserverFilter& parent_;
+  };
+
+  class DownstreamSubscriber : public Http::DownstreamWatermarkCallbacks {
+  public:
+    explicit DownstreamSubscriber(BidirectionalWatermarkObserverFilter& parent) : parent_(parent) {}
+    void onAboveWriteBufferHighWatermark() override {
+      {
+        absl::MutexLock lock(parent_.state_->mutex);
+        ++parent_.state_->downstream_high;
+      }
+      if (parent_.state_->mode ==
+              BidirectionalWatermarkCounts::Mode::SelfUnsubscribeInDownstreamHighCallback &&
+          parent_.is_target_stream_ && parent_.downstream_subscribed_) {
+        parent_.downstream_subscribed_ = false;
+        parent_.callbacks_->removeDownstreamWatermarkCallbacks(*this);
+        return;
+      }
+      if (parent_.state_->mode ==
+              BidirectionalWatermarkCounts::Mode::StopAllAndWatermarkOnEncodeHeaders &&
+          parent_.stopped_encode_headers_ && !parent_.scheduled_continue_ &&
+          parent_.continue_cb_ != nullptr) {
+        parent_.scheduled_continue_ = true;
+        parent_.continue_cb_->scheduleCallbackNextIteration();
+      }
+    }
+    void onBelowWriteBufferLowWatermark() override {
+      absl::MutexLock lock(parent_.state_->mutex);
+      ++parent_.state_->downstream_low;
+    }
+    BidirectionalWatermarkObserverFilter& parent_;
+  };
+
+  std::shared_ptr<BidirectionalWatermarkCounts> state_;
+  std::shared_ptr<std::atomic<bool>> alive_;
+  Http::StreamDecoderFilterCallbacks* callbacks_{nullptr};
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
+  Event::SchedulableCallbackPtr continue_cb_;
+  UpstreamSubscriber upstream_cb_;
+  DownstreamSubscriber downstream_cb_;
+  bool is_target_stream_{true};
+  bool upstream_subscribed_{false};
+  bool downstream_subscribed_{false};
+  bool stopped_encode_headers_{false};
+  bool scheduled_continue_{false};
+};
+
+class BidirectionalWatermarkObserverFilterFactory
+    : public Server::Configuration::UpstreamHttpFilterConfigFactory {
+public:
+  explicit BidirectionalWatermarkObserverFilterFactory(
+      std::shared_ptr<BidirectionalWatermarkCounts> state)
+      : state_(std::move(state)) {}
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::UpstreamFactoryContext&) override {
+    auto state = state_;
+    return [state](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamFilter(std::make_shared<BidirectionalWatermarkObserverFilter>(state));
+    };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        test::integration::filters::BidirectionalWatermarkObserverFilterConfig>();
+  }
+  std::string name() const override { return "envoy.test.bidirectional_watermark_observer"; }
+
+private:
+  std::shared_ptr<BidirectionalWatermarkCounts> state_;
+};
+
+// Downstream HCM filter that raises DownstreamFilterManager's high watermark in decodeHeaders()
+// (before Router::Filter receives response headers) and holds it until released by the test thread.
+struct DownstreamWatermarkDriverState {
+  absl::Mutex mutex;
+  Event::Dispatcher* dispatcher ABSL_GUARDED_BY(mutex){nullptr};
+  std::weak_ptr<std::atomic<bool>> alive ABSL_GUARDED_BY(mutex);
+  std::function<void()> lower_fn ABSL_GUARDED_BY(mutex);
+  bool lowered ABSL_GUARDED_BY(mutex){false};
+
+  void releaseBackpressure() {
+    Event::Dispatcher* disp = nullptr;
+    std::weak_ptr<std::atomic<bool>> alive_ref;
+    std::function<void()> fn;
+    {
+      absl::MutexLock lock(mutex);
+      disp = dispatcher;
+      alive_ref = alive;
+      fn = lower_fn;
+      lowered = false;
+    }
+    ASSERT_NE(disp, nullptr);
+    disp->post([this, alive_ref = std::move(alive_ref), fn = std::move(fn)]() {
+      if (auto guard = alive_ref.lock(); guard != nullptr && guard->load()) {
+        fn();
+      }
+      absl::MutexLock lock(mutex);
+      lowered = true;
+    });
+    absl::MutexLock lock(mutex);
+    auto cond = [&]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) { return lowered; };
+    ASSERT_TRUE(mutex.AwaitWithTimeout(absl::Condition(&cond), absl::Seconds(10)));
+  }
+};
+
+class DownstreamPreResponseWatermarkFilter : public Http::StreamFilter {
+public:
+  explicit DownstreamPreResponseWatermarkFilter(
+      std::shared_ptr<DownstreamWatermarkDriverState> state)
+      : state_(std::move(state)), alive_(std::make_shared<std::atomic<bool>>(true)) {}
+
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
+    raised_ = true;
+    absl::MutexLock lock(state_->mutex);
+    state_->dispatcher = &decoder_callbacks_->dispatcher();
+    state_->alive = alive_;
+    state_->lower_fn = [this]() {
+      if (raised_) {
+        raised_ = false;
+        encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark();
+      }
+    };
+    return Http::FilterHeadersStatus::Continue;
+  }
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
+    return Http::FilterDataStatus::Continue;
+  }
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
+    return Http::FilterTrailersStatus::Continue;
+  }
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
+  }
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
+    return Http::Filter1xxHeadersStatus::Continue;
+  }
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
+    return Http::FilterDataStatus::Continue;
+  }
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override {
+    return Http::FilterTrailersStatus::Continue;
+  }
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
+    encoder_callbacks_ = &callbacks;
+  }
+  void onDestroy() override { alive_->store(false); }
+
+private:
+  std::shared_ptr<DownstreamWatermarkDriverState> state_;
+  std::shared_ptr<std::atomic<bool>> alive_;
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
+  bool raised_{false};
+};
+
+class DownstreamPreResponseWatermarkFilterFactory
+    : public Server::Configuration::NamedHttpFilterConfigFactory {
+public:
+  explicit DownstreamPreResponseWatermarkFilterFactory(
+      std::shared_ptr<DownstreamWatermarkDriverState> state)
+      : state_(std::move(state)) {}
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::FactoryContext&) override {
+    auto state = state_;
+    return [state](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamFilter(std::make_shared<DownstreamPreResponseWatermarkFilter>(state));
+    };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        test::integration::filters::BidirectionalWatermarkObserverFilterConfig>();
+  }
+  std::string name() const override { return "envoy.test.downstream_preresponse_watermark"; }
+
+private:
+  std::shared_ptr<DownstreamWatermarkDriverState> state_;
+};
+
+} // namespace
+
+// Verifies that an upstream HTTP filter receives real backpressure in both directions:
+// - slow upstream backend triggers UpstreamWatermarkCallbacks high/low;
+// - slow downstream client triggers DownstreamWatermarkCallbacks high/low without double
+//   counting upstream_flow_control_paused_reading_total.
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, BidirectionalWatermarkPropagation) {
+  autonomous_upstream_ = false;
+  auto counts = std::make_shared<BidirectionalWatermarkCounts>();
+  BidirectionalWatermarkObserverFilterFactory factory(counts);
+  Registry::InjectFactory<Server::Configuration::UpstreamHttpFilterConfigFactory> registration(
+      factory);
+
+  config_helper_.setBufferLimits(1024, 1024);
+  addStaticTypedConfigFilter(
+      "envoy.test.bidirectional_watermark_observer",
+      test::integration::filters::BidirectionalWatermarkObserverFilterConfig());
+  addCodecFilter();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl post_headers{
+      {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  auto encoder_decoder = codec_client_->startRequest(post_headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // 1. Request direction: pause upstream reads and push > buffer limit from client.
+  upstream_request_->readDisable(true);
+  const std::string large_request(1024 * 1024, 'a');
+  codec_client_->sendData(*request_encoder_, large_request, true);
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::upstream_high, 1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_backed_up_total", Ge(1));
+
+  // Resume upstream reads and verify request drains and completes.
+  upstream_request_->readDisable(false);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(large_request, upstream_request_->body().toString());
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::upstream_low, 1));
+
+  // 2. Response direction: pause downstream client reads and push > buffer limit from backend.
+  request_encoder_->getStream().readDisable(true);
+  const std::string large_response(1024 * 1024, 'b');
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(large_response, false);
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::downstream_high, 1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               Ge(1));
+  {
+    absl::MutexLock lock(counts->mutex);
+    // Downstream watermark must not double-increment paused_reading_total vs subscriber delivery.
+    EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_flow_control_paused_reading_total")
+                  ->value(),
+              static_cast<uint64_t>(counts->downstream_high));
+  }
+
+  // Resume downstream client reads, send terminal frame, and verify response completes.
+  request_encoder_->getStream().readDisable(false);
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::downstream_low, 1));
+  upstream_request_->encodeData("end", true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(large_response + "end", response->body());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Verifies simultaneous full-duplex backpressure (slow backend + slow client on the same stream).
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
+       BidirectionalWatermarkFullDuplexSlowClientAndBackend) {
+  autonomous_upstream_ = false;
+  auto counts = std::make_shared<BidirectionalWatermarkCounts>();
+  BidirectionalWatermarkObserverFilterFactory factory(counts);
+  Registry::InjectFactory<Server::Configuration::UpstreamHttpFilterConfigFactory> registration(
+      factory);
+
+  config_helper_.setBufferLimits(1024, 1024);
+  addStaticTypedConfigFilter(
+      "envoy.test.bidirectional_watermark_observer",
+      test::integration::filters::BidirectionalWatermarkObserverFilterConfig());
+  addCodecFilter();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl post_headers{
+      {":method", "POST"}, {":path", "/duplex"}, {":scheme", "http"}, {":authority", "host"}};
+  auto encoder_decoder = codec_client_->startRequest(post_headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  upstream_request_->readDisable(true);
+  request_encoder_->getStream().readDisable(true);
+  const std::string req_body(512 * 1024, 'r');
+  const std::string resp_body(512 * 1024, 's');
+  codec_client_->sendData(*request_encoder_, req_body, false);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(resp_body, false);
+
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::upstream_high, 1));
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::downstream_high, 1));
+
+  upstream_request_->readDisable(false);
+  request_encoder_->getStream().readDisable(false);
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::upstream_low, 1));
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::downstream_low, 1));
+
+  codec_client_->sendData(*request_encoder_, "req-end", true);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(req_body + "req-end", upstream_request_->body().toString());
+
+  upstream_request_->encodeData("resp-end", true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(resp_body + "resp-end", response->body());
+
+  {
+    absl::MutexLock lock(counts->mutex);
+    EXPECT_EQ(counts->upstream_high, counts->upstream_low);
+    EXPECT_EQ(counts->downstream_high, counts->downstream_low);
+  }
+  cleanupUpstreamAndDownstream();
+}
+
+// Verifies that a deferred downstream watermark flushes once on 100 Continue.
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, DeferredDownstreamWatermarkWith100Continue) {
+  autonomous_upstream_ = false;
+  auto counts = std::make_shared<BidirectionalWatermarkCounts>();
+  BidirectionalWatermarkObserverFilterFactory factory(counts);
+  Registry::InjectFactory<Server::Configuration::UpstreamHttpFilterConfigFactory> registration(
+      factory);
+  auto ds_state = std::make_shared<DownstreamWatermarkDriverState>();
+  DownstreamPreResponseWatermarkFilterFactory ds_factory(ds_state);
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> ds_registration(
+      ds_factory);
+
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.set_proxy_100_continue(true); });
+  config_helper_.prependFilter(R"EOF(
+name: envoy.test.downstream_preresponse_watermark
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.BidirectionalWatermarkObserverFilterConfig
+)EOF");
+  addStaticTypedConfigFilter(
+      "envoy.test.bidirectional_watermark_observer",
+      test::integration::filters::BidirectionalWatermarkObserverFilterConfig());
+  addCodecFilter();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/100"},
+                                         {":scheme", "http"},
+                                         {":authority", "host"},
+                                         {"expect", "100-continue"}};
+  auto enc_dec = codec_client_->startRequest(headers);
+  auto response = std::move(enc_dec.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  {
+    absl::MutexLock lock(counts->mutex);
+    EXPECT_EQ(counts->downstream_high, 0);
+  }
+
+  upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::downstream_high, 1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               Ge(1));
+
+  ds_state->releaseBackpressure();
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::downstream_low, 1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                               Ge(1));
+
+  codec_client_->sendData(enc_dec.first, "payload", true);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData("ok", true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("ok", response->body());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Verifies that a retriable 503 response does not flush deferred downstream watermarks or charge
+// upstream_flow_control_paused_reading_total on the retried attempt.
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
+       DeferredDownstreamWatermarkNotFlushedOnRetriable503) {
+  autonomous_upstream_ = false;
+  auto counts = std::make_shared<BidirectionalWatermarkCounts>();
+  BidirectionalWatermarkObserverFilterFactory factory(counts);
+  Registry::InjectFactory<Server::Configuration::UpstreamHttpFilterConfigFactory> registration(
+      factory);
+  auto ds_state = std::make_shared<DownstreamWatermarkDriverState>();
+  DownstreamPreResponseWatermarkFilterFactory ds_factory(ds_state);
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> ds_registration(
+      ds_factory);
+
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* retry_policy = hcm.mutable_route_config()
+                                 ->mutable_virtual_hosts(0)
+                                 ->mutable_routes(0)
+                                 ->mutable_route()
+                                 ->mutable_retry_policy();
+        retry_policy->set_retry_on("5xx");
+        retry_policy->mutable_num_retries()->set_value(1);
+      });
+  config_helper_.prependFilter(R"EOF(
+name: envoy.test.downstream_preresponse_watermark
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.BidirectionalWatermarkObserverFilterConfig
+)EOF");
+  addStaticTypedConfigFilter(
+      "envoy.test.bidirectional_watermark_observer",
+      test::integration::filters::BidirectionalWatermarkObserverFilterConfig());
+  addCodecFilter();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  FakeStreamPtr attempt1;
+  FakeStreamPtr attempt2;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, attempt1));
+  ASSERT_TRUE(attempt1->waitForEndStream(*dispatcher_));
+
+  const uint64_t paused_before_503 =
+      test_server_->counter("cluster.cluster_0.upstream_flow_control_paused_reading_total")
+          ->value();
+  attempt1->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, attempt2));
+  ASSERT_TRUE(attempt2->waitForEndStream(*dispatcher_));
+
+  const uint64_t paused_after_503 =
+      test_server_->counter("cluster.cluster_0.upstream_flow_control_paused_reading_total")
+          ->value();
+  int downstream_high_after_503 = 0;
+  {
+    absl::MutexLock lock(counts->mutex);
+    downstream_high_after_503 = counts->downstream_high;
+  }
+
+  // Attempt #2 succeeds and commits the response (flushing deferred watermark once).
+  attempt2->encodeHeaders(default_response_headers_, false);
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::downstream_high, 1));
+  ds_state->releaseBackpressure();
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::downstream_low, 1));
+  attempt2->encodeData("retry-ok", true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("retry-ok", response->body());
+
+  EXPECT_EQ(paused_after_503, paused_before_503);
+  EXPECT_EQ(downstream_high_after_503, 0);
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Verifies that deferred downstream watermarks compose cleanly with an upstream encoder filter
+// returning StopAllIterationAndWatermark and buffering over the buffer limit.
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
+       DeferredDownstreamWatermarkWithUpstreamEncoderStopAllAndWatermark) {
+  autonomous_upstream_ = false;
+  auto counts = std::make_shared<BidirectionalWatermarkCounts>();
+  counts->mode = BidirectionalWatermarkCounts::Mode::StopAllAndWatermarkOnEncodeHeaders;
+  BidirectionalWatermarkObserverFilterFactory factory(counts);
+  Registry::InjectFactory<Server::Configuration::UpstreamHttpFilterConfigFactory> registration(
+      factory);
+  auto ds_state = std::make_shared<DownstreamWatermarkDriverState>();
+  DownstreamPreResponseWatermarkFilterFactory ds_factory(ds_state);
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> ds_registration(
+      ds_factory);
+
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.prependFilter(R"EOF(
+name: envoy.test.downstream_preresponse_watermark
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.BidirectionalWatermarkObserverFilterConfig
+)EOF");
+  addStaticTypedConfigFilter(
+      "envoy.test.bidirectional_watermark_observer",
+      test::integration::filters::BidirectionalWatermarkObserverFilterConfig());
+  addCodecFilter();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  const std::string body(64 * 1024, 'm');
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(body, false);
+
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::encoder_continued, 1));
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::downstream_high, 2));
+
+  ds_state->releaseBackpressure();
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::downstream_low, 2));
+
+  upstream_request_->encodeData("tail", true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(body + "tail", response->body());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Verifies that lowering a pre-pool encoder high watermark does not steal an active downstream
+// readDisable(true) and prematurely resume upstream reading while downstream is paused.
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
+       PrePoolEncoderHighWatermarkNotStolenByDownstreamBackpressure) {
+  autonomous_upstream_ = false;
+  auto counts = std::make_shared<BidirectionalWatermarkCounts>();
+  counts->mode = BidirectionalWatermarkCounts::Mode::PrePoolEncoderHighThenTriggerLow;
+  BidirectionalWatermarkObserverFilterFactory factory(counts);
+  Registry::InjectFactory<Server::Configuration::UpstreamHttpFilterConfigFactory> registration(
+      factory);
+  auto ds_state = std::make_shared<DownstreamWatermarkDriverState>();
+  DownstreamPreResponseWatermarkFilterFactory ds_factory(ds_state);
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> ds_registration(
+      ds_factory);
+
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.prependFilter(R"EOF(
+name: envoy.test.downstream_preresponse_watermark
+typed_config:
+  "@type": type.googleapis.com/test.integration.filters.BidirectionalWatermarkObserverFilterConfig
+)EOF");
+  addStaticTypedConfigFilter(
+      "envoy.test.bidirectional_watermark_observer",
+      test::integration::filters::BidirectionalWatermarkObserverFilterConfig());
+  addCodecFilter();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Committing response headers flushes the deterministic downstream high watermark (paused == 1).
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::downstream_high, 1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               Eq(1));
+  EXPECT_EQ(0U,
+            test_server_->counter("cluster.cluster_0.upstream_flow_control_resumed_reading_total")
+                ->value());
+
+  // Lowering the pre-pool encoder watermark must NOT steal downstream's readDisable(true).
+  counts->runActiveAction();
+  EXPECT_EQ(0U,
+            test_server_->counter("cluster.cluster_0.upstream_flow_control_resumed_reading_total")
+                ->value());
+
+  // Releasing downstream backpressure resumes upstream reading once and completes the response.
+  ds_state->releaseBackpressure();
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                               Eq(1));
+  upstream_request_->encodeData("end", true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("end", response->body());
+  cleanupUpstreamAndDownstream();
+}
+
+// Verifies that an upstream filter unsubscribing itself inside DownstreamWatermarkCallbacks does
+// not invalidate FilterManager iteration or cause heap-use-after-free.
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
+       SelfUnsubscribeInDownstreamWatermarkCallbackDoesNotUaf) {
+  autonomous_upstream_ = false;
+  auto counts = std::make_shared<BidirectionalWatermarkCounts>();
+  counts->mode = BidirectionalWatermarkCounts::Mode::SelfUnsubscribeInDownstreamHighCallback;
+  BidirectionalWatermarkObserverFilterFactory factory(counts);
+  Registry::InjectFactory<Server::Configuration::UpstreamHttpFilterConfigFactory> registration(
+      factory);
+
+  config_helper_.setBufferLimits(1024, 1024);
+  addStaticTypedConfigFilter(
+      "envoy.test.bidirectional_watermark_observer",
+      test::integration::filters::BidirectionalWatermarkObserverFilterConfig());
+  addCodecFilter();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, "", true);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  request_encoder_->getStream().readDisable(true);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  const std::string body(512 * 1024, 'v');
+  upstream_request_->encodeData(body, true);
+
+  ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::downstream_high, 1));
+  request_encoder_->getStream().readDisable(false);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(body, response->body());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Verifies that local reply, client reset, backend reset, and filter reset while above high
+// watermark all unwind cleanly without leaking watermarks on the shared HTTP/2 connection.
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
+       ResetAndLocalReplyWhileAboveHighWatermarkReuseH2Connection) {
+  autonomous_upstream_ = false;
+  auto counts = std::make_shared<BidirectionalWatermarkCounts>();
+  counts->target_path = "/local-reply";
+  counts->mode = BidirectionalWatermarkCounts::Mode::RaiseDecoderHighAndLocalReplyInDecodeHeaders;
+  BidirectionalWatermarkObserverFilterFactory factory(counts);
+  Registry::InjectFactory<Server::Configuration::UpstreamHttpFilterConfigFactory> registration(
+      factory);
+
+  config_helper_.setBufferLimits(1024, 1024);
+  addStaticTypedConfigFilter(
+      "envoy.test.bidirectional_watermark_observer",
+      test::integration::filters::BidirectionalWatermarkObserverFilterConfig());
+  addCodecFilter();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // 1. Pre-pool filter raises decoder high watermark and sends 403 local reply.
+  {
+    Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                           {":path", "/local-reply"},
+                                           {":scheme", "http"},
+                                           {":authority", "host"}};
+    auto resp = codec_client_->makeRequestWithBody(headers, std::string(16 * 1024, 'a'));
+    ASSERT_TRUE(resp->waitForEndStream());
+    EXPECT_EQ("403", resp->headers().getStatusValue());
+  }
+
+  // 2. Client resets stream while request direction is above high watermark.
+  {
+    Http::TestRequestHeaderMapImpl post_headers{
+        {":method", "POST"}, {":path", "/client-rst"}, {":scheme", "http"}, {":authority", "host"}};
+    auto enc_dec = codec_client_->startRequest(post_headers);
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    FakeStreamPtr up;
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, up));
+    ASSERT_TRUE(up->waitForHeadersComplete());
+
+    up->readDisable(true);
+    codec_client_->sendData(enc_dec.first, std::string(512 * 1024, 'b'), false);
+    test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_backed_up_total", Ge(1));
+
+    codec_client_->sendReset(enc_dec.first);
+    ASSERT_TRUE(up->waitForReset());
+  }
+
+  // 3. Backend resets stream while response direction is above high watermark.
+  {
+    Http::TestRequestHeaderMapImpl get_headers{
+        {":method", "GET"}, {":path", "/backend-rst"}, {":scheme", "http"}, {":authority", "host"}};
+    auto enc_dec = codec_client_->startRequest(get_headers);
+    codec_client_->sendData(enc_dec.first, "", true);
+    FakeStreamPtr up;
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, up));
+    ASSERT_TRUE(up->waitForEndStream(*dispatcher_));
+
+    enc_dec.first.getStream().readDisable(true);
+    up->encodeHeaders(default_response_headers_, false);
+    up->encodeData(std::string(512 * 1024, 'c'), false);
+    test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                                 Ge(1));
+
+    up->encodeResetStream();
+    ASSERT_TRUE(enc_dec.second->waitForReset());
+  }
+
+  // 4. Upstream filter resets stream while both directions are above high watermark.
+  {
+    {
+      absl::MutexLock lock(counts->mutex);
+      counts->mode = BidirectionalWatermarkCounts::Mode::ResetStreamOnDemand;
+      counts->target_path = "/filter-rst";
+      counts->upstream_high = 0;
+      counts->downstream_high = 0;
+    }
+    Http::TestRequestHeaderMapImpl post_headers{
+        {":method", "POST"}, {":path", "/filter-rst"}, {":scheme", "http"}, {":authority", "host"}};
+    auto enc_dec = codec_client_->startRequest(post_headers);
+    FakeStreamPtr up;
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, up));
+    ASSERT_TRUE(up->waitForHeadersComplete());
+
+    up->readDisable(true);
+    enc_dec.first.getStream().readDisable(true);
+    codec_client_->sendData(enc_dec.first, std::string(512 * 1024, 'd'), false);
+    up->encodeHeaders(default_response_headers_, false);
+    up->encodeData(std::string(512 * 1024, 'e'), false);
+    ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::upstream_high, 1));
+    ASSERT_TRUE(counts->waitForCount(&BidirectionalWatermarkCounts::downstream_high, 1));
+
+    counts->runActiveAction();
+    ASSERT_TRUE(enc_dec.second->waitForReset());
+    ASSERT_TRUE(up->waitForReset());
+  }
+
+  // 5. Follow-up request on the same HTTP/2 connections succeeds cleanly.
+  {
+    {
+      absl::MutexLock lock(counts->mutex);
+      counts->target_path = "/none";
+    }
+    Http::TestRequestHeaderMapImpl ok_headers{
+        {":method", "GET"}, {":path", "/ok"}, {":scheme", "http"}, {":authority", "host"}};
+    auto ok_resp = codec_client_->makeHeaderOnlyRequest(ok_headers);
+    FakeStreamPtr up;
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, up));
+    ASSERT_TRUE(up->waitForEndStream(*dispatcher_));
+    up->encodeHeaders(default_response_headers_, false);
+    up->encodeData("ok", true);
+    ASSERT_TRUE(ok_resp->waitForEndStream());
+    EXPECT_EQ("200", ok_resp->headers().getStatusValue());
+    EXPECT_EQ("ok", ok_resp->body());
+  }
 
   cleanupUpstreamAndDownstream();
 }
