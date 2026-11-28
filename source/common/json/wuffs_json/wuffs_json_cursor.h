@@ -168,7 +168,14 @@ public:
     virtual void onContainerClose(int depth, size_t token_end) = 0;
   };
 
-  explicit WuffsJsonCursor(Handler& handler);
+  struct Options {
+    // Accept a dict that repeats a key instead of failing. The handler gets every occurrence,
+    // in order, and sawDuplicateKeys() reports the repeat.
+    bool allow_duplicate_keys{false};
+  };
+
+  explicit WuffsJsonCursor(Handler& handler) : WuffsJsonCursor(handler, Options{}) {}
+  WuffsJsonCursor(Handler& handler, Options options);
 
   WuffsJsonCursor(const WuffsJsonCursor&) = delete;
   WuffsJsonCursor& operator=(const WuffsJsonCursor&) = delete;
@@ -210,6 +217,9 @@ public:
   // Aligns with token_start / token_end values in callbacks.
   size_t nextSourcePosition() const { return body_src_pos_; }
 
+  // True if a dict repeated a key. Needs Options::allow_duplicate_keys.
+  bool sawDuplicateKeys() const { return saw_duplicate_keys_; }
+
   // Exclusive upper bound for per-depth state tracking: depths 1 through
   // kMaxTrackedDepth-1 (currently 1–16) have full key/dup/path tracking.
   // Value covers the deepest known provider schema paths:
@@ -237,6 +247,8 @@ private:
   absl::Status feedChunk(absl::string_view chunk, bool closed);
 
   Handler& handler_;
+  const Options options_;
+  bool saw_duplicate_keys_{false};
 
   wuffs_json__decoder::unique_ptr decoder_;
   static constexpr size_t kTokenBufLen = 256;

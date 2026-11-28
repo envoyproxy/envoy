@@ -56,7 +56,8 @@ void appendCodePoint(std::string& out, uint32_t code_point) {
 
 } // namespace
 
-WuffsJsonCursor::WuffsJsonCursor(Handler& handler) : handler_(handler) {
+WuffsJsonCursor::WuffsJsonCursor(Handler& handler, Options options)
+    : handler_(handler), options_(options) {
   decoder_ = wuffs_json__decoder::alloc();
   token_buf_ =
       wuffs_base__slice_token__writer(wuffs_base__make_slice_token(token_data_, kTokenBufLen));
@@ -306,12 +307,14 @@ absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t 
   in_string_chain_ = continued;
   if (!in_string_chain_) {
     if (string_is_key_) {
-      // TODO(tyxia): duplicate-key rejection is unconditional. There are 3 popular options
-      // here: reject / last-wins / first-wins
-      // Adding a configuration option here to enable different options.
+      // A repeated key is rejected, or passed on like any other key and left to the handler.
+      // TODO(tyxia): offer first-wins and last-wins here if a handler needs them.
       if (depth_ < kMaxTrackedDepth && !seen_keys_[depth_].insert(key_buffer_).second) {
-        return absl::InvalidArgumentError(
-            absl::StrCat("wuffs json: duplicate key \"", key_buffer_, "\""));
+        if (!options_.allow_duplicate_keys) {
+          return absl::InvalidArgumentError(
+              absl::StrCat("wuffs json: duplicate key \"", key_buffer_, "\""));
+        }
+        saw_duplicate_keys_ = true;
       }
       if (depth_ < kMaxTrackedDepth) {
         key_stack_[depth_] = key_buffer_;
