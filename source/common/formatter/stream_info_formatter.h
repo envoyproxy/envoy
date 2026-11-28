@@ -56,11 +56,16 @@ public:
                      const StreamInfo::StreamInfo& stream_info) const override;
 
 protected:
-  std::optional<std::string>
-  formatMetadata(const envoy::config::core::v3::Metadata& metadata) const;
+  bool formatMetadataTo(const envoy::config::core::v3::Metadata& metadata, std::string& sink) const;
   Protobuf::Value formatMetadataValue(const envoy::config::core::v3::Metadata& metadata) const;
 
 private:
+  // Returns the value at path_, which must not be empty. The result points into the metadata, or
+  // into truncated, as a string, when max_length_ shortened the value. Returns nullptr when the
+  // path is absent.
+  const Protobuf::Value* leafValue(const envoy::config::core::v3::Metadata& metadata,
+                                   Protobuf::Value& truncated) const;
+
   std::string filter_namespace_;
   std::vector<std::string> path_;
   std::optional<size_t> max_length_;

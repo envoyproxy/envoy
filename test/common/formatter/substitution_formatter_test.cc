@@ -4584,6 +4584,13 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
       DynamicMetadataFormatter bool_formatter("com.test", {"test_bool"}, std::optional<size_t>(2));
       EXPECT_THAT(formatValueForTest(bool_formatter, stream_info),
                   ProtoEq(ValueUtil::stringValue("tr")));
+
+      // A scalar that fits within max_length keeps its type.
+      DynamicMetadataFormatter wide_num_formatter("com.test", {"test_num"},
+                                                  std::optional<size_t>(10));
+      EXPECT_THAT(formatValueForTest(wide_num_formatter, stream_info),
+                  ProtoEq(ValueUtil::numberValue(1234)));
+      EXPECT_EQ("1234", formatForTest(wide_num_formatter, stream_info));
     }
 
     struct_obj.mutable_fields()->erase("test_num");
@@ -4613,6 +4620,57 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
     std::optional<std::string> value = formatForTest(formatter, stream_info);
     EXPECT_EQ("inf", value.value());
   }
+}
+
+// formatValueTo() serializes the metadata in place instead of going through formatValue(), so its
+// JSON is pinned literally, including escaping, truncation and the explicit null that leaves the
+// sink unconsumed.
+TEST(SubstitutionFormatterTest, DynamicMetadataFormatValueTo) {
+  envoy::config::core::v3::Metadata metadata;
+  populateMetadataTestData(metadata);
+  auto& fields = *(*metadata.mutable_filter_metadata())["com.test"].mutable_fields();
+  fields["null_key"] = ValueUtil::nullValue();
+  fields["quoted_key"] = ValueUtil::stringValue(R"(a"b\c)");
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+  EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  const auto format_value_to = [&stream_info](absl::string_view filter_namespace,
+                                              const std::vector<absl::string_view>& path,
+                                              std::optional<size_t> max_length) {
+    DynamicMetadataFormatter formatter(filter_namespace, path, max_length);
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), {}, stream_info);
+    return std::make_pair(helper.consumed(), helper.output());
+  };
+
+  EXPECT_EQ(std::make_pair(true, std::string(R"("test_value")")),
+            format_value_to("com.test", {"test_key"}, std::nullopt));
+  EXPECT_EQ(std::make_pair(true, std::string(R"("test_")")),
+            format_value_to("com.test", {"test_key"}, 5));
+  EXPECT_EQ(std::make_pair(true, std::string(R"("a\"b\\c")")),
+            format_value_to("com.test", {"quoted_key"}, std::nullopt));
+  EXPECT_EQ(std::make_pair(true, std::string(R"({"inner_key":"inner_value"})")),
+            format_value_to("com.test", {"test_obj"}, 5));
+  EXPECT_EQ(std::make_pair(true, std::string(R"(["item0",4.2])")),
+            format_value_to("com.test", {"test_list"}, 5));
+  EXPECT_EQ(std::make_pair(true, std::string(R"({"null_key":null,"quoted_key":"a\"b\\c",)"
+                                             R"("test_key":"test_value",)"
+                                             R"("test_list":["item0",4.2],)"
+                                             R"("test_obj":{"inner_key":"inner_value"}})")),
+            format_value_to("com.test", {}, 5));
+
+  EXPECT_EQ(std::make_pair(false, std::string()),
+            format_value_to("com.test", {"null_key"}, std::nullopt));
+  EXPECT_EQ(std::make_pair(false, std::string()),
+            format_value_to("com.test", {"notfound"}, std::nullopt));
+  EXPECT_EQ(std::make_pair(false, std::string()),
+            format_value_to("com.notfound", {}, std::nullopt));
+
+  // format() reports an explicit null as a missing value, and formatValue() as a null Value.
+  DynamicMetadataFormatter null_formatter("com.test", {"null_key"}, std::nullopt);
+  EXPECT_EQ(std::nullopt, formatForTest(null_formatter, stream_info));
+  EXPECT_THAT(formatValueForTest(null_formatter, stream_info), ProtoEq(ValueUtil::nullValue()));
 }
 
 // A metadata source that isn't available at all (no cluster info, no upstream host) is reported
