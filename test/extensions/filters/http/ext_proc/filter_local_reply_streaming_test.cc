@@ -532,6 +532,8 @@ TEST_F(StreamingLocalReplyTest, RequestWithBodyDuplexAndLocalHeadersOnlyResponse
               encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), true));
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  // Nor should the request headers be sent on to the rest of the filter chain.
+  EXPECT_CALL(decoder_callbacks_, injectDecodedHeadersToFilterChain(_)).Times(0);
   processRequestHeadersAndStartLocalResponse(
       [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
         makeLocalResponseHeaders(header_resp, true);
@@ -547,6 +549,42 @@ TEST_F(StreamingLocalReplyTest, RequestWithBodyDuplexAndLocalHeadersOnlyResponse
 }
 
 // TODO(yavlasov): needs gRPC message queue
+// A local response that is only headers can be started in any body mode. In STREAMED mode, as in
+// FULL_DUPLEX_STREAMED, the request headers are sent on when the header response is handled: they
+// must not be once the local response has started.
+TEST_F(StreamingLocalReplyTest, RequestWithBodyStreamedAndLocalHeadersOnlyResponse) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    request_body_mode: "STREAMED"
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  Envoy::Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"},
+                                                                   {"x-some-other-header", "no"}};
+  EXPECT_CALL(decoder_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), true));
+  // Decoding should not be continued since ext_proc is the terminal filter for local responses.
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  // Nor should the request headers be sent on to the rest of the filter chain.
+  EXPECT_CALL(decoder_callbacks_, injectDecodedHeadersToFilterChain(_)).Times(0);
+  processRequestHeadersAndStartLocalResponse(
+      [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
+        makeLocalResponseHeaders(header_resp, true);
+      });
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
 TEST_F(StreamingLocalReplyTest, DISABLED_RequestWithBodyTogetherDuplexAndLocalResponseWithBody) {
   initialize(R"EOF(
   grpc_service:
@@ -628,6 +666,8 @@ TEST_F(StreamingLocalReplyTest, RequestWithBodyDuplexAndLocalResponseWithBody) {
               encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  // Nor should the request headers be sent on to the rest of the filter chain.
+  EXPECT_CALL(decoder_callbacks_, injectDecodedHeadersToFilterChain(_)).Times(0);
   EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
   processRequestHeadersAndStartLocalResponse(
       [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
@@ -682,6 +722,8 @@ TEST_F(StreamingLocalReplyTest, RequestWithLargeBodyDuplexAndLocalResponseWithBo
               encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  // Nor should the request headers be sent on to the rest of the filter chain.
+  EXPECT_CALL(decoder_callbacks_, injectDecodedHeadersToFilterChain(_)).Times(0);
   EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
   processRequestHeadersAndStartLocalResponse(
       [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
@@ -806,6 +848,8 @@ TEST_F(StreamingLocalReplyTest,
               encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  // Nor should the request headers be sent on to the rest of the filter chain.
+  EXPECT_CALL(decoder_callbacks_, injectDecodedHeadersToFilterChain(_)).Times(0);
   EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
   processRequestHeadersAndStartLocalResponse(
       [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
@@ -860,6 +904,8 @@ TEST_F(StreamingLocalReplyTest,
               encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  // Nor should the request headers be sent on to the rest of the filter chain.
+  EXPECT_CALL(decoder_callbacks_, injectDecodedHeadersToFilterChain(_)).Times(0);
   EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
   processRequestHeadersAndStartLocalResponse(
       [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
