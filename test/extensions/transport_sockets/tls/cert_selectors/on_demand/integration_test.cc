@@ -1,6 +1,9 @@
+#include <cstddef>
 #include <memory>
 #include <string>
+#include <utility>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
@@ -10,8 +13,17 @@
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/listener_filter_buffer.h"
+#include "envoy/server/factory_context.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
+#include "envoy/stream_info/filter_state.h"
+
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/extensions/transport_sockets/tls/cert_selectors/on_demand/config.h"
 
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/config/integration/certs/server2cert_hash.h"
@@ -20,11 +32,16 @@
 #include "test/integration/integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/integration/tcp_proxy_integration.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
+#include "absl/base/thread_annotations.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_replace.h"
+#include "absl/strings/string_view.h"
+#include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
 using testing::Eq;
@@ -35,6 +52,146 @@ namespace Tls {
 namespace CertificateSelectors {
 namespace OnDemand {
 namespace {
+
+// Thread-safe dynamic filter state controller used by multi-tenant integration tests to vary
+// per-connection tenant IDs (and upstream secret names) across sequential connections on the same
+// SecretManager.
+struct DynamicFilterState {
+  absl::Mutex mutex;
+  std::string tenant_id ABSL_GUARDED_BY(mutex);
+  std::string secret_name ABSL_GUARDED_BY(mutex);
+
+  void setTenant(absl::string_view tenant) {
+    absl::MutexLock lock(mutex);
+    tenant_id = std::string(tenant);
+  }
+  void setUpstream(absl::string_view secret, absl::string_view tenant) {
+    absl::MutexLock lock(mutex);
+    secret_name = std::string(secret);
+    tenant_id = std::string(tenant);
+  }
+};
+
+class DynamicTenantListenerFilter : public Network::ListenerFilter {
+public:
+  explicit DynamicTenantListenerFilter(std::shared_ptr<DynamicFilterState> state)
+      : state_(std::move(state)) {}
+
+  Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
+    std::string tenant;
+    {
+      absl::MutexLock lock(state_->mutex);
+      tenant = state_->tenant_id;
+    }
+    if (!tenant.empty()) {
+      cb.streamInfo().filterState()->setData(TenantIdFilterStateKey,
+                                             std::make_shared<Router::StringAccessorImpl>(tenant),
+                                             StreamInfo::FilterState::LifeSpan::Connection);
+    }
+    return Network::FilterStatus::Continue;
+  }
+
+  size_t maxReadBytes() const override { return 0; }
+  Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {
+    return Network::FilterStatus::Continue;
+  }
+
+private:
+  std::shared_ptr<DynamicFilterState> state_;
+};
+
+class DynamicTenantListenerFilterFactory
+    : public Server::Configuration::NamedListenerFilterConfigFactory {
+public:
+  explicit DynamicTenantListenerFilterFactory(std::shared_ptr<DynamicFilterState> state)
+      : state_(std::move(state)) {}
+
+  Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message&,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      Server::Configuration::ListenerFactoryContext&) override {
+    return [listener_filter_matcher,
+            state = state_](Network::ListenerFilterManager& filter_manager) -> void {
+      filter_manager.addAcceptFilter(listener_filter_matcher,
+                                     std::make_unique<DynamicTenantListenerFilter>(state));
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  std::string name() const override { return "test.filters.listener.dynamic_tenant"; }
+
+private:
+  std::shared_ptr<DynamicFilterState> state_;
+};
+
+class DynamicUpstreamFilterStateReadFilter : public Network::ReadFilter {
+public:
+  explicit DynamicUpstreamFilterStateReadFilter(std::shared_ptr<DynamicFilterState> state)
+      : state_(std::move(state)) {}
+
+  Network::FilterStatus onData(Buffer::Instance&, bool) override {
+    return Network::FilterStatus::Continue;
+  }
+
+  Network::FilterStatus onNewConnection() override {
+    std::string secret;
+    std::string tenant;
+    {
+      absl::MutexLock lock(state_->mutex);
+      secret = state_->secret_name;
+      tenant = state_->tenant_id;
+    }
+    auto& filter_state = *read_callbacks_->connection().streamInfo().filterState();
+    if (!secret.empty()) {
+      filter_state.setData("envoy.tls.certificate_mappers.on_demand_secret",
+                           std::make_shared<Router::StringAccessorImpl>(secret),
+                           StreamInfo::FilterState::LifeSpan::Connection,
+                           StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+    }
+    if (!tenant.empty()) {
+      filter_state.setData(TenantIdFilterStateKey,
+                           std::make_shared<Router::StringAccessorImpl>(tenant),
+                           StreamInfo::FilterState::LifeSpan::Connection,
+                           StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+    }
+    return Network::FilterStatus::Continue;
+  }
+
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
+    read_callbacks_ = &callbacks;
+  }
+
+private:
+  std::shared_ptr<DynamicFilterState> state_;
+  Network::ReadFilterCallbacks* read_callbacks_{nullptr};
+};
+
+class DynamicUpstreamFilterStateNetworkFilterFactory
+    : public Server::Configuration::NamedNetworkFilterConfigFactory {
+public:
+  explicit DynamicUpstreamFilterStateNetworkFilterFactory(std::shared_ptr<DynamicFilterState> state)
+      : state_(std::move(state)) {}
+
+  absl::StatusOr<Network::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
+    return [state = state_](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(std::make_shared<DynamicUpstreamFilterStateReadFilter>(state));
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  std::string name() const override { return "test.filters.network.dynamic_upstream_filter_state"; }
+
+private:
+  std::shared_ptr<DynamicFilterState> state_;
+};
 
 // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221.
 const envoy::service::secret::v3::SdsDummy _sds_dummy;
@@ -63,9 +220,18 @@ class OnDemandIntegrationTest : public BaseTcpProxySslIntegrationTest,
 public:
   OnDemandIntegrationTest()
       : BaseTcpProxySslIntegrationTest(GetParam().ip_version),
-        upstream_selector_(GetParam().upstream) {}
+        upstream_selector_(GetParam().upstream),
+        dynamic_filter_state_(std::make_shared<DynamicFilterState>()),
+        listener_tenant_factory_(dynamic_filter_state_),
+        listener_tenant_reg_(listener_tenant_factory_),
+        upstream_filter_state_factory_(dynamic_filter_state_),
+        upstream_filter_state_reg_(upstream_filter_state_factory_) {}
 
-  void TearDown() override { cleanUpXdsConnection(); }
+  void TearDown() override {
+    cleanUpXdsConnection();
+    test_server_.reset();
+    extra_contexts_.clear();
+  }
 
   void setup(const std::string& config = "") {
     const std::string on_demand_config = config.empty() ? defaultConfig() : config;
@@ -88,7 +254,19 @@ public:
         envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
         configToUseSds(*tls_context.mutable_common_tls_context(), on_demand_config);
         std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
-        if (!filter_state_value_.empty()) {
+        if (use_dynamic_upstream_filter_state_) {
+          const std::string dynamic_filter = R"EOF(
+          name: test.filters.network.dynamic_upstream_filter_state
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.Struct
+          )EOF";
+          envoy::config::listener::v3::Filter filter;
+          TestUtility::loadFromYaml(dynamic_filter, filter);
+          auto* filter_chain =
+              bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+          filter_chain->add_filters()->MergeFrom(filter_chain->filters(0));
+          filter_chain->mutable_filters(0)->Swap(&filter);
+        } else if (!filter_state_value_.empty()) {
           const std::string set_filter_state = fmt::format(R"EOF(
           name: envoy.filters.network.set_filter_state
           typed_config:
@@ -200,15 +378,52 @@ public:
     return std::make_unique<ClientSslConnection>(*this);
   }
 
+  std::unique_ptr<TestClientConnection> createClientConnectionWithSni(absl::string_view sni) {
+    if (context_ != nullptr) {
+      extra_contexts_.push_back(std::move(context_));
+    }
+    ssl_options_.setSni(std::string(sni));
+    context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_,
+                                                          &server_factory_context_.serverScope());
+    return createClientConnection();
+  }
+
+  // Configures tcp_proxy to wait for downstream TLS handshake completion before connecting
+  // upstream so connections rejected during pending admission do not enqueue dead upstream sockets
+  // on dataStream().
+  void delayUpstreamConnectUntilTlsHandshake() {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* filter = bootstrap.mutable_static_resources()
+                         ->mutable_listeners(0)
+                         ->mutable_filter_chains(0)
+                         ->mutable_filters(0);
+      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+      std::ignore = filter->typed_config().UnpackTo(&tcp_proxy);
+      tcp_proxy.set_upstream_connect_mode(
+          envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+      tcp_proxy.mutable_max_early_data_bytes()->set_value(0);
+      std::ignore = filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    });
+  }
+
   std::string cacert() const { return upstream_selector_ ? "upstreamcacert" : "cacert"; }
 
 protected:
   const bool upstream_selector_;
   bool mtls_{false};
   bool validation_sds_{false};
+  bool use_dynamic_upstream_filter_state_{false};
   std::string filter_state_value_;
   // Certificate-level TLS parameters to attach to every certificate secret sent over SDS.
   std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters> cert_tls_params_;
+  std::shared_ptr<DynamicFilterState> dynamic_filter_state_;
+  DynamicTenantListenerFilterFactory listener_tenant_factory_;
+  Registry::InjectFactory<Server::Configuration::NamedListenerFilterConfigFactory>
+      listener_tenant_reg_;
+  DynamicUpstreamFilterStateNetworkFilterFactory upstream_filter_state_factory_;
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory>
+      upstream_filter_state_reg_;
+  std::vector<Network::UpstreamTransportSocketFactoryPtr> extra_contexts_;
 
   envoy::extensions::transport_sockets::tls::v3::Secret makeSecret(absl::string_view name,
                                                                    absl::string_view cert) {
@@ -231,8 +446,7 @@ protected:
     return secret;
   }
 
-  FakeStream& waitSendSdsResponse(absl::string_view name, absl::string_view cert = "",
-                                  bool fail_fast = false) {
+  FakeStream& waitForSdsRequest(absl::string_view name) {
     xds_streams_.emplace_back();
     AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_streams_.back());
     RELEASE_ASSERT(result, result.message());
@@ -246,6 +460,12 @@ protected:
         << "Should be 1 resource in DELTA_GRPC";
     EXPECT_EQ(name, delta_discovery_request.resource_names_subscribe().at(0))
         << "Secret name doesn't match in the request";
+    return xds_stream;
+  }
+
+  FakeStream& waitSendSdsResponse(absl::string_view name, absl::string_view cert = "",
+                                  bool fail_fast = false) {
+    auto& xds_stream = waitForSdsRequest(name);
     if (fail_fast) {
       removeSecret(xds_stream, name);
       return xds_stream;
@@ -761,6 +981,480 @@ TEST_P(OnDemandIntegrationTest, PerCertTlsParamsAppliedAfterAsyncSelection) {
   conn2->sendAndReceiveTlsData("hello", "world");
   EXPECT_EQ("ECDHE-RSA-AES128-GCM-SHA256", conn2->ciphersuite().value_or(""));
   conn2.reset();
+}
+
+TEST_P(OnDemandIntegrationTest, MaxActiveSecretsSieveEviction) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "SNI mapper only works on downstream";
+  }
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: "*"
+  max_active_secrets: 2
+  )EOF");
+
+  // Load s1.
+  {
+    auto conn = createClientConnectionWithSni("s1");
+    waitCertsRequested(1);
+    createXdsConnection();
+    waitSendSdsResponse("s1", "server");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
+
+  // Load s2 (cache now at capacity 2).
+  {
+    auto conn = createClientConnectionWithSni("s2");
+    waitCertsRequested(2);
+    waitSendSdsResponse("s2", "server");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(2));
+  EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_active"))->value());
+
+  // Hit s1 again (cache hit, marks s1 visited so SIEVE spares it).
+  {
+    auto conn = createClientConnectionWithSni("s1");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  EXPECT_EQ(2, test_server_->counter(onDemandStat("cert_requested"))->value());
+
+  // Load s3 -> SIEVE skips visited s1 and evicts unvisited s2.
+  {
+    auto conn = createClientConnectionWithSni("s3");
+    waitCertsRequested(3);
+    waitSendSdsResponse("s3", "server");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(3));
+  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_evicted"))->value());
+  EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_active"))->value());
+
+  // s1 must still be cached (no SDS request).
+  {
+    auto conn = createClientConnectionWithSni("s1");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  EXPECT_EQ(3, test_server_->counter(onDemandStat("cert_requested"))->value());
+
+  // s2 was evicted and must trigger a fresh SDS fetch.
+  {
+    auto conn = createClientConnectionWithSni("s2");
+    waitCertsRequested(4);
+    waitSendSdsResponse("s2", "server");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(4));
+  EXPECT_EQ(2, test_server_->counter(onDemandStat("cert_evicted"))->value());
+  EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
+TEST_P(OnDemandIntegrationTest, MaxActiveSecretsPerTenantFairEviction) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "SNI mapper and listener filter only apply to downstream";
+  }
+  config_helper_.addListenerFilter(R"EOF(
+  name: test.filters.listener.dynamic_tenant
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF");
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: "*"
+  max_active_secrets: 2
+  )EOF");
+
+  // Tenant B loads b1 (and never hits it again during A's flood).
+  dynamic_filter_state_->setTenant("tenant-b");
+  {
+    auto conn = createClientConnectionWithSni("b1");
+    waitCertsRequested(1);
+    createXdsConnection();
+    waitSendSdsResponse("b1", "server");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
+
+  // Tenant A loads a1, a2, a3: fair eviction must evict Tenant A's own certs while preserving b1.
+  dynamic_filter_state_->setTenant("tenant-a");
+  uint32_t expected_reqs = 1;
+  for (const auto& sni : {"a1", "a2", "a3"}) {
+    auto conn = createClientConnectionWithSni(sni);
+    waitCertsRequested(++expected_reqs);
+    waitSendSdsResponse(sni, "server");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+    test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(expected_reqs));
+  }
+  EXPECT_EQ(2, test_server_->counter(onDemandStat("cert_evicted"))->value());
+  EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_active"))->value());
+
+  // Tenant B's b1 must still be cached (hit without SDS).
+  dynamic_filter_state_->setTenant("tenant-b");
+  {
+    auto conn = createClientConnectionWithSni("b1");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  EXPECT_EQ(expected_reqs, test_server_->counter(onDemandStat("cert_requested"))->value());
+}
+
+TEST_P(OnDemandIntegrationTest, MaxActiveSecretsLazyOwnershipTransfer) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "SNI mapper and listener filter only apply to downstream";
+  }
+  config_helper_.addListenerFilter(R"EOF(
+  name: test.filters.listener.dynamic_tenant
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF");
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: "*"
+  max_active_secrets: 3
+  )EOF");
+
+  // Tenant A initially mints shared, a1, a2 (filling all 3 slots).
+  dynamic_filter_state_->setTenant("tenant-a");
+  {
+    auto conn = createClientConnectionWithSni("shared");
+    waitCertsRequested(1);
+    createXdsConnection();
+    waitSendSdsResponse("shared", "server");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
+
+  uint32_t expected_reqs = 1;
+  for (const auto& sni : {"a1", "a2"}) {
+    auto conn = createClientConnectionWithSni(sni);
+    waitCertsRequested(++expected_reqs);
+    waitSendSdsResponse(sni, "server");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+    test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(expected_reqs));
+  }
+
+  // Tenant B (0 active certs) hits "shared", updating last_hit_tenant to tenant-b.
+  dynamic_filter_state_->setTenant("tenant-b");
+  {
+    auto conn = createClientConnectionWithSni("shared");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  EXPECT_EQ(3, test_server_->counter(onDemandStat("cert_requested"))->value());
+
+  // Tenant A floods a3: lazy ownership transfer moves "shared" to tenant-b and evicts a1 instead.
+  dynamic_filter_state_->setTenant("tenant-a");
+  {
+    auto conn = createClientConnectionWithSni("a3");
+    waitCertsRequested(++expected_reqs);
+    waitSendSdsResponse("a3", "server");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(expected_reqs));
+  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_evicted"))->value());
+  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_ownership_transferred"))->value());
+  EXPECT_EQ(3, test_server_->gauge(onDemandStat("cert_active"))->value());
+
+  // "shared" must still be cached (hit without SDS).
+  dynamic_filter_state_->setTenant("tenant-b");
+  {
+    auto conn = createClientConnectionWithSni("shared");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  EXPECT_EQ(expected_reqs, test_server_->counter(onDemandStat("cert_requested"))->value());
+}
+
+TEST_P(OnDemandIntegrationTest, MaxActiveSecretsUpstreamFilterStateTenant) {
+  if (!upstream_selector_) {
+    GTEST_SKIP() << "Upstream shared filter state test only applies to upstream selector";
+  }
+  use_dynamic_upstream_filter_state_ = true;
+  setup(R"EOF(
+  certificate_mapper:
+    name: filter_state_override
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config
+      default_value: "*"
+  max_active_secrets: 2
+  )EOF");
+
+  // Tenant B loads b1.
+  dynamic_filter_state_->setUpstream("b1", "tenant-b");
+  {
+    auto conn = createClientConnection();
+    conn->waitForUpstreamConnection();
+    waitCertsRequested(1);
+    createXdsConnection();
+    waitSendSdsResponse("b1", "server");
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
+
+  // Tenant A loads a1, then a2 -> evicts a1 while preserving b1.
+  uint32_t expected_reqs = 1;
+  for (const auto& secret : {"a1", "a2"}) {
+    dynamic_filter_state_->setUpstream(secret, "tenant-a");
+    auto conn = createClientConnection();
+    conn->waitForUpstreamConnection();
+    waitCertsRequested(++expected_reqs);
+    waitSendSdsResponse(secret, "server");
+    conn->sendAndReceiveTlsData("hello", "world");
+    test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(expected_reqs));
+  }
+  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_evicted"))->value());
+  EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_active"))->value());
+
+  // Tenant B hits b1 without triggering an SDS fetch.
+  dynamic_filter_state_->setUpstream("b1", "tenant-b");
+  {
+    auto conn = createClientConnection();
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  EXPECT_EQ(expected_reqs, test_server_->counter(onDemandStat("cert_requested"))->value());
+}
+
+TEST_P(OnDemandIntegrationTest, MaxPendingSecretsRejection) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "SNI mapper only works on downstream";
+  }
+  delayUpstreamConnectUntilTlsHandshake();
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: "*"
+  max_pending_secrets: 1
+  )EOF");
+
+  // Start pending fetch for s1 and hold the SDS response.
+  auto conn1 = createClientConnectionWithSni("s1");
+  waitCertsRequested(1);
+  createXdsConnection();
+  auto& s1_stream = waitForSdsRequest("s1");
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_pending"))->value());
+
+  // A duplicate handshake for s1 coalesces without consuming another pending slot.
+  auto conn1_dup = createClientConnectionWithSni("s1");
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // A distinct secret s2 is rejected while s1 occupies the single pending slot.
+  auto conn2 = createClientConnectionWithSni("s2");
+  test_server_->waitForCounter(onDemandStat("cert_pending_rejected"), Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
+  conn2->waitForDisconnect();
+  conn2.reset();
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_pending"))->value());
+
+  // Complete s1: both coalesced connections complete TLS handshakes and open upstream connections,
+  // and pending count returns to 0.
+  sendSecret(s1_stream, "s1", "server");
+  conn1->waitForUpstreamConnection();
+  conn1_dup->waitForUpstreamConnection();
+  conn1->close();
+  conn1.reset();
+  conn1_dup->close();
+  conn1_dup.reset();
+  test_server_->waitForGauge(onDemandStat("cert_pending"), Eq(0));
+
+  // Now s2 is admitted and succeeds.
+  {
+    auto conn3 = createClientConnectionWithSni("s2");
+    waitCertsRequested(2);
+    waitSendSdsResponse("s2", "server");
+    conn3->waitForUpstreamConnection();
+    conn3->sendAndReceiveTlsData("hello", "world");
+  }
+  test_server_->waitForGauge(onDemandStat("cert_pending"), Eq(0));
+}
+
+TEST_P(OnDemandIntegrationTest, MaxPendingSecretsMultiTenantDynamicThreshold) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "SNI mapper and listener filter only apply to downstream";
+  }
+  delayUpstreamConnectUntilTlsHandshake();
+  config_helper_.addListenerFilter(R"EOF(
+  name: test.filters.listener.dynamic_tenant
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF");
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: "*"
+  max_pending_secrets: 2
+  )EOF");
+
+  // Tenant A opens pending a1 (admitted: 0 < 2).
+  dynamic_filter_state_->setTenant("tenant-a");
+  auto conn_a1 = createClientConnectionWithSni("a1");
+  waitCertsRequested(1);
+  createXdsConnection();
+  auto& a1_stream = waitForSdsRequest("a1");
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_pending"))->value());
+
+  // Tenant A attempts a2 -> rejected by Choudhury & Hahne Dynamic Thresholds (1 < 2 - 1 is false),
+  // reserving the remaining pending slot for other tenants.
+  auto conn_a2 = createClientConnectionWithSni("a2");
+  test_server_->waitForCounter(onDemandStat("cert_pending_rejected"), Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
+  conn_a2->waitForDisconnect();
+  conn_a2.reset();
+
+  // Tenant B opens pending b1 -> admitted into the reserved slot.
+  dynamic_filter_state_->setTenant("tenant-b");
+  auto conn_b1 = createClientConnectionWithSni("b1");
+  waitCertsRequested(2);
+  auto& b1_stream = waitForSdsRequest("b1");
+  EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_pending"))->value());
+
+  // Complete a1 first, then b1, so each connection deterministically pairs with its own upstream
+  // socket on dataStream().
+  sendSecret(a1_stream, "a1", "server");
+  conn_a1->waitForUpstreamConnection();
+  conn_a1->sendAndReceiveTlsData("hello", "world");
+  conn_a1.reset();
+  test_server_->waitForGauge(onDemandStat("cert_pending"), Eq(1));
+
+  sendSecret(b1_stream, "b1", "server");
+  conn_b1->waitForUpstreamConnection();
+  conn_b1->sendAndReceiveTlsData("lorem", "ipsum");
+  conn_b1.reset();
+  test_server_->waitForGauge(onDemandStat("cert_pending"), Eq(0));
+}
+
+TEST_P(OnDemandIntegrationTest, ListenerSetFilterStateTenantIntegration) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "Listener set_filter_state only applies to downstream";
+  }
+  delayUpstreamConnectUntilTlsHandshake();
+  // Verify the real envoy.filters.listener.set_filter_state extension wires the fixed
+  // `envoy.tls.certificate_selectors.on_demand_secret.tenant_id` filter state key into the
+  // on-demand selector (proving named-tenant dynamic threshold caps a single tenant to 1 of 2
+  // pending slots).
+  config_helper_.addListenerFilter(R"EOF(
+  name: envoy.filters.listener.set_filter_state
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.listener.set_filter_state.v3.Config
+    on_accept:
+    - object_key: envoy.tls.certificate_selectors.on_demand_secret.tenant_id
+      factory_key: envoy.string
+      format_string:
+        text_format_source:
+          inline_string: tenant-from-listener-filter
+  )EOF");
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: "*"
+  max_pending_secrets: 2
+  )EOF");
+
+  auto conn1 = createClientConnectionWithSni("s1");
+  waitCertsRequested(1);
+  createXdsConnection();
+  auto& s1_stream = waitForSdsRequest("s1");
+
+  // Because a named tenant was extracted from envoy.filters.listener.set_filter_state, the second
+  // pending secret from the same tenant is rejected by dynamic thresholds (whereas unattributed
+  // default-bucket mode would have admitted both slots).
+  auto conn2 = createClientConnectionWithSni("s2");
+  test_server_->waitForCounter(onDemandStat("cert_pending_rejected"), Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
+  conn2->waitForDisconnect();
+  conn2.reset();
+
+  sendSecret(s1_stream, "s1", "server");
+  conn1->waitForUpstreamConnection();
+  conn1->sendAndReceiveTlsData("hello", "world");
+  conn1.reset();
+  test_server_->waitForGauge(onDemandStat("cert_pending"), Eq(0));
+}
+
+TEST_P(OnDemandIntegrationTest, IdleTimeoutExpiresUnusedSecretExemptsPrefetchAndRefetchesOnDemand) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "SNI mapper only works on downstream";
+  }
+  on_server_init_function_ = [&]() {
+    createXdsConnection();
+    waitSendSdsResponse("prefetch", "server");
+  };
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: "*"
+  prefetch_secret_names:
+  - prefetch
+  max_active_secrets: 4
+  idle_timeout: 1s
+  )EOF");
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+
+  // Fetch an on-demand secret "idle" and complete a TLS handshake.
+  {
+    auto conn = createClientConnectionWithSni("idle");
+    waitCertsRequested(2);
+    waitSendSdsResponse("idle", "server");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(2));
+  EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_active"))->value());
+
+  // Wait for the real main-thread idle timer to expire "idle" (between 1.0s and 1.25s).
+  test_server_->waitForCounter(onDemandStat("cert_idle_expired"), Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForGauge(onDemandStat("cert_active"), Eq(1), TestUtility::DefaultTimeout);
+
+  // "prefetch" was loaded before "idle" and never hit, yet must remain cached (no new SDS fetch).
+  {
+    auto conn = createClientConnectionWithSni("prefetch");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  EXPECT_EQ(2, test_server_->counter(onDemandStat("cert_requested"))->value());
+  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_idle_expired"))->value());
+
+  // Reconnecting to "idle" must trigger a fresh on-demand SDS fetch and succeed.
+  {
+    auto conn = createClientConnectionWithSni("idle");
+    waitCertsRequested(3);
+    waitSendSdsResponse("idle", "server");
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+  }
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(4));
+  EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, OnDemandIntegrationTest,

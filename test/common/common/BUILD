@@ -746,3 +746,13 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "fair_sieve_cache_test",
+    srcs = ["fair_sieve_cache_test.cc"],
+    deps = [
+        "//source/common/common:fair_sieve_cache_lib",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
+    ],
+)

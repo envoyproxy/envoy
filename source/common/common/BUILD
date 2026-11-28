@@ -697,3 +697,16 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:node_hash_set",
     ],
 )
+
+envoy_cc_library(
+    name = "fair_sieve_cache_lib",
+    srcs = ["fair_sieve_cache.cc"],
+    hdrs = ["fair_sieve_cache.h"],
+    deps = [
+        ":assert_lib",
+        ":hash_lib",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/strings",
+    ],
+)
