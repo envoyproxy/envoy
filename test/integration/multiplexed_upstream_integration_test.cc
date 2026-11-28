@@ -292,6 +292,29 @@ void MultiplexedUpstreamIntegrationTest::manySimultaneousRequests(uint32_t reque
   autonomous_upstream_ = true;
   initialize();
 
+  // This flakes rarely in CI on HTTP/3 upstream params: a request that should complete comes back
+  // truncated, or a 504. If it fails, print the upstream cluster's stats, which show how the
+  // connection came up (including 0-RTT) and how the requests ended. See issue #49609.
+  Cleanup print_stats_on_failure([this]() {
+    if (!HasFailure() || test_server_ == nullptr) {
+      return;
+    }
+    const std::string prefix = "cluster.cluster_0.";
+    std::cerr
+        << "manySimultaneousRequests failed, with the stats (non-zero) of the upstream cluster:"
+        << std::endl;
+    for (const auto& counter : test_server_->counters()) {
+      if (counter->value() != 0 && absl::StartsWith(counter->name(), prefix)) {
+        std::cerr << "  counter " << counter->name() << ": " << counter->value() << std::endl;
+      }
+    }
+    for (const auto& gauge : test_server_->gauges()) {
+      if (gauge->value() != 0 && absl::StartsWith(gauge->name(), prefix)) {
+        std::cerr << "  gauge " << gauge->name() << ": " << gauge->value() << std::endl;
+      }
+    }
+  });
+
   codec_client_ = makeHttpConnection(lookupPort("http"));
   for (uint32_t i = 0; i < num_requests; ++i) {
     response_bytes.push_back(rand.random() % (max_response_bytes));
