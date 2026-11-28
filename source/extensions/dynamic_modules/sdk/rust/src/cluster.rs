@@ -595,6 +595,9 @@ pub trait EnvoyCluster: Send + Sync {
   /// Create a new implementation of the [`EnvoyClusterScheduler`] trait.
   ///
   /// This can be used to schedule an event to the main thread where the cluster is running.
+  ///
+  /// This must only be called on the main thread, e.g. during the cluster creation or from the
+  /// main thread hooks. Only the returned scheduler can be used from any thread.
   fn new_scheduler(&self) -> Box<dyn EnvoyClusterScheduler>;
 
   /// Posts the module's worker-event hook to every worker thread registered with the server's

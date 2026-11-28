@@ -86,8 +86,10 @@ unsafe impl Send for Reporter {}
 unsafe impl Sync for Reporter {}
 
 impl Reporter {
-  /// Create a reporter for the session identified by `session_envoy_ptr`. Must be called on the
-  /// main thread (i.e. from within an event hook).
+  /// Create a reporter for the session identified by `session_envoy_ptr`.
+  ///
+  /// This must only be called on the main thread, e.g. during the session creation or from the main
+  /// thread hooks. Only the returned reporter can be used from any thread.
   fn new(
     session_envoy_ptr: abi::envoy_dynamic_module_type_health_checker_session_envoy_ptr,
   ) -> Self {

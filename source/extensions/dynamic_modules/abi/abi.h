@@ -3276,6 +3276,9 @@ void envoy_dynamic_module_callback_http_add_custom_flag(
  * HTTP filter scheduler. The scheduler is used to dispatch HTTP filter operations from any thread
  * including the ones managed by the module.
  *
+ * This must only be called on the worker thread that processes the request, i.e. from within the
+ * HTTP filter callbacks. Only the returned scheduler can be used from any thread.
+ *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @return envoy_dynamic_module_type_http_filter_scheduler_module_ptr is the pointer to the
@@ -3326,6 +3329,9 @@ void envoy_dynamic_module_callback_http_filter_scheduler_delete(
  * a new HTTP filter configuration scheduler. The scheduler is used to dispatch HTTP filter
  * configuration operations to the main thread from any thread including the ones managed by the
  * module.
+ *
+ * This must only be called on the main thread, e.g. during the filter config creation or from the
+ * main thread hooks. Only the returned scheduler can be used from any thread.
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
  * @return envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr is the pointer to the
@@ -5929,6 +5935,9 @@ bool envoy_dynamic_module_callback_network_filter_above_high_watermark(
  * new network filter scheduler. The scheduler is used to dispatch network filter operations from
  * any thread including the ones managed by the module.
  *
+ * This must only be called on the worker thread that processes the connection, i.e. from within
+ * the network filter callbacks. Only the returned scheduler can be used from any thread.
+ *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
  * corresponding network filter.
  * @return envoy_dynamic_module_type_network_filter_scheduler_module_ptr is the pointer to the
@@ -5980,6 +5989,9 @@ void envoy_dynamic_module_callback_network_filter_scheduler_delete(
  * create a new network filter configuration scheduler. The scheduler is used to dispatch network
  * filter configuration operations to the main thread from any thread including the ones managed by
  * the module.
+ *
+ * This must only be called on the main thread, e.g. during the filter config creation or from the
+ * main thread hooks. Only the returned scheduler can be used from any thread.
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig object.
  * @return envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr is the pointer to
@@ -7318,6 +7330,9 @@ envoy_dynamic_module_callback_listener_filter_http_callout(
  * new listener filter scheduler. The scheduler is used to dispatch listener filter operations from
  * any thread including the ones managed by the module.
  *
+ * This must only be called on the worker thread that processes the connection, i.e. from within
+ * the listener filter callbacks. Only the returned scheduler can be used from any thread.
+ *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
  * corresponding listener filter.
  * @return envoy_dynamic_module_type_listener_filter_scheduler_module_ptr is the pointer to the
@@ -7369,6 +7384,9 @@ void envoy_dynamic_module_callback_listener_filter_scheduler_delete(
  * create a new listener filter configuration scheduler. The scheduler is used to dispatch listener
  * filter configuration operations to the main thread from any thread including the ones managed by
  * the module.
+ *
+ * This must only be called on the main thread, e.g. during the filter config creation or from the
+ * main thread hooks. Only the returned scheduler can be used from any thread.
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig object.
  * @return envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr is the pointer to
@@ -10182,6 +10200,9 @@ void envoy_dynamic_module_on_bootstrap_extension_xds_update(
  * bootstrap extension configuration operations to the main thread from any thread including the
  * ones managed by the module.
  *
+ * This must only be called on the main thread, e.g. during the bootstrap extension config creation
+ * or from the main thread hooks. Only the returned scheduler can be used from any thread.
+ *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
  * @return envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr is the pointer
@@ -12640,6 +12661,9 @@ uint32_t envoy_dynamic_module_callback_cluster_lb_get_locality_weight(
 /**
  * envoy_dynamic_module_callback_cluster_scheduler_new creates a new scheduler for the given
  * cluster. The scheduler allows the module to dispatch events to the main thread from any thread.
+ *
+ * This must only be called on the main thread, e.g. during the cluster creation or from the main
+ * thread hooks. Only the returned scheduler can be used from any thread.
  *
  * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
  * @return envoy_dynamic_module_type_cluster_scheduler_module_ptr is the pointer to the scheduler.
@@ -15566,6 +15590,9 @@ envoy_dynamic_module_callback_tls_certificate_selector_config_record_histogram_v
  * selector configuration on the main thread from any thread, including the ones managed by the
  * module.
  *
+ * This must only be called on the main thread, e.g. during the certificate selector config creation
+ * or from the main thread hooks. Only the returned scheduler can be used from any thread.
+ *
  * @param config_envoy_ptr is the pointer to the DynamicModuleTlsCertificateSelectorConfig object.
  * @return a pointer to the created scheduler.
  *
@@ -18111,6 +18138,9 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_stat_sink
  * configuration scheduler. The scheduler dispatches events to the stats sink configuration on the
  * main thread from any thread, including the ones managed by the module.
  *
+ * This must only be called on the main thread, e.g. during the stats sink config creation or from
+ * the main thread hooks. Only the returned scheduler can be used from any thread.
+ *
  * @param config_envoy_ptr is the pointer to the DynamicModuleStatsSinkConfig object in Envoy.
  * @return a pointer to the created scheduler.
  *
@@ -18303,8 +18333,10 @@ void envoy_dynamic_module_on_health_checker_session_destroy(
  * new health checker scheduler for a session. The scheduler is a thread-safe handle used to report
  * a health check result back to the session on the main thread from any thread.
  *
+ * This must only be called on the main thread, e.g. during the session creation or from the main
+ * thread hooks. Only the returned scheduler can be used from any thread.
+ *
  * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
- *        This must be called on the main thread.
  * @return envoy_dynamic_module_type_health_checker_scheduler_module_ptr is the pointer to the
  *         created scheduler.
  *
@@ -21293,6 +21325,9 @@ bool envoy_dynamic_module_callback_resource_monitor_config_enable_synchronous_fe
  * envoy_dynamic_module_callback_resource_monitor_config_scheduler_new creates a new resource
  * monitor configuration scheduler, which reports the outcome of a pending update from any thread,
  * including the ones managed by the module.
+ *
+ * This must only be called on the main thread, e.g. during the resource monitor config creation or
+ * from the main thread hooks. Only the returned scheduler can be used from any thread.
  *
  * The caller must delete the scheduler with
  * envoy_dynamic_module_callback_resource_monitor_config_scheduler_delete when it is no longer

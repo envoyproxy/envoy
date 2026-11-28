@@ -101,6 +101,9 @@ impl EnvoyResourceMonitorConfig {
   }
 
   /// Creates a scheduler that reports the outcome of a pending update from any thread.
+  ///
+  /// This must only be called on the main thread, e.g. during the resource monitor config creation
+  /// or from the main thread hooks. Only the returned scheduler can be used from any thread.
   #[must_use]
   pub fn new_config_scheduler(&self) -> impl EnvoyResourceMonitorConfigScheduler + 'static {
     let scheduler_ptr = unsafe {

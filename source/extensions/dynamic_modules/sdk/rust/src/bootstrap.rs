@@ -250,6 +250,10 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// Create a new implementation of the [`EnvoyBootstrapExtensionConfigScheduler`] trait.
   ///
   /// This can be used to schedule an event to the main thread where the config is running.
+  ///
+  /// This must only be called on the main thread, e.g. during the bootstrap extension config
+  /// creation or from the main thread hooks. Only the returned scheduler can be used from any
+  /// thread.
   fn new_scheduler(&self) -> Box<dyn EnvoyBootstrapExtensionConfigScheduler>;
 
   /// Send an HTTP callout to the given cluster with the given headers and optional body.

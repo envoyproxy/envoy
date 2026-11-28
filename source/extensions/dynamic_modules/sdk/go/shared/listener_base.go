@@ -149,6 +149,10 @@ type ListenerFilterHandle interface {
 	IncrementCounterValue(id MetricID, value uint64) MetricsResult
 
 	// GetScheduler returns a scheduler bound to this listener filter's worker thread.
+	//
+	// NOTE: This MUST only be called on the worker thread that processes the connection, i.e.
+	// during listener filter callbacks. But then the returned Scheduler can be used later even
+	// outside of the callbacks and at other threads.
 	GetScheduler() Scheduler
 	// GetWorkerIndex returns the Envoy worker index for this listener filter instance.
 	GetWorkerIndex() uint32
@@ -183,6 +187,10 @@ type ListenerFilterConfigHandle interface {
 	RecordHistogramValue(id MetricID, value uint64) MetricsResult
 
 	// GetScheduler returns a scheduler bound to the config context.
+	//
+	// NOTE: This MUST only be called on the main thread, e.g. during the plugin configuration
+	// phase. But then the returned Scheduler can be used later even outside of the callbacks and
+	// at other threads.
 	GetScheduler() Scheduler
 	// GetLoadShedPoint returns a load shed point of the overload manager by name, to shed load at
 	// the plugin's own point of the connection processing. It returns nil if the overload manager

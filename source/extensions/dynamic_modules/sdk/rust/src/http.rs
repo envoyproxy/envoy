@@ -616,6 +616,9 @@ pub trait EnvoyHttpFilterConfig {
   /// Create a new implementation of the [`EnvoyHttpFilterConfigScheduler`] trait.
   ///
   /// This can be used to schedule an event to the main thread where the filter config is running.
+  ///
+  /// This must only be called on the main thread, e.g. during the filter config creation or from
+  /// the main thread hooks. Only the returned scheduler can be used from any thread.
   fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterConfigScheduler>;
 
   /// Perform an HTTP callout from the config context. The result will be delivered to
@@ -2018,6 +2021,9 @@ pub trait EnvoyHttpFilter {
   fn continue_encoding(&mut self);
 
   /// Create a new implementation of the [`EnvoyHttpFilterScheduler`] trait.
+  ///
+  /// This must only be called on the worker thread that processes the request, i.e. from within
+  /// the HTTP filter callbacks. Only the returned scheduler can be used from any thread.
   ///
   /// ## Example Usage
   ///

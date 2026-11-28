@@ -15,7 +15,8 @@ type BootstrapExtensionConfigHandle interface {
 	SignalInitComplete()
 
 	// GetScheduler returns a scheduler whose tasks run on the main thread. Obtain it
-	// on the main thread; Schedule may then be called from any goroutine. Tasks that
+	// strictly on the main thread (e.g. during Create); Schedule may then be called from any
+	// goroutine. Tasks that
 	// have not run when the configuration is destroyed are discarded, and scheduling
 	// after destruction is a no-op.
 	GetScheduler() Scheduler

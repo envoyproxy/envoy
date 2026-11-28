@@ -522,9 +522,9 @@ type HttpFilterHandle interface {
 	// GetScheduler retrieves the scheduler related to this stream plugin for asynchronous
 	// operations.
 	//
-	// NOTE: This MUST only be called during OnRequest* or OnResponse* callbacks. But then the
-	// returned Scheduler can be used later even outside of the callbacks and even at other
-	// threads.
+	// NOTE: This MUST only be called on the worker thread that processes the request, i.e. during
+	// OnRequest* or OnResponse* callbacks. But then the returned Scheduler can be used later even
+	// outside of the callbacks and even at other threads.
 	GetScheduler() Scheduler
 
 	// Log will log the given message via the host environment's logging mechanism.
@@ -697,8 +697,9 @@ type HttpFilterConfigHandle interface {
 	ResetHttpStream(streamID uint64)
 
 	// GetScheduler retrieves a scheduler for deferred task execution in the config context.
-	// This should be called only during the plugin configuration phase, and the returned
-	// Scheduler can be used later even outside of the callbacks and at other threads.
+	// This MUST only be called on the main thread, e.g. during the plugin configuration phase.
+	// But then the returned Scheduler can be used later even outside of the callbacks and at
+	// other threads.
 	GetScheduler() Scheduler
 
 	// RecordHistogramValue records the given value to the histogram metric. The order and

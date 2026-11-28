@@ -79,6 +79,9 @@ pub trait EnvoyListenerFilterConfig {
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
   /// Create a new implementation of the [`EnvoyListenerFilterConfigScheduler`] trait.
+  ///
+  /// This must only be called on the main thread, e.g. during the filter config creation or from
+  /// the main thread hooks. Only the returned scheduler can be used from any thread.
   fn new_config_scheduler(&self) -> impl EnvoyListenerFilterConfigScheduler + 'static;
 
   /// Get a load shed point of the overload manager by name, to shed load at the module's own point
@@ -481,6 +484,9 @@ pub trait EnvoyListenerFilter {
   );
 
   /// Create a new implementation of the [`EnvoyListenerFilterScheduler`] trait.
+  ///
+  /// This must only be called on the worker thread that processes the connection, i.e. from within
+  /// the listener filter callbacks. Only the returned scheduler can be used from any thread.
   ///
   /// ## Example Usage
   ///

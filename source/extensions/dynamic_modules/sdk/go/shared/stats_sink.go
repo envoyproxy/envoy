@@ -134,7 +134,7 @@ type StatSinkHandle interface {
 	// GetScheduler returns a scheduler whose scheduled functions run on the main
 	// thread. A sink that aggregates metrics off the main thread, for example on a
 	// goroutine started from OnFlush, uses it to publish results with SetGauge. It
-	// must be called while the sink is being created, from
-	// StatSinkConfigFactory.Create.
+	// MUST only be called on the main thread while the sink is being created, from
+	// StatSinkConfigFactory.Create. The returned Scheduler can then be used from any thread.
 	GetScheduler() Scheduler
 }
