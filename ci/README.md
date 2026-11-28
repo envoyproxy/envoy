@@ -162,7 +162,7 @@ To enable the previous behavior of the `release.server_only` target where the fi
 For a debug version of the Envoy binary you can run:
 
 ```bash
-./ci/run_envoy_docker.sh './ci/do_ci.sh debug.server_only'
+./ci/run_envoy_docker.sh './ci/do_ci.sh debug.server'
 ```
 
 The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-debug` (or wherever
@@ -189,11 +189,19 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `asan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=asan` with clang.
 * `debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
 * `debug <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c dbg`.
-* `debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
+* `debug.server` &mdash; build Envoy static binary under `-c dbg`.
+* `debug.test` &mdash; run tests under `-c dbg`, without building the Envoy static binary.
+* `debug.test <test>` &mdash; run a specified test or test dir under `-c dbg`, without building the Envoy static binary.
 * `dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with clang.
 * `dev <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c fastbuild` with clang.
+* `dev.server` &mdash; build Envoy static binary under `-c fastbuild` with clang.
+* `dev.test` &mdash; run tests under `-c fastbuild` with clang, without building the Envoy static binary.
+* `dev.test <test>` &mdash; run a specified test or test dir under `-c fastbuild` with clang, without building the Envoy static binary.
 * `dev.contrib` &mdash; build Envoy static binary with contrib and run tests under `-c fastbuild` with clang.
 * `dev.contrib <test>` &mdash; build Envoy static binary with contrib and run a specified test or test dir under `-c fastbuild` with clang.
+* `dev.contrib.server` &mdash; build Envoy static binary with contrib under `-c fastbuild` with clang.
+* `dev.contrib.test` &mdash; run tests under `-c fastbuild` with clang, without building the Envoy static binary with contrib.
+* `dev.contrib.test <test>` &mdash; run a specified test or test dir under `-c fastbuild` with clang, without building the Envoy static binary with contrib.
 * `release` &mdash; build Envoy static binary and run tests under `-c opt` with clang.
 * `release <test>` &mdash; build Envoy static binaries and run a specified test or test dir under `-c opt` with clang.
 * `release.server_only` &mdash; build Envoy static binaries under `-c opt` with clang.
