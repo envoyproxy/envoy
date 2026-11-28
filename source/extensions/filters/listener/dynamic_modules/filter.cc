@@ -31,6 +31,9 @@ void DynamicModuleListenerFilter::initializeInModuleFilter() {
 }
 
 void DynamicModuleListenerFilter::destroy() {
+  // Stop the schedulers before the destroy hook, which may join a module thread that is committing
+  // an event.
+  scheduler_target_->clear();
   if (in_module_filter_ != nullptr) {
     config_->on_listener_filter_destroy_(in_module_filter_);
     in_module_filter_ = nullptr;
@@ -40,6 +43,7 @@ void DynamicModuleListenerFilter::destroy() {
 
 Network::FilterStatus DynamicModuleListenerFilter::onAccept(Network::ListenerFilterCallbacks& cb) {
   callbacks_ = &cb;
+  scheduler_target_->initialize(cb.dispatcher(), weak_from_this());
 
   if (in_module_filter_ == nullptr) {
     // Module failed to create filter, close the connection.

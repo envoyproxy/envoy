@@ -10,6 +10,7 @@
 #include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/scheduler.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -93,6 +94,11 @@ public:
 
   // The main thread dispatcher for scheduling config-level events.
   Event::Dispatcher& main_thread_dispatcher_;
+
+  // Shared with the schedulers of this config. Initialized once the config is held by a shared
+  // pointer, before the module can create a scheduler, and cleared at the start of the destructor.
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleNetworkFilterConfig> scheduler_target_{
+      std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleNetworkFilterConfig>>()};
 
   // ----------------------------- Metrics Support -----------------------------
   // Handle classes for storing defined metrics.
@@ -205,24 +211,8 @@ private:
  * envoy_dynamic_module_callback_network_filter_config_scheduler_new and deleted via
  * envoy_dynamic_module_callback_network_filter_config_scheduler_delete.
  */
-class DynamicModuleNetworkFilterConfigScheduler {
-public:
-  DynamicModuleNetworkFilterConfigScheduler(std::weak_ptr<DynamicModuleNetworkFilterConfig> config,
-                                            Event::Dispatcher& dispatcher)
-      : config_(std::move(config)), dispatcher_(dispatcher) {}
-
-  void commit(uint64_t event_id) {
-    dispatcher_.post([config = config_, event_id]() {
-      if (std::shared_ptr<DynamicModuleNetworkFilterConfig> config_shared = config.lock()) {
-        config_shared->onScheduled(event_id);
-      }
-    });
-  }
-
-private:
-  std::weak_ptr<DynamicModuleNetworkFilterConfig> config_;
-  Event::Dispatcher& dispatcher_;
-};
+using DynamicModuleNetworkFilterConfigScheduler =
+    DynamicModuleScheduler<DynamicModuleNetworkFilterConfig>;
 
 /**
  * Creates a new DynamicModuleNetworkFilterConfig for given configuration.

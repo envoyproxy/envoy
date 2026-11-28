@@ -93,6 +93,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 

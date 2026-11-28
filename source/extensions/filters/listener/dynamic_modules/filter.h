@@ -5,6 +5,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/scheduler.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter_config.h"
 
 namespace Envoy {
@@ -70,6 +71,14 @@ public:
     return callbacks_ != nullptr ? &callbacks_->dispatcher() : nullptr;
   }
 
+  /**
+   * Returns the target that the schedulers of this filter post through.
+   */
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleListenerFilter>&
+  schedulerTarget() const {
+    return scheduler_target_;
+  }
+
 private:
   /**
    * Helper to get the `this` pointer as a void pointer.
@@ -95,6 +104,11 @@ private:
   Network::Address::InstanceConstSharedPtr cached_original_dst_;
 
   bool destroyed_ = false;
+
+  // Shared with the schedulers of this filter. Initialized when the filter accepts the socket and
+  // cleared when the filter is destroyed.
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleListenerFilter> scheduler_target_{
+      std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleListenerFilter>>()};
 };
 
 /**
@@ -103,27 +117,7 @@ private:
  * envoy_dynamic_module_callback_listener_filter_scheduler_new and deleted via
  * envoy_dynamic_module_callback_listener_filter_scheduler_delete.
  */
-class DynamicModuleListenerFilterScheduler {
-public:
-  DynamicModuleListenerFilterScheduler(DynamicModuleListenerFilterWeakPtr filter,
-                                       Event::Dispatcher& dispatcher)
-      : filter_(std::move(filter)), dispatcher_(dispatcher) {}
-
-  void commit(uint64_t event_id) {
-    dispatcher_.post([filter = filter_, event_id]() {
-      if (DynamicModuleListenerFilterSharedPtr filter_shared = filter.lock()) {
-        filter_shared->onScheduled(event_id);
-      }
-    });
-  }
-
-private:
-  // The filter that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
-  // extending the lifetime of the filter.
-  DynamicModuleListenerFilterWeakPtr filter_;
-  // The dispatcher is used to post the event to the worker thread that filter_ is assigned to.
-  Event::Dispatcher& dispatcher_;
-};
+using DynamicModuleListenerFilterScheduler = DynamicModuleScheduler<DynamicModuleListenerFilter>;
 
 } // namespace ListenerFilters
 } // namespace DynamicModules

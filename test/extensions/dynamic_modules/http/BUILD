@@ -96,6 +96,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
+    data = [
+        "//test/extensions/dynamic_modules/test_data/c:no_op",
+    ],
     # http_mocks needs this.
     rbe_pool = {
         "default": {"build": "linux_x64_small"},
@@ -111,11 +114,15 @@ envoy_cc_test(
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
+        "//source/extensions/filters/http/dynamic_modules:filter_lib",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/extensions/dynamic_modules:util",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
