@@ -56,6 +56,10 @@ message UpstreamTlsContext {
   // For common cases where an SNI value is present and the server certificate should include a corresponding SAN,
   // this option ensures the SAN is properly validated.
   //
+  // On HTTP/3 upstreams the SNI is always matched against a DNS SAN of the server certificate unless the
+  // validation context configures an explicit identity check (SAN matchers, certificate pins or a custom
+  // validator) and this option is not set. Setting this option keeps that SNI check in place.
+  //
   // See the :ref:`validation configuration <start_quick_start_securing_validation>` for how this interacts with
   // other validation options.
   bool auto_sni_san_validation = 7;

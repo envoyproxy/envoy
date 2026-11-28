@@ -32,23 +32,40 @@ bool verifyLeafCertMatchesHostname(quic::CertificateView& cert_view, const std::
   return false;
 }
 
+// When the leaf certificate must carry a DNS SAN matching the hostname once the chain has been
+// validated.
+enum class HostnameCheck {
+  Always,
+  Never,
+  // Only if the cert validator did not check the peer identity itself, e.g. because the TLS
+  // context skips validation altogether.
+  UnlessValidated,
+};
+
+bool hostnameCheckRequired(HostnameCheck hostname_check,
+                           Ssl::ClientValidationStatus detailed_status) {
+  return hostname_check == HostnameCheck::Always ||
+         (hostname_check == HostnameCheck::UnlessValidated &&
+          detailed_status == Ssl::ClientValidationStatus::NotValidated);
+}
+
 class QuicValidateResultCallback : public Ssl::ValidateResultCallback {
 public:
   QuicValidateResultCallback(Event::Dispatcher& dispatcher,
                              std::unique_ptr<quic::ProofVerifierCallback>&& quic_callback,
                              const std::string& hostname, absl::string_view leaf_cert,
-                             bool accept_untrusted)
+                             HostnameCheck hostname_check)
       : dispatcher_(dispatcher), quic_callback_(std::move(quic_callback)), hostname_(hostname),
-        leaf_cert_(leaf_cert), accept_untrusted_(accept_untrusted) {}
+        leaf_cert_(leaf_cert), hostname_check_(hostname_check) {}
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
-  void onCertValidationResult(bool succeeded, Ssl::ClientValidationStatus /*detailed_status*/,
+  void onCertValidationResult(bool succeeded, Ssl::ClientValidationStatus detailed_status,
                               const std::string& error_details, uint8_t /*tls_alert*/) override {
     std::string error;
     if (!succeeded) {
       error = error_details;
-    } else if (!accept_untrusted_) {
+    } else if (hostnameCheckRequired(hostname_check_, detailed_status)) {
       std::unique_ptr<quic::CertificateView> cert_view =
           quic::CertificateView::ParseSingleCertificate(leaf_cert_);
       succeeded = verifyLeafCertMatchesHostname(*cert_view, hostname_, &error);
@@ -64,10 +81,21 @@ private:
   const std::string hostname_;
   // Leaf cert needs to be retained in case of asynchronous validation.
   std::string leaf_cert_;
-  const bool accept_untrusted_;
+  const HostnameCheck hostname_check_;
 };
 
 } // namespace
+
+bool EnvoyQuicProofVerifier::hasExplicitIdentityCheck(
+    const Envoy::Ssl::CertificateValidationContextConfig* validation_context) {
+  if (validation_context == nullptr || validation_context->autoSniSanMatch()) {
+    return false;
+  }
+  return !validation_context->subjectAltNameMatchers().empty() ||
+         !validation_context->verifyCertificateHashList().empty() ||
+         !validation_context->verifyCertificateSpkiList().empty() ||
+         validation_context->customValidatorConfig().has_value();
+}
 
 quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     const std::string& hostname, const uint16_t /*port*/,
@@ -103,9 +131,30 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     return quic::QUIC_FAILURE;
   }
 
+  // Once the chain is validated the leaf certificate must carry a DNS SAN matching the hostname
+  // (the SNI), unless untrusted certificates are accepted, or the operator configured an explicit
+  // identity check (SAN matchers, certificate pins or a custom validator, either in the validation
+  // context or as a per-connection SAN override) which replaces the SNI-derived check the same way
+  // it does for the TLS client on TCP. A per-connection SAN override only replaces it when
+  // ``auto_sni_san_validation`` is not set, and when the cert validator actually checked it: a TLS
+  // context without any validation configured skips validation, and with it the override.
+  HostnameCheck hostname_check = HostnameCheck::Always;
+  if (accept_untrusted_) {
+    hostname_check = HostnameCheck::Never;
+  } else if (Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.quic_hostname_check_deferred_to_explicit_san_match")) {
+    if (explicit_identity_check_) {
+      hostname_check = HostnameCheck::Never;
+    } else if (!auto_sni_san_match_ && verify_context->transportSocketOptions() != nullptr &&
+               !verify_context->transportSocketOptions()
+                    ->verifySubjectAltNameListOverride()
+                    .empty()) {
+      hostname_check = HostnameCheck::UnlessValidated;
+    }
+  }
   auto envoy_callback = std::make_unique<QuicValidateResultCallback>(
       verify_context->dispatcher(), std::move(callback), hostname, std::string(certs[0]),
-      accept_untrusted_);
+      hostname_check);
   ASSERT(dynamic_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(context_.get()) !=
          nullptr);
   // We down cast rather than add customVerifyCertChainForQuic to Envoy::Ssl::Context because
@@ -121,7 +170,8 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     return quic::QUIC_PENDING;
   }
   if (result.status == ValidationResults::ValidationStatus::Successful) {
-    if (verifyLeafCertMatchesHostname(*cert_view, hostname, error_details)) {
+    if (!hostnameCheckRequired(hostname_check, result.detailed_status) ||
+        verifyLeafCertMatchesHostname(*cert_view, hostname, error_details)) {
       // Hand the verifier-built chain (not the peer-sent list) to the details so the connection
       // info can report the validated issuer.
       *details = std::make_unique<CertVerifyResult>(true, std::move(result.validated_chain));
