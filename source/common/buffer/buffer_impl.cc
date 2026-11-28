@@ -511,83 +511,144 @@ void OwnedImpl::commit(uint64_t length, absl::Span<RawSlice> slices,
 }
 
 ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start, size_t length) const {
-  // This implementation uses the same search algorithm as evbuffer_search(), a naive
-  // scan that requires O(M*N) comparisons in the worst case.
-  // TODO(brian-pane): replace this with a more efficient search if it shows up
-  // prominently in CPU profiling.
   if (size == 0) {
-    return (start <= length_) ? start : -1;
+    return (start <= length_) ? static_cast<ssize_t>(start) : -1;
+  }
+  if (start >= length_) {
+    return -1;
   }
 
   // length equal to zero means that entire buffer must be searched.
-  // Adjust the length to buffer length taking the staring index into account.
-  size_t left_to_search = length;
-  if (0 == length) {
-    left_to_search = length_ - start;
+  // Adjust the length to buffer length taking the starting index into account.
+  size_t left_to_search = (0 == length) ? (length_ - start) : std::min(length, length_ - start);
+  if (left_to_search < size) {
+    return -1;
   }
+
   ssize_t offset = 0;
   const uint8_t* needle = static_cast<const uint8_t*>(data);
-  for (size_t slice_index = 0; slice_index < slices_.size() && (left_to_search > 0);
+  for (size_t slice_index = 0; slice_index < slices_.size() && left_to_search >= size;
        slice_index++) {
     const auto& slice = slices_[slice_index];
-    uint64_t slice_size = slice.dataSize();
+    const uint64_t slice_size = slice.dataSize();
     if (slice_size <= start) {
       start -= slice_size;
       offset += slice_size;
       continue;
     }
-    const uint8_t* slice_start = slice.data();
-    const uint8_t* haystack = slice_start;
-    const uint8_t* haystack_end = haystack + slice_size;
-    haystack += start;
-    while (haystack < haystack_end) {
-      const size_t slice_search_limit =
-          std::min(static_cast<size_t>(haystack_end - haystack), left_to_search);
-      // Search within this slice for the first byte of the needle.
-      const uint8_t* first_byte_match =
+    const uint8_t* const slice_start = slice.data();
+    const uint8_t* haystack = slice_start + start;
+    const uint8_t* const haystack_end = slice_start + slice_size;
+    const size_t slice_search_limit =
+        std::min(static_cast<size_t>(haystack_end - haystack), left_to_search);
+
+    if (size == 1) {
+      const uint8_t* match =
           static_cast<const uint8_t*>(memchr(haystack, needle[0], slice_search_limit));
-      if (first_byte_match == nullptr) {
-        left_to_search -= slice_search_limit;
-        break;
+      if (match != nullptr) {
+        return offset + (match - slice_start);
       }
-      // After finding a match for the first byte of the needle, check whether the following
-      // bytes in the buffer match the remainder of the needle. Note that the match can span
-      // two or more slices.
-      left_to_search -= static_cast<size_t>(first_byte_match - haystack + 1);
-      // Save the current number of bytes left to search.
-      // If the pattern is not found, the search will resume from the next byte
-      // and left_to_search value must be restored.
-      const size_t saved_left_to_search = left_to_search;
-      size_t i = 1;
-      size_t match_index = slice_index;
-      const uint8_t* match_next = first_byte_match + 1;
-      const uint8_t* match_end = haystack_end;
-      while ((i < size) && (0 < left_to_search)) {
-        if (match_next >= match_end) {
-          // We've hit the end of this slice, so continue checking against the next slice.
-          match_index++;
-          if (match_index == slices_.size()) {
-            // We've hit the end of the entire buffer.
-            break;
-          }
-          const auto& match_slice = slices_[match_index];
-          match_next = match_slice.data();
-          match_end = match_next + match_slice.dataSize();
-          continue;
-        }
-        left_to_search--;
-        if (*match_next++ != needle[i]) {
+      left_to_search -= slice_search_limit;
+      start = 0;
+      offset += slice_size;
+      continue;
+    }
+
+    // Fast path: search the contiguous interior of this slice for a complete match.
+    // Start with `memchr` (SIMD-accelerated) which is optimal when `needle[0]` is infrequent.
+    // If repeated false positives occur (e.g., partial-match heavy input), switch to linear-time
+    // `memmem` (or `string_view::find` fallback) to avoid O(M*N) worst-case blowup.
+    if (slice_search_limit >= size) {
+      const uint8_t* interior_end = haystack + slice_search_limit - size + 1;
+      const uint8_t first_byte = needle[0];
+      const uint8_t last_byte = needle[size - 1];
+      const uint8_t* scan = haystack;
+      uint32_t false_positives = 0;
+      constexpr uint32_t kMaxMemchrFalsePositives = 4;
+
+      while (scan < interior_end) {
+        const uint8_t* match =
+            static_cast<const uint8_t*>(memchr(scan, first_byte, interior_end - scan));
+        if (match == nullptr) {
           break;
         }
-        i++;
+        if (match[size - 1] == last_byte &&
+            (size <= 2 || memcmp(match + 1, needle + 1, size - 2) == 0)) {
+          return offset + (match - slice_start);
+        }
+        scan = match + 1;
+        if (++false_positives >= kMaxMemchrFalsePositives && scan < interior_end) {
+#if defined(__GLIBC__) || defined(__APPLE__) || defined(__FreeBSD__)
+          const void* found = memmem(scan, (haystack + slice_search_limit) - scan, needle, size);
+          if (found != nullptr) {
+            return offset + (static_cast<const uint8_t*>(found) - slice_start);
+          }
+#else
+          const absl::string_view rem_view(reinterpret_cast<const char*>(scan),
+                                           (haystack + slice_search_limit) - scan);
+          const absl::string_view needle_view(reinterpret_cast<const char*>(needle), size);
+          const size_t pos = rem_view.find(needle_view);
+          if (pos != absl::string_view::npos) {
+            return offset + (scan - slice_start) + static_cast<ssize_t>(pos);
+          }
+#endif
+          break;
+        }
       }
-      if (i == size) {
-        // Successful match of the entire needle.
+
+      if (slice_search_limit == left_to_search) {
+        return -1;
+      }
+      // No match starts in the interior; only the final (size - 1) bytes of this slice can start
+      // a match spanning into subsequent slices.
+      const size_t skipped = slice_search_limit - (size - 1);
+      haystack += skipped;
+      left_to_search -= skipped;
+    }
+
+    // Check candidate start positions in the slice-boundary tail for cross-slice matches.
+    const size_t tail_len = std::min(static_cast<size_t>(haystack_end - haystack), left_to_search);
+    const uint8_t* const tail_end = haystack + tail_len;
+    while (haystack < tail_end && left_to_search >= size) {
+      const size_t rem_in_tail = static_cast<size_t>(tail_end - haystack);
+      const uint8_t* first_byte_match =
+          static_cast<const uint8_t*>(memchr(haystack, needle[0], rem_in_tail));
+      if (first_byte_match == nullptr) {
+        left_to_search -= rem_in_tail;
+        break;
+      }
+      left_to_search -= static_cast<size_t>(first_byte_match - haystack);
+      if (left_to_search < size) {
+        return -1;
+      }
+      const size_t first_chunk =
+          std::min<size_t>(size, static_cast<size_t>(haystack_end - first_byte_match));
+      bool matched =
+          (first_chunk == 1 || memcmp(first_byte_match + 1, needle + 1, first_chunk - 1) == 0);
+      size_t matched_bytes = first_chunk;
+      size_t next_slice_idx = slice_index + 1;
+      while (matched && matched_bytes < size) {
+        if (next_slice_idx >= slices_.size()) {
+          matched = false;
+          break;
+        }
+        const auto& next_slice = slices_[next_slice_idx++];
+        const uint64_t next_len = next_slice.dataSize();
+        if (next_len == 0) {
+          continue;
+        }
+        const size_t to_cmp = std::min<size_t>(size - matched_bytes, next_len);
+        if (memcmp(next_slice.data(), needle + matched_bytes, to_cmp) != 0) {
+          matched = false;
+          break;
+        }
+        matched_bytes += to_cmp;
+      }
+      if (matched && matched_bytes == size) {
         return offset + (first_byte_match - slice_start);
       }
-      // If this wasn't a successful match, start scanning again at the next byte.
       haystack = first_byte_match + 1;
-      left_to_search = saved_left_to_search;
+      left_to_search--;
     }
     start = 0;
     offset += slice_size;
