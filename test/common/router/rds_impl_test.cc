@@ -708,6 +708,96 @@ TEST_F(RdsImplTest, VHDSandRDSupdateTogether) {
                        ->clusterName());
 }
 
+TEST_F(RdsImplTest, VhdsSkipInitialWarmingMarksReadyImmediately) {
+  setup();
+
+  const std::string response_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "virtual_hosts": [
+        {
+          "name": "foo",
+          "domains": [
+            "foo"
+          ],
+          "routes": [
+            {
+              "match": {
+                "prefix": "/foo"
+              },
+              "route": {
+                "cluster": "foo"
+              }
+            }
+          ]
+        }
+      ],
+      "vhds": {
+        "config_source": {
+          "resource_api_version": "V3",
+          "api_config_source": {
+            "api_type": "DELTA_GRPC",
+            "transport_api_version": "V3",
+            "grpc_services": {
+              "envoy_grpc": {
+                "cluster_name": "xds_cluster"
+              }
+            }
+          }
+        },
+        "skip_initial_warming": {}
+      }
+    }
+  ]
+}
+)EOF";
+  auto response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response);
+
+  // With skip_initial_warming set, initialization marks ready immediately upon RDS update
+  // without waiting for the initial VHDS update.
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()));
+  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
+
+  EXPECT_EQ(1UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+  EXPECT_TRUE(rds_->configCast()->usesVhds());
+  EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
+                       ->routeEntry()
+                       ->clusterName());
+  EXPECT_EQ(nullptr, route(Http::TestRequestHeaderMapImpl{{":authority", "bar"}, {":path", "/"}}));
+
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks =
+      server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  ASSERT_NE(nullptr, vhds_callbacks);
+  ASSERT_NE(rds_callbacks_, vhds_callbacks);
+
+  // Subsequent VHDS updates publish the new virtual hosts without re-firing init_watcher_.ready().
+  EXPECT_CALL(init_watcher_, ready()).Times(0);
+  const auto vhds_resources = vhdsResources("bar", "bar");
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(vhds_resources);
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "1"));
+
+  EXPECT_EQ(2UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+  EXPECT_EQ(1UL, scope_.counter("foo.rds.vhds.foo_route_config.config_reload").value());
+  EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
+                       ->routeEntry()
+                       ->clusterName());
+  EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "bar"}, {":path", "/"}})
+                       ->routeEntry()
+                       ->clusterName());
+
+  vhds_callbacks->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
+                                       nullptr);
+}
+
 // VHDS added by an RDS update to a route configuration that didn't have it before starts the VHDS
 // subscription.
 TEST_F(RdsImplTest, VHDSAddedByALaterRDSUpdate) {

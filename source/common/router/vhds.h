@@ -82,6 +82,7 @@ private:
   // update and publishes it to its observer once it is warmed up.
   VhdsConfigUpdateReceiver& receiver_;
   const std::string route_config_name_;
+  const bool skip_initial_warming_;
   Stats::ScopeSharedPtr scope_;
   VhdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;

@@ -70,8 +70,15 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
   }
   auto new_route_config = std::make_unique<envoy::config::route::v3::RouteConfiguration>();
   new_route_config->CheckTypeAndMergeFrom(rc);
-  const uint64_t new_vhds_config_hash =
-      new_route_config->has_vhds() ? MessageUtil::hash(new_route_config->vhds()) : 0ul;
+  uint64_t new_vhds_config_hash = 0ul;
+  if (new_route_config->has_vhds()) {
+    // Exclude skip_initial_warming from the subscription hash: vhds_configuration_changed only
+    // gates post-initialization subscription replacement, where initial warming has already
+    // completed.
+    auto* skip_initial_warming = new_route_config->mutable_vhds()->release_skip_initial_warming();
+    new_vhds_config_hash = MessageUtil::hash(new_route_config->vhds());
+    new_route_config->mutable_vhds()->set_allocated_skip_initial_warming(skip_initial_warming);
+  }
   std::unique_ptr<VirtualHostMap> rds_virtual_hosts;
   if (new_route_config->has_vhds()) {
     // When using VHDS, stash away RDS vhosts, so that they can be merged with VHDS vhosts in

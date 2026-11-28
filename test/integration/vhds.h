@@ -276,7 +276,7 @@ public:
   }
 
   void useRdsWithVhosts() { use_rds_with_vhosts = true; }
-  const envoy::config::route::v3::RouteConfiguration rdsConfig() const {
+  virtual const envoy::config::route::v3::RouteConfiguration rdsConfig() const {
     return TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
         use_rds_with_vhosts ? RdsConfigWithVhosts : RdsConfig);
   }
