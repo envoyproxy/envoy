@@ -256,6 +256,51 @@ void DynamicModuleBootstrapExtensionConfig::onListenerRemoval(const std::string&
   }
 }
 
+bool DynamicModuleBootstrapExtensionConfig::enableSecretLifecycle() {
+  if (secret_lifecycle_enabled_) {
+    return false;
+  }
+  if (!server_initialized_) {
+    ENVOY_LOG(error, "cannot enable secret lifecycle before server is initialized");
+    return false;
+  }
+  if (!shutdownNotificationExpected()) {
+    ENVOY_LOG(error, "cannot enable secret lifecycle once shutdown started or in init only mode");
+    return false;
+  }
+  if (on_bootstrap_extension_secret_add_or_update_ == nullptr &&
+      on_bootstrap_extension_secret_removal_ == nullptr) {
+    ENVOY_LOG(error, "cannot enable secret lifecycle without a secret lifecycle hook");
+    return false;
+  }
+  secret_lifecycle_enabled_ = true;
+  // Replays the delivered secrets inline through onSecretAddOrUpdate.
+  secret_lifecycle_callbacks_handle_ = context_.secretManager().addSecretLifecycleCallbacks(*this);
+  // Release the handle at shutdown so no secret event reaches the module after it.
+  secret_lifecycle_shutdown_handle_ = context_.lifecycleNotifier().registerCallback(
+      Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+      [this]() { secret_lifecycle_callbacks_handle_.reset(); });
+  return true;
+}
+
+void DynamicModuleBootstrapExtensionConfig::onSecretAddOrUpdate(absl::string_view secret_name) {
+  if (in_module_config_ != nullptr && on_bootstrap_extension_secret_add_or_update_ != nullptr) {
+    const bool previous = std::exchange(in_resource_lifecycle_callback, true);
+    Cleanup cleanup([previous]() { in_resource_lifecycle_callback = previous; });
+    on_bootstrap_extension_secret_add_or_update_(thisAsVoidPtr(), in_module_config_,
+                                                 {secret_name.data(), secret_name.size()});
+  }
+}
+
+void DynamicModuleBootstrapExtensionConfig::onSecretRemoval(absl::string_view secret_name) {
+  if (in_module_config_ != nullptr && on_bootstrap_extension_secret_removal_ != nullptr) {
+    const bool previous = std::exchange(in_resource_lifecycle_callback, true);
+    Cleanup cleanup([previous]() { in_resource_lifecycle_callback = previous; });
+    on_bootstrap_extension_secret_removal_(thisAsVoidPtr(), in_module_config_,
+                                           {secret_name.data(), secret_name.size()});
+  }
+}
+
 bool DynamicModuleBootstrapExtensionConfig::setXdsNotifications(bool enabled) {
   if (!enabled) {
     ++xds_notifications_generation_;
@@ -836,6 +881,16 @@ newDynamicModuleBootstrapExtensionConfig(
     return on_listener_removal.status();
   }
 
+  // Secret lifecycle hooks are optional per the ABI compatibility policy (abi/abi.h): an absent
+  // symbol means the module does not implement the hook, not a load failure. A module that never
+  // enables secret lifecycle need not export them.
+  auto on_secret_add_or_update =
+      dynamic_module->getFunctionPointer<OnBootstrapExtensionSecretAddOrUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update");
+  auto on_secret_removal =
+      dynamic_module->getFunctionPointer<OnBootstrapExtensionSecretRemovalType>(
+          "envoy_dynamic_module_on_bootstrap_extension_secret_removal");
+
   auto config = std::make_shared<DynamicModuleBootstrapExtensionConfig>(
       extension_name, extension_config, metrics_namespace, std::move(dynamic_module),
       main_thread_dispatcher, context, stats_store);
@@ -931,6 +986,10 @@ newDynamicModuleBootstrapExtensionConfig(
   config->on_bootstrap_extension_cluster_removal_ = on_cluster_removal.value();
   config->on_bootstrap_extension_listener_add_or_update_ = on_listener_add_or_update.value();
   config->on_bootstrap_extension_listener_removal_ = on_listener_removal.value();
+  config->on_bootstrap_extension_secret_add_or_update_ =
+      on_secret_add_or_update.ok() ? on_secret_add_or_update.value() : nullptr;
+  config->on_bootstrap_extension_secret_removal_ =
+      on_secret_removal.ok() ? on_secret_removal.value() : nullptr;
 
   config->stat_creation_frozen_ = true;
 

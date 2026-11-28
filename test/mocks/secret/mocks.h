@@ -59,6 +59,16 @@ public:
                Server::Configuration::ServerFactoryContext&, OptRef<Init::Manager> init_manager,
                bool warm));
   MOCK_METHOD(std::vector<absl::string_view>, dynamicActiveSecretNames, (), (const));
+  MOCK_METHOD(Common::CallbackHandlePtr, addSecretLifecycleCallbacks,
+              (SecretLifecycleCallbacks & callbacks));
+};
+
+class MockSecretLifecycleCallbacks : public SecretLifecycleCallbacks {
+public:
+  MockSecretLifecycleCallbacks();
+  ~MockSecretLifecycleCallbacks() override;
+  MOCK_METHOD(void, onSecretAddOrUpdate, (absl::string_view name));
+  MOCK_METHOD(void, onSecretRemoval, (absl::string_view name));
 };
 
 class MockSecretCallbacks : public SecretCallbacks {

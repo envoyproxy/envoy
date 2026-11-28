@@ -33,6 +33,7 @@ envoy_cc_library(
     hdrs = ["secret_manager.h"],
     deps = [
         ":secret_provider_interface",
+        "//envoy/common:callback",
         "//envoy/common:optref_lib",
         "//envoy/common:pure_lib",
         "//envoy/init:manager_interface",

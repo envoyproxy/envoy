@@ -17,6 +17,7 @@
 #include "test/common/secret/private_key_provider.pb.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/matcher/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/config_tracker.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -475,6 +476,173 @@ generic_secret:
   EXPECT_THAT(secret_manager->dynamicActiveSecretNames(),
               testing::UnorderedElementsAre("abc.com", "abc.com.validation", "abc.com.stek",
                                             "signing_key"));
+}
+
+class SecretLifecycleTest : public SecretManagerImplTest {
+protected:
+  SecretLifecycleTest() : secret_manager_(std::make_unique<SecretManagerImpl>(config_tracker_)) {
+    ON_CALL(init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
+      init_target_handles_.push_back(target.createHandle("test"));
+      init_target_handles_.back()->initialize(init_watcher_);
+    }));
+    ON_CALL(secret_context_.server_context_, mainThreadDispatcher())
+        .WillByDefault(ReturnRef(*dispatcher_));
+    ON_CALL(secret_context_.server_context_, localInfo()).WillByDefault(ReturnRef(local_info_));
+    ON_CALL(secret_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
+  }
+
+  // Creates a TLS certificate provider and returns it with its subscription callbacks.
+  std::pair<TlsCertificateConfigProviderSharedPtr, Config::SubscriptionCallbacks*>
+  createTlsProvider(const std::string& name, bool warm = true) {
+    auto provider = secret_manager_->findOrCreateTlsCertificateProvider(
+        config_source_, name, secret_context_.server_context_, init_manager_, warm);
+    return {provider,
+            secret_context_.server_context_.cluster_manager_.subscription_factory_.callbacks_};
+  }
+
+  static void deliver(Config::SubscriptionCallbacks& callbacks, const std::string& yaml) {
+    envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+    TestUtility::loadFromYaml(yaml, typed_secret);
+    const auto decoded_resources = TestUtility::decodeResources({typed_secret});
+    EXPECT_OK(callbacks.onConfigUpdate(decoded_resources.refvec_, ""));
+  }
+
+  static void deliverTls(Config::SubscriptionCallbacks& callbacks, const std::string& name,
+                         const std::string& cert = "CERT_A") {
+    deliver(callbacks, fmt::format(R"EOF(
+name: "{}"
+tls_certificate:
+  certificate_chain:
+    inline_string: "{}"
+  private_key:
+    inline_string: "KEY"
+)EOF",
+                                   name, cert));
+  }
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context_;
+  envoy::config::core::v3::ConfigSource config_source_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Init::MockManager> init_manager_;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
+  std::vector<Init::TargetHandlePtr> init_target_handles_;
+  StrictMock<MockSecretLifecycleCallbacks> callbacks_;
+  SecretManagerPtr secret_manager_;
+};
+
+// Delivery and rotation fire add-or-update; a delta xDS removal does not fire removal because the
+// provider keeps the secret; removal fires when the provider leaves the manager.
+TEST_F(SecretLifecycleTest, AddUpdateAndRemoval) {
+  auto handle = secret_manager_->addSecretLifecycleCallbacks(callbacks_);
+  auto [provider, subscription] = createTlsProvider("abc.com");
+
+  EXPECT_CALL(callbacks_, onSecretAddOrUpdate("abc.com"));
+  deliverTls(*subscription, "abc.com");
+
+  EXPECT_CALL(callbacks_, onSecretAddOrUpdate("abc.com"));
+  deliverTls(*subscription, "abc.com", "CERT_B");
+
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  *removed_resources.Add() = "abc.com";
+  EXPECT_OK(subscription->onConfigUpdate({}, removed_resources, ""));
+  EXPECT_THAT(secret_manager_->dynamicActiveSecretNames(), testing::ElementsAre("abc.com"));
+
+  EXPECT_CALL(callbacks_, onSecretRemoval("abc.com")).WillOnce(Invoke([this](absl::string_view) {
+    EXPECT_TRUE(secret_manager_->dynamicActiveSecretNames().empty());
+  }));
+  provider.reset();
+}
+
+// Registration replays each delivered name once, and skips providers that are still warming.
+TEST_F(SecretLifecycleTest, RegistrationReplaysDeliveredNamesOnce) {
+  auto [warm_provider, warm_subscription] = createTlsProvider("abc.com", true);
+  deliverTls(*warm_subscription, "abc.com");
+  auto [provider, subscription] = createTlsProvider("abc.com", false);
+  deliverTls(*subscription, "abc.com");
+  auto warming = createTlsProvider("xyz.com");
+
+  EXPECT_CALL(callbacks_, onSecretAddOrUpdate("abc.com"));
+  auto handle = secret_manager_->addSecretLifecycleCallbacks(callbacks_);
+}
+
+// Removal fires only when the last provider for a name leaves, and only for a delivered name.
+TEST_F(SecretLifecycleTest, RemovalWaitsForLastProviderOfDeliveredName) {
+  auto handle = secret_manager_->addSecretLifecycleCallbacks(callbacks_);
+  auto [first, first_subscription] = createTlsProvider("abc.com", true);
+  auto [second, second_subscription] = createTlsProvider("abc.com", false);
+  auto warming = createTlsProvider("xyz.com").first;
+  EXPECT_NE(first.get(), second.get());
+
+  EXPECT_CALL(callbacks_, onSecretAddOrUpdate("abc.com"));
+  deliverTls(*first_subscription, "abc.com");
+
+  first.reset();
+  warming.reset();
+  EXPECT_CALL(callbacks_, onSecretRemoval("abc.com"));
+  second.reset();
+}
+
+// A name whose providers all left is tracked afresh by a new provider.
+TEST_F(SecretLifecycleTest, NameIsTrackedAgainAfterRemoval) {
+  auto handle = secret_manager_->addSecretLifecycleCallbacks(callbacks_);
+  {
+    auto [provider, subscription] = createTlsProvider("abc.com");
+    EXPECT_CALL(callbacks_, onSecretAddOrUpdate("abc.com"));
+    deliverTls(*subscription, "abc.com");
+    EXPECT_CALL(callbacks_, onSecretRemoval("abc.com"));
+  }
+  // The re-created provider has not delivered, so its removal is silent.
+  createTlsProvider("abc.com");
+}
+
+// Every registered observer is notified, and destroying a handle unregisters only that observer.
+TEST_F(SecretLifecycleTest, MultipleObservers) {
+  StrictMock<MockSecretLifecycleCallbacks> other;
+  auto handle = secret_manager_->addSecretLifecycleCallbacks(callbacks_);
+  auto other_handle = secret_manager_->addSecretLifecycleCallbacks(other);
+  auto [provider, subscription] = createTlsProvider("abc.com");
+
+  EXPECT_CALL(callbacks_, onSecretAddOrUpdate("abc.com"));
+  EXPECT_CALL(other, onSecretAddOrUpdate("abc.com"));
+  deliverTls(*subscription, "abc.com");
+
+  handle.reset();
+  EXPECT_CALL(other, onSecretRemoval("abc.com"));
+  provider.reset();
+}
+
+// Only TLS certificate providers are observed.
+TEST_F(SecretLifecycleTest, OtherSecretKindsAreNotObserved) {
+  auto handle = secret_manager_->addSecretLifecycleCallbacks(callbacks_);
+  auto validation_provider = secret_manager_->findOrCreateCertificateValidationContextProvider(
+      config_source_, "abc.com.validation", secret_context_.server_context_, init_manager_);
+  deliver(*secret_context_.server_context_.cluster_manager_.subscription_factory_.callbacks_,
+          R"EOF(
+name: "abc.com.validation"
+validation_context:
+  trusted_ca:
+    inline_string: "DUMMY_INLINE_STRING_TRUSTED_CA"
+)EOF");
+  auto generic_provider = secret_manager_->findOrCreateGenericSecretProvider(
+      config_source_, "signing_key", secret_context_.server_context_, init_manager_, true);
+  deliver(*secret_context_.server_context_.cluster_manager_.subscription_factory_.callbacks_,
+          R"EOF(
+name: "signing_key"
+generic_secret:
+  secret:
+    inline_string: "DUMMY"
+)EOF");
+  EXPECT_THAT(secret_manager_->dynamicActiveSecretNames(),
+              testing::UnorderedElementsAre("abc.com.validation", "signing_key"));
+  validation_provider.reset();
+  generic_provider.reset();
+}
+
+// A handle that outlives the manager is safe to destroy.
+TEST_F(SecretLifecycleTest, HandleOutlivesManager) {
+  auto handle = secret_manager_->addSecretLifecycleCallbacks(callbacks_);
+  secret_manager_.reset();
+  handle.reset();
 }
 
 TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {

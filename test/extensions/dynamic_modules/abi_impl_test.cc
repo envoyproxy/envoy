@@ -725,6 +725,8 @@ WEAK_STUB(BootstrapExtensionConfigSnapshotDelete,
           envoy_dynamic_module_callback_bootstrap_extension_config_snapshot_delete(nullptr))
 WEAK_STUB(BootstrapExtensionEnableListenerLifecycle,
           envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr))
+WEAK_STUB(BootstrapExtensionEnableSecretLifecycle,
+          envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle(nullptr))
 WEAK_STUB(BootstrapExtensionSetXdsNotifications,
           envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(nullptr, true))
 WEAK_STUB(BootstrapExtensionEnableRuntimeUpdate,

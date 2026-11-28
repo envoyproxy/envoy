@@ -2319,6 +2319,8 @@ TEST_F(BootstrapAbiImplTest, ConfigSnapshotUnavailableDuringResourceLifecycleHoo
   config->on_bootstrap_extension_cluster_add_or_update_ = check_unavailable;
   config->on_bootstrap_extension_cluster_removal_ = check_unavailable;
   config->on_bootstrap_extension_listener_add_or_update_ = check_unavailable;
+  config->on_bootstrap_extension_secret_add_or_update_ = check_unavailable;
+  config->on_bootstrap_extension_secret_removal_ = check_unavailable;
   config->on_bootstrap_extension_listener_removal_ = [](void* envoy, const void*,
                                                         envoy_dynamic_module_type_envoy_buffer) {
     static_cast<DynamicModuleBootstrapExtensionConfig*>(envoy)->onClusterRemoval("nested");
@@ -2338,6 +2340,8 @@ TEST_F(BootstrapAbiImplTest, ConfigSnapshotUnavailableDuringResourceLifecycleHoo
   testing::NiceMock<Network::MockListenerConfig> listener;
   config->onListenerAddOrUpdate("listener", listener);
   config->onListenerRemoval("listener");
+  config->onSecretAddOrUpdate("secret");
+  config->onSecretRemoval("secret");
   config->in_module_config_ = original_module_config;
 
   Server::ConfigTrackerImpl tracker;
@@ -2676,8 +2680,11 @@ TEST_F(BootstrapAbiImplTest, EnableListenerLifecycleBeforeServerInit) {
 // since nothing would release the registrations before the server frees what they refer to.
 TEST_F(BootstrapAbiImplTest, LifecycleRefusedOnceShutdownStartedAndInInitOnlyMode) {
   testing::NiceMock<Server::MockListenerManager> listener_manager;
+  testing::NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context_, secretManager()).WillByDefault(testing::ReturnRef(secret_manager));
   EXPECT_CALL(context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_)).Times(0);
   EXPECT_CALL(listener_manager, addListenerUpdateCallbacks_(_)).Times(0);
+  EXPECT_CALL(secret_manager, addSecretLifecycleCallbacks(_)).Times(0);
   for (const bool init_only : {false, true}) {
     ON_CALL(context_.options_, mode())
         .WillByDefault(testing::Return(init_only ? Server::Mode::InitOnly : Server::Mode::Serve));
@@ -2694,6 +2701,11 @@ TEST_F(BootstrapAbiImplTest, LifecycleRefusedOnceShutdownStartedAndInInitOnlyMod
     EXPECT_LOG_CONTAINS(
         "error", "cannot enable listener lifecycle once shutdown started or in init only mode", {
           EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
+              config->thisAsVoidPtr()));
+        });
+    EXPECT_LOG_CONTAINS(
+        "error", "cannot enable secret lifecycle once shutdown started or in init only mode", {
+          EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle(
               config->thisAsVoidPtr()));
         });
   }
@@ -3338,6 +3350,11 @@ TEST_F(BootstrapAbiImplTest, MainThreadCallbacksOffMainThreadFailClosed) {
        [] {
          EXPECT_FALSE(
              envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(nullptr));
+       }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle",
+       [] {
+         EXPECT_FALSE(
+             envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle(nullptr));
        }},
       {"envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications",
        [] {

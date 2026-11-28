@@ -415,8 +415,8 @@ Collection and sensitive-field redaction run synchronously on the main thread af
 initialization and before shutdown begins. Their cost grows with the selected resources. Combine
 frequent notifications into one collection.
 
-Collection is refused in cluster or listener lifecycle hooks, whatever triggered them, and in
-other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction. Providers can
+Collection is refused in cluster, listener or secret lifecycle hooks, whatever triggered them, and
+in other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction. Providers can
 contain partially applied changes with an old version. Defer collection with the bootstrap config
 scheduler. Callout failures during cluster removal are already reported from a posted callback.
 

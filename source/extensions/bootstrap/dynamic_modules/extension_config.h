@@ -3,11 +3,13 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/optref.h"
 #include "envoy/config/xds_config_tracker.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/watcher.h"
 #include "envoy/http/async_client.h"
+#include "envoy/secret/secret_manager.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
@@ -71,6 +73,10 @@ using OnBootstrapExtensionListenerAddOrUpdateType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update);
 using OnBootstrapExtensionListenerRemovalType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_removal);
+using OnBootstrapExtensionSecretAddOrUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update);
+using OnBootstrapExtensionSecretRemovalType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_secret_removal);
 using OnBootstrapExtensionXdsUpdateType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_xds_update);
 using OnBootstrapExtensionWorkerEventType =
@@ -104,6 +110,7 @@ class DynamicModuleBootstrapExtensionConfig
     : public std::enable_shared_from_this<DynamicModuleBootstrapExtensionConfig>,
       public Upstream::ClusterUpdateCallbacks,
       public Server::ListenerUpdateCallbacks,
+      public Secret::SecretLifecycleCallbacks,
       public Config::XdsConfigTracker,
       public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
@@ -227,6 +234,21 @@ public:
   void onListenerAddOrUpdate(absl::string_view listener_name,
                              const Network::ListenerConfig& listener_config) override;
   void onListenerRemoval(const std::string& listener_name) override;
+
+  /**
+   * Enables secret lifecycle event notifications for the dynamic TLS certificate secrets. The
+   * secrets that are already delivered are replayed through
+   * on_bootstrap_extension_secret_add_or_update before this returns. Main thread only, after the
+   * server is initialized.
+   *
+   * @return true if the callbacks were registered, false if already registered or the server is
+   * not initialized yet.
+   */
+  bool enableSecretLifecycle();
+
+  // Secret::SecretLifecycleCallbacks
+  void onSecretAddOrUpdate(absl::string_view secret_name) override;
+  void onSecretRemoval(absl::string_view secret_name) override;
 
   /**
    * Registers or unregisters xDS notifications on the main thread.
@@ -357,6 +379,8 @@ public:
   OnBootstrapExtensionListenerRemovalType on_bootstrap_extension_listener_removal_ = nullptr;
 
   // The following hooks are optional and stay nullptr when the module does not implement them.
+  OnBootstrapExtensionSecretAddOrUpdateType on_bootstrap_extension_secret_add_or_update_ = nullptr;
+  OnBootstrapExtensionSecretRemovalType on_bootstrap_extension_secret_removal_ = nullptr;
   OnBootstrapExtensionXdsUpdateType on_bootstrap_extension_xds_update_ = nullptr;
   OnBootstrapExtensionEcdsUpdateType on_bootstrap_extension_ecds_update_ = nullptr;
   OnBootstrapExtensionWorkerEventType on_bootstrap_extension_worker_event_ = nullptr;
@@ -504,6 +528,12 @@ private:
   // Handle for the shutdown lifecycle callback that cleans up listener_update_callbacks_handle_.
   Server::ServerLifecycleNotifier::HandlePtr listener_lifecycle_shutdown_handle_;
   bool listener_lifecycle_enabled_ = false;
+
+  // Handle for the secret lifecycle callbacks registered with the SecretManager.
+  Common::CallbackHandlePtr secret_lifecycle_callbacks_handle_;
+  // Handle for the shutdown lifecycle callback that cleans up secret_lifecycle_callbacks_handle_.
+  Server::ServerLifecycleNotifier::HandlePtr secret_lifecycle_shutdown_handle_;
+  bool secret_lifecycle_enabled_ = false;
 
   Common::CallbackHandlePtr xds_update_handle_;
   uint64_t xds_notifications_generation_ = 0;

@@ -18,6 +18,7 @@ envoy_cc_library(
         "//envoy/secret:secret_manager_interface",
         "//envoy/server:transport_socket_config_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:callback_impl_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

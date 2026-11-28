@@ -80,6 +80,8 @@ test_program(name = "bootstrap_listener_lifecycle_test")
 
 test_program(name = "bootstrap_runtime_update_test")
 
+test_program(name = "bootstrap_secret_lifecycle_test")
+
 test_program(name = "bootstrap_writer_test")
 
 test_program(name = "bootstrap_xds_test")

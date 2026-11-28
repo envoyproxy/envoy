@@ -151,10 +151,10 @@ impl Drop for EnvoyBootstrapExtensionConfigSnapshotImpl {
 /// A collection or encoding failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigSnapshotError {
-  /// Called off the main thread, before `on_server_initialized`, during shutdown, from a cluster
-  /// or listener lifecycle hook, whatever triggered it, from another bootstrap hook Envoy runs
-  /// inside an xDS update or a resource's destruction, or while another collection runs. A call
-  /// off the main thread also reports an Envoy bug.
+  /// Called off the main thread, before `on_server_initialized`, during shutdown, from a cluster,
+  /// listener or secret lifecycle hook, whatever triggered it, from another bootstrap hook Envoy
+  /// runs inside an xDS update or a resource's destruction, or while another collection runs. A
+  /// call off the main thread also reports an Envoy bug.
   NotAllowed,
   /// The name filter is invalid or its RE2 program size exceeds
   /// `re2.max_program_size.error_level`.
@@ -506,9 +506,9 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// expression selects all names. Cost grows with the selected resources, so combine frequent
   /// notifications into one collection.
   ///
-  /// Collection is refused in cluster or listener lifecycle hooks, whatever triggered them, and in
-  /// other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction. Providers
-  /// can contain partial changes under the previous version. Defer collection with
+  /// Collection is refused in cluster, listener or secret lifecycle hooks, whatever triggered them,
+  /// and in other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction.
+  /// Providers can contain partial changes under the previous version. Defer collection with
   /// [`Self::new_scheduler`]. Callout failures during cluster removal are already reported from a
   /// posted callback.
   /// No admin listener is needed and admin `allow_paths` does not restrict access.
@@ -530,6 +530,23 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// also returns `false` once the server began to shut down and when Envoy runs with
   /// `--mode init_only`.
   fn enable_listener_lifecycle(&self) -> bool;
+
+  /// Enable secret lifecycle event notifications. When enabled, the module will receive
+  /// [`BootstrapExtensionConfig::on_secret_add_or_update`] and
+  /// [`BootstrapExtensionConfig::on_secret_removal`] for the dynamic TLS certificate secrets only.
+  /// SDS secrets are independent xDS resources, so these fire even when no cluster or listener is
+  /// re-pushed.
+  ///
+  /// Before this returns, `on_secret_add_or_update` is called once for each name that has
+  /// delivered a secret, so do not hold a lock or borrow across this call that the hook also takes.
+  ///
+  /// This must be called on the main thread, during or after `on_server_initialized`. Calls before
+  /// that return `false`.
+  ///
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`. This
+  /// also returns `false` once the server began to shut down and when Envoy runs with
+  /// `--mode init_only`.
+  fn enable_secret_lifecycle(&self) -> bool;
 
   /// Enables or disables [`BootstrapExtensionConfig::on_xds_update`] notifications.
   ///
@@ -991,6 +1008,53 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     &self,
     _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
     _listener_name: &str,
+  ) {
+  }
+
+  /// This is called each time a dynamic TLS certificate provider stores a secret, on first
+  /// delivery and on every rotation. A name can be held by several providers, so this can repeat
+  /// for the same name, and a rotation that a TLS context rejects can repeat on later file events
+  /// or polls. The provider has stored the secret; the TLS contexts may never serve it.
+  ///
+  /// [`EnvoyBootstrapExtensionConfig::get_config_snapshot`] returns
+  /// [`ConfigSnapshotError::NotAllowed`] during this hook, including the replay inside
+  /// [`EnvoyBootstrapExtensionConfig::enable_secret_lifecycle`].
+  ///
+  /// This is only called if the module has opted in via
+  /// [`EnvoyBootstrapExtensionConfig::enable_secret_lifecycle`]. The callback is invoked on the
+  /// main thread.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `secret_name` is the name of the secret that became active or was updated.
+  fn on_secret_add_or_update(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _secret_name: &str,
+  ) {
+  }
+
+  /// This is called when the last dynamic TLS certificate provider for a name that delivered a
+  /// secret is destroyed, such as when the last listener or cluster that references it is removed,
+  /// or when an on-demand certificate selector drops it after a delta xDS removal. A delta xDS
+  /// removal alone does not trigger it while a listener or cluster still holds a provider for the
+  /// name, and a name held only by a draining listener or filter chain is reported when the drain
+  /// ends. Likewise a name held only by a removed cluster is reported once the connections and
+  /// requests still using that cluster are done, so a long-lived stream can delay it well past the
+  /// cluster's removal. The name can leave the active resource names before this is called.
+  ///
+  /// [`EnvoyBootstrapExtensionConfig::get_config_snapshot`] returns
+  /// [`ConfigSnapshotError::NotAllowed`] during this hook.
+  ///
+  /// This is only called if the module has opted in via
+  /// [`EnvoyBootstrapExtensionConfig::enable_secret_lifecycle`]. The callback is invoked on the
+  /// main thread.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `secret_name` is the name of the secret that was removed.
+  fn on_secret_removal(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _secret_name: &str,
   ) {
   }
 
@@ -1936,6 +2000,12 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     }
   }
 
+  fn enable_secret_lifecycle(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle(self.raw)
+    }
+  }
+
   fn set_xds_notifications(&self, enabled: bool) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(
@@ -2721,6 +2791,58 @@ ffi_export! {
     extension_config.on_listener_removal(
       &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
       listener_name_str.as_ref(),
+    );
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy when a dynamic TLS certificate provider stores a secret.
+  ///
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    secret_name: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+
+    let secret_name_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(secret_name.ptr as *const u8, secret_name.length)
+    };
+
+    extension_config.on_secret_add_or_update(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      secret_name_str.as_ref(),
+    );
+  }
+}
+
+ffi_export! {
+  /// Event hook called by Envoy when the last provider for a dynamic TLS certificate secret leaves.
+  ///
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_bootstrap_extension_secret_removal(
+    envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+    secret_name: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) {
+    let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    let extension_config = unsafe { &**extension_config };
+
+    let secret_name_str = unsafe {
+      crate::ffi_helpers::str_lossy_from_raw(secret_name.ptr as *const u8, secret_name.length)
+    };
+
+    extension_config.on_secret_removal(
+      &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+      secret_name_str.as_ref(),
     );
   }
 }

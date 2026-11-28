@@ -832,6 +832,18 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle
   return config->enableListenerLifecycle();
 }
 
+// -------------------- Secret Lifecycle Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  return config->enableSecretLifecycle();
+}
+
 // -------------------- xDS Notification Callbacks --------------------
 
 bool envoy_dynamic_module_callback_bootstrap_extension_set_xds_notifications(

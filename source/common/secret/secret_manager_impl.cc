@@ -18,6 +18,9 @@ namespace Envoy {
 namespace Secret {
 
 SecretManagerImpl::SecretManagerImpl(OptRef<Server::ConfigTracker> config_tracker) {
+  certificate_providers_.setLifecycleCallback([this](absl::string_view name, bool removed) {
+    secret_lifecycle_callbacks_.runCallbacks(name, removed);
+  });
   if (config_tracker.has_value()) {
     config_tracker_entry_ =
         config_tracker->add("secrets", [this](const Matchers::StringMatcher& name_matcher) {
@@ -181,6 +184,22 @@ std::vector<absl::string_view> SecretManagerImpl::dynamicActiveSecretNames() con
   appendActiveSecretNames(session_ticket_keys_providers_.allSecretProviders(), names);
   appendActiveSecretNames(generic_secret_providers_.allSecretProviders(), names);
   return names;
+}
+
+Common::CallbackHandlePtr
+SecretManagerImpl::addSecretLifecycleCallbacks(SecretLifecycleCallbacks& callbacks) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Replay the names whose removal will be reported.
+  for (const std::string& name : certificate_providers_.deliveredNames()) {
+    callbacks.onSecretAddOrUpdate(name);
+  }
+  return secret_lifecycle_callbacks_.add([&callbacks](absl::string_view name, bool removed) {
+    if (removed) {
+      callbacks.onSecretRemoval(name);
+    } else {
+      callbacks.onSecretAddOrUpdate(name);
+    }
+  });
 }
 
 ProtobufTypes::MessagePtr

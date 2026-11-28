@@ -9669,8 +9669,8 @@ typedef enum envoy_dynamic_module_type_bootstrap_config_snapshot_result {
   envoy_dynamic_module_type_bootstrap_config_snapshot_result_Success = 0,
   // called off the main thread, before
   // envoy_dynamic_module_on_bootstrap_extension_server_initialized, during shutdown, from a
-  // cluster or listener lifecycle hook, whatever triggered it, from another bootstrap hook Envoy
-  // runs inside an xDS update or a resource's destruction, or while another collection runs
+  // cluster, listener or secret lifecycle hook, whatever triggered it, from another bootstrap hook
+  // Envoy runs inside an xDS update or a resource's destruction, or while another collection runs
   envoy_dynamic_module_type_bootstrap_config_snapshot_result_NotAllowed = 1,
   // the name regex is invalid or its RE2 program size exceeds re2.max_program_size.error_level
   envoy_dynamic_module_type_bootstrap_config_snapshot_result_InvalidRegex = 2,
@@ -10148,6 +10148,67 @@ void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
     envoy_dynamic_module_type_envoy_buffer listener_name);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update is called each time a dynamic
+ * (SDS) TLS certificate provider stores a secret, on first delivery and on every rotation. Only TLS
+ * certificates fire; certificate validation contexts, session ticket keys and generic secrets do
+ * not, although envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names lists
+ * them. Secrets are independent xDS resources, so this fires even when no cluster or listener is
+ * re-pushed.
+ *
+ * A name can be held by several providers (one per config source and warming mode), so this can
+ * repeat for the same name, and a rotation that a TLS context rejects can repeat on later file
+ * events or polls. The event means the provider stored the secret; the TLS contexts may never
+ * serve it.
+ *
+ * Config snapshot collection returns NotAllowed during this hook, including the replay inside
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle. Defer collection with
+ * the bootstrap config scheduler.
+ *
+ * This hook is optional. It is only called if the module has opted in to receiving secret lifecycle
+ * events via envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle. The
+ * callback is registered on the main thread and invoked on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param secret_name is the name of the secret that became active or was updated.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer secret_name);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_secret_removal is called when the last dynamic (SDS)
+ * TLS certificate provider for a name is destroyed, such as when the last listener or cluster that
+ * references it is removed, or when an on-demand certificate selector drops it after a delta xDS
+ * removal. A delta xDS removal alone does not fire it while a listener or cluster still holds a
+ * provider for the name, and a name held only by a draining listener or filter chain fires when
+ * the drain ends. Likewise a name held only by a removed cluster fires once the connections and
+ * requests still using that cluster are done, so a long-lived stream can delay it well past the
+ * cluster's removal. It fires only for a name that delivered a secret, and the name can leave the
+ * active resource names before it fires.
+ *
+ * Config snapshot collection returns NotAllowed during this hook. Defer collection with the
+ * bootstrap config scheduler.
+ *
+ * This hook is optional. It is only called if the module has opted in to receiving secret lifecycle
+ * events via envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle. The
+ * callback is registered on the main thread and invoked on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param secret_name is the name of the secret that was removed.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_secret_removal(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer secret_name);
 
 /**
  * Optional main-thread hook for gRPC xDS outcomes, enabled with
@@ -10837,10 +10898,11 @@ bool envoy_dynamic_module_callback_bootstrap_extension_subscribe_ecds(
  * cluster name when no service name is set.
  * Cost grows with the selected resources, so combine frequent notifications into one collection.
  *
- * Collection is refused in cluster or listener lifecycle hooks, whatever triggered them, and in
- * other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction. Providers can
- * contain partial changes under the previous version. Defer collection with the bootstrap config
- * scheduler. Callout failures during cluster removal are already reported from a posted callback.
+ * Collection is refused in cluster, listener or secret lifecycle hooks, whatever triggered them,
+ * and in other bootstrap hooks Envoy runs inside an xDS update or a resource's destruction.
+ * Providers can contain partial changes under the previous version. Defer collection with the
+ * bootstrap config scheduler. Callout failures during cluster removal are already reported from a
+ * posted callback.
  *
  * Only protobuf fields annotated as sensitive are redacted. Metadata, opaque strings and module
  * configuration may retain sensitive data. No admin listener is needed, and admin allow_paths does
@@ -10976,6 +11038,33 @@ void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_active_resource_kind kind,
     envoy_dynamic_module_type_bootstrap_active_resource_name_fn name_fn, void* user_data);
+
+// -------------------- Bootstrap Extension Callbacks - Secret Lifecycle --------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle is called by the
+ * module to opt in to receiving secret lifecycle events
+ * (envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update and
+ * envoy_dynamic_module_on_bootstrap_extension_secret_removal).
+ *
+ * Before this returns, envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update is invoked
+ * once for each name that has delivered a secret. A module must not hold a lock or borrow across
+ * this call that the hook also takes.
+ *
+ * This must be called on the main thread, during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized. Calls before that return false;
+ * the validation server never reaches that point.
+ *
+ * This should be called at most once. Subsequent calls are no-ops and return false. This also
+ * returns false once the server began to shut down, when Envoy runs with --mode init_only, and when
+ * the module implements neither secret lifecycle hook.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @return true if the secret lifecycle callbacks were successfully registered, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_secret_lifecycle(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
 
 // -------------------- Bootstrap Extension - Runtime Update --------------------
 
