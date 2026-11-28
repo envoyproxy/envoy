@@ -467,6 +467,40 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
   updatePerWorkerConnectionStats(node_id, cluster_id, increment, tenant_isolation_enabled);
 }
 
+void ReverseTunnelAcceptorExtension::updateIdleSocketStats(const std::string& cluster_id,
+                                                           bool increment,
+                                                           bool tenant_isolation_enabled) {
+  if (!enable_detailed_stats_) {
+    return;
+  }
+  auto* local_registry = getLocalRegistry();
+  if (local_registry == nullptr) {
+    return;
+  }
+
+  ReverseConnectionUtility::TenantScopedIdentifierView scoped_cluster{};
+  if (tenant_isolation_enabled) {
+    scoped_cluster = ReverseConnectionUtility::splitTenantScopedIdentifier(cluster_id);
+  }
+  const absl::string_view cluster =
+      scoped_cluster.hasTenant() ? scoped_cluster.identifier : absl::string_view(cluster_id);
+  if (cluster.empty()) {
+    return;
+  }
+
+  auto& stats_store = context_.scope();
+  Stats::StatNameManagedStorage stat_name(fmt::format("{}.{}.idle.cluster.{}", stat_prefix_,
+                                                      local_registry->dispatcher().name(), cluster),
+                                          stats_store.symbolTable());
+  auto& gauge =
+      stats_store.gaugeFromStatName(stat_name.statName(), Stats::Gauge::ImportMode::NeverImport);
+  if (increment) {
+    gauge.inc();
+  } else if (gauge.value() > 0) {
+    gauge.dec();
+  }
+}
+
 std::vector<ReverseTunnelAcceptorExtension::ReachableTunnel>
 ReverseTunnelAcceptorExtension::reachableTunnels() const {
   std::vector<ReachableTunnel> result;
