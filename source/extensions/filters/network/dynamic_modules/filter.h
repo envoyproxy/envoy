@@ -12,6 +12,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/scheduler.h"
 #include "source/extensions/filters/network/dynamic_modules/filter_config.h"
 
 namespace Envoy {
@@ -201,6 +202,13 @@ public:
   Event::Dispatcher* dispatcher() { return cached_dispatcher_.load(std::memory_order_acquire); }
 
   /**
+   * Returns the target that the schedulers of this filter post through.
+   */
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleNetworkFilter>& schedulerTarget() const {
+    return scheduler_target_;
+  }
+
+  /**
    * Returns the worker index assigned to this filter.
    */
   uint32_t workerIndex() const { return worker_index_; }
@@ -249,6 +257,9 @@ private:
 
   bool destroyed_ = false;
 
+  // Set when the connection closes, after which scheduled events are dropped.
+  bool connection_closed_ = false;
+
   // The reports and access log flushes of the module have no effect until the filter passes the new
   // connection to it. A TCP proxy later in the chain replaces the upstream info and sets its
   // downstream bytes meter when its callbacks are set, and the stream info asserts that no other
@@ -259,6 +270,11 @@ private:
 
   // Worker dispatcher published at callback-init, cleared on destroy. Read via `dispatcher()`.
   std::atomic<Event::Dispatcher*> cached_dispatcher_{nullptr};
+
+  // Shared with the schedulers of this filter. Initialized when the read filter callbacks are set
+  // and cleared when the connection closes or the filter is destroyed, whichever comes first.
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleNetworkFilter> scheduler_target_{
+      std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleNetworkFilter>>()};
 
   uint32_t worker_index_ = 0;
 
@@ -314,34 +330,7 @@ private:
  * envoy_dynamic_module_callback_network_filter_scheduler_new and deleted via
  * envoy_dynamic_module_callback_network_filter_scheduler_delete.
  */
-class DynamicModuleNetworkFilterScheduler {
-public:
-  explicit DynamicModuleNetworkFilterScheduler(DynamicModuleNetworkFilterWeakPtr filter)
-      : filter_(std::move(filter)) {}
-
-  // Safe to call from any thread. Reads only the weak_ptr and the atomic dispatcher cache (see
-  // `DynamicModuleNetworkFilter::dispatcher()`); it never dereferences `read_callbacks_` from a
-  // foreign thread.
-  void commit(uint64_t event_id) {
-    DynamicModuleNetworkFilterSharedPtr filter_shared = filter_.lock();
-    if (!filter_shared) {
-      return;
-    }
-    Event::Dispatcher* dispatcher = filter_shared->dispatcher();
-    if (dispatcher == nullptr) {
-      return;
-    }
-    // Move the locked filter into the posted callback so the last reference is always released on
-    // the worker thread that owns the filter, not on the module's thread that called `commit`.
-    dispatcher->post(
-        [filter = std::move(filter_shared), event_id]() { filter->onScheduled(event_id); });
-  }
-
-private:
-  // The filter that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
-  // extending the lifetime of the filter.
-  DynamicModuleNetworkFilterWeakPtr filter_;
-};
+using DynamicModuleNetworkFilterScheduler = DynamicModuleScheduler<DynamicModuleNetworkFilter>;
 
 } // namespace NetworkFilters
 } // namespace DynamicModules

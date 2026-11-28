@@ -1,3 +1,4 @@
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -38,6 +39,7 @@
 #include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/mutex.h"
 #include "gmock/gmock.h"
 
 using testing::_;
@@ -5997,67 +5999,146 @@ TEST_F(DynamicModuleHttpFilterSchedulerTest,
   envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
 }
 
-TEST_F(DynamicModuleHttpFilterSchedulerTest,
-       HttpFilterConfigSchedulerCommitReleasesLastReferenceOnMainThread) {
-  auto* scheduler = envoy_dynamic_module_callback_http_filter_config_scheduler_new(configPtr());
-  ASSERT_NE(nullptr, scheduler);
+TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterSchedulerDoesNotExtendFilterLifetime) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  std::weak_ptr<DynamicModuleHttpFilter> weak_filter = filter_;
 
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  });
+  std::thread module_thread(
+      [&]() { envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 7); });
+  module_thread.join();
+  ASSERT_TRUE(captured_cb);
+
+  // The filter is destroyed on this thread as soon as its last reference is dropped.
+  filter_.reset();
+  EXPECT_TRUE(weak_filter.expired());
+  captured_cb();
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterScheduledEventAfterOnDestroyIsDropped) {
+  // The hook is a C function pointer, so it reaches the flag through a static.
+  static bool hook_ran = false;
+  hook_ran = false;
+  filter_config_->on_http_filter_scheduled_ = [](envoy_dynamic_module_type_http_filter_envoy_ptr,
+                                                 envoy_dynamic_module_type_http_filter_module_ptr,
+                                                 uint64_t) { hook_ran = true; };
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  });
+  envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 7);
+  ASSERT_TRUE(captured_cb);
+
+  filter_->onDestroy();
+  captured_cb();
+  EXPECT_FALSE(hook_ran);
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterSchedulerCommitRacesOnDestroy) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+
+  absl::Mutex mutex;
+  std::vector<Event::PostCb> posted;
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillRepeatedly([&](Event::PostCb cb) {
+    absl::MutexLock lock(mutex);
+    posted.push_back(std::move(cb));
+  });
+  std::atomic<bool> started{false};
+  std::thread module_thread([&]() {
+    for (uint64_t i = 0; i < 1000; ++i) {
+      envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, i);
+      started.store(true);
+    }
+  });
+  while (!started.load()) {
+  }
+  filter_->onDestroy();
+  filter_.reset();
+  module_thread.join();
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+
+  // Every event posted before the teardown is dropped when it runs.
+  absl::MutexLock lock(mutex);
+  for (Event::PostCb& cb : posted) {
+    cb();
+  }
+}
+
+TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterConfigSchedulerDoesNotExtendConfigLifetime) {
+  // The hook is a C function pointer, so it reaches the flag through a static.
+  static bool hook_ran = false;
+  hook_ran = false;
+  filter_config_->on_http_filter_config_scheduled_ =
+      [](envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+         envoy_dynamic_module_type_http_filter_config_module_ptr, uint64_t) { hook_ran = true; };
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_config_scheduler_new(configPtr());
   filter_.reset();
   std::weak_ptr<DynamicModuleHttpFilterConfig> weak_config = filter_config_;
 
   Event::PostCb captured_cb;
   EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-    // The main thread drops its reference while the module thread is inside `commit`.
-    filter_config_.reset();
   });
-
   std::thread module_thread(
       [&]() { envoy_dynamic_module_callback_http_filter_config_scheduler_commit(scheduler, 7); });
   module_thread.join();
-
-  // The module thread must not have destroyed the config.
-  EXPECT_FALSE(weak_config.expired());
   ASSERT_TRUE(captured_cb);
 
-  // Running and releasing the callback on the main thread destroys it.
-  captured_cb();
-  captured_cb = nullptr;
+  // The config is destroyed on this thread as soon as its last reference is dropped.
+  filter_config_.reset();
   EXPECT_TRUE(weak_config.expired());
+
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).Times(0);
+  envoy_dynamic_module_callback_http_filter_config_scheduler_commit(scheduler, 8);
+  captured_cb();
+  EXPECT_FALSE(hook_ran);
 
   envoy_dynamic_module_callback_http_filter_config_scheduler_delete(scheduler);
 }
 
 TEST_F(DynamicModuleHttpFilterSchedulerTest,
-       HttpFilterSchedulerCommitReleasesLastReferenceOnWorkerThread) {
-  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+       HttpFilterConfigSchedulerCommitRacesConfigDestruction) {
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_config_scheduler_new(configPtr());
+  filter_.reset();
+  std::weak_ptr<DynamicModuleHttpFilterConfig> weak_config = filter_config_;
 
-  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
-  ASSERT_NE(nullptr, scheduler);
-
-  std::weak_ptr<DynamicModuleHttpFilter> weak_filter = filter_;
-
-  Event::PostCb captured_cb;
-  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
-    captured_cb = std::move(cb);
-    // The worker drops its reference while the module thread is inside `commit`.
-    filter_.reset();
+  absl::Mutex mutex;
+  std::vector<Event::PostCb> posted;
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillRepeatedly([&](Event::PostCb cb) {
+    absl::MutexLock lock(mutex);
+    posted.push_back(std::move(cb));
   });
-
-  std::thread module_thread(
-      [&]() { envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 7); });
+  std::atomic<bool> started{false};
+  std::thread module_thread([&]() {
+    for (uint64_t i = 0; i < 1000; ++i) {
+      envoy_dynamic_module_callback_http_filter_config_scheduler_commit(scheduler, i);
+      started.store(true);
+    }
+  });
+  while (!started.load()) {
+  }
+  filter_config_.reset();
+  EXPECT_TRUE(weak_config.expired());
   module_thread.join();
+  envoy_dynamic_module_callback_http_filter_config_scheduler_delete(scheduler);
 
-  // The module thread must not have destroyed the filter.
-  EXPECT_FALSE(weak_filter.expired());
-  ASSERT_TRUE(captured_cb);
-
-  // Running and releasing the callback on the worker destroys it.
-  captured_cb();
-  captured_cb = nullptr;
-  EXPECT_TRUE(weak_filter.expired());
-
-  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+  // Every event posted before the config was destroyed is dropped when it runs.
+  absl::MutexLock lock(mutex);
+  for (Event::PostCb& cb : posted) {
+    cb();
+  }
 }
 
 } // namespace HttpFilters

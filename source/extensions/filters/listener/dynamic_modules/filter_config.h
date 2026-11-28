@@ -9,6 +9,7 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/dynamic_modules/metric_registry.h"
+#include "source/extensions/dynamic_modules/scheduler.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -104,6 +105,11 @@ public:
   // The main thread dispatcher for scheduling config-level events.
   Event::Dispatcher& main_thread_dispatcher_;
 
+  // Shared with the schedulers of this config. Initialized once the config is held by a shared
+  // pointer, before the module can create a scheduler, and cleared at the start of the destructor.
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleListenerFilterConfig> scheduler_target_{
+      std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleListenerFilterConfig>>()};
+
   // The provider of the load shed points that the module can check. It is empty when the factory
   // context of the filter bypasses the overload manager.
   const OptRef<Server::LoadShedPointProvider> load_shed_point_provider_;
@@ -147,31 +153,8 @@ private:
  * envoy_dynamic_module_callback_listener_filter_config_scheduler_new and deleted via
  * envoy_dynamic_module_callback_listener_filter_config_scheduler_delete.
  */
-class DynamicModuleListenerFilterConfigScheduler {
-public:
-  explicit DynamicModuleListenerFilterConfigScheduler(
-      std::weak_ptr<DynamicModuleListenerFilterConfig> config)
-      : config_(std::move(config)) {}
-
-  void commit(uint64_t event_id) {
-    // Lock the config so its dispatcher member stays valid across `post`, and to hand the
-    // reference to the posted callback below.
-    auto config_shared = config_.lock();
-    if (!config_shared) {
-      return;
-    }
-    // Move the locked config into the posted callback so the last reference is always released on
-    // the main thread (when the callback runs, or when the dispatcher is destroyed). The module may
-    // call this from a thread it manages; dropping the last reference there would run the
-    // destructor and the module's destroy hook off the main thread.
-    Event::Dispatcher& dispatcher = config_shared->main_thread_dispatcher_;
-    dispatcher.post(
-        [config = std::move(config_shared), event_id]() { config->onScheduled(event_id); });
-  }
-
-private:
-  std::weak_ptr<DynamicModuleListenerFilterConfig> config_;
-};
+using DynamicModuleListenerFilterConfigScheduler =
+    DynamicModuleScheduler<DynamicModuleListenerFilterConfig>;
 
 /**
  * Creates a new DynamicModuleListenerFilterConfig for given configuration.

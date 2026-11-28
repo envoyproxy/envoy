@@ -125,6 +125,9 @@ DynamicModuleTlsCertificateSelectorConfig::DynamicModuleTlsCertificateSelectorCo
 }
 
 DynamicModuleTlsCertificateSelectorConfig::~DynamicModuleTlsCertificateSelectorConfig() {
+  // Stop the schedulers before the destroy hook, which may join a module thread that is committing
+  // an event.
+  scheduler_target_->clear();
   if (in_module_config_ != nullptr) {
     on_config_destroy_(in_module_config_);
   }
@@ -499,6 +502,7 @@ newDynamicModuleTlsCertificateSelectorConfig(
   auto config = std::make_shared<DynamicModuleTlsCertificateSelectorConfig>(
       std::move(dynamic_module), factory_context, tls_config, metrics_namespace,
       certificate_request_timeout, std::move(dynamic_context_factory));
+  config->scheduler_target_->initialize(config->main_thread_dispatcher_, config);
   config->on_config_destroy_ = on_config_destroy.value();
   config->on_new_ = on_new.value();
   config->on_destroy_ = on_destroy.value();
@@ -526,22 +530,6 @@ newDynamicModuleTlsCertificateSelectorConfig(
   // the module can only record previously defined metrics, so the registry is read-only.
   config->stat_creation_frozen_.store(true, std::memory_order_release);
   return config;
-}
-
-void DynamicModuleTlsCertificateSelectorConfigScheduler::commit(uint64_t event_id) {
-  // Lock the config so its dispatcher member stays valid across `post`, and to hand the
-  // reference to the posted callback below.
-  auto config_shared = config_.lock();
-  if (config_shared == nullptr) {
-    return;
-  }
-  // Move the locked config into the posted callback so the last reference is always released on
-  // the main thread (when the callback runs, or when the dispatcher is destroyed). The module may
-  // call this from a thread it manages; dropping the last reference there would run the
-  // destructor and the module's destroy hook off the main thread.
-  Event::Dispatcher& dispatcher = config_shared->main_thread_dispatcher_;
-  dispatcher.post(
-      [config = std::move(config_shared), event_id]() { config->onScheduled(event_id); });
 }
 
 DynamicModuleTlsCertificateSelector::DynamicModuleTlsCertificateSelector(

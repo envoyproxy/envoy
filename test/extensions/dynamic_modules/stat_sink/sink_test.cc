@@ -1,4 +1,6 @@
+#include <atomic>
 #include <thread>
+#include <vector>
 
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/stat_sinks/dynamic_modules/flush_context.h"
@@ -12,6 +14,7 @@
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/mutex.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -294,8 +297,11 @@ TEST_F(DynamicModuleStatsSinkTest, OnHistogramCompleteReentrantCallKeepsOuterNam
 class DynamicModuleStatsSinkGaugeTest : public testing::Test {
 public:
   DynamicModuleStatsSinkConfigSharedPtr makeConfig() {
-    return std::make_shared<DynamicModuleStatsSinkConfig>("test_sink", "test_config",
-                                                          /*dynamic_module=*/nullptr, context_);
+    auto config = std::make_shared<DynamicModuleStatsSinkConfig>(
+        "test_sink", "test_config", /*dynamic_module=*/nullptr, context_);
+    // newDynamicModuleStatsSinkConfig does this for a config the module creates.
+    config->scheduler_target_->initialize(context_.dispatcher_, config);
+    return config;
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
@@ -420,7 +426,7 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, OnScheduledInvokesHook) {
   EXPECT_EQ(55u, gauge->value());
 }
 
-// commit() locks the config, posts to the main thread dispatcher, and runs the scheduled hook.
+// commit() posts to the main thread dispatcher, and the posted callback runs the scheduled hook.
 TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerCommitPostsAndRunsHook) {
   auto config = makeConfig();
   size_t id = 0;
@@ -434,7 +440,7 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerCommitPostsAndRunsHook) {
   // Run the posted callback inline to model the main thread dispatching the event.
   EXPECT_CALL(context_.dispatcher_, post(_)).WillOnce([](Event::PostCb cb) { cb(); });
 
-  DynamicModuleStatsSinkConfigScheduler scheduler(config->weak_from_this());
+  DynamicModuleStatsSinkConfigScheduler scheduler(config->scheduler_target_);
   scheduler.commit(42);
 
   auto gauge = TestUtility::findGauge(context_.store_, "g");
@@ -442,21 +448,16 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerCommitPostsAndRunsHook) {
   EXPECT_EQ(42u, gauge->value());
 }
 
-// commit() on a scheduler whose config has already been destroyed is a safe no-op and never posts.
-TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerCommitOnExpiredConfigIsNoop) {
-  std::weak_ptr<DynamicModuleStatsSinkConfig> weak;
-  {
-    auto config = makeConfig();
-    weak = config->weak_from_this();
-  }
-  ASSERT_TRUE(weak.expired());
+TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerCommitAfterConfigDestroyedDoesNotPost) {
+  auto config = makeConfig();
+  DynamicModuleStatsSinkConfigScheduler scheduler(config->scheduler_target_);
+  config.reset();
 
   EXPECT_CALL(context_.dispatcher_, post(_)).Times(0);
-  DynamicModuleStatsSinkConfigScheduler scheduler(weak);
-  scheduler.commit(1); // Must not crash or post.
+  scheduler.commit(1);
 }
 
-TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerPostedEventKeepsConfigUntilDelivered) {
+TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerPostedEventDoesNotKeepConfigAlive) {
   // The hook is a C function pointer, so it reaches the flag through a static.
   static bool hook_ran = false;
   hook_ran = false;
@@ -471,18 +472,47 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerPostedEventKeepsConfigUntilDeli
                                     envoy_dynamic_module_type_stat_sink_config_module_ptr,
                                     uint64_t) { hook_ran = true; };
 
-  DynamicModuleStatsSinkConfigScheduler scheduler(config->weak_from_this());
+  DynamicModuleStatsSinkConfigScheduler scheduler(config->scheduler_target_);
   scheduler.commit(99);
   ASSERT_TRUE(posted_cb);
 
   std::weak_ptr<DynamicModuleStatsSinkConfig> weak_config = config;
   config.reset();
-  // The posted callback owns the last reference, so the event is still delivered.
-  EXPECT_FALSE(weak_config.expired());
-  posted_cb();
-  EXPECT_TRUE(hook_ran);
-  posted_cb = nullptr;
+  // Neither the scheduler nor the pending event holds the config.
   EXPECT_TRUE(weak_config.expired());
+  posted_cb();
+  EXPECT_FALSE(hook_ran);
+}
+
+TEST_F(DynamicModuleStatsSinkGaugeTest, SchedulerCommitRacesConfigDestruction) {
+  absl::Mutex mutex;
+  std::vector<Event::PostCb> posted;
+  EXPECT_CALL(context_.dispatcher_, post(_)).WillRepeatedly([&](Event::PostCb cb) {
+    absl::MutexLock lock(mutex);
+    posted.push_back(std::move(cb));
+  });
+
+  auto config = makeConfig();
+  std::weak_ptr<DynamicModuleStatsSinkConfig> weak_config = config;
+  DynamicModuleStatsSinkConfigScheduler scheduler(config->scheduler_target_);
+  std::atomic<bool> started{false};
+  std::thread module_thread([&]() {
+    for (uint64_t i = 0; i < 1000; ++i) {
+      scheduler.commit(i);
+      started.store(true);
+    }
+  });
+  while (!started.load()) {
+  }
+  config.reset();
+  EXPECT_TRUE(weak_config.expired());
+  module_thread.join();
+
+  // Every event posted before the config was destroyed is dropped when it runs.
+  absl::MutexLock lock(mutex);
+  for (Event::PostCb& cb : posted) {
+    cb();
+  }
 }
 
 // When a module is missing its config_new symbol, newDynamicModuleStatsSinkConfig

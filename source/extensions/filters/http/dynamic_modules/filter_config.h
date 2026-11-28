@@ -12,6 +12,7 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/dynamic_modules/metric_registry.h"
+#include "source/extensions/dynamic_modules/scheduler.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -143,6 +144,10 @@ public:
 
   Envoy::Upstream::ClusterManager& cluster_manager_;
   Event::Dispatcher& main_thread_dispatcher_;
+  // Shared with the schedulers of this config. Initialized once the config is held by a shared
+  // pointer, before the module can create a scheduler, and cleared at the start of the destructor.
+  const DynamicModuleSchedulerTargetSharedPtr<DynamicModuleHttpFilterConfig> scheduler_target_{
+      std::make_shared<DynamicModuleSchedulerTarget<DynamicModuleHttpFilterConfig>>()};
   const Stats::ScopeSharedPtr stats_scope_;
   // Shared metrics registry composed from stats_scope_.
   Extensions::DynamicModules::MetricRegistry metrics_;
@@ -349,31 +354,8 @@ private:
       http_stream_callouts_;
 };
 
-class DynamicModuleHttpFilterConfigScheduler {
-public:
-  explicit DynamicModuleHttpFilterConfigScheduler(
-      std::weak_ptr<DynamicModuleHttpFilterConfig> config)
-      : config_(std::move(config)) {}
-
-  void commit(uint64_t event_id) {
-    // Lock the config so its dispatcher member stays valid across `post`, and to hand the
-    // reference to the posted callback below.
-    auto config_shared = config_.lock();
-    if (!config_shared) {
-      return;
-    }
-    // Move the locked config into the posted callback so the last reference is always released on
-    // the main thread (when the callback runs, or when the dispatcher is destroyed). The module may
-    // call this from a thread it manages; dropping the last reference there would run the
-    // destructor and the module's destroy hook off the main thread.
-    Event::Dispatcher& dispatcher = config_shared->main_thread_dispatcher_;
-    dispatcher.post(
-        [config = std::move(config_shared), event_id]() { config->onScheduled(event_id); });
-  }
-
-private:
-  std::weak_ptr<DynamicModuleHttpFilterConfig> config_;
-};
+using DynamicModuleHttpFilterConfigScheduler =
+    DynamicModuleScheduler<DynamicModuleHttpFilterConfig>;
 
 class DynamicModuleHttpPerRouteFilterConfig : public Router::RouteSpecificFilterConfig {
 public:

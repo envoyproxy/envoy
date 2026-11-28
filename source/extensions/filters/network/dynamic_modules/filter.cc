@@ -48,6 +48,9 @@ void DynamicModuleNetworkFilter::initializeInModuleFilter() {
 }
 
 void DynamicModuleNetworkFilter::destroy() {
+  // Stop the schedulers before the destroy hook, which may join a module thread that is committing
+  // an event.
+  scheduler_target_->clear();
   // Cancel all pending HTTP callouts before destroying the filter.
   for (auto& callout : http_callouts_) {
     if (callout.second->request_ != nullptr) {
@@ -68,8 +71,8 @@ void DynamicModuleNetworkFilter::destroy() {
 void DynamicModuleNetworkFilter::initializeReadFilterCallbacks(
     Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
-  // Publish the worker dispatcher for cross-thread `commit()`; see `dispatcher()`.
   cached_dispatcher_.store(&callbacks.connection().dispatcher(), std::memory_order_release);
+  scheduler_target_->initialize(callbacks.connection().dispatcher(), weak_from_this());
 
   worker_index_ = callbacks.connection().dispatcher().workerId().value_or(0);
 
@@ -139,8 +142,16 @@ Network::FilterStatus DynamicModuleNetworkFilter::onWrite(Buffer::Instance& data
 }
 
 void DynamicModuleNetworkFilter::onEvent(Network::ConnectionEvent event) {
-  if (!config_->access_logs_.empty() && (event == Network::ConnectionEvent::RemoteClose ||
-                                         event == Network::ConnectionEvent::LocalClose)) {
+  const bool closed = event == Network::ConnectionEvent::RemoteClose ||
+                      event == Network::ConnectionEvent::LocalClose;
+  if (closed) {
+    // The filter can outlive the connection, so drop the events scheduled from now on: their hook
+    // could call back into the connection after it is freed. This is done before the event hook,
+    // which may join a module thread that is committing an event.
+    scheduler_target_->clear();
+    connection_closed_ = true;
+  }
+  if (!config_->access_logs_.empty() && closed) {
     connection().streamInfo().downstreamTiming().onDownstreamConnectionEnd(
         connection().dispatcher().timeSource());
     // The filter can outlive the connection, so the timer is destroyed here on the worker.
@@ -208,7 +219,8 @@ void DynamicModuleNetworkFilter::onAccessLogFlushInterval() {
 
 void DynamicModuleNetworkFilter::onScheduled(uint64_t event_id) {
   HookScope hook_scope(*this);
-  if (in_module_filter_ != nullptr && config_->on_network_filter_scheduled_ != nullptr) {
+  if (in_module_filter_ != nullptr && !connection_closed_ &&
+      config_->on_network_filter_scheduled_ != nullptr) {
     config_->on_network_filter_scheduled_(thisAsVoidPtr(), in_module_filter_, event_id);
   }
 }

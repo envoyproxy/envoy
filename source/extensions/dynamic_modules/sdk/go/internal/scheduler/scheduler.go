@@ -37,8 +37,8 @@ func (s *Scheduler) Schedule(task func()) {
 	s.active++
 	s.mu.Unlock()
 
-	// A native commit can release its last reference to the Envoy object and re-enter
-	// Close. Keep the native scheduler alive until every in-flight commit returns.
+	// Close can run on the main thread while a commit is in flight. Keep the native
+	// scheduler alive until every in-flight commit returns.
 	defer func() {
 		s.mu.Lock()
 		s.active--

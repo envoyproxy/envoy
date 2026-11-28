@@ -13,9 +13,8 @@ type BootstrapExtensionConfigFactory interface {
 type BootstrapExtensionConfig interface {
 	// Create creates an instance. Returning nil rejects the extension.
 	Create(handle BootstrapExtensionHandle) BootstrapExtension
-	// OnDestroy releases configuration resources. It can run on the goroutine
-	// whose scheduler commit releases the last native configuration reference.
-	// Do not call main-thread-only host services or wait for that commit to return.
+	// OnDestroy releases configuration resources. Schedulers do not keep the
+	// configuration alive, and tasks scheduled after it starts are discarded.
 	OnDestroy()
 }
 

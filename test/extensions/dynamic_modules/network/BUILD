@@ -121,6 +121,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 

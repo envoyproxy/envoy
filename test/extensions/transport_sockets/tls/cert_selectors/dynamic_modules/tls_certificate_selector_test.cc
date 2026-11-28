@@ -1410,7 +1410,7 @@ TEST_F(DynamicModuleTlsCertificateSelectorTest, SchedulerDeliversEventsToModule)
   envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_delete(other_scheduler);
 }
 
-TEST_F(DynamicModuleTlsCertificateSelectorTest, ScheduledEventKeepsConfigUntilDelivered) {
+TEST_F(DynamicModuleTlsCertificateSelectorTest, ScheduledEventIsDroppedWhenConfigIsGone) {
   initializeDownstream("tls_certificate_selector_dynamic");
   std::vector<Event::PostCb> posted;
   EXPECT_CALL(factory_context_.server_context_.dispatcher_, post(_))
@@ -1422,14 +1422,12 @@ TEST_F(DynamicModuleTlsCertificateSelectorTest, ScheduledEventKeepsConfigUntilDe
   selector_.reset();
   factory_.reset();
   config_.reset();
-  // The posted callback owns the last reference, so the event is still delivered.
-  EXPECT_FALSE(weak_config.expired());
+  // The pending event does not keep the config alive.
+  EXPECT_TRUE(weak_config.expired());
   ASSERT_EQ(1U, posted.size());
   posted[0]();
-  EXPECT_EQ(1U, counterValue("dynamicmodulescustom.scheduled"));
-  posted.clear();
-  EXPECT_TRUE(weak_config.expired());
   envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_delete(scheduler);
+  EXPECT_EQ(0U, counterValue("dynamicmodulescustom.scheduled"));
 }
 
 TEST_F(DynamicModuleTlsCertificateSelectorTest, MetricsAreDefinedOnlyDuringConfigCreation) {
