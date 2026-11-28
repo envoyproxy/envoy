@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "envoy/extensions/ai_protocol_manager/external_buffer/in_memory/v3/in_memory.pb.h"
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.validate.h"
@@ -424,6 +426,130 @@ TEST(AiProtocolManagerConfigTest, NoAiFiltersByDefault) {
                            std::make_shared<InMemoryExternalBufferFactory>());
   ASSERT_TRUE(config.ok());
   EXPECT_TRUE((*config)->aiFilterFactories().empty());
+}
+
+// What an AI filter that takes no per-route configuration and reads no request string says.
+TEST(AiProtocolManagerConfigTest, AiFilterFactoryDefaults) {
+  TestAiFilterConfigFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  const Protobuf::Struct config;
+
+  EXPECT_EQ(factory.createEmptyRouteConfigProto(), nullptr);
+  const auto route_config = factory.createRouteConfig(config, context.server_factory_context_,
+                                                      context.messageValidationVisitor());
+  ASSERT_TRUE(route_config.ok());
+  EXPECT_EQ(*route_config, nullptr);
+  EXPECT_EQ(factory.requestInlineStringBytes(config), std::nullopt);
+  EXPECT_THAT(factory.configTypes(), testing::ElementsAre("google.protobuf.Struct"));
+}
+
+class TestAiFilterRouteConfig : public Router::RouteSpecificFilterConfig {};
+
+// Takes a Struct as its configuration and a Value as its per-route one.
+class RouteConfiguredAiFilterConfigFactory : public TestAiFilterConfigFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
+    return std::make_unique<Protobuf::Value>();
+  }
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteConfig(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
+                    ProtobufMessage::ValidationVisitor&) override {
+    if (!error_.empty()) {
+      return absl::InvalidArgumentError(error_);
+    }
+    return std::make_shared<const TestAiFilterRouteConfig>();
+  }
+  std::optional<uint32_t> requestInlineStringBytes(const Protobuf::Message&) override {
+    return 4096;
+  }
+};
+
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+routeConfigWithAiFilterConfig(const Protobuf::Message& typed_config) {
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute proto;
+  EXPECT_TRUE((*proto.mutable_typed_per_filter_config())["test.ai_filter"].PackFrom(typed_config));
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  AiProtocolManagerFilterConfigFactory factory;
+  return factory.createRouteSpecificFilterConfig(proto, context,
+                                                 ProtobufMessage::getNullValidationVisitor());
+}
+
+// A route's AI filter configuration is built by the AI filter that registers its type.
+TEST(AiProtocolManagerConfigTest, ResolvesPerRouteAiFilterConfig) {
+  RouteConfiguredAiFilterConfigFactory test_factory;
+  Registry::InjectFactory<AiFilterConfigFactory> registration(test_factory);
+  EXPECT_THAT(test_factory.configTypes(),
+              testing::UnorderedElementsAre("google.protobuf.Struct", "google.protobuf.Value"));
+
+  const auto route_config = routeConfigWithAiFilterConfig(Protobuf::Value());
+  ASSERT_TRUE(route_config.ok()) << route_config.status();
+  const auto* config = dynamic_cast<const RouteConfig*>(route_config->get());
+  ASSERT_NE(config, nullptr);
+  ASSERT_NE(config->filterConfigs(), nullptr);
+  EXPECT_THAT(config->filterConfigs()->at("test.ai_filter").get(),
+              testing::WhenDynamicCastTo<const TestAiFilterRouteConfig*>(testing::NotNull()));
+}
+
+TEST(AiProtocolManagerConfigTest, RouteWithoutAiFilterConfigHasNone) {
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute proto;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  AiProtocolManagerFilterConfigFactory factory;
+  const auto route_config = factory.createRouteSpecificFilterConfig(
+      proto, context, ProtobufMessage::getNullValidationVisitor());
+  ASSERT_TRUE(route_config.ok());
+  EXPECT_EQ(dynamic_cast<const RouteConfig&>(**route_config).filterConfigs(), nullptr);
+}
+
+// Neither an unregistered type nor the type of a filter that takes no per-route configuration.
+TEST(AiProtocolManagerConfigTest, RejectsPerRouteConfigNoAiFilterTakes) {
+  TestAiFilterConfigFactory test_factory;
+  Registry::InjectFactory<AiFilterConfigFactory> registration(test_factory);
+  const auto expect_rejected = [](const Protobuf::Message& typed_config) {
+    const auto route_config = routeConfigWithAiFilterConfig(typed_config);
+    EXPECT_EQ(route_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(std::string(route_config.status().message()),
+                testing::HasSubstr("no AI filter takes the per-route configuration"));
+  };
+
+  expect_rejected(Protobuf::Value());
+  expect_rejected(Protobuf::Struct());
+}
+
+// A filter's own configuration type finds its factory, but is not its per-route configuration.
+TEST(AiProtocolManagerConfigTest, RejectsFilterConfigAsPerRouteConfig) {
+  RouteConfiguredAiFilterConfigFactory test_factory;
+  Registry::InjectFactory<AiFilterConfigFactory> registration(test_factory);
+
+  const auto route_config = routeConfigWithAiFilterConfig(Protobuf::Struct());
+  EXPECT_EQ(route_config.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(std::string(route_config.status().message()),
+              testing::HasSubstr("no AI filter takes the per-route configuration"));
+}
+
+TEST(AiProtocolManagerConfigTest, PropagatesPerRouteAiFilterConfigError) {
+  RouteConfiguredAiFilterConfigFactory test_factory;
+  test_factory.error_ = "bad per-route config";
+  Registry::InjectFactory<AiFilterConfigFactory> registration(test_factory);
+
+  const auto route_config = routeConfigWithAiFilterConfig(Protobuf::Value());
+  EXPECT_EQ(route_config.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(route_config.status().message(), "bad per-route config");
+}
+
+// The manager keeps inline what its AI filters say they read.
+TEST(AiProtocolManagerConfigTest, AiFilterNeedRaisesTheInlineStringThreshold) {
+  RouteConfiguredAiFilterConfigFactory test_factory;
+  Registry::InjectFactory<AiFilterConfigFactory> registration(test_factory);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+
+  const auto config = FilterConfig::create(
+      configWithAiFilter(Protobuf::Struct()), context.server_factory_context_,
+      *stats_store.rootScope(), std::make_shared<InMemoryExternalBufferFactory>());
+  ASSERT_TRUE(config.ok()) << config.status();
+  EXPECT_EQ((*config)->inlineStringThresholdBytes(), 4096);
+  EXPECT_EQ((*config)->aiFilterName(0), "test.ai_filter");
+  EXPECT_EQ((*config)->aiFilterName(1), "");
 }
 
 // A config whose external_buffer_config selects `name` with `typed_config`.

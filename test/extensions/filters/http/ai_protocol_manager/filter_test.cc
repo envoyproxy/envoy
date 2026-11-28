@@ -1,4 +1,5 @@
 #include <deque>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -2753,6 +2754,460 @@ TEST_F(AiProtocolManagerFilterTest,
   EXPECT_EQ(
       encoded_injected_.toString(),
       R"({"model":"gpt-4","usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12},"tagged":true})");
+}
+
+// Answers a request the manager has no document for, and records what it was asked.
+class UnparsedAnsweringAiFilter : public PassThroughAiFilter {
+public:
+  UnparsedAnsweringAiFilter(std::vector<UnparsedRequest>& seen, std::optional<LocalReply> reply)
+      : seen_(seen), reply_(std::move(reply)) {}
+
+  std::optional<LocalReply> onUnparsedRequest(UnparsedRequest reason) override {
+    seen_.push_back(reason);
+    return reply_;
+  }
+
+private:
+  std::vector<UnparsedRequest>& seen_;
+  const std::optional<LocalReply> reply_;
+};
+
+AiFilterFactories unparsedAnswering(std::vector<UnparsedRequest>& seen,
+                                    std::optional<LocalReply> reply) {
+  return {[&seen, reply](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<UnparsedAnsweringAiFilter>(seen, reply);
+  }};
+}
+
+// A filter can answer a request that ends on its headers, with its own body, headers and details.
+TEST_F(AiProtocolManagerFilterTest, AiFilterAnswersAHeadersOnlyRequest) {
+  std::vector<UnparsedRequest> seen;
+  createFilterWithAiFilters(unparsedAnswering(
+      seen, LocalReply{.code = Http::Code::MethodNotAllowed,
+                       .body = "POST only",
+                       .details = "post_only",
+                       .modify_headers =
+                           [](Http::ResponseHeaderMap& headers) {
+                             headers.addCopy(Http::LowerCaseString("allow"), "POST");
+                           },
+                       .grpc_status = Grpc::Status::WellKnownGrpcStatus::InvalidArgument}));
+  setRouteConfig();
+  EXPECT_CALL(callbacks_,
+              sendLocalReply(Http::Code::MethodNotAllowed, "POST only", testing::_,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::InvalidArgument),
+                             "post_only"))
+      .WillOnce([](Http::Code, absl::string_view,
+                   std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                   const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        Http::TestResponseHeaderMapImpl headers;
+        modify_headers(headers);
+        EXPECT_EQ(headers.get_("allow"), "POST");
+      });
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/chat/completions"}};
+  EXPECT_EQ(filter_->decodeHeaders(headers, true), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_THAT(seen, testing::ElementsAre(UnparsedRequest::NoBody));
+}
+
+// Without an answer the headers flow, as they do without AI filters.
+TEST_F(AiProtocolManagerFilterTest, HeadersOnlyRequestFlowsWhenNoAiFilterAnswers) {
+  std::vector<UnparsedRequest> seen;
+  createFilterWithAiFilters(unparsedAnswering(seen, std::nullopt));
+  setRouteConfig();
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/chat/completions"}};
+  EXPECT_EQ(filter_->decodeHeaders(headers, true), Http::FilterHeadersStatus::Continue);
+  EXPECT_THAT(seen, testing::ElementsAre(UnparsedRequest::NoBody));
+  EXPECT_EQ(local_reply_calls_, 0);
+}
+
+// Only a declared endpoint's request is the AI filters' to answer.
+TEST_F(AiProtocolManagerFilterTest, HeadersOnlyRequestOnAnUndeclaredRouteIsNotOffered) {
+  std::vector<UnparsedRequest> seen;
+  createFilterWithAiFilters(unparsedAnswering(seen, LocalReply{Http::Code::Forbidden, "no"}));
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/healthz"}};
+  EXPECT_EQ(filter_->decodeHeaders(headers, true), Http::FilterHeadersStatus::Continue);
+  EXPECT_THAT(seen, testing::IsEmpty());
+}
+
+// A filter's answer to a payload that is not JSON replaces the manager's 400.
+TEST_F(AiProtocolManagerFilterTest, AiFilterAnswersAPayloadThatIsNotJson) {
+  std::vector<UnparsedRequest> seen;
+  createFilterWithAiFilters(
+      unparsedAnswering(seen, LocalReply{Http::Code::UnprocessableEntity, "not json"}));
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body("{not json");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+
+  EXPECT_THAT(seen, testing::ElementsAre(UnparsedRequest::InvalidJson));
+  EXPECT_EQ(local_reply_calls_, 1);
+  EXPECT_EQ(local_reply_code_, Http::Code::UnprocessableEntity);
+  // A reply that names no details gets the manager's.
+  EXPECT_EQ(local_reply_details_, "ai_protocol_manager_filter_rejected");
+  EXPECT_EQ(counterValue("request_parse_error"), 1);
+}
+
+TEST_F(AiProtocolManagerFilterTest, PayloadThatIsNotJsonGetsA400WhenNoAiFilterAnswers) {
+  std::vector<UnparsedRequest> seen;
+  createFilterWithAiFilters(unparsedAnswering(seen, std::nullopt));
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body("{not json");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+
+  EXPECT_THAT(seen, testing::ElementsAre(UnparsedRequest::InvalidJson));
+  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
+  EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
+}
+
+// The filters are given the size of the payload up to the end of the frame that is not JSON.
+TEST_F(AiProtocolManagerFilterTest, PayloadThatIsNotJsonCountsItsLastFrame) {
+  uint64_t payload_bytes = 0;
+  createFilterWithAiFilters({[&payload_bytes](const AiFilterContext& context) -> AiFilterSharedPtr {
+    payload_bytes = context.request_payload_bytes;
+    return std::make_shared<PassThroughAiFilter>();
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl first(R"({"a":1,)");
+  EXPECT_EQ(filter_->decodeData(first, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Buffer::OwnedImpl second("not json");
+  EXPECT_EQ(filter_->decodeData(second, true), Http::FilterDataStatus::StopIterationNoBuffer);
+
+  EXPECT_EQ(payload_bytes, 15);
+  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
+}
+
+// A body announced but never sent is a request without one.
+TEST_F(AiProtocolManagerFilterTest, AiFilterAnswersAnEmptyBody) {
+  std::vector<UnparsedRequest> seen;
+  createFilterWithAiFilters(unparsedAnswering(seen, LocalReply{Http::Code::BadRequest, "empty"}));
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body;
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_THAT(seen, testing::ElementsAre(UnparsedRequest::NoBody));
+  EXPECT_EQ(local_reply_calls_, 1);
+  EXPECT_EQ(inject_calls_, 0);
+}
+
+TEST_F(AiProtocolManagerFilterTest, AiFilterAnswersARequestOfOnlyTrailers) {
+  std::vector<UnparsedRequest> seen;
+  createFilterWithAiFilters(unparsedAnswering(seen, LocalReply{Http::Code::BadRequest, "empty"}));
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Http::TestRequestTrailerMapImpl trailers{{"x-trailer", "1"}};
+  EXPECT_EQ(filter_->decodeTrailers(trailers), Http::FilterTrailersStatus::StopIteration);
+
+  EXPECT_THAT(seen, testing::ElementsAre(UnparsedRequest::NoBody));
+  EXPECT_EQ(local_reply_calls_, 1);
+}
+
+class TestAiFilterRouteConfig : public Router::RouteSpecificFilterConfig {};
+
+// Each filter is handed its own name, and the configuration the route carries under it.
+TEST_F(AiProtocolManagerFilterTest, AiFilterContextCarriesItsNameAndRouteConfig) {
+  struct Seen {
+    std::string name;
+    Router::RouteSpecificFilterConfigConstSharedPtr route_config;
+  };
+  std::vector<Seen> seen;
+  const AiFilterFactoryCb record = [&seen](const AiFilterContext& context) -> AiFilterSharedPtr {
+    seen.push_back({std::string(context.filter_name), context.route_config});
+    return std::make_shared<PassThroughAiFilter>();
+  };
+  filter_->onDestroy();
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
+  proto.mutable_request_handling();
+  proto.add_filters()->set_name("first");
+  proto.add_filters()->set_name("second");
+  filter_ = std::make_unique<AiProtocolManagerFilter>(std::make_shared<const FilterConfig>(
+      proto, *stats_store_.rootScope(), AiFilterFactories{record, record}, factory_));
+  filter_->setDecoderFilterCallbacks(callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  const auto second_config = std::make_shared<const TestAiFilterRouteConfig>();
+  route_config_ =
+      RouteConfig::create(chatRoute(), std::make_shared<const AiFilterRouteConfigs>(
+                                           AiFilterRouteConfigs{{"second", second_config}}))
+          .value();
+  ON_CALL(callbacks_, mostSpecificPerFilterConfig())
+      .WillByDefault(testing::Return(route_config_.get()));
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  ASSERT_EQ(seen.size(), 2);
+  EXPECT_EQ(seen[0].name, "first");
+  EXPECT_EQ(seen[0].route_config, nullptr);
+  EXPECT_EQ(seen[1].name, "second");
+  EXPECT_EQ(seen[1].route_config, second_config);
+}
+
+// A filter that rewrites what the request is routed by has the route selected again.
+TEST_F(AiProtocolManagerFilterTest, AiFilterContextClearsTheRouteCache) {
+  std::function<void()> clear_route_cache;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+    clear_route_cache = context.clear_route_cache;
+    return std::make_shared<PassThroughAiFilter>();
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  ASSERT_NE(clear_route_cache, nullptr);
+
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
+  clear_route_cache();
+
+  // An upstream filter chain has no route to select.
+  ON_CALL(callbacks_, downstreamCallbacks())
+      .WillByDefault(testing::Return(OptRef<Http::DownstreamStreamFilterCallbacks>{}));
+  clear_route_cache();
+}
+
+// What the AI filters need inline raises the configured threshold, up to the manager's limit.
+TEST_F(AiProtocolManagerFilterTest, AiFilterNeedRaisesTheInlineStringThreshold) {
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
+  const auto threshold = [&](uint32_t min_inline_string_threshold_bytes) {
+    return FilterConfig(proto, *stats_store_.rootScope(), AiFilterFactories{}, factory_,
+                        min_inline_string_threshold_bytes)
+        .inlineStringThresholdBytes();
+  };
+  EXPECT_EQ(threshold(0), 1024);
+  EXPECT_EQ(threshold(4096), 4096);
+  EXPECT_EQ(threshold(std::numeric_limits<uint32_t>::max()), 1024 * 1024);
+
+  proto.mutable_request_handling()
+      ->mutable_limits()
+      ->mutable_inline_string_threshold_bytes()
+      ->set_value(8192);
+  EXPECT_EQ(threshold(4096), 8192);
+}
+
+// Maps the request onto one without a body.
+class BodyDroppingAiFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    request->dropBody();
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
+};
+
+TEST_F(AiProtocolManagerFilterTest, SendsNoBodyForARequestAnAiFilterDropsTheBodyOf) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<BodyDroppingAiFilter>();
+  }});
+  setRouteConfig();
+  request_headers_ = requestHeaders();
+  request_headers_.setContentLength(62);
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(injected_.length(), 0);
+  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(request_headers_.getContentLengthValue(), "0");
+}
+
+// Takes the response as bytes: brackets the body, and marks the headers it was shown.
+class RawAiFilter : public PassThroughAiFilter {
+public:
+  struct Options {
+    ResponseMode mode{ResponseMode::Raw};
+    // Replies locally on the first chunk instead of forwarding it.
+    bool reply{false};
+    bool fail{false};
+  };
+
+  explicit RawAiFilter(Options options) : options_(options) {}
+
+  ResponseMode onResponseHeaders(Http::ResponseHeaderMap& headers, bool) override {
+    headers_ = &headers;
+    headers.setStatus(200);
+    return options_.mode;
+  }
+
+  Coroutine::Task<absl::Status> encodeRaw(RawResponseReceiver receive,
+                                          RawResponsePropagator propagate,
+                                          LocalReplier reply_locally) override {
+    std::string body;
+    while (true) {
+      ASSIGN_OR_CO_RETURN(std::optional<Buffer::InstancePtr> chunk, co_await receive());
+      if (!chunk.has_value()) {
+        break;
+      }
+      if (options_.reply) {
+        std::move(reply_locally)(Http::Code::ServiceUnavailable, "replaced");
+        co_return absl::OkStatus();
+      }
+      if (options_.fail) {
+        co_return absl::InternalError("raw filter error");
+      }
+      body += (*chunk)->toString();
+    }
+    body = absl::StrCat("[", body, "]");
+    if (options_.mode == ResponseMode::RawHoldHeaders) {
+      headers_->setContentLength(body.size());
+    }
+    co_return co_await propagate(std::make_unique<Buffer::OwnedImpl>(body));
+  }
+
+private:
+  const Options options_;
+  Http::ResponseHeaderMap* headers_{nullptr};
+};
+
+class AiProtocolManagerRawResponseTest : public AiProtocolManagerFilterTest {
+public:
+  // Runs a request through a chain of an inert filter and a RawAiFilter, leaving the response
+  // to the test.
+  void sendRequest(RawAiFilter::Options options, bool declared_endpoint = true) {
+    createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+                                 return std::make_shared<PassThroughAiFilter>();
+                               },
+                               [options](const AiFilterContext&) -> AiFilterSharedPtr {
+                                 return std::make_shared<RawAiFilter>(options);
+                               }});
+    if (declared_endpoint) {
+      setRouteConfig();
+    }
+    EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+    Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+    EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+    drain();
+    ASSERT_TRUE(injected_end_stream_);
+  }
+
+  // Neither a status nor a content type the manager parses a response of.
+  Http::TestResponseHeaderMapImpl response_headers_{
+      {":status", "503"}, {"content-type", "text/plain"}, {"content-length", "11"}};
+};
+
+// A raw response reaches the filter whatever its status and content type, and its headers go
+// ahead of the body.
+TEST_F(AiProtocolManagerRawResponseTest, AiFilterTakesAResponseRaw) {
+  sendRequest({});
+
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(response_headers_.getStatusValue(), "200");
+  // Framing is the filter's to keep, so the manager leaves it.
+  EXPECT_EQ(response_headers_.getContentLengthValue(), "11");
+
+  Buffer::OwnedImpl first("upstream ");
+  EXPECT_EQ(filter_->encodeData(first, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Buffer::OwnedImpl second("is down");
+  EXPECT_EQ(filter_->encodeData(second, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+  EXPECT_EQ(encoded_injected_.toString(), "[upstream is down]");
+  EXPECT_TRUE(encoded_injected_end_stream_);
+}
+
+// The chain also runs on a parsed request of an undeclared route, and a filter that rewrote one
+// has to get its response.
+TEST_F(AiProtocolManagerRawResponseTest, AiFilterTakesAResponseRawOnAnUndeclaredRoute) {
+  sendRequest({}, /*declared_endpoint=*/false);
+
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+  Buffer::OwnedImpl body("upstream is down");
+  EXPECT_EQ(filter_->encodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encoded_injected_.toString(), "[upstream is down]");
+  EXPECT_TRUE(encoded_injected_end_stream_);
+}
+
+// Held headers can still be rewritten once the filter has seen the body.
+TEST_F(AiProtocolManagerRawResponseTest, RawResponseHeadersAreHeldOnRequest) {
+  sendRequest({.mode = ResponseMode::RawHoldHeaders});
+
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl body("upstream is down");
+  EXPECT_EQ(filter_->encodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(response_headers_.getContentLengthValue(), "18");
+  EXPECT_EQ(encoded_injected_.toString(), "[upstream is down]");
+  EXPECT_TRUE(encoded_injected_end_stream_);
+}
+
+// The headers of a response that ended on them are held, so the filter can give it a body.
+TEST_F(AiProtocolManagerRawResponseTest, RawResponseThatEndedOnItsHeadersCanGetABody) {
+  sendRequest({});
+
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, true),
+            Http::FilterHeadersStatus::StopIteration);
+  drain();
+
+  EXPECT_EQ(encoded_injected_.toString(), "[]");
+  EXPECT_TRUE(encoded_injected_end_stream_);
+}
+
+TEST_F(AiProtocolManagerRawResponseTest, RawResponseEndedByTrailersContinuesEncoding) {
+  sendRequest({});
+
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+  Buffer::OwnedImpl body("upstream is down");
+  EXPECT_EQ(filter_->encodeData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Http::TestResponseTrailerMapImpl trailers{{"x-trailer", "1"}};
+  EXPECT_EQ(filter_->encodeTrailers(trailers), Http::FilterTrailersStatus::StopIteration);
+  drain();
+
+  EXPECT_EQ(encode_continue_calls_, 1);
+  EXPECT_EQ(encoded_injected_.toString(), "[upstream is down]");
+}
+
+// The filter's reply replaces the response, and what is left of the body is dropped.
+TEST_F(AiProtocolManagerRawResponseTest, AiFilterRepliesLocallyToARawResponse) {
+  sendRequest({.mode = ResponseMode::RawHoldHeaders, .reply = true});
+
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl first("upstream ");
+  EXPECT_EQ(filter_->encodeData(first, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  EXPECT_EQ(encode_local_reply_calls_, 1);
+  EXPECT_EQ(encode_local_reply_code_, Http::Code::ServiceUnavailable);
+
+  Buffer::OwnedImpl second("is down");
+  EXPECT_EQ(filter_->encodeData(second, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  EXPECT_EQ(second.length(), 0);
+  EXPECT_EQ(encoded_inject_calls_, 0);
+  EXPECT_EQ(encode_local_reply_calls_, 1);
+}
+
+TEST_F(AiProtocolManagerRawResponseTest, RawResponseFilterErrorSendsBadGatewayLocalReply) {
+  sendRequest({.fail = true});
+
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+  Buffer::OwnedImpl body("upstream is down");
+  EXPECT_EQ(filter_->encodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 1);
+  EXPECT_EQ(encode_local_reply_code_, Http::Code::BadGateway);
 }
 
 } // namespace

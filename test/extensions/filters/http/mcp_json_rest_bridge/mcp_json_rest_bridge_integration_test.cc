@@ -1,4 +1,6 @@
+#include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/codec.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -32,20 +34,124 @@ void expectJsonRpcParseErrorResponse(IntegrationStreamDecoder& response) {
           R"json({"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"JSON parse error"}})json"));
 }
 
-class McpJsonRestBridgeIntegrationTest : public HttpProtocolIntegrationTest {
+// The filter that hosts the bridge: its own HTTP filter, or the AI Protocol Manager through the
+// bridge's AI filter. Every test runs under both, since the two share one bridge.
+enum class BridgeHost { HttpFilter, AiFilter };
+
+constexpr char AiProtocolManagerName[] = "envoy.filters.http.ai_protocol_manager";
+
+class McpJsonRestBridgeIntegrationTest
+    : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, BridgeHost>>,
+      public HttpIntegrationTest {
 public:
+  McpJsonRestBridgeIntegrationTest()
+      : HttpIntegrationTest(protocolParams().downstream_protocol, protocolParams().version,
+                            ConfigHelper::httpProxyConfig()) {
+    setupHttp2ImplOverrides(protocolParams().http2_implementation);
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                      protocolParams().use_universal_header_validator ? "true"
+                                                                                      : "false");
+  }
+
+  static std::string testParamsToString(
+      const testing::TestParamInfo<std::tuple<HttpProtocolTestParams, BridgeHost>>& params) {
+    return fmt::format(
+        "{}_{}",
+        HttpProtocolIntegrationTest::protocolTestParamsToString(
+            testing::TestParamInfo<HttpProtocolTestParams>(std::get<0>(params.param), 0)),
+        std::get<1>(params.param) == BridgeHost::HttpFilter ? "HttpFilter" : "AiFilter");
+  }
+
+  void SetUp() override {
+    setDownstreamProtocol(protocolParams().downstream_protocol);
+    setUpstreamProtocol(protocolParams().upstream_protocol);
+  }
+
+  void initialize() override {
+    config_helper_.setAsyncLb();
+    HttpIntegrationTest::initialize();
+  }
+
+  // `config` is the bridge as its HTTP filter is configured.
   void initializeFilter(const std::string& config) {
-    config_helper_.prependFilter(config);
+    if (host() == BridgeHost::HttpFilter) {
+      config_helper_.prependFilter(config);
+    } else {
+      prependAiProtocolManager(config);
+    }
     initialize();
+  }
+
+  static BridgeHost host() { return std::get<1>(GetParam()); }
+
+  // Expects `actual` to be the body `expected` as the host forwards one the bridge leaves alone:
+  // byte for byte under the HTTP filter, and as the same document under the AI Protocol Manager,
+  // which re-serializes the JSON of a declared endpoint.
+  static void expectForwarded(const std::string& actual, const std::string& expected) {
+    if (host() == BridgeHost::HttpFilter) {
+      EXPECT_EQ(actual, expected);
+    } else {
+      EXPECT_EQ(nlohmann::json::parse(actual), nlohmann::json::parse(expected));
+    }
+  }
+
+private:
+  static const HttpProtocolTestParams& protocolParams() { return std::get<0>(GetParam()); }
+
+  // Hosts the bridge on the AI Protocol Manager: as its one AI filter, under the HTTP filter's
+  // name and configuration, on routes that are all declared AI endpoints.
+  void prependAiProtocolManager(const std::string& config) {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter bridge;
+    TestUtility::loadFromYaml(config, bridge);
+
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager manager;
+    manager.mutable_request_handling();
+    auto* ai_filter = manager.add_filters();
+    ai_filter->set_name(bridge.name());
+    *ai_filter->mutable_typed_config() = bridge.typed_config();
+
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter filter;
+    filter.set_name(AiProtocolManagerName);
+    MessageUtil::packFrom(*filter.mutable_typed_config(), manager);
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(filter));
+
+    // Added last, so it sees the per-route bridge configuration a test has set.
+    config_helper_.addConfigModifier(
+        [name = bridge.name()](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          for (auto& virtual_host : *hcm.mutable_route_config()->mutable_virtual_hosts()) {
+            declareAiEndpoint(*virtual_host.mutable_typed_per_filter_config(), name);
+            for (auto& route : *virtual_host.mutable_routes()) {
+              if (route.typed_per_filter_config().contains(name)) {
+                declareAiEndpoint(*route.mutable_typed_per_filter_config(), name);
+              }
+            }
+          }
+        });
+  }
+
+  // Declares an AI endpoint in `per_filter_config`, moving the bridge's per-route configuration
+  // under it.
+  static void declareAiEndpoint(Protobuf::Map<std::string, Protobuf::Any>& per_filter_config,
+                                const std::string& bridge_name) {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute per_route;
+    per_route.mutable_request();
+    if (const auto it = per_filter_config.find(bridge_name); it != per_filter_config.end()) {
+      (*per_route.mutable_typed_per_filter_config())[bridge_name] = it->second;
+      per_filter_config.erase(it);
+    }
+    MessageUtil::packFrom(per_filter_config[AiProtocolManagerName], per_route);
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, McpJsonRestBridgeIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             /*downstream_protocols=*/{Http::CodecType::HTTP1,
-                                                       Http::CodecType::HTTP2},
-                             /*upstream_protocols=*/{Http::CodecType::HTTP2})),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, McpJsonRestBridgeIntegrationTest,
+    testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                         /*downstream_protocols=*/{Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+                         /*upstream_protocols=*/{Http::CodecType::HTTP2})),
+                     testing::Values(BridgeHost::HttpFilter, BridgeHost::AiFilter)),
+    McpJsonRestBridgeIntegrationTest::testParamsToString);
 
 TEST_P(McpJsonRestBridgeIntegrationTest, InitializeSuccess) {
   const std::string config = R"EOF(
@@ -917,6 +1023,54 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallTranscoding) {
   EXPECT_TRUE(metadata_verified);
 }
 
+// An argument far longer than a tool name still maps into the path of the backend request.
+TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallWithLongArgumentInPath) {
+  initializeFilter(R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+      tool_config:
+        tools:
+          - name: "get_item"
+            http_rule:
+              get: "/v1/items/{id}"
+  )EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string id(4000, 'a');
+  const nlohmann::json request = {
+      {"jsonrpc", "2.0"},
+      {"id", 1},
+      {"method", "tools/call"},
+      {"params", {{"name", "get_item"}, {"arguments", {{"id", id}}}}},
+  };
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request.dump());
+
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers().getMethodValue(), StrEq("GET"));
+  EXPECT_THAT(upstream_request_->headers().getPathValue(), StrEq("/v1/items/" + id));
+  EXPECT_THAT(upstream_request_->body().toString(), IsEmpty());
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data(R"({"id":"item"})");
+  upstream_request_->encodeData(response_data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
+  EXPECT_EQ(nlohmann::json::parse(response->body())["result"]["content"][0]["text"],
+            R"({"id":"item"})");
+}
+
 TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallWithTrailersTranscoding) {
   const std::string config = R"EOF(
     name: envoy.filters.http.mcp_json_rest_bridge
@@ -1364,8 +1518,11 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsListPassthrough) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
-  EXPECT_THAT(response->headers().getContentLengthValue(),
-              StrEq(std::to_string(response->body().size())));
+  // The AI Protocol Manager streams a response it parses, without a content-length.
+  if (host() == BridgeHost::HttpFilter) {
+    EXPECT_THAT(response->headers().getContentLengthValue(),
+                StrEq(std::to_string(response->body().size())));
+  }
 
   EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(backend_response_body));
 }
@@ -1954,7 +2111,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, PerRouteConfigWithCustomPath) {
     // Verify it arrived at the upstream unmodified
     EXPECT_THAT(upstream_request_->headers().getMethodValue(), StrEq("POST"));
     EXPECT_THAT(upstream_request_->headers().getPathValue(), StrEq("/unconfigured_mcp"));
-    EXPECT_THAT(upstream_request_->body().toString(), StrEq(passthrough_body));
+    expectForwarded(upstream_request_->body().toString(), passthrough_body);
 
     Http::TestResponseHeaderMapImpl response_headers;
     response_headers.setStatus(200);
@@ -1969,7 +2126,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, PerRouteConfigWithCustomPath) {
     EXPECT_TRUE(upstream_request_->complete());
 
     EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
-    EXPECT_EQ(response->body(), R"({"passthrough_response": true})");
+    expectForwarded(response->body(), R"({"passthrough_response": true})");
   }
 }
 
@@ -2245,11 +2402,11 @@ TEST_P(McpJsonRestBridgeIntegrationTest, PerRouteOnlyNoOpModeIntegrationTest) {
   waitForNextUpstreamRequest();
   EXPECT_THAT(upstream_request_->headers().getMethodValue(), StrEq("POST"));
   EXPECT_THAT(upstream_request_->headers().getPathValue(), StrEq("/mcp"));
-  EXPECT_THAT(upstream_request_->body().toString(), StrEq(request_body));
+  expectForwarded(upstream_request_->body().toString(), request_body);
 
   Http::TestResponseHeaderMapImpl response_headers;
   response_headers.setStatus(200);
-  response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+  response_headers.setContentType(Http::Headers::get().ContentTypeValues.Text);
 
   upstream_request_->encodeHeaders(response_headers, false);
 

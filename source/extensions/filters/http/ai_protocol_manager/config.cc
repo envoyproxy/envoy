@@ -49,6 +49,38 @@ absl::StatusOr<ExternalBufferFactorySharedPtr> resolveExternalBufferFactory(
   return buffer_factory;
 }
 
+// Builds the AI filter configurations a route carries. Each is built by the AI filter that
+// registers its message type.
+absl::StatusOr<AiFilterRouteConfigsConstSharedPtr> resolveAiFilterRouteConfigs(
+    const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute&
+        proto_config,
+    Server::Configuration::ServerFactoryContext& context,
+    ProtobufMessage::ValidationVisitor& validator) {
+  if (proto_config.typed_per_filter_config().empty()) {
+    return nullptr;
+  }
+  auto filter_configs = std::make_shared<AiFilterRouteConfigs>();
+  for (const auto& [name, typed_config] : proto_config.typed_per_filter_config()) {
+    auto* factory = Config::Utility::getFactoryByType<AiFilterConfigFactory>(typed_config);
+    const ProtobufTypes::MessagePtr config =
+        factory != nullptr ? factory->createEmptyRouteConfigProto() : nullptr;
+    const std::string type = Config::Utility::getFactoryType(typed_config);
+    // A factory is found by its filter configuration type as well.
+    if (config == nullptr || config->GetTypeName() != type) {
+      return absl::InvalidArgumentError(
+          fmt::format("ai_protocol_manager: no AI filter takes the per-route configuration '{}' "
+                      "with type URL '{}'",
+                      name, type));
+    }
+    RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(typed_config, validator, *config));
+    absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr> filter_config =
+        factory->createRouteConfig(*config, context, validator);
+    RETURN_IF_NOT_OK_REF(filter_config.status());
+    filter_configs->emplace(name, std::move(filter_config.value()));
+  }
+  return filter_configs;
+}
+
 } // namespace
 
 absl::StatusOr<Http::FilterFactoryCb>
@@ -72,8 +104,13 @@ absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 AiProtocolManagerFilterConfigFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute&
         proto_config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  absl::StatusOr<std::unique_ptr<RouteConfig>> route_config = RouteConfig::create(proto_config);
+    Server::Configuration::ServerFactoryContext& context,
+    ProtobufMessage::ValidationVisitor& validator) {
+  absl::StatusOr<AiFilterRouteConfigsConstSharedPtr> filter_configs =
+      resolveAiFilterRouteConfigs(proto_config, context, validator);
+  RETURN_IF_NOT_OK_REF(filter_configs.status());
+  absl::StatusOr<std::unique_ptr<RouteConfig>> route_config =
+      RouteConfig::create(proto_config, std::move(filter_configs.value()));
   if (!route_config.ok()) {
     return route_config.status();
   }

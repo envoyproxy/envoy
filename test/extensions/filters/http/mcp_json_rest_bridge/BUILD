@@ -85,7 +85,11 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "mcp_json_rest_bridge_integration_test",
     srcs = ["mcp_json_rest_bridge_integration_test.cc"],
-    extension_names = ["envoy.filters.http.mcp_json_rest_bridge"],
+    extension_names = [
+        "envoy.filters.http.ai_protocol_manager",
+        "envoy.filters.http.mcp_json_rest_bridge",
+        "envoy.http.ai_filters.mcp_json_rest_bridge",
+    ],
     rbe_pool = {
         "gcc": {"build": "linux_x64_small"},
         "openssl": {"link": "linux_x64_small"},
@@ -94,12 +98,16 @@ envoy_extension_cc_test(
     },
     shard_count = 4,
     deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:config",
         "//source/extensions/filters/http/mcp_json_rest_bridge:config",
+        "//source/extensions/http/ai_filters/mcp_json_rest_bridge:config",
         "//test/integration:fake_access_log_lib",
         "//test/integration:http_protocol_integration_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@nlohmann_json//:json",
     ],
 )

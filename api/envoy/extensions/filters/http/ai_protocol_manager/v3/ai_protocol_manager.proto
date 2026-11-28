@@ -6,6 +6,7 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/type/ai/v3/llm_binding.proto";
 import "envoy/type/ai/v3/llm_protocol.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
@@ -251,6 +252,12 @@ message AiProtocolManagerPerRoute {
   // processing inherits ``request.llm_protocol`` when available, then the
   // global fallback.
   ResponsePerRoute response = 2;
+
+  // Per-route configuration for the :ref:`AI filters
+  // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.filters>`,
+  // keyed by the filter's ``name`` there. An AI filter that takes no per-route
+  // configuration rejects an entry.
+  map<string, google.protobuf.Any> typed_per_filter_config = 3;
 }
 
 // Per-route request-side behavior.

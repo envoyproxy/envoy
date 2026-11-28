@@ -506,6 +506,7 @@ EXTENSIONS = {
     #
     # AI filters
     #
+    "envoy.http.ai_filters.mcp_json_rest_bridge":       "//source/extensions/http/ai_filters/mcp_json_rest_bridge:config",
     "envoy.http.ai_filters.model_router":               "//source/extensions/http/ai_filters/model_router:config",
     "envoy.http.ai_filters.request_info":               "//source/extensions/http/ai_filters/request_info:config",
     "envoy.http.ai_filters.route_selector":             "//source/extensions/http/ai_filters/route_selector:config",

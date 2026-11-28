@@ -38,6 +38,7 @@ public:
   enum class Mode {
     Sse,
     Unary,
+    Raw,
   };
 
   struct Config {
@@ -45,9 +46,11 @@ public:
     SseEventDecoder::Config sse{};
   };
 
+  // `local_reply_fn` sends the local reply a filter answers a raw response with.
   ResponseFilterManager(std::vector<AiFilterSharedPtr> filters,
                         ExternalBufferFactory& buffer_factory, FilterChainBridge& bridge,
-                        BufferManager& out_buffer_manager, OnCompleteFn on_complete, Config config);
+                        BufferManager& out_buffer_manager, OnCompleteFn on_complete, Config config,
+                        LocalReplyFn local_reply_fn = nullptr);
   ~ResponseFilterManager();
 
   // Starts the response filter pipeline and sink coroutines.

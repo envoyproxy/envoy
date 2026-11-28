@@ -621,8 +621,7 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
       max_supported_protocol_version_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config_.server_info(), max_supported_protocol_version,
           std::string(McpConstants::MCP_VERSION_2025_11_25))),
-      max_request_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_request_body_size,
-                                                             DEFAULT_MAX_REQUEST_BODY_SIZE)),
+      max_request_body_size_(maxRequestBodySize(proto_config_)),
       max_response_body_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config_, max_response_body_size,
                                                               DEFAULT_MAX_RESPONSE_BODY_SIZE)),
       server_discovery_cache_ttl_ms_(PROTOBUF_GET_MS_OR_DEFAULT(
@@ -630,6 +629,13 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
       server_discovery_cache_scope_(cacheScopeToString(
           proto_config_.server_info().server_discovery_cache_config().cache_scope())),
       clear_route_cache_(!proto_config_.disable_clear_route_cache()) {}
+
+uint32_t McpJsonRestBridgeFilterConfig::maxRequestBodySize(
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+        proto_config) {
+  return PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_request_body_size,
+                                         DEFAULT_MAX_REQUEST_BODY_SIZE);
+}
 
 absl::Status McpJsonRestBridgeFilterConfig::initialize() {
   const auto& tool_config = proto_config_.tool_config();
@@ -985,8 +991,9 @@ bool McpJsonRestBridgePerRouteConfig::hasEndpoint(absl::string_view host,
   return false;
 }
 
-Http::FilterHeadersStatus
-McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool end_stream) {
+McpJsonRestBridge::RequestStatus
+McpJsonRestBridge::onRequestHeaders(const Http::RequestHeaderMap& request_headers, bool end_stream,
+                                    const McpJsonRestBridgePerRouteConfig* per_route_config) {
   absl::string_view path = request_headers.getPathValue();
   auto query_idx = path.find('?');
   if (query_idx != absl::string_view::npos) {
@@ -996,12 +1003,9 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
   std::string server_name =
       std::string(Http::Utility::parseAuthority(request_headers.getHostValue()).host_);
 
-  const auto* per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
-          decoder_callbacks_);
   if (config_->perRouteOnly() && per_route_config == nullptr) {
     mcp_operation_ = McpOperation::Unspecified;
-    return Http::FilterHeadersStatus::Continue;
+    return RequestStatus::PassThrough;
   }
 
   bool has_endpoint = false;
@@ -1013,7 +1017,7 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
 
   if (!has_endpoint) {
     mcp_operation_ = McpOperation::Unspecified;
-    return Http::FilterHeadersStatus::Continue;
+    return RequestStatus::PassThrough;
   }
 
   path_ = std::string(path);
@@ -1021,8 +1025,8 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
   server_name_ = std::move(server_name);
 
   if (request_headers.getMethodValue() != Http::Headers::get().MethodValues.Post) {
-    ENVOY_STREAM_LOG(warn, "Only POST method is supported for MCP. Received: {}",
-                     *decoder_callbacks_, request_headers.getMethodValue());
+    ENVOY_STREAM_LOG(warn, "Only POST method is supported for MCP. Received: {}", callbacks_,
+                     request_headers.getMethodValue());
     sendErrorResponse(
         Http::Code::MethodNotAllowed, BridgeStatus::HttpRequestMethodNotPost,
         "HTTP Method Not Allowed",
@@ -1031,75 +1035,39 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
                                    Http::Headers::get().MethodValues.Post);
         },
         "", json::object(), Grpc::Status::WellKnownGrpcStatus::InvalidArgument);
-    return Http::FilterHeadersStatus::StopIteration;
+    return RequestStatus::Replied;
   }
 
   if (end_stream) {
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestFailedToParseJsonRpc,
-                      generateErrorJsonResponse(-32700, "JSON parse error").dump());
-    return Http::FilterHeadersStatus::StopIteration;
+    onRequestBodyInvalid();
+    return RequestStatus::Replied;
   }
 
-  return Http::FilterHeadersStatus::StopIteration;
+  return RequestStatus::NeedsBody;
 }
 
-Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& data,
-                                                           bool end_stream) {
-  if (mcp_operation_ == McpOperation::Unspecified) {
-    return Http::FilterDataStatus::Continue;
-  }
-
-  const auto* per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
-          decoder_callbacks_);
-
+bool McpJsonRestBridge::onRequestBodySize(uint64_t size) {
   const uint32_t max_request_body_size = config_->maxRequestBodySize();
-  if (max_request_body_size > 0 &&
-      (request_body_.length() + data.length()) > max_request_body_size) {
-    ENVOY_STREAM_LOG(error, "Request body exceeds limit. Size: {}, Limit: {}", *decoder_callbacks_,
-                     request_body_.length() + data.length(), max_request_body_size);
-    sendErrorResponse(Http::Code::PayloadTooLarge, BridgeStatus::RequestTooLarge,
-                      generateErrorJsonResponse(-32000, "Request body too large").dump());
-    return Http::FilterDataStatus::StopIterationNoBuffer;
+  if (max_request_body_size == 0 || size <= max_request_body_size) {
+    return true;
   }
-
-  request_body_.move(data);
-
-  if (!end_stream) {
-    return Http::FilterDataStatus::StopIterationNoBuffer;
-  }
-
-  const size_t total_size = request_body_.length();
-  void* linearized_data = request_body_.linearize(total_size);
-  const char* json_ptr = static_cast<const char*>(linearized_data);
-  json request_body_json = json::parse(json_ptr, json_ptr + total_size,
-                                       /*parser_callback_t=*/nullptr, /*allow_exceptions=*/false);
-
-  if (request_body_json.is_discarded()) {
-    ENVOY_STREAM_LOG(error, "Failed to parse JSON-RPC request body.", *decoder_callbacks_);
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestFailedToParseJsonRpc,
-                      generateErrorJsonResponse(-32700, "JSON parse error").dump());
-    return Http::FilterDataStatus::StopIterationNoBuffer;
-  }
-
-  handleMcpMethod(request_body_json, decoder_callbacks_->requestHeaders(), per_route_config);
-  data.add(request_body_str_);
-  request_body_str_.clear();
-
-  if (mcp_operation_ == McpOperation::Initialization ||
-      mcp_operation_ == McpOperation::InitializationAck ||
-      mcp_operation_ == McpOperation::OperationFailed ||
-      mcp_operation_ == McpOperation::ServerDiscover ||
-      mcp_operation_ == McpOperation::ToolsListLocal) {
-    // sendLocalReply/encodeHeaders was called in handleMcpMethod for these operations.
-    return Http::FilterDataStatus::StopIterationNoBuffer;
-  }
-
-  return Http::FilterDataStatus::Continue;
+  ENVOY_STREAM_LOG(error, "Request body exceeds limit. Size: {}, Limit: {}", callbacks_, size,
+                   max_request_body_size);
+  onRequestBodyTooLarge();
+  return false;
 }
 
-Http::FilterHeadersStatus
-McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers, bool end_stream) {
+void McpJsonRestBridge::onRequestBodyTooLarge() {
+  sendErrorResponse(Http::Code::PayloadTooLarge, BridgeStatus::RequestTooLarge,
+                    generateErrorJsonResponse(-32000, "Request body too large").dump());
+}
+
+void McpJsonRestBridge::onRequestBodyInvalid() {
+  sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestFailedToParseJsonRpc,
+                    generateErrorJsonResponse(-32700, "JSON parse error").dump());
+}
+
+McpJsonRestBridge::ResponseStatus McpJsonRestBridge::responseStatus() const {
   switch (mcp_operation_) {
   case McpOperation::Unspecified:
   case McpOperation::Undecided:
@@ -1111,9 +1079,18 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
   case McpOperation::ServerDiscover:
   // ToolsListLocal sends a local reply, so the headers are already correct.
   case McpOperation::ToolsListLocal:
-    return Http::FilterHeadersStatus::Continue;
+    return ResponseStatus::PassThrough;
   default:
     break;
+  }
+  return streaming_json_prefix_.empty() ? ResponseStatus::Buffered : ResponseStatus::Streaming;
+}
+
+McpJsonRestBridge::ResponseStatus
+McpJsonRestBridge::onResponseHeaders(Http::ResponseHeaderMap& response_headers, bool end_stream,
+                                     std::string& body) {
+  if (responseStatus() == ResponseStatus::PassThrough) {
+    return ResponseStatus::PassThrough;
   }
 
   const int response_code = getResponseCode(response_headers);
@@ -1121,12 +1098,11 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
     // Backend returned a headers-only response (e.g., 204 No Content). Synthesize a JSON-RPC
     // response body so MCP clients don't hang waiting for a body that will never arrive.
     const bool is_error = response_code >= static_cast<int>(Http::Code::BadRequest);
-    std::string synthetic;
     if (mcp_operation_ == McpOperation::ToolsCall) {
       json response =
           translateJsonRestResponseToJsonRpc("", *session_id_, is_error, is_stateless_request_);
 
-      synthetic = response.dump();
+      body = response.dump();
     } else if (mcp_operation_ == McpOperation::ToolsList) {
       // headers-only means no tools list is available; return a server error.
       json ret = {
@@ -1134,7 +1110,7 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
           {McpConstants::ID_FIELD, *session_id_},
           {McpConstants::ERROR_FIELD, generateErrorJsonResponse(-32000, "Server error")},
       };
-      synthetic = ret.dump();
+      body = ret.dump();
     }
     // Overwrite response code to 200 OK unless it is 401 or 403. Non-200 responses
     // cause MCP clients to fail at the transport layer. 401 and 403 are preserved
@@ -1149,10 +1125,8 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
       response_headers.setStatus(enumToInt(Http::Code::OK));
     }
     response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
-    response_headers.setContentLength(synthetic.size());
-    Buffer::OwnedImpl body_buffer(synthetic);
-    encoder_callbacks_->addEncodedData(body_buffer, false);
-    return Http::FilterHeadersStatus::Continue;
+    response_headers.setContentLength(body.size());
+    return ResponseStatus::Complete;
   }
 
   // Streaming mode: pre-build the JSON-RPC prefix/suffix, strip Content-Length
@@ -1175,91 +1149,49 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
     buildStreamingPrefixAndSuffix(response_code >= static_cast<int>(Http::Code::BadRequest));
     response_headers.removeContentLength();
     response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
-    return Http::FilterHeadersStatus::Continue;
+    return ResponseStatus::Streaming;
   }
 
-  return Http::FilterHeadersStatus::StopIteration;
+  return ResponseStatus::Buffered;
 }
 
-Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& data,
-                                                           bool end_stream) {
-  // No need to encode the response body for Initialization and InitializationAck. ToolsListLocal,
-  // ServerDiscover, and Undecided (e.g. local replies before body decoding) are local responses,
-  // and the response body is already encoded.
-  if (mcp_operation_ == McpOperation::Unspecified || mcp_operation_ == McpOperation::Undecided ||
-      mcp_operation_ == McpOperation::Initialization ||
-      mcp_operation_ == McpOperation::InitializationAck ||
-      mcp_operation_ == McpOperation::ServerDiscover ||
-      mcp_operation_ == McpOperation::ToolsListLocal) {
-    return Http::FilterDataStatus::Continue;
-  }
-
-  // Streaming fast-path for tools/call: JSON-escape each chunk on-the-fly without
-  // buffering the full response body.
-  if (!streaming_json_prefix_.empty()) {
-    return encodeStreamingData(data, end_stream);
-  }
-
+bool McpJsonRestBridge::onResponseBodySize(uint64_t size,
+                                           Http::ResponseHeaderMapOptRef response_headers) {
   const uint32_t max_response_body_size = config_->maxResponseBodySize();
-  if (max_response_body_size > 0 &&
-      (response_body_.length() + data.length()) > max_response_body_size) {
-    ENVOY_STREAM_LOG(error, "Response body exceeds limit. Size: {}, Limit: {}", *encoder_callbacks_,
-                     response_body_.length() + data.length(), max_response_body_size);
-    json error_json = {
-        {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
-        // If the ID is missing in the request, the ID in the response should be null.
-        {McpConstants::ID_FIELD, session_id_.has_value() ? *session_id_ : json(nullptr)},
-        {McpConstants::ERROR_FIELD, generateErrorJsonResponse(-32000, "Response body too large")}};
-    setResponseMetadata(BridgeStatus::ResponseTooLarge,
-                        getResponseCode(encoder_callbacks_->responseHeaders()));
-    mcp_operation_ = McpOperation::OperationFailed;
-    decoder_callbacks_->sendLocalReply(
-        Http::Code::OK, error_json.dump(),
-        [](Http::ResponseHeaderMap& headers) {
-          headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
-        },
-        Grpc::Status::WellKnownGrpcStatus::Internal,
-        bridgeStatusToString(BridgeStatus::ResponseTooLarge));
-    return Http::FilterDataStatus::StopIterationNoBuffer;
+  if (max_response_body_size == 0 || size <= max_response_body_size) {
+    return true;
   }
-
-  response_body_.move(data);
-
-  if (!end_stream) {
-    return Http::FilterDataStatus::StopIterationNoBuffer;
-  }
-  // TODO(guoyilin42): Add SSE response support for non-streaming path using the buffered body.
-  encodeJsonRpcData(encoder_callbacks_->responseHeaders());
-  data.add(response_body_str_);
-  response_body_str_.clear();
-  return Http::FilterDataStatus::Continue;
+  ENVOY_STREAM_LOG(error, "Response body exceeds limit. Size: {}, Limit: {}", callbacks_, size,
+                   max_response_body_size);
+  json error_json = {
+      {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+      // If the ID is missing in the request, the ID in the response should be null.
+      {McpConstants::ID_FIELD, session_id_.has_value() ? *session_id_ : json(nullptr)},
+      {McpConstants::ERROR_FIELD, generateErrorJsonResponse(-32000, "Response body too large")}};
+  setResponseMetadata(BridgeStatus::ResponseTooLarge, getResponseCode(response_headers));
+  mcp_operation_ = McpOperation::OperationFailed;
+  callbacks_.sendLocalReply(
+      Http::Code::OK, error_json.dump(),
+      [](Http::ResponseHeaderMap& headers) {
+        headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+      },
+      Grpc::Status::WellKnownGrpcStatus::Internal,
+      bridgeStatusToString(BridgeStatus::ResponseTooLarge), LocalReplyFor::BufferedResponse);
+  return false;
 }
 
-Http::FilterTrailersStatus McpJsonRestBridgeFilter::encodeTrailers(Http::ResponseTrailerMap&) {
-  if (mcp_operation_ != McpOperation::ToolsList && mcp_operation_ != McpOperation::ToolsCall) {
-    return Http::FilterTrailersStatus::Continue;
+std::string McpJsonRestBridge::encodeStreamingEnd() {
+  ENVOY_STREAM_LOG(debug, "Streaming: appending suffix in encodeTrailers.", callbacks_);
+  std::string data;
+  if (is_first_streaming_chunk_) {
+    data = streaming_json_prefix_;
+    is_first_streaming_chunk_ = false;
   }
-
-  if (!streaming_json_prefix_.empty()) {
-    ENVOY_STREAM_LOG(debug, "Streaming: appending suffix in encodeTrailers.", *encoder_callbacks_);
-    Buffer::OwnedImpl data;
-    if (is_first_streaming_chunk_) {
-      data.add(streaming_json_prefix_);
-      is_first_streaming_chunk_ = false;
-    }
-    data.add(streaming_json_suffix_);
-    encoder_callbacks_->addEncodedData(data, false);
-  } else {
-    encodeJsonRpcData(encoder_callbacks_->responseHeaders());
-    Buffer::OwnedImpl data(response_body_str_);
-    response_body_str_.clear();
-    encoder_callbacks_->addEncodedData(data, false);
-  }
-
-  return Http::FilterTrailersStatus::Continue;
+  absl::StrAppend(&data, streaming_json_suffix_);
+  return data;
 }
 
-void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
+void McpJsonRestBridge::buildStreamingPrefixAndSuffix(bool is_error) {
   if (is_sse_response_) {
     json ref = {
         {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
@@ -1313,7 +1245,7 @@ void McpJsonRestBridgeFilter::buildStreamingPrefixAndSuffix(bool is_error) {
 
 // Send a local reply for a tools/list call. Construct the response body directly instead of
 // building a JSON object, to minimize copying.
-void McpJsonRestBridgeFilter::serveToolsListLocal(
+void McpJsonRestBridge::serveToolsListLocal(
     const nlohmann::json& json_rpc,
     const std::vector<
         const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>& tools,
@@ -1387,15 +1319,16 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(
     absl::StrAppend(&response_data, fragment);
   }
 
-  decoder_callbacks_->sendLocalReply(
+  callbacks_.sendLocalReply(
       Http::Code::OK, response_data,
       [](Http::ResponseHeaderMap& headers) {
         headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
       },
-      Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_tools_list");
+      Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_tools_list",
+      LocalReplyFor::Request);
 }
 
-absl::Status McpJsonRestBridgeFilter::validateMcpProtocolVersionHeader(
+absl::Status McpJsonRestBridge::validateMcpProtocolVersionHeader(
     const nlohmann::json& json_rpc, absl::string_view method,
     Http::RequestHeaderMapOptConstRef request_headers) {
   const nlohmann::json& params = json_rpc.contains(McpConstants::PARAMS_FIELD)
@@ -1433,8 +1366,7 @@ absl::Status McpJsonRestBridgeFilter::validateMcpProtocolVersionHeader(
     ENVOY_STREAM_LOG(debug,
                      "MCP-Protocol-Version header '{}' does not match the JSON-RPC protocol "
                      "version '{}'.",
-                     *decoder_callbacks_, header_protocol_version.value_or(""),
-                     body_protocol_version);
+                     callbacks_, header_protocol_version.value_or(""), body_protocol_version);
     sendErrorResponse(
         Http::Code::BadRequest, BridgeStatus::RequestMcpHeaderMismatch,
         generateErrorJsonResponse(
@@ -1455,8 +1387,8 @@ absl::Status McpJsonRestBridgeFilter::validateMcpProtocolVersionHeader(
   return absl::OkStatus();
 }
 
-bool McpJsonRestBridgeFilter::validateClientCapabilitiesMeta(const nlohmann::json& json_rpc,
-                                                             absl::string_view method) {
+bool McpJsonRestBridge::validateClientCapabilitiesMeta(const nlohmann::json& json_rpc,
+                                                       absl::string_view method) {
   const nlohmann::json& params = json_rpc[McpConstants::PARAMS_FIELD];
   const nlohmann::json& meta = params[McpConstants::META_FIELD];
   const auto client_capabilities = meta.find(McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD);
@@ -1470,8 +1402,7 @@ bool McpJsonRestBridgeFilter::validateClientCapabilitiesMeta(const nlohmann::jso
                          McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD)
           : absl::StrCat("Invalid params._meta field: ",
                          McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD, " must be an object");
-  ENVOY_STREAM_LOG(debug, "Rejecting stateless MCP request: {}", *decoder_callbacks_,
-                   error_message);
+  ENVOY_STREAM_LOG(debug, "Rejecting stateless MCP request: {}", callbacks_, error_message);
   sendErrorResponse(
       Http::Code::BadRequest, BridgeStatus::RequestMcpClientCapabilitiesInvalid,
       generateErrorJsonResponse(McpConstants::JSONRPC_INVALID_PARAMS_ERROR_CODE, error_message)
@@ -1480,16 +1411,16 @@ bool McpJsonRestBridgeFilter::validateClientCapabilitiesMeta(const nlohmann::jso
   return false;
 }
 
-bool McpJsonRestBridgeFilter::validateMcpMethodHeader(
-    const nlohmann::json& json_rpc, absl::string_view method,
-    Http::RequestHeaderMapOptRef request_headers) {
+bool McpJsonRestBridge::validateMcpMethodHeader(const nlohmann::json& json_rpc,
+                                                absl::string_view method,
+                                                Http::RequestHeaderMapOptRef request_headers) {
   const std::optional<absl::string_view> header_method = getRequestMcpMethodHeader(request_headers);
   if (header_method.has_value() && *header_method == method) {
     return true;
   }
 
   ENVOY_STREAM_LOG(debug, "Mcp-Method header '{}' does not match the JSON-RPC method '{}'.",
-                   *decoder_callbacks_, header_method.value_or(""), method);
+                   callbacks_, header_method.value_or(""), method);
   sendErrorResponse(
       Http::Code::BadRequest, BridgeStatus::RequestMcpHeaderMismatch,
       generateErrorJsonResponse(McpConstants::MCP_HEADER_MISMATCH_ERROR_CODE,
@@ -1501,9 +1432,9 @@ bool McpJsonRestBridgeFilter::validateMcpMethodHeader(
   return false;
 }
 
-bool McpJsonRestBridgeFilter::validateMcpNameHeader(const nlohmann::json& json_rpc,
-                                                    absl::string_view method,
-                                                    Http::RequestHeaderMapOptRef request_headers) {
+bool McpJsonRestBridge::validateMcpNameHeader(const nlohmann::json& json_rpc,
+                                              absl::string_view method,
+                                              Http::RequestHeaderMapOptRef request_headers) {
   const std::optional<absl::string_view> raw_header_name = getRequestMcpNameHeader(request_headers);
   const std::optional<absl::string_view> body_name = getJsonRpcParamsName(json_rpc);
 
@@ -1515,7 +1446,7 @@ bool McpJsonRestBridgeFilter::validateMcpNameHeader(const nlohmann::json& json_r
   }
 
   ENVOY_STREAM_LOG(debug, "Mcp-Name header '{}' does not match the JSON-RPC params.name '{}'.",
-                   *decoder_callbacks_, raw_header_name.value_or(""), body_name.value_or(""));
+                   callbacks_, raw_header_name.value_or(""), body_name.value_or(""));
   sendErrorResponse(
       Http::Code::BadRequest, BridgeStatus::RequestMcpHeaderMismatch,
       generateErrorJsonResponse(McpConstants::MCP_HEADER_MISMATCH_ERROR_CODE,
@@ -1527,9 +1458,10 @@ bool McpJsonRestBridgeFilter::validateMcpNameHeader(const nlohmann::json& json_r
   return false;
 }
 
-bool McpJsonRestBridgeFilter::validateMcpParamHeaders(
-    const std::vector<McpParamHeaderMapping>& mappings, const nlohmann::json& arguments,
-    const nlohmann::json& params, Http::RequestHeaderMapOptRef request_headers) {
+bool McpJsonRestBridge::validateMcpParamHeaders(const std::vector<McpParamHeaderMapping>& mappings,
+                                                const nlohmann::json& arguments,
+                                                const nlohmann::json& params,
+                                                Http::RequestHeaderMapOptRef request_headers) {
   for (const McpParamHeaderMapping& mapping : mappings) {
     const json* argument = findMcpParamArgument(arguments, mapping.property_path);
     const McpRequestHeader header = getRequestMcpParamHeader(request_headers, mapping);
@@ -1540,7 +1472,7 @@ bool McpJsonRestBridgeFilter::validateMcpParamHeaders(
     ENVOY_STREAM_LOG(debug,
                      "{} header does not match the tools/call arguments (header present: {}, "
                      "header repeated: {}, argument present: {}).",
-                     *decoder_callbacks_, mapping.header_name.get(),
+                     callbacks_, mapping.header_name.get(),
                      header.state != McpRequestHeader::State::Missing,
                      header.state == McpRequestHeader::State::Duplicate, argument != nullptr);
     sendErrorResponse(
@@ -1555,12 +1487,12 @@ bool McpJsonRestBridgeFilter::validateMcpParamHeaders(
   return true;
 }
 
-void McpJsonRestBridgeFilter::handleMcpMethod(
+McpJsonRestBridge::RequestStatus McpJsonRestBridge::onRequestBody(
     const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
-    const McpJsonRestBridgePerRouteConfig* per_route_config) {
-  ENVOY_STREAM_LOG(debug, "Handling MCP JSON-RPC: {}", *decoder_callbacks_, json_rpc.dump());
+    const McpJsonRestBridgePerRouteConfig* per_route_config, nlohmann::json& body) {
+  ENVOY_STREAM_LOG(debug, "Handling MCP JSON-RPC: {}", callbacks_, json_rpc.dump());
   if (!validateJsonRpcIdAndMethod(json_rpc).ok()) {
-    return;
+    return RequestStatus::Replied;
   }
 
   is_stateless_request_ =
@@ -1570,20 +1502,20 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
   std::string method = json_rpc[McpConstants::METHOD_FIELD];
 
   if (!validateMcpProtocolVersionHeader(json_rpc, method, request_headers).ok()) {
-    return;
+    return RequestStatus::Replied;
   }
 
   if (is_stateless_request_ && !validateMcpMethodHeader(json_rpc, method, request_headers)) {
-    return;
+    return RequestStatus::Replied;
   }
 
   if (is_stateless_request_ && method == McpConstants::Methods::TOOLS_CALL &&
       !validateMcpNameHeader(json_rpc, method, request_headers)) {
-    return;
+    return RequestStatus::Replied;
   }
 
   if (is_stateless_request_ && !validateClientCapabilitiesMeta(json_rpc, method)) {
-    return;
+    return RequestStatus::Replied;
   }
 
   if (method == McpConstants::Methods::TOOLS_LIST) {
@@ -1608,13 +1540,13 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
                                  Http::CustomHeaders::get().AcceptEncodingValues.Identity);
       }
 
-      if (config_->clearRouteCache() && decoder_callbacks_->downstreamCallbacks().has_value()) {
-        decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+      if (config_->clearRouteCache()) {
+        callbacks_.clearRouteCache();
       }
       setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                      ? json_rpc[McpConstants::PARAMS_FIELD]
                                      : json::object());
-      return;
+      return RequestStatus::ForwardNoBody;
     } else {
       bool tool_list_local = (per_route_config == nullptr)
                                  ? config_->toolListLocal(server_name_, path_)
@@ -1629,16 +1561,14 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                        ? json_rpc[McpConstants::PARAMS_FIELD]
                                        : json::object());
-        return;
+        return RequestStatus::Replied;
       } else {
-        // TODO(guoyilin42): Handle this more elegantly to avoid an unnecessary copy here. This can
-        // be addressed later when the JSON parser is updated.
         mcp_operation_ = McpOperation::Unspecified;
-        request_body_str_ = json_rpc.dump();
         status_ = BridgeStatus::InternalToolsListPassthrough;
         setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                        ? json_rpc[McpConstants::PARAMS_FIELD]
                                        : json::object());
+        return RequestStatus::PassThrough;
       }
     }
 
@@ -1650,7 +1580,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
       setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                      ? json_rpc[McpConstants::PARAMS_FIELD]
                                      : json::object());
-      decoder_callbacks_->sendLocalReply(
+      callbacks_.sendLocalReply(
           Http::Code::OK,
           generateInitializeResponse(
               *session_id_, server_name_,
@@ -1660,8 +1590,9 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
           [](Http::ResponseHeaderMap& headers) {
             headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
           },
-          Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_initialize");
-      return;
+          Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_initialize",
+          LocalReplyFor::Request);
+      return RequestStatus::Replied;
     }
     sendErrorResponse(
         Http::Code::OK, BridgeStatus::RequestInitializeNotValid,
@@ -1678,24 +1609,24 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
     setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                    ? json_rpc[McpConstants::PARAMS_FIELD]
                                    : json::object());
-    decoder_callbacks_->sendLocalReply(Http::Code::Accepted, "", nullptr,
-                                       Grpc::Status::WellKnownGrpcStatus::Ok,
-                                       "mcp_json_rest_bridge_filter_initialize_ack");
+    callbacks_.sendLocalReply(Http::Code::Accepted, "", nullptr,
+                              Grpc::Status::WellKnownGrpcStatus::Ok,
+                              "mcp_json_rest_bridge_filter_initialize_ack", LocalReplyFor::Request);
   } else if (method == McpConstants::Methods::TOOLS_CALL) {
     mcp_operation_ = McpOperation::ToolsCall;
     if (config_->traceContextExtraction() && request_headers.has_value()) {
       ENVOY_STREAM_LOG(debug, "Trace context extraction is enabled for tools/call method.",
-                       *decoder_callbacks_);
+                       callbacks_);
       McpTraceContext trace_context(json_rpc);
       setTraceContextHeaders(*request_headers, trace_context);
     }
-    mapMcpToolToApiBackend(json_rpc, per_route_config);
+    return mapMcpToolToApiBackend(json_rpc, request_headers, per_route_config, body);
   } else if (method == McpConstants::Methods::SERVER_DISCOVER && is_stateless_request_) {
     mcp_operation_ = McpOperation::ServerDiscover;
     setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                    ? json_rpc[McpConstants::PARAMS_FIELD]
                                    : json::object());
-    decoder_callbacks_->sendLocalReply(
+    callbacks_.sendLocalReply(
         Http::Code::OK,
         generateServerDiscoverResponse(*session_id_, server_name_,
                                        config_->serverDiscoveryCacheTtlMs(),
@@ -1704,7 +1635,8 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         [](Http::ResponseHeaderMap& headers) {
           headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
         },
-        Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_server_discover");
+        Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_server_discover",
+        LocalReplyFor::Request);
   } else {
     // MCP 2026-07-28 Streamable HTTP requires 404 Not Found together with -32601 (Method not found)
     // for methods the server does not implement. Legacy (2025-11-25 and earlier) requests keep
@@ -1717,14 +1649,33 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         nullptr, method,
         json_rpc.contains(McpConstants::PARAMS_FIELD) ? json_rpc[McpConstants::PARAMS_FIELD]
                                                       : json::object());
-    return;
   }
+  return RequestStatus::Replied;
 }
 
-void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers) {
-  const size_t total_size = response_body_.length();
-  const char* json_ptr = static_cast<const char*>(response_body_.linearize(total_size));
-  ENVOY_STREAM_LOG(debug, "Encoding Json-RPC data from response body: {}", *encoder_callbacks_,
+std::optional<std::string> McpJsonRestBridge::jsonRpcError(absl::string_view error) const {
+  if (mcp_operation_ != McpOperation::OperationFailed) {
+    return std::nullopt;
+  }
+  // TODO(guoyilin42): Construct the full JSON-RPC error response directly in `sendErrorResponse`
+  // to avoid this inefficient serialization-then-deserialization cycle and simplify the code.
+  json error_json = json::parse(error, /*parser_callback_t=*/nullptr, /*allow_exceptions=*/false);
+  if (error_json.is_discarded()) {
+    return std::nullopt;
+  }
+  json ret = {{McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+              // If the ID is missing in the request, the ID in the response should be null.
+              {McpConstants::ID_FIELD, session_id_.has_value() ? *session_id_ : json(nullptr)},
+              {McpConstants::ERROR_FIELD, error_json}};
+  return ret.dump();
+}
+
+std::string McpJsonRestBridge::encodeJsonRpcData(Buffer::Instance& body,
+                                                 Http::ResponseHeaderMapOptRef response_headers) {
+  std::string response_body_str;
+  const size_t total_size = body.length();
+  const char* json_ptr = static_cast<const char*>(body.linearize(total_size));
+  ENVOY_STREAM_LOG(debug, "Encoding Json-RPC data from response body: {}", callbacks_,
                    absl::string_view(json_ptr, total_size));
   switch (mcp_operation_) {
   case McpOperation::ToolsList: {
@@ -1733,13 +1684,13 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
     if (tools.is_discarded() ||
         getResponseCode(response_headers) >= static_cast<int>(Http::Code::BadRequest)) {
       ENVOY_STREAM_LOG(error, "Tool list response is invalid or has error status code.",
-                       *encoder_callbacks_);
+                       callbacks_);
       json ret = {
           {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
           {McpConstants::ID_FIELD, *session_id_},
           {McpConstants::ERROR_FIELD, generateErrorJsonResponse(-32000, "Server error")},
       };
-      response_body_str_ = ret.dump();
+      response_body_str = ret.dump();
       setResponseMetadata(getResponseCode(response_headers) >=
                                   static_cast<int>(Http::Code::BadRequest)
                               ? BridgeStatus::ResponseHttpStatusError
@@ -1753,7 +1704,7 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
         {McpConstants::RESULT_FIELD, tools},
     };
 
-    response_body_str_ = ret.dump();
+    response_body_str = ret.dump();
     setResponseMetadata(BridgeStatus::Ok, getResponseCode(response_headers));
     break;
   }
@@ -1763,12 +1714,12 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
       ENVOY_STREAM_LOG(
           warn,
           "API backend returns an invalid UTF-8 payload response. Returns error back to client.",
-          *encoder_callbacks_);
+          callbacks_);
       json response =
           translateJsonRestResponseToJsonRpc("Backend response returns an invalid UTF-8 payload.",
                                              *session_id_, true, is_stateless_request_);
 
-      response_body_str_ = response.dump();
+      response_body_str = response.dump();
       setResponseMetadata(BridgeStatus::ResponseToolsCallInvalidUtf8,
                           getResponseCode(response_headers));
     } else {
@@ -1776,7 +1727,7 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
       json response = translateJsonRestResponseToJsonRpc(
           absl::string_view(json_ptr, total_size), *session_id_, is_error, is_stateless_request_);
 
-      response_body_str_ = response.dump();
+      response_body_str = response.dump();
       if (is_error) {
         setResponseMetadata(BridgeStatus::ResponseHttpStatusError,
                             getResponseCode(response_headers));
@@ -1787,19 +1738,12 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
     break;
   }
   case McpOperation::OperationFailed: {
-    // TODO(guoyilin42): Construct the full JSON-RPC error response directly in `sendErrorResponse`
-    // to avoid this inefficient serialization-then-deserialization cycle and simplify the code.
-    json error = json::parse(json_ptr, json_ptr + total_size, /*parser_callback_t=*/nullptr,
-                             /*allow_exceptions=*/false);
-    if (error.is_discarded()) {
-      ENVOY_STREAM_LOG(error, "Failed to parse error response.", *encoder_callbacks_);
-      return;
+    std::optional<std::string> error = jsonRpcError(absl::string_view(json_ptr, total_size));
+    if (!error.has_value()) {
+      ENVOY_STREAM_LOG(error, "Failed to parse error response.", callbacks_);
+      return response_body_str;
     }
-    json ret = {{McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
-                // If the ID is missing in the request, the ID in the response should be null.
-                {McpConstants::ID_FIELD, session_id_.has_value() ? *session_id_ : json(nullptr)},
-                {McpConstants::ERROR_FIELD, error}};
-    response_body_str_ = ret.dump();
+    response_body_str = *std::move(error);
     break;
   }
   default:
@@ -1822,42 +1766,34 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
         response_headers->setStatus(enumToInt(Http::Code::OK));
       }
     }
-    const auto transfer_encoding = response_headers->TransferEncoding();
-    const bool is_chunked =
-        transfer_encoding != nullptr &&
-        absl::EqualsIgnoreCase(transfer_encoding->value().getStringView(),
-                               Http::Headers::get().TransferEncodingValues.Chunked);
-    if (is_chunked) {
-      response_headers->removeContentLength();
-    } else {
-      response_headers->setContentLength(response_body_str_.size());
-    }
+    setContentLength(*response_headers, response_body_str.size());
     response_headers->setContentType(Http::Headers::get().ContentTypeValues.Json);
   }
+  return response_body_str;
 }
 
-void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
-    const nlohmann::json& json_rpc, const McpJsonRestBridgePerRouteConfig* per_route_config) {
+McpJsonRestBridge::RequestStatus McpJsonRestBridge::mapMcpToolToApiBackend(
+    const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
+    const McpJsonRestBridgePerRouteConfig* per_route_config, nlohmann::json& body) {
   const auto params_it = json_rpc.find(McpConstants::PARAMS_FIELD);
   if (params_it == json_rpc.end() || !params_it->is_object()) {
     ENVOY_STREAM_LOG(error,
                      "The tool call request is missing 'params' field or it's not an object.",
-                     *decoder_callbacks_);
+                     callbacks_);
     sendErrorResponse(Http::Code::OK, BridgeStatus::RequestToolsCallToolNameMissing,
                       generateErrorJsonResponse(-32602, "Invalid params").dump(), nullptr,
                       McpConstants::Methods::TOOLS_CALL, json::object());
-    return;
+    return RequestStatus::Replied;
   }
   const auto& params = *params_it;
 
   const auto name_it = params.find(McpConstants::NAME_FIELD);
   if (name_it == params.end() || !name_it->is_string()) {
-    ENVOY_STREAM_LOG(error, "Failed to get the name of the tool call request.",
-                     *decoder_callbacks_);
+    ENVOY_STREAM_LOG(error, "Failed to get the name of the tool call request.", callbacks_);
     sendErrorResponse(Http::Code::OK, BridgeStatus::RequestToolsCallToolNameMissing,
                       generateErrorJsonResponse(-32602, "Tool name not found").dump(), nullptr,
                       McpConstants::Methods::TOOLS_CALL, params);
-    return;
+    return RequestStatus::Replied;
   }
   const auto& tool_name = name_it->get<std::string>();
 
@@ -1866,12 +1802,11 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
                                     : per_route_config->getHttpRule(tool_name, server_name_, path_);
 
   if (!http_rule.ok()) {
-    ENVOY_STREAM_LOG(error, "Failed to get http rule for method: {}", *decoder_callbacks_,
-                     tool_name);
+    ENVOY_STREAM_LOG(error, "Failed to get http rule for method: {}", callbacks_, tool_name);
     sendErrorResponse(Http::Code::OK, BridgeStatus::RequestToolsCallToolNameUnknown,
                       generateErrorJsonResponse(-32602, "Unknown tool").dump(), nullptr,
                       McpConstants::Methods::TOOLS_CALL, params);
-    return;
+    return RequestStatus::Replied;
   }
 
   // Set the per-request streaming flag based on the tool's config.
@@ -1883,11 +1818,11 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   const auto arguments_it = params.find(McpConstants::ARGUMENTS_FIELD);
   if (arguments_it != params.end() && !arguments_it->is_object()) {
     ENVOY_STREAM_LOG(error, "The arguments of the tool call request must be an object.",
-                     *decoder_callbacks_);
+                     callbacks_);
     sendErrorResponse(Http::Code::OK, BridgeStatus::RequestToolsCallArgumentsMalformed,
                       generateErrorJsonResponse(-32602, "Tool arguments must be an object").dump(),
                       nullptr, McpConstants::Methods::TOOLS_CALL, params);
-    return;
+    return RequestStatus::Replied;
   }
 
   const nlohmann::json empty_arguments = nlohmann::json::object();
@@ -1898,9 +1833,8 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
         (per_route_config == nullptr)
             ? config_->mcpParamHeaders(tool_name, server_name_, path_)
             : per_route_config->mcpParamHeaders(tool_name, server_name_, path_);
-    if (!validateMcpParamHeaders(mcp_param_headers, arguments, params,
-                                 decoder_callbacks_->requestHeaders())) {
-      return;
+    if (!validateMcpParamHeaders(mcp_param_headers, arguments, params, request_headers)) {
+      return RequestStatus::Replied;
     }
   }
 
@@ -1908,31 +1842,20 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(*http_rule, arguments, bridge_status);
   if (!http_request.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to build HTTP request for method: {} with status: {}",
-                     *decoder_callbacks_, tool_name, http_request.status());
+                     callbacks_, tool_name, http_request.status());
     sendErrorResponse(Http::Code::OK, bridge_status,
                       generateErrorJsonResponse(-32602, http_request.status().message()).dump(),
                       nullptr, McpConstants::Methods::TOOLS_CALL, params);
-    return;
+    return RequestStatus::Replied;
   }
 
-  request_body_str_ = http_request->body.is_null() ? "" : http_request->body.dump();
   ENVOY_STREAM_LOG(debug, "Mapping MCP tool to HTTP request url: {} method: {} body: {}",
-                   *decoder_callbacks_, http_request->url, http_request->method, request_body_str_);
+                   callbacks_, http_request->url, http_request->method,
+                   http_request->body.is_null() ? "" : http_request->body.dump());
 
-  auto request_headers = decoder_callbacks_->requestHeaders();
   if (request_headers.has_value()) {
     request_headers->setPath(http_request->url);
     request_headers->setMethod(http_request->method);
-    const auto transfer_encoding = request_headers->TransferEncoding();
-    const bool is_chunked =
-        transfer_encoding != nullptr &&
-        absl::EqualsIgnoreCase(transfer_encoding->value().getStringView(),
-                               Http::Headers::get().TransferEncodingValues.Chunked);
-    if (is_chunked) {
-      request_headers->removeContentLength();
-    } else {
-      request_headers->setContentLength(request_body_str_.size());
-    }
     request_headers->setContentType(Http::Headers::get().ContentTypeValues.Json);
     // Set AcceptEncoding to "identity" to prevent server encoding the response.
     request_headers->setCopy(Http::CustomHeaders::get().AcceptEncoding,
@@ -1945,17 +1868,16 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
       if (key_view == "content-length" || key_view == "transfer-encoding" || key_view == "host" ||
           key_view == ":authority" || key_view == "cookie" || key_view == "accept-encoding" ||
           absl::StartsWith(key_view, ThreadSafeSingleton<Http::PrefixValue>::get().prefix())) {
-        ENVOY_STREAM_LOG(warn, "Ignoring restricted header parameter: {}", *decoder_callbacks_,
-                         key);
+        ENVOY_STREAM_LOG(warn, "Ignoring restricted header parameter: {}", callbacks_, key);
         continue;
       }
-      ENVOY_STREAM_LOG(debug, "Adding header: {} with value: {}", *decoder_callbacks_, key, value);
+      ENVOY_STREAM_LOG(debug, "Adding header: {} with value: {}", callbacks_, key, value);
       request_headers->setCopy(lower_key, value);
     }
 
     // Add cookie parameters.
     if (!http_request->cookies_params.empty()) {
-      ENVOY_STREAM_LOG(debug, "Adding cookie: {}", *decoder_callbacks_,
+      ENVOY_STREAM_LOG(debug, "Adding cookie: {}", callbacks_,
                        absl::StrJoin(http_request->cookies_params, "; ", absl::PairFormatter("=")));
       request_headers->addCopy(
           Envoy::Http::Headers::get().Cookie,
@@ -1963,17 +1885,19 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
     }
   }
 
-  if (config_->clearRouteCache() && decoder_callbacks_->downstreamCallbacks().has_value()) {
-    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+  if (config_->clearRouteCache()) {
+    callbacks_.clearRouteCache();
   }
   setParsingMetadata(McpConstants::Methods::TOOLS_CALL, params);
+  body = std::move(http_request->body);
+  return RequestStatus::Forward;
 }
 
-void McpJsonRestBridgeFilter::sendErrorResponse(
+void McpJsonRestBridge::sendErrorResponse(
     Http::Code response_code, BridgeStatus status, absl::string_view response_body,
     std::function<void(Http::ResponseHeaderMap&)> modify_headers, absl::string_view method,
     const nlohmann::json& params, Grpc::Status::GrpcStatus grpc_status) {
-  ENVOY_STREAM_LOG(error, "Sending error response with status: {}", *decoder_callbacks_,
+  ENVOY_STREAM_LOG(error, "Sending error response with status: {}", callbacks_,
                    bridgeStatusToString(status));
   status_ = status;
   if (status != BridgeStatus::HttpRequestMethodNotPost) {
@@ -1986,11 +1910,11 @@ void McpJsonRestBridgeFilter::sendErrorResponse(
   const Http::Code code = (is_notification_ && response_code == Http::Code::OK)
                               ? Http::Code::BadRequest
                               : response_code;
-  decoder_callbacks_->sendLocalReply(code, response_body, modify_headers, grpc_status,
-                                     bridgeStatusToString(status));
+  callbacks_.sendLocalReply(code, response_body, modify_headers, grpc_status,
+                            bridgeStatusToString(status), LocalReplyFor::Request);
 }
 
-void McpJsonRestBridgeFilter::setDynamicMetadata() {
+void McpJsonRestBridge::setDynamicMetadata() {
   Protobuf::Struct dynamic_metadata;
   (*dynamic_metadata.mutable_fields())[BridgeStatusValues::STATUS].set_string_value(
       std::string(bridgeStatusToString(status_)));
@@ -2007,14 +1931,13 @@ void McpJsonRestBridgeFilter::setDynamicMetadata() {
         .set_number_value(*backend_response_code_);
   }
 
-  decoder_callbacks_->streamInfo().setDynamicMetadata(
-      std::string(decoder_callbacks_->filterConfigName()), dynamic_metadata);
-  ENVOY_STREAM_LOG(debug, "MCP JSON REST Bridge filter set dynamic metadata: {}",
-                   *decoder_callbacks_, dynamic_metadata.DebugString());
+  callbacks_.streamInfo().setDynamicMetadata(std::string(callbacks_.filterConfigName()),
+                                             dynamic_metadata);
+  ENVOY_STREAM_LOG(debug, "MCP JSON REST Bridge filter set dynamic metadata: {}", callbacks_,
+                   dynamic_metadata.DebugString());
 }
 
-void McpJsonRestBridgeFilter::setParsingMetadata(absl::string_view method,
-                                                 const nlohmann::json& params) {
+void McpJsonRestBridge::setParsingMetadata(absl::string_view method, const nlohmann::json& params) {
   if (!config_->shouldStoreToDynamicMetadata()) {
     return;
   }
@@ -2027,16 +1950,15 @@ void McpJsonRestBridgeFilter::setParsingMetadata(absl::string_view method,
     if (status.ok()) {
       has_params_ = !mcp_params_.fields().empty();
     } else {
-      ENVOY_STREAM_LOG(warn, "Failed to parse params as Protobuf Struct: {}", *decoder_callbacks_,
-                       status);
+      ENVOY_STREAM_LOG(warn, "Failed to parse params as Protobuf Struct: {}", callbacks_, status);
     }
   }
 
   setDynamicMetadata();
 }
 
-void McpJsonRestBridgeFilter::setResponseMetadata(BridgeStatus status,
-                                                  std::optional<uint64_t> response_code) {
+void McpJsonRestBridge::setResponseMetadata(BridgeStatus status,
+                                            std::optional<uint64_t> response_code) {
   status_ = status;
   backend_response_code_ = response_code;
   if (!config_->shouldStoreToDynamicMetadata()) {
@@ -2046,8 +1968,7 @@ void McpJsonRestBridgeFilter::setResponseMetadata(BridgeStatus status,
   setDynamicMetadata();
 }
 
-Http::FilterDataStatus McpJsonRestBridgeFilter::encodeStreamingData(Buffer::Instance& data,
-                                                                    bool end_stream) {
+bool McpJsonRestBridge::encodeStreamingData(Buffer::Instance& data, bool end_stream) {
   uint64_t len = data.length();
   // Note: An empty chunk can arrive when the upstream uses the body + trailer pattern (end_stream
   // is false on the last data frame). It is a no-op here; the suffix will be appended in
@@ -2056,20 +1977,21 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeStreamingData(Buffer::Inst
 
   absl::StatusOr<std::string> payload = prepareStreamingPayload(chunk, end_stream);
   if (!payload.ok()) {
-    ENVOY_STREAM_LOG(error, "Streaming payload preparation error: {}", *encoder_callbacks_,
+    ENVOY_STREAM_LOG(error, "Streaming payload preparation error: {}", callbacks_,
                      payload.status());
     json error_json = {
         {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
         {McpConstants::ID_FIELD, session_id_.has_value() ? *session_id_ : json(nullptr)},
         {McpConstants::ERROR_FIELD, generateErrorJsonResponse(-32000, payload.status().message())}};
-    encoder_callbacks_->sendLocalReply(
+    callbacks_.sendLocalReply(
         Http::Code::InternalServerError, error_json.dump(),
         [](Http::ResponseHeaderMap& headers) {
           headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
         },
         Grpc::Status::WellKnownGrpcStatus::Internal,
-        "mcp_json_rest_bridge_filter_streaming_payload_preparation_error");
-    return Http::FilterDataStatus::StopIterationNoBuffer;
+        "mcp_json_rest_bridge_filter_streaming_payload_preparation_error",
+        LocalReplyFor::StreamingResponse);
+    return false;
   }
   std::string output_to_add = *std::move(payload);
 
@@ -2082,23 +2004,23 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeStreamingData(Buffer::Inst
   if (is_first_streaming_chunk_) {
     ENVOY_STREAM_LOG(debug,
                      "Streaming: emitting prefix + first chunk ({} raw bytes, {} escaped bytes).",
-                     *encoder_callbacks_, len, output_to_add.size());
+                     callbacks_, len, output_to_add.size());
     data.add(streaming_json_prefix_);
     is_first_streaming_chunk_ = false;
   } else {
     ENVOY_STREAM_LOG(debug, "Streaming: forwarding chunk ({} raw bytes, {} escaped bytes).",
-                     *encoder_callbacks_, len, output_to_add.size());
+                     callbacks_, len, output_to_add.size());
   }
   data.add(output_to_add);
   if (end_stream) {
-    ENVOY_STREAM_LOG(debug, "Streaming: appending suffix, stream complete.", *encoder_callbacks_);
+    ENVOY_STREAM_LOG(debug, "Streaming: appending suffix, stream complete.", callbacks_);
     data.add(streaming_json_suffix_);
   }
-  return Http::FilterDataStatus::Continue;
+  return true;
 }
 
-absl::StatusOr<std::string> McpJsonRestBridgeFilter::processSseResponse(absl::string_view chunk,
-                                                                        bool end_stream) {
+absl::StatusOr<std::string> McpJsonRestBridge::processSseResponse(absl::string_view chunk,
+                                                                  bool end_stream) {
   absl::StatusOr<std::vector<std::string>> event_payloads =
       sse_response_extractor_.processChunk(chunk, end_stream);
   if (!event_payloads.ok()) {
@@ -2121,15 +2043,15 @@ absl::StatusOr<std::string> McpJsonRestBridgeFilter::processSseResponse(absl::st
   return output;
 }
 
-absl::StatusOr<std::string>
-McpJsonRestBridgeFilter::prepareStreamingPayload(absl::string_view chunk, bool end_stream) {
+absl::StatusOr<std::string> McpJsonRestBridge::prepareStreamingPayload(absl::string_view chunk,
+                                                                       bool end_stream) {
   if (is_sse_response_) {
     return processSseResponse(chunk, end_stream);
   }
   return JsonEscaper::escapeString(chunk, JsonEscaper::extraSpace(chunk));
 }
 
-absl::Status McpJsonRestBridgeFilter::validateJsonRpcIdAndMethod(const nlohmann::json& json_rpc) {
+absl::Status McpJsonRestBridge::validateJsonRpcIdAndMethod(const nlohmann::json& json_rpc) {
   absl::StatusOr<nlohmann::json> session_id = getSessionId(json_rpc);
   if (session_id.ok()) {
     session_id_ = *session_id;
@@ -2158,6 +2080,154 @@ absl::Status McpJsonRestBridgeFilter::validateJsonRpcIdAndMethod(const nlohmann:
     return absl::InvalidArgumentError("Missing ID field");
   }
   return absl::OkStatus();
+}
+
+void McpJsonRestBridgeFilter::sendLocalReply(
+    Http::Code code, absl::string_view body,
+    std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+    Grpc::Status::GrpcStatus grpc_status, absl::string_view details, LocalReplyFor reply_for) {
+  // A streaming response is replaced from the encode path, which is where it fails.
+  if (reply_for == LocalReplyFor::StreamingResponse) {
+    encoder_callbacks_->sendLocalReply(code, body, std::move(modify_headers), grpc_status, details);
+  } else {
+    decoder_callbacks_->sendLocalReply(code, body, std::move(modify_headers), grpc_status, details);
+  }
+}
+
+Http::FilterHeadersStatus
+McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool end_stream) {
+  const auto* per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
+          decoder_callbacks_);
+  if (bridge_.onRequestHeaders(request_headers, end_stream, per_route_config) ==
+      McpJsonRestBridge::RequestStatus::PassThrough) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  bridged_ = true;
+  return Http::FilterHeadersStatus::StopIteration;
+}
+
+Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& data,
+                                                           bool end_stream) {
+  if (!bridged_) {
+    return Http::FilterDataStatus::Continue;
+  }
+
+  const auto* per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
+          decoder_callbacks_);
+
+  if (!bridge_.onRequestBodySize(request_body_.length() + data.length())) {
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
+  request_body_.move(data);
+
+  if (!end_stream) {
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
+  const size_t total_size = request_body_.length();
+  void* linearized_data = request_body_.linearize(total_size);
+  const char* json_ptr = static_cast<const char*>(linearized_data);
+  nlohmann::json request_body_json =
+      nlohmann::json::parse(json_ptr, json_ptr + total_size, /*parser_callback_t=*/nullptr,
+                            /*allow_exceptions=*/false);
+
+  if (request_body_json.is_discarded()) {
+    ENVOY_STREAM_LOG(error, "Failed to parse JSON-RPC request body.", *decoder_callbacks_);
+    bridge_.onRequestBodyInvalid();
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
+  nlohmann::json body;
+  switch (bridge_.onRequestBody(request_body_json, decoder_callbacks_->requestHeaders(),
+                                per_route_config, body)) {
+  case McpJsonRestBridge::RequestStatus::Replied:
+  case McpJsonRestBridge::RequestStatus::NeedsBody:
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  case McpJsonRestBridge::RequestStatus::PassThrough:
+    // TODO(guoyilin42): Handle this more elegantly to avoid an unnecessary copy here. This can
+    // be addressed later when the JSON parser is updated.
+    data.add(request_body_json.dump());
+    break;
+  case McpJsonRestBridge::RequestStatus::Forward: {
+    const std::string serialized = body.is_null() ? "" : body.dump();
+    if (Http::RequestHeaderMapOptRef request_headers = decoder_callbacks_->requestHeaders();
+        request_headers.has_value()) {
+      McpJsonRestBridge::setContentLength(*request_headers, serialized.size());
+    }
+    data.add(serialized);
+    break;
+  }
+  case McpJsonRestBridge::RequestStatus::ForwardNoBody:
+    break;
+  }
+  return Http::FilterDataStatus::Continue;
+}
+
+Http::FilterHeadersStatus
+McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers, bool end_stream) {
+  std::string body;
+  switch (bridge_.onResponseHeaders(response_headers, end_stream, body)) {
+  case McpJsonRestBridge::ResponseStatus::PassThrough:
+  case McpJsonRestBridge::ResponseStatus::Streaming:
+    return Http::FilterHeadersStatus::Continue;
+  case McpJsonRestBridge::ResponseStatus::Complete: {
+    Buffer::OwnedImpl body_buffer(body);
+    encoder_callbacks_->addEncodedData(body_buffer, false);
+    return Http::FilterHeadersStatus::Continue;
+  }
+  case McpJsonRestBridge::ResponseStatus::Buffered:
+    break;
+  }
+  return Http::FilterHeadersStatus::StopIteration;
+}
+
+Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& data,
+                                                           bool end_stream) {
+  switch (bridge_.responseStatus()) {
+  case McpJsonRestBridge::ResponseStatus::PassThrough:
+    return Http::FilterDataStatus::Continue;
+  case McpJsonRestBridge::ResponseStatus::Streaming:
+    // Streaming fast-path for tools/call: JSON-escape each chunk on-the-fly without
+    // buffering the full response body.
+    return bridge_.encodeStreamingData(data, end_stream)
+               ? Http::FilterDataStatus::Continue
+               : Http::FilterDataStatus::StopIterationNoBuffer;
+  default:
+    break;
+  }
+
+  if (!bridge_.onResponseBodySize(response_body_.length() + data.length(),
+                                  encoder_callbacks_->responseHeaders())) {
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
+  response_body_.move(data);
+
+  if (!end_stream) {
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+  // TODO(guoyilin42): Add SSE response support for non-streaming path using the buffered body.
+  data.add(bridge_.encodeJsonRpcData(response_body_, encoder_callbacks_->responseHeaders()));
+  return Http::FilterDataStatus::Continue;
+}
+
+Http::FilterTrailersStatus McpJsonRestBridgeFilter::encodeTrailers(Http::ResponseTrailerMap&) {
+  if (!bridge_.handlesResponseTrailers()) {
+    return Http::FilterTrailersStatus::Continue;
+  }
+
+  Buffer::OwnedImpl data;
+  if (bridge_.responseStatus() == McpJsonRestBridge::ResponseStatus::Streaming) {
+    data.add(bridge_.encodeStreamingEnd());
+  } else {
+    data.add(bridge_.encodeJsonRpcData(response_body_, encoder_callbacks_->responseHeaders()));
+  }
+  encoder_callbacks_->addEncodedData(data, false);
+
+  return Http::FilterTrailersStatus::Continue;
 }
 
 } // namespace McpJsonRestBridge

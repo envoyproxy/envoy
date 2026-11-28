@@ -193,6 +193,16 @@ may read or modify the document, or reject the request with a local reply.
 Requests the filter does not parse -- those passed through, those without a
 body, and best-effort payloads that fail to parse -- run no AI filters.
 
+A declared endpoint's request that has no body, or whose body is not JSON, is
+still offered to each AI filter, which may answer it with a local reply of its
+own; when none does, the request without a body is forwarded and the one that is
+not JSON is rejected with a 400.
+
+A route configures an AI filter with :ref:`typed_per_filter_config
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.typed_per_filter_config>`,
+keyed by the filter's name in ``filters``. A route's ``AiProtocolManagerPerRoute``
+replaces the virtual host's as a whole, this map included.
+
 Once the AI filters finish, the parsed document is re-serialized as the
 request body by default. With :ref:`reserialize_body
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.reserialize_body>`
@@ -203,6 +213,12 @@ that read the request.
 A response runs the AI filters when its request was an AI call: a declared
 AI endpoint, or one whose API an AI filter detected. Any other response
 passes through untouched.
+
+An AI filter is handed a 2xx SSE or JSON response as the manager parses it. It
+may instead take the response of any request the AI filters ran over as bytes,
+whatever its status and content type, and rewrite its headers. Such a response
+is bytes to every AI filter of the chain, and token usage is not extracted from
+it.
 
 The available AI filters are described under :ref:`AI filters
 <config_http_ai_filters>`.

@@ -12,9 +12,12 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
+#include "envoy/network/connection.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/http/headers.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/bridge_status.h"
@@ -22,6 +25,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "nlohmann/json.hpp" // IWYU pragma: keep
 
@@ -74,6 +78,11 @@ public:
 
   const std::string& fallbackProtocolVersion() const { return fallback_protocol_version_; }
   const std::string& maxSupportedProtocolVersion() const { return max_supported_protocol_version_; }
+
+  // The request body limit `proto_config` sets, or the default; 0 for no limit.
+  static uint32_t maxRequestBodySize(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+          proto_config);
 
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   uint32_t maxResponseBodySize() const { return max_response_body_size_; }
@@ -228,29 +237,137 @@ private:
 using McpJsonRestBridgeFilterConfigSharedPtr = std::shared_ptr<McpJsonRestBridgeFilterConfig>;
 using McpJsonRestBridgePerRouteConfigSharedPtr = std::shared_ptr<McpJsonRestBridgePerRouteConfig>;
 
-/**
- * MCP JSON REST Bridge proxy implementation.
- */
-class McpJsonRestBridgeFilter : public Http::PassThroughFilter,
-                                public Logger::Loggable<Logger::Id::filter> {
-public:
-  explicit McpJsonRestBridgeFilter(McpJsonRestBridgeFilterConfigSharedPtr config)
-      : sse_response_extractor_(config->maxResponseBodySize()), config_(config) {}
+// What a local reply of the bridge takes the place of.
+enum class LocalReplyFor {
+  // The request.
+  Request,
+  // A Buffered response, whose headers are still held.
+  BufferedResponse,
+  // A Streaming response, whose headers have gone downstream.
+  StreamingResponse,
+};
 
-  // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
-                                          bool end_stream) override;
-  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
-                                          bool end_stream) override;
-  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
+// The stream a bridge runs on, as the filter hosting it provides it.
+class BridgeCallbacks {
+public:
+  virtual ~BridgeCallbacks() = default;
+
+  virtual void sendLocalReply(Http::Code code, absl::string_view body,
+                              std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                              Grpc::Status::GrpcStatus grpc_status, absl::string_view details,
+                              LocalReplyFor reply_for) PURE;
+  virtual void clearRouteCache() PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
+  // The hosting filter's configured name, which is the dynamic metadata namespace.
+  virtual absl::string_view filterConfigName() const PURE;
+  // For ENVOY_STREAM_LOG.
+  virtual OptRef<const Network::Connection> connection() PURE;
+  virtual uint64_t streamId() const PURE;
+};
+
+/**
+ * Translates one MCP JSON-RPC exchange to and from a JSON REST backend. It is the logic the
+ * HTTP filter and the AI filter share: the filter hosting it supplies the stream through
+ * BridgeCallbacks, buffers what the bridge asks for, and forwards what the bridge returns.
+ */
+class McpJsonRestBridge : public Logger::Loggable<Logger::Id::filter> {
+public:
+  McpJsonRestBridge(McpJsonRestBridgeFilterConfigSharedPtr config, BridgeCallbacks& callbacks)
+      : sse_response_extractor_(config->maxResponseBodySize()), callbacks_(callbacks),
+        config_(std::move(config)) {}
+
+  enum class RequestStatus {
+    // Not a request the bridge handles: forward it as received.
+    PassThrough,
+    // The bridge replied locally.
+    Replied,
+    // Hold the request for its body.
+    NeedsBody,
+    // Forward the request with the body the bridge returned, null for an empty one. The host
+    // frames the body, as with setContentLength().
+    Forward,
+    // Forward the request without a body.
+    ForwardNoBody,
+  };
+
+  // Starts a request. `end_stream` is whether it ended on its headers.
+  RequestStatus onRequestHeaders(const Http::RequestHeaderMap& request_headers, bool end_stream,
+                                 const McpJsonRestBridgePerRouteConfig* per_route_config);
+
+  // Returns whether a request body of `size` bytes is within the limit; replies locally if not.
+  bool onRequestBodySize(uint64_t size);
+
+  // Replies locally to a request whose body is more than the bridge can take.
+  void onRequestBodyTooLarge();
+
+  // Replies locally to a request whose body is not JSON.
+  void onRequestBodyInvalid();
+
+  // Handles the JSON-RPC request. When it is forwarded, `request_headers` are rewritten into
+  // those of the backend request, and on Forward `body` is its body.
+  RequestStatus onRequestBody(const nlohmann::json& json_rpc,
+                              Http::RequestHeaderMapOptRef request_headers,
+                              const McpJsonRestBridgePerRouteConfig* per_route_config,
+                              nlohmann::json& body);
+
+  // Returns the JSON-RPC error response for `error`, the body of the local reply a failed
+  // operation was answered with; nullopt for any other reply.
+  std::optional<std::string> jsonRpcError(absl::string_view error) const;
+
+  enum class ResponseStatus {
+    // Not a response the bridge handles: forward it as received.
+    PassThrough,
+    // The response ended on its headers: forward the body the bridge returned.
+    Complete,
+    // Forward the headers, and each body chunk through encodeStreamingData().
+    Streaming,
+    // Hold the headers, and buffer the body for encodeJsonRpcData().
+    Buffered,
+  };
+
+  // Starts a response, rewriting its headers unless it is Buffered. `body` is the body of a
+  // Complete response.
+  ResponseStatus onResponseHeaders(Http::ResponseHeaderMap& response_headers, bool end_stream,
+                                   std::string& body);
+
+  // How the body of the response is handled: PassThrough, Streaming or Buffered.
+  ResponseStatus responseStatus() const;
+
+  // Translates one chunk of a Streaming response in place. Returns false after replying locally
+  // to a chunk it cannot translate.
+  bool encodeStreamingData(Buffer::Instance& data, bool end_stream);
+
+  // Returns what closes a Streaming response that ended without an end_stream chunk.
+  std::string encodeStreamingEnd();
+
+  // Returns whether `size` buffered bytes of a Buffered response are within the limit; replies
+  // locally if not.
+  bool onResponseBodySize(uint64_t size, Http::ResponseHeaderMapOptRef response_headers);
+
+  // Returns the JSON-RPC response for the Buffered `body`, and rewrites the headers for it.
+  std::string encodeJsonRpcData(Buffer::Instance& body,
+                                Http::ResponseHeaderMapOptRef response_headers);
+
+  // Whether the bridge closes the response body ahead of its trailers.
+  bool handlesResponseTrailers() const {
+    return mcp_operation_ == McpOperation::ToolsList || mcp_operation_ == McpOperation::ToolsCall;
+  }
+
+  // Sets content-length for a body of `size` bytes, unless the message is chunked.
+  template <class HeaderMap> static void setContentLength(HeaderMap& headers, uint64_t size) {
+    const auto transfer_encoding = headers.TransferEncoding();
+    const bool is_chunked =
+        transfer_encoding != nullptr &&
+        absl::EqualsIgnoreCase(transfer_encoding->value().getStringView(),
+                               Http::Headers::get().TransferEncodingValues.Chunked);
+    if (is_chunked) {
+      headers.removeContentLength();
+    } else {
+      headers.setContentLength(size);
+    }
+  }
 
 private:
-  // Handles "method" field in the MCP request.
-  void handleMcpMethod(const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
-                       const McpJsonRestBridgePerRouteConfig* per_route_config);
-
   // Validates the "MCP-Protocol-Version" request header against the JSON-RPC request body.
   // Sends a local error response and returns an error status if validation fails.
   absl::Status validateMcpProtocolVersionHeader(const nlohmann::json& json_rpc,
@@ -291,12 +408,11 @@ private:
           const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>& tools,
       const ToolListCacheConfig& cache_config);
 
-  // Modifies the response from upstream into JSON-RPC response.
-  void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);
-
   // Maps the tool call request to the backend API.
-  void mapMcpToolToApiBackend(const nlohmann::json& json_rpc,
-                              const McpJsonRestBridgePerRouteConfig* per_route_config);
+  RequestStatus mapMcpToolToApiBackend(const nlohmann::json& json_rpc,
+                                       Http::RequestHeaderMapOptRef request_headers,
+                                       const McpJsonRestBridgePerRouteConfig* per_route_config,
+                                       nlohmann::json& body);
 
   // Handles decoding errors: sets dynamic metadata and sends a local reply.
   // IMPORTANT PROTOCOL RULE:
@@ -351,9 +467,6 @@ private:
   // Builds streaming_json_prefix_ and streaming_json_suffix_ for the tools/call streaming path.
   void buildStreamingPrefixAndSuffix(bool is_error);
 
-  // Encodes incoming data chunks for streaming MCP tool calls.
-  Http::FilterDataStatus encodeStreamingData(Buffer::Instance& data, bool end_stream);
-
   // Processes an SSE response chunk and returns the serialized JSON event payloads.
   absl::StatusOr<std::string> processSseResponse(absl::string_view chunk, bool end_stream);
 
@@ -385,10 +498,6 @@ private:
   bool is_notification_{false};
   std::string server_name_;
   std::string path_;
-  Buffer::OwnedImpl request_body_;
-  std::string request_body_str_;
-  Buffer::OwnedImpl response_body_;
-  std::string response_body_str_;
 
   // Per-request streaming flag, set during tool lookup in mapMcpToolToApiBackend.
   bool text_content_streaming_enabled_ = false;
@@ -411,7 +520,54 @@ private:
   bool is_first_sse_event_ = true;
   SseResponseExtractor sse_response_extractor_;
 
+  BridgeCallbacks& callbacks_;
   McpJsonRestBridgeFilterConfigSharedPtr config_;
+};
+
+/**
+ * MCP JSON REST Bridge HTTP filter: hosts the bridge on the HTTP filter chain.
+ */
+class McpJsonRestBridgeFilter : public Http::PassThroughFilter,
+                                public BridgeCallbacks,
+                                public Logger::Loggable<Logger::Id::filter> {
+public:
+  explicit McpJsonRestBridgeFilter(McpJsonRestBridgeFilterConfigSharedPtr config)
+      : bridge_(std::move(config), *this) {}
+
+  // Http::StreamDecoderFilter
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override;
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
+
+  // BridgeCallbacks
+  void sendLocalReply(Http::Code code, absl::string_view body,
+                      std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                      Grpc::Status::GrpcStatus grpc_status, absl::string_view details,
+                      LocalReplyFor reply_for) override;
+  void clearRouteCache() override {
+    if (decoder_callbacks_->downstreamCallbacks().has_value()) {
+      decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+    }
+  }
+  StreamInfo::StreamInfo& streamInfo() override { return decoder_callbacks_->streamInfo(); }
+  absl::string_view filterConfigName() const override {
+    return decoder_callbacks_->filterConfigName();
+  }
+  OptRef<const Network::Connection> connection() override {
+    return decoder_callbacks_->connection();
+  }
+  uint64_t streamId() const override { return decoder_callbacks_->streamId(); }
+
+private:
+  McpJsonRestBridge bridge_;
+  // Whether the bridge handles the request.
+  bool bridged_{false};
+  Buffer::OwnedImpl request_body_;
+  Buffer::OwnedImpl response_body_;
 };
 
 } // namespace McpJsonRestBridge

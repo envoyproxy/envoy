@@ -14,6 +14,7 @@ for when they run.
 .. toctree::
   :maxdepth: 2
 
+  mcp_json_rest_bridge_filter
   model_router_filter
   request_info_filter
   route_selector_filter
