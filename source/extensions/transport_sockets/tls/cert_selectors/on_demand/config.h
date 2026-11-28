@@ -21,6 +21,7 @@ namespace OnDemand {
 
 #define ALL_CERT_SELECTION_STATS(COUNTER, GAUGE, HISTOGRAM)                                        \
   COUNTER(cert_requested)                                                                          \
+  COUNTER(cert_subscription_failed)                                                                \
   COUNTER(cert_updated)                                                                            \
   GAUGE(cert_active, Accumulate)
 
@@ -141,6 +142,8 @@ public:
 
 private:
   void doRemoveCertificateConfig(absl::string_view);
+  // Fails the connections waiting on a secret whose subscription could not be created.
+  void failCertificateConfig(absl::string_view secret_name, absl::string_view error);
   const Stats::ScopeSharedPtr stats_scope_;
   CertSelectionStatsSharedPtr stats_;
   Server::Configuration::ServerFactoryContext& factory_context_;

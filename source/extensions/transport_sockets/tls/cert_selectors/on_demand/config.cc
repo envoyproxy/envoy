@@ -1,5 +1,8 @@
 #include "source/extensions/transport_sockets/tls/cert_selectors/on_demand/config.h"
 
+#include "envoy/common/exception.h"
+
+#include "source/common/common/thread.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/tls/context_impl.h"
@@ -178,6 +181,26 @@ void SecretManager::doRemoveCertificateConfig(absl::string_view secret_name) {
             secret_name, notify_count);
 }
 
+void SecretManager::failCertificateConfig(absl::string_view secret_name, absl::string_view error) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  stats_->cert_subscription_failed_.inc();
+  // The secret name can come from the client hello, so don't log every failed handshake.
+  ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(10),
+                     "Failed to create a certificate subscription for '{}': {}", secret_name,
+                     error);
+  // addCertificateConfig() creates the entry before the subscription that failed.
+  auto it = cache_.find(secret_name);
+  ASSERT(it != cache_.end());
+  // The subscription was never created, so only the pending connections need to be failed. The
+  // entry is removed so that a later handshake tries to subscribe again.
+  for (const auto& fetch_handle : it->second.callbacks_) {
+    if (auto handle = fetch_handle.lock(); handle) {
+      handle->notify(nullptr);
+    }
+  }
+  cache_.erase(it);
+}
+
 HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
                                                 Ssl::CertificateSelectionCallbackPtr&& cb,
                                                 bool client_ocsp_capable) {
@@ -192,7 +215,9 @@ HandleSharedPtr SecretManager::fetchCertificate(absl::string_view secret_name,
         auto that = weak_this.lock();
         auto handle = weak_handle.lock();
         if (that && handle) {
-          that->addCertificateConfig(name, handle, {});
+          TRY_ASSERT_MAIN_THREAD { that->addCertificateConfig(name, handle, {}); }
+          END_TRY
+          CATCH(const EnvoyException& e, { that->failCertificateConfig(name, e.what()); });
         }
       });
   return handle;
