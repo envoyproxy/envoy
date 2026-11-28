@@ -1350,7 +1350,7 @@ TEST(TranscoderFlattenJsonTest, MatchesDecoderOnSerializedDocument) {
 
   for (const nlohmann::json& document : documents) {
     SCOPED_TRACE(document.dump());
-    FlatteningJsonDecoder decoder;
+    FlatteningJsonDecoder decoder({});
     Buffer::OwnedImpl serialized(document.dump());
     absl::StatusOr<std::vector<FlattenJsonField>> decoded =
         decoder.onData(serialized, /*end_stream=*/true);

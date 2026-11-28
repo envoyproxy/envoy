@@ -272,6 +272,20 @@ TEST_F(ResponseFilterManagerTest, SseMutationsReachTheWire) {
   EXPECT_EQ(output(), "data: {\"a\":1,\"tagged\":true}\n\n");
 }
 
+// An event nested past the decoder's bound reaches the filters unparsed and the wire unchanged.
+TEST_F(ResponseFilterManagerTest, SseEventPastMaxDepthStaysRaw) {
+  ResponseFilterManager::Config config;
+  config.sse.parser.max_depth = 1;
+  std::vector<AiFilterSharedPtr> filters;
+  filters.push_back(std::make_unique<TaggingSseFilter>("tagged"));
+  makeManager(std::move(filters), config);
+
+  feed("data: {\"a\":1}\n\ndata: {\"a\":{\"b\":1}}\n\n");
+
+  EXPECT_THAT(result_, IsOk());
+  EXPECT_EQ(output(), "data: {\"a\":1,\"tagged\":true}\n\ndata: {\"a\":{\"b\":1}}\n\n");
+}
+
 // The chain decodes and re-serializes rather than forwarding bytes, so a field it does not model
 // only reaches the client if it is carried deliberately.
 TEST_F(ResponseFilterManagerTest, SseUnknownFieldsSurviveTheChain) {
@@ -875,6 +889,17 @@ TEST_F(ResponseFilterManagerTest, UnaryInvalidJsonFailsPipeline) {
 
   EXPECT_EQ(complete_calls_, 1);
   EXPECT_EQ(result_.code(), absl::StatusCode::kInvalidArgument);
+}
+
+// A body nested past the decoder's bound fails the pipeline with its own status code.
+TEST_F(ResponseFilterManagerTest, UnaryBodyPastMaxDepthFailsPipeline) {
+  ResponseFilterManager::Config config = unaryConfig();
+  config.unary.max_depth = 1;
+  makeManager({}, config);
+  feed(R"({"a":{"b":1}})");
+
+  EXPECT_EQ(complete_calls_, 1);
+  EXPECT_EQ(result_.code(), absl::StatusCode::kResourceExhausted);
 }
 
 TEST_F(ResponseFilterManagerTest, UnarySourceIsPausedWhenPipelineIsBackedUp) {

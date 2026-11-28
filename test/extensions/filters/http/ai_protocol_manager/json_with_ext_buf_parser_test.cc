@@ -386,6 +386,18 @@ TEST_F(JsonWithExtBufParserTest, GeminiFunctionCallDepthParses) {
   EXPECT_EQ(doc.json()[0]["usageMetadata"]["totalTokenCount"], 15);
 }
 
+// The nesting bound is the config's, and exceeding it is told apart from
+// malformed JSON by its status code.
+TEST_F(JsonWithExtBufParserTest, MaxDepthIsConfigured) {
+  const std::string body = R"({"a":{"b":{"c":1}}})";
+  config_.max_depth = 3;
+  ASSERT_OK(parse(body));
+  EXPECT_EQ(json()["a"]["b"]["c"], 1);
+
+  config_.max_depth = 2;
+  EXPECT_THAT(parse(body), HasStatusCode(absl::StatusCode::kResourceExhausted));
+}
+
 // The node budget bounds DOM amplification: a document of many tiny scalars
 // fails parsing once it exceeds max_nodes, regardless of its byte size.
 TEST_F(JsonWithExtBufParserTest, NodeBudgetBoundsAmplification) {

@@ -56,6 +56,14 @@ per-stream memory. What counts as oversized is
 enough that conversation content does not. A declared API whose payload schema
 pins its own threshold uses that instead.
 
+A payload may nest JSON objects and arrays up to :ref:`max_json_depth
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestParsingLimits.max_json_depth>`
+levels, 64 by default. A deeper one is well-formed JSON that the filter declines
+to parse: a declared AI endpoint rejects it with a 400 whose response code
+details are ``ai_protocol_manager_json_depth_exceeded``, and a route parsed under
+``parse_unconfigured_routes`` forwards it unparsed. Either way it is counted by
+``request_json_depth_exceeded``.
+
 Upon stream completion, the parsed document is handed to the configured
 :ref:`AI filters <config_http_filters_ai_protocol_manager_ai_filters>`.
 Holding it to its API's payload schema is the job of the :ref:`schema
@@ -203,6 +211,13 @@ that read the request.
 A response runs the AI filters when its request was an AI call: a declared
 AI endpoint, or one whose API an AI filter detected. Any other response
 passes through untouched.
+
+A response payload, a JSON body or the data of one SSE event, may nest up to
+:ref:`max_json_depth
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.ResponseParsingLimits.max_json_depth>`
+levels, 64 by default. A deeper one is not parsed: the AI filters get the SSE
+event unparsed, a JSON body they would run on is replaced with a 502, and token
+usage extraction counts it in ``response_parse_error``.
 
 The available AI filters are described under :ref:`AI filters
 <config_http_ai_filters>`.
@@ -485,8 +500,9 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   :widths: 1, 1, 2
 
   request_parsed, Counter, A held request payload was parsed into a document.
-  request_parse_error, Counter, A declared AI endpoint's payload was not well-formed JSON and was rejected with a 400.
+  request_parse_error, Counter, "A declared AI endpoint's payload was not well-formed JSON, or nested too deep, and was rejected with a 400."
   request_passthrough, Counter, "A payload on an unconfigured route failed to parse under :ref:`parse_unconfigured_routes <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>` and was forwarded unchanged; never a request failure."
+  request_json_depth_exceeded, Counter, "A payload nested deeper than :ref:`max_json_depth <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestParsingLimits.max_json_depth>`; also counted by ``request_parse_error`` or ``request_passthrough``, whichever became of the request."
   route_binding_unused, Counter, "A request on a route that declares a :ref:`binding <config_http_ai_filters_transcoder_instructions>` no AI filter of the chain applies, such as a ``response.binding`` with no transcoder running a request ``FROM_IR`` leg."
   request_external_buffer_error, Counter, The external buffer failed irrecoverably on the request path and the stream was answered with a 500.
   response_external_buffer_error, Counter, The external buffer failed irrecoverably on the response path and the stream was answered with a 500.

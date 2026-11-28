@@ -384,7 +384,7 @@ TEST(StructuralMatchTest, RoutesDepthOneScalar) {
   EXPECT_EQ(h.captured(), "m;");
 }
 
-// Dict-only chain: intermediate labels come from key_stack_ at the ancestor
+// Dict-only chain: intermediate labels come from levels_[d].key at the ancestor
 // depth. "name" precedes "_meta" at depth 2, so this also covers the slot
 // being overwritten by an earlier sibling key before the match runs.
 TEST(StructuralMatchTest, RoutesNestedDicts) {
@@ -542,7 +542,7 @@ TEST(StructuralMatchTest, KindMismatchRejected) {
 // length-vs-depth mismatch: empty, shorter than the cursor (an ancestor), longer,
 // or past kMaxTrackedDepth must all return false rather than match or read out of
 // bounds. "Longer" is reachable, not hypothetical — per-depth state survives a
-// pop, so against {"a":{"b":1},"c":"x"} key_stack_[2] still reads "b" at "c".
+// pop, so against {"a":{"b":1},"c":"x"} levels_[2].key still reads "b" at "c".
 class MatchProbeHandler : public MockHandler {
 public:
   void setCursor(const WuffsJsonCursor* cursor) { cursor_ = cursor; }
@@ -552,7 +552,7 @@ public:
     const std::vector<WuffsJsonCursor::PatternSegment> c = {{"c"}};
     matched_correct_ = cursor_->matchesPatternPath(c);
     matched_empty_ = cursor_->matchesPatternPath({});
-    // Reaches below the cursor, where key_stack_[2] still reads the closed {"b":1}.
+    // Reaches below the cursor, where levels_[2].key still reads the closed {"b":1}.
     const std::vector<WuffsJsonCursor::PatternSegment> c_b = {{"c"}, {"b"}};
     matched_below_cursor_ = cursor_->matchesPatternPath(c_b);
     const std::vector<WuffsJsonCursor::PatternSegment> deep(WuffsJsonCursor::kMaxTrackedDepth,

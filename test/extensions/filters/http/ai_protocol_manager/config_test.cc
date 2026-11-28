@@ -177,6 +177,55 @@ TEST(AiProtocolManagerConfigTest, RejectsOutOfRangeInlineStringThreshold) {
   }
 }
 
+// Each direction has its own nesting bound, with the same default.
+TEST(AiProtocolManagerConfigTest, MaxJsonDepthDefaultsAndOverrides) {
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    const FilterConfig config(proto_config, *stats_store.rootScope(), AiFilterFactories{},
+                              std::make_shared<InMemoryExternalBufferFactory>());
+    EXPECT_EQ(config.maxRequestJsonDepth(), 64);
+    EXPECT_EQ(config.maxResponseJsonDepth(), 64);
+  }
+  {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    proto_config.mutable_request_handling()->mutable_limits()->mutable_max_json_depth()->set_value(
+        32);
+    proto_config.mutable_response_handling()->mutable_limits()->mutable_max_json_depth()->set_value(
+        48);
+    const FilterConfig config(proto_config, *stats_store.rootScope(), AiFilterFactories{},
+                              std::make_shared<InMemoryExternalBufferFactory>());
+    EXPECT_EQ(config.maxRequestJsonDepth(), 32);
+    EXPECT_EQ(config.maxResponseJsonDepth(), 48);
+  }
+}
+
+// Zero would reject every payload, and the ceiling keeps the code that walks
+// the parsed document recursively within a bounded stack.
+TEST(AiProtocolManagerConfigTest, RejectsOutOfRangeMaxJsonDepth) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  AiProtocolManagerFilterConfigFactory factory;
+  for (const uint32_t value : {0u, 129u}) {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager request_config;
+    request_config.mutable_request_handling()
+        ->mutable_limits()
+        ->mutable_max_json_depth()
+        ->set_value(value);
+    EXPECT_THROW(
+        factory.createFilterFactoryFromProto(request_config, "stats", context).IgnoreError(),
+        EnvoyException);
+
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager response_config;
+    response_config.mutable_response_handling()
+        ->mutable_limits()
+        ->mutable_max_json_depth()
+        ->set_value(value);
+    EXPECT_THROW(
+        factory.createFilterFactoryFromProto(response_config, "stats", context).IgnoreError(),
+        EnvoyException);
+  }
+}
+
 // Creating the filter from an upstream factory context yields the same stream
 // filter as the downstream path (see #46385: the upstream role installs the
 // full filter, request offload included, with the caveats documented for that

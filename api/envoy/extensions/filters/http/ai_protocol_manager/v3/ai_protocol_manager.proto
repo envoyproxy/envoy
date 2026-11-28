@@ -125,6 +125,19 @@ message RequestParsingLimits {
   // requires ``model`` inline, so it rejects an offloaded one with a 400.
   google.protobuf.UInt32Value inline_string_threshold_bytes = 1
       [(validate.rules).uint32 = {lte: 1048576 gte: 64}];
+
+  // Maximum nesting depth of a request payload: how many JSON objects and
+  // arrays may be open at once, the root counting as one. A payload nested
+  // deeper is rejected with a 400 on a declared AI endpoint. On a route parsed
+  // under ``parse_unconfigured_routes`` it is forwarded unchanged, and the AI
+  // filters do not run on it. Both are counted by
+  // ``request_json_depth_exceeded``.
+  //
+  // Defaults to 64. A tool's parameter schema, or a response schema, nests two
+  // levels for each object it describes, on top of the levels of the request
+  // around it, so a schema several objects deep needs far more than its own
+  // depth.
+  google.protobuf.UInt32Value max_json_depth = 2 [(validate.rules).uint32 = {lte: 128 gte: 1}];
 }
 
 // Response-side processing configuration. Individual response features are
@@ -133,6 +146,24 @@ message ResponseHandling {
   // Extract canonical token usage from eligible AI responses. When unset,
   // token usage extraction is disabled.
   TokenUsageExtraction token_usage = 1;
+
+  // Response-path parsing limits. Defaults apply when unset.
+  ResponseParsingLimits limits = 2;
+}
+
+// Per-stream limits for response payload parsing.
+message ResponseParsingLimits {
+  // Maximum nesting depth of a response payload, counted the same way as the
+  // request's :ref:`max_json_depth
+  // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestParsingLimits.max_json_depth>`.
+  // It applies to a JSON response body and to the payload of each SSE event.
+  //
+  // A payload nested deeper is not parsed. Token usage extraction counts it in
+  // ``response_parse_error``. The AI filters get an SSE event unparsed, and a
+  // JSON response body they would run on is replaced with a 502.
+  //
+  // Defaults to 64.
+  google.protobuf.UInt32Value max_json_depth = 1 [(validate.rules).uint32 = {lte: 128 gte: 1}];
 }
 
 // Configuration for canonical response token-usage extraction.

@@ -804,6 +804,36 @@ TEST_F(ResponseHandlerTest, JsonInvalidBodyCounted) {
   EXPECT_FALSE(handler.usage().hasAny());
 }
 
+// The nesting bound is the caller's. Usage two levels down is read under a
+// bound of two and counted as a parse error under a bound of one.
+TEST_F(ResponseHandlerTest, MaxJsonDepthBoundsBothHandlers) {
+  const std::string body =
+      R"({"object":"chat.completion","usage":{"prompt_tokens":3,"completion_tokens":4}})";
+  const std::string event = "data: " + body + "\n\n";
+  {
+    JsonResponseHandler json(LLMProtocol::OpenAiChatCompletions, TestMaxBodySize, stats_, nullptr,
+                             /*max_json_depth=*/2);
+    feed(json, body, 4096);
+    EXPECT_EQ(json.usage().output_tokens, 4);
+    SseResponseHandler sse(LLMProtocol::OpenAiChatCompletions, TestMaxEventSize,
+                           TestMaxParsedEvents, stats_, nullptr, /*max_json_depth=*/2);
+    feed(sse, event, 4096);
+    EXPECT_EQ(sse.usage().output_tokens, 4);
+    EXPECT_EQ(stats_.response_parse_error_.value(), 0);
+  }
+  {
+    JsonResponseHandler json(LLMProtocol::OpenAiChatCompletions, TestMaxBodySize, stats_, nullptr,
+                             /*max_json_depth=*/1);
+    feed(json, body, 4096);
+    EXPECT_TRUE(json.degraded());
+    SseResponseHandler sse(LLMProtocol::OpenAiChatCompletions, TestMaxEventSize,
+                           TestMaxParsedEvents, stats_, nullptr, /*max_json_depth=*/1);
+    feed(sse, event, 4096);
+    EXPECT_TRUE(sse.degraded());
+    EXPECT_EQ(stats_.response_parse_error_.value(), 2);
+  }
+}
+
 TEST_F(ResponseHandlerTest, JsonNonObjectRootTolerated) {
   JsonResponseHandler handler(LLMProtocol::Unspecified, TestMaxBodySize, stats_);
   feed(handler, "42", 4096);

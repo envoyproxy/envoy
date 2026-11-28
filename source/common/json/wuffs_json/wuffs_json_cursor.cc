@@ -1,5 +1,6 @@
 #include "source/common/json/wuffs_json/wuffs_json_cursor.h"
 
+#include <algorithm>
 #include <string>
 
 #include "absl/status/status.h"
@@ -11,6 +12,9 @@ namespace Json {
 namespace Wuffs {
 
 namespace {
+
+// Wuffs stops at this depth itself, so a larger bound would never be reached.
+constexpr uint32_t kWuffsMaxDepth = WUFFS_JSON__DECODER_DEPTH_MAX_INCL;
 
 // Append the content of one Wuffs STRING token to `out`.
 // JSON STRING tokens carry either plain bytes (COPY) or the opening/closing
@@ -56,7 +60,9 @@ void appendCodePoint(std::string& out, uint32_t code_point) {
 
 } // namespace
 
-WuffsJsonCursor::WuffsJsonCursor(Handler& handler) : handler_(handler) {
+WuffsJsonCursor::WuffsJsonCursor(Handler& handler, Options options)
+    : handler_(handler), max_depth_(static_cast<int>(std::min(options.max_depth, kWuffsMaxDepth))),
+      levels_(1) {
   decoder_ = wuffs_json__decoder::alloc();
   token_buf_ =
       wuffs_base__slice_token__writer(wuffs_base__make_slice_token(token_data_, kTokenBufLen));
@@ -209,8 +215,13 @@ absl::Status WuffsJsonCursor::feedChunk(absl::string_view chunk, bool closed) {
       break;
     }
     if (!wuffs_base__status__is_suspension(&status)) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("wuffs json: ", wuffs_base__status__message(&status)));
+      const std::string message =
+          absl::StrCat("wuffs json: ", wuffs_base__status__message(&status));
+      // Wuffs' own depth bound, reachable only when max_depth_ equals it.
+      if (status.repr == wuffs_json__error__unsupported_recursion_depth) {
+        return absl::ResourceExhaustedError(message);
+      }
+      return absl::InvalidArgumentError(message);
     }
     if (status.repr == wuffs_base__suspension__short_read) {
       // When Wuffs suspends mid-token it resets its read cursor to before the
@@ -242,27 +253,26 @@ absl::Status WuffsJsonCursor::handleStructureToken(uint64_t token_detail, size_t
   const bool to_dict = (token_detail & WUFFS_BASE__TOKEN__VBD__STRUCTURE__TO_DICT) != 0;
   if (is_push) {
     ++depth_;
-    if (depth_ > kMaxTrackedDepth - 1) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("wuffs json: nesting depth exceeds ", kMaxTrackedDepth - 1));
+    if (depth_ > max_depth_) {
+      return absl::ResourceExhaustedError(
+          absl::StrCat("wuffs json: nesting depth exceeds ", max_depth_));
     }
-    if (depth_ < kMaxTrackedDepth) {
-      seen_keys_[depth_].clear();
-      is_dict_[depth_] = to_dict;
-      expecting_key_[depth_] = to_dict;
+    if (static_cast<size_t>(depth_) == levels_.size()) {
+      levels_.emplace_back();
     }
+    Level& level = levels_[depth_];
+    level.seen_keys.clear();
+    level.is_dict = to_dict;
+    level.expecting_key = to_dict;
     // key for onContainerOpen is the parent dict key that triggered this container.
     // Empty when the parent is an array or at root (depth 1).
-    const absl::string_view parent_key = (depth_ > 1 && is_dict_[depth_ - 1])
-                                             ? absl::string_view(key_stack_[depth_ - 1])
-                                             : absl::string_view();
-    handler_.onContainerOpen(parent_key, to_dict, depth_, token_start);
+    handler_.onContainerOpen(keyAt(depth_ - 1), to_dict, depth_, token_start);
   } else {
     const int pop_depth = depth_;
     --depth_;
     handler_.onContainerClose(pop_depth, body_src_pos_);
-    if (depth_ >= 1 && depth_ < kMaxTrackedDepth && is_dict_[depth_]) {
-      expecting_key_[depth_] = true;
+    if (depth_ >= 1 && levels_[depth_].is_dict) {
+      levels_[depth_].expecting_key = true;
     }
   }
   return absl::OkStatus();
@@ -272,14 +282,12 @@ absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t 
                                                 bool continued, size_t token_start) {
   if (!in_string_chain_) {
     key_buffer_.clear();
-    string_is_key_ = depth_ < kMaxTrackedDepth && is_dict_[depth_] && expecting_key_[depth_];
+    string_is_key_ = levels_[depth_].is_dict && levels_[depth_].expecting_key;
     if (string_is_key_) {
       key_token_start_ = token_start;
     } else {
-      // key_stack_[depth_] is always current here — onKey fired before this value.
-      const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
-                                              ? absl::string_view(key_stack_[depth_])
-                                              : absl::string_view();
+      // levels_[depth_].key is always current here — onKey fired before this value.
+      const absl::string_view value_key = keyAt(depth_);
       string_capturing_ = handler_.openStringCapture(value_key, depth_, token_start);
       string_chunk_active_ = string_capturing_;
     }
@@ -296,9 +304,7 @@ absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t 
   } else if (string_chunk_active_ &&
              (token_detail & WUFFS_BASE__TOKEN__VBD__STRING__CONVERT_1_DST_1_SRC_COPY) &&
              !raw.empty()) {
-    const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
-                                            ? absl::string_view(key_stack_[depth_])
-                                            : absl::string_view();
+    const absl::string_view value_key = keyAt(depth_);
     if (!handler_.onStringChunk(value_key, depth_, raw)) {
       string_chunk_active_ = false;
     }
@@ -309,26 +315,20 @@ absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t 
       // TODO(tyxia): duplicate-key rejection is unconditional. There are 3 popular options
       // here: reject / last-wins / first-wins
       // Adding a configuration option here to enable different options.
-      if (depth_ < kMaxTrackedDepth && !seen_keys_[depth_].insert(key_buffer_).second) {
+      if (!levels_[depth_].seen_keys.insert(key_buffer_).second) {
         return absl::InvalidArgumentError(
             absl::StrCat("wuffs json: duplicate key \"", key_buffer_, "\""));
       }
-      if (depth_ < kMaxTrackedDepth) {
-        key_stack_[depth_] = key_buffer_;
-      }
+      levels_[depth_].key = key_buffer_;
       if (auto s = handler_.onKey(key_buffer_, depth_, key_token_start_); !s.ok()) {
         return s;
       }
-      if (depth_ < kMaxTrackedDepth) {
-        expecting_key_[depth_] = false;
-      }
+      levels_[depth_].expecting_key = false;
     } else {
-      const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
-                                              ? absl::string_view(key_stack_[depth_])
-                                              : absl::string_view();
+      const absl::string_view value_key = keyAt(depth_);
       handler_.closeStringCapture(value_key, depth_, body_src_pos_);
-      if (depth_ >= 1 && depth_ < kMaxTrackedDepth && is_dict_[depth_]) {
-        expecting_key_[depth_] = true;
+      if (depth_ >= 1 && levels_[depth_].is_dict) {
+        levels_[depth_].expecting_key = true;
       }
     }
     string_capturing_ = false;
@@ -360,9 +360,7 @@ absl::Status WuffsJsonCursor::handleUnicodeCodePointToken(uint64_t token_detail)
     // them as a single call on the next STRING/COPY token or chain end.
     uint8_t buf[4];
     encodeCodePoint(buf, code_point);
-    const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
-                                            ? absl::string_view(key_stack_[depth_])
-                                            : absl::string_view();
+    const absl::string_view value_key = keyAt(depth_);
     if (!handler_.onStringChunk(value_key, depth_,
                                 absl::string_view(reinterpret_cast<char*>(buf), utf8_len))) {
       string_chunk_active_ = false;
@@ -376,9 +374,7 @@ absl::Status WuffsJsonCursor::handleUnicodeCodePointToken(uint64_t token_detail)
 absl::Status WuffsJsonCursor::handleNumberOrLiteralToken(int64_t token_category,
                                                          absl::string_view raw,
                                                          size_t token_start) {
-  const absl::string_view value_key = (depth_ < kMaxTrackedDepth && is_dict_[depth_])
-                                          ? absl::string_view(key_stack_[depth_])
-                                          : absl::string_view();
+  const absl::string_view value_key = keyAt(depth_);
   if (token_category == WUFFS_BASE__TOKEN__VBC__NUMBER) {
     if (raw.size() > kMaxNumberBytes) {
       return absl::InvalidArgumentError("wuffs json: number token too large");
@@ -394,8 +390,8 @@ absl::Status WuffsJsonCursor::handleNumberOrLiteralToken(int64_t token_category,
   } else {
     handler_.onNull(value_key, depth_, token_start, body_src_pos_);
   }
-  if (depth_ >= 1 && depth_ < kMaxTrackedDepth && is_dict_[depth_]) {
-    expecting_key_[depth_] = true;
+  if (depth_ >= 1 && levels_[depth_].is_dict) {
+    levels_[depth_].expecting_key = true;
   }
   return absl::OkStatus();
 }
@@ -404,19 +400,18 @@ absl::Status WuffsJsonCursor::handleNumberOrLiteralToken(int64_t token_category,
 // every level must agree in kind, and dict levels in whole-label equality.
 //
 // Callers check the pattern length against their own level first, which is what
-// keeps every index below kMaxTrackedDepth — handleStructureToken caps depth_ at
-// kMaxTrackedDepth-1 at push time.
+// keeps every index within levels_ — it holds every depth up to depth_.
 bool WuffsJsonCursor::matchesChain(absl::Span<const PatternSegment> segments) const {
   for (size_t i = 0; i < segments.size(); ++i) {
     const int d = static_cast<int>(i) + 1;
     const PatternSegment& seg = segments[i];
-    if (is_dict_[d]) {
+    if (levels_[d].is_dict) {
       if (seg.is_array_element) {
         return false;
       }
-      // is_dict_[d] means key_stack_[d] names the item at depth d: the leaf key
-      // at the last level, else the key that opened the container at depth d+1.
-      if (key_stack_[d] != seg.key) {
+      // A dict level's key names the item at depth d: the leaf key at the last
+      // level, else the key that opened the container at depth d+1.
+      if (levels_[d].key != seg.key) {
         return false;
       }
       continue;
@@ -427,6 +422,11 @@ bool WuffsJsonCursor::matchesChain(absl::Span<const PatternSegment> segments) co
     }
   }
   return true;
+}
+
+absl::string_view WuffsJsonCursor::keyAt(int depth) const {
+  const Level& level = levels_[depth];
+  return level.is_dict ? absl::string_view(level.key) : absl::string_view();
 }
 
 bool WuffsJsonCursor::matchesPatternPath(absl::Span<const PatternSegment> segments) const {

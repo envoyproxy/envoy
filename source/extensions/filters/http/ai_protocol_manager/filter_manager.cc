@@ -42,10 +42,10 @@ void FilterManager::startSseResponse(ExternalBufferFactory& buffer_factory,
 
 void FilterManager::startUnaryResponse(ExternalBufferFactory& buffer_factory,
                                        FilterChainBridge& bridge, BufferManager& out_buffer_manager,
-                                       OnCompleteFn on_complete) {
+                                       OnCompleteFn on_complete,
+                                       ResponseFilterManager::Config config) {
   ASSERT(response_manager_ == nullptr);
   std::vector<AiFilterSharedPtr> reversed(filters_.rbegin(), filters_.rend());
-  ResponseFilterManager::Config config;
   config.mode = ResponseFilterManager::Mode::Unary;
   response_manager_ =
       std::make_unique<ResponseFilterManager>(std::move(reversed), buffer_factory, bridge,

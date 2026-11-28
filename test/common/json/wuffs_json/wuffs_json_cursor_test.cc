@@ -1,3 +1,4 @@
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -613,6 +614,74 @@ TEST(WuffsJsonCursorTest, ExceedMaxDepthRejected) {
           R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}}}}}}}}}})",
           h),
       Not(IsOk()));
+}
+
+// Reports the key of the number it sees, and whether the number sits on `pattern`.
+class MatchOnNumberHandler : public CapturingHandler {
+public:
+  const WuffsJsonCursor* cursor{nullptr};
+  std::vector<WuffsJsonCursor::PatternSegment> pattern;
+  std::string number_key;
+  bool matched{false};
+
+  absl::Status onNumber(absl::string_view key, absl::string_view, int, size_t, size_t) override {
+    number_key = std::string(key);
+    matched = cursor->matchesPatternPath(pattern);
+    return absl::OkStatus();
+  }
+};
+
+// The bound is the caller's to set, and the levels past the inline ones track
+// keys like any other.
+TEST(WuffsJsonCursorTest, ConfiguredMaxDepth) {
+  constexpr int depth = 2 * WuffsJsonCursor::kMaxTrackedDepth;
+  std::string open;
+  for (int i = 0; i < depth; ++i) {
+    open += R"({"a":)";
+  }
+  const std::string nested = open + "1" + std::string(depth, '}');
+  {
+    MatchOnNumberHandler h;
+    h.pattern.assign(depth, WuffsJsonCursor::PatternSegment{"a"});
+    WuffsJsonCursor cursor(h, {.max_depth = depth});
+    h.cursor = &cursor;
+    EXPECT_OK(cursor.feed(nested, /*closed=*/true));
+    EXPECT_EQ(h.number_key, "a");
+    EXPECT_TRUE(h.matched);
+  }
+  {
+    CapturingHandler h;
+    WuffsJsonCursor cursor(h, {.max_depth = depth});
+    const absl::Status status =
+        cursor.feed(open + R"(1,"a":2)" + std::string(depth, '}'), /*closed=*/true);
+    EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_EQ(status.message(), "wuffs json: duplicate key \"a\"");
+  }
+  {
+    CapturingHandler h;
+    WuffsJsonCursor cursor(h, {.max_depth = depth - 1});
+    const absl::Status status = cursor.feed(nested, /*closed=*/true);
+    EXPECT_EQ(status.code(), absl::StatusCode::kResourceExhausted);
+    EXPECT_EQ(status.message(), "wuffs json: nesting depth exceeds " + std::to_string(depth - 1));
+  }
+}
+
+// A bound past Wuffs' own is capped at it, and nesting past that is the same
+// depth error.
+TEST(WuffsJsonCursorTest, MaxDepthCappedAtWuffsBound) {
+  constexpr int wuffs_bound = WUFFS_JSON__DECODER_DEPTH_MAX_INCL;
+  const auto nested = [](int depth) { return std::string(depth, '[') + std::string(depth, ']'); };
+  {
+    CapturingHandler h;
+    WuffsJsonCursor cursor(h, {.max_depth = std::numeric_limits<uint32_t>::max()});
+    EXPECT_OK(cursor.feed(nested(wuffs_bound), /*closed=*/true));
+  }
+  {
+    CapturingHandler h;
+    WuffsJsonCursor cursor(h, {.max_depth = std::numeric_limits<uint32_t>::max()});
+    EXPECT_EQ(cursor.feed(nested(wuffs_bound + 1), /*closed=*/true).code(),
+              absl::StatusCode::kResourceExhausted);
+  }
 }
 
 // Path-tracking tests

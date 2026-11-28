@@ -9,6 +9,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
+#include "source/extensions/filters/http/ai_protocol_manager/flattening_json_codec.h"
 #include "source/extensions/filters/http/ai_protocol_manager/sse/sse_event_codec.h"
 
 #include "absl/functional/any_invocable.h"
@@ -43,6 +44,7 @@ public:
   struct Config {
     Mode mode{Mode::Sse};
     SseEventDecoder::Config sse{};
+    FlatteningJsonDecoder::Config unary{};
   };
 
   ResponseFilterManager(std::vector<AiFilterSharedPtr> filters,
