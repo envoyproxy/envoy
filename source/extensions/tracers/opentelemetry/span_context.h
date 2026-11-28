@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string>
 
+#include "source/common/common/statusor.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
