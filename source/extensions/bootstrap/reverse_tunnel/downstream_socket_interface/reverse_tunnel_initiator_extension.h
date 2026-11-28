@@ -249,7 +249,9 @@ public:
  * Thread local storage for ReverseTunnelInitiator.
  * Stores the thread-local dispatcher and stats scope for each worker thread.
  */
-class DownstreamSocketThreadLocal : public ThreadLocal::ThreadLocalObject {
+class DownstreamSocketThreadLocal
+    : public ThreadLocal::ThreadLocalObject,
+      public std::enable_shared_from_this<DownstreamSocketThreadLocal> {
 public:
   DownstreamSocketThreadLocal(Event::Dispatcher& dispatcher, Stats::Scope& scope)
       : dispatcher_(dispatcher), scope_(scope) {}

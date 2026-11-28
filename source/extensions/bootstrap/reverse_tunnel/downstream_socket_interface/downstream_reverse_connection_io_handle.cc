@@ -26,10 +26,14 @@ DownstreamReverseConnectionIOHandle::DownstreamReverseConnectionIOHandle(
             fd_, connection_key_);
   // Register with the parent so it can null this back-pointer if it is torn down first.
   if (parent_ != nullptr) {
+    connection_info_ = parent_->connectionInfo();
     parent_->registerChildIoHandle(*this);
     auto* extension = parent_->getDownstreamExtension();
-    if (extension != nullptr && extension->getLocalRegistry() != nullptr) {
-      extension->getLocalRegistry()->registerIoHandle(this);
+    if (extension != nullptr) {
+      if (auto* local_registry = extension->getLocalRegistry(); local_registry != nullptr) {
+        local_registry_ = local_registry->weak_from_this();
+        local_registry->registerIoHandle(this);
+      }
     }
   }
 }
@@ -84,12 +88,11 @@ DownstreamReverseConnectionIOHandle::~DownstreamReverseConnectionIOHandle() {
   // rejection, must still run the terminal cleanup so the parent drops the tunnel key and redials.
   // close() is idempotent through its fd_ guard, so this is a no-op when close() already ran.
   close();
+  if (auto local_registry = local_registry_.lock(); local_registry != nullptr) {
+    local_registry->unregisterIoHandle(this);
+  }
   if (parent_ != nullptr) {
     parent_->unregisterChildIoHandle(*this);
-    auto* extension = parent_->getDownstreamExtension();
-    if (extension != nullptr && extension->getLocalRegistry() != nullptr) {
-      extension->getLocalRegistry()->unregisterIoHandle(this);
-    }
   }
   SET_SOCKET_INVALID(fd_);
 }
@@ -165,9 +168,7 @@ void DownstreamReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement()
   }
 }
 
-std::string DownstreamReverseConnectionIOHandle::connectionInfo() const {
-  return parent_->connectionInfo();
-}
+std::string DownstreamReverseConnectionIOHandle::connectionInfo() const { return connection_info_; }
 
 } // namespace ReverseConnection
 } // namespace Bootstrap

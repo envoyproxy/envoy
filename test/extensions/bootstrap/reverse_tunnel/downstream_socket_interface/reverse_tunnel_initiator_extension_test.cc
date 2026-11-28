@@ -1170,6 +1170,76 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, ActiveTunnelsSurviveListenerResetFil
   EXPECT_TRUE(after_close.empty());
 }
 
+// Parent listener teardown detaches live child tunnels; activeTunnels must still report the
+// draining tunnel safely without dereferencing the null parent, and destroying the child must
+// unregister it from the worker registry so no dangling pointer remains.
+TEST_F(ReverseTunnelInitiatorExtensionTest,
+       ActiveTunnelsSurviveParentTeardownAndUnregisterOnChildClose) {
+  setupThreadLocalSlot();
+  auto* registry = extension_->getLocalRegistry();
+  ASSERT_NE(registry, nullptr);
+
+  ReverseConnectionSocketConfig config;
+  config.src_cluster_id = "cluster-a";
+  config.src_node_id = "node-a";
+  config.src_tenant_id = "tenant-a";
+  auto parent = createTestIOHandle(config);
+  auto tunnel = createTunnelHandle(*parent, "a1");
+
+  // Destroy parent first (triggers detachParent() on live child).
+  parent.reset();
+  EXPECT_TRUE(tunnel->listenerStopped());
+
+  // Inspecting active tunnels while the detached child is alive must not dereference null parent.
+  absl::flat_hash_map<std::string, size_t> while_draining;
+  registry->activeTunnels(while_draining);
+  EXPECT_THAT(while_draining, UnorderedElementsAre(Pair("node-a:cluster-a:tenant-a", 1)));
+
+  // Closing and destroying the detached child must still unregister it from io_handles_.
+  tunnel.reset();
+  absl::flat_hash_map<std::string, size_t> after_close;
+  registry->activeTunnels(after_close);
+  EXPECT_TRUE(after_close.empty());
+}
+
+// Regression test isolating the destructor unregistration path after parent teardown.
+TEST_F(ReverseTunnelInitiatorExtensionTest,
+       ActiveTunnelsUnregistersChildAfterParentTeardownWithoutDanglingPointer) {
+  setupThreadLocalSlot();
+  auto* registry = extension_->getLocalRegistry();
+  ASSERT_NE(registry, nullptr);
+
+  ReverseConnectionSocketConfig config;
+  config.src_cluster_id = "cluster-b";
+  config.src_node_id = "node-b";
+  auto parent = createTestIOHandle(config);
+  auto tunnel = createTunnelHandle(*parent, "b1");
+
+  parent.reset();
+  tunnel.reset();
+
+  absl::flat_hash_map<std::string, size_t> after_close;
+  registry->activeTunnels(after_close);
+  EXPECT_TRUE(after_close.empty());
+}
+
+// Worker indices at or beyond active_tunnels.size() must be skipped safely.
+TEST_F(ReverseTunnelInitiatorExtensionTest, ActiveTunnelsSkipsOutOfRangeWorkerIndex) {
+  setupThreadLocalSlot();
+  const size_t slot_index = thread_local_.data_.size() - 1;
+
+  absl::InlinedVector<absl::flat_hash_map<std::string, size_t>, 3> active_tunnels(1);
+  bool callback_ran = false;
+  auto callback = [&callback_ran] { callback_ran = true; };
+
+  NiceMock<Event::MockDispatcher> out_of_range{"worker_5"};
+  thread_local_.data_[slot_index] =
+      std::make_shared<DownstreamSocketThreadLocal>(out_of_range, *stats_scope_);
+  extension_->activeTunnels(callback, active_tunnels);
+  EXPECT_TRUE(callback_ran);
+  EXPECT_TRUE(active_tunnels[0].empty());
+}
+
 TEST_F(ReverseTunnelInitiatorExtensionTest, ActiveTunnelsSkipsNonWorkerAndUninitializedSlots) {
   setupThreadLocalSlot();
   const size_t slot_index = thread_local_.data_.size() - 1;
