@@ -23,7 +23,6 @@ TODO(htuch):
   - Generate the full perf trace as well, since we may have a different version
     of perf local vs. remote.
   - Add a Bazel run wrapper.
-  - Support v2 proto config in ModifyEnvoyConfig().
   - Flamegraph generation in post-processing.
   - Support other modes of data collection (e.g. snapshotting on SIGUSR,
     periodic).
@@ -42,14 +41,16 @@ import ctypes.util
 import datetime
 import json
 import os
-import pipes
+import shlex
 import shutil
 import signal
 import subprocess as sp
 import sys
 import tarfile
 import tempfile
-from six.moves import urllib
+import urllib.request
+
+import yaml
 
 DEFAULT_ENVOY_PATH = os.getenv('ENVOY_PATH', 'bazel-bin/source/exe/envoy-static')
 PERF_PATH = os.getenv('PERF_PATH', 'perf')
@@ -57,6 +58,12 @@ PERF_PATH = os.getenv('PERF_PATH', 'perf')
 PR_SET_PDEATHSIG = 1  # See prtcl(2).
 
 DUMP_HANDLERS = ['clusters', 'listeners', 'server_info', 'stats']
+
+HCM_TYPE = (
+    'type.googleapis.com/'
+    'envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager')
+FILE_ACCESS_LOG_TYPE = (
+    'type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog')
 
 
 def fetch_url(url):
@@ -77,22 +84,34 @@ def modify_envoy_config(config_path, perf, output_directory):
     if perf:
         return config_path, []
 
-    # Load original Envoy config.
+    # Load original Envoy config (YAML or JSON). PyYAML follows YAML 1.1, so unquoted
+    # on/off/yes/no become booleans and values like 0600 become octal integers before the
+    # config is written back as JSON, and an unquoted date makes json.dumps() below fail.
+    # Quote such values in the config if Envoy must see them as written.
     with open(config_path, 'r') as f:
-        envoy_config = json.loads(f.read())
+        envoy_config = yaml.safe_load(f) or {}
 
-    # Add unconditional access logs for all listeners.
+    # Add unconditional access logs for all static HTTP connection managers.
     access_log_paths = []
-    for n, listener in enumerate(envoy_config['listeners']):
-        for network_filter in listener['filters']:
-            if network_filter['name'] == 'http_connection_manager':
-                config = network_filter['config']
-                access_log_path = os.path.join(output_directory, 'access_%d.log' % n)
-                access_log_config = {'path': access_log_path}
-                if 'access_log' in config:
-                    config['access_log'].append(access_log_config)
-                else:
-                    config['access_log'] = [access_log_config]
+    listeners = (envoy_config.get('static_resources') or {}).get('listeners') or []
+    for listener in listeners:
+        filter_chains = list(listener.get('filter_chains') or [])
+        if listener.get('default_filter_chain'):
+            filter_chains.append(listener['default_filter_chain'])
+        for filter_chain in filter_chains:
+            for network_filter in filter_chain.get('filters') or []:
+                config = network_filter.get('typed_config') or {}
+                if config.get('@type') != HCM_TYPE:
+                    continue
+                access_log_path = os.path.join(
+                    output_directory, 'access_%d.log' % len(access_log_paths))
+                config.setdefault('access_log', []).append({
+                    'name': 'envoy.access_loggers.file',
+                    'typed_config': {
+                        '@type': FILE_ACCESS_LOG_TYPE,
+                        'path': access_log_path,
+                    },
+                })
                 access_log_paths.append(access_log_path)
 
     # Write out modified Envoy config.
@@ -115,7 +134,7 @@ def run_envoy(envoy_shcmd_args, envoy_log_path, admin_address_path, dump_handler
     Returns:
         The Envoy subprocess exit code.
     """
-    envoy_shcmd = ' '.join(map(pipes.quote, envoy_shcmd_args))
+    envoy_shcmd = ' '.join(map(shlex.quote, envoy_shcmd_args))
     print(envoy_shcmd)
 
     # Some process setup stuff to ensure the child process gets cleaned up properly if the

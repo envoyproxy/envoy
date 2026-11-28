@@ -3,6 +3,9 @@
 The `envoy_collect.py` wrapper script supports gathering up a bundle of useful artifacts from Envoy's
 execution for the purpose of performance profiling or debugging.
 
+The script is run directly with Python 3 and needs [PyYAML](https://pypi.org/project/PyYAML/)
+installed (e.g. `pip install pyyaml`) to read the Envoy config.
+
 ## Debugging
 
 To collect verbose logs, stats and other accessible data from the admin endpoint in a tarball,
