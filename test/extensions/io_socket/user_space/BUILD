@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_mock",
     "envoy_package",
 )
 load(
@@ -10,6 +11,15 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_cc_mock(
+    name = "user_space_mocks",
+    hdrs = ["user_space_mocks.h"],
+    deps = [
+        "//source/extensions/io_socket/user_space:io_handle_lib",
+        "//test/mocks/network:io_handle_mocks",
+    ],
+)
 
 envoy_extension_cc_test(
     name = "file_event_impl_test",
@@ -32,6 +42,7 @@ envoy_extension_cc_test(
     srcs = ["io_handle_impl_test.cc"],
     extension_names = ["envoy.io_socket.user_space"],
     deps = [
+        ":user_space_mocks",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/stream_info:filter_state_lib",

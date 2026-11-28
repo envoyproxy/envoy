@@ -69,6 +69,9 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, ioctl,
               (unsigned long, void*, unsigned long, void*, unsigned long, unsigned long*));
   MOCK_METHOD(std::optional<std::string>, interfaceName, ());
+  MOCK_METHOD(void, mergeStateInto,
+              (envoy::config::core::v3::Metadata & metadata,
+               StreamInfo::FilterState& filter_state));
 };
 
 } // namespace Network

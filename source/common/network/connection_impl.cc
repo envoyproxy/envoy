@@ -1125,9 +1125,13 @@ ClientConnectionImpl::ClientConnectionImpl(
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
 
+  // Must run before the downstream shared objects are copied, so that those replace any
+  // same-named state from the IoHandle.
+  socket_->ioHandle().mergeStateInto(stream_info_.dynamicMetadata(), *stream_info_.filterState());
+
   if (transport_options) {
     for (const auto& object : transport_options->downstreamSharedFilterStateObjects()) {
-      // This does not throw as all objects are distinctly named and the stream info is empty.
+      // Downstream shared objects are distinctly named, and replace same-named IoHandle state.
       stream_info_.filterState()->setData(object.name_, object.data_,
                                           StreamInfo::FilterState::LifeSpan::Connection,
                                           object.stream_sharing_);

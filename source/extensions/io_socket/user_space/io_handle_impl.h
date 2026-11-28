@@ -166,21 +166,26 @@ public:
 
   void mergeStateInto(envoy::config::core::v3::Metadata& metadata,
                       StreamInfo::FilterState& filter_state) override {
-    // This must be called only once as the internal listener does not allow listener handoff.
-    if (passthrough_state_) {
+    // Passthrough state flows from the client handle to the listener handle. This must be called
+    // only once on the listener handle as the internal listener does not allow listener handoff.
+    if (!is_client_handle_ && passthrough_state_) {
       passthrough_state_->mergeInto(metadata, filter_state);
     }
   }
 
 private:
   friend class IoHandleFactory;
-  explicit IoHandleImpl(PassthroughStateSharedPtr passthrough_state = nullptr);
+  IoHandleImpl(PassthroughStateSharedPtr passthrough_state, bool is_client_handle);
 
   static const Network::Address::InstanceConstSharedPtr& getCommonInternalAddress();
 
   // Support isOpen() and close(). Network::IoHandle owner must invoke close() to avoid potential
   // resource leak.
   bool closed_{false};
+
+  // True for the first handle of a pair, the client side. It keeps the shared passthrough state so
+  // the internal upstream transport socket can initialize it, but must not consume it.
+  const bool is_client_handle_;
 
   // The attached file event with this socket.
   std::unique_ptr<FileEventImpl> user_file_event_;
@@ -231,7 +236,8 @@ using IoHandleImplPtr = std::unique_ptr<IoHandleImpl>;
 class IoHandleFactory {
 public:
   /**
-   * @return a pair of connected IoHandleImpl instances.
+   * @return a pair of connected IoHandleImpl instances. The first handle is the client side (does
+   * not merge passthrough state) and the second is the listener side (merges passthrough state).
    * @param state optional existing value to use as the shared PassthroughState. If omitted, a
    * newly constructed PassthroughStateImpl will be used.
    */
@@ -239,7 +245,9 @@ public:
   createIoHandlePair(PassthroughStatePtr state = nullptr);
 
   /**
-   * @return a pair of connected IoHandleImpl instances with pre-configured watermarks.
+   * @return a pair of connected IoHandleImpl instances with pre-configured watermarks. The first
+   * handle is the client side (does not merge passthrough state) and the second is the listener
+   * side (merges passthrough state).
    * @param buffer_size buffer watermark size in bytes
    * @param state optional existing value to use as the shared PassthroughState. If omitted, a
    * newly constructed PassthroughStateImpl will be used.

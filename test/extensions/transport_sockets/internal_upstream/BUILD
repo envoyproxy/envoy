@@ -25,6 +25,7 @@ envoy_extension_cc_test(
         "//source/extensions/io_socket/user_space:io_handle_lib",
         "//source/extensions/transport_sockets/internal_upstream",
         "//source/extensions/transport_sockets/internal_upstream:config",
+        "//test/extensions/io_socket/user_space:user_space_mocks",
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/network:transport_socket_mocks",

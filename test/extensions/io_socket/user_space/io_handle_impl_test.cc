@@ -6,6 +6,7 @@
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
+#include "test/extensions/io_socket/user_space/user_space_mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/struct_matchers.h"
@@ -1277,6 +1278,26 @@ TEST_F(IoHandleImplTest, MergeStateInto) {
   auto dest_object = dest_filter_state.getDataReadOnly<TestObject>("object_key");
   ASSERT_NE(nullptr, dest_object);
   EXPECT_EQ(object->value_, dest_object->value_);
+}
+
+TEST_F(IoHandleImplTest, ClientHandleMergeStateIntoIsNoOp) {
+  {
+    auto state = std::make_unique<testing::StrictMock<MockPassthroughState>>();
+    EXPECT_CALL(*state, mergeInto(_, _)).Times(0);
+    auto [client_handle, _] = IoHandleFactory::createIoHandlePair(std::move(state));
+    StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+    envoy::config::core::v3::Metadata metadata;
+    client_handle->mergeStateInto(metadata, filter_state);
+  }
+  {
+    auto state = std::make_unique<testing::StrictMock<MockPassthroughState>>();
+    EXPECT_CALL(*state, mergeInto(_, _)).Times(0);
+    auto [client_handle, _] =
+        IoHandleFactory::createBufferLimitedIoHandlePair(1024, std::move(state));
+    StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+    envoy::config::core::v3::Metadata metadata;
+    client_handle->mergeStateInto(metadata, filter_state);
+  }
 }
 
 // A full peer close() drains pending data and returns clean EOF on read/readv/recv while latching

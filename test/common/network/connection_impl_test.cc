@@ -4834,6 +4834,90 @@ TEST_P(ConnectionImplTest, LocalCloseReasonsRecordedInOrder) {
   EXPECT_EQ(connection->localCloseReason(), "second_reason");
 }
 
+namespace {
+
+class MergeStateTestObject : public StreamInfo::FilterState::Object {
+public:
+  explicit MergeStateTestObject(std::string value) : value_(std::move(value)) {}
+  const std::string value_;
+};
+
+} // namespace
+
+TEST_F(InternalClientConnectionImplTest,
+       IoHandleMergeStateIntoPopulatesStreamInfoAndYieldsToSharedObjects) {
+  bool is_open = true;
+  auto io_handle = std::make_unique<NiceMock<MockIoHandle>>();
+  ON_CALL(*io_handle, isOpen()).WillByDefault([&is_open]() { return is_open; });
+  ON_CALL(*io_handle, close()).WillByDefault([&is_open]() {
+    is_open = false;
+    return Api::ioCallUint64ResultNoError();
+  });
+
+  EXPECT_CALL(*io_handle, mergeStateInto(_, _))
+      .WillOnce([](envoy::config::core::v3::Metadata& metadata,
+                   StreamInfo::FilterState& filter_state) {
+        (*(*metadata.mutable_filter_metadata())["envoy.test"].mutable_fields())["key"]
+            .set_string_value("from_io_handle");
+        filter_state.setData("io_handle_only",
+                             std::make_shared<MergeStateTestObject>("from_io_handle"),
+                             StreamInfo::FilterState::LifeSpan::Connection,
+                             StreamInfo::StreamSharingMayImpactPooling::None);
+        filter_state.setData("shared_key", std::make_shared<MergeStateTestObject>("from_io_handle"),
+                             StreamInfo::FilterState::LifeSpan::Connection,
+                             StreamInfo::StreamSharingMayImpactPooling::None);
+      });
+
+  auto address = std::make_shared<Address::EnvoyInternalInstance>("listener_0");
+  auto socket = std::make_unique<ConnectionSocketImpl>(std::move(io_handle), address, address);
+
+  StreamInfo::FilterStateImpl shared_filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  shared_filter_state.setData(
+      "shared_key", std::make_shared<MergeStateTestObject>("from_downstream"),
+      StreamInfo::FilterState::LifeSpan::Connection,
+      StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  auto transport_options = TransportSocketOptionsUtility::fromFilterState(shared_filter_state);
+
+  auto connection = std::make_unique<ClientConnectionImpl>(
+      *dispatcher_, std::move(socket), nullptr, std::make_unique<NiceMock<MockTransportSocket>>(),
+      nullptr, transport_options);
+
+  const auto& filter_metadata = connection->streamInfo().dynamicMetadata().filter_metadata();
+  ASSERT_TRUE(filter_metadata.contains("envoy.test"));
+  EXPECT_EQ("from_io_handle", filter_metadata.at("envoy.test").fields().at("key").string_value());
+
+  const auto* io_handle_only =
+      connection->streamInfo().filterState()->getDataReadOnly<MergeStateTestObject>(
+          "io_handle_only");
+  ASSERT_NE(nullptr, io_handle_only);
+  EXPECT_EQ("from_io_handle", io_handle_only->value_);
+
+  const auto* shared_obj =
+      connection->streamInfo().filterState()->getDataReadOnly<MergeStateTestObject>("shared_key");
+  ASSERT_NE(nullptr, shared_obj);
+  EXPECT_EQ("from_downstream", shared_obj->value_);
+}
+
+TEST_F(InternalClientConnectionImplTest, IoHandleMergeStateIntoSkippedOnClosedSocket) {
+  auto io_handle = std::make_unique<NiceMock<MockIoHandle>>();
+  ON_CALL(*io_handle, isOpen()).WillByDefault(Return(false));
+  EXPECT_CALL(*io_handle, mergeStateInto(_, _)).Times(0);
+
+  auto address = std::make_shared<Address::EnvoyInternalInstance>("listener_0");
+  auto socket = std::make_unique<ConnectionSocketImpl>(std::move(io_handle), address, address);
+
+  std::unique_ptr<ClientConnectionImpl> connection;
+  EXPECT_ENVOY_BUG(connection = std::make_unique<ClientConnectionImpl>(
+                       *dispatcher_, std::move(socket), nullptr,
+                       std::make_unique<NiceMock<MockTransportSocket>>(), nullptr, nullptr),
+                   "Client socket failure");
+  if (connection != nullptr) {
+    connection->addConnectionCallbacks(client_callbacks_);
+    EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy
