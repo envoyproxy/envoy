@@ -1,14 +1,19 @@
 #include <fstream>
 
+#include "envoy/filesystem/watcher.h"
+
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/extensions/formatter/file_content/config.h"
 
 #include "test/common/formatter/formatter_test_utility.h"
+#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -221,6 +226,60 @@ TEST_F(FileContentFormatterTest, TooManyColonsThrows) {
 
   EXPECT_THROW_WITH_REGEX(parser->parse("FILE_CONTENT", "/a:/b:/c", std::nullopt).value(),
                           EnvoyException, "FILE_CONTENT: expected format");
+}
+
+TEST_F(FileContentFormatterTest, WindowsDrivePrefixesAndColonValidation) {
+  NiceMock<Server::Configuration::MockFactoryContext> mock_context;
+  auto& mock_fs = mock_context.server_factory_context_.api_.file_system_;
+  auto& mock_dispatcher = mock_context.server_factory_context_.dispatcher_;
+
+  FileContentFormatterFactory factory;
+  auto empty_config = factory.createEmptyConfigProto();
+  auto parser = factory.createCommandParserFromProto(*empty_config, mock_context);
+
+  auto expect_parsed = [&](absl::string_view subcommand, const std::string& expected_file,
+                           const std::string& expected_watch_dir, const std::string& content) {
+    EXPECT_CALL(mock_fs, fileReadToEnd(expected_file)).WillOnce(testing::Return(content));
+    if (!expected_watch_dir.empty()) {
+      auto* dir_watcher = new NiceMock<Filesystem::MockWatcher>();
+      auto* file_watcher = new NiceMock<Filesystem::MockWatcher>();
+      EXPECT_CALL(mock_dispatcher, createFilesystemWatcher_())
+          .WillOnce(testing::Return(dir_watcher))
+          .WillOnce(testing::Return(file_watcher));
+      EXPECT_CALL(*dir_watcher, addWatch(absl::StrCat(expected_watch_dir, "/"),
+                                         Filesystem::Watcher::Events::MovedTo, testing::_))
+          .WillOnce(testing::Return(absl::OkStatus()));
+      EXPECT_CALL(*file_watcher,
+                  addWatch(expected_file, Filesystem::Watcher::Events::Modified, testing::_))
+          .WillOnce(testing::Return(absl::OkStatus()));
+    } else {
+      auto* file_watcher = new NiceMock<Filesystem::MockWatcher>();
+      EXPECT_CALL(mock_dispatcher, createFilesystemWatcher_())
+          .WillOnce(testing::Return(file_watcher));
+      EXPECT_CALL(*file_watcher,
+                  addWatch(expected_file, Filesystem::Watcher::Events::Modified, testing::_))
+          .WillOnce(testing::Return(absl::OkStatus()));
+    }
+
+    auto provider = parser->parse("FILE_CONTENT", subcommand, std::nullopt).value();
+    ASSERT_NE(nullptr, provider);
+    auto result = Envoy::Formatter::formatForTest(*provider, formatter_context_, stream_info_);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(content, *result);
+  };
+
+  expect_parsed(R"(C:\dir\file.txt:D:\watch)", R"(C:\dir\file.txt)", R"(D:\watch)", "win-bs");
+  expect_parsed("c:/dir/file.txt:d:/watch", "c:/dir/file.txt", "d:/watch", "win-fs");
+  expect_parsed(R"(C:\dir\only.txt)", R"(C:\dir\only.txt)", "", "win-single");
+  // Drive-letter colon without a path separator is treated as a normal delimiter.
+  expect_parsed("C:relative", "C", "relative", "rel-token");
+
+  for (absl::string_view invalid :
+       {":/watch", "/path:", R"(C:\dir\file.txt:)", "/a:/b:/c", R"(C:\dir\file.txt:D:\watch:extra)",
+        R"(C:relative:D:\watch)", R"(C:\dir\file.txt:D:relative)"}) {
+    EXPECT_THROW_WITH_REGEX(parser->parse("FILE_CONTENT", invalid, std::nullopt).value(),
+                            EnvoyException, "FILE_CONTENT: expected format");
+  }
 }
 
 } // namespace Formatter

@@ -192,6 +192,35 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, FormattedHeaders) {
   callback->onSuccess(request, std::move(msg));
 }
 
+TEST_F(OpenTelemetryHttpTraceExporterTest, FormattedHeadersWithWatchDirectory) {
+  const std::string token_path =
+      TestEnvironment::writeStringToFileForTest("otel_watch_token.txt", "watched-secret-token");
+  const std::string watch_dir = TestEnvironment::temporaryDirectory();
+
+  envoy::config::core::v3::HttpService http_service;
+  TestUtility::loadFromYaml(R"EOF(
+  http_uri:
+    uri: "https://some-o11y.com/otlp/v1/traces"
+    cluster: "my_o11y_backend"
+    timeout: 0.250s
+  formatters:
+  - name: envoy.formatter.file_content
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.formatter.file_content.v3.FileContent
+  )EOF",
+                            http_service);
+  auto* header = http_service.add_request_headers_to_add()->mutable_header();
+  header->set_key("authorization");
+  header->set_value(fmt::format("Bearer %FILE_CONTENT({}:{})%", token_path, watch_dir));
+
+  auto applicator = Http::HttpServiceHeadersApplicator::createOrThrow(
+      http_service, context_.server_factory_context_);
+  Http::TestRequestHeaderMapImpl headers;
+  applicator->apply(headers);
+  EXPECT_EQ("Bearer watched-secret-token",
+            headers.get(Http::LowerCaseString("authorization"))[0]->value().getStringView());
+}
+
 // Test export is aborted when cluster is not found
 TEST_F(OpenTelemetryHttpTraceExporterTest, UnsuccessfulLogWithoutThreadLocalCluster) {
   std::string yaml_string = fmt::format(R"EOF(
