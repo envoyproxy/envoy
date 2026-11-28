@@ -82,6 +82,23 @@ are also left undecoded. Specifically the following characters are left in the e
 
   The OAuth2 filter is currently under active development.
 
+Logout
+------
+
+Requests matching the configured
+:ref:`signout_path <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.signout_path>`
+clear the local authentication cookies. When
+:ref:`end_session_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.end_session_endpoint>`
+is configured, the filter redirects to the OpenID Provider's logout endpoint with ``client_id``.
+The redirect includes ``id_token_hint`` only when the ID Token cookie has a non-empty value.
+When that cookie is missing or empty, the parameter is omitted, allowing the provider to apply
+its logout policy.
+
+The ``post_logout_redirect_uri`` defaults to the request's scheme and host with the path ``/``.
+It can be customized or disabled using
+:ref:`post_logout_redirect_uri <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.post_logout_redirect_uri>`.
+The provider determines whether to accept the logout request and perform post-logout redirection.
+
 Example configuration
 ---------------------
 
