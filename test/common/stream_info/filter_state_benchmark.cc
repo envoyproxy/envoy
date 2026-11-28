@@ -4,6 +4,8 @@
 
 #include "envoy/stream_info/filter_state.h"
 
+#include "source/common/http/local_reply_owner_object.h"
+#include "source/common/network/upstream_server_name.h"
 #include "source/common/stream_info/filter_state_impl.h"
 
 #include "benchmark/benchmark.h"
@@ -35,19 +37,19 @@ BENCHMARK(BM_FilterStateStringLookup);
 
 static void BM_FilterStateIndexedLookup(benchmark::State& state) {
   FilterStateImpl filter_state(FilterState::LifeSpan::FilterChain);
-  const std::string name = std::string(FilterState::indexToName(FilterStateIndex::LocalReplyOwner));
-  filter_state.setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(42),
-                              FilterState::LifeSpan::FilterChain);
+  filter_state.setIndexedData<FilterStateIndex::LocalReplyOwner>(
+      std::make_shared<Http::LocalReplyOwnerObject>("my_filter"),
+      FilterState::LifeSpan::FilterChain);
 
   for (auto _ : state) {
-    auto* obj = filter_state.getIndexedDataReadOnly<SimpleType>(FilterStateIndex::LocalReplyOwner);
+    auto* obj = filter_state.getIndexedDataReadOnly<FilterStateIndex::LocalReplyOwner>();
     benchmark::DoNotOptimize(obj);
   }
 }
 BENCHMARK(BM_FilterStateIndexedLookup);
 
 static void BM_FilterStateStringCycle(benchmark::State& state) {
-  const std::string name = "envoy.filters.network.http_connection_manager.local_reply_owner";
+  const std::string name = "envoy.filters.network.http_connection_manager.custom_reply_owner";
   for (auto _ : state) {
     FilterStateImpl filter_state(FilterState::LifeSpan::FilterChain);
     filter_state.setData(name, std::make_shared<SimpleType>(42),
@@ -79,12 +81,12 @@ static void BM_FilterStateUnindexedCycle(benchmark::State& state) {
 BENCHMARK(BM_FilterStateUnindexedCycle)->Arg(1)->Arg(4);
 
 static void BM_FilterStateIndexedCycle(benchmark::State& state) {
-  const std::string name = std::string(FilterState::indexToName(FilterStateIndex::LocalReplyOwner));
   for (auto _ : state) {
     FilterStateImpl filter_state(FilterState::LifeSpan::FilterChain);
-    filter_state.setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(42),
-                                FilterState::LifeSpan::FilterChain);
-    auto* obj = filter_state.getIndexedDataReadOnly<SimpleType>(FilterStateIndex::LocalReplyOwner);
+    filter_state.setIndexedData<FilterStateIndex::LocalReplyOwner>(
+        std::make_shared<Http::LocalReplyOwnerObject>("my_filter"),
+        FilterState::LifeSpan::FilterChain);
+    auto* obj = filter_state.getIndexedDataReadOnly<FilterStateIndex::LocalReplyOwner>();
     benchmark::DoNotOptimize(obj);
   }
 }
@@ -109,16 +111,41 @@ BENCHMARK(BM_FilterStateStringComparisonPenalty);
 static void BM_FilterStateIndexedUpstreamServerNameLookup(benchmark::State& state) {
   FilterStateImpl filter_state(FilterState::LifeSpan::FilterChain);
   // "envoy.network.upstream_server_name" is resolved in O(1) via its index without string lookup
-  filter_state.setIndexedData(FilterStateIndex::UpstreamServerName,
-                              std::make_shared<SimpleType>(42), FilterState::LifeSpan::FilterChain);
+  filter_state.setIndexedData<FilterStateIndex::UpstreamServerName>(
+      std::make_shared<Network::UpstreamServerName>("example.com"),
+      FilterState::LifeSpan::FilterChain);
 
   for (auto _ : state) {
-    auto* obj =
-        filter_state.getIndexedDataReadOnly<SimpleType>(FilterStateIndex::UpstreamServerName);
+    auto* obj = filter_state.getIndexedDataReadOnly<FilterStateIndex::UpstreamServerName>();
     benchmark::DoNotOptimize(obj);
   }
 }
 BENCHMARK(BM_FilterStateIndexedUpstreamServerNameLookup);
+
+static void BM_FilterStateThreeLevelWellKnownKeyNameMiss(benchmark::State& state) {
+  // Models an HTTP stream's three-level FilterState hierarchy (FilterChain -> Request ->
+  // Connection) when looking up an unset well-known indexed key by name.
+  auto connection_state = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
+  FilterStateImpl stream_state(connection_state, FilterState::LifeSpan::FilterChain);
+  const absl::string_view key = Network::UpstreamServerName::key();
+
+  for (auto _ : state) {
+    auto* obj = stream_state.getDataReadOnlyGeneric(key);
+    benchmark::DoNotOptimize(obj);
+  }
+}
+BENCHMARK(BM_FilterStateThreeLevelWellKnownKeyNameMiss);
+
+static void BM_FilterStateThreeLevelIndexedMiss(benchmark::State& state) {
+  auto connection_state = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::Connection);
+  FilterStateImpl stream_state(connection_state, FilterState::LifeSpan::FilterChain);
+
+  for (auto _ : state) {
+    auto* obj = stream_state.getIndexedDataReadOnly<FilterStateIndex::UpstreamServerName>();
+    benchmark::DoNotOptimize(obj);
+  }
+}
+BENCHMARK(BM_FilterStateThreeLevelIndexedMiss);
 
 } // namespace
 } // namespace StreamInfo

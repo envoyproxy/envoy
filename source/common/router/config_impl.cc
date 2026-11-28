@@ -269,10 +269,6 @@ createRedirectConfig(const envoy::config::route::v3::Route& route, Regex::Engine
 
 } // namespace
 
-const std::string& OriginalConnectPort::key() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.router.original_connect_port");
-}
-
 std::string SslRedirector::newUri(const Http::RequestHeaderMap& headers,
                                   const StreamInfo::StreamInfo&) const {
   return Http::Utility::createSslRedirectPath(headers);

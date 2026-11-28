@@ -708,16 +708,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
     if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options->auto_sni() &&
         !filter_state->hasIndexedData(StreamInfo::FilterStateIndex::UpstreamServerName)) {
-      filter_state->setIndexedData(
-          StreamInfo::FilterStateIndex::UpstreamServerName,
+      filter_state->setIndexedData<StreamInfo::FilterStateIndex::UpstreamServerName>(
           std::make_shared<Network::UpstreamServerName>(parsed_authority.host_),
           StreamInfo::FilterState::LifeSpan::FilterChain);
     }
 
     if (upstream_http_protocol_options->auto_san_validation() &&
         !filter_state->hasIndexedData(StreamInfo::FilterStateIndex::UpstreamSubjectAltNames)) {
-      filter_state->setIndexedData(
-          StreamInfo::FilterStateIndex::UpstreamSubjectAltNames,
+      filter_state->setIndexedData<StreamInfo::FilterStateIndex::UpstreamSubjectAltNames>(
           std::make_shared<Network::UpstreamSubjectAltNames>(
               std::vector<std::string>{std::string(parsed_authority.host_)}),
           StreamInfo::FilterState::LifeSpan::FilterChain);

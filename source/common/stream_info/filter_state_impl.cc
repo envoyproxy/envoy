@@ -1,12 +1,58 @@
 #include "source/common/stream_info/filter_state_impl.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/common/execution_context.h"
 
 #include "source/common/common/compiled_string_map.h"
 #include "source/common/common/macros.h"
+#include "source/common/http/local_reply_owner_object.h"
+#include "source/common/network/downstream_network_namespace.h"
+#include "source/common/network/upstream_server_name.h"
+#include "source/common/network/upstream_socket_options_filter_state.h"
+#include "source/common/network/upstream_subject_alt_names.h"
+#include "source/common/router/original_connect_port.h"
 
 namespace Envoy {
 namespace StreamInfo {
+namespace {
+
+template <typename T>
+const FilterState::Object* canonicalObjectBase(const FilterState::Object* data) {
+  const T* typed = dynamic_cast<const T*>(data);
+  return typed != nullptr ? static_cast<const FilterState::Object*>(typed) : nullptr;
+}
+
+const FilterState::Object* findCanonicalObjectBase(FilterStateIndex index,
+                                                   const FilterState::Object* data) {
+  const size_t idx = static_cast<size_t>(index);
+  if (data == nullptr || idx >= FilterStateIndexCount) {
+    return nullptr;
+  }
+  using Canonicalizer = const FilterState::Object* (*)(const FilterState::Object*);
+  static constexpr std::array<Canonicalizer, FilterStateIndexCount> canonicalizers = {
+#define GENERATE_CANONICALIZER(enum_val, string_val, obj_type) &canonicalObjectBase<obj_type>,
+      FOR_EACH_FILTER_STATE_INDEX(GENERATE_CANONICALIZER)
+#undef GENERATE_CANONICALIZER
+  };
+  return canonicalizers[idx](data);
+}
+
+std::shared_ptr<FilterState::Object>
+canonicalizeForIndex(FilterStateIndex index, std::shared_ptr<FilterState::Object>& data) {
+  const FilterState::Object* canonical = findCanonicalObjectBase(index, data.get());
+  if (canonical == nullptr) {
+    return nullptr;
+  }
+  if (canonical == data.get()) {
+    return std::move(data);
+  }
+  // Re-alias to the canonical T's FilterState::Object base subobject so static_cast<T*> on lookup
+  // returns the right pointer even for multiple-inheritance classes with multiple Object bases.
+  return std::shared_ptr<FilterState::Object>(std::move(data),
+                                              const_cast<FilterState::Object*>(canonical));
+}
+
+} // namespace
 
 absl::string_view FilterState::indexToName(FilterStateIndex index) {
   const size_t idx = static_cast<size_t>(index);
@@ -14,11 +60,15 @@ absl::string_view FilterState::indexToName(FilterStateIndex index) {
     return "";
   }
   static constexpr std::array<absl::string_view, FilterStateIndexCount> names = {
-#define GENERATE_NAMES(enum_val, string_val) string_val,
+#define GENERATE_NAMES(enum_val, string_val, obj_type) string_val,
       FOR_EACH_FILTER_STATE_INDEX(GENERATE_NAMES)
 #undef GENERATE_NAMES
   };
   return names[idx];
+}
+
+bool FilterState::isValidObjectForIndex(FilterStateIndex index, const Object* data) {
+  return data != nullptr && findCanonicalObjectBase(index, data) == data;
 }
 
 std::optional<FilterStateIndex> FilterState::nameToIndex(absl::string_view name) {
@@ -68,7 +118,7 @@ void FilterStateImpl::maybeCreateParent(FilterStateSharedPtr ancestor) {
 void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Object> data,
                               FilterState::LifeSpan life_span,
                               StreamSharingMayImpactPooling stream_sharing) {
-  auto index = FilterState::nameToIndex(data_name);
+  const auto index = FilterState::nameToIndex(data_name);
   if (index.has_value()) {
     setIndexedData(index.value(), std::move(data), life_span, stream_sharing);
     return;
@@ -102,7 +152,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
 }
 
 bool FilterStateImpl::hasDataWithName(absl::string_view data_name) const {
-  auto index = FilterState::nameToIndex(data_name);
+  const auto index = FilterState::nameToIndex(data_name);
   if (index.has_value()) {
     return hasIndexedData(index.value());
   }
@@ -111,20 +161,20 @@ bool FilterStateImpl::hasDataWithName(absl::string_view data_name) const {
 
 const FilterState::Object*
 FilterStateImpl::getDataReadOnlyGeneric(absl::string_view data_name) const {
-  auto index = FilterState::nameToIndex(data_name);
+  const auto index = FilterState::nameToIndex(data_name);
   if (index.has_value()) {
-    return getIndexedDataReadOnlyGeneric(index.value());
+    return getIndexedDataReadOnlyAnyType(index.value());
   }
-  const auto it = data_storage_.find(data_name);
-
-  if (it == data_storage_.end()) {
-    if (parent_) {
-      return parent_->getDataReadOnlyGeneric(data_name);
+  if (!data_storage_.empty()) {
+    const auto it = data_storage_.find(data_name);
+    if (it != data_storage_.end()) {
+      return it->second.data_.get();
     }
-    return nullptr;
   }
-
-  return it->second.data_.get();
+  if (parent_) {
+    return parent_->getDataReadOnlyGeneric(data_name);
+  }
+  return nullptr;
 }
 
 FilterState::Object* FilterStateImpl::getDataMutableGeneric(absl::string_view data_name) {
@@ -133,20 +183,20 @@ FilterState::Object* FilterStateImpl::getDataMutableGeneric(absl::string_view da
 
 std::shared_ptr<FilterState::Object>
 FilterStateImpl::getDataSharedMutableGeneric(absl::string_view data_name) {
-  auto index = FilterState::nameToIndex(data_name);
+  const auto index = FilterState::nameToIndex(data_name);
   if (index.has_value()) {
-    return getIndexedDataSharedMutableGeneric(index.value());
+    return getIndexedDataSharedMutableAnyType(index.value());
   }
-  const auto it = data_storage_.find(data_name);
-
-  if (it == data_storage_.end()) {
-    if (parent_) {
-      return parent_->getDataSharedMutableGeneric(data_name);
+  if (!data_storage_.empty()) {
+    const auto it = data_storage_.find(data_name);
+    if (it != data_storage_.end()) {
+      return it->second.data_;
     }
-    return nullptr;
   }
-
-  return it->second.data_;
+  if (parent_) {
+    return parent_->getDataSharedMutableGeneric(data_name);
+  }
+  return nullptr;
 }
 
 bool FilterStateImpl::hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) const {
@@ -203,9 +253,32 @@ void FilterStateImpl::setIndexedData(FilterStateIndex index, std::shared_ptr<Obj
                                      FilterState::LifeSpan life_span,
                                      StreamSharingMayImpactPooling stream_sharing) {
   const size_t idx = static_cast<size_t>(index);
-  if (idx >= FilterStateIndexCount) {
+  if (idx >= FilterStateIndexCount || data == nullptr) {
     return;
   }
+  if (auto canonical = canonicalizeForIndex(index, data); canonical != nullptr) {
+    storeIndexedData(index, std::move(canonical), /*is_canonical=*/true, life_span, stream_sharing);
+    return;
+  }
+  storeIndexedData(index, std::move(data), /*is_canonical=*/false, life_span, stream_sharing);
+}
+
+void FilterStateImpl::setIndexedDataGeneric(FilterStateIndex index, std::shared_ptr<Object> data,
+                                            FilterState::LifeSpan life_span,
+                                            StreamSharingMayImpactPooling stream_sharing) {
+  const size_t idx = static_cast<size_t>(index);
+  ASSERT(idx < FilterStateIndexCount);
+  if (data == nullptr) {
+    return;
+  }
+  ASSERT(FilterState::isValidObjectForIndex(index, data.get()));
+  storeIndexedData(index, std::move(data), /*is_canonical=*/true, life_span, stream_sharing);
+}
+
+void FilterStateImpl::storeIndexedData(FilterStateIndex index, std::shared_ptr<Object> data,
+                                       bool is_canonical, FilterState::LifeSpan life_span,
+                                       StreamSharingMayImpactPooling stream_sharing) {
+  const size_t idx = static_cast<size_t>(index);
   if (life_span > life_span_) {
     if (indexed_data_storage_[idx] != nullptr) {
       IS_ENVOY_BUG(fmt::format("FilterStateAccessViolation: FilterState::setIndexedData<T> "
@@ -215,7 +288,11 @@ void FilterStateImpl::setIndexedData(FilterStateIndex index, std::shared_ptr<Obj
       return;
     }
     maybeCreateParent(nullptr);
-    parent_->setIndexedData(index, std::move(data), life_span, stream_sharing);
+    if (is_canonical) {
+      parent_->setIndexedDataGeneric(index, std::move(data), life_span, stream_sharing);
+    } else {
+      parent_->setIndexedData(index, std::move(data), life_span, stream_sharing);
+    }
     return;
   }
   if (parent_ && parent_->hasIndexedData(index)) {
@@ -228,11 +305,12 @@ void FilterStateImpl::setIndexedData(FilterStateIndex index, std::shared_ptr<Obj
 
   if (indexed_data_storage_[idx] == nullptr) {
     ++indexed_count_;
+    indexed_data_storage_[idx] = std::make_unique<StoredObject>();
   }
-  auto filter_object = std::make_unique<StoredObject>();
-  filter_object->data_ = std::move(data);
-  filter_object->stream_sharing_ = stream_sharing;
-  indexed_data_storage_[idx] = std::move(filter_object);
+  StoredObject& filter_object = *indexed_data_storage_[idx];
+  filter_object.data_ = std::move(data);
+  filter_object.stream_sharing_ = stream_sharing;
+  filter_object.is_canonical_ = is_canonical;
 }
 
 const FilterState::Object*
@@ -241,18 +319,27 @@ FilterStateImpl::getIndexedDataReadOnlyGeneric(FilterStateIndex index) const {
   if (idx >= FilterStateIndexCount) {
     return nullptr;
   }
-  const auto& obj = indexed_data_storage_[idx];
-  if (obj == nullptr) {
-    if (parent_) {
-      return parent_->getIndexedDataReadOnlyGeneric(index);
-    }
-    return nullptr;
+  if (const auto& obj = indexed_data_storage_[idx]; obj != nullptr) {
+    return obj->is_canonical_ ? obj->data_.get() : nullptr;
   }
-  return obj->data_.get();
+  if (parent_) {
+    return parent_->getIndexedDataReadOnlyGeneric(index);
+  }
+  return nullptr;
 }
 
 FilterState::Object* FilterStateImpl::getIndexedDataMutableGeneric(FilterStateIndex index) {
-  return getIndexedDataSharedMutableGeneric(index).get();
+  const size_t idx = static_cast<size_t>(index);
+  if (idx >= FilterStateIndexCount) {
+    return nullptr;
+  }
+  if (const auto& obj = indexed_data_storage_[idx]; obj != nullptr) {
+    return obj->is_canonical_ ? obj->data_.get() : nullptr;
+  }
+  if (parent_) {
+    return parent_->getIndexedDataMutableGeneric(index);
+  }
+  return nullptr;
 }
 
 std::shared_ptr<FilterState::Object>
@@ -261,14 +348,13 @@ FilterStateImpl::getIndexedDataSharedMutableGeneric(FilterStateIndex index) {
   if (idx >= FilterStateIndexCount) {
     return nullptr;
   }
-  const auto& obj = indexed_data_storage_[idx];
-  if (obj == nullptr) {
-    if (parent_) {
-      return parent_->getIndexedDataSharedMutableGeneric(index);
-    }
-    return nullptr;
+  if (const auto& obj = indexed_data_storage_[idx]; obj != nullptr) {
+    return obj->is_canonical_ ? obj->data_ : nullptr;
   }
-  return obj->data_;
+  if (parent_) {
+    return parent_->getIndexedDataSharedMutableGeneric(index);
+  }
+  return nullptr;
 }
 
 bool FilterStateImpl::hasIndexedData(FilterStateIndex index) const {
@@ -277,6 +363,36 @@ bool FilterStateImpl::hasIndexedData(FilterStateIndex index) const {
     return false;
   }
   return indexed_data_storage_[idx] != nullptr || (parent_ && parent_->hasIndexedData(index));
+}
+
+const FilterState::Object*
+FilterStateImpl::getIndexedDataReadOnlyAnyType(FilterStateIndex index) const {
+  const size_t idx = static_cast<size_t>(index);
+  if (idx >= FilterStateIndexCount) {
+    return nullptr;
+  }
+  if (const auto& obj = indexed_data_storage_[idx]; obj != nullptr) {
+    return obj->data_.get();
+  }
+  if (parent_) {
+    return parent_->getIndexedDataReadOnlyAnyType(index);
+  }
+  return nullptr;
+}
+
+std::shared_ptr<FilterState::Object>
+FilterStateImpl::getIndexedDataSharedMutableAnyType(FilterStateIndex index) {
+  const size_t idx = static_cast<size_t>(index);
+  if (idx >= FilterStateIndexCount) {
+    return nullptr;
+  }
+  if (const auto& obj = indexed_data_storage_[idx]; obj != nullptr) {
+    return obj->data_;
+  }
+  if (parent_) {
+    return parent_->getIndexedDataSharedMutableAnyType(index);
+  }
+  return nullptr;
 }
 
 } // namespace StreamInfo

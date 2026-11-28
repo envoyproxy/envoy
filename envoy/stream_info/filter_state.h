@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -14,9 +15,33 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
+
+// Forward declarations of canonical FilterState::Object subclasses bound to FilterStateIndex
+// entries below. Forward-declaring here avoids pulling subsystem headers into this low-level
+// interface header; callers of the typed indexed accessors include the concrete header they use.
+#ifdef ENVOY_ENABLE_EXECUTION_CONTEXT
+class ExecutionContext;
+#endif
+
+namespace Http {
+class LocalReplyOwnerObject;
+} // namespace Http
+
+namespace Network {
+class DownstreamNetworkNamespace;
+class UpstreamServerName;
+class UpstreamSocketOptionsFilterState;
+class UpstreamSubjectAltNames;
+} // namespace Network
+
+namespace Router {
+class OriginalConnectPort;
+} // namespace Router
+
 namespace StreamInfo {
 
 class FilterState;
+class FilterStateImpl;
 
 using FilterStateSharedPtr = std::shared_ptr<FilterState>;
 
@@ -48,31 +73,54 @@ enum class StreamSharingMayImpactPooling {
 
 #ifdef ENVOY_ENABLE_EXECUTION_CONTEXT
 #define ENVOY_EXECUTION_CONTEXT_KEY_X(X)                                                           \
-  X(ConnectionExecutionContext, "envoy.network.connection_execution_context")
+  X(ConnectionExecutionContext, "envoy.network.connection_execution_context",                      \
+    ::Envoy::ExecutionContext)
 #else
 #define ENVOY_EXECUTION_CONTEXT_KEY_X(X)
 #endif
 
 #define FOR_EACH_FILTER_STATE_INDEX(X)                                                             \
-  X(LocalReplyOwner, "envoy.filters.network.http_connection_manager.local_reply_owner")            \
-  X(UpstreamServerName, "envoy.network.upstream_server_name")                                      \
-  X(UpstreamSocketOptions, "envoy.network.upstream_socket_options")                                \
-  X(UpstreamSubjectAltNames, "envoy.network.upstream_subject_alt_names")                           \
-  X(NetworkNamespace, "envoy.network.network_namespace")                                           \
-  X(OriginalConnectPort, "envoy.router.original_connect_port")                                     \
+  X(LocalReplyOwner, "envoy.filters.network.http_connection_manager.local_reply_owner",            \
+    ::Envoy::Http::LocalReplyOwnerObject)                                                          \
+  X(UpstreamServerName, "envoy.network.upstream_server_name",                                      \
+    ::Envoy::Network::UpstreamServerName)                                                          \
+  X(UpstreamSocketOptions, "envoy.network.upstream_socket_options",                                \
+    ::Envoy::Network::UpstreamSocketOptionsFilterState)                                            \
+  X(UpstreamSubjectAltNames, "envoy.network.upstream_subject_alt_names",                           \
+    ::Envoy::Network::UpstreamSubjectAltNames)                                                     \
+  X(NetworkNamespace, "envoy.network.network_namespace",                                           \
+    ::Envoy::Network::DownstreamNetworkNamespace)                                                  \
+  X(OriginalConnectPort, "envoy.router.original_connect_port",                                     \
+    ::Envoy::Router::OriginalConnectPort)                                                          \
   ENVOY_EXECUTION_CONTEXT_KEY_X(X)
 
 enum class FilterStateIndex : uint32_t {
-#define GENERATE_INDEX_ENUM(enum_val, string_val) enum_val,
+#define GENERATE_INDEX_ENUM(enum_val, string_val, obj_type) enum_val,
   FOR_EACH_FILTER_STATE_INDEX(GENERATE_INDEX_ENUM)
 #undef GENERATE_INDEX_ENUM
 };
 
 constexpr size_t FilterStateIndexCount = 0
-#define GENERATE_COUNT(enum_val, string_val) +1
+#define GENERATE_COUNT(enum_val, string_val, obj_type) +1
     FOR_EACH_FILTER_STATE_INDEX(GENERATE_COUNT)
 #undef GENERATE_COUNT
     ;
+
+/**
+ * Maps each FilterStateIndex to its canonical FilterState::Object subclass.
+ * Any bound type must inherit non-virtually from FilterState::Object so that indexed lookups
+ * can safely downcast via static_cast once write-time type invariants are enforced.
+ */
+template <FilterStateIndex Index> struct FilterStateIndexTraits;
+#define GENERATE_INDEX_TRAITS(enum_val, string_val, obj_type)                                      \
+  template <> struct FilterStateIndexTraits<FilterStateIndex::enum_val> {                          \
+    using Type = obj_type;                                                                         \
+  };
+FOR_EACH_FILTER_STATE_INDEX(GENERATE_INDEX_TRAITS)
+#undef GENERATE_INDEX_TRAITS
+
+template <FilterStateIndex Index>
+using IndexedFilterStateType = typename FilterStateIndexTraits<Index>::Type;
 
 /**
  * FilterState represents dynamically generated information regarding a stream (TCP or HTTP level)
@@ -263,26 +311,122 @@ public:
   static absl::string_view indexToName(FilterStateIndex index);
   static std::optional<FilterStateIndex> nameToIndex(absl::string_view name);
 
+  /**
+   * @return whether data is non-null, index is valid, and data points directly to the
+   * FilterState::Object base subobject of the canonical type bound to index (so static_cast to the
+   * bound type is valid without cross-cast adjustment).
+   */
+  static bool isValidObjectForIndex(FilterStateIndex index, const Object* data);
+
+  /**
+   * Stores a canonical IndexedFilterStateType<Index> object under Index.
+   * Non-canonical types are rejected at compile time so indexed lookups can safely downcast via
+   * static_cast. Passing nullptr is a no-op.
+   *
+   * Note that it is an error to call setIndexedData() twice on the same index with different
+   * life_span.
+   */
+  template <FilterStateIndex Index>
+  void setIndexedData(
+      std::shared_ptr<IndexedFilterStateType<Index>> data,
+      LifeSpan life_span = LifeSpan::FilterChain,
+      StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) {
+    setIndexedDataGeneric(Index, std::move(data), life_span, stream_sharing);
+  }
+
+  /**
+   * @return a const pointer to the canonical IndexedFilterStateType<Index> object, or nullptr if
+   * the key is unset or holds a non-canonical Object type (in which case hasIndexedData(Index) may
+   * still be true; use getDataReadOnly<T>() to read non-canonical types). Casts via static_cast
+   * relying on the getIndexedDataReadOnlyGeneric() contract.
+   */
+  template <FilterStateIndex Index>
+  const IndexedFilterStateType<Index>* getIndexedDataReadOnly() const {
+    const Object* data = getIndexedDataReadOnlyGeneric(Index);
+    ASSERT(data == nullptr ||
+           static_cast<const Object*>(dynamic_cast<const IndexedFilterStateType<Index>*>(data)) ==
+               data);
+    return static_cast<const IndexedFilterStateType<Index>*>(data);
+  }
+
+  /**
+   * Implementations must return either nullptr or an Object* satisfying
+   * isValidObjectForIndex(index, ptr) (pointing directly to the bound type's own Object base
+   * subobject) so that getIndexedDataReadOnly<Index>() can safely static_cast the result.
+   * Non-canonical objects stored under index must not be returned here.
+   */
+  virtual const Object* getIndexedDataReadOnlyGeneric(FilterStateIndex index) const PURE;
+
+  /**
+   * @return a mutable pointer to the canonical IndexedFilterStateType<Index> object, or nullptr if
+   * the key is unset or holds a non-canonical Object type. Casts via static_cast relying on the
+   * getIndexedDataMutableGeneric() contract.
+   */
+  template <FilterStateIndex Index> IndexedFilterStateType<Index>* getIndexedDataMutable() {
+    Object* data = getIndexedDataMutableGeneric(Index);
+    ASSERT(data == nullptr ||
+           static_cast<const Object*>(dynamic_cast<IndexedFilterStateType<Index>*>(data)) == data);
+    return static_cast<IndexedFilterStateType<Index>*>(data);
+  }
+
+  // Legacy runtime-indexed overloads retained for downstream migration compatibility; prefer the
+  // compile-time <FilterStateIndex> templates above.
   virtual void setIndexedData(
       FilterStateIndex index, std::shared_ptr<Object> data,
       LifeSpan life_span = LifeSpan::FilterChain,
       StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
 
   template <typename T> const T* getIndexedDataReadOnly(FilterStateIndex index) const {
-    return dynamic_cast<const T*>(getIndexedDataReadOnlyGeneric(index));
+    return dynamic_cast<const T*>(getIndexedDataReadOnlyAnyType(index));
   }
-
-  virtual const Object* getIndexedDataReadOnlyGeneric(FilterStateIndex index) const PURE;
 
   template <typename T> T* getIndexedDataMutable(FilterStateIndex index) {
-    return dynamic_cast<T*>(getIndexedDataMutableGeneric(index));
+    return dynamic_cast<T*>(getIndexedDataSharedMutableAnyType(index).get());
   }
 
+  /**
+   * Implementations must return either nullptr or an Object* satisfying
+   * isValidObjectForIndex(index, ptr) so that getIndexedDataMutable<Index>() can safely
+   * static_cast the result. Non-canonical objects stored under index must not be returned here.
+   */
   virtual Object* getIndexedDataMutableGeneric(FilterStateIndex index) PURE;
 
+  /**
+   * Same canonical-object contract as getIndexedDataMutableGeneric(), returning a shared_ptr.
+   */
   virtual std::shared_ptr<Object> getIndexedDataSharedMutableGeneric(FilterStateIndex index) PURE;
 
+  /**
+   * @return whether data of any Object type (canonical or non-canonical) exists under index,
+   * matching hasDataWithName(indexToName(index)).
+   */
   virtual bool hasIndexedData(FilterStateIndex index) const PURE;
+
+  /**
+   * Single-walk lookups returning any Object (canonical or non-canonical) stored under index,
+   * used by getData*Generic(), legacy runtime-indexed getters, and generic callers that accept
+   * arbitrary FilterState::Object types under a well-known key.
+   */
+  virtual const Object* getIndexedDataReadOnlyAnyType(FilterStateIndex index) const {
+    return getIndexedDataReadOnlyGeneric(index);
+  }
+  virtual std::shared_ptr<Object> getIndexedDataSharedMutableAnyType(FilterStateIndex index) {
+    return getIndexedDataSharedMutableGeneric(index);
+  }
+
+protected:
+  friend class FilterStateImpl;
+
+  /**
+   * Stores an object already validated to satisfy isValidObjectForIndex(index, data.get()).
+   * Defaults to setIndexedData() so external subclasses and mocks do not need to override it.
+   */
+  virtual void setIndexedDataGeneric(
+      FilterStateIndex index, std::shared_ptr<Object> data,
+      LifeSpan life_span = LifeSpan::FilterChain,
+      StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) {
+    setIndexedData(index, std::move(data), life_span, stream_sharing);
+  }
 };
 
 } // namespace StreamInfo

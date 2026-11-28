@@ -30,9 +30,16 @@ envoy_cc_library(
     srcs = ["filter_state_impl.cc"],
     hdrs = ["filter_state_impl.h"],
     deps = [
+        "//envoy/common:execution_context",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:compiled_string_map_lib",
         "//source/common/common:macros",
+        "//source/common/http:local_reply_owner_object_lib",
+        "//source/common/network:downstream_network_namespace_lib",
+        "//source/common/network:upstream_server_name_lib",
+        "//source/common/network:upstream_socket_options_filter_state_lib",
+        "//source/common/network:upstream_subject_alt_names_lib",
+        "//source/common/router:original_connect_port_lib",
     ],
 )
 

@@ -1,4 +1,5 @@
 #include <memory>
+#include <type_traits>
 
 #include "envoy/common/execution_context.h"
 #include "envoy/http/filter_factory.h"
@@ -56,6 +57,22 @@ private:
   int activation_generations_ = 0;
 };
 
+class NonExecutionContextObject : public StreamInfo::FilterState::Object {};
+
+template <typename T>
+concept CanSetExecutionContextIndexed =
+    requires(StreamInfo::FilterState& fs, std::shared_ptr<T> obj) {
+      fs.setIndexedData<StreamInfo::FilterStateIndex::ConnectionExecutionContext>(std::move(obj));
+    };
+
+static_assert(std::is_same_v<StreamInfo::IndexedFilterStateType<
+                                 StreamInfo::FilterStateIndex::ConnectionExecutionContext>,
+                             ExecutionContext>);
+static_assert(CanSetExecutionContextIndexed<ExecutionContext>);
+static_assert(CanSetExecutionContextIndexed<TestExecutionContext>);
+static_assert(!CanSetExecutionContextIndexed<StreamInfo::FilterState::Object>);
+static_assert(!CanSetExecutionContextIndexed<NonExecutionContextObject>);
+
 class ExecutionContextTest : public testing::Test {
 public:
   static void SetUpTestCase() {
@@ -100,6 +117,93 @@ TEST_F(ExecutionContextTest, IndexedFilterState) {
       StreamInfo::FilterStateIndex::ConnectionExecutionContext));
   EXPECT_EQ(ExecutionContext::fromStreamInfo(OptRef<const StreamInfo::StreamInfo>(stream_info_)),
             context_.get());
+}
+
+TEST_F(ExecutionContextTest, TypedIndexedFilterState) {
+  EXPECT_EQ(kConnectionExecutionContextFilterStateName,
+            StreamInfo::FilterState::indexToName(
+                StreamInfo::FilterStateIndex::ConnectionExecutionContext));
+  EXPECT_EQ(StreamInfo::FilterStateIndex::ConnectionExecutionContext,
+            StreamInfo::FilterState::nameToIndex(kConnectionExecutionContextFilterStateName));
+
+  context_ = std::make_shared<TestExecutionContext>();
+  stream_info_.filter_state_ =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info_.filter_state_
+      ->setIndexedData<StreamInfo::FilterStateIndex::ConnectionExecutionContext>(
+          context_, StreamInfo::FilterState::LifeSpan::Connection);
+
+  const NonExecutionContextObject wrong_object;
+  EXPECT_TRUE(StreamInfo::FilterState::isValidObjectForIndex(
+      StreamInfo::FilterStateIndex::ConnectionExecutionContext, context_.get()));
+  EXPECT_FALSE(StreamInfo::FilterState::isValidObjectForIndex(
+      StreamInfo::FilterStateIndex::ConnectionExecutionContext, &wrong_object));
+  EXPECT_TRUE(stream_info_.filter_state_->hasIndexedData(
+      StreamInfo::FilterStateIndex::ConnectionExecutionContext));
+  EXPECT_EQ(ExecutionContext::fromStreamInfo(OptRef<const StreamInfo::StreamInfo>(stream_info_)),
+            context_.get());
+
+  // Verify legacy runtime-indexed getters remain source-compatible for downstream callers.
+  EXPECT_EQ(context_.get(), stream_info_.filter_state_->getIndexedDataReadOnly<ExecutionContext>(
+                                StreamInfo::FilterStateIndex::ConnectionExecutionContext));
+  EXPECT_EQ(context_.get(), stream_info_.filter_state_->getIndexedDataMutable<ExecutionContext>(
+                                StreamInfo::FilterStateIndex::ConnectionExecutionContext));
+}
+
+TEST_F(ExecutionContextTest, MismatchedFilterStateObjectIgnored) {
+  stream_info_.filter_state_ =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info_.filter_state_->setData(kConnectionExecutionContextFilterStateName,
+                                      std::make_shared<NonExecutionContextObject>(),
+                                      StreamInfo::FilterState::LifeSpan::Connection);
+
+  EXPECT_TRUE(stream_info_.filter_state_->hasIndexedData(
+      StreamInfo::FilterStateIndex::ConnectionExecutionContext));
+  EXPECT_EQ(nullptr,
+            ExecutionContext::fromStreamInfo(OptRef<const StreamInfo::StreamInfo>(stream_info_)));
+  ScopedExecutionContext scoped_context(&tracked_object_);
+  EXPECT_TRUE(scoped_context.isNull());
+}
+
+TEST_F(ExecutionContextTest, DualObjectBaseCanonicalization) {
+  class DualObjectPrefix : public StreamInfo::FilterState::Object {
+  public:
+    explicit DualObjectPrefix(int value) : value_(value) {}
+    int value() const { return value_; }
+
+  private:
+    int value_;
+  };
+
+  class DualObjectExecutionContext : public DualObjectPrefix, public TestExecutionContext {
+  public:
+    explicit DualObjectExecutionContext(int value) : DualObjectPrefix(value) {}
+  };
+
+  auto dual = std::make_shared<DualObjectExecutionContext>(7);
+  std::shared_ptr<StreamInfo::FilterState::Object> via_other_base(
+      dual, static_cast<DualObjectPrefix*>(dual.get()));
+  ASSERT_NE(via_other_base.get(), static_cast<const StreamInfo::FilterState::Object*>(
+                                      static_cast<const ExecutionContext*>(dual.get())));
+
+  stream_info_.filter_state_ =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info_.filter_state_->setData(kConnectionExecutionContextFilterStateName, via_other_base,
+                                      StreamInfo::FilterState::LifeSpan::Connection);
+
+  EXPECT_EQ(static_cast<ExecutionContext*>(dual.get()),
+            ExecutionContext::fromStreamInfo(OptRef<const StreamInfo::StreamInfo>(stream_info_)));
+  EXPECT_EQ(7, stream_info_.filter_state_
+                   ->getDataReadOnly<DualObjectPrefix>(kConnectionExecutionContextFilterStateName)
+                   ->value());
+
+  {
+    ScopedExecutionContext scoped_context(&tracked_object_);
+    EXPECT_FALSE(scoped_context.isNull());
+    EXPECT_EQ(1, dual->activationDepth());
+    EXPECT_EQ(1, dual->activationGenerations());
+  }
+  EXPECT_EQ(0, dual->activationDepth());
 }
 
 TEST_F(ExecutionContextTest, NullContext) {
