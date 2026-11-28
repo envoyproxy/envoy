@@ -27,6 +27,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/upstream/host_utility.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
@@ -34,6 +35,9 @@ namespace Envoy {
 namespace Upstream {
 
 namespace {
+
+// The health check metadata key under which HDS reports the response status code.
+constexpr absl::string_view kReservedHealthMetadataKey = "http_status_code";
 
 envoy::config::core::v3::RequestMethod
 getMethod(const envoy::config::core::v3::RequestMethod config_method) {
@@ -55,6 +59,11 @@ Http::CodecType codecTypeFromAlpn(absl::string_view alpn, Http::CodecType fallba
     return Http::CodecType::HTTP1;
   }
   return fallback;
+}
+
+std::vector<Http::LowerCaseString>
+lowerCaseHeaderNames(const Protobuf::RepeatedPtrField<std::string>& names) {
+  return {names.begin(), names.end()};
 }
 
 } // namespace
@@ -86,6 +95,8 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
       http_status_checker_(config.http_health_check().expected_statuses(),
                            config.http_health_check().retriable_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
+      response_headers_to_metadata_(
+          lowerCaseHeaderNames(config.http_health_check().response_headers_to_metadata())),
       codec_client_type_(codecClientType(config.http_health_check().codec_client_type())),
       negotiate_codec_(config.http_health_check().use_alpn_protocol()),
       random_generator_(context.api().randomGenerator()) {
@@ -110,6 +121,15 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
           fmt::format("use_alpn_protocol configured for the health check of cluster {} "
                       "which has a non-ALPN transport socket",
                       cluster.info()->name()));
+    }
+  }
+
+  for (const Http::LowerCaseString& header : response_headers_to_metadata_) {
+    // A header under this key would overwrite the status code that HDS reports.
+    if (header.get() == kReservedHealthMetadataKey) {
+      throw EnvoyException(fmt::format("response_headers_to_metadata of the health check of "
+                                       "cluster {} cannot contain the reserved name '{}'",
+                                       cluster.info()->name(), kReservedHealthMetadataKey));
     }
   }
 
@@ -541,6 +561,17 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
   // Store the raw HTTP response code on the host for HDS metadata reporting.
   if (response_headers_ != nullptr) {
     host_->setLastHealthCheckHttpStatus(response_code);
+    // Only touch the host's health check metadata when response headers are configured.
+    if (!parent_.response_headers_to_metadata_.empty()) {
+      absl::flat_hash_map<std::string, std::string> metadata;
+      for (const Http::LowerCaseString& header : parent_.response_headers_to_metadata_) {
+        const auto value = Http::HeaderUtility::getAllOfHeaderAsString(*response_headers_, header);
+        if (value.result().has_value()) {
+          metadata.emplace(header.get(), std::string(value.result().value()));
+        }
+      }
+      host_->setHealthCheckMetadata(std::move(metadata));
+    }
   }
 
   switch (healthCheckResult(response_code)) {
@@ -580,6 +611,14 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
   }
 
   return Http::HeaderUtility::shouldCloseConnection(client_->protocol(), *response_headers_);
+}
+
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onNetworkFailure() {
+  // There is no response to take header values from, so do not let HDS keep reporting those of an
+  // earlier response.
+  if (!parent_.response_headers_to_metadata_.empty()) {
+    host_->setHealthCheckMetadata({});
+  }
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
