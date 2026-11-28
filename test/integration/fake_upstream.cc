@@ -1,9 +1,14 @@
 #include "test/integration/fake_upstream.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <tuple>
+#include <utility>
+
+#include "envoy/api/io_error.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/config/utility.h"
@@ -437,9 +442,10 @@ FakeHttpConnection::FakeHttpConnection(
     uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action,
-    bool deferred_read_enable)
+    bool deferred_read_enable, bool disable_and_do_not_enable)
     : FakeConnectionBase(shared_connection, time_system), type_(type),
       deferred_read_enable_(deferred_read_enable),
+      disable_and_do_not_enable_(disable_and_do_not_enable),
       header_validator_factory_(
           IntegrationUtil::makeHeaderValidationFactory(fakeUpstreamHeaderValidatorConfig())) {
   ASSERT(max_request_headers_count != 0);
@@ -937,7 +943,9 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
         *this, consumeConnection(/*defer_read_enable=*/true), http_type_, time_system_,
         config_.max_request_headers_kb_, config_.max_request_headers_count_,
         config_.headers_with_underscores_action_,
-        /*deferred_read_enable=*/read_disable_on_new_connection_ && !disable_and_do_not_enable_);
+        /*deferred_read_enable=*/read_disable_on_new_connection_ && !disable_and_do_not_enable_,
+        /*disable_and_do_not_enable=*/read_disable_on_new_connection_ &&
+            disable_and_do_not_enable_);
     connection->initialize();
     return AssertionSuccess();
   });
@@ -977,7 +985,9 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
             upstream.timeSystem(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
             Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
             /*deferred_read_enable=*/upstream.read_disable_on_new_connection_ &&
-                !upstream.disable_and_do_not_enable_);
+                !upstream.disable_and_do_not_enable_,
+            /*disable_and_do_not_enable=*/upstream.read_disable_on_new_connection_ &&
+                upstream.disable_and_do_not_enable_);
         connection->initialize();
         return AssertionSuccess();
       }));
@@ -1041,7 +1051,9 @@ void FakeUpstream::convertFromRawToHttp(FakeRawConnectionPtr& raw_connection,
 
   connection = std::make_unique<FakeHttpConnection>(
       *this, shared_connection, http_type_, time_system_, config_.max_request_headers_kb_,
-      config_.max_request_headers_count_, config_.headers_with_underscores_action_);
+      config_.max_request_headers_count_, config_.headers_with_underscores_action_,
+      /*deferred_read_enable=*/false,
+      /*disable_and_do_not_enable=*/read_disable_on_new_connection_ && disable_and_do_not_enable_);
   connection->initialize();
   raw_connection.release();
 }
@@ -1231,45 +1243,86 @@ Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& da
 ABSL_MUST_USE_RESULT
 AssertionResult FakeHttpConnection::waitForInexactRawData(absl::string_view data, std::string& out,
                                                           std::chrono::milliseconds timeout) {
-  absl::MutexLock lock(lock_);
-  const auto reached = [this, data, &out]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
-    char peek_buf[200];
-    auto result = dynamic_cast<Network::ConnectionImpl*>(&connection())
-                      ->ioHandle()
-                      .recv(peek_buf, 200, MSG_PEEK);
-    ASSERT(result.ok() || result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again);
-    if (!result.ok()) {
-      return false;
-    }
-    absl::string_view peek_data(peek_buf, result.return_value_);
-    size_t index = peek_data.find(data);
-    const auto data_len = data.length();
-    if (index != absl::string_view::npos) {
-      Buffer::OwnedImpl buffer;
-      out = std::string(peek_data.data(), index + data_len);
-      auto result = dynamic_cast<Network::ConnectionImpl*>(&connection())
-                        ->ioHandle()
-                        .recv(peek_buf, index + data_len, 0);
-      return true;
-    }
-    return false;
-  };
   // Because the connection must be read disabled to not auto-consume the
   // underlying data, waitFor hangs with no events to force the time system to
-  // continue. Break it up into smaller chunks.
-  for (int i = 0; i < timeout / 10ms; ++i) {
-    if (time_system_.waitFor(lock_, absl::Condition(&reached), 10ms)) {
+  // continue. Break it up into smaller chunks, dispatching ioHandle().recv() on
+  // the upstream dispatcher thread so file-event re-arming stays thread-safe.
+  struct PeekState {
+    std::string target;
+    std::string out;
+    bool matched{false};
+    bool disable_and_do_not_enable{false};
+  };
+  auto state = std::make_shared<PeekState>();
+  state->target = std::string(data);
+  state->disable_and_do_not_enable = disable_and_do_not_enable_;
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+
+  while (bound.withinBound()) {
+    if (!shared_connection_.connected()) {
+      return AssertionFailure() << "connection disconnected while waiting for raw data";
+    }
+    AssertionResult dispatch_result = shared_connection_.executeOnDispatcher(
+        [state](Network::Connection& connection) {
+          auto* conn_impl = dynamic_cast<Network::ConnectionImpl*>(&connection);
+          char peek_buf[200];
+          auto result = conn_impl->ioHandle().recv(peek_buf, 200, MSG_PEEK);
+          ASSERT(result.ok() || result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again);
+          if (result.ok()) {
+            absl::string_view peek_data(peek_buf, result.return_value_);
+            size_t index = peek_data.find(state->target);
+            const auto data_len = state->target.length();
+            if (index != absl::string_view::npos) {
+              state->out = std::string(peek_data.data(), index + data_len);
+              std::ignore = conn_impl->ioHandle().recv(peek_buf, index + data_len, 0);
+              state->matched = true;
+            }
+          }
+#ifdef WIN32
+          // Win32SocketHandleImpl::emulatePeek re-arms EmulatedEdge Read on EAGAIN; restore the
+          // connection's read-disabled event mask so ConnectionImpl invariants stay intact.
+          if (connection.state() == Network::Connection::State::Open && !connection.readEnabled()) {
+            const uint32_t events =
+                state->disable_and_do_not_enable
+                    ? 0
+                    : (Event::FileReadyType::Write |
+                       (!connection.isHalfCloseEnabled() ? Event::FileReadyType::Closed : 0));
+            conn_impl->ioHandle().enableFileEvents(events);
+          }
+#endif
+        },
+        bound.timeLeft());
+    if (!dispatch_result) {
+      return dispatch_result;
+    }
+    if (state->matched) {
+      out = std::move(state->out);
       return AssertionSuccess();
+    }
+    if (!shared_connection_.connected()) {
+      return AssertionFailure() << "connection disconnected while waiting for raw data";
+    }
+    const auto sleep_time = std::min<std::chrono::milliseconds>(10ms, bound.timeLeft());
+    if (sleep_time > 0ms) {
+      absl::MutexLock lock(lock_);
+      const auto never_ready = []() { return false; };
+      time_system_.waitFor(lock_, absl::Condition(&never_ready), sleep_time);
     }
   }
   return AssertionFailure() << "timed out waiting for raw data";
 }
 
 void FakeHttpConnection::writeRawData(absl::string_view data) {
-  Buffer::OwnedImpl buffer(data);
-  Api::IoCallUint64Result result =
-      dynamic_cast<Network::ConnectionImpl*>(&connection())->ioHandle().write(buffer);
-  ASSERT(result.ok());
+  std::string copy(data);
+  AssertionResult dispatch_result = shared_connection_.executeOnDispatcher(
+      [copy = std::move(copy)](Network::Connection& connection) {
+        Buffer::OwnedImpl buffer(copy);
+        Api::IoCallUint64Result result =
+            dynamic_cast<Network::ConnectionImpl*>(&connection)->ioHandle().write(buffer);
+        ASSERT(result.ok());
+      },
+      TestUtility::DefaultTimeout);
+  RELEASE_ASSERT(dispatch_result, dispatch_result.message());
 }
 
 AssertionResult FakeHttpConnection::postWriteRawData(std::string data) {

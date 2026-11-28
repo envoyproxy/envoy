@@ -585,7 +585,7 @@ public:
                      uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                          headers_with_underscores_action,
-                     bool deferred_read_enable = false);
+                     bool deferred_read_enable = false, bool disable_and_do_not_enable = false);
   ~FakeHttpConnection() override;
 
   void initialize() override;
@@ -665,6 +665,7 @@ private:
   // Accessed only from the fake upstream connection's dispatcher thread.
   bool shutting_down_for_cleanup_{false};
   bool deferred_read_enable_;
+  bool disable_and_do_not_enable_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
   testing::NiceMock<Server::MockOverloadManager> overload_manager_;

@@ -401,7 +401,7 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
                            .return_value_ == 0,
                    "Failed getsockopt IP_DONTFRAG");
     EXPECT_EQ(value, 1);
-#else
+#elif defined(ENVOY_IP_MTU_DISCOVER)
     RELEASE_ASSERT(
         connection_socket->getSocketOption(IPPROTO_IP, IP_MTU_DISCOVER, &value, &val_length)
                 .return_value_ == 0,
@@ -439,7 +439,7 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
         "Failed getsockopt IPV6_DONTFRAG");
     ;
     EXPECT_EQ(value, 1);
-#else
+#elif defined(ENVOY_IP_MTU_DISCOVER)
     RELEASE_ASSERT(
         connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_MTU_DISCOVER, &value, &val_length)
                 .return_value_ == 0,
@@ -472,7 +472,7 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
                 .return_value_ == 0,
         "Failed getsockopt IPV6_DONTFRAG");
     EXPECT_EQ(value, 1);
-#else
+#elif defined(ENVOY_IP_MTU_DISCOVER)
     RELEASE_ASSERT(
         connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_MTU_DISCOVER, &value, &val_length)
                 .return_value_ == 0,

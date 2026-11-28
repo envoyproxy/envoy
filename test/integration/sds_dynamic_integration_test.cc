@@ -476,6 +476,32 @@ protected:
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
                          testing::ValuesIn(getSdsTestsParams()), sdsTestParamsToString);
 
+static void setUpSdsDynamicKeyRotation() {
+  const std::string test_certs = TestEnvironment::runfilesPath("test/config/integration/certs");
+  const std::string root = TestEnvironment::temporaryPath("root");
+  const std::string server_keycert = root + "/server";
+  const std::string server_ecdsa_keycert = root + "/server_ecdsa";
+  const std::string empty_keycert = root + "/empty_keycert";
+
+  TestEnvironment::removePath(root);
+  TestEnvironment::createPath(server_keycert);
+  TestEnvironment::createPath(server_ecdsa_keycert);
+  TestEnvironment::createPath(empty_keycert);
+
+  auto copy_file = [](const std::string& src, const std::string& dst) {
+    TestEnvironment::writeStringToFileForTest(dst, TestEnvironment::readFileToStringForTest(src),
+                                              /*fully_qualified_path=*/true);
+  };
+  copy_file(test_certs + "/servercert.pem", server_keycert + "/servercert.pem");
+  copy_file(test_certs + "/serverkey.pem", server_keycert + "/serverkey.pem");
+  copy_file(test_certs + "/server_ecdsacert.pem", server_ecdsa_keycert + "/servercert.pem");
+  copy_file(test_certs + "/server_ecdsakey.pem", server_ecdsa_keycert + "/serverkey.pem");
+
+  TestEnvironment::createSymlink(server_keycert, root + "/current");
+  TestEnvironment::createSymlink(server_ecdsa_keycert, root + "/new");
+  TestEnvironment::createSymlink(empty_keycert, root + "/empty");
+}
+
 class SdsDynamicKeyRotationIntegrationTest : public SdsDynamicDownstreamIntegrationTest {
 protected:
   envoy::extensions::transport_sockets::tls::v3::Secret getCurrentServerSecret() {
@@ -499,9 +525,11 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicKeyRotationIntegrationT
 
 // Validate that a basic key-cert rotation works via symlink rename.
 TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
+#ifdef WIN32
+  GTEST_SKIP() << "Atomic directory symlink replacement is not supported on Windows.";
+#endif
   v3_resource_api_ = true;
-  TestEnvironment::exec(
-      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+  ASSERT_NO_FATAL_FAILURE(setUpSdsDynamicKeyRotation());
 
   on_server_init_function_ = [this]() {
     createSdsStream(*sdsUpstream());
@@ -581,9 +609,11 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, PollingRotation) {
 
 // Validate that rotating to a directory with missing certs is handled.
 TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
+#ifdef WIN32
+  GTEST_SKIP() << "Atomic directory symlink replacement is not supported on Windows.";
+#endif
   v3_resource_api_ = true;
-  TestEnvironment::exec(
-      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+  ASSERT_NO_FATAL_FAILURE(setUpSdsDynamicKeyRotation());
 
   on_server_init_function_ = [this]() {
     createSdsStream(*sdsUpstream());
@@ -627,10 +657,12 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
 // The test asserts only on those race-independent outcomes (request succeeds,
 // key log grows), so it is deterministic regardless of the interleaving.
 TEST_P(SdsDynamicKeyRotationIntegrationTest, KeyLogRotation) {
+#ifdef WIN32
+  GTEST_SKIP() << "Atomic directory symlink replacement is not supported on Windows.";
+#endif
   v3_resource_api_ = true;
   configure_keylog_ = true;
-  TestEnvironment::exec(
-      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+  ASSERT_NO_FATAL_FAILURE(setUpSdsDynamicKeyRotation());
 
   on_server_init_function_ = [this]() {
     createSdsStream(*sdsUpstream());
@@ -1953,8 +1985,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamPrivateKeyInt
 BORINGSSL_TEST_P(SdsDynamicDownstreamPrivateKeyIntegrationTest, BasicPrivateKeyProvider) {
   v3_resource_api_ = true;
 
-  TestEnvironment::exec(
-      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+  ASSERT_NO_FATAL_FAILURE(setUpSdsDynamicKeyRotation());
 
   // Set up the private key provider.
   Extensions::PrivateKeyMethodProvider::TestPrivateKeyMethodFactory test_factory;
@@ -2013,8 +2044,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsCdsPrivateKeyIntegrationTest,
 BORINGSSL_TEST_P(SdsCdsPrivateKeyIntegrationTest, BasicSdsCdsPrivateKeyProvider) {
   v3_resource_api_ = true;
 
-  TestEnvironment::exec(
-      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+  ASSERT_NO_FATAL_FAILURE(setUpSdsDynamicKeyRotation());
 
   // Set up the private key provider.
   Extensions::PrivateKeyMethodProvider::TestPrivateKeyMethodFactory test_factory;

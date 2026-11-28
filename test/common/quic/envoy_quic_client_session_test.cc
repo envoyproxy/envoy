@@ -623,6 +623,10 @@ TEST_P(EnvoyQuicClientSessionTest, EcnReportingIsEnabled) {
 }
 
 TEST_P(EnvoyQuicClientSessionTest, EcnReporting) {
+#ifdef WIN32
+  // Setting outgoing IP_TOS / IPV6_TCLASS via setsockopt is not supported on Windows.
+  return;
+#endif
   std::optional<Network::Address::IpVersion> version = peer_socket_->ipVersion();
   EXPECT_TRUE(version.has_value());
   // Make the peer socket send ECN marks
@@ -786,6 +790,7 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
   slice.mem_ = write_data.data();
   slice.len_ = write_data.length();
 
+#ifdef UDP_GRO
   // We already skip the test if UDP GRO is not supported, so checking the socket option is safe
   // here.
   int sock_opt;
@@ -794,6 +799,7 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
                    ->getSocketOption(SOL_UDP, UDP_GRO, &sock_opt, &sock_len)
                    .return_value_);
   EXPECT_EQ(1, sock_opt);
+#endif
 
   // GRO uses `recvmsg`, not `recvmmsg`.
   EXPECT_CALL(os_sys_calls, supportsUdpGro()).WillRepeatedly(Return(true));
@@ -917,6 +923,7 @@ TEST_P(EnvoyQuicClientSessionDisallowMmsgTest, UsesRecvMsgWhenNoGro) {
   slice.mem_ = write_data.data();
   slice.len_ = write_data.length();
 
+#ifdef UDP_GRO
   if (is_udp_gro_supported_on_platform_) {
     // Make sure the option for GRO is *not* set on the socket. This check cannot be called if the
     // platform doesn't support the UDP_GRO socket option; otherwise getSocketOption() will return
@@ -928,6 +935,7 @@ TEST_P(EnvoyQuicClientSessionDisallowMmsgTest, UsesRecvMsgWhenNoGro) {
                      .return_value_);
     EXPECT_EQ(0, sock_opt);
   }
+#endif
 
   // Uses `recvmsg`, not `recvmmsg`.
   EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _)).Times(0);

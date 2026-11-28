@@ -727,12 +727,12 @@ TEST_P(Http2FrameIntegrationTest, UpstreamGoAway) {
       Http2Frame::makeEmptyGoAwayFrame(12345, Http2Frame::ErrorCode::NoError);
   ASSERT_TRUE(fake_upstream_connection->write(
       absl::StrCat(std::string(rst_stream), std::string(go_away_frame))));
-  ASSERT_TRUE(fake_upstream_connection->close());
 
   test_server_->waitForCounter("cluster.cluster_0.upstream_cx_close_notify", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value());
 
   // Cleanup.
+  ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client_->close();
 }
 
