@@ -6,9 +6,10 @@
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 
-#include "source/common/common/containers.h"
+#include "source/common/common/cleanup.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/ecds_subscription_registry.h"
+#include "source/common/event/deferred_task.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 
@@ -59,6 +60,15 @@ DynamicFilterConfigProviderImplBase::validateTypeUrl(const std::string& type_url
 }
 
 const std::string& DynamicFilterConfigProviderImplBase::name() { return subscription_->name(); }
+
+absl::Status
+DynamicFilterConfigProviderImplBase::applyConfigUpdate(const Protobuf::Message* resource,
+                                                       Config::ConfigAppliedCb applied) {
+  auto update = prepareConfigUpdate(resource);
+  RETURN_IF_NOT_OK_REF(update.status());
+  (*update)(std::move(applied));
+  return absl::OkStatus();
+}
 
 absl::StatusOr<std::unique_ptr<FilterConfigSubscription>> FilterConfigSubscription::create(
     const envoy::config::core::v3::ConfigSource& config_source,
@@ -154,22 +164,7 @@ FilterConfigSubscription::onConfigUpdate(const std::vector<Config::DecodedResour
   for (auto* provider : filter_config_providers_) {
     provider->validateMessage(filter_config_name_, *next->config_, next->factory_name_);
   }
-  ENVOY_LOG(debug, "Updated filter config {} accepted, posting to workers", filter_config_name_);
-  // Update the latest subscription config first, to prevent a race with new
-  // providers missing the latest config.
-  last_ = std::move(next);
-  RETURN_IF_NOT_OK(Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
-      filter_config_providers_,
-      [last = last_](DynamicFilterConfigProviderImplBase* provider,
-                     std::shared_ptr<Cleanup> cleanup) {
-        return provider->onConfigUpdate(*last->config_, last->version_info_, [cleanup] {});
-      },
-      [me = shared_from_this()]() { me->updateComplete(); }));
-  // The filter configs are created and published to worker queues at this point, so it
-  // is safe to mark the subscription as ready and publish the warmed parent resources.
-  ENVOY_LOG(debug, "Updated filter config {} created, warming done", filter_config_name_);
-  init_target_.ready();
-  return absl::OkStatus();
+  return applyConfig(std::move(next));
 }
 
 absl::Status FilterConfigSubscription::onConfigUpdate(
@@ -177,18 +172,41 @@ absl::Status FilterConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   if (!removed_resources.empty()) {
     ASSERT(removed_resources.size() == 1);
+    if (!last_->config_) {
+      // A response can confirm that the resource was already absent. Release initial warming
+      // without rebuilding the active default.
+      markInitReady();
+      return absl::OkStatus();
+    }
     ENVOY_LOG(debug, "Removing filter config {}", filter_config_name_);
-    last_ = std::make_shared<ConfigVersion>("", factory_context_.timeSource().systemTime());
-    RETURN_IF_NOT_OK(Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
-        filter_config_providers_,
-        [](DynamicFilterConfigProviderImplBase* provider, std::shared_ptr<Cleanup> cleanup) {
-          return provider->onConfigRemoved([cleanup] {});
-        },
-        [me = shared_from_this()]() { me->updateComplete(); }));
+    return applyConfig(
+        std::make_shared<ConfigVersion>("", factory_context_.timeSource().systemTime()));
   } else if (!added_resources.empty()) {
     ASSERT(added_resources.size() == 1);
     return onConfigUpdate(added_resources, added_resources[0].get().version());
   }
+  return absl::OkStatus();
+}
+
+absl::Status FilterConfigSubscription::applyConfig(ConfigVersionSharedPtr next) {
+  // Providers sharing a subscription may have different factory contexts or defaults. A failure
+  // in any of them must leave every worker and the cached resource at the last accepted version.
+  std::vector<DynamicFilterConfigProviderImplBase::PreparedConfigUpdate> updates;
+  updates.reserve(filter_config_providers_.size());
+  for (auto* provider : filter_config_providers_) {
+    auto update = provider->prepareConfigUpdate(next->config_.get());
+    RETURN_IF_NOT_OK_REF(update.status());
+    updates.emplace_back(std::move(*update));
+  }
+
+  ENVOY_LOG(debug, "Updated filter config {} accepted, posting to workers", filter_config_name_);
+  last_ = std::move(next);
+  auto completion = std::make_shared<Cleanup>([me = shared_from_this()] { me->updateComplete(); });
+  for (const auto& update : updates) {
+    update([completion] {});
+  }
+  // Worker updates are queued before listener warming completes.
+  markInitReady();
   return absl::OkStatus();
 }
 
@@ -198,7 +216,18 @@ void FilterConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureR
             static_cast<int>(reason));
   stats_.config_fail_.inc();
   // Make sure to make progress in case the control plane is temporarily failing.
+  markInitReady();
+}
+
+void FilterConfigSubscription::markInitReady() {
+  auto self = shared_from_this();
   init_target_.ready();
+  if (filter_config_providers_.empty()) {
+    // Warming can destroy the last provider if listener initialization fails. Keep the xDS
+    // subscription alive until its current callback returns.
+    Event::DeferredTaskUtil::deferredRun(factory_context_.mainThreadDispatcher(),
+                                         [self = std::move(self)]() mutable { self.reset(); });
+  }
 }
 
 void FilterConfigSubscription::updateComplete() {

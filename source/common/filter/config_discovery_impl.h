@@ -38,6 +38,12 @@ using FilterConfigSubscriptionSharedPtr = std::shared_ptr<FilterConfigSubscripti
  **/
 class DynamicFilterConfigProviderImplBase : public Config::DynamicExtensionConfigProviderBase {
 public:
+  // Construct the factory on the main thread and return a callback to publish it once.
+  // A null resource selects this provider's default configuration, if any.
+  using PreparedConfigUpdate = std::function<void(Config::ConfigAppliedCb)>;
+  virtual absl::StatusOr<PreparedConfigUpdate>
+  prepareConfigUpdate(const Protobuf::Message* resource) PURE;
+
   DynamicFilterConfigProviderImplBase(FilterConfigSubscriptionSharedPtr& subscription,
                                       const absl::flat_hash_set<std::string>& require_type_urls,
                                       bool last_filter_in_filter_chain,
@@ -61,6 +67,8 @@ private:
   Init::TargetImpl init_target_;
 
 protected:
+  absl::Status applyConfigUpdate(const Protobuf::Message* resource,
+                                 Config::ConfigAppliedCb applied);
   const bool last_filter_in_filter_chain_;
   const std::string filter_chain_type_;
 };
@@ -108,30 +116,19 @@ public:
     }
     return {};
   }
-
   // Config::DynamicExtensionConfigProviderBase
   absl::Status onConfigUpdate(const Protobuf::Message& message, const std::string&,
                               Config::ConfigAppliedCb applied_on_all_threads) override {
-    const absl::StatusOr<FactoryCb> config_or_error = instantiateFilterFactory(message);
-    RETURN_IF_NOT_OK_REF(config_or_error.status());
-    update(std::move(config_or_error.value()), applied_on_all_threads);
-    return absl::OkStatus();
+    return applyConfigUpdate(&message, std::move(applied_on_all_threads));
   }
 
   absl::Status onConfigRemoved(Config::ConfigAppliedCb applied_on_all_threads) override {
-    std::optional<FactoryCb> cb;
-    if (default_configuration_) {
-      auto cb_or_error = instantiateFilterFactory(*default_configuration_);
-      RETURN_IF_NOT_OK_REF(cb_or_error.status());
-      cb = std::move(cb_or_error.value());
-    }
-    update(cb, applied_on_all_threads);
-    return absl::OkStatus();
+    return applyConfigUpdate(nullptr, std::move(applied_on_all_threads));
   }
 
   absl::Status applyDefaultConfiguration() override {
     if (default_configuration_) {
-      return onConfigUpdate(*default_configuration_, "", nullptr);
+      return applyConfigUpdate(nullptr, nullptr);
     }
     return absl::OkStatus();
   }
@@ -144,6 +141,20 @@ protected:
   const Network::ListenerFilterMatcherSharedPtr listener_filter_matcher_;
 
 private:
+  absl::StatusOr<PreparedConfigUpdate>
+  prepareConfigUpdate(const Protobuf::Message* resource) override {
+    std::optional<FactoryCb> factory;
+    if (resource != nullptr || default_configuration_) {
+      auto result =
+          instantiateFilterFactory(resource != nullptr ? *resource : *default_configuration_);
+      RETURN_IF_NOT_OK_REF(result.status());
+      factory.emplace(std::move(*result));
+    }
+    return [this, factory = std::move(factory)](Config::ConfigAppliedCb applied) mutable {
+      update(std::move(factory), std::move(applied));
+    };
+  }
+
   virtual absl::StatusOr<FactoryCb>
   instantiateFilterFactory(const Protobuf::Message& message) const PURE;
 
@@ -464,11 +475,12 @@ private:
     uint64_t config_hash_{0ul};
     const SystemTime updated_;
   };
-  // Using a heap allocated record because updates are completed by all workers asynchronously.
   using ConfigVersionSharedPtr = std::shared_ptr<ConfigVersion>;
   using ConfigVersionConstSharedPtr = std::shared_ptr<const ConfigVersion>;
 
   void start();
+  void markInitReady();
+  absl::Status applyConfig(ConfigVersionSharedPtr next);
 
   // Config::SubscriptionCallbacks
   absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,

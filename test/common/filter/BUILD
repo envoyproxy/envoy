@@ -33,6 +33,7 @@ envoy_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/common/network:filter_matcher_lib",
         "//test/integration/filters:add_body_filter_config_lib",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
