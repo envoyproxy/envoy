@@ -14246,6 +14246,65 @@ unsafe extern "C" {
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
+    /** envoy_dynamic_module_on_lb_config_http_callout_done is called on the main thread when a callout
+ finishes. In C, if the module does not implement this, a callout made once the server's init
+ manager has started returns CannotCreateRequest. Rust SDK modules always export it.
+
+ @param lb_config_envoy_ptr is the pointer to the DynamicModuleLbConfig.
+ @param lb_config_module_ptr is the pointer to the in-module load balancer config.
+ @param callout_id is the ID of the callout.
+ @param result is the result of the callout.
+ @param headers is the headers of the response.
+ @param headers_size is the size of the headers.
+ @param body_chunks is the body of the response.
+ @param body_chunks_size is the size of the body.
+
+ Envoy reports a failure from a later callback. headers and body_chunks are owned by Envoy, and
+ they are guaranteed to be valid until the end of this event hook. They may be null if the
+ callout fails or the response is empty.*/
+    pub fn envoy_dynamic_module_on_lb_config_http_callout_done(
+        lb_config_envoy_ptr: envoy_dynamic_module_type_lb_config_envoy_ptr,
+        lb_config_module_ptr: envoy_dynamic_module_type_lb_config_module_ptr,
+        callout_id: u64,
+        result: envoy_dynamic_module_type_http_callout_result,
+        headers: *mut envoy_dynamic_module_type_envoy_http_header,
+        headers_size: usize,
+        body_chunks: *mut envoy_dynamic_module_type_envoy_buffer,
+        body_chunks_size: usize,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_on_lb_config_timer is called on the main thread when the periodic timer
+ fires. If the module does not implement this,
+ envoy_dynamic_module_callback_lb_config_enable_timer does nothing.
+
+ @param lb_config_envoy_ptr is the pointer to the DynamicModuleLbConfig.
+ @param lb_config_module_ptr is the pointer to the in-module load balancer config.*/
+    pub fn envoy_dynamic_module_on_lb_config_timer(
+        lb_config_envoy_ptr: envoy_dynamic_module_type_lb_config_envoy_ptr,
+        lb_config_module_ptr: envoy_dynamic_module_type_lb_config_module_ptr,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_on_lb_config_server_initialized is called at most once on the main thread,
+ and only if on_lb_config_new called
+ envoy_dynamic_module_callback_lb_config_schedule_on_server_initialized. At startup it runs when
+ the server's init manager starts, after every cluster's initial warm-up. For a configuration
+ built after that, it runs inline while Envoy builds the cluster, even if Envoy then rejects it,
+ so a callout to that cluster returns ClusterNotFound when the cluster is new, or reaches the
+ version it replaces, which can reset the callout when the update lands.
+
+ @param lb_config_envoy_ptr is the pointer to the DynamicModuleLbConfig.
+ @param lb_config_module_ptr is the pointer to the in-module load balancer config.*/
+    pub fn envoy_dynamic_module_on_lb_config_server_initialized(
+        lb_config_envoy_ptr: envoy_dynamic_module_type_lb_config_envoy_ptr,
+        lb_config_module_ptr: envoy_dynamic_module_type_lb_config_module_ptr,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
     /** envoy_dynamic_module_callback_lb_get_cluster_name returns the name of the cluster.
 
  @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
@@ -14942,6 +15001,89 @@ unsafe extern "C" {
         label_values_length: usize,
         value: u64,
     ) -> envoy_dynamic_module_type_metrics_result;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_lb_config_http_callout is called by the module to send an HTTP
+ request on the main thread. The response is received in
+ envoy_dynamic_module_on_lb_config_http_callout_done. Must be called on the main thread.
+
+ Off the main thread a debug build aborts, and other builds return CannotCreateRequest. For a
+ request with the required headers, it returns ClusterNotFound until the server's init manager
+ starts after every cluster's initial warm-up, which covers on_lb_config_new at startup and any
+ timer that fires before then. A callout that completes before this returns is reported only by
+ the return value. Callouts in flight when the load balancer configuration is destroyed are
+ cancelled without calling envoy_dynamic_module_on_lb_config_http_callout_done, and from
+ envoy_dynamic_module_on_lb_config_destroy a request with the required headers returns
+ CannotCreateRequest.
+
+ A callout to a cluster using this load balancer can call choose_host synchronously on the
+ main thread before returning, so the module must not hold locks across this call that
+ choose_host takes, or send one to that cluster from that load balancer's own hooks.
+
+ @param lb_config_envoy_ptr is the pointer to the DynamicModuleLbConfig.
+ @param callout_id_out is a pointer to a variable where the callout ID will be stored. It is set
+ only when this returns Success.
+ @param cluster_name is the name of the cluster to which the callout is sent.
+ @param headers is the headers of the request. It must contain :method, :path, and host headers.
+ @param headers_size is the size of the headers.
+ @param body is the body of the request.
+ @param timeout_milliseconds is the timeout for the callout in milliseconds. Zero sets no
+ timeout of its own.
+ @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout.*/
+    pub fn envoy_dynamic_module_callback_lb_config_http_callout(
+        lb_config_envoy_ptr: envoy_dynamic_module_type_lb_config_envoy_ptr,
+        callout_id_out: *mut u64,
+        cluster_name: envoy_dynamic_module_type_module_buffer,
+        headers: *mut envoy_dynamic_module_type_module_http_header,
+        headers_size: usize,
+        body: envoy_dynamic_module_type_module_buffer,
+        timeout_milliseconds: u64,
+    ) -> envoy_dynamic_module_type_http_callout_init_result;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_lb_config_enable_timer is called by the module to arm a periodic
+ timer on the main thread. Each fire calls envoy_dynamic_module_on_lb_config_timer and re-arms
+ until disable. In C, this is a no-op when the module does not implement
+ envoy_dynamic_module_on_lb_config_timer. Rust SDK modules always export this symbol. Must be
+ called on the main thread. An interval of 0 re-arms at 0 and runs on every main-thread event
+ loop iteration.
+
+ Envoy stops the timer on its own only when it destroys the load balancer configuration, after
+ the last host, connection or request that uses that version of the cluster is gone, so a removed
+ or updated cluster keeps its old timer running until then, beside the new one after an update.
+
+ @param lb_config_envoy_ptr is the pointer to the DynamicModuleLbConfig.
+ @param interval_milliseconds is the timer interval in milliseconds.*/
+    pub fn envoy_dynamic_module_callback_lb_config_enable_timer(
+        lb_config_envoy_ptr: envoy_dynamic_module_type_lb_config_envoy_ptr,
+        interval_milliseconds: u64,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_lb_config_disable_timer is called by the module to stop the timer
+ on the main thread. This is a no-op when the timer is not armed. Must be called on the main
+ thread.
+
+ @param lb_config_envoy_ptr is the pointer to the DynamicModuleLbConfig.*/
+    pub fn envoy_dynamic_module_callback_lb_config_disable_timer(
+        lb_config_envoy_ptr: envoy_dynamic_module_type_lb_config_envoy_ptr,
+    );
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
+    /** envoy_dynamic_module_callback_lb_config_schedule_on_server_initialized is called by the module
+ from envoy_dynamic_module_on_lb_config_new to opt into
+ envoy_dynamic_module_on_lb_config_server_initialized. Must be called on the main thread.
+
+ @param lb_config_envoy_ptr is the pointer to the DynamicModuleLbConfig.
+ @return true if the hook was scheduled, or false if called after config creation, off the main
+ thread, or when the module does not implement it.*/
+    pub fn envoy_dynamic_module_callback_lb_config_schedule_on_server_initialized(
+        lb_config_envoy_ptr: envoy_dynamic_module_type_lb_config_envoy_ptr,
+    ) -> bool;
 }
 /** envoy_dynamic_module_type_matcher_config_envoy_ptr is a raw pointer to
  the DynamicModuleInputMatcher class in Envoy.

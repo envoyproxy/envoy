@@ -1166,6 +1166,13 @@ WEAK_STUB(LbConfigDefineHistogram,
 WEAK_STUB(LbConfigRecordHistogramValue,
           envoy_dynamic_module_callback_lb_config_record_histogram_value(nullptr, 0, nullptr, 0,
                                                                          100))
+WEAK_STUB(LbConfigHttpCallout,
+          envoy_dynamic_module_callback_lb_config_http_callout(nullptr, nullptr, {nullptr, 0},
+                                                               nullptr, 0, {nullptr, 0}, 0))
+WEAK_STUB(LbConfigEnableTimer, envoy_dynamic_module_callback_lb_config_enable_timer(nullptr, 0))
+WEAK_STUB(LbConfigDisableTimer, envoy_dynamic_module_callback_lb_config_disable_timer(nullptr))
+WEAK_STUB(LbConfigScheduleOnServerInitialized,
+          envoy_dynamic_module_callback_lb_config_schedule_on_server_initialized(nullptr))
 
 WEAK_STUB(MatcherGetHeadersSize,
           envoy_dynamic_module_callback_matcher_get_headers_size(

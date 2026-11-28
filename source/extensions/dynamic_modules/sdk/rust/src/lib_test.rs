@@ -7878,6 +7878,185 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_host_stat
   0
 }
 
+// Stubs the EnvoyLbConfig metric vtable. These tests do not call metrics.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_lb_config_define_counter(
+  _lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  _counter_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_lb_config_increment_counter(
+  _lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_lb_config_define_gauge(
+  _lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  _gauge_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_lb_config_set_gauge(
+  _lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_lb_config_increment_gauge(
+  _lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_lb_config_decrement_gauge(
+  _lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_lb_config_define_histogram(
+  _lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  _histogram_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_lb_config_record_histogram_value(
+  _lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+thread_local! {
+  static LB_CALLOUT_CLUSTER: std::cell::RefCell<String> =
+    const { std::cell::RefCell::new(String::new()) };
+  static LB_CALLOUT_HEADERS: std::cell::RefCell<Vec<(String, Vec<u8>)>> =
+    const { std::cell::RefCell::new(Vec::new()) };
+  static LB_CALLOUT_BODY: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+  static LB_CALLOUT_BODY_BYTES: std::cell::RefCell<Vec<u8>> =
+    const { std::cell::RefCell::new(Vec::new()) };
+  static LB_CALLOUT_TIMEOUT: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+  static LB_TIMER_MS: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+  static LB_TIMER_DISABLED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+  static LB_SCHEDULED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+  static LB_LAST_CONFIG_PTR: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_lb_config_http_callout(
+  _lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+  callout_id_out: *mut u64,
+  cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  headers: *mut abi::envoy_dynamic_module_type_module_http_header,
+  headers_size: usize,
+  body: abi::envoy_dynamic_module_type_module_buffer,
+  timeout_milliseconds: u64,
+) -> abi::envoy_dynamic_module_type_http_callout_init_result {
+  let cluster = unsafe {
+    std::str::from_utf8(std::slice::from_raw_parts(
+      cluster_name.ptr as *const u8,
+      cluster_name.length,
+    ))
+    .unwrap()
+    .to_string()
+  };
+  LB_CALLOUT_CLUSTER.with(|recorded| *recorded.borrow_mut() = cluster);
+  let mut recorded_headers = Vec::new();
+  if !headers.is_null() && headers_size > 0 {
+    let header_slice = unsafe { std::slice::from_raw_parts(headers, headers_size) };
+    for h in header_slice {
+      let key = unsafe {
+        std::str::from_utf8(std::slice::from_raw_parts(
+          h.key_ptr as *const u8,
+          h.key_length,
+        ))
+        .unwrap()
+        .to_string()
+      };
+      let value =
+        unsafe { std::slice::from_raw_parts(h.value_ptr as *const u8, h.value_length).to_vec() };
+      recorded_headers.push((key, value));
+    }
+  }
+  LB_CALLOUT_HEADERS.with(|recorded| *recorded.borrow_mut() = recorded_headers);
+  LB_CALLOUT_BODY.with(|recorded| recorded.set(body.length));
+  let body_bytes = if !body.ptr.is_null() && body.length > 0 {
+    unsafe { std::slice::from_raw_parts(body.ptr as *const u8, body.length).to_vec() }
+  } else {
+    Vec::new()
+  };
+  LB_CALLOUT_BODY_BYTES.with(|recorded| *recorded.borrow_mut() = body_bytes);
+  LB_CALLOUT_TIMEOUT.with(|recorded| recorded.set(timeout_milliseconds));
+  unsafe {
+    *callout_id_out = 7;
+  }
+  abi::envoy_dynamic_module_type_http_callout_init_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_lb_config_enable_timer(
+  _lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+  interval_milliseconds: u64,
+) {
+  LB_TIMER_MS.with(|recorded| recorded.set(Some(interval_milliseconds)));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_lb_config_disable_timer(
+  lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+) {
+  LB_LAST_CONFIG_PTR.with(|recorded| recorded.set(lb_config_envoy_ptr as usize));
+  LB_TIMER_DISABLED.with(|recorded| recorded.set(true));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_lb_config_schedule_on_server_initialized(
+  _lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+) -> bool {
+  LB_SCHEDULED.with(|recorded| recorded.set(true));
+  true
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_http_callout(
   _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
@@ -16344,4 +16523,246 @@ mod xds_tests {
       None,
     );
   }
+}
+
+// =============================================================================
+// Load Balancer Config HTTP Callout and Timer tests.
+// =============================================================================
+
+struct RecordingLbConfig {
+  callout_done: std::sync::Arc<AtomicBool>,
+  timer: std::sync::Arc<AtomicBool>,
+  server_initialized: std::sync::Arc<AtomicBool>,
+}
+
+impl LoadBalancerConfig for RecordingLbConfig {
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyLoadBalancer) -> Box<dyn LoadBalancer> {
+    unimplemented!()
+  }
+
+  fn on_http_callout_done(
+    &self,
+    _envoy_config: &dyn EnvoyLbConfig,
+    callout_id: u64,
+    result: abi::envoy_dynamic_module_type_http_callout_result,
+    response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+    response_body: Option<&[EnvoyBuffer]>,
+  ) {
+    assert_eq!(4, callout_id);
+    assert_eq!(
+      abi::envoy_dynamic_module_type_http_callout_result::Reset,
+      result
+    );
+    let headers = response_headers.expect("headers should be present");
+    assert_eq!(2, headers.len());
+    assert_eq!(b":status", headers[0].0.as_slice());
+    assert_eq!(b"200", headers[0].1.as_slice());
+    assert_eq!(b"x-foo", headers[1].0.as_slice());
+    assert_eq!(b"bar", headers[1].1.as_slice());
+    let body = response_body.expect("body should be present");
+    assert_eq!(1, body.len());
+    assert_eq!(b"ok", body[0].as_slice());
+    self
+      .callout_done
+      .store(true, std::sync::atomic::Ordering::SeqCst);
+  }
+
+  fn on_timer(&self, envoy_config: &dyn EnvoyLbConfig) {
+    envoy_config.disable_timer();
+    self.timer.store(true, std::sync::atomic::Ordering::SeqCst);
+  }
+
+  fn on_server_initialized(&self, _envoy_config: &dyn EnvoyLbConfig) {
+    self
+      .server_initialized
+      .store(true, std::sync::atomic::Ordering::SeqCst);
+  }
+}
+
+/// Tests that FFI hooks correctly dispatch to the LoadBalancerConfig trait.
+#[test]
+fn test_lb_config_hooks_dispatch_to_the_trait() {
+  let callout_done = std::sync::Arc::new(AtomicBool::new(false));
+  let timer = std::sync::Arc::new(AtomicBool::new(false));
+  let server_initialized = std::sync::Arc::new(AtomicBool::new(false));
+  let inner: Box<dyn LoadBalancerConfig> = Box::new(RecordingLbConfig {
+    callout_done: callout_done.clone(),
+    timer: timer.clone(),
+    server_initialized: server_initialized.clone(),
+  });
+  let module_ptr = Box::into_raw(Box::new(inner));
+  let dummy_config_ptr = 0x5678 as abi::envoy_dynamic_module_type_lb_config_envoy_ptr;
+  unsafe {
+    let headers = [
+      abi::envoy_dynamic_module_type_envoy_http_header {
+        key_ptr: b":status".as_ptr() as *const _,
+        key_length: 7,
+        value_ptr: b"200".as_ptr() as *const _,
+        value_length: 3,
+      },
+      abi::envoy_dynamic_module_type_envoy_http_header {
+        key_ptr: b"x-foo".as_ptr() as *const _,
+        key_length: 5,
+        value_ptr: b"bar".as_ptr() as *const _,
+        value_length: 3,
+      },
+    ];
+    let body = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: b"ok".as_ptr() as *const _,
+      length: 2,
+    };
+    envoy_dynamic_module_on_lb_config_http_callout_done(
+      dummy_config_ptr,
+      module_ptr as abi::envoy_dynamic_module_type_lb_config_module_ptr,
+      4,
+      abi::envoy_dynamic_module_type_http_callout_result::Reset,
+      headers.as_ptr(),
+      headers.len(),
+      &body as *const _,
+      1,
+    );
+    assert!(callout_done.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(!timer.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(!server_initialized.load(std::sync::atomic::Ordering::SeqCst));
+
+    LB_LAST_CONFIG_PTR.with(|recorded| recorded.set(0));
+    envoy_dynamic_module_on_lb_config_timer(
+      dummy_config_ptr,
+      module_ptr as abi::envoy_dynamic_module_type_lb_config_module_ptr,
+    );
+    assert!(timer.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(!server_initialized.load(std::sync::atomic::Ordering::SeqCst));
+    assert_eq!(
+      dummy_config_ptr as usize,
+      LB_LAST_CONFIG_PTR.with(|recorded| recorded.get())
+    );
+
+    envoy_dynamic_module_on_lb_config_server_initialized(
+      dummy_config_ptr,
+      module_ptr as abi::envoy_dynamic_module_type_lb_config_module_ptr,
+    );
+    assert!(server_initialized.load(std::sync::atomic::Ordering::SeqCst));
+
+    drop(Box::from_raw(module_ptr));
+  }
+}
+
+struct DefaultLbConfig;
+
+impl LoadBalancerConfig for DefaultLbConfig {
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyLoadBalancer) -> Box<dyn LoadBalancer> {
+    unimplemented!()
+  }
+}
+
+/// Tests that default implementations of the LoadBalancerConfig hooks are no-ops.
+#[test]
+fn test_lb_config_default_hooks_are_noops() {
+  let inner: Box<dyn LoadBalancerConfig> = Box::new(DefaultLbConfig);
+  let dummy_envoy_config = EnvoyLbConfigImpl::new(std::ptr::null_mut());
+  inner.on_http_callout_done(
+    &dummy_envoy_config,
+    1,
+    abi::envoy_dynamic_module_type_http_callout_result::Success,
+    None,
+    None,
+  );
+  inner.on_timer(&dummy_envoy_config);
+  inner.on_server_initialized(&dummy_envoy_config);
+
+  let module_ptr = Box::into_raw(Box::new(inner));
+  unsafe {
+    envoy_dynamic_module_on_lb_config_http_callout_done(
+      std::ptr::null_mut(),
+      module_ptr as abi::envoy_dynamic_module_type_lb_config_module_ptr,
+      1,
+      abi::envoy_dynamic_module_type_http_callout_result::Success,
+      std::ptr::null(),
+      0,
+      std::ptr::null(),
+      0,
+    );
+    envoy_dynamic_module_on_lb_config_timer(
+      std::ptr::null_mut(),
+      module_ptr as abi::envoy_dynamic_module_type_lb_config_module_ptr,
+    );
+    envoy_dynamic_module_on_lb_config_server_initialized(
+      std::ptr::null_mut(),
+      module_ptr as abi::envoy_dynamic_module_type_lb_config_module_ptr,
+    );
+    drop(Box::from_raw(module_ptr));
+  }
+}
+
+/// Tests that send_http_callout forwards parameters to the Envoy ABI callback.
+#[test]
+fn test_lb_config_send_http_callout_forwards_to_the_abi() {
+  let config = EnvoyLbConfigImpl::new(std::ptr::null_mut());
+  let (result, callout_id) = config.send_http_callout(
+    "test-cluster",
+    &[
+      (":method", b"GET"),
+      (":path", b"/"),
+      ("host", b"example.com"),
+    ],
+    Some(b"hi"),
+    25,
+  );
+  assert_eq!(
+    abi::envoy_dynamic_module_type_http_callout_init_result::Success,
+    result
+  );
+  assert_eq!(7, callout_id);
+  LB_CALLOUT_CLUSTER.with(|recorded| assert_eq!("test-cluster", recorded.borrow().as_str()));
+  LB_CALLOUT_HEADERS.with(|recorded| {
+    let headers = recorded.borrow();
+    assert_eq!(3, headers.len());
+    assert_eq!(":method", headers[0].0);
+    assert_eq!(b"GET", headers[0].1.as_slice());
+    assert_eq!(":path", headers[1].0);
+    assert_eq!(b"/", headers[1].1.as_slice());
+    assert_eq!("host", headers[2].0);
+    assert_eq!(b"example.com", headers[2].1.as_slice());
+  });
+  LB_CALLOUT_BODY.with(|recorded| assert_eq!(2, recorded.get()));
+  LB_CALLOUT_BODY_BYTES.with(|recorded| assert_eq!(b"hi", recorded.borrow().as_slice()));
+  LB_CALLOUT_TIMEOUT.with(|recorded| assert_eq!(25, recorded.get()));
+
+  let (result, _) = config.send_http_callout(
+    "test-cluster",
+    &[
+      (":method", b"GET"),
+      (":path", b"/"),
+      ("host", b"example.com"),
+    ],
+    None,
+    25,
+  );
+  assert_eq!(
+    abi::envoy_dynamic_module_type_http_callout_init_result::Success,
+    result
+  );
+  LB_CALLOUT_BODY.with(|recorded| assert_eq!(0, recorded.get()));
+  LB_CALLOUT_BODY_BYTES.with(|recorded| assert_eq!(b"", recorded.borrow().as_slice()));
+}
+
+/// Tests that timer and schedule callbacks forward to the Envoy ABI.
+#[test]
+fn test_lb_config_timer_and_schedule_forward_to_the_abi() {
+  LB_TIMER_MS.with(|recorded| recorded.set(None));
+  LB_TIMER_DISABLED.with(|recorded| recorded.set(false));
+  LB_SCHEDULED.with(|recorded| recorded.set(false));
+  let config = EnvoyLbConfigImpl::new(std::ptr::null_mut());
+
+  config.enable_timer(40);
+  LB_TIMER_MS.with(|recorded| assert_eq!(Some(40), recorded.get()));
+  LB_TIMER_DISABLED.with(|recorded| assert!(!recorded.get()));
+  LB_SCHEDULED.with(|recorded| assert!(!recorded.get()));
+
+  config.disable_timer();
+  LB_TIMER_DISABLED.with(|recorded| assert!(recorded.get()));
+  LB_SCHEDULED.with(|recorded| assert!(!recorded.get()));
+
+  assert!(config.schedule_on_server_initialized());
+  LB_SCHEDULED.with(|recorded| assert!(recorded.get()));
 }

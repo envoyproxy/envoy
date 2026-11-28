@@ -17,19 +17,6 @@ using DynamicModulesLbProto = envoy::extensions::load_balancing_policies::dynami
     DynamicModulesLoadBalancerConfig;
 
 /**
- * Load balancer config that wraps the dynamic module configuration.
- */
-class TypedDynamicModuleLbConfig : public Upstream::LoadBalancerConfig {
-public:
-  TypedDynamicModuleLbConfig(DynamicModuleLbConfigSharedPtr config) : config_(std::move(config)) {}
-
-  const DynamicModuleLbConfigSharedPtr& config() const { return config_; }
-
-private:
-  DynamicModuleLbConfigSharedPtr config_;
-};
-
-/**
  * Factory for creating Dynamic Module load balancers.
  */
 class Factory : public Upstream::TypedLoadBalancerFactoryBase<DynamicModulesLbProto>,
