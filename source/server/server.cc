@@ -1188,6 +1188,11 @@ void InstanceBase::shutdownAdmin() {
   stat_flush_timer_.reset();
   handler_->stopListeners();
   if (admin_) {
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+    // The child now owns the admin socket and this process no longer flushes stats.
+    handler_->onListenerDrain(AdminImpl::ListenerTag,
+                              {api().timeSource().monotonicTime(), DrainStrategy::Immediate});
+#endif
     admin_->closeSocket();
   }
 

@@ -19,6 +19,8 @@ The hot restart functionality has the following general architecture:
   discovery and health checking phase, etc.) before it asks for copies of the listen sockets from
   the old process. The new process starts listening and then tells the old process to start
   draining.
+* When the new process takes over the admin listener, the old process stops accepting admin
+  connections and drains existing ones so monitoring clients reconnect to the new process.
 * During the draining phase, the old process attempts to gracefully close existing connections. How
   this is done depends on the configured filters. The drain time is configurable via the
   :option:`--drain-time-s` option and as more time passes draining becomes more aggressive.

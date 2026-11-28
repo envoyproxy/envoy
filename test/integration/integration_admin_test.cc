@@ -502,6 +502,33 @@ TEST_P(IntegrationAdminTest, ConfigDumpNodeDynamicParameters) {
             dynamic_params.at("type.googleapis.com/some.resource.Type").params().at("some_key"));
 }
 
+TEST_P(IntegrationAdminTest, CloseAdminKeepAliveAfterShutdown) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "This test checks the HTTP/1 keep-alive response.";
+  }
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("admin"));
+  Http::TestRequestHeaderMapImpl request_headers = {
+      {":method", "GET"}, {":path", "/ready"}, {":authority", "admin"}, {":scheme", "http"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  ASSERT_NE("close", response->headers().getConnectionValue());
+
+  absl::Notification shutdown;
+  test_server_->server().dispatcher().post([&]() {
+    test_server_->server().shutdownAdmin();
+    shutdown.Notify();
+  });
+  shutdown.WaitForNotification();
+
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  EXPECT_EQ("close", response->headers().getConnectionValue());
+}
+
 // Test Prometheus protobuf format with content negotiation via Accept header, and
 // correct response content type.
 TEST_P(IntegrationAdminTest, AdminPrometheusProtobufFormat) {
