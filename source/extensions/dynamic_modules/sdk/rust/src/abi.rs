@@ -15652,9 +15652,8 @@ unsafe extern "C" {
     /** envoy_dynamic_module_on_tls_certificate_selector_config_destroy is called when the certificate
  selector configuration is destroyed in Envoy, after every selector created from it is destroyed.
  The module should release any resources associated with the in-module configuration. This may
- run on a worker thread when a connection outlives the TLS context, or on a thread that calls
- envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_commit, so it must not
- assume the main thread.
+ run on a worker thread when a connection outlives the TLS context, so it must not assume the main
+ thread.
 
  @param config_module_ptr is the pointer to the in-module certificate selector configuration being
  destroyed.*/

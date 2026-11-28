@@ -46,6 +46,7 @@ envoy_cc_library(
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/dynamic_modules:metric_registry",
+        "//source/extensions/dynamic_modules:scheduler_lib",
         "//source/extensions/dynamic_modules/abi",
         "//source/extensions/transport_sockets/tls/cert_selectors/common:async_context_lib",
         "//source/server:generic_factory_context_lib",

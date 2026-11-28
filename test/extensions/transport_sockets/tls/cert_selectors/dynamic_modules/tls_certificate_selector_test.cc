@@ -1418,9 +1418,12 @@ TEST_F(DynamicModuleTlsCertificateSelectorTest, ScheduledEventIsDroppedWhenConfi
   auto* scheduler =
       envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_new(config_.get());
   envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_commit(scheduler, 1);
+  std::weak_ptr<DynamicModuleTlsCertificateSelectorConfig> weak_config = config_;
   selector_.reset();
   factory_.reset();
   config_.reset();
+  // The pending event does not keep the config alive.
+  EXPECT_TRUE(weak_config.expired());
   ASSERT_EQ(1U, posted.size());
   posted[0]();
   envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_delete(scheduler);

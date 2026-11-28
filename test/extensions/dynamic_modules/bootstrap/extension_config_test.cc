@@ -65,7 +65,7 @@ TEST_F(ExtensionConfigTest, GoConfigFailure) {
   }
 }
 
-TEST_F(ExtensionConfigTest, GoConfigDestroyedDuringSchedulerCommit) {
+TEST_F(ExtensionConfigTest, GoConfigDestroyedWhileSchedulerCommits) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       TestEnvironment::runfilesPath(
           "test/extensions/dynamic_modules/test_data/go/libbootstrap_integration_test.so"),
@@ -88,13 +88,13 @@ TEST_F(ExtensionConfigTest, GoConfigDestroyedDuringSchedulerCommit) {
       dispatcher_, context_, context_.store_);
   ASSERT_OK(config);
   EXPECT_TRUE(posting->WaitForNotificationWithTimeout(timeout));
-  // commit holds the last native config reference while posting. Releasing it
-  // re-enters Go configuration destruction before Schedule has returned.
+  // The commit holds no config reference, so the config is destroyed on this thread, after the
+  // in-flight post returns, and Go configuration destruction can run before Schedule returns.
   std::weak_ptr<DynamicModuleBootstrapExtensionConfig> weak_config = config.value();
-  config.value().reset();
   return_from_post->Notify();
-  EXPECT_TRUE(wait_for_commit.value()(TestUtility::DefaultTimeout.count()));
+  config.value().reset();
   EXPECT_TRUE(weak_config.expired());
+  EXPECT_TRUE(wait_for_commit.value()(TestUtility::DefaultTimeout.count()));
 }
 
 TEST_F(ExtensionConfigTest, ConfigNewFail) {

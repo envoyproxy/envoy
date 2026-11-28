@@ -27,6 +27,7 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/dynamic_modules/metric_registry.h"
+#include "source/extensions/dynamic_modules/scheduler.h"
 #include "source/extensions/transport_sockets/tls/cert_selectors/common/async_context.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -189,6 +190,12 @@ public:
   // The main thread dispatcher used to post work back to the main thread.
   Event::Dispatcher& main_thread_dispatcher_;
 
+  // Shared with the schedulers of this config. Initialized once the config is held by a shared
+  // pointer, before the module can create a scheduler, and cleared at the start of the destructor.
+  using SchedulerTarget = Envoy::Extensions::DynamicModules::DynamicModuleSchedulerTarget<
+      DynamicModuleTlsCertificateSelectorConfig>;
+  const std::shared_ptr<SchedulerTarget> scheduler_target_{std::make_shared<SchedulerTarget>()};
+
   // Metrics can only be defined during config_new, so the registry needs no lock. The flag is
   // stored with release ordering once the configuration is created and loaded with acquire ordering
   // when the module defines a metric.
@@ -284,17 +291,9 @@ newDynamicModuleTlsCertificateSelectorConfig(
  * Scheduler that dispatches events to a certificate selector configuration on the main thread. The
  * module can hold it on any thread and call commit() to run the scheduled hook on the main thread.
  */
-class DynamicModuleTlsCertificateSelectorConfigScheduler {
-public:
-  explicit DynamicModuleTlsCertificateSelectorConfigScheduler(
-      std::weak_ptr<DynamicModuleTlsCertificateSelectorConfig> config)
-      : config_(std::move(config)) {}
-
-  void commit(uint64_t event_id);
-
-private:
-  std::weak_ptr<DynamicModuleTlsCertificateSelectorConfig> config_;
-};
+using DynamicModuleTlsCertificateSelectorConfigScheduler =
+    Envoy::Extensions::DynamicModules::DynamicModuleScheduler<
+        DynamicModuleTlsCertificateSelectorConfig>;
 
 /**
  * The Envoy side of a single certificate selection, which the module receives as the selection
