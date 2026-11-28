@@ -346,9 +346,56 @@ absl::Status Cluster::onDnsHostAddOrUpdate(
   Upstream::HostVector hosts_removed;
   RETURN_IF_NOT_OK(addOrUpdateHost(host, host_info, hosts_added, hosts_removed));
   if (!hosts_added.empty() || !hosts_removed.empty()) {
-    updatePriorityState(hosts_added, hosts_removed);
+    if (coalesceHostUpdates()) {
+      queueHostUpdate(hosts_added, hosts_removed);
+    } else {
+      updatePriorityState(hosts_added, hosts_removed);
+    }
   }
   return absl::OkStatus();
+}
+
+bool Cluster::coalesceHostUpdates() {
+  // Outlier detection and health checking attach per-host state from the member update callback,
+  // which has to run before the DNS cache wakes the requests waiting on the host.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dfp_cluster_coalesce_host_updates") &&
+      outlierDetector() == nullptr && healthChecker() == nullptr) {
+    if (host_update_flush_ == nullptr) {
+      host_update_flush_ =
+          main_thread_dispatcher_.createSchedulableCallback([this]() { flushHostUpdates(); });
+    }
+    return true;
+  }
+  // Keep queueing until the scheduled flush runs, so every publish carries its exact delta.
+  return host_update_flush_ != nullptr && host_update_flush_->enabled();
+}
+
+void Cluster::queueHostUpdate(const Upstream::HostVector& hosts_added,
+                              const Upstream::HostVector& hosts_removed) {
+  ASSERT(main_thread_dispatcher_.isThreadSafe());
+  pending_hosts_added_.insert(hosts_added.begin(), hosts_added.end());
+  for (const auto& host : hosts_removed) {
+    // A host added and removed before the next publish is not added, but is still published as
+    // removed: workers may have opened connection pools to it through the host map.
+    pending_hosts_added_.erase(host);
+    pending_hosts_removed_.push_back(host);
+  }
+  if (!host_update_flush_->enabled()) {
+    host_update_flush_->scheduleCallbackNextIteration();
+  }
+}
+
+void Cluster::flushHostUpdates() {
+  Upstream::HostVector added(pending_hosts_added_.begin(), pending_hosts_added_.end());
+  Upstream::HostVector removed = std::move(pending_hosts_removed_);
+  pending_hosts_added_.clear();
+  pending_hosts_removed_.clear();
+  if (!added.empty() || !removed.empty()) {
+    // updatePriorityState rebuilds the full host set from host_map_, so one call publishes every
+    // change queued since the last pass, as one update per worker.
+    updatePriorityState(added, removed);
+  }
 }
 
 void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
@@ -377,7 +424,11 @@ void Cluster::onDnsHostRemove(const std::string& host) {
     host_map_.erase(host);
     ENVOY_LOG(debug, "removing dfproxy cluster host '{}'", host);
   }
-  updatePriorityState({}, hosts_removed);
+  if (coalesceHostUpdates()) {
+    queueHostUpdate({}, hosts_removed);
+  } else {
+    updatePriorityState({}, hosts_removed);
+  }
 }
 
 Upstream::HostSelectionResponse
