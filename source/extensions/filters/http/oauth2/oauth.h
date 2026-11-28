@@ -33,6 +33,11 @@ public:
 
   virtual Http::FilterHeadersStatus onRefreshAccessTokenFailure() PURE;
 
+  // PAR (RFC 9126). On success the request_uri is available from the client's pushedRequestUri().
+  virtual void onPushAuthorizationRequestSuccess() PURE;
+  // PAR failed. The login must fail.
+  virtual void onPushAuthorizationRequestFailure() PURE;
+
   virtual Http::FilterHeadersStatus handleOAuthFailure(const std::string& reason,
                                                        const std::string& extra_details = "") PURE;
 };

@@ -175,6 +175,12 @@ public:
               (const std::string&, const std::string&, const std::string&,
                Envoy::Extensions::HttpFilters::Oauth2::AuthType));
 
+  MOCK_METHOD(void, asyncPushAuthorizationRequest,
+              (const FormParams&, const std::string&, const std::string&,
+               Envoy::Extensions::HttpFilters::Oauth2::AuthType));
+
+  MOCK_METHOD(const std::string&, pushedRequestUri, (), (const, override));
+
   MOCK_METHOD(OAuthState, getState, (), (const, override));
 };
 
@@ -7587,6 +7593,441 @@ TEST_F(OAuth2Test, ChunkedTokenCookiesRoundTripThroughValidator) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::Utility::parseCookieValue(request_headers, "BearerToken"), access_token);
   EXPECT_EQ(config->stats().oauth_token_cookie_reassembled_.value(), 2);
+}
+
+TEST_F(OAuth2Test, RedirectWithUsePushesAuthorizationRequestInsteadOfRedirecting) {
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  p.set_use_par(true);
+  auto* par_endpoint = p.mutable_par_endpoint();
+  par_endpoint->set_cluster("auth.example.com");
+  par_endpoint->set_uri("auth.example.com/_par");
+  par_endpoint->mutable_timeout()->set_seconds(1);
+
+  auto credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+
+  MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+  auto secret_reader = std::make_shared<MockSecretReader>();
+  init(makeFilterConfig(p, secret_reader).value());
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  OAuth2Client::FormParams sent_params;
+  EXPECT_CALL(*oauth_client_, asyncPushAuthorizationRequest(_, TEST_CLIENT_ID, _, _))
+      .WillOnce([&sent_params](const OAuth2Client::FormParams& params, const std::string&,
+                               const std::string&, AuthType) { sent_params = params; });
+  // The browser is not redirected; the redirect happens after the PAR response.
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers, false));
+
+  std::map<std::string, std::string> sent(sent_params.begin(), sent_params.end());
+  EXPECT_NE(sent.find("state"), sent.end());
+  EXPECT_NE(sent.find("code_challenge"), sent.end());
+  EXPECT_EQ("https://traffic.example.com/_oauth", sent.at("redirect_uri"));
+  EXPECT_EQ(sent.find("client_id"), sent.end());
+}
+
+// Tests for the browser redirect sent once a Pushed Authorization Request (RFC 9126) succeeds.
+class OAuth2ParRedirectTest : public OAuth2Test {
+public:
+  static constexpr absl::string_view kRequestUri =
+      "urn:ietf:params:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c";
+  static constexpr absl::string_view kEncodedRequestUri =
+      "urn%3Aietf%3Aparams%3Aoauth%3Arequest_uri%3A6esc_11ACC5bwc014ltc14eY22c";
+
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config parProtoConfig(
+      bool use_par = true,
+      const std::string& authorization_endpoint = "https://auth.example.com/oauth/authorize/",
+      const std::string& client_id = TEST_CLIENT_ID) {
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+    auto* endpoint = p.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    endpoint->mutable_timeout()->set_seconds(1);
+    p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+    p.set_authorization_endpoint(authorization_endpoint);
+    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+    p.add_auth_scopes("user");
+    p.add_auth_scopes("openid");
+    p.set_use_par(use_par);
+    auto* par_endpoint = p.mutable_par_endpoint();
+    par_endpoint->set_cluster("auth.example.com");
+    par_endpoint->set_uri("auth.example.com/_par");
+    par_endpoint->mutable_timeout()->set_seconds(1);
+    auto* credentials = p.mutable_credentials();
+    credentials->set_client_id(client_id);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+    return p;
+  }
+
+  void initPar(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& p) {
+    MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+    init(makeFilterConfig(p, std::make_shared<MockSecretReader>()).value());
+  }
+
+  // Sends an unauthenticated request so that the filter pushes the authorization request, and
+  // returns the parameters that were pushed. The browser must not be answered at this point.
+  OAuth2Client::FormParams startParFlow() {
+    EXPECT_CALL(*validator_, setParams(_, _));
+    EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+    EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillRepeatedly(Return(false));
+    OAuth2Client::FormParams pushed;
+    EXPECT_CALL(*oauth_client_, asyncPushAuthorizationRequest(_, _, _, _))
+        .WillOnce(testing::SaveArg<0>(&pushed));
+    EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+              filter_->decodeHeaders(request_headers_, false));
+    return pushed;
+  }
+
+  // Runs the PAR flow with `request_uri` returned by the PAR endpoint and returns the Location
+  // of the single redirect that is sent.
+  std::string redirectLocationFor(const std::string& request_uri) {
+    startParFlow();
+    std::string location;
+    EXPECT_CALL(*oauth_client_, pushedRequestUri()).WillRepeatedly(ReturnRef(request_uri));
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+        .WillOnce([&location](Http::ResponseHeaderMap& headers, bool) {
+          EXPECT_EQ("302", headers.getStatusValue());
+          location = std::string(headers.getLocationValue());
+        });
+    filter_->onPushAuthorizationRequestSuccess();
+    return location;
+  }
+
+  // The Set-Cookie headers produced by redirectToOAuthServer() with the default cookie settings.
+  static std::vector<std::pair<std::string, std::string>> defaultFlowCookies() {
+    const std::string tail = ";path=/;Max-Age=600;secure;HttpOnly";
+    return {
+        {Http::Headers::get().SetCookie.get(),
+         "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN + tail},
+        {Http::Headers::get().SetCookie.get(), "OauthNonce=" + TEST_CSRF_TOKEN + tail},
+        {Http::Headers::get().SetCookie.get(),
+         "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER + tail},
+        {Http::Headers::get().SetCookie.get(),
+         "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + tail},
+    };
+  }
+
+  Http::TestRequestHeaderMapImpl request_headers_{
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+};
+
+// A successful PAR sends exactly one 302 to the authorization endpoint with only client_id and the
+// encoded request_uri, carrying the CSRF nonce and PKCE code verifier cookies unchanged.
+TEST_F(OAuth2ParRedirectTest, SuccessRedirectsWithClientIdAndRequestUri) {
+  initPar(parProtoConfig());
+
+  // No response may be sent while the PAR request is in flight.
+  bool par_completed = false;
+  Http::TestResponseHeaderMapImpl expected_headers{{Http::Headers::get().Status.get(), "302"}};
+  for (const auto& [key, value] : defaultFlowCookies()) {
+    expected_headers.addCopy(key, value);
+  }
+  expected_headers.addCopy(Http::Headers::get().Location.get(),
+                           absl::StrCat("https://auth.example.com/oauth/authorize/?client_id=",
+                                        TEST_CLIENT_ID, "&request_uri=", kEncodedRequestUri));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true))
+      .WillOnce([&par_completed](Http::ResponseHeaderMap&, bool) { EXPECT_TRUE(par_completed); });
+
+  startParFlow();
+  EXPECT_EQ(0, config_->stats().oauth_unauthorized_rq_.value());
+
+  const std::string request_uri(kRequestUri);
+  EXPECT_CALL(*oauth_client_, pushedRequestUri()).WillRepeatedly(ReturnRef(request_uri));
+  par_completed = true;
+  filter_->onPushAuthorizationRequestSuccess();
+
+  EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(0, config_->stats().oauth_failure_.value());
+}
+
+// The authorization parameters, including query parameters configured on the authorization
+// endpoint, are pushed to the PAR endpoint and never appear in the browser redirect.
+TEST_F(OAuth2ParRedirectTest, RedirectDoesNotExposePushedParameters) {
+  initPar(parProtoConfig(true, "https://auth.example.com/oauth/authorize/?foo=bar"));
+
+  const std::string request_uri(kRequestUri);
+  startParFlow();
+  std::string location;
+  EXPECT_CALL(*oauth_client_, pushedRequestUri()).WillRepeatedly(ReturnRef(request_uri));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+      .WillOnce([&location](Http::ResponseHeaderMap& headers, bool) {
+        location = std::string(headers.getLocationValue());
+      });
+  filter_->onPushAuthorizationRequestSuccess();
+
+  EXPECT_THAT(location, StartsWith("https://auth.example.com/oauth/authorize/?"));
+  const auto params = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(location);
+  EXPECT_THAT(params.data(),
+              UnorderedElementsAre(Pair("client_id", testing::ElementsAre(TEST_CLIENT_ID)),
+                                   Pair("request_uri", testing::ElementsAre(request_uri))));
+  for (const absl::string_view name :
+       {"scope", "state", "redirect_uri", "code_challenge", "code_challenge_method",
+        "response_type", "foo", "client_secret", "client_assertion", "client_assertion_type"}) {
+    EXPECT_THAT(location, Not(HasSubstr(absl::StrCat(name, "=")))) << name;
+  }
+  EXPECT_THAT(location, Not(HasSubstr("asdf_client_secret_fdsa")));
+  EXPECT_THAT(location, Not(HasSubstr(TEST_CODE_CHALLENGE)));
+}
+
+// The parameters missing from the redirect were pushed to the PAR endpoint instead.
+TEST_F(OAuth2ParRedirectTest, OmittedParametersWerePushed) {
+  initPar(parProtoConfig(true, "https://auth.example.com/oauth/authorize/?foo=bar"));
+
+  const OAuth2Client::FormParams pushed = startParFlow();
+  std::map<std::string, std::string> pushed_map(pushed.begin(), pushed.end());
+  EXPECT_EQ("bar", pushed_map["foo"]);
+  EXPECT_EQ("code", pushed_map["response_type"]);
+  EXPECT_EQ("S256", pushed_map["code_challenge_method"]);
+  EXPECT_EQ(TEST_CODE_CHALLENGE, pushed_map["code_challenge"]);
+  EXPECT_FALSE(pushed_map["state"].empty());
+  EXPECT_FALSE(pushed_map["scope"].empty());
+}
+
+// request_uri values with reserved characters are percent-encoded like other Envoy-built query
+// values (everything except ALPHA / DIGIT / "*" / "-" / "." / "_"), and decode back unchanged.
+// Each case is its own test so the filter is initialized once per test.
+void expectEncodedRequestUriRedirect(OAuth2ParRedirectTest& test, const std::string& request_uri,
+                                     const std::string& encoded) {
+  test.initPar(test.parProtoConfig());
+  const std::string location = test.redirectLocationFor(request_uri);
+  EXPECT_EQ(absl::StrCat("https://auth.example.com/oauth/authorize/?client_id=", TEST_CLIENT_ID,
+                         "&request_uri=", encoded),
+            location);
+  const auto params = Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(location);
+  EXPECT_EQ(request_uri, params.getFirstValue("request_uri").value_or(""));
+}
+
+TEST_F(OAuth2ParRedirectTest, RequestUriEncodesUrnColons) {
+  expectEncodedRequestUriRedirect(*this, std::string(kRequestUri), std::string(kEncodedRequestUri));
+}
+
+TEST_F(OAuth2ParRedirectTest, RequestUriEncodesUrlQueryAndFragment) {
+  expectEncodedRequestUriRedirect(
+      *this, "https://as.example.com/par/requests?id=a1&x=y#frag",
+      "https%3A%2F%2Fas.example.com%2Fpar%2Frequests%3Fid%3Da1%26x%3Dy%23frag");
+}
+
+TEST_F(OAuth2ParRedirectTest, RequestUriEncodesPercentSpacePlusAndTilde) {
+  expectEncodedRequestUriRedirect(*this, "urn:example:100%25 off+plus=/~",
+                                  "urn%3Aexample%3A100%2525%20off%2Bplus%3D%2F%7E");
+}
+
+// client_id is percent-encoded as well.
+TEST_F(OAuth2ParRedirectTest, ClientIdIsPercentEncoded) {
+  initPar(parProtoConfig(true, "https://auth.example.com/oauth/authorize/", "my client:id/1"));
+  EXPECT_EQ(absl::StrCat("https://auth.example.com/oauth/authorize/?client_id=my%20client%3Aid%2F1"
+                         "&request_uri=",
+                         kEncodedRequestUri),
+            redirectLocationFor(std::string(kRequestUri)));
+}
+
+// Configured cookie attributes (domain, SameSite, Partitioned) on the nonce and code verifier
+// cookies are kept in the PAR redirect.
+TEST_F(OAuth2ParRedirectTest, RedirectKeepsCookieAttributes) {
+  auto p = parProtoConfig();
+  p.mutable_credentials()->set_cookie_domain("example.com");
+  auto* cookie_configs = p.mutable_cookie_configs();
+  cookie_configs->mutable_oauth_nonce_cookie_config()->set_same_site(
+      envoy::extensions::filters::http::oauth2::v3::CookieConfig::STRICT);
+  auto* code_verifier_config = cookie_configs->mutable_code_verifier_cookie_config();
+  code_verifier_config->set_same_site(
+      envoy::extensions::filters::http::oauth2::v3::CookieConfig::NONE);
+  code_verifier_config->set_partitioned(true);
+  initPar(p);
+
+  const std::string nonce_tail = ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly;"
+                                 "SameSite=Strict";
+  const std::string verifier_tail = ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly;"
+                                    "SameSite=None;Partitioned";
+  Http::TestResponseHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN + nonce_tail},
+      {Http::Headers::get().SetCookie.get(), "OauthNonce=" + TEST_CSRF_TOKEN + nonce_tail},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER + verifier_tail},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + verifier_tail},
+      {Http::Headers::get().Location.get(),
+       absl::StrCat("https://auth.example.com/oauth/authorize/?client_id=", TEST_CLIENT_ID,
+                    "&request_uri=", kEncodedRequestUri)},
+  };
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+
+  startParFlow();
+  const std::string request_uri(kRequestUri);
+  EXPECT_CALL(*oauth_client_, pushedRequestUri()).WillRepeatedly(ReturnRef(request_uri));
+  filter_->onPushAuthorizationRequestSuccess();
+}
+
+// The async client may complete inline, before asyncPushAuthorizationRequest() returns. The
+// redirect is still sent exactly once and decodeHeaders() still stops iteration.
+TEST_F(OAuth2ParRedirectTest, InlineParSuccessSendsOneRedirect) {
+  initPar(parProtoConfig());
+  const std::string request_uri(kRequestUri);
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillRepeatedly(Return(false));
+  EXPECT_CALL(*oauth_client_, pushedRequestUri()).WillRepeatedly(ReturnRef(request_uri));
+  EXPECT_CALL(*oauth_client_, asyncPushAuthorizationRequest(_, _, _, _))
+      .WillOnce([this](const OAuth2Client::FormParams&, const std::string&, const std::string&,
+                       AuthType) { filter_->onPushAuthorizationRequestSuccess(); });
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+      .WillOnce([](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("302", headers.getStatusValue());
+        EXPECT_THAT(std::string(headers.getLocationValue()), HasSubstr("request_uri="));
+      });
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
+}
+
+// The request is never forwarded upstream: decoding stays stopped during PAR and after the
+// redirect is sent.
+TEST_F(OAuth2ParRedirectTest, RequestIsNotForwardedUpstream) {
+  initPar(parProtoConfig());
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  const std::string request_uri(kRequestUri);
+  startParFlow();
+  EXPECT_CALL(*oauth_client_, pushedRequestUri()).WillRepeatedly(ReturnRef(request_uri));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true));
+  filter_->onPushAuthorizationRequestSuccess();
+}
+
+// RFC 8707 resource indicators are sent to the PAR endpoint, not dropped.
+TEST_F(OAuth2ParRedirectTest, ResourcesArePushedToParEndpoint) {
+  auto p = parProtoConfig();
+  p.add_resources("https://api.example.com");
+  initPar(p);
+
+  const OAuth2Client::FormParams pushed = startParFlow();
+  EXPECT_THAT(pushed, testing::Contains(Pair("resource", "https://api.example.com")));
+}
+
+// A second success callback must not send a second response.
+TEST_F(OAuth2ParRedirectTest, RepeatedSuccessCallbackSendsOneRedirect) {
+  initPar(parProtoConfig());
+  startParFlow();
+  const std::string request_uri(kRequestUri);
+  EXPECT_CALL(*oauth_client_, pushedRequestUri()).WillRepeatedly(ReturnRef(request_uri));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  filter_->onPushAuthorizationRequestSuccess();
+  filter_->onPushAuthorizationRequestSuccess();
+  EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
+}
+
+// A success callback with no PAR redirect pending (for example PAR not in use) sends nothing.
+TEST_F(OAuth2ParRedirectTest, SuccessCallbackWithoutPendingRedirectIsIgnored) {
+  initPar(parProtoConfig(/*use_par=*/false));
+  EXPECT_CALL(*oauth_client_, pushedRequestUri()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  filter_->onPushAuthorizationRequestSuccess();
+  EXPECT_EQ(0, config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(0, config_->stats().oauth_failure_.value());
+}
+
+// An empty request_uri fails closed with 401 instead of redirecting.
+TEST_F(OAuth2ParRedirectTest, EmptyRequestUriFailsClosed) {
+  initPar(parProtoConfig());
+  startParFlow();
+  const std::string empty;
+  EXPECT_CALL(*oauth_client_, pushedRequestUri()).WillRepeatedly(ReturnRef(empty));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _,
+                                                 "PAR response did not provide a request_uri"));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce([](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("401", headers.getStatusValue());
+        EXPECT_EQ("", headers.getLocationValue());
+      });
+
+  filter_->onPushAuthorizationRequestSuccess();
+  EXPECT_EQ(0, config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(1, config_->stats().oauth_failure_.value());
+}
+
+// A failed PAR request ends in a 401 and never in an authorization redirect.
+TEST_F(OAuth2ParRedirectTest, ParFailureNeverRedirects) {
+  initPar(parProtoConfig());
+  startParFlow();
+  EXPECT_CALL(*oauth_client_, pushedRequestUri()).Times(0);
+  // The mock's sendLocalReply() encodes the 401 headers followed by a body.
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce([](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("401", headers.getStatusValue());
+        EXPECT_EQ("", headers.getLocationValue());
+      });
+
+  filter_->onPushAuthorizationRequestFailure();
+  EXPECT_EQ(0, config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(1, config_->stats().oauth_failure_.value());
+}
+
+// Destroying the stream while PAR is in flight cancels the client and sends nothing.
+TEST_F(OAuth2ParRedirectTest, StreamDestroyedDuringParCancelsClient) {
+  initPar(parProtoConfig());
+  startParFlow();
+  EXPECT_CALL(*oauth_client_, cancel());
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  filter_->onDestroy();
+}
+
+// With use_par false (even with par_endpoint configured) the standard redirect is unchanged.
+TEST_F(OAuth2ParRedirectTest, UseParDisabledKeepsStandardRedirect) {
+  initPar(parProtoConfig(/*use_par=*/false));
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillRepeatedly(Return(false));
+  EXPECT_CALL(*oauth_client_, asyncPushAuthorizationRequest(_, _, _, _)).Times(0);
+
+  Http::TestResponseHeaderMapImpl expected_headers{{Http::Headers::get().Status.get(), "302"}};
+  for (const auto& [key, value] : defaultFlowCookies()) {
+    expected_headers.addCopy(key, value);
+  }
+  expected_headers.addCopy(Http::Headers::get().Location.get(),
+                           "https://auth.example.com/oauth/authorize/?client_id=" + TEST_CLIENT_ID +
+                               "&code_challenge=" + TEST_CODE_CHALLENGE +
+                               "&code_challenge_method=S256"
+                               "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
+                               "&response_type=code&scope=user%20openid&state=" +
+                               TEST_ENCODED_STATE);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
 }
 
 } // namespace Oauth2

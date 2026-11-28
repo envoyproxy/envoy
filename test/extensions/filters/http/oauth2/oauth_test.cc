@@ -40,6 +40,8 @@ public:
   MOCK_METHOD(void, onRefreshAccessTokenSuccess,
               (const std::string&, const std::string&, const std::string&, std::chrono::seconds));
   MOCK_METHOD(Http::FilterHeadersStatus, onRefreshAccessTokenFailure, ());
+  MOCK_METHOD(void, onPushAuthorizationRequestSuccess, ());
+  MOCK_METHOD(void, onPushAuthorizationRequestFailure, ());
 };
 
 class OAuth2ClientTest : public testing::Test {
@@ -206,6 +208,194 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenIncompleteResponse) {
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+}
+
+TEST_F(OAuth2ClientTest, PushAuthorizationRequestSuccess) {
+  std::string json = R"EOF(
+    {
+      "request_uri": "urn:ietf:params:oauth:request_uri:abc",
+      "expires_in": 60
+    }
+    )EOF";
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().Status.get(), "201"},
+      {Http::Headers::get().ContentType.get(), "application/json"},
+  }};
+  Http::ResponseMessagePtr mock_response(
+      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
+  mock_response->body().add(json);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        EXPECT_EQ("response_type=code&client_id=b&client_secret=c", message->body().toString());
+        callbacks_.push_back(&cb);
+        return &request_;
+      });
+
+  dynamic_cast<OAuth2ClientImpl&>(*client_).setParEndpoint(uri_);
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncPushAuthorizationRequest({{"response_type", "code"}}, "b", "c");
+  EXPECT_EQ(1, callbacks_.size());
+  EXPECT_EQ(OAuth2Client::OAuthState::PendingPushedAuthorizationRequest, client_->getState());
+  EXPECT_CALL(*mock_callbacks_, onPushAuthorizationRequestSuccess());
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  ASSERT_TRUE(popPendingCallback(
+      [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+  EXPECT_EQ(OAuth2Client::OAuthState::Idle, client_->getState());
+  EXPECT_EQ("urn:ietf:params:oauth:request_uri:abc", client_->pushedRequestUri());
+}
+
+TEST_F(OAuth2ClientTest, PushAuthorizationRequestMissingRequestUri) {
+  std::string json = R"EOF(
+    {
+      "expires_in": 60
+    }
+    )EOF";
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().Status.get(), "201"},
+      {Http::Headers::get().ContentType.get(), "application/json"},
+  }};
+  Http::ResponseMessagePtr mock_response(
+      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
+  mock_response->body().add(json);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_.push_back(&cb);
+        return &request_;
+      });
+
+  dynamic_cast<OAuth2ClientImpl&>(*client_).setParEndpoint(uri_);
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncPushAuthorizationRequest({{"response_type", "code"}}, "b", "c");
+  EXPECT_EQ(1, callbacks_.size());
+  EXPECT_CALL(*mock_callbacks_, onPushAuthorizationRequestFailure());
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  ASSERT_TRUE(popPendingCallback(
+      [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+  EXPECT_TRUE(client_->pushedRequestUri().empty());
+}
+
+TEST_F(OAuth2ClientTest, PushAuthorizationRequestHttpFailure) {
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_.push_back(&cb);
+        return &request_;
+      });
+
+  dynamic_cast<OAuth2ClientImpl&>(*client_).setParEndpoint(uri_);
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncPushAuthorizationRequest({{"response_type", "code"}}, "b", "c");
+  EXPECT_EQ(1, callbacks_.size());
+  EXPECT_CALL(*mock_callbacks_, onPushAuthorizationRequestFailure());
+  ASSERT_TRUE(popPendingCallback([&](auto* callback) {
+    callback->onFailure(request_, Http::AsyncClient::FailureReason::Reset);
+  }));
+  EXPECT_EQ(OAuth2Client::OAuthState::Idle, client_->getState());
+}
+
+TEST_F(OAuth2ClientTest, PushAuthorizationRequestSuccessWith200) {
+  std::string json = R"EOF(
+    {
+      "request_uri": "urn:ietf:params:oauth:request_uri:abc",
+      "expires_in": 60
+    }
+    )EOF";
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().Status.get(), "200"},
+      {Http::Headers::get().ContentType.get(), "application/json"},
+  }};
+  Http::ResponseMessagePtr mock_response(
+      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
+  mock_response->body().add(json);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_.push_back(&cb);
+        return &request_;
+      });
+
+  dynamic_cast<OAuth2ClientImpl&>(*client_).setParEndpoint(uri_);
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncPushAuthorizationRequest({{"response_type", "code"}}, "b", "c");
+  EXPECT_CALL(*mock_callbacks_, onPushAuthorizationRequestSuccess());
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  ASSERT_TRUE(popPendingCallback(
+      [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+  EXPECT_EQ("urn:ietf:params:oauth:request_uri:abc", client_->pushedRequestUri());
+}
+
+TEST_F(OAuth2ClientTest, PushAuthorizationRequestEmptyRequestUri) {
+  std::string json = R"EOF(
+    {
+      "request_uri": "",
+      "expires_in": 60
+    }
+    )EOF";
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().Status.get(), "201"},
+      {Http::Headers::get().ContentType.get(), "application/json"},
+  }};
+  Http::ResponseMessagePtr mock_response(
+      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
+  mock_response->body().add(json);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_.push_back(&cb);
+        return &request_;
+      });
+
+  dynamic_cast<OAuth2ClientImpl&>(*client_).setParEndpoint(uri_);
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncPushAuthorizationRequest({{"response_type", "code"}}, "b", "c");
+  EXPECT_CALL(*mock_callbacks_, onPushAuthorizationRequestFailure());
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  ASSERT_TRUE(popPendingCallback(
+      [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+  EXPECT_TRUE(client_->pushedRequestUri().empty());
+}
+
+TEST_F(OAuth2ClientTest, PushAuthorizationRequestHttp400) {
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().Status.get(), "400"},
+      {Http::Headers::get().ContentType.get(), "application/json"},
+  }};
+  Http::ResponseMessagePtr mock_response(
+      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
+  mock_response->body().add(R"EOF({"error": "invalid_request"})EOF");
+
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_.push_back(&cb);
+        return &request_;
+      });
+
+  dynamic_cast<OAuth2ClientImpl&>(*client_).setParEndpoint(uri_);
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncPushAuthorizationRequest({{"response_type", "code"}}, "b", "c");
+  EXPECT_CALL(*mock_callbacks_, onPushAuthorizationRequestFailure());
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  ASSERT_TRUE(popPendingCallback(
+      [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+  EXPECT_TRUE(client_->pushedRequestUri().empty());
+  EXPECT_EQ(OAuth2Client::OAuthState::Idle, client_->getState());
+}
+
+TEST_F(OAuth2ClientTest, PushAuthorizationRequestMissingCluster) {
+  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
+
+  dynamic_cast<OAuth2ClientImpl&>(*client_).setParEndpoint(uri_);
+  client_->setCallbacks(*mock_callbacks_);
+  EXPECT_CALL(*mock_callbacks_, onPushAuthorizationRequestFailure());
+  client_->asyncPushAuthorizationRequest({{"response_type", "code"}}, "b", "c");
+  EXPECT_EQ(OAuth2Client::OAuthState::Idle, client_->getState());
 }
 
 TEST_F(OAuth2ClientTest, RequestAccessTokenErrorResponse) {
