@@ -1,5 +1,7 @@
 #include "source/common/stream_info/filter_state_impl.h"
 
+#include <cstddef>
+
 #include "envoy/common/exception.h"
 
 #include "source/common/common/compiled_string_map.h"
@@ -193,6 +195,25 @@ FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() c
     }
   }
   return objects;
+}
+
+void FilterStateImpl::mergeInto(FilterState& target, FilterState::LifeSpan max_life_span) const {
+  if (life_span_ > max_life_span) {
+    return;
+  }
+  if (const auto* parent_impl = dynamic_cast<const FilterStateImpl*>(parent_.get());
+      parent_impl != nullptr) {
+    parent_impl->mergeInto(target, max_life_span);
+  }
+  for (const auto& [name, obj] : data_storage_) {
+    target.setData(name, obj->data_, life_span_, obj->stream_sharing_);
+  }
+  for (size_t i = 0; i < FilterStateIndexCount; ++i) {
+    if (const auto& obj = indexed_data_storage_[i]; obj != nullptr) {
+      target.setIndexedData(static_cast<FilterStateIndex>(i), obj->data_, life_span_,
+                            obj->stream_sharing_);
+    }
+  }
 }
 
 bool FilterStateImpl::hasDataWithNameInternally(absl::string_view data_name) const {

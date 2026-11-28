@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/common/exception.h"
 
 #include "source/common/stream_info/filter_state_impl.h"
@@ -564,6 +566,53 @@ TEST_F(FilterStateImplTest, IndexedFilterStateUtilities) {
             FilterState::nameToIndex("envoy.network.network_namespace"));
   EXPECT_EQ("envoy.network.network_namespace",
             FilterState::indexToName(FilterStateIndex::NetworkNamespace));
+}
+
+TEST_F(FilterStateImplTest, MergeIntoCopiesUpToMaxLifeSpanAndEnforcesLifespanConflicts) {
+  // Source hierarchy holds FilterChain, Request, and Connection entries (named and indexed).
+  FilterStateImpl source(FilterState::LifeSpan::FilterChain);
+  source.setData("fc_key", std::make_shared<SimpleType>(10), FilterState::LifeSpan::FilterChain,
+                 StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  source.setData("req_key", std::make_shared<SimpleType>(20), FilterState::LifeSpan::Request);
+  source.setData("conn_key", std::make_shared<SimpleType>(30), FilterState::LifeSpan::Connection);
+  source.setIndexedData(FilterStateIndex::UpstreamServerName, std::make_shared<SimpleType>(40),
+                        FilterState::LifeSpan::FilterChain);
+  source.setIndexedData(FilterStateIndex::LocalReplyOwner, std::make_shared<SimpleType>(50),
+                        FilterState::LifeSpan::Request,
+                        StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  source.setIndexedData(FilterStateIndex::OriginalConnectPort, std::make_shared<SimpleType>(60),
+                        FilterState::LifeSpan::Connection);
+
+  FilterStateImpl target(FilterState::LifeSpan::FilterChain);
+  source.mergeInto(target, FilterState::LifeSpan::Request);
+
+  EXPECT_EQ(10, target.getDataReadOnly<SimpleType>("fc_key")->access());
+  EXPECT_EQ(20, target.getDataReadOnly<SimpleType>("req_key")->access());
+  EXPECT_FALSE(target.hasDataWithName("conn_key"));
+  EXPECT_EQ(
+      40,
+      target.getIndexedDataReadOnly<SimpleType>(FilterStateIndex::UpstreamServerName)->access());
+  EXPECT_EQ(50,
+            target.getIndexedDataReadOnly<SimpleType>(FilterStateIndex::LocalReplyOwner)->access());
+  EXPECT_FALSE(target.hasIndexedData(FilterStateIndex::OriginalConnectPort));
+  EXPECT_EQ(2u, target.objectsSharedWithUpstreamConnection()->size());
+
+  // Recreating from target.parent() preserves Request entries and drops FilterChain entries.
+  FilterStateImpl redirected(target.parent(), FilterState::LifeSpan::FilterChain);
+  EXPECT_FALSE(redirected.hasDataWithName("fc_key"));
+  EXPECT_EQ(20, redirected.getDataReadOnly<SimpleType>("req_key")->access());
+  EXPECT_FALSE(redirected.hasIndexedData(FilterStateIndex::UpstreamServerName));
+  EXPECT_EQ(
+      50,
+      redirected.getIndexedDataReadOnly<SimpleType>(FilterStateIndex::LocalReplyOwner)->access());
+
+  // Merging a FilterChain entry onto a target that already holds that key at Request lifespan
+  // triggers standard FilterStateAccessViolation.
+  FilterStateImpl conflict_target(FilterState::LifeSpan::FilterChain);
+  conflict_target.setData("fc_key", std::make_shared<SimpleType>(99),
+                          FilterState::LifeSpan::Request);
+  EXPECT_ENVOY_BUG(source.mergeInto(conflict_target, FilterState::LifeSpan::Request),
+                   "FilterStateAccessViolation");
 }
 
 } // namespace StreamInfo

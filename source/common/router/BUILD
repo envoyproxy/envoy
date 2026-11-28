@@ -399,6 +399,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "upstream_filter_state_lib",
+    srcs = ["upstream_filter_state.cc"],
+    hdrs = ["upstream_filter_state.h"],
+    deps = [
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/stream_info:filter_state_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "upstream_to_downstream_impl_base",
     hdrs = [
         "upstream_to_downstream_impl_base.h",
