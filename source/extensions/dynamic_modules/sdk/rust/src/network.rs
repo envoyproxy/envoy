@@ -85,6 +85,9 @@ pub trait EnvoyNetworkFilterConfig {
   /// Create a new implementation of the [`EnvoyNetworkFilterConfigScheduler`] trait.
   ///
   /// This allows scheduling events to be delivered on the main thread.
+  ///
+  /// This must only be called on the main thread, e.g. during the filter config creation or from
+  /// the main thread hooks. Only the returned scheduler can be used from any thread.
   fn new_config_scheduler(&self) -> impl EnvoyNetworkFilterConfigScheduler + 'static;
 
   /// Get a load shed point of the overload manager by name, to shed load at the module's own point
@@ -724,6 +727,9 @@ pub trait EnvoyNetworkFilter {
   fn above_high_watermark(&self) -> bool;
 
   /// Create a new implementation of the [`EnvoyNetworkFilterScheduler`] trait.
+  ///
+  /// This must only be called on the worker thread that processes the connection, i.e. from within
+  /// the network filter callbacks. Only the returned scheduler can be used from any thread.
   ///
   /// ## Example Usage
   ///

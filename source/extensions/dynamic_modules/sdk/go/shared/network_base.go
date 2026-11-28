@@ -295,8 +295,9 @@ type NetworkFilterHandle interface {
 	// GetScheduler retrieves the scheduler related to this network filter for asynchronous
 	// operations.
 	//
-	// NOTE: This MUST only be called during network filter callbacks. But then the returned
-	// Scheduler can be used later even outside of the callbacks and at other threads.
+	// NOTE: This MUST only be called on the worker thread that processes the connection, i.e.
+	// during network filter callbacks. But then the returned Scheduler can be used later even
+	// outside of the callbacks and at other threads.
 	GetScheduler() Scheduler
 
 	// GetWorkerIndex returns the worker index assigned to the current filter instance.
@@ -340,8 +341,9 @@ type NetworkFilterConfigHandle interface {
 	RecordHistogramValue(id MetricID, value uint64) MetricsResult
 
 	// GetScheduler retrieves a scheduler for deferred task execution in the config context.
-	// This should be called only during the plugin configuration phase, and the returned
-	// Scheduler can be used later even outside of the callbacks and at other threads.
+	// This MUST only be called on the main thread, e.g. during the plugin configuration phase.
+	// But then the returned Scheduler can be used later even outside of the callbacks and at
+	// other threads.
 	GetScheduler() Scheduler
 
 	// GetLoadShedPoint returns a load shed point of the overload manager by name, to shed load at

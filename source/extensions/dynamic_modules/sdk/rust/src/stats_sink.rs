@@ -770,6 +770,9 @@ impl EnvoyStatSinkConfig {
   }
 
   /// Creates a scheduler that posts events to this configuration on the main thread.
+  ///
+  /// This must only be called on the main thread, e.g. during the stats sink config creation or
+  /// from the main thread hooks. Only the returned scheduler can be used from any thread.
   #[must_use]
   pub fn new_config_scheduler(&self) -> impl EnvoyStatSinkConfigScheduler + 'static {
     let scheduler_ptr =

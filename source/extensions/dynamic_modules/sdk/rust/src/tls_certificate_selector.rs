@@ -350,6 +350,10 @@ pub trait EnvoyTlsCertificateSelectorConfig: Send + Sync {
   fn signal_init_complete(&self);
 
   /// Creates a scheduler that posts events to this configuration on the main thread.
+  ///
+  /// This must only be called on the main thread, e.g. during the certificate selector config
+  /// creation or from the main thread hooks. Only the returned scheduler can be used from any
+  /// thread.
   fn new_scheduler(&self) -> Box<dyn EnvoyTlsCertificateSelectorConfigScheduler>;
 }
 

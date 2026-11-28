@@ -20,8 +20,10 @@ type ClusterHandle interface {
 	// drops the call and the cluster stays warming.
 	PreInitComplete()
 
-	// GetScheduler returns a scheduler for main-thread tasks. Obtain it on the
-	// main thread before sharing it with goroutines or worker callbacks. Acquire
+	// GetScheduler returns a scheduler for main-thread tasks. It MUST only be
+	// called on the main thread; but then the returned Scheduler can be used
+	// from any thread. Obtain it on the main thread before sharing it with
+	// goroutines or worker callbacks. Acquire
 	// it in OnInit for compatibility with hosts that establish native cluster
 	// ownership after ClusterConfig.Create returns. Envoy discards pending tasks
 	// at destruction and ignores later scheduling attempts.
