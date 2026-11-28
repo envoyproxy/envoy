@@ -13,6 +13,7 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/integration.h"
+#include "test/integration/utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -3014,34 +3015,42 @@ TEST_P(RedisProxyWithExternalAuthIntegrationTest, ExternalAuthRespectsPipelining
   redis_client->close();
 }
 
-// Shared by the two tags-mode tests below. The proxy, splitter and per-command stats must carry
-// the stat prefix as the envoy.redis_prefix tag with identical flat and tag-extracted names in
-// both the legacy (regex extraction) and explicit tags modes.
+// Exercise the same flat names, extracted names and tags in both store modes.
 void expectRedisStatsTagsAndNames(IntegrationTestServer& server) {
-  auto expect_tags = [](const Stats::Metric& metric, const std::string& tag_extracted_name) {
-    EXPECT_EQ(tag_extracted_name, metric.tagExtractedName())
-        << " for stat '" << metric.name() << "'";
-    ASSERT_EQ(1U, metric.tags().size()) << " for stat '" << metric.name() << "'";
-    EXPECT_EQ("envoy.redis_prefix", metric.tags()[0].name_)
-        << " for stat '" << metric.name() << "'";
-    EXPECT_EQ("redis_stats", metric.tags()[0].value_) << " for stat '" << metric.name() << "'";
+  const std::vector<std::string> commands{"get", "mset"};
+  const Stats::Tag prefix{"envoy.redis_prefix", "redis_stats"};
+  auto expect_counter = [&](const std::string& name, const std::string& extracted,
+                            const Stats::TagVector& tags) {
+    const auto counter = server.counter(name);
+    ASSERT_NE(nullptr, counter) << name;
+    EXPECT_EQ(extracted, counter->tagExtractedName()) << name;
+    EXPECT_THAT(counter->tags(), testing::UnorderedElementsAreArray(tags)) << name;
   };
-
-  const std::vector<std::pair<std::string, std::string>> counter_expectations = {
-      {"redis.redis_stats.downstream_cx_total", "redis.downstream_cx_total"},
-      {"redis.redis_stats.splitter.invalid_request", "redis.splitter.invalid_request"},
-      {"redis.redis_stats.command.get.total", "redis.command.get.total"},
-  };
-  for (const auto& [name, tag_extracted_name] : counter_expectations) {
-    const Stats::CounterSharedPtr counter = server.counter(name);
-    ASSERT_NE(counter, nullptr) << "no counter named '" << name << "'";
-    expect_tags(*counter, tag_extracted_name);
+  expect_counter("redis.redis_stats.downstream_cx_total", "redis.downstream_cx_total", {prefix});
+  expect_counter("redis.redis_stats.splitter.invalid_request", "redis.splitter.invalid_request",
+                 {prefix});
+  for (const auto& command : commands) {
+    expect_counter("redis.redis_stats.command." + command + ".total", "redis.command.total",
+                   {prefix, {"envoy.redis_command", command}});
   }
 
-  const Stats::ParentHistogramSharedPtr latency =
-      server.histogram("redis.redis_stats.command.get.latency");
-  ASSERT_NE(latency, nullptr);
-  expect_tags(*latency, "redis.command.get.latency");
+  const auto latency = server.histogram("redis.redis_stats.command.get.latency");
+  ASSERT_NE(nullptr, latency);
+  EXPECT_EQ("redis.command.latency", latency->tagExtractedName());
+  EXPECT_THAT(latency->tags(),
+              testing::UnorderedElementsAre(prefix, Stats::Tag{"envoy.redis_command", "get"}));
+
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+  const auto response = IntegrationUtil::makeSingleRequest(
+      server.adminAddress(), "GET", "/stats/prometheus?filter=command.*total", "",
+      Http::CodecType::HTTP1);
+  ASSERT_EQ("200", response->headers().getStatusValue());
+  for (const auto& command : commands) {
+    EXPECT_THAT(response->body(),
+                testing::ContainsRegex("envoy_redis_command_total\\{[^}]*envoy_redis_command=\"" +
+                                       command + "\""));
+  }
+#endif
 }
 
 // The tags mode is latched from the process-global runtime flag during server initialization, so

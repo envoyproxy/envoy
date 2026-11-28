@@ -52,6 +52,13 @@ The Redis filter will gather statistics for commands in the
 *redis.<stat_prefix>.command.<command>.* namespace. By default latency stats are in milliseconds and can be
 changed to microseconds by setting the configuration parameter :ref:`latency_in_micros <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.latency_in_micros>` to true.
 
+With default stats tags, Prometheus groups these metrics by command. For example,
+the flat counter ``redis.cache.command.get.total`` is exported as
+``envoy_redis_command_total`` with labels ``envoy_redis_prefix="cache"`` and
+``envoy_redis_command="get"``. A module command such as ``json.set`` retains its full name in the label.
+If a legacy flat name admits two possible ``.command.`` separators, the default extractor leaves
+the command in the metric name.
+
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
