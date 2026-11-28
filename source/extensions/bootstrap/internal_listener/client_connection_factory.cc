@@ -5,6 +5,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/stream_info/connection_state_publisher.h"
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
 namespace Envoy {
@@ -12,6 +13,24 @@ namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace InternalListener {
+
+namespace {
+
+class InternalListenerPassthroughState : public IoSocket::UserSpace::PassthroughStateImpl {
+public:
+  void mergeInto(envoy::config::core::v3::Metadata& metadata,
+                 StreamInfo::FilterState& filter_state) override {
+    PassthroughStateImpl::mergeInto(metadata, filter_state);
+    // Install after the forward transfer so a request cannot supply a publisher belonging to a
+    // different connection. Do not forward this publisher to another upstream connection.
+    filter_state.setData(StreamInfo::ConnectionStatePublisher::key(), std::move(publisher_),
+                         StreamInfo::FilterState::LifeSpan::Connection);
+  }
+
+  std::shared_ptr<StreamInfo::ConnectionStatePublisher> publisher_;
+};
+
+} // namespace
 
 ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>*
     InternalClientConnectionFactory::registry_tls_slot_ = nullptr;
@@ -30,15 +49,22 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
       std::make_shared<Network::Address::EnvoyInternalInstance>("internal_client_address");
 
   ENVOY_LOG(debug, "Internal client connection buffer size {}.", buffer_size_);
+  auto passthrough_state = std::make_unique<InternalListenerPassthroughState>();
+  auto& state = *passthrough_state;
   auto [io_handle_client, io_handle_server] =
       Extensions::IoSocket::UserSpace::IoHandleFactory::createBufferLimitedIoHandlePair(
-          buffer_size_);
+          buffer_size_, std::move(passthrough_state));
 
   auto client_conn = std::make_unique<Network::ClientConnectionImpl>(
       dispatcher,
       std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_client), source_address,
                                                       address),
       source_address, std::move(transport_socket), options, transport_options);
+
+  // ClientConnectionImpl's StreamInfo does not exist during transport socket construction.
+  // Initialize the return path after construction and before the listener can run filters.
+  state.publisher_ = std::make_shared<StreamInfo::ConnectionStatePublisher>(
+      client_conn->streamInfo().filterState());
 
   if (registry_tls_slot_ == nullptr || !registry_tls_slot_->get().has_value()) {
     ENVOY_LOG_MISC(debug,

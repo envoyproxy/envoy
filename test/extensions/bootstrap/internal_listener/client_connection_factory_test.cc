@@ -5,6 +5,9 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/fine_grain_logger.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/connection_state_publisher.h"
+#include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/bootstrap/internal_listener/client_connection_factory.h"
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
@@ -191,6 +194,71 @@ TEST_F(ClientConnectionFactoryTest, ConnectSucceeds) {
   client_conn->close(Network::ConnectionCloseType::NoFlush);
   server_socket->close();
 }
+TEST_F(ClientConnectionFactoryTest, PublishesToTheActualConnectionWithoutRetainingIt) {
+  setupTlsSlot();
+  registry_->setInternalListenerManager(internal_listener_manager_);
+  testing::StrictMock<MockInternalListener> internal_listener;
+  EXPECT_CALL(internal_listener_manager_, findByAddress(_))
+      .Times(2)
+      .WillRepeatedly(testing::Return(Network::InternalListenerOptRef{internal_listener}));
+
+  auto unrelated_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::Connection);
+  std::vector<Network::ConnectionSocketPtr> server_sockets;
+  std::vector<StreamInfo::FilterStateSharedPtr> server_states;
+  EXPECT_CALL(internal_listener, onAccept(_)).Times(2).WillRepeatedly([&](auto&& socket) {
+    auto& handle = dynamic_cast<IoSocket::UserSpace::IoHandle&>(socket->ioHandle());
+    auto state = std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::Connection);
+    envoy::config::core::v3::Metadata metadata;
+    // Simulate a forwarded publisher from a different hop. The newly created connection must
+    // replace it, and must not forward its own publisher transitively.
+    StreamInfo::FilterState::Objects forwarded{
+        {std::make_shared<StreamInfo::ConnectionStatePublisher>(unrelated_state),
+         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection,
+         std::string(StreamInfo::ConnectionStatePublisher::key())}};
+    handle.passthroughState()->initialize(nullptr, forwarded);
+    handle.passthroughState()->mergeInto(metadata, *state);
+    server_states.push_back(std::move(state));
+    server_sockets.push_back(std::move(socket));
+  });
+  std::vector<Network::ClientConnectionPtr> clients;
+  for (int i = 0; i < 2; ++i) {
+    clients.push_back(dispatcher_->createClientConnection(
+        std::make_shared<Network::Address::EnvoyInternalInstance>(listener_addr), nullptr,
+        Network::Test::createRawBufferSocket(), nullptr, nullptr));
+    const auto* publisher = server_states[i]->getDataReadOnly<StreamInfo::ConnectionStatePublisher>(
+        StreamInfo::ConnectionStatePublisher::key());
+    ASSERT_NE(nullptr, publisher);
+    publisher->publish("destination",
+                       std::make_shared<Router::StringAccessorImpl>(std::to_string(i)));
+    EXPECT_TRUE(server_states[i]->objectsSharedWithUpstreamConnection()->empty());
+    EXPECT_FALSE(clients[i]->streamInfo().filterState()->hasDataWithName(
+        StreamInfo::ConnectionStatePublisher::key()));
+  }
+  EXPECT_FALSE(unrelated_state->hasDataWithName("destination"));
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(std::to_string(i), clients[i]
+                                     ->streamInfo()
+                                     .filterState()
+                                     ->getDataReadOnly<Router::StringAccessorImpl>("destination")
+                                     ->asString());
+    // Access logs may retain connection state after the connection itself is destroyed.
+    auto retained_state = clients[i]->streamInfo().filterState();
+    clients[i]->close(Network::ConnectionCloseType::NoFlush);
+    clients[i].reset();
+    EXPECT_TRUE(retained_state->hasDataWithName("destination"));
+    std::weak_ptr<StreamInfo::FilterState> weak_state = retained_state;
+    retained_state.reset();
+    EXPECT_TRUE(weak_state.expired());
+    // The server can finish after the client, without a dangling connection pointer.
+    server_states[i]
+        ->getDataReadOnly<StreamInfo::ConnectionStatePublisher>(
+            StreamInfo::ConnectionStatePublisher::key())
+        ->publish("late", std::make_shared<Router::StringAccessorImpl>("ignored"));
+    server_sockets[i]->close();
+  }
+}
+
 } // namespace
 } // namespace InternalListener
 } // namespace Bootstrap

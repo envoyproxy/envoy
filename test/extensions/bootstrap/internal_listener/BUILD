@@ -18,6 +18,9 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:connection_state_publisher_lib",
+        "//source/common/stream_info:filter_state_lib",
         "//source/extensions/bootstrap/internal_listener:client_connection_factory",
         "//source/extensions/io_socket/user_space:io_handle_impl_lib",
         "//test/mocks/event:event_mocks",

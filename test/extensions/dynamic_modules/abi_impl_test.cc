@@ -1467,6 +1467,9 @@ WEAK_STUB(AccessLoggerGetDynamicMetadataBool,
 WEAK_STUB(AccessLoggerGetFilterState,
           envoy_dynamic_module_callback_access_logger_get_filter_state(nullptr, {nullptr, 0},
                                                                        nullptr))
+WEAK_STUB(AccessLoggerGetUpstreamFilterStateStringField,
+          envoy_dynamic_module_callback_access_logger_get_upstream_filter_state_string_field(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
 WEAK_STUB(AccessLoggerGetHeaderValue,
           envoy_dynamic_module_callback_access_logger_get_header_value(
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},

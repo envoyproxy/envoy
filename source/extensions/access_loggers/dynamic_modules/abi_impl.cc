@@ -742,6 +742,30 @@ bool envoy_dynamic_module_callback_access_logger_get_local_reply_body(
   return ContextAccessor::getLocalReplyBody(*logger->log_context_, result);
 }
 
+bool envoy_dynamic_module_callback_access_logger_get_upstream_filter_state_string_field(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer field,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  *result = {nullptr, 0};
+  const auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamFilterState()) {
+    return false;
+  }
+  const auto* object = upstream->upstreamFilterState()->getDataReadOnlyGeneric(
+      absl::string_view(key.ptr, key.length));
+  if (object == nullptr || !object->hasFieldSupport()) {
+    return false;
+  }
+  const auto value = object->getField(absl::string_view(field.ptr, field.length));
+  const auto* string_value = absl::get_if<absl::string_view>(&value);
+  if (string_value == nullptr) {
+    return false;
+  }
+  *result = {string_value->data(), string_value->size()};
+  return true;
+}
+
 // -----------------------------------------------------------------------------
 // Access Logger Callbacks - Tracing
 // -----------------------------------------------------------------------------

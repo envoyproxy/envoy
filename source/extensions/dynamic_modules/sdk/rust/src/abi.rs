@@ -9455,6 +9455,23 @@ unsafe extern "C" {
 }
 #[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
 unsafe extern "C" {
+    /** Get a string field from the selected upstream connection's filter state without serialization.
+ The returned buffer is borrowed and may only be used during the current log callback.
+
+ @param logger_envoy_ptr is the pointer to the log context.
+ @param key is the filter state object key.
+ @param field is the field name understood by that object.
+ @param result receives the borrowed string, or an empty buffer on failure.
+ @return true for a string field, false if the connection, object, or string field is absent.*/
+    pub fn envoy_dynamic_module_callback_access_logger_get_upstream_filter_state_string_field(
+        logger_envoy_ptr: envoy_dynamic_module_type_access_logger_envoy_ptr,
+        key: envoy_dynamic_module_type_module_buffer,
+        field: envoy_dynamic_module_type_module_buffer,
+        result: *mut envoy_dynamic_module_type_envoy_buffer,
+    ) -> bool;
+}
+#[cfg_attr(envoy_dynamic_module_dll, link(name = "envoy", kind = "raw-dylib"))]
+unsafe extern "C" {
     /** @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
  envoy_dynamic_module_type_attribute_id_RequestId instead.
 

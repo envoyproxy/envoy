@@ -1,4 +1,6 @@
 #include "source/common/network/address_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/extensions/access_loggers/dynamic_modules/access_log.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
@@ -847,6 +849,83 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetRequestIdMissingProvider) {
 // =============================================================================
 // Filter State Tests
 // =============================================================================
+
+TEST_F(DynamicModuleAccessLogAbiTest, ReadsSelectedUpstreamConnectionStateAtLogTime) {
+  Formatter::Context log_context(&request_headers_, &response_headers_, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+  const std::string key_name = TcpProxy::TunnelResponseHeaders::key();
+  const envoy_dynamic_module_type_module_buffer key{key_name.data(), key_name.size()};
+  const envoy_dynamic_module_type_module_buffer field{"x-ip", 4};
+  envoy_dynamic_module_type_envoy_buffer result{"stale", 5};
+  auto read = [&] {
+    return envoy_dynamic_module_callback_access_logger_get_upstream_filter_state_string_field(
+        env_ptr, key, field, &result);
+  };
+  stream_info_.upstream_info_.reset();
+  EXPECT_FALSE(read());
+  EXPECT_EQ(nullptr, result.ptr);
+  EXPECT_EQ(0, result.length);
+  stream_info_.upstream_info_ = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+  EXPECT_FALSE(read());
+  auto first_connection =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::Connection);
+  stream_info_.upstream_info_->setUpstreamFilterState(first_connection);
+  EXPECT_FALSE(read());
+
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{"x-ip", "192.0.2.1"}}};
+  auto tunnel = std::make_shared<TcpProxy::TunnelResponseHeaders>(std::move(headers));
+  first_connection->setData(key_name, tunnel, StreamInfo::FilterState::Connection);
+  // Application headers are a different source, even when they use the same name.
+  response_headers_.addCopy("x-ip", "198.51.100.1");
+  EXPECT_TRUE(read());
+  EXPECT_EQ("192.0.2.1", absl::string_view(result.ptr, result.length));
+  // This is a borrowed field, not an allocated serialization.
+  EXPECT_EQ(absl::get<absl::string_view>(tunnel->getField("x-ip")).data(), result.ptr);
+  EXPECT_TRUE(read()); // A subsequent periodic/final callback sees the same connection state.
+
+  auto second_connection =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::Connection);
+  stream_info_.upstream_info_->setUpstreamFilterState(second_connection);
+  EXPECT_FALSE(read()); // An upstream retry cannot pick up the previous connection's IP.
+  EXPECT_EQ(nullptr, result.ptr);
+  Http::ResponseHeaderMapPtr second_headers{
+      new Http::TestResponseHeaderMapImpl{{"x-ip", "2001:db8::1"}}};
+  second_connection->setData(
+      key_name, std::make_shared<TcpProxy::TunnelResponseHeaders>(std::move(second_headers)),
+      StreamInfo::FilterState::Connection);
+  EXPECT_TRUE(read());
+  EXPECT_EQ("2001:db8::1", absl::string_view(result.ptr, result.length));
+  // The request keeps the selected connection's state alive for its final log.
+  second_connection.reset();
+  EXPECT_TRUE(read());
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_filter_state_string_field(
+      env_ptr, key, {"missing", 7}, &result));
+  EXPECT_EQ(nullptr, result.ptr);
+  first_connection->setData(key_name, std::make_shared<StreamInfo::FilterState::Object>(),
+                            StreamInfo::FilterState::Connection);
+  stream_info_.upstream_info_->setUpstreamFilterState(first_connection);
+  EXPECT_FALSE(read());
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, NonStringUpstreamFieldIsAbsent) {
+  class NumberField : public StreamInfo::FilterState::Object {
+  public:
+    bool hasFieldSupport() const override { return true; }
+    FieldType getField(absl::string_view) const override { return int64_t{42}; }
+  };
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+  auto state = std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::Connection);
+  state->setData("object", std::make_shared<NumberField>(), StreamInfo::FilterState::Connection);
+  stream_info_.upstream_info_ = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+  stream_info_.upstream_info_->setUpstreamFilterState(state);
+  envoy_dynamic_module_type_envoy_buffer result{"stale", 5};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_filter_state_string_field(
+      env_ptr, {"object", 6}, {"field", 5}, &result));
+  EXPECT_EQ(nullptr, result.ptr);
+  EXPECT_EQ(0, result.length);
+}
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetFilterStateAlwaysFalse) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);

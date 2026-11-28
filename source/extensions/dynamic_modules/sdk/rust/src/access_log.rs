@@ -1239,6 +1239,41 @@ impl LogContext {
     }
   }
 
+  /// Read a string field from the connection used by this request's selected upstream attempt.
+  ///
+  /// Returns `None` before a connection is selected or when the object or string field is absent.
+  /// The value is borrowed for this log callback; copy it before retaining it asynchronously.
+  /// For tunnel response headers, use key `envoy.tcp_proxy.propagate_response_headers` and the
+  /// header name as the field. The TCP proxy must enable propagation to the upstream connection.
+  pub fn get_upstream_filter_state_string_field(
+    &self,
+    key: &str,
+    field: &str,
+  ) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: ptr::null_mut(),
+      length: 0,
+    };
+    if unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_filter_state_string_field(
+        self.envoy_ptr,
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: key.as_ptr() as *const _,
+          length: key.len(),
+        },
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: field.as_ptr() as *const _,
+          length: field.len(),
+        },
+        &mut result,
+      )
+    } {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
+    } else {
+      None
+    }
+  }
+
   /// Get the trace ID.
   ///
   /// Note: This is not currently supported and always returns `None`.

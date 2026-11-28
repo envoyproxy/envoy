@@ -1827,6 +1827,11 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_access_logger_get_filter_state, fa
           envoy_dynamic_module_type_access_logger_envoy_ptr,
           envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_access_logger_get_upstream_filter_state_string_field,
+          false, envoy_dynamic_module_type_access_logger_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_envoy_buffer*)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_access_logger_get_header_value, false,
           envoy_dynamic_module_type_access_logger_envoy_ptr,
           envoy_dynamic_module_type_http_header_type, envoy_dynamic_module_type_module_buffer,

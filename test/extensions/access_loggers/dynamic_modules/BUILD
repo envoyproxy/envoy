@@ -86,6 +86,8 @@ envoy_extension_cc_test(
         "tsan": {"build": "default"},
     },
     deps = [
+        "//source/common/stream_info:filter_state_lib",
+        "//source/common/tcp_proxy",
         "//source/extensions/access_loggers/dynamic_modules:access_log_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/http:http_mocks",

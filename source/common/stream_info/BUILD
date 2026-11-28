@@ -9,6 +9,12 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "connection_state_publisher_lib",
+    hdrs = ["connection_state_publisher.h"],
+    deps = ["//envoy/stream_info:filter_state_interface"],
+)
+
+envoy_cc_library(
     name = "stream_info_lib",
     hdrs = ["stream_info_impl.h"],
     deps = [

@@ -54,10 +54,11 @@ public:
   // namespace. If empty, the default key "tunnel_request_id" is used.
   virtual const std::string& requestIDMetadataKey() const PURE;
 
-  // Save HTTP response headers to the downstream filter state.
-  virtual void
-  propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
-                           const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
+  // Save HTTP response headers to the downstream filter state. tunnel_established indicates
+  // whether these headers accepted a tunnel that remains open for application traffic.
+  virtual void propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
+                                        const StreamInfo::FilterStateSharedPtr& filter_state,
+                                        bool tunnel_established) const PURE;
 
   // Save HTTP response trailers to the downstream filter state.
   virtual void

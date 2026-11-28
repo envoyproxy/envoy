@@ -39,6 +39,7 @@
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/shadow_writer_impl.h"
+#include "source/common/stream_info/connection_state_publisher.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -1023,6 +1024,8 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     Server::Configuration::FactoryContext& context)
     : header_parser_(buildTunnelingHeaderParser(config_message.tunneling_config(), context)),
       propagate_response_headers_(config_message.tunneling_config().propagate_response_headers()),
+      propagate_response_headers_to_upstream_connection_(
+          config_message.tunneling_config().propagate_response_headers_to_upstream_connection()),
       propagate_response_trailers_(config_message.tunneling_config().propagate_response_trailers()),
       post_path_(config_message.tunneling_config().post_path()),
       route_stat_name_storage_("tcpproxy_tunneling", context.scope().symbolTable()),
@@ -1079,14 +1082,23 @@ std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream
 }
 
 void TunnelingConfigHelperImpl::propagateResponseHeaders(
-    Http::ResponseHeaderMapPtr&& headers,
-    const StreamInfo::FilterStateSharedPtr& filter_state) const {
-  if (!propagate_response_headers_) {
+    Http::ResponseHeaderMapPtr&& headers, const StreamInfo::FilterStateSharedPtr& filter_state,
+    bool tunnel_established) const {
+  const auto* publisher = propagate_response_headers_to_upstream_connection_ && tunnel_established
+                              ? filter_state->getDataReadOnly<StreamInfo::ConnectionStatePublisher>(
+                                    StreamInfo::ConnectionStatePublisher::key())
+                              : nullptr;
+  if (!propagate_response_headers_ && publisher == nullptr) {
     return;
   }
-  filter_state->setData(TunnelResponseHeaders::key(),
-                        std::make_shared<TunnelResponseHeaders>(std::move(headers)),
-                        StreamInfo::FilterState::LifeSpan::Connection);
+  auto response = std::make_shared<TunnelResponseHeaders>(std::move(headers));
+  if (propagate_response_headers_) {
+    filter_state->setData(TunnelResponseHeaders::key(), response,
+                          StreamInfo::FilterState::LifeSpan::Connection);
+  }
+  if (publisher != nullptr) {
+    publisher->publish(TunnelResponseHeaders::key(), std::move(response));
+  }
 }
 
 void TunnelingConfigHelperImpl::propagateResponseTrailers(

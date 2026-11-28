@@ -53,6 +53,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//source/common/network:connection_lib",
         "//source/common/network:listen_socket_lib",
+        "//source/common/stream_info:connection_state_publisher_lib",
         "//source/extensions/io_socket/user_space:io_handle_impl_lib",
     ],
 )

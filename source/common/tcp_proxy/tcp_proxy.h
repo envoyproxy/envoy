@@ -145,6 +145,14 @@ public:
   TunnelResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers)
       : response_headers_(std::move(response_headers)) {}
   const Http::HeaderMap& value() const override { return *response_headers_; }
+  bool hasFieldSupport() const override { return true; }
+  FieldType getField(absl::string_view name) const override {
+    const auto values = response_headers_->get(Http::LowerCaseString(name));
+    if (values.size() != 1) {
+      return absl::monostate{};
+    }
+    return values[0]->value().getStringView();
+  }
   static const std::string& key();
 
 private:
@@ -182,9 +190,9 @@ public:
   }
 
   const Envoy::Router::FilterConfig& routerFilterConfig() const override { return router_config_; }
-  void
-  propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
-                           const StreamInfo::FilterStateSharedPtr& filter_state) const override;
+  void propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
+                                const StreamInfo::FilterStateSharedPtr& filter_state,
+                                bool tunnel_established) const override;
   void
   propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
                             const StreamInfo::FilterStateSharedPtr& filter_state) const override;
@@ -198,6 +206,7 @@ private:
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
   Formatter::FormatterPtr hostname_fmt_;
   const bool propagate_response_headers_;
+  const bool propagate_response_headers_to_upstream_connection_;
   const bool propagate_response_trailers_;
   std::string post_path_;
   // Request ID extension for tunneling requests. If null, no request ID is generated.

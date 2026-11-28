@@ -259,7 +259,8 @@ private:
       bool is_valid_response = parent_.isValidResponse(*headers);
       const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
       parent_.config_.propagateResponseHeaders(std::move(headers),
-                                               parent_.downstream_info_.filterState());
+                                               parent_.downstream_info_.filterState(),
+                                               is_valid_response && !end_stream);
       if (!is_valid_response || end_stream) {
         parent_.tunnel_response_status_ = response_code;
         if (parent_.conn_pool_callbacks_ != nullptr) {
@@ -395,7 +396,8 @@ private:
       bool is_valid_response = parent_.isValidResponse(*headers);
       const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
       parent_.config_.propagateResponseHeaders(std::move(headers),
-                                               parent_.downstream_info_.filterState());
+                                               parent_.downstream_info_.filterState(),
+                                               is_valid_response && !end_stream);
       if (!is_valid_response || end_stream) {
         parent_.tunnel_response_status_ = response_code;
         if (parent_.conn_pool_callbacks_ != nullptr) {

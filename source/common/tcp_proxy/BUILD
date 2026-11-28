@@ -89,6 +89,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:metadatamatchcriteria_lib",
+        "//source/common/stream_info:connection_state_publisher_lib",
         "//source/common/stream_info:stream_id_provider_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:uint64_accessor_lib",
