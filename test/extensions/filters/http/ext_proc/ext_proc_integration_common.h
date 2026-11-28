@@ -15,11 +15,13 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/ext_proc_test_filters.pb.h"
+#include "test/extensions/filters/http/ext_proc/ext_proc_test_server.h"
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 
 #include "absl/strings/string_view.h"
@@ -104,10 +106,16 @@ public:
 // These tests exercise the ext_proc filter through Envoy's integration test
 // environment by configuring an instance of the Envoy server and driving it
 // through the mock network stack.
-class ExtProcIntegrationTest : public HttpIntegrationTest,
+class ExtProcIntegrationTest : public Event::TestUsingSimulatedTime,
+                               public HttpIntegrationTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 protected:
-  ExtProcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
+  ExtProcIntegrationTest();
+  ~ExtProcIntegrationTest() override;
+
+  void sendGrpcResponse(FakeStream& stream, const ProcessingResponse& response);
+  void startGrpcStream(FakeStream& stream, bool send_headers = true);
+  void finishGrpcStream(FakeStream& stream, Grpc::Status::GrpcStatus status);
 
   void createUpstreams() override;
 
@@ -235,6 +243,8 @@ protected:
   void serverSendTrailerRespDuplexStreamed(FakeStreamPtr& processor_stream, bool response = false);
   void initializeLogConfig(std::string& access_log_path);
   void prependExtProcCompositeFilter(const Protobuf::Message& match_input);
+
+  ExtProcTestServer ext_proc_test_server_;
 
   std::unique_ptr<UniqueSimpleFilterConfig<
       DynamicMetadataToHeadersFilter,

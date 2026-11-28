@@ -37,7 +37,23 @@ using Envoy::Protobuf::Any;
 using Envoy::Protobuf::MapPair;
 using namespace std::chrono_literals;
 
-// ExtProcIntegrationTest::
+ExtProcIntegrationTest::ExtProcIntegrationTest()
+    : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()), ext_proc_test_server_(simTime()) {}
+
+ExtProcIntegrationTest::~ExtProcIntegrationTest() = default;
+
+void ExtProcIntegrationTest::sendGrpcResponse(FakeStream& stream,
+                                              const ProcessingResponse& response) {
+  ASSERT_TRUE(ext_proc_test_server_.sendResponse(stream, response));
+}
+
+void ExtProcIntegrationTest::startGrpcStream(FakeStream& stream, bool send_headers) {
+  ASSERT_TRUE(ext_proc_test_server_.startStream(stream, send_headers));
+}
+
+void ExtProcIntegrationTest::finishGrpcStream(FakeStream& stream, Grpc::Status::GrpcStatus status) {
+  ASSERT_TRUE(ext_proc_test_server_.finishStream(stream, status));
+}
 
 void ExtProcIntegrationTest::createUpstreams() {
   HttpIntegrationTest::createUpstreams();
@@ -110,14 +126,6 @@ void ExtProcIntegrationTest::initializeConfig(
         auto* new_lb_endpoint = endpoints->add_lb_endpoints();
         new_lb_endpoint->MergeFrom(endpoints->lb_endpoints(0));
       }
-    }
-
-    // The filter's default message timeout (200ms) is shorter than a round trip through the
-    // fake ext_proc server can take under the sanitizers. A timeout fails the request with a 504
-    // (or passes it through unprocessed with failure_mode_allow), and the test then fails on
-    // whatever it expected next. Tests of the timeout itself set their own.
-    if (!proto_config_.has_message_timeout()) {
-      proto_config_.mutable_message_timeout()->set_seconds(5);
     }
 
     const std::string valid_grpc_cluster_name = "ext_proc_server_0";
@@ -432,12 +440,12 @@ void ExtProcIntegrationTest::processGenericMessage(
   }
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
   if (first_message) {
-    processor_stream_->startGrpcStream();
+    startGrpcStream(*processor_stream_);
   }
   ProcessingResponse response;
   const bool sendReply = !cb || (*cb)(request, response);
   if (sendReply) {
-    processor_stream_->sendGrpcMessage(response);
+    sendGrpcResponse(*processor_stream_, response);
   }
 }
 
@@ -453,13 +461,13 @@ void ExtProcIntegrationTest::processRequestHeadersMessage(
   ASSERT_TRUE(request.has_request_headers());
   protocolConfigEncoding(request);
   if (first_message) {
-    processor_stream_->startGrpcStream();
+    startGrpcStream(*processor_stream_);
   }
   ProcessingResponse response;
   auto* headers = response.mutable_request_headers();
   const bool sendReply = !cb || (*cb)(request.request_headers(), *headers);
   if (sendReply) {
-    processor_stream_->sendGrpcMessage(response);
+    sendGrpcResponse(*processor_stream_, response);
   }
 }
 
@@ -474,13 +482,13 @@ void ExtProcIntegrationTest::processRequestTrailersMessage(
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
   ASSERT_TRUE(request.has_request_trailers());
   if (first_message) {
-    processor_stream_->startGrpcStream();
+    startGrpcStream(*processor_stream_);
   }
   ProcessingResponse response;
   auto* body = response.mutable_request_trailers();
   const bool sendReply = !cb || (*cb)(request.request_trailers(), *body);
   if (sendReply) {
-    processor_stream_->sendGrpcMessage(response);
+    sendGrpcResponse(*processor_stream_, response);
   }
 }
 
@@ -497,13 +505,13 @@ void ExtProcIntegrationTest::processResponseHeadersMessage(
   protocolConfigEncoding(request);
 
   if (first_message) {
-    processor_stream_->startGrpcStream();
+    startGrpcStream(*processor_stream_);
   }
   ProcessingResponse response;
   auto* headers = response.mutable_response_headers();
   const bool sendReply = !cb || (*cb)(request.response_headers(), *headers);
   if (sendReply) {
-    processor_stream_->sendGrpcMessage(response);
+    sendGrpcResponse(*processor_stream_, response);
   }
 }
 
@@ -521,7 +529,7 @@ void ExtProcIntegrationTest::processRequestBodyMessage(
   protocolConfigEncoding(request);
 
   if (first_message) {
-    processor_stream_->startGrpcStream();
+    startGrpcStream(*processor_stream_);
   }
 
   if (check_downstream_flow_control) {
@@ -536,7 +544,7 @@ void ExtProcIntegrationTest::processRequestBodyMessage(
   auto* body = response.mutable_request_body();
   const bool sendReply = !cb || (*cb)(request.request_body(), *body);
   if (sendReply) {
-    processor_stream_->sendGrpcMessage(response);
+    sendGrpcResponse(*processor_stream_, response);
   }
 }
 
@@ -553,13 +561,13 @@ void ExtProcIntegrationTest::processResponseBodyMessage(
   protocolConfigEncoding(request);
 
   if (first_message) {
-    processor_stream_->startGrpcStream();
+    startGrpcStream(*processor_stream_);
   }
   ProcessingResponse response;
   auto* body = response.mutable_response_body();
   const bool sendReply = !cb || (*cb)(request.response_body(), *body);
   if (sendReply) {
-    processor_stream_->sendGrpcMessage(response);
+    sendGrpcResponse(*processor_stream_, response);
   }
 }
 
@@ -592,13 +600,13 @@ void ExtProcIntegrationTest::processResponseTrailersMessage(
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
   ASSERT_TRUE(request.has_response_trailers());
   if (first_message) {
-    processor_stream_->startGrpcStream();
+    startGrpcStream(*processor_stream_);
   }
   ProcessingResponse response;
   auto* body = response.mutable_response_trailers();
   const bool sendReply = !cb || (*cb)(request.response_trailers(), *body);
   if (sendReply) {
-    processor_stream_->sendGrpcMessage(response);
+    sendGrpcResponse(*processor_stream_, response);
   }
 }
 
@@ -612,14 +620,14 @@ void ExtProcIntegrationTest::processAndRespondImmediately(
   }
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
   if (first_message) {
-    processor_stream_->startGrpcStream();
+    startGrpcStream(*processor_stream_);
   }
   ProcessingResponse response;
   auto* immediate = response.mutable_immediate_response();
   if (cb) {
     (*cb)(*immediate);
   }
-  processor_stream_->sendGrpcMessage(response);
+  sendGrpcResponse(*processor_stream_, response);
 }
 
 void ExtProcIntegrationTest::packTwoResponsesInOneMessage(
@@ -629,7 +637,7 @@ void ExtProcIntegrationTest::packTwoResponsesInOneMessage(
   ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
   ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-  processor_stream_->startGrpcStream();
+  startGrpcStream(*processor_stream_);
 
   ProcessingResponse response1;
   if (immediate_response) {
@@ -659,7 +667,7 @@ void ExtProcIntegrationTest::serverSendNewTimeout(const uint64_t timeout_ms) {
   } else {
     response.mutable_override_message_timeout()->set_seconds(timeout_ms / 1000);
   }
-  processor_stream_->sendGrpcMessage(response);
+  sendGrpcResponse(*processor_stream_, response);
 }
 
 void ExtProcIntegrationTest::newTimeoutWrongConfigTest(const uint64_t timeout_ms) {
@@ -680,10 +688,15 @@ void ExtProcIntegrationTest::newTimeoutWrongConfigTest(const uint64_t timeout_ms
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
                                [&](const HttpHeaders&, HeadersResponse&) {
                                  serverSendNewTimeout(timeout_ms);
-                                 // ext_proc server stays idle for 300ms before sending back the
-                                 // response.
-                                 timeSystem().advanceTimeWaitImpl(300ms);
-                                 return true;
+                                 // 300ms passes the original 200ms deadline; an ignored override
+                                 // must not extend it.
+                                 simTime().advanceTimeWait(300ms);
+                                 // Preserve the late reply, but do not wait for delivery on the
+                                 // side stream that the timeout has already reset.
+                                 ProcessingResponse late_response;
+                                 late_response.mutable_request_headers();
+                                 processor_stream_->sendGrpcMessage(late_response);
+                                 return false;
                                });
   // Verify the new timer is not started and the original timer timeouts,
   // and downstream receives 504.
@@ -780,14 +793,8 @@ void ExtProcIntegrationTest::testGetAndCloseStream() {
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
   // Just close the stream without doing anything
-  processor_stream_->startGrpcStream();
-  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
-
-  // finishGrpcStream() only posts the response on the fake upstream's dispatcher. In
-  // observability mode, the main stream does not wait for the ext_proc stream, so wait until Envoy
-  // has processed the close before allowing the main response to complete and consume its logging
-  // info.
-  test_server_->waitForCounter("http.config_test.ext_proc.server_half_closed", Ge(1));
+  startGrpcStream(*processor_stream_);
+  finishGrpcStream(*processor_stream_, Grpc::Status::Ok);
 
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
@@ -989,7 +996,7 @@ uint32_t ExtProcIntegrationTest::serverReceiveBodyDuplexStreamed(absl::string_vi
 
 void ExtProcIntegrationTest::serverSendHeaderResp(bool first_message, bool response) {
   if (first_message) {
-    processor_stream_->startGrpcStream();
+    startGrpcStream(*processor_stream_);
   }
   ProcessingResponse response_header;
   HeadersResponse* header_resp;
@@ -1004,12 +1011,12 @@ void ExtProcIntegrationTest::serverSendHeaderResp(bool first_message, bool respo
   sh->mutable_append()->set_value(false);
   header->set_key("x-new-header");
   header->set_raw_value("new");
-  processor_stream_->sendGrpcMessage(response_header);
+  sendGrpcResponse(*processor_stream_, response_header);
 }
 
 void ExtProcIntegrationTest::server1SendHeaderResp(bool first_message, bool response) {
   if (first_message) {
-    processor_stream_1_->startGrpcStream();
+    startGrpcStream(*processor_stream_1_);
   }
   ProcessingResponse response_header;
   HeadersResponse* header_resp;
@@ -1024,7 +1031,7 @@ void ExtProcIntegrationTest::server1SendHeaderResp(bool first_message, bool resp
   sh->mutable_append()->set_value(false);
   header->set_key("x-new-header_1");
   header->set_raw_value("new_1");
-  processor_stream_1_->sendGrpcMessage(response_header);
+  sendGrpcResponse(*processor_stream_1_, response_header);
 }
 
 void ExtProcIntegrationTest::serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg,
@@ -1212,7 +1219,9 @@ void ExtProcIntegrationTest::performStandAloneModeOverrideNormal(
   EXPECT_TRUE(request.request_body().end_of_stream());
 
   if (delay_header_response) {
-    timeSystem().advanceTimeWaitImpl(400ms);
+    // 400ms is twice the caller's 200ms timeout: FULL_DUPLEX_STREAMED must have disabled
+    // the message timer even while the header response is still pending.
+    simTime().advanceTimeWait(400ms);
   }
 
   // The server sends back the header response first:
