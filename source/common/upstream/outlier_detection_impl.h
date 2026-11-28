@@ -171,7 +171,7 @@ public:
 
   // handlers for reporting local origin errors
   void localOriginFailure();
-  void localOriginNoFailure();
+  void localOriginNoFailure(bool reset_consecutive = true);
 
   // handlers for setting and getting jitter, used to add a random value
   // to outlier eject time in order to prevent a connection storm when
