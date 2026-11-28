@@ -22,6 +22,7 @@ envoy_cc_library(
         "//source/common/secret:secret_provider_impl_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/dynamic_modules:metric_registry",
+        "//source/extensions/dynamic_modules:scheduler_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -36,6 +37,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//source/common/event:deferred_task",
         "//source/common/tracing:null_span_lib",
+        "//source/extensions/dynamic_modules:scheduler_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )

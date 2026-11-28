@@ -97,6 +97,7 @@ envoy_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:status_utility_lib",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 

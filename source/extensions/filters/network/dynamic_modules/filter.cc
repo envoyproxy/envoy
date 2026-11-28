@@ -48,6 +48,9 @@ void DynamicModuleNetworkFilter::initializeInModuleFilter() {
 }
 
 void DynamicModuleNetworkFilter::destroy() {
+  // Stop the schedulers before the destroy hook, which may join a module thread that is committing
+  // an event.
+  scheduler_target_->clear();
   // Cancel all pending HTTP callouts before destroying the filter.
   for (auto& callout : http_callouts_) {
     if (callout.second->request_ != nullptr) {
@@ -68,8 +71,8 @@ void DynamicModuleNetworkFilter::destroy() {
 void DynamicModuleNetworkFilter::initializeReadFilterCallbacks(
     Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
-  // Publish the worker dispatcher for cross-thread `commit()`; see `dispatcher()`.
   cached_dispatcher_.store(&callbacks.connection().dispatcher(), std::memory_order_release);
+  scheduler_target_->initialize(callbacks.connection().dispatcher(), weak_from_this());
 
   worker_index_ = parseWorkerIndexFromDispatcherName(callbacks.connection().dispatcher().name());
 

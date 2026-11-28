@@ -15,7 +15,8 @@ namespace DynamicModules {
 namespace HttpFilters {
 
 DynamicModuleHttpFilter::~DynamicModuleHttpFilter() {
-  // In a well-formed filter chain onDestroy() has already run and this is a no-op.
+  // In a well-formed filter chain onDestroy() has already run and these are no-ops.
+  scheduler_target_->clear();
   destroy();
 }
 
@@ -43,10 +44,12 @@ void DynamicModuleHttpFilter::onStreamComplete() {
 }
 
 void DynamicModuleHttpFilter::onDestroy() {
+  // Stop the schedulers before the module hooks below, which may join a module thread that is
+  // committing an event.
+  scheduler_target_->clear();
   destroyed_ = true;
   // Read before the cache is cleared below, because destroy() defers the module hook onto it.
   OptRef<Event::Dispatcher> worker_dispatcher = makeOptRefFromPtr(dispatcher());
-  // Clear the cached dispatcher so any concurrent foreign-thread `commit()` short-circuits.
   cached_dispatcher_.store(nullptr, std::memory_order_release);
   // Pair with the register in maybeRegisterDownstreamWatermarkCallbacks(); the underlying
   // removeDownstreamWatermarkCallbacks() asserts the callback was previously added.
